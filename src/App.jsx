@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
+import { supabase } from './supabaseClient'
 import {
   Calendar, Phone, Check, ChevronRight, ChevronLeft, MessageSquare, Bell, User, Camera,
   Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock,
@@ -133,6 +134,15 @@ const DEFAULT_BUSINESS = {
     thresholdMin: 5,                 // show the prompt when this many minutes are left
     ranges: ["5–10", "10–15"],       // delay options offered to choose from
     message: "Hi {client}, it's {provider} at {shop} — I'm just wrapping up and running about {range} min behind. Thanks so much for your patience, see you soon!",
+  },
+  // ---- "It's been a while" buffer: add time for clients overdue past a threshold ----
+  overdueBuffer: {
+    enabled: true,
+    thresholdWeeks: 8,   // if last visit was longer ago than this, add buffer
+    addMinutes: 10,      // how much time to add
+    charge: false,       // false = free bonus (perceived value); true = charge for it
+    chargeAmount: 5,     // $ added when charge = true
+    message: "Welcome back! Since it's been a little while, we've added some extra time to your appointment so we can take care of everything properly.",
   },
   // ---- Tipping shown at checkout ----
   tipping: {
@@ -324,10 +334,12 @@ const DEFAULT_SERVICES = [
   {
     id: "cut", name: "Haircut", category: "Services", price: 42, duration: 45, color: "sage", photo: "photo-1503951914875-452162b0f3f1",
     staff: { dan: { on: true, duration: 35, price: null }, heather: { on: true, duration: 45, price: null } },
+    cutTypes: [
+      { id: "standard", label: "Standard Haircut", desc: "A classic, clean cut.", price: 42, min: 0, images: ["photo-1503951914875-452162b0f3f1", "photo-1622286342621-4bd786c2447c"] },
+      { id: "skinfade", label: "Skin Fade", desc: "Faded sides, blended to the skin.", price: 47, min: 5, images: ["photo-1605497788044-5a32c7078486", "photo-1599351431202-1e0f0137899a"] },
+      { id: "scissor", label: "Precision Scissor Cut", desc: "Scissor-only, textured and natural.", price: 45, min: 5, images: ["photo-1621607512214-68297480165e", "photo-1503951914875-452162b0f3f1"] },
+    ],
     addonGroups: [
-      { id: "skinfade", label: "Skinfade?", type: "choice", photo: "photo-1605497788044-5a32c7078486", options: [
-        { id: "yes", label: "Yes – Skinfade", price: 5, min: 0 }, { id: "no", label: "No – Standard Cut", price: 0, min: 0 },
-      ]},
       { id: "facial", label: "Want a facial?", type: "addon", photo: "photo-1570172619644-dfd03ed5d881", item: {
         name: "The Gentleman's Facial", price: 30, min: 20,
         desc: "A rejuvenating facial featuring steam, deep cleansing, exfoliation, and hydration, finished with a 24K Gold Collagen mask.",
@@ -337,10 +349,16 @@ const DEFAULT_SERVICES = [
   {
     id: "cutbeard", name: "Haircut + Beard", category: "Services", price: 58, duration: 60, color: "gold", photo: "photo-1621607512214-68297480165e",
     staff: { dan: { on: true, duration: 50, price: null }, heather: { on: true, duration: 60, price: null } },
+    cutTypes: [
+      { id: "standard", label: "Standard Haircut", desc: "A classic, clean cut, with beard.", price: 58, min: 0, images: ["photo-1503951914875-452162b0f3f1", "photo-1622286342621-4bd786c2447c"] },
+      { id: "skinfade", label: "Skin Fade", desc: "Faded sides, blended to the skin, with beard.", price: 63, min: 5, images: ["photo-1605497788044-5a32c7078486", "photo-1599351431202-1e0f0137899a"] },
+      { id: "scissor", label: "Precision Scissor Cut", desc: "Scissor-only, textured, with beard.", price: 61, min: 5, images: ["photo-1621607512214-68297480165e", "photo-1503951914875-452162b0f3f1"] },
+    ],
     addonGroups: [
-      { id: "hottowel", label: "Hot Towel / Straight Razor Finish", type: "choice", photo: "photo-1493256338651-d82f7acb2b38", options: [
-        { id: "yes", label: "Yes – Add Hot Towel and Straight Razor", price: 5, min: 10 }, { id: "no", label: "No Thanks!", price: 0, min: 0 },
-      ]},
+      { id: "hottowel", label: "Hot Towel / Straight Razor Finish", type: "addon", photo: "photo-1493256338651-d82f7acb2b38", item: {
+        name: "Hot Towel & Straight Razor", price: 5, min: 10,
+        desc: "A hot towel treatment finished with a straight-razor line-up.",
+      }},
     ],
   },
   { id: "beard", name: "Beard Trim", category: "Services", price: 35, duration: 30, color: "clay", photo: "photo-1517832606299-7ae9b720a186", staff: { dan: { on: true, duration: null, price: null }, heather: { on: true, duration: null, price: null } }, addonGroups: [] },
@@ -499,6 +517,24 @@ export default function App() {
   const [categories, setCategories] = useState(["Services"]); // ordered list of category names
   const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
   const [theme, setTheme] = useState("snow"); // clean light default, app-wide
+
+  // ---- Supabase load + save (debounced) for each piece of state ----
+  // Loads saved data on first open; saves automatically whenever it changes.
+  // Messages are stored inside each client, so saving clients covers messages too.
+  useEffect(() => {
+    supabase.from('app_state').select('data').eq('id', 'business').single().then(({ data }) => { if (data && data.data) setBusiness(data.data); });
+    supabase.from('app_state').select('data').eq('id', 'clients').single().then(({ data }) => { if (data && data.data) setClients(data.data); });
+    supabase.from('app_state').select('data').eq('id', 'appointments').single().then(({ data }) => { if (data && data.data) setAppts(data.data); });
+    supabase.from('app_state').select('data').eq('id', 'waitlist').single().then(({ data }) => { if (data && data.data) setWaitlist(data.data); });
+    supabase.from('app_state').select('data').eq('id', 'providers').single().then(({ data }) => { if (data && data.data) setProviders(data.data); });
+  }, []);
+
+  useEffect(() => { const t = setTimeout(() => { supabase.from('app_state').upsert({ id: 'business', data: business }).then(() => {}); }, 800); return () => clearTimeout(t); }, [business]);
+  useEffect(() => { const t = setTimeout(() => { supabase.from('app_state').upsert({ id: 'clients', data: clients }).then(() => {}); }, 800); return () => clearTimeout(t); }, [clients]);
+  useEffect(() => { const t = setTimeout(() => { supabase.from('app_state').upsert({ id: 'appointments', data: appts }).then(() => {}); }, 800); return () => clearTimeout(t); }, [appts]);
+  useEffect(() => { const t = setTimeout(() => { supabase.from('app_state').upsert({ id: 'waitlist', data: waitlist }).then(() => {}); }, 800); return () => clearTimeout(t); }, [waitlist]);
+  useEffect(() => { const t = setTimeout(() => { supabase.from('app_state').upsert({ id: 'services', data: services }).then(() => {}); }, 800); return () => clearTimeout(t); }, [services]);
+  useEffect(() => { const t = setTimeout(() => { supabase.from('app_state').upsert({ id: 'providers', data: providers }).then(() => {}); }, 800); return () => clearTimeout(t); }, [providers]);
 
   return (
     <div id="app-root" className={`theme-${theme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
@@ -666,6 +702,9 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
   const [intakeFor, setIntakeFor] = useState(null); // service object when running first-time intake
   const [draft, setDraft] = useState(null);
   const [draftAddons, setDraftAddons] = useState({});
+  const [cutType, setCutType] = useState(null); // chosen cut-type id (for services with cutTypes)
+  const [cutPhase, setCutPhase] = useState("type"); // within step 2: "type" then "addons"
+  const [cutCarousel, setCutCarousel] = useState({}); // per-cut-type image index
   const [phone, setPhone] = useState("");
   const [matched, setMatched] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -684,6 +723,11 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
 
   const lineTotal = (entry) => {
     let p = entry.service.price, m = getDuration(matched, entry.service);
+    // cut type overrides the base price/time when present
+    if (entry.service.cutTypes && entry.cutType) {
+      const ct = entry.service.cutTypes.find((c) => c.id === entry.cutType);
+      if (ct) { p = ct.price; m = getDuration(matched, entry.service) + (ct.min || 0); }
+    }
     entry.service.addonGroups.forEach((g) => {
       const sel = entry.addons[g.id];
       if (g.type === "choice" && sel) { const opt = g.options.find((o) => o.id === sel); if (opt) { p += opt.price; m += opt.min; } }
@@ -703,6 +747,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
       return clean.length ? `First visit — ${clean.join(", ")}` : entry.service.name;
     }
     const picks = [];
+    if (entry.service.cutTypes && entry.cutType) { const ct = entry.service.cutTypes.find((c) => c.id === entry.cutType); if (ct) picks.push(ct.label); }
     entry.service.addonGroups.forEach((g) => {
       const sel = entry.addons[g.id];
       if (g.type === "choice" && sel) picks.push(g.options.find((o) => o.id === sel)?.label);
@@ -725,7 +770,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
   }, [selectedDate, dateOptions, allSlots]);
   const dateIsFull = selectedDate && openSlots.length === 0;
 
-  const back = () => { setShowWaitlist(false); if (step <= 1) return onExit(); if (step === 2) { setDraft(null); setDraftAddons({}); setStep(1); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (step <= 1) return onExit(); if (step === 2) { if (draft && draft.cutTypes && draft.cutTypes.length && cutPhase === "addons") { setCutPhase("type"); setCutType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setCutPhase("type"); setStep(1); return; } setStep(step - 1); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -751,12 +796,13 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
             <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300 }}>Choose your service to begin.</p>
             <div style={{ display: "grid", gap: 14 }}>
               {services.map((s) => (
-                <button key={s.id} className="lift card" onClick={() => { if (s.firstTime && s.intake) { setIntakeFor(s); } else { setDraft(s); setDraftAddons({}); setStep(2); } }} style={{ display: "block", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 0, color: "var(--text)", textAlign: "left", overflow: "hidden" }}>
+                <button key={s.id} className="lift card" onClick={() => { if (s.firstTime && s.intake) { setIntakeFor(s); } else { setDraft(s); setDraftAddons({}); setCutType(null); setCutPhase("type"); setStep(2); } }} style={{ display: "block", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 0, color: "var(--text)", textAlign: "left", overflow: "hidden" }}>
                   {s.photo && <div style={{ height: 150, overflow: "hidden" }}><img src={imgUrl(s.photo, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: s.booking && s.booking.description ? "16px 18px 0" : "16px 18px" }}>
                     <div><div style={{ fontSize: 17, marginBottom: 2 }}>{s.name}</div><div style={{ color: "var(--faint)", fontSize: 15 }}>{s.duration} min</div></div>
                     <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)" }}>${s.price}</div>
                   </div>
+                  {s.booking && s.booking.description && <p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5, fontWeight: 300, padding: "8px 18px 16px", margin: 0 }}>{s.booking.description}</p>}
                 </button>
               ))}
             </div>
@@ -775,13 +821,51 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
           />
         )}
 
-        {/* STEP 2 — add-ons (with optional photos) */}
-        {step === 2 && draft && (
+        {/* STEP 2 — cut type (own screen), then add-ons (own screen) */}
+        {step === 2 && draft && draft.cutTypes && draft.cutTypes.length > 0 && cutPhase === "type" && (
+          <div className="fade-up">
+            <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>{draft.name.toUpperCase()}</div>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Which cut would you like?</h2>
+            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>Pick the style closest to what you want — your barber confirms the details in the chair.</p>
+            <div style={{ display: "grid", gap: 24 }}>
+              {draft.cutTypes.map((ct) => {
+                const imgs = ct.images || [];
+                const idx = cutCarousel[ct.id] || 0;
+                const img = imgs[idx];
+                const flip = (dir) => setCutCarousel((c) => { const cur = c[ct.id] || 0; let n = cur + dir; if (n < 0) n = imgs.length - 1; if (n >= imgs.length) n = 0; return { ...c, [ct.id]: n }; });
+                return (
+                  <div key={ct.id}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      {imgs.length > 1 && <button aria-label="Previous example" onClick={() => flip(-1)} style={{ width: 34, height: 34, flexShrink: 0, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><ChevronLeft size={18} /></button>}
+                      <div style={{ flex: 1, position: "relative", aspectRatio: "1/1", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)" }}>
+                        {img && <img src={imgUrl(img, 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
+                        {imgs.length > 1 && <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, display: "flex", gap: 5, justifyContent: "center" }}>{imgs.map((_, di) => (<span key={di} style={{ width: 6, height: 6, borderRadius: "50%", background: di === idx ? "#fff" : "rgba(255,255,255,0.5)" }} />))}</div>}
+                      </div>
+                      {imgs.length > 1 && <button aria-label="Next example" onClick={() => flip(1)} style={{ width: 34, height: 34, flexShrink: 0, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><ChevronRight size={18} /></button>}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", margin: "14px 2px 12px", gap: 12 }}>
+                      <div><div style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.2 }}>{ct.label}</div>{ct.desc && <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{ct.desc}</div>}</div>
+                      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, color: "var(--gold)", whiteSpace: "nowrap" }}>${ct.price}</div>
+                    </div>
+                    <button className="lift" onClick={() => { setCutType(ct.id); setCutPhase("addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none" }}>CHOOSE THIS</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2 — add-ons screen (after cut type, or directly if no cut types) */}
+        {step === 2 && draft && (!draft.cutTypes || draft.cutTypes.length === 0 || cutPhase === "addons") && (
           <div className="fade-up">
             <div style={{ background: "var(--panel)", borderRadius: 12, padding: "14px 18px", marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div><div style={{ fontSize: 16 }}>{draft.name}</div><button onClick={() => { setDraft(null); setStep(1); }} style={{ background: "none", color: "var(--sub)", fontSize: 15, textDecoration: "underline", padding: 0, marginTop: 2 }}>Change</button></div>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, color: "var(--gold)" }}>${draft.price}</div>
+              <div>
+                <div style={{ fontSize: 16 }}>{draft.name}{draft.cutTypes && cutType ? ` · ${draft.cutTypes.find((c) => c.id === cutType)?.label}` : ""}</div>
+                <button onClick={() => { if (draft.cutTypes && draft.cutTypes.length) { setCutPhase("type"); setCutType(null); } else { setDraft(null); setStep(1); } }} style={{ background: "none", color: "var(--sub)", fontSize: 15, textDecoration: "underline", padding: 0, marginTop: 2 }}>Change</button>
+              </div>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, color: "var(--gold)" }}>${draft.cutTypes && cutType ? draft.cutTypes.find((c) => c.id === cutType)?.price : draft.price}</div>
             </div>
+            {draft.addonGroups.length > 0 && <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, marginBottom: 18 }}>Any add-ons?</h2>}
             {draft.addonGroups.length === 0 && <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300 }}>No add-ons for this service. Continue when ready.</p>}
             {draft.addonGroups.map((g) => (
               <div key={g.id} style={{ marginBottom: 28 }}>
@@ -813,7 +897,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 18 }}>Choose your provider</h2>
             <div style={{ display: "grid", gap: 10 }}>
               {providers.map((p) => (
-                <button key={p.id} className="lift" onClick={() => { setCart([...cart, { service: draft, addons: draftAddons, provider: p }]); setDraft(null); setDraftAddons({}); setStep(4); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 18px", color: "var(--text)", textAlign: "left" }}>
+                <button key={p.id} className="lift" onClick={() => { setCart([...cart, { service: draft, addons: draftAddons, cutType, provider: p }]); setDraft(null); setDraftAddons({}); setCutType(null); setCutPhase("type"); setStep(4); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 18px", color: "var(--text)", textAlign: "left" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}><div style={{ width: 44, height: 44, borderRadius: "50%", background: p.color + "22", color: p.color, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 18 }}>{p.id === "anyone" ? <User size={20} /> : p.name.charAt(0)}</div><div><div style={{ fontSize: 16 }}>{p.name}</div><div style={{ fontSize: 14, color: "var(--faint)", letterSpacing: 1 }}>{p.id === "anyone" ? "Any available day" : daysSummary(p.hours)}</div></div></div>
                   <ChevronRight size={18} style={{ color: "var(--faint)" }} />
                 </button>
@@ -848,8 +932,33 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
         {/* STEP 6 — date/time + waitlist */}
         {step === 6 && (
           <div className="fade-up">
-            {matched && <div style={{ background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 12, padding: "14px 16px", marginBottom: 20, display: "flex", gap: 12, alignItems: "center" }}><Sparkles size={18} style={{ color: "var(--gold)", flexShrink: 0 }} /><div style={{ fontSize: 15, lineHeight: 1.5 }}>Welcome back, <strong>{matched.name.split(" ")[0]}</strong>. We've reserved <strong style={{ color: "var(--gold)" }}>{cartMin} min</strong> based on your past visits.</div></div>}
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 16 }}>Pick a date</h2>
+            {matched && (() => {
+              const g = (matched.gallery || []); const last = g.length ? g[g.length - 1] : null;
+              const usualProv = providers.find((p) => p.id === matched.provider);
+              return (
+                <div style={{ background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 12, padding: "14px 16px", marginBottom: 20, display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <Sparkles size={18} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
+                  <div style={{ fontSize: 15, lineHeight: 1.5 }}>
+                    Welcome back, <strong>{matched.name.split(" ")[0]}</strong>. We've reserved <strong style={{ color: "var(--gold)" }}>{cartMin} min</strong> based on your past visits.
+                    {(last || usualProv) && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 6, lineHeight: 1.5 }}>{last && last.note ? `Last time: ${last.note}.` : ""}{usualProv && usualProv.id !== "anyone" ? ` Usually with ${usualProv.name}.` : ""}</div>}
+                  </div>
+                </div>
+              );
+            })()}
+            {matched && matched.lastVisit && business.overdueBuffer && business.overdueBuffer.enabled !== false && (() => {
+              const ob = business.overdueBuffer;
+              const weeksAgo = (Date.now() - new Date(matched.lastVisit)) / (7 * 86400000);
+              if (weeksAgo < (ob.thresholdWeeks || 8)) return null;
+              return (
+                <div style={{ background: "rgba(122,158,159,0.10)", border: "1px solid rgba(122,158,159,0.30)", borderRadius: 12, padding: "14px 16px", marginBottom: 20, display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <Clock size={18} style={{ color: "#5E8C8C", flexShrink: 0, marginTop: 2 }} />
+                  <div style={{ fontSize: 14.5, lineHeight: 1.5 }}>
+                    {ob.message || "Since it's been a while, we've added a little extra time."}
+                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 6 }}>+{ob.addMinutes || 10} min added{ob.charge ? ` · +$${ob.chargeAmount || 5}` : " · no extra charge"}</div>
+                  </div>
+                </div>
+              );
+            })()}
             <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 22 }}>
               {dateOptions.map((d, i) => {
                 const on = selectedDate && d.toDateString() === selectedDate.toDateString();
@@ -990,6 +1099,7 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
   const [i, setI] = useState(0);
   const [answers, setAnswers] = useState({});
   const [lightbox, setLightbox] = useState(null);
+  const [carousel, setCarousel] = useState({}); // { [optionId]: currentImageIndex }
   const cur = steps[i];
   const choose = (optId) => {
     const next = { ...answers, [cur.key]: optId };
@@ -998,13 +1108,14 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
     else onDone(next);
   };
   const back = () => { if (i === 0) onCancel(); else setI(i - 1); };
+  const stepImage = (optId, total, dir) => setCarousel((c) => { const cur = c[optId] || 0; let n = cur + dir; if (n < 0) n = total - 1; if (n >= total) n = 0; return { ...c, [optId]: n }; });
 
   return (
     <div className="fade-up">
       <button onClick={back} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", color: "var(--sub)", fontSize: 15, marginBottom: 18 }}><ArrowLeft size={18} /> Back</button>
-      <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>FIRST VISIT · STEP {i + 1} OF {steps.length}</div>
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 6, lineHeight: 1.1 }}>{cur.label}</h2>
-      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.5 }}>This helps us set aside exactly the right amount of time for you.</p>
+      <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>FIRST VISIT · STEP {i + 1} OF {steps.length}</div>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>{cur.label}</h2>
+      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>Pick the look closest to what you want — it helps us reserve exactly the right time for you.</p>
 
       {cur.kind === "list" && (
         <div style={{ display: "grid", gap: 12 }}>
@@ -1018,26 +1129,39 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
       )}
 
       {cur.kind === "gallery" && (
-        <div style={{ display: "grid", gap: 16 }}>
-          {cur.options.map((o) => (
-            <div key={o.id} className="card" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden" }}>
-              <div style={{ padding: "16px 18px 12px" }}>
-                <div style={{ fontSize: 18, marginBottom: 2 }}>{o.label}</div>
-                {o.desc && <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.4 }}>{o.desc}</div>}
-              </div>
-              <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "0 18px 14px" }}>
-                {(o.images || []).map((img, idx) => (
-                  <button key={idx} onClick={() => setLightbox(img)} style={{ flexShrink: 0, width: 96, height: 96, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", padding: 0, background: "var(--panel2)" }}>
-                    <img src={imgUrl(img, 240)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        <div style={{ display: "grid", gap: 24 }}>
+          {cur.options.map((o) => {
+            const imgs = o.images || [];
+            const idx = carousel[o.id] || 0;
+            const img = imgs[idx];
+            return (
+              <div key={o.id}>
+                {/* medium image with side arrows */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {imgs.length > 1 && (
+                    <button aria-label="Previous example" onClick={() => stepImage(o.id, imgs.length, -1)} style={{ width: 34, height: 34, flexShrink: 0, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><ChevronLeft size={18} /></button>
+                  )}
+                  <button onClick={() => img && setLightbox(img)} style={{ flex: 1, position: "relative", aspectRatio: "1/1", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", padding: 0 }}>
+                    {img && <img src={imgUrl(img, 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
+                    {imgs.length > 1 && (
+                      <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, display: "flex", gap: 5, justifyContent: "center" }}>
+                        {imgs.map((_, di) => (<span key={di} style={{ width: 6, height: 6, borderRadius: "50%", background: di === idx ? "#fff" : "rgba(255,255,255,0.5)" }} />))}
+                      </div>
+                    )}
                   </button>
-                ))}
+                  {imgs.length > 1 && (
+                    <button aria-label="Next example" onClick={() => stepImage(o.id, imgs.length, 1)} style={{ width: 34, height: 34, flexShrink: 0, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><ChevronRight size={18} /></button>
+                  )}
+                </div>
+                <div style={{ margin: "14px 2px 12px" }}>
+                  <div style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.2 }}>{o.label}</div>
+                  {o.desc && <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
+                </div>
+                <button className="lift" onClick={() => choose(o.id)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none" }}>CHOOSE THIS</button>
               </div>
-              <div style={{ padding: "0 18px 18px" }}>
-                <button className="lift" onClick={() => choose(o.id)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none" }}>THIS IS WHAT I WANT</button>
-              </div>
-            </div>
-          ))}
-          <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.5 }}>Tap any photo to see it larger. Not sure? Pick the closest one — your barber will confirm in the chair.</p>
+            );
+          })}
+          <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.5 }}>Use the arrows to see more examples. Not sure? Pick the closest — your barber will confirm in the chair.</p>
         </div>
       )}
 
@@ -1278,6 +1402,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const defaultBooking = () => ({ available: true, description: "", customPrice: false, promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false });
   const blank = { id: "", name: "", price: "", duration: "", color: "sage", photo: "", category: cats[0], addonGroups: [], staff: {}, booking: defaultBooking() };
   const [form, setForm] = useState(blank);
+  const dragId = useRef(null);
 
   // ensure the form always has an entry for every current staff member
   const ensureStaff = (s) => { const m = { ...(s.staff || {}) }; staffList.forEach((p) => { if (!m[p.id]) m[p.id] = { on: true, duration: null, price: null }; }); return m; };
@@ -1554,7 +1679,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     showToast(`Category "${name}" removed; its services moved to "${fallback}".`);
   };
   // drag-and-drop (works in the artifact frame; arrows are the mobile-safe fallback)
-  const dragId = useRef(null);
   const onDragStart = (id) => (e) => { dragId.current = id; e.dataTransfer && (e.dataTransfer.effectAllowed = "move"); };
   const onDropOn = (targetId, targetCat) => (e) => {
     e.preventDefault();
@@ -2289,6 +2413,57 @@ function RunningLateEditor({ r, onChange }) {
           <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>Sent as an in-app notification — no text message.</div>
           <textarea value={r.message || ""} onChange={(e) => set({ message: e.target.value })} rows={4} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", resize: "vertical", lineHeight: 1.5 }} />
           <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.5 }}>Tags you can use: <strong style={{ color: "var(--sub)" }}>{"{client}"}</strong> name, <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> barber, <strong style={{ color: "var(--sub)" }}>{"{shop}"}</strong>, <strong style={{ color: "var(--sub)" }}>{"{range}"}</strong> minutes behind.</div>
+        </div>
+      </>)}
+    </div>
+  );
+}
+
+// "It's been a while" buffer — add time for overdue clients; charge or gift it.
+function OverdueBufferEditor({ b, onChange }) {
+  const set = (patch) => onChange({ ...b, ...patch });
+  const Toggle = ({ on, onClick }) => (
+    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+  );
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+        <div><div style={{ fontSize: 15.5, fontWeight: 600 }}>Add time for overdue clients</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>When someone hasn't visited in a while, automatically pad their appointment so there's enough time.</div></div>
+        <Toggle on={b.enabled} onClick={() => set({ enabled: !b.enabled })} />
+      </div>
+
+      {b.enabled && (<>
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Counts as "a while" after</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>How long since their last visit before time gets added.</div>
+          <Stepper value={b.thresholdWeeks || 8} onChange={(v) => set({ thresholdWeeks: v })} min={1} max={52} step={1} suffix="weeks" />
+        </div>
+
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Extra time to add</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>How many minutes to pad the appointment.</div>
+          <Stepper value={b.addMinutes || 10} onChange={(v) => set({ addMinutes: v })} min={5} max={60} step={5} suffix="min" />
+        </div>
+
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 10 }}>How to handle it</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => set({ charge: false })} style={{ flex: 1, padding: "12px 8px", borderRadius: 10, border: `1px solid ${!b.charge ? "var(--gold)" : "var(--border)"}`, background: !b.charge ? "rgba(176,141,87,0.12)" : "transparent", color: !b.charge ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: !b.charge ? 600 : 400 }}>Free bonus</button>
+            <button onClick={() => set({ charge: true })} style={{ flex: 1, padding: "12px 8px", borderRadius: 10, border: `1px solid ${b.charge ? "var(--gold)" : "var(--border)"}`, background: b.charge ? "rgba(176,141,87,0.12)" : "transparent", color: b.charge ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: b.charge ? 600 : 400 }}>Charge for it</button>
+          </div>
+          {b.charge && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 8 }}>Amount to add</div>
+              <Stepper value={b.chargeAmount || 5} onChange={(v) => set({ chargeAmount: v })} min={0} max={100} step={5} suffix="$" />
+            </div>
+          )}
+          <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>{b.charge ? "The client sees the added time and small fee, framed as a more thorough visit." : "The client is told the extra time is on the house — they feel looked-after, and your schedule stays protected."}</p>
+        </div>
+
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
+          <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Message to the client</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>Shown at booking when extra time is added.</div>
+          <textarea value={b.message || ""} onChange={(e) => set({ message: e.target.value })} rows={4} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", resize: "vertical", lineHeight: 1.5 }} />
         </div>
       </>)}
     </div>
@@ -3171,6 +3346,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       status: form.runningLate?.enabled === false ? "Off" : `On · ${form.runningLate?.thresholdMin || 5} min warning`,
       keywords: "running late behind next client wrapping up notify prompt delay minutes message schedule overrun",
       editor: <RunningLateEditor r={form.runningLate || {}} onChange={(rl) => setForm({ ...form, runningLate: { ...(form.runningLate || {}), ...rl } })} />,
+    },
+    {
+      id: "overduebuffer", title: "It's Been a While", icon: Clock, category: "Calendar & Appointments",
+      status: form.overdueBuffer?.enabled === false ? "Off" : `+${form.overdueBuffer?.addMinutes || 10} min after ${form.overdueBuffer?.thresholdWeeks || 8} wks`,
+      keywords: "overdue buffer been a while extra time add minutes long time since last visit haircut more to cut charge free bonus perceived value lapsed returning",
+      editor: <OverdueBufferEditor b={form.overdueBuffer || {}} onChange={(ob) => setForm({ ...form, overdueBuffer: { ...(form.overdueBuffer || {}), ...ob } })} />,
     },
     {
       id: "policy", title: "Cancel & Reschedule", icon: AlertCircle, category: "Calendar & Appointments",
