@@ -1,0 +1,5227 @@
+import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
+import {
+  Calendar, Phone, Check, ChevronRight, ChevronLeft, MessageSquare, Bell, User, Camera,
+  Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock,
+  Settings, Image as ImageIcon, Trash2, Upload, GripVertical, DollarSign,
+  MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
+  BarChart3, TrendingUp
+} from "lucide-react";
+
+// ============================================================
+// PHOTO LIBRARY — curated "looks" baked in for the prototype.
+// In the live product this becomes a live Unsplash/Pexels feed.
+// (Using Unsplash CDN URLs as stand-ins for the curated set.)
+// ============================================================
+const PHOTO_LIBRARY = {
+  Haircuts: [
+    "photo-1503951914875-452162b0f3f1", "photo-1599351431202-1e0f0137899a",
+    "photo-1622286342621-4bd786c2447c", "photo-1605497788044-5a32c7078486",
+  ],
+  Beard: [
+    "photo-1621607512214-68297480165e", "photo-1517832606299-7ae9b720a186",
+    "photo-1635273051937-a0cc8b6e8e8e", "photo-1582893561942-d61adcb2e534",
+  ],
+  Shave: [
+    "photo-1503951914875-452162b0f3f1", "photo-1493256338651-d82f7acb2b38",
+    "photo-1599351431613-18ef1fdd09e3", "photo-1596728325488-58c87691e9af",
+  ],
+  Spa: [
+    "photo-1570172619644-dfd03ed5d881", "photo-1596755389378-c31d21fd1273",
+    "photo-1512290923902-8a9f81dc236c", "photo-1519823551278-64ac92734fb1",
+  ],
+};
+const imgUrl = (id, w = 400) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=70`;
+// Portrait/headshot stand-ins for staff profile pictures.
+const STAFF_PORTRAITS = [
+  "photo-1622286342621-4bd786c2447c", "photo-1595959183082-7b570b7e08e2",
+  "photo-1500648767791-00dcc994a43e", "photo-1494790108377-be9c29b29330",
+  "photo-1607990281513-2c110a25bd8c", "photo-1544005313-94ddf0286df2",
+  "photo-1568602471122-7832951cc4c5", "photo-1438761681033-6461ffad8d80",
+  "photo-1507003211169-0a1dd7228f2d", "photo-1599566150163-29194dcaad36",
+  "photo-1580489944761-15a19d654956", "photo-1534528741775-53994a69daeb",
+];
+// Guarantees a profile photo for any staff member: their own if set,
+// otherwise a stable portrait derived from their id (never blank).
+const hashStr = (str) => { let h = 0; const s = String(str || ""); for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; } return Math.abs(h); };
+const staffPhoto = (p) => (p && p.photo) ? p.photo : STAFF_PORTRAITS[hashStr(p && p.id) % STAFF_PORTRAITS.length];
+// Clients keep their colored initial unless a photo has been set explicitly.
+const clientPhoto = (c) => (c && c.photo) ? c.photo : null;
+// Reusable circular avatar — edge-to-edge photo or centered initial.
+// Renders identically everywhere so staff/client avatars never break.
+function Avatar({ size = 42, photo = null, initial = "", color = "var(--gold)", fontSize, style = {}, children }) {
+  const fs = fontSize || Math.round(size * 0.44);
+  const base = color || "var(--gold)";
+  return (
+    <div style={{ width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0, position: "relative", background: photo ? "var(--panel2)" : base, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontWeight: 500, fontSize: fs, ...style }}>
+      {photo
+        ? <img src={imgUrl(photo, Math.max(120, size * 3))} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        : (initial || null)}
+      {children}
+    </div>
+  );
+}
+const ALL_LIBRARY = Object.entries(PHOTO_LIBRARY).flatMap(([cat, ids]) => ids.map((id) => ({ id, cat })));
+
+// ============================================================
+// SERVICE COLOR PALETTE — muted, premium tones (editable per service)
+// Plus the status colors that OVERRIDE service color on the calendar.
+// ============================================================
+const SERVICE_PALETTE = [
+  { id: "sage", name: "Sage", hex: "#7A9E9F" },
+  { id: "gold", name: "Gold", hex: "var(--gold)" },
+  { id: "clay", name: "Clay", hex: "#C2703D" },
+  { id: "slate", name: "Slate", hex: "#6B7A99" },
+  { id: "olive", name: "Olive", hex: "#8A8A5C" },
+  { id: "mauve", name: "Mauve", hex: "#9C7A8E" },
+  { id: "teal", name: "Teal", hex: "#5E8C8C" },
+  { id: "sand", name: "Sand", hex: "#A89878" },
+];
+const STATUS_COLORS = {
+  "checked-in": "#8B6FB0", // purple — client has arrived
+  "in-service": "#D98BA0", // reddish/pink — in the chair
+  done: "var(--border2)",         // muted/greyed — finished, recedes
+};
+const hexById = (id) => (SERVICE_PALETTE.find((c) => c.id === id) || SERVICE_PALETTE[0]).hex;
+
+// ============================================================
+// DEFAULT BUSINESS CONFIG — fully editable in Settings
+// ============================================================
+const DEFAULT_BUSINESS = {
+  name: "MERIDIAN",
+  legalName: "Meridian Studio",
+  address: "2077 NE Town Center Dr",
+  address2: "Suite 120",
+  cityZip: "Beaverton, OR 97006",
+  email: "hello@meridianstudio.com",
+  phones: [{ id: "ph1", label: "Main", number: "(503) 555-0142" }],
+  logoText: "", // optional custom logo wordmark (falls back to business name)
+  showAddonPhotos: true, // owner preference toggle
+  weekStartsOn: 0, // 0=Sunday … 6=Saturday — first day of the calendar week
+  // Shop open hours per weekday (0=Sun … 6=Sat), times in minutes from midnight
+  hours: { 0: { on: true, start: 600, end: 900 }, 1: { on: true, start: 540, end: 1020 }, 2: { on: false, start: 540, end: 1020 }, 3: { on: false, start: 540, end: 1020 }, 4: { on: true, start: 540, end: 1020 }, 5: { on: true, start: 540, end: 1020 }, 6: { on: true, start: 540, end: 1020 } },
+  // Waitlist auto-notify behavior when a slot frees up
+  waitlist: { mode: "ask", order: "longest", delayMin: 30 }, // mode: ask|silent · order: longest|all
+  // Softened, neutral default policy — every business edits this freely
+  policy: "We kindly ask for at least 24 hours' notice to cancel or reschedule so we can offer the time to someone else. A card is required to reserve your appointment; you won't be charged unless you miss it without notice. Thank you for understanding.",
+  // ---- Online booking rules ----
+  booking: {
+    enabled: true,
+    leadTimeMin: 120,        // minimum notice before an appointment, in minutes
+    horizonDays: 60,         // how far out clients can book
+    sameDayCutoff: "",       // e.g. "14:00" — no same-day bookings after this (blank = off)
+    allowMultiple: true,     // multiple services per booking
+    clientType: "all",       // all | returning | new
+    requireCard: true,
+    deposit: { mode: "none", amount: 0 }, // none | fixed | percent
+    bufferBefore: 0,         // minutes pad before each appt
+    bufferAfter: 5,          // minutes pad after each appt
+    dailyCap: 0,             // 0 = unlimited online bookings per day
+    fillGapsFirst: true,     // Boulevard-style: offer gap-filling slots first
+    rebookNudgeWeeks: 4,     // suggest rebooking after N weeks (0 = off)
+  },
+  // ---- Waiting Room / check-in behavior (Calendar & Appointments → Waiting Room) ----
+  waitingRoom: {
+    selfCheckIn: false,        // (needs link/QR) clients can check themselves in
+    autoReadyMessage: true,    // send a "we're ready for you" notice on Notify·Ready
+    readyMessage: "{provider} is ready for you and will meet you in front.",
+    showWaitingList: true,     // show a live "who's waiting" panel
+    notifyOnArrival: true,     // ping the provider when a client checks in
+  },
+  // ---- Running-late alert: prompt to notify the next client when wrapping up ----
+  runningLate: {
+    enabled: true,
+    thresholdMin: 5,                 // show the prompt when this many minutes are left
+    ranges: ["5–10", "10–15"],       // delay options offered to choose from
+    message: "Hi {client}, it's {provider} at {shop} — I'm just wrapping up and running about {range} min behind. Thanks so much for your patience, see you soon!",
+  },
+  // ---- Tipping shown at checkout ----
+  tipping: {
+    enabled: true,
+    presets: [18, 20, 25],   // percentage buttons clients see
+    allowCustom: true,        // let them enter a custom amount
+    allowNoTip: true,         // show a "No tip" option
+    smartDefault: 20,         // pre-highlighted suggestion
+  },
+  // ---- Checkout / payment behavior (Payments & Checkout → Checkout Settings) ----
+  checkout: {
+    customMethods: ["Cash", "Card", "Venmo"], // accepted payment method labels
+    requireSignature: "over",  // never | always | over (over a threshold)
+    signatureThreshold: 25,    // $ amount above which a signature is asked
+    changeCalculator: true,    // show change-due calculator on cash payments
+    requireStaffAssignment: true, // every line item must have a staff member
+    clientSelfCheckout: false, // (needs payment backend) let clients pay on their own device
+    receiptDefault: "ask",     // ask | email | text | print | none
+    receiptFooter: "Thank you for visiting!",
+  },
+  // ---- Rebooking offer at end of checkout (customizable) ----
+  rebook: {
+    enabled: true,
+    discount: 5,                  // dollars off for rebooking now
+    weeks: [2, 3, 4, 6, 8],       // quick-jump options offered
+    message: "Would you like to save ${discount} by rebooking now?",
+  },
+  // ---- Automated messages: editable wording per event ----
+  // Merge tags {client} {provider} {service} {date} {time} {business} get filled in automatically.
+  messages: [
+    { id: "booked", label: "Appointment Booked", channel: "both", timing: "Right after booking", enabled: true,
+      body: "You're all set, {client}! Your {service} with {provider} at {business} is confirmed for {date} at {time}. Need to change it? Reply or tap the link in your confirmation." },
+    { id: "remind2d", label: "Reminder — 2 days before", channel: "email", timing: "2 days before", enabled: true,
+      body: "Hi {client}, just a reminder of your upcoming {service} with {provider} at {business} on {date} at {time}. See you soon!" },
+    { id: "remind24h", label: "Reminder — 24 hours before", channel: "text", timing: "24 hours before", enabled: true,
+      body: "Reminder: {service} with {provider} tomorrow at {time}. Reply C to confirm, or tap to reschedule." },
+    { id: "remind3h", label: "Reminder — 3 hours before", channel: "text", timing: "3 hours before", enabled: true,
+      body: "See you today at {time}, {client}! {provider} has you down for a {service}. {business}" },
+    { id: "checkin", label: "Check-in / Ready", channel: "text", timing: "When you tap \u201cready\u201d", enabled: true,
+      body: "{provider} is ready for you, {client}! Come on back whenever you're set." },
+    { id: "canceled", label: "Appointment Canceled", channel: "both", timing: "When canceled", enabled: true,
+      body: "Your {service} on {date} at {time} has been canceled, {client}. We'd love to see you again — book anytime at {business}." },
+    { id: "rescheduled", label: "Appointment Rescheduled", channel: "both", timing: "When rescheduled", enabled: true,
+      body: "Updated! Your {service} with {provider} is now {date} at {time}. See you then, {client}." },
+    { id: "waitlist", label: "Waitlist — Slot Opened", channel: "text", timing: "When a slot opens", enabled: true,
+      body: "Good news {client} — a spot opened for your {service} with {provider} on {date} at {time}. Reply YES to grab it before someone else does!" },
+  ],
+  // ---- Locations: off by default; turns on for multi-location businesses ----
+  multiLocation: false,
+  locations: [
+    { id: "loc1", name: "Main Studio", address: "2077 NE Town Center Dr, Suite 120", cityZip: "Beaverton, OR 97006", phone: "(503) 555-0142", hours: "Mon, Thu–Sun · 9–5" },
+  ],
+};
+
+// Each working day: { on: bool, start: minutes, end: minutes }. Keyed 0(Sun)–6(Sat).
+const DEFAULT_HOURS = {
+  0: { on: true, start: 600, end: 900 },   // Sun 10–3
+  1: { on: true, start: 540, end: 1020 },  // Mon 9–5
+  2: { on: false, start: 540, end: 1020 }, // Tue off
+  3: { on: false, start: 540, end: 1020 }, // Wed off
+  4: { on: true, start: 540, end: 1020 },  // Thu 9–5
+  5: { on: true, start: 540, end: 1020 },  // Fri 9–5
+  6: { on: true, start: 540, end: 1020 },  // Sat 9–5
+};
+const defaultStaffNotifications = () => ({ smsOnlineBooking: true, smsOtherBooking: true, emailOnlineBooking: false, appNewText: true, appNewChat: true, appMissedCall: true });
+const defaultComp = () => ({
+  service: { on: false, type: "basic", basicPct: 0, tiers: [{ upTo: 500, pct: 30 }, { upTo: null, pct: 40 }] },
+  product: { on: false, defaultPct: 0, overridesOn: false },
+  hourly: { on: false, rate: 0, greaterOf: false },
+});
+
+// ============================================================
+// PERMISSIONS — Mangomint-style access toggles, grouped by area.
+// Each item: { key, label, desc }. defaultPermissions(userType)
+// returns every key on for Admins, off for everyone else.
+// ============================================================
+const PERMISSION_SECTIONS = [
+  { group: "Setup & Management", items: [
+    { key: "manageStaff", label: "Can manage staff members", desc: "Add staff members, change work hours and service assignments, etc. Does not grant access to the Permissions and Compensation tabs." },
+    { key: "manageServices", label: "Can manage service settings", desc: "Create and change services, service assignments, online booking service settings, etc." },
+    { key: "managePaymentAccounts", label: "Can manage payment accounts", desc: "Grants access to the Payment Accounts tab to review transactions, payouts, etc." },
+  ] },
+  { group: "User Profile", items: [
+    { key: "ownWorkSchedule", label: "Can change own work schedule", desc: "Set, modify, and override own work schedule via their User Profile menu." },
+    { key: "ownServiceAssignments", label: "Can change own service assignments", desc: "Assign/unassign themselves to services via their User Profile menu. Grants overriding of their own default service prices and durations." },
+    { key: "ownTotals", label: "Can view own daily/weekly totals", desc: "Grants access to Daily Totals and Weekly Totals (i.e. number of services, service revenue, tips, etc.) from the mobile app menu." },
+  ] },
+  { group: "Calendar", items: [
+    { key: "manageWaitlist", label: "Can manage waitlist", desc: "Add, change, and remove waitlist entries." },
+  ] },
+  { group: "Clients", items: [
+    { key: "accessAllClients", label: "Can access everybody's clients", desc: "Grants access to all clients, regardless of who is set as the client owner." },
+    { key: "viewClientLastNames", label: "Can view clients' last names", desc: "Disable this permission to hide clients' last names from this staff member and remove access to the clients list." },
+    { key: "accessClientContact", label: "Can access clients' contact details", desc: "Disable this permission to hide any client contact details (i.e. phone number, email address) from this staff member." },
+    { key: "deleteMergeClients", label: "Can delete and merge clients", desc: "Allows deleting or merging any clients this staff member can access. Does not affect client visibility." },
+  ] },
+  { group: "Sales", items: [
+    { key: "adjustClientBalances", label: "Can manually adjust client account balances", desc: "Manually increase or decrease a client's account balance." },
+    { key: "viewIndividualSales", label: "Can view individual sales on calendar", desc: "View the attached sale for appointments that are visible to this person. Does not grant access to the Sales app." },
+    { key: "viewOwnSales", label: "Can view list of own sales", desc: "Grants access to the list of their own sales." },
+    { key: "viewAllSales", label: "Can view all sales", desc: "Viewing only. Grants access to the Sales app. Does not allow modifying of sales." },
+    { key: "checkoutModifySales", label: "Can start a checkout and modify sales", desc: "Take payments, reopen closed sales, make changes to services and products in a sale, etc." },
+    { key: "sellNonRetail", label: "Can sell non-retail products", desc: "Add products from \"non-retail\" categories during checkout. Can be helpful for tracking internal product usage (professional-use items)." },
+    { key: "refundClosedSales", label: "Can refund sales (open and closed)", desc: "Allow refunding items or entire sales, whether they are open or closed. Grants full refund capabilities." },
+    { key: "refundOpenSales", label: "Can refund open sales", desc: "Allow refunding payments during checkout or on a re-opened sale." },
+  ] },
+  { group: "Messages", items: [
+    { key: "viewIndividualConversations", label: "Can view individual conversations", desc: "View conversations and message history for clients that are visible to this person. Does not allow sending messages." },
+    { key: "viewAllConversations", label: "Can view all conversations", desc: "Viewing only. Grants access to the Messages app. Does not allow sending messages." },
+    { key: "sendMessages", label: "Can send messages", desc: "Send messages to clients in the conversations that are visible to this person." },
+  ] },
+  { group: "Reports", items: [
+    { key: "companyReports", label: "Can access company reports", desc: "Grants access to all available reports." },
+  ] },
+  { group: "Products", items: [
+    { key: "manageProducts", label: "Can manage products", desc: "Create, change, and delete products. Allows manual inventory changes. Not required to add products during checkout." },
+  ] },
+  { group: "Gift Cards", items: [
+    { key: "manageGiftCards", label: "Can manage gift cards", desc: "Manually create, adjust, and delete gift cards. Not required to sell or redeem gift cards during checkout." },
+  ] },
+  { group: "Packages", items: [
+    { key: "managePackages", label: "Can manage packages", desc: "Manually create, adjust, and delete packages. Not required to sell or use packages during checkout." },
+    { key: "managePackageSetups", label: "Can manage package setups", desc: "Create and modify package setups." },
+  ] },
+  { group: "Memberships", items: [
+    { key: "manageMemberships", label: "Can manage memberships", desc: "Start, change, and cancel client memberships. Includes pausing client memberships and renewing client memberships early." },
+    { key: "bypassMembershipAgreements", label: "Can bypass membership agreements", desc: "Skip agreement requirement when starting memberships." },
+    { key: "manageMembershipPlans", label: "Can manage membership plans", desc: "Create and modify membership plans." },
+  ] },
+  { group: "Cash Drawer", items: [
+    { key: "manageCashDrawer", label: "Can manage cash drawer", desc: "Grants access to the Cash Drawer app. Perform counts and add manual pay-ins and pay-outs." },
+  ] },
+  { group: "Time Clock", items: [
+    { key: "viewTimeClock", label: "Can view Time Clock app", desc: "Grants access to the Time Clock app. Allows clocking in on any device where this user is logged in. Note that this permission is not required to clock in. Staff can still clock in using their pin under another user account where the Time Clock app is visible." },
+    { key: "manageTimeCards", label: "Can manage time cards", desc: "View, edit, and delete time cards for all staff members." },
+  ] },
+  { group: "Payroll", items: [
+    { key: "viewPayroll", label: "Can view Payroll app", desc: "Grants access to the Payroll app. Allows viewing of payroll reports and exporting of payroll data." },
+    { key: "managePayrollAdjustments", label: "Can manage payroll adjustments", desc: "Grants access to create and delete payroll adjustments." },
+  ] },
+  { group: "Forms", items: [
+    { key: "viewIndividualForms", label: "Can view individual form submissions", desc: "View form submissions attached to appointments that are visible to this person. Does not grant access to the Forms app." },
+    { key: "viewAllForms", label: "Can view all form submissions", desc: "Grants access to the Forms app." },
+    { key: "manageFormTemplates", label: "Can manage form templates", desc: "Create and modify form templates." },
+  ] },
+  { group: "Resources", items: [
+    { key: "manageResources", label: "Can manage resources", desc: "Create and modify resources and resource groups." },
+    { key: "viewResourcesCalendar", label: "Can view resources on calendar", desc: "View resources such as rooms or chairs as separate columns on the calendar." },
+  ] },
+  { group: "Campaigns", items: [
+    { key: "editCampaigns", label: "Can edit campaigns", desc: "Create and modify marketing campaigns." },
+    { key: "sendCampaigns", label: "Can send campaigns", desc: "Send marketing campaigns or schedule them for sending." },
+  ] },
+  { group: "Flows", items: [
+    { key: "manageFlows", label: "Can manage flows", desc: "Create and modify flows and flow runs." },
+  ] },
+  { group: "Offers", items: [
+    { key: "manageOffers", label: "Can manage offers", desc: "Create and modify offers." },
+  ] },
+];
+const ALL_PERMISSION_KEYS = PERMISSION_SECTIONS.flatMap((s) => s.items.map((i) => i.key));
+const defaultPermissions = (userType) => {
+  const on = userType === "Admin";
+  const m = {};
+  ALL_PERMISSION_KEYS.forEach((k) => { m[k] = on; });
+  return m;
+};
+const countPermsOn = (perms) => ALL_PERMISSION_KEYS.reduce((n, k) => n + ((perms && perms[k]) ? 1 : 0), 0);
+
+const DEFAULT_PROVIDERS = [
+  { id: "anyone", name: "Anyone", role: "First available", color: "var(--sub)", hours: DEFAULT_HOURS },
+  { id: "dan", name: "Dan", role: "Master Barber", color: "var(--gold)", hours: DEFAULT_HOURS,
+    email: "sanctuarybarberco@gmail.com", phone: "+1 503 840 2389", userType: "Admin", isProvider: true, onlineBooking: true, archived: false, photo: "photo-1622286342621-4bd786c2447c",
+    notifications: defaultStaffNotifications(), comp: { ...defaultComp(), hourly: { on: true, rate: 0, greaterOf: false } }, permissions: defaultPermissions("Admin") },
+  { id: "heather", name: "Heather", role: "Stylist", color: "#7A9E9F", hours: { ...DEFAULT_HOURS, 1: { on: false, start: 540, end: 1020 }, 6: { on: true, start: 600, end: 840 } },
+    email: "sanctuarybarberco@gmail.com", phone: "+1 503 840 2390", userType: "Admin", isProvider: true, onlineBooking: true, archived: false, photo: "photo-1595959183082-7b570b7e08e2",
+    notifications: defaultStaffNotifications(), comp: { ...defaultComp(), service: { on: true, type: "basic", basicPct: 40, tiers: [{ upTo: 500, pct: 30 }, { upTo: null, pct: 40 }] } }, permissions: defaultPermissions("Admin") },
+];
+// human-readable summary of which days a provider works
+const DAY_ABBR = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const daysSummary = (hours) => {
+  const on = [0, 1, 2, 3, 4, 5, 6].filter((d) => hours[d]?.on);
+  if (on.length === 0) return "No days set";
+  if (on.length === 7) return "Every day";
+  return on.map((d) => DAY_ABBR[d]).join(", ");
+};
+
+const DEFAULT_SERVICES = [
+  {
+    id: "cut", name: "Haircut", category: "Services", price: 42, duration: 45, color: "sage", photo: "photo-1503951914875-452162b0f3f1",
+    staff: { dan: { on: true, duration: 35, price: null }, heather: { on: true, duration: 45, price: null } },
+    addonGroups: [
+      { id: "skinfade", label: "Skinfade?", type: "choice", photo: "photo-1605497788044-5a32c7078486", options: [
+        { id: "yes", label: "Yes – Skinfade", price: 5, min: 0 }, { id: "no", label: "No – Standard Cut", price: 0, min: 0 },
+      ]},
+      { id: "facial", label: "Want a facial?", type: "addon", photo: "photo-1570172619644-dfd03ed5d881", item: {
+        name: "The Gentleman's Facial", price: 30, min: 20,
+        desc: "A rejuvenating facial featuring steam, deep cleansing, exfoliation, and hydration, finished with a 24K Gold Collagen mask.",
+      }},
+    ],
+  },
+  {
+    id: "cutbeard", name: "Haircut + Beard", category: "Services", price: 58, duration: 60, color: "gold", photo: "photo-1621607512214-68297480165e",
+    staff: { dan: { on: true, duration: 50, price: null }, heather: { on: true, duration: 60, price: null } },
+    addonGroups: [
+      { id: "hottowel", label: "Hot Towel / Straight Razor Finish", type: "choice", photo: "photo-1493256338651-d82f7acb2b38", options: [
+        { id: "yes", label: "Yes – Add Hot Towel and Straight Razor", price: 5, min: 10 }, { id: "no", label: "No Thanks!", price: 0, min: 0 },
+      ]},
+    ],
+  },
+  { id: "beard", name: "Beard Trim", category: "Services", price: 35, duration: 30, color: "clay", photo: "photo-1517832606299-7ae9b720a186", staff: { dan: { on: true, duration: null, price: null }, heather: { on: true, duration: null, price: null } }, addonGroups: [] },
+  { id: "shave", name: "Straight Razor Shave", category: "Services", price: 30, duration: 30, color: "slate", photo: "photo-1596728325488-58c87691e9af", staff: { dan: { on: true, duration: null, price: null }, heather: { on: false, duration: null, price: null } }, addonGroups: [] },
+  {
+    id: "firsttime", name: "First Time Client", category: "Services", price: 50, duration: 60, color: "gold", photo: "photo-1599351431202-1e0f0137899a",
+    firstTime: true, // launches the guided intake instead of the add-on flow
+    staff: { dan: { on: true, duration: null, price: null }, heather: { on: true, duration: null, price: null } },
+    addonGroups: [],
+    // Customizable guided intake — shop can edit questions, options, and image galleries.
+    intake: {
+      service: { // step 1: what service
+        label: "What are you booking?",
+        options: [
+          { id: "haircut", label: "Haircut only" },
+          { id: "haircutbeard", label: "Haircut & Beard" },
+        ],
+      },
+      style: { // step 2: which kind of cut (with example galleries)
+        label: "Which best describes the cut you want?",
+        options: [
+          { id: "standard", label: "Standard Cut", desc: "A classic, straightforward cut.", images: ["photo-1503951914875-452162b0f3f1", "photo-1605497788044-5a32c7078486", "photo-1622286342621-4bd786c2447c", "photo-1599351431202-1e0f0137899a", "photo-1517832606299-7ae9b720a186"] },
+          { id: "clean", label: "Basic Clean Cut", desc: "Crisp and tidy, neat lines.", images: ["photo-1621607512214-68297480165e", "photo-1503951914875-452162b0f3f1", "photo-1605497788044-5a32c7078486", "photo-1596728325488-58c87691e9af", "photo-1622286342621-4bd786c2447c"] },
+          { id: "fade", label: "Skin Fade / Specialty", desc: "Faded sides or a detailed, custom style.", images: ["photo-1605497788044-5a32c7078486", "photo-1622286342621-4bd786c2447c", "photo-1503951914875-452162b0f3f1", "photo-1621607512214-68297480165e", "photo-1599351431202-1e0f0137899a"] },
+        ],
+      },
+    },
+  },
+];
+
+const CLIENTS = [
+  { id: "c1", name: "Marcus Webb", phone: "503-555-0142", provider: "dan", visits: 14, cadenceDays: 21, lastVisit: (() => { const d = new Date(); d.setDate(d.getDate() - 28); return d.toISOString(); })(), photo: "photo-1500648767791-00dcc994a43e", gallery: [{ id: "g1", photo: "photo-1503951914875-452162b0f3f1", note: "Skin fade #2, scissor top", date: (() => { const d = new Date(); d.setDate(d.getDate() - 28); return d.toISOString(); })() }, { id: "g2", photo: "photo-1605497788044-5a32c7078486", note: "Tighter on the sides this time", date: (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString(); })() }], customDurations: { cut: 35, cutbeard: 50 }, notes: "Skin fade #2 on sides, scissor on top. Black coffee.", messages: [{ from: "client", text: "Running about 5 min late!", time: "11:42 AM" }, { from: "shop", text: "No problem Marcus, see you soon.", time: "11:43 AM" }] },
+  { id: "c2", name: "Tariq Allen", phone: "503-555-0188", provider: "dan", visits: 6, cadenceDays: 28, lastVisit: (() => { const d = new Date(); d.setDate(d.getDate() - 10); return d.toISOString(); })(), gallery: [{ id: "g3", photo: "photo-1621607512214-68297480165e", note: "Tight taper + beard line-up", date: (() => { const d = new Date(); d.setDate(d.getDate() - 14); return d.toISOString(); })() }], customDurations: { cut: 45 }, notes: "Tight taper. Prefers minimal small talk.", messages: [] },
+  { id: "c3", name: "Jordan Ellis", phone: "503-555-0210", provider: "heather", visits: 3, cadenceDays: 14, lastVisit: (() => { const d = new Date(); d.setDate(d.getDate() - 25); return d.toISOString(); })(), customDurations: {}, notes: "Growing out a textured crop.", messages: [] },
+];
+
+// start/end in minutes-from-midnight. vip = flagged, hasPhotos = uploaded refs,
+// hasNote = client note, detail = add-on answers shown on the block.
+const TODAY_APPTS = [
+  // Dan's column
+  { id: 1, providerId: "dan", clientId: "c1", serviceId: "cutbeard", start: 540, end: 590, status: "in-service", vip: true, name: "Marcus Webb", title: "Cut & Beard", detail: "Hot Towel & Straight Razor", phone: "503-555-0142", photos: 2, hasPhotos: true, bookedFor: (() => { const d = new Date(); d.setDate(d.getDate() + 3); d.setHours(9, 0, 0, 0); return d.toISOString(); })() },
+  { id: 2, providerId: "dan", clientId: "c2", serviceId: "cut", start: 590, end: 625, status: "checked-in", vip: true, name: "Tariq Allen", title: "Haircut", detail: "Standard Cut" },
+  { id: 3, providerId: "dan", clientId: "guest", serviceId: "cut", start: 625, end: 670, status: "confirmed", hasPhotos: true, vip: true, name: "Jay Espe", title: "Haircut", detail: "Skinfade" },
+  { id: 4, providerId: "dan", clientId: "guest", serviceId: "cut", start: 670, end: 705, status: "confirmed", vip: true, name: "Mark Inada", title: "Haircut", detail: "Standard Cut" },
+  { id: 5, providerId: "dan", clientId: "guest", serviceId: "cutbeard", start: 705, end: 745, status: "confirmed", name: "Josh Kegler", title: "Cut & Beard", detail: "Skinfade, Hot Towel" },
+  // Heather's column
+  { id: 6, providerId: "heather", clientId: "guest", serviceId: "cut", start: 545, end: 590, status: "confirmed", name: "Michael Victory", title: "Haircut", detail: "Standard Cut" },
+  { id: 7, providerId: "heather", clientId: "guest", serviceId: "cut", start: 590, end: 630, status: "confirmed", hasNote: true, name: "Justin Heintz", title: "Rebooked Haircut", detail: "Skinfade" },
+  { id: 8, providerId: "heather", clientId: "c3", serviceId: "cut", start: 630, end: 705, status: "confirmed", name: "Eric Espinoza", title: "Standard Cut", detail: "No Skinfade" },
+  { id: 9, providerId: "heather", clientId: "guest", serviceId: "cutbeard", start: 705, end: 765, status: "confirmed", vip: true, name: "Patrick D.", title: "Skin Fade & Specialty", detail: "Skinfade, Transformation" },
+];
+
+const FONT_DISPLAY = "var(--font-disp, 'Fraunces', Georgia, serif)";
+const FONT_BODY = "var(--font-body, 'Inter', -apple-system, sans-serif)";
+
+// ============================================================
+// THEME GALLERY — 8 dramatically distinct looks. Each is a complete
+// palette PLUS its own font pairing (display + body) so themes read
+// and feel different, not just recolored.
+// ============================================================
+const THEMES = [
+  // GlossGenius-inspired. Default = airy editorial serif on white (Energy/Zen).
+  { id: "snow", name: "Atelier", tagline: "Airy editorial · serif on white", group: "Light", dark: false,
+    disp: "'Cormorant Garamond', serif", body: "'Jost', sans-serif",
+    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F6F5F2", line:"#EFEDE8", border:"#E6E3DC", border2:"#CDC8BD", text:"#1A1A18", text2:"#3D3C38", sub:"#777268", faint:"#ADA89C", gold:"#1A1A18", onGold:"#FFFFFF", shadow:"rgba(20,18,12,.06)", overlay:"rgba(20,18,14,0.30)" } },
+  { id: "sagespa", name: "Northside", tagline: "Cream & forest green", group: "Light", dark: false,
+    disp: "'Fraunces', serif", body: "'Inter', sans-serif",
+    t: { bg:"#F6F1E7", panel:"#FFFDF7", panel2:"#EEE7D6", line:"#E5DCC6", border:"#DBD0B6", border2:"#C2B695", text:"#1E2A20", text2:"#39463B", sub:"#6C7464", faint:"#A6A088", gold:"#1F5138", onGold:"#F8F4EA", shadow:"rgba(60,50,20,.08)", overlay:"rgba(30,42,32,0.34)" } },
+  { id: "blossom", name: "Bloom", tagline: "Soft blush & rose", group: "Light", dark: false,
+    disp: "'Playfair Display', serif", body: "'Poppins', sans-serif",
+    t: { bg:"#FBF3F2", panel:"#FFFAFA", panel2:"#F6E6E4", line:"#F0DAD8", border:"#E8CCC9", border2:"#D6ABA7", text:"#241419", text2:"#46292F", sub:"#8A6B6F", faint:"#C4A6A8", gold:"#B14A63", onGold:"#FFF7F6", shadow:"rgba(120,50,60,.08)", overlay:"rgba(36,20,25,0.34)" } },
+  { id: "sunset", name: "Canvas", tagline: "Warm sand & charcoal", group: "Light", dark: false,
+    disp: "'Fraunces', serif", body: "'Jost', sans-serif",
+    t: { bg:"#F4F1EC", panel:"#FCFAF6", panel2:"#EAE4D9", line:"#E0D8C9", border:"#D5CBB8", border2:"#BBAE96", text:"#222019", text2:"#403B30", sub:"#736C5C", faint:"#ADA48E", gold:"#2B2823", onGold:"#FAF8F3", shadow:"rgba(60,50,30,.07)", overlay:"rgba(34,32,25,0.32)" } },
+  { id: "midnight", name: "Onyx", tagline: "Black & warm ivory", group: "Dark", dark: true,
+    disp: "'Cormorant Garamond', serif", body: "'Jost', sans-serif",
+    t: { bg:"#100F0D", panel:"#1A1916", panel2:"#22201C", line:"#2E2B26", border:"#3A372F", border2:"#524E43", text:"#F4F1E9", text2:"#D4CFC2", sub:"#969080", faint:"#5C5749", gold:"#E8E3D6", onGold:"#100F0D", shadow:"rgba(0,0,0,.55)", overlay:"rgba(0,0,0,0.78)" } },
+  { id: "plum", name: "Velvet", tagline: "Aubergine & lilac", group: "Dark", dark: true,
+    disp: "'Playfair Display', serif", body: "'Jost', sans-serif",
+    t: { bg:"#16101A", panel:"#211826", panel2:"#2B2032", line:"#392B41", border:"#473551", border2:"#62496E", text:"#F1E9F2", text2:"#D4C4D9", sub:"#A48FAA", faint:"#67546D", gold:"#C9A0E0", onGold:"#170F1B", shadow:"rgba(0,0,0,.55)", overlay:"rgba(10,4,14,0.78)" } },
+  { id: "steel", name: "Deep Teal", tagline: "Teal & seafoam", group: "Dark", dark: true,
+    disp: "'Fraunces', serif", body: "'Inter', sans-serif",
+    t: { bg:"#0B1819", panel:"#122324", panel2:"#182E2F", line:"#223C3D", border:"#2D4B4D", border2:"#406A6C", text:"#E6F2F1", text2:"#BFD7D5", sub:"#7C9A98", faint:"#496765", gold:"#5FD0BE", onGold:"#04201C", shadow:"rgba(0,0,0,.5)", overlay:"rgba(4,16,16,0.78)" } },
+  { id: "barber", name: "Espresso", tagline: "Mocha & brass", group: "Dark", dark: true,
+    disp: "'Oswald', sans-serif", body: "'Jost', sans-serif",
+    t: { bg:"#181310", panel:"#221A15", panel2:"#2C221B", line:"#382C23", border:"#45372E", border2:"#5D4B3E", text:"#F3E9DD", text2:"#D6C6B4", sub:"#9C8B78", faint:"#615142", gold:"#CD9551", onGold:"#1A120A", shadow:"rgba(0,0,0,.55)", overlay:"rgba(0,0,0,0.76)" } },
+];
+const THEME_IDS = THEMES.map((t) => t.id);
+const buildThemeCSS = () => THEMES.map((th) => {
+  const v = th.t;
+  return `.theme-${th.id}{--bg:${v.bg};--panel:${v.panel};--panel2:${v.panel2};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--on-gold:${v.onGold};--shadow:${v.shadow};--overlay:${v.overlay};--font-disp:${th.disp};--font-body:${th.body};}`;
+}).join("\n");
+
+// Portal: render full-screen overlays. Without react-dom we can't truly portal,
+// so we render inline but pin to the viewport with position:fixed + max z-index.
+// The overlay wrapper itself carries NO transform (so it anchors to the viewport,
+// not a transformed ancestor); inner content keeps the drop animation.
+function Portal({ children }) {
+  return <>{children}</>;
+}
+
+// Sheet: a popup that opens centered in the viewport, never off-screen.
+function Sheet({ open, onClose, children, align = "center", maxWidth = 520 }) {
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [open]);
+  if (!open) return null;
+  const justify = align === "bottom" ? "flex-end" : "center";
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 2000, display: "flex", alignItems: justify, justifyContent: "center", padding: align === "center" ? "20px" : 0, boxSizing: "border-box" }}>
+      <div onClick={(e) => e.stopPropagation()} className="appt-drop" style={{ width: "100%", maxWidth, background: "var(--bg)", borderRadius: align === "center" ? 22 : "22px 22px 0 0", padding: "16px 16px calc(20px + env(safe-area-inset-bottom))", maxHeight: "82vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+
+
+const fmtTime = (mins) => { const h = Math.floor(mins / 60), m = mins % 60; const ampm = h >= 12 ? "PM" : "AM"; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`; };
+const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const relativeDate = (date) => { const today = new Date(); today.setHours(0,0,0,0); const d = new Date(date); d.setHours(0,0,0,0); const diff = Math.round((d - today) / 86400000); if (diff === 0) return "Today"; if (diff === 1) return "Tomorrow"; if (diff > 1 && diff < 7) return DAYS[d.getDay()]; return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
+const DAYS_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const apptDateLabel = () => { const d = new Date(); return `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
+// Duration cascade: per-client override → per-staff default → service default.
+const getStaffEntry = (service, providerId) => (service && service.staff && providerId && service.staff[providerId]) || null;
+const getDuration = (client, service, providerId) => {
+  if (client && client.customDurations && client.customDurations[service.id]) return client.customDurations[service.id];
+  const se = getStaffEntry(service, providerId);
+  if (se && se.duration != null) return se.duration;
+  return service.duration;
+};
+// Price cascade: per-staff price → service default. (No per-client price.)
+const getPrice = (service, providerId) => {
+  const se = getStaffEntry(service, providerId);
+  if (se && se.price != null) return se.price;
+  return service.price;
+};
+const inputStyle = { width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY };
+
+// ============================================================
+export default function App() {
+  const [view, setView] = useState("landing");
+  const [clients, setClients] = useState(CLIENTS);
+  const [appts, setAppts] = useState(TODAY_APPTS);
+  const [waitlist, setWaitlist] = useState([
+    { id: "w1", name: "Andre Foster", phone: "503-555-0277", provider: "Dan", day: "This week", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 3 * 3600e3).toLocaleString() },
+    { id: "w2", name: "Sam Rivera", phone: "503-555-0291", provider: "Dan", day: "Any day", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 1 * 3600e3).toLocaleString() },
+  ]);
+  const [business, setBusiness] = useState(DEFAULT_BUSINESS);
+  const [services, setServices] = useState(DEFAULT_SERVICES);
+  const [categories, setCategories] = useState(["Services"]); // ordered list of category names
+  const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
+  const [theme, setTheme] = useState("snow"); // clean light default, app-wide
+
+  return (
+    <div id="app-root" className={`theme-${theme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600&family=Oswald:wght@400;500;600&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, button, input, textarea { font-family: var(--font-body, 'Jost', sans-serif); }
+        ${buildThemeCSS()}
+        :root {
+          --ease: cubic-bezier(.16,.84,.44,1);
+          --shadow-sm: 0 1px 3px var(--shadow), 0 1px 2px rgba(0,0,0,0.03);
+          --shadow-md: 0 6px 20px -6px var(--shadow), 0 2px 8px -3px var(--shadow);
+          --shadow-lg: 0 24px 60px -16px var(--shadow), 0 8px 20px -8px var(--shadow);
+          --radius: 16px;
+        }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(14px);} to {opacity:1; transform:none;} }
+        @keyframes pulse { 0% { transform: scale(0.92); opacity: 0.7; } 50% { transform: scale(1.06); opacity: 0.3; } 100% { transform: scale(0.92); opacity: 0.7; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes popIn { 0% { transform: scale(0); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+        @keyframes dropDown { from { opacity: 0; transform: translateY(-24px);} to {opacity:1; transform:none;} }
+        .appt-drop { animation: dropDown .32s var(--ease) both; }
+        @keyframes fadeIn { from { opacity: 0;} to {opacity:1;} }
+        @keyframes slideInRight { from { opacity:0; transform: translateX(28px);} to {opacity:1; transform:none;} }
+        .fade-up { animation: fadeUp .55s var(--ease) both; } .fade-in { animation: fadeIn .4s var(--ease) both; }
+        .fade-up > * { animation: fadeUp .55s var(--ease) both; }
+        .appt-screen { animation: slideInRight .3s var(--ease) both; }
+        .scrub-lock, .scrub-lock * { touch-action: none !important; overflow: hidden !important; overscroll-behavior: none !important; -webkit-user-select: none !important; user-select: none !important; }
+        button { font-family: ${FONT_BODY}; cursor: pointer; border: none; transition: transform .2s var(--ease), box-shadow .25s var(--ease), background .2s var(--ease), border-color .2s var(--ease), opacity .2s var(--ease); }
+        button:active { transform: scale(0.975); }
+        input, textarea, select { outline: none; font-family: ${FONT_BODY}; transition: border-color .2s var(--ease), box-shadow .2s var(--ease); }
+        input:focus, textarea:focus, select:focus { border-color: var(--gold) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 18%, transparent); }
+        .lift { transition: transform .25s var(--ease), box-shadow .25s var(--ease), border-color .2s var(--ease), background .2s var(--ease); }
+        .lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .card { box-shadow: var(--shadow-sm); }
+        ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 8px; } ::-webkit-scrollbar-track { background: transparent; }
+        * { -webkit-tap-highlight-color: transparent; }
+      `}</style>
+
+      {view === "landing" && <Landing business={business} onPick={setView} />}
+      {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("landing")} />}
+      {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={() => setView("landing")} />}
+      {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} onExit={() => setView("landing")} />}
+    </div>
+  );
+}
+
+function Landing({ business, onPick }) {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, background: "radial-gradient(circle at 50% 0%, #1A1A1F 0%, var(--bg) 60%)" }}>
+      <div className="fade-up" style={{ textAlign: "center", maxWidth: 540 }}>
+        <div style={{ fontSize: 15, letterSpacing: 6, color: "var(--gold)", marginBottom: 18 }}>PROTOTYPE PREVIEW</div>
+        <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: "clamp(48px, 12vw, 88px)", fontWeight: 500, lineHeight: 1, letterSpacing: 2 }}>{business.name}</h1>
+        <div style={{ width: 40, height: 1, background: "var(--gold)", margin: "20px auto" }} />
+        <p style={{ color: "var(--sub)", fontSize: 15, lineHeight: 1.7, marginBottom: 44, fontWeight: 300 }}>Preview how a client books, or step into the studio dashboard to customize your menu, photos, and policies.</p>
+        <div style={{ display: "grid", gap: 14 }}>
+          <button className="lift" onClick={() => onPick("client")} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "18px 28px", fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>CLIENT BOOKING EXPERIENCE →</button>
+          <button className="lift" onClick={() => onPick("manage")} style={{ background: "transparent", color: "var(--text)", padding: "18px 28px", fontSize: 14, letterSpacing: 2, border: "1px solid var(--border)", borderRadius: 10 }}>MANAGE MY APPOINTMENT →</button>
+          <button className="lift" onClick={() => onPick("shop")} style={{ background: "transparent", color: "var(--text)", padding: "18px 28px", fontSize: 14, letterSpacing: 2, border: "1px solid var(--border)", borderRadius: 10 }}>STUDIO DASHBOARD →</button>
+        </div>
+        <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 28, lineHeight: 1.6 }}>Clickable prototype with sample data. No real texts, charges, or bookings are sent.</p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// PHOTO PICKER MODAL — library + "upload your own"
+// ============================================================
+function PhotoPicker({ onClose, onPick }) {
+  const [cat, setCat] = useState("Haircuts");
+  const [tab, setTab] = useState("library");
+  return (
+    <Sheet open={true} onClose={onClose} maxWidth={560}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24 }}>Choose a photo</div>
+          <button onClick={onClose} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+          <button onClick={() => setTab("library")} style={{ flex: 1, padding: 12, borderRadius: 12, background: tab === "library" ? "var(--gold)" : "var(--panel2)", color: tab === "library" ? "var(--on-gold)" : "var(--text)", fontSize: 15, letterSpacing: 1 }}>FROM LIBRARY</button>
+          <button onClick={() => setTab("upload")} style={{ flex: 1, padding: 12, borderRadius: 12, background: tab === "upload" ? "var(--gold)" : "var(--panel2)", color: tab === "upload" ? "var(--on-gold)" : "var(--text)", fontSize: 15, letterSpacing: 1 }}>UPLOAD YOUR OWN</button>
+        </div>
+
+        {tab === "library" && (
+          <>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+              {Object.keys(PHOTO_LIBRARY).map((c) => (
+                <button key={c} onClick={() => setCat(c)} style={{ padding: "7px 14px", borderRadius: 20, fontSize: 15, background: cat === c ? "var(--border)" : "transparent", color: cat === c ? "var(--text)" : "var(--sub)", border: "1px solid var(--border)" }}>{c}</button>
+              ))}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+              {PHOTO_LIBRARY[cat].map((id) => (
+                <button key={id} className="lift" onClick={() => { onPick(id); onClose(); }} style={{ padding: 0, borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)", aspectRatio: "4/3", background: "var(--panel2)" }}>
+                  <img src={imgUrl(id)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                </button>
+              ))}
+            </div>
+            <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 16, lineHeight: 1.5 }}>In the live product this is a searchable feed of free professional photos. Here it's a curated sample set.</p>
+          </>
+        )}
+        {tab === "upload" && (
+          <div style={{ textAlign: "center", padding: "30px 0" }}>
+            <div style={{ border: "1px dashed var(--border2)", borderRadius: 8, padding: 40, marginBottom: 16 }}>
+              <Upload size={32} style={{ color: "var(--faint)", marginBottom: 12 }} />
+              <div style={{ fontSize: 15, marginBottom: 6 }}>Upload your own photo</div>
+              <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300 }}>Your photos always take priority over the library.</p>
+            </div>
+            <button className="lift" onClick={() => { onPick(ALL_LIBRARY[Math.floor(Math.random() * ALL_LIBRARY.length)].id); onClose(); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>CHOOSE FILE (SIMULATED)</button>
+            <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>Real uploads work in the live product. Here we'll drop in a sample so you can see the result.</p>
+          </div>
+        )}
+      </Sheet>
+  );
+}
+
+// Profile-picture picker for staff members: portrait grid + simulated upload.
+function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
+  const [tab, setTab] = useState("library");
+  return (
+    <Sheet open={true} onClose={onClose} maxWidth={560}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24 }}>Profile picture</div>
+        <button onClick={onClose} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+        <button onClick={() => setTab("library")} style={{ flex: 1, padding: 12, borderRadius: 12, background: tab === "library" ? "var(--gold)" : "var(--panel2)", color: tab === "library" ? "var(--on-gold)" : "var(--text)", fontSize: 15, letterSpacing: 1 }}>FROM LIBRARY</button>
+        <button onClick={() => setTab("upload")} style={{ flex: 1, padding: 12, borderRadius: 12, background: tab === "upload" ? "var(--gold)" : "var(--panel2)", color: tab === "upload" ? "var(--on-gold)" : "var(--text)", fontSize: 15, letterSpacing: 1 }}>UPLOAD YOUR OWN</button>
+      </div>
+
+      {tab === "library" && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+            {STAFF_PORTRAITS.map((id) => (
+              <button key={id} className="lift" onClick={() => { onPick(id); onClose(); }} style={{ padding: 0, borderRadius: "50%", overflow: "hidden", border: "1px solid var(--border)", aspectRatio: "1", background: "var(--panel2)" }}>
+                <img src={imgUrl(id, 240)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              </button>
+            ))}
+          </div>
+          <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 16, lineHeight: 1.5 }}>In the live product this is where you'd upload a real headshot. Here it's a curated sample set.</p>
+        </>
+      )}
+      {tab === "upload" && (
+        <div style={{ textAlign: "center", padding: "30px 0" }}>
+          <div style={{ border: "1px dashed var(--border2)", borderRadius: 8, padding: 40, marginBottom: 16 }}>
+            <Upload size={32} style={{ color: "var(--faint)", marginBottom: 12 }} />
+            <div style={{ fontSize: 15, marginBottom: 6 }}>Upload a profile picture</div>
+            <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300 }}>A clear, front-facing headshot works best.</p>
+          </div>
+          <button className="lift" onClick={() => { onPick(STAFF_PORTRAITS[Math.floor(Math.random() * STAFF_PORTRAITS.length)]); onClose(); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>CHOOSE FILE (SIMULATED)</button>
+          <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>Real uploads work in the live product. Here we'll drop in a sample so you can see the result.</p>
+        </div>
+      )}
+      {hasPhoto && (
+        <button onClick={() => { onRemove(); onClose(); }} style={{ width: "100%", marginTop: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><RefreshCw size={16} /> RESET TO DEFAULT</button>
+      )}
+    </Sheet>
+  );
+}
+
+// ============================================================
+// CLIENT BOOKING FLOW
+// ============================================================
+function ClientFlow({ business, services, providers, clients, appts, setAppts, waitlist, setWaitlist, onExit }) {
+  const [step, setStep] = useState(1);
+  const [cart, setCart] = useState([]);
+  const [intakeFor, setIntakeFor] = useState(null); // service object when running first-time intake
+  const [draft, setDraft] = useState(null);
+  const [draftAddons, setDraftAddons] = useState({});
+  const [phone, setPhone] = useState("");
+  const [matched, setMatched] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [slot, setSlot] = useState(null);
+  const [agreed, setAgreed] = useState(false);
+  const [showWaitlist, setShowWaitlist] = useState(false);
+  const [waitlistDone, setWaitlistDone] = useState(false);
+  const [photos, setPhotos] = useState(0);       // 0–3 uploaded at booking
+  const [bookedId, setBookedId] = useState(null); // id of the appointment just created
+  // waitlist join form
+  const [wlName, setWlName] = useState("");
+  const [wlDay, setWlDay] = useState("");          // preferred day label
+  const [wlWhen, setWlWhen] = useState("");         // early | midday | afternoon
+  const [wlPhotos, setWlPhotos] = useState(0);
+  const [wlService, setWlService] = useState("");
+
+  const lineTotal = (entry) => {
+    let p = entry.service.price, m = getDuration(matched, entry.service);
+    entry.service.addonGroups.forEach((g) => {
+      const sel = entry.addons[g.id];
+      if (g.type === "choice" && sel) { const opt = g.options.find((o) => o.id === sel); if (opt) { p += opt.price; m += opt.min; } }
+      if (g.type === "addon" && sel) { p += g.item.price; m += g.item.min; }
+    });
+    return { price: p, min: m };
+  };
+  const cartPrice = cart.reduce((s, e) => s + lineTotal(e).price, 0);
+  const cartMin = cart.reduce((s, e) => s + lineTotal(e).min, 0);
+  const describeEntry = (entry) => {
+    // First-time intake answers (if present) read as the meaningful description
+    if (entry.intakeAnswers && entry.service.intake) {
+      const ik = entry.service.intake; const a = entry.intakeAnswers; const parts = [];
+      if (ik.service && a.service) parts.push(ik.service.options.find((o) => o.id === a.service)?.label);
+      if (ik.style && a.style) parts.push(ik.style.options.find((o) => o.id === a.style)?.label);
+      const clean = parts.filter(Boolean);
+      return clean.length ? `First visit — ${clean.join(", ")}` : entry.service.name;
+    }
+    const picks = [];
+    entry.service.addonGroups.forEach((g) => {
+      const sel = entry.addons[g.id];
+      if (g.type === "choice" && sel) picks.push(g.options.find((o) => o.id === sel)?.label);
+      if (g.type === "addon" && sel) picks.push(g.item.name);
+    });
+    return picks.length ? `${entry.service.name} (${picks.join(", ")})` : entry.service.name;
+  };
+  const provider = cart[0]?.provider || providers[0];
+
+  const dateOptions = useMemo(() => { const arr = []; const base = new Date(); const worksOn = (dow) => providers.some((p) => p.id !== "anyone" && p.hours?.[dow]?.on); for (let i = 0; i < 14; i++) { const d = new Date(base); d.setDate(base.getDate() + i); if (!worksOn(d.getDay())) continue; arr.push(d); } return arr; }, [providers]);
+  const allSlots = useMemo(() => { if (!cartMin) return []; const out = []; for (let t = 9 * 60; t + cartMin <= 17 * 60; t += cartMin) out.push(t); return out; }, [cartMin]);
+  // open slots for the chosen date: the soonest two dates are simulated as fully booked
+  // so the "join the waitlist" path is visible; real product checks live appointments.
+  const openSlots = useMemo(() => {
+    if (!selectedDate) return [];
+    const idx = dateOptions.findIndex((d) => d.toDateString() === selectedDate.toDateString());
+    if (idx <= 1) return [];               // first two bookable days are full
+    if (idx === 2) return allSlots.slice(-2); // next day nearly full
+    return allSlots;
+  }, [selectedDate, dateOptions, allSlots]);
+  const dateIsFull = selectedDate && openSlots.length === 0;
+
+  const back = () => { setShowWaitlist(false); if (step <= 1) return onExit(); if (step === 2) { setDraft(null); setDraftAddons({}); setStep(1); return; } setStep(step - 1); };
+
+  const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
+      {labels.map((l, i) => (<React.Fragment key={l}><span style={{ fontSize: 14, padding: "6px 16px", borderRadius: 20, background: active === i ? "var(--panel2)" : "transparent", color: active === i ? "var(--text)" : "var(--faint)", border: active === i ? "1px solid var(--border)" : "1px solid transparent" }}>{l}</span>{i < labels.length - 1 && <ChevronRight size={14} style={{ color: "var(--border2)" }} />}</React.Fragment>))}
+    </div>); };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
+          <div style={{ width: 50 }} />
+        </div>
+        {step <= 5 && <Stepper active={0} />}
+        {step === 6 && <Stepper active={1} />}
+        {step >= 7 && <Stepper active={2} />}
+
+        {/* STEP 1 — service menu WITH PHOTOS */}
+        {step === 1 && (
+          <div className="fade-up">
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 4 }}>Services</h2>
+            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300 }}>Choose your service to begin.</p>
+            <div style={{ display: "grid", gap: 14 }}>
+              {services.map((s) => (
+                <button key={s.id} className="lift card" onClick={() => { if (s.firstTime && s.intake) { setIntakeFor(s); } else { setDraft(s); setDraftAddons({}); setStep(2); } }} style={{ display: "block", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 0, color: "var(--text)", textAlign: "left", overflow: "hidden" }}>
+                  {s.photo && <div style={{ height: 150, overflow: "hidden" }}><img src={imgUrl(s.photo, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px" }}>
+                    <div><div style={{ fontSize: 17, marginBottom: 2 }}>{s.name}</div><div style={{ color: "var(--faint)", fontSize: 15 }}>{s.duration} min</div></div>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)" }}>${s.price}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {intakeFor && (
+          <FirstTimeIntake
+            service={intakeFor}
+            onCancel={() => setIntakeFor(null)}
+            onDone={(answers) => {
+              // attach the captured answers to the service draft, then go pick a provider
+              const labeled = { ...intakeFor, intakeAnswers: answers };
+              setDraft(labeled); setDraftAddons({}); setIntakeFor(null); setStep(3);
+            }}
+          />
+        )}
+
+        {/* STEP 2 — add-ons (with optional photos) */}
+        {step === 2 && draft && (
+          <div className="fade-up">
+            <div style={{ background: "var(--panel)", borderRadius: 12, padding: "14px 18px", marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div><div style={{ fontSize: 16 }}>{draft.name}</div><button onClick={() => { setDraft(null); setStep(1); }} style={{ background: "none", color: "var(--sub)", fontSize: 15, textDecoration: "underline", padding: 0, marginTop: 2 }}>Change</button></div>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, color: "var(--gold)" }}>${draft.price}</div>
+            </div>
+            {draft.addonGroups.length === 0 && <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300 }}>No add-ons for this service. Continue when ready.</p>}
+            {draft.addonGroups.map((g) => (
+              <div key={g.id} style={{ marginBottom: 28 }}>
+                <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 14 }}>
+                  {business.showAddonPhotos && g.photo && <img src={imgUrl(g.photo, 160)} alt="" style={{ width: 48, height: 48, borderRadius: 6, objectFit: "cover" }} />}
+                  <div style={{ fontSize: 17 }}>{g.label}</div>
+                </div>
+                {g.type === "choice" && g.options.map((o) => { const on = draftAddons[g.id] === o.id; return (
+                  <button key={o.id} onClick={() => setDraftAddons({ ...draftAddons, [g.id]: o.id })} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", padding: "14px 0", borderBottom: "1px solid var(--line)", color: "var(--text)", textAlign: "left" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}><span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--faint)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--gold)" }} />}</span><span style={{ fontSize: 15 }}>{o.label}</span></div>
+                    <span style={{ color: "var(--sub)", fontSize: 14, textAlign: "right" }}>{o.price > 0 ? `+ $${o.price}` : ""}{o.min > 0 ? <div style={{ fontSize: 14, color: "var(--faint)" }}>+ {o.min}min</div> : null}</span>
+                  </button>); })}
+                {g.type === "addon" && (
+                  <button onClick={() => setDraftAddons({ ...draftAddons, [g.id]: draftAddons[g.id] ? false : true })} style={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 14, background: draftAddons[g.id] ? "rgba(176,141,87,0.08)" : "none", border: `1px solid ${draftAddons[g.id] ? "rgba(176,141,87,0.3)" : "var(--border)"}`, borderRadius: 6, padding: 14, color: "var(--text)", textAlign: "left", overflow: "hidden" }}>
+                    {business.showAddonPhotos && g.photo && <img src={imgUrl(g.photo, 200)} alt="" style={{ width: 64, height: 64, borderRadius: 14, objectFit: "cover", flexShrink: 0 }} />}
+                    <div style={{ flex: 1 }}><div style={{ fontSize: 15, marginBottom: 4 }}>{g.item.name}</div><div style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.5, fontWeight: 300 }}>{g.item.desc}</div></div>
+                    <span style={{ color: "var(--sub)", fontSize: 14, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>+ ${g.item.price} {draftAddons[g.id] ? <Check size={16} style={{ color: "var(--gold)" }} /> : <Plus size={16} />}</span>
+                  </button>
+                )}
+              </div>
+            ))}
+            <button className="lift" disabled={draft.addonGroups.some((g) => g.type === "choice" && !draftAddons[g.id])} onClick={() => setStep(3)} style={{ width: "100%", marginTop: 8, background: draft.addonGroups.some((g) => g.type === "choice" && !draftAddons[g.id]) ? "var(--border)" : "var(--gold)", color: draft.addonGroups.some((g) => g.type === "choice" && !draftAddons[g.id]) ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>CONTINUE</button>
+          </div>
+        )}
+
+        {/* STEP 3 — provider */}
+        {step === 3 && draft && (
+          <div className="fade-up">
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 18 }}>Choose your provider</h2>
+            <div style={{ display: "grid", gap: 10 }}>
+              {providers.map((p) => (
+                <button key={p.id} className="lift" onClick={() => { setCart([...cart, { service: draft, addons: draftAddons, provider: p }]); setDraft(null); setDraftAddons({}); setStep(4); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 18px", color: "var(--text)", textAlign: "left" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}><div style={{ width: 44, height: 44, borderRadius: "50%", background: p.color + "22", color: p.color, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 18 }}>{p.id === "anyone" ? <User size={20} /> : p.name.charAt(0)}</div><div><div style={{ fontSize: 16 }}>{p.name}</div><div style={{ fontSize: 14, color: "var(--faint)", letterSpacing: 1 }}>{p.id === "anyone" ? "Any available day" : daysSummary(p.hours)}</div></div></div>
+                  <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4 — add another */}
+        {step === 4 && (
+          <div className="fade-up">
+            <div style={{ background: "var(--panel)", borderRadius: 12, padding: 18, marginBottom: 28 }}>
+              <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>YOUR SERVICES</div>
+              {cart.map((e, i) => (<div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: i < cart.length - 1 ? "1px solid var(--line)" : "none" }}><div><div style={{ fontSize: 15 }}>{describeEntry(e)}</div><div style={{ fontSize: 15, color: "var(--sub)" }}>with {e.provider.name}</div></div><button onClick={() => setCart(cart.filter((_, idx) => idx !== i))} style={{ background: "none", color: "#C2703D", fontSize: 15 }}>Remove</button></div>))}
+            </div>
+            <p style={{ textAlign: "center", color: "var(--text)", fontSize: 16, marginBottom: 20 }}>Do you want to add another service?</p>
+            <div style={{ display: "flex", gap: 12 }}><button className="lift" onClick={() => setStep(1)} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 16, fontSize: 14, letterSpacing: 1, borderRadius: 10 }}>Yes</button><button className="lift" onClick={() => setStep(5)} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>No</button></div>
+          </div>
+        )}
+
+        {/* STEP 5 — phone */}
+        {step === 5 && (
+          <div className="fade-up">
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Your number</h2>
+            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300 }}>We'll use this to recognize you and pull up your preferences.</p>
+            <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
+            <p style={{ color: "var(--faint)", fontSize: 14, marginBottom: 22 }}>Try <span style={{ color: "var(--gold)", cursor: "pointer" }} onClick={() => setPhone("503-555-0142")}>503-555-0142</span> (returning client Marcus).</p>
+            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={() => { const digits = phone.replace(/\D/g, ""); setMatched(clients.find((c) => c.phone.replace(/\D/g, "") === digits) || null); setStep(6); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "var(--border)" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>CONTINUE →</button>
+          </div>
+        )}
+
+        {/* STEP 6 — date/time + waitlist */}
+        {step === 6 && (
+          <div className="fade-up">
+            {matched && <div style={{ background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 12, padding: "14px 16px", marginBottom: 20, display: "flex", gap: 12, alignItems: "center" }}><Sparkles size={18} style={{ color: "var(--gold)", flexShrink: 0 }} /><div style={{ fontSize: 15, lineHeight: 1.5 }}>Welcome back, <strong>{matched.name.split(" ")[0]}</strong>. We've reserved <strong style={{ color: "var(--gold)" }}>{cartMin} min</strong> based on your past visits.</div></div>}
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 16 }}>Pick a date</h2>
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 22 }}>
+              {dateOptions.map((d, i) => {
+                const on = selectedDate && d.toDateString() === selectedDate.toDateString();
+                const isToday = d.toDateString() === new Date().toDateString();
+                return (
+                  <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); }} style={{ flexShrink: 0, width: 64, padding: "10px 0", borderRadius: 8, background: on ? "var(--gold)" : "var(--panel2)", border: "2px solid", borderColor: on ? "var(--gold)" : (isToday ? "var(--gold)" : "var(--border)"), color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", position: "relative" }}>
+                    <div style={{ fontSize: 13, letterSpacing: 1, opacity: 0.7 }}>{DAYS[d.getDay()].slice(0, 3).toUpperCase()}</div>
+                    {isToday
+                      ? <div style={{ fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 600, color: on ? "var(--on-gold)" : "var(--gold)", lineHeight: "26px" }}>Today</div>
+                      : <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22 }}>{d.getDate()}</div>}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedDate && !dateIsFull && (<>
+              <div style={{ fontSize: 14, color: "var(--sub)", marginBottom: 14 }}>Selected: <strong style={{ color: "var(--text)" }}>{relativeDate(selectedDate)}</strong>{relativeDate(selectedDate).includes(",") ? "" : `, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 26 }}>{openSlots.map((t) => (<button key={t} className="lift" onClick={() => setSlot(t)} style={{ background: slot === t ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: slot === t ? "var(--gold)" : "var(--border)", borderRadius: 12, padding: "14px 8px", color: slot === t ? "var(--on-gold)" : "var(--text)", fontSize: 14 }}>{fmtTime(t)}</button>))}</div>
+              {slot != null && <button className="lift" onClick={() => setStep(7)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 24 }}>CONTINUE →</button>}
+            </>)}
+
+            {/* date is fully booked → waitlist path */}
+            {dateIsFull && !waitlistDone && (
+              <div className="fade-up" style={{ marginBottom: 8 }}>
+                <div style={{ background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 6, padding: "16px 18px", marginBottom: 20, display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <AlertCircle size={18} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+                  <div style={{ fontSize: 14, lineHeight: 1.5 }}><strong>{relativeDate(selectedDate)}</strong> is fully booked. Join the waitlist and we'll text you the moment something opens.</div>
+                </div>
+
+                {!showWaitlist ? (
+                  <button className="lift" onClick={() => { setShowWaitlist(true); setWlName(matched ? matched.name : ""); setWlDay(relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate) : `${relativeDate(selectedDate)}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`); setWlService(cart.map(describeEntry).join(", ")); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>JOIN THE WAITLIST →</button>
+                ) : (
+                  <div style={{ background: "var(--panel)", borderRadius: 8, padding: 20, textAlign: "left" }}>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, marginBottom: 16 }}>Join the waitlist</div>
+
+                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Your name</label>
+                    <input value={wlName} onChange={(e) => setWlName(e.target.value)} placeholder="First and last name" style={{ ...inputStyle, marginBottom: 16 }} />
+
+                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Phone</label>
+                    <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 16 }} />
+
+                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Preferred day</label>
+                    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 16 }}>
+                      {dateOptions.slice(0, 10).map((d, i) => { const lbl = relativeDate(d).includes(",") ? relativeDate(d) : `${relativeDate(d)}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; const on = wlDay === lbl; return (
+                        <button key={i} onClick={() => setWlDay(lbl)} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+                          <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
+                          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18 }}>{d.getDate()}</div>
+                        </button>
+                      ); })}
+                    </div>
+
+                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Time of day that works</label>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                      {[["early", "Early", "Open–11a"], ["midday", "Midday", "11a–2p"], ["afternoon", "Afternoon", "2p–close"]].map(([id, label, sub]) => { const on = wlWhen === id; return (
+                        <button key={id} onClick={() => setWlWhen(id)} style={{ flex: 1, padding: "12px 6px", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: "var(--text)" }}>
+                          <div style={{ fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</div>
+                          <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>{sub}</div>
+                        </button>
+                      ); })}
+                    </div>
+
+                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Service</label>
+                    <div style={{ position: "relative", marginBottom: 16 }}>
+                      <select value={wlService} onChange={(e) => setWlService(e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 40px 13px 15px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 15px center" }}>
+                        {cart.length > 0 && <option value={cart.map(describeEntry).join(", ")}>{cart.map(describeEntry).join(", ")}</option>}
+                        {services.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                      </select>
+                      <ChevronRight size={16} style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%) rotate(90deg)", color: "var(--faint)", pointerEvents: "none" }} />
+                    </div>
+
+                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Add a photo of your current hair (helps us judge if we can squeeze you in)</label>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 6, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: i < wlPhotos ? "rgba(176,141,87,0.12)" : "transparent" }}>{i < wlPhotos ? <Check size={18} style={{ color: "var(--gold)" }} /> : <Camera size={16} style={{ color: "var(--faint)" }} />}</div>))}</div>
+                    <button onClick={() => setWlPhotos(Math.min(3, wlPhotos + 1))} disabled={wlPhotos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: wlPhotos >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 13, letterSpacing: 1, borderRadius: 6, marginBottom: 20 }}>{wlPhotos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${wlPhotos}/3)`}</button>
+
+                    <button className="lift" disabled={!wlName || phone.replace(/\D/g, "").length < 10 || !wlWhen} onClick={() => {
+                      const ready = wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen;
+                      if (!ready) return;
+                      setWaitlist([...waitlist, { name: wlName, phone, provider: provider.name, day: wlDay, when: wlWhen, service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() }]);
+                      setWaitlistDone(true); setShowWaitlist(false);
+                    }} style={{ width: "100%", background: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen) ? "var(--gold)" : "var(--border)", color: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen) ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>ADD ME TO THE WAITLIST</button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {waitlistDone && <div style={{ background: "var(--panel)", borderRadius: 8, padding: 24, textAlign: "center" }}><CheckCircle2 size={32} style={{ color: "#7A9E9F", marginBottom: 12 }} /><div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, marginBottom: 6 }}>You're on the list</div><p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5 }}>We'll text {wlName ? wlName.split(" ")[0] : "you"} the moment a {wlWhen || ""} slot opens up. No need to check back.</p></div>}
+
+            {!dateIsFull && !waitlistDone && (
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 22, textAlign: "center", marginTop: 8 }}>
+                <p style={{ color: "var(--sub)", fontSize: 14 }}>Fully booked days show a waitlist option here.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* STEP 7 — contact + EDITABLE policy */}
+        {step === 7 && (
+          <div className="fade-up">
+            <div style={{ background: "var(--panel)", borderRadius: 12, padding: 18, marginBottom: 22, textAlign: "center" }}>
+              <div style={{ fontSize: 15, marginBottom: 6 }}>{relativeDate(selectedDate)}{relativeDate(selectedDate).includes(",") ? "" : `, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
+              <div style={{ fontSize: 14, color: "var(--sub)" }}>{cart.map(describeEntry).join(" · ")}</div>
+              <div style={{ fontSize: 14, color: "var(--sub)" }}>with {provider.name} at {fmtTime(slot)}</div>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)", marginTop: 8 }}>${cartPrice}</div>
+            </div>
+            <div style={{ display: "grid", gap: 12, marginBottom: 18 }}><input placeholder="First name" style={inputStyle} defaultValue={matched ? matched.name.split(" ")[0] : ""} /><input placeholder="Last name" style={inputStyle} defaultValue={matched ? matched.name.split(" ").slice(1).join(" ") : ""} /><input placeholder="Email" style={inputStyle} /></div>
+            <div style={{ fontSize: 15, color: "var(--faint)", marginBottom: 8 }}>Card on file (required to book)</div>
+            <div style={{ display: "grid", gap: 12, marginBottom: 18 }}><input placeholder="Card number" style={inputStyle} /><div style={{ display: "flex", gap: 12 }}><input placeholder="MM / YY" style={inputStyle} /><input placeholder="CVC" style={inputStyle} /></div></div>
+
+            {/* photo upload — their choice: reference, current look, or a selfie */}
+            <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 18 }}>
+              <div style={{ fontSize: 14, marginBottom: 4 }}>Add photos (optional)</div>
+              <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.5, fontWeight: 300, marginBottom: 14 }}>Up to 3 — a style you want, how your hair looks now, or anything that helps {provider.name === "Anyone" ? "your stylist" : provider.name}.</p>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 14, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: i < photos ? "rgba(176,141,87,0.12)" : "transparent" }}>{i < photos ? <Check size={20} style={{ color: "var(--gold)" }} /> : <Camera size={18} style={{ color: "var(--faint)" }} />}</div>))}</div>
+              <button onClick={() => setPhotos(Math.min(3, photos + 1))} disabled={photos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: photos >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 15, letterSpacing: 1, borderRadius: 10 }}>{photos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${photos}/3)`}</button>
+            </div>
+
+            <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 18 }}><div style={{ fontSize: 14, marginBottom: 8 }}>Cancellation policy</div><p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300 }}>{business.policy}</p></div>
+            <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", color: "var(--text)", marginBottom: 24, fontSize: 14 }}><span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>I agree to the cancellation policy</button>
+            <button className="lift" disabled={!agreed} onClick={() => { const newId = Date.now(); const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(slot / 60), slot % 60, 0, 0); setAppts([...appts, { id: newId, providerId: provider.id === "anyone" ? "dan" : provider.id, clientId: matched?.id || "guest", serviceId: cart[0].service.id, start: slot, status: "confirmed", name: matched?.name || "New Client", title: cart.map(describeEntry).join(", "), bookedFor: bookedFor.toISOString(), photos, hasPhotos: photos > 0, phone }]); setBookedId(newId); setStep(8); }} style={{ width: "100%", background: agreed ? "var(--gold)" : "var(--border)", color: agreed ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>BOOK NOW</button>
+          </div>
+        )}
+
+        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartPrice} provider={provider} selectedDate={selectedDate} slot={slot} photos={photos} onManage={() => setStep(9)} onExit={onExit} />}
+
+        {step === 9 && <ManageAppointment business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} initialPhone={phone} dateOptions={dateOptions} onExit={onExit} showToast={(m) => {}} />}
+      </div>
+    </div>
+  );
+}
+
+// Guided intake for first-time clients — walks through the configured questions
+// (service, then cut style with example galleries) so the shop knows exactly
+// what's wanted and can reserve the right amount of time.
+function FirstTimeIntake({ service, onCancel, onDone }) {
+  const cfg = service.intake || {};
+  const steps = [];
+  if (cfg.service) steps.push({ key: "service", ...cfg.service, kind: "list" });
+  if (cfg.style) steps.push({ key: "style", ...cfg.style, kind: "gallery" });
+  const [i, setI] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [lightbox, setLightbox] = useState(null);
+  const cur = steps[i];
+  const choose = (optId) => {
+    const next = { ...answers, [cur.key]: optId };
+    setAnswers(next);
+    if (i < steps.length - 1) setI(i + 1);
+    else onDone(next);
+  };
+  const back = () => { if (i === 0) onCancel(); else setI(i - 1); };
+
+  return (
+    <div className="fade-up">
+      <button onClick={back} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", color: "var(--sub)", fontSize: 15, marginBottom: 18 }}><ArrowLeft size={18} /> Back</button>
+      <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>FIRST VISIT · STEP {i + 1} OF {steps.length}</div>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 6, lineHeight: 1.1 }}>{cur.label}</h2>
+      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.5 }}>This helps us set aside exactly the right amount of time for you.</p>
+
+      {cur.kind === "list" && (
+        <div style={{ display: "grid", gap: 12 }}>
+          {cur.options.map((o) => (
+            <button key={o.id} className="lift card" onClick={() => choose(o.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 20px", color: "var(--text)", textAlign: "left" }}>
+              <span style={{ fontSize: 17 }}>{o.label}</span>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {cur.kind === "gallery" && (
+        <div style={{ display: "grid", gap: 16 }}>
+          {cur.options.map((o) => (
+            <div key={o.id} className="card" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden" }}>
+              <div style={{ padding: "16px 18px 12px" }}>
+                <div style={{ fontSize: 18, marginBottom: 2 }}>{o.label}</div>
+                {o.desc && <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.4 }}>{o.desc}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "0 18px 14px" }}>
+                {(o.images || []).map((img, idx) => (
+                  <button key={idx} onClick={() => setLightbox(img)} style={{ flexShrink: 0, width: 96, height: 96, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", padding: 0, background: "var(--panel2)" }}>
+                    <img src={imgUrl(img, 240)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  </button>
+                ))}
+              </div>
+              <div style={{ padding: "0 18px 18px" }}>
+                <button className="lift" onClick={() => choose(o.id)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none" }}>THIS IS WHAT I WANT</button>
+              </div>
+            </div>
+          ))}
+          <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.5 }}>Tap any photo to see it larger. Not sure? Pick the closest one — your barber will confirm in the chair.</p>
+        </div>
+      )}
+
+      {lightbox && (
+        <div onClick={() => setLightbox(null)} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <img src={imgUrl(lightbox, 900)} alt="" style={{ maxWidth: "100%", maxHeight: "85vh", borderRadius: 14, display: "block" }} />
+          <button onClick={() => setLightbox(null)} style={{ position: "absolute", top: 20, right: 20, background: "rgba(255,255,255,0.15)", color: "#fff", width: 40, height: 40, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={22} /></button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider, selectedDate, slot, photos, onManage, onExit }) {
+  const relDate = relativeDate(selectedDate);
+  const relPlus = relDate.includes(",") ? relDate : `${relDate}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
+  const summaryLine = `${cart.map(describeEntry).join(", ")} with ${provider.name} at ${fmtTime(slot)}`;
+  return (
+    <div className="fade-up" style={{ textAlign: "center", paddingTop: 16 }}>
+      <div style={{ width: 70, height: 70, borderRadius: "50%", background: "rgba(176,141,87,0.12)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}><Check size={32} style={{ color: "var(--gold)" }} /></div>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 38, fontWeight: 500, marginBottom: 8 }}>You're booked</h2>
+      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300 }}>A confirmation has been sent to your phone and email.</p>
+      <div style={{ background: "var(--panel)", borderRadius: 14, padding: 20, marginBottom: 24 }}><div style={{ fontSize: 17, marginBottom: 4 }}>{relPlus}</div><div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.6 }}>{summaryLine}</div><div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, color: "var(--gold)", marginTop: 8 }}>${cartPrice}</div>{photos > 0 && <div style={{ fontSize: 15, color: "var(--sub)", marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><ImageIcon size={14} style={{ color: "var(--gold)" }} /> {photos} photo{photos > 1 ? "s" : ""} attached</div>}</div>
+      <div style={{ textAlign: "left", marginBottom: 20 }}><div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 10 }}>CONFIRMATION TEXT (PREVIEW)</div><div style={{ background: "var(--panel2)", borderRadius: 14, borderBottomLeftRadius: 4, padding: "14px 16px", fontSize: 14, lineHeight: 1.5 }}>You're all set! You have an appointment with {provider.name} at {business.legalName} {relPlus} at {fmtTime(slot)}.<br /><br />Need to make a change? <span onClick={onManage} style={{ color: "var(--gold)", textDecoration: "underline", cursor: "pointer" }}>Tap here to reschedule or cancel.</span></div></div>
+      <button className="lift" onClick={onManage} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 500, borderRadius: 10, marginBottom: 12 }}>MANAGE MY APPOINTMENT</button>
+      <button className="lift" onClick={onExit} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 24 }}>BOOK ANOTHER APPOINTMENT</button>
+      <div style={{ color: "var(--faint)", fontSize: 15, lineHeight: 1.7 }}><div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, color: "var(--sub)", marginBottom: 6 }}>{business.legalName}</div>{business.address}<br />{business.address2}<br />{business.cityZip}</div>
+    </div>
+  );
+}
+
+// ============================================================
+// MANAGE — standalone wrapper (from landing page), supplies chrome + dates
+// ============================================================
+function ManageStandalone({ business, appts, setAppts, providers, services, onExit }) {
+  const dateOptions = useMemo(() => { const arr = []; const base = new Date(); const worksOn = (dow) => providers.some((p) => p.id !== "anyone" && p.hours?.[dow]?.on); for (let i = 0; i < 14; i++) { const d = new Date(base); d.setDate(base.getDate() + i); if (!worksOn(d.getDay())) continue; arr.push(d); } return arr; }, [providers]);
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <button onClick={onExit} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
+          <div style={{ width: 50 }} />
+        </div>
+        <ManageAppointment business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} initialPhone={null} dateOptions={dateOptions} onExit={onExit} showToast={() => {}} />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MANAGE APPOINTMENT — client self-service (phone confirm, no login)
+// Reschedule / cancel allowed only before the policy deadline.
+// ============================================================
+function ManageAppointment({ business, appts, setAppts, providers, services, initialPhone, dateOptions, onExit, showToast }) {
+  const [phone, setPhone] = useState(initialPhone || "");
+  const [confirmed, setConfirmed] = useState(!!initialPhone); // if we came from a fresh booking, skip the lookup
+  const [reschedId, setReschedId] = useState(null);  // appt being rescheduled
+  const [newDate, setNewDate] = useState(null);
+  const [newSlot, setNewSlot] = useState(null);
+  const [cancelId, setCancelId] = useState(null);    // appt pending cancel confirm
+
+  const windowHrs = business.cancelWindowHrs || 24;
+  const digits = (s) => (s || "").replace(/\D/g, "");
+  const mine = appts.filter((a) => digits(a.phone) === digits(phone) && a.status !== "cancelled" && a.bookedFor);
+  // sort soonest first
+  mine.sort((a, b) => new Date(a.bookedFor) - new Date(b.bookedFor));
+
+  const fmtWhen = (iso) => { const d = new Date(iso); const day = relativeDate(d); const lbl = day.includes(",") ? day : `${day}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; return `${lbl} at ${fmtTime(d.getHours() * 60 + d.getMinutes())}`; };
+  const hoursUntil = (iso) => (new Date(iso) - new Date()) / 36e5;
+  const canChange = (iso) => hoursUntil(iso) >= windowHrs;
+
+  const slots = useMemo(() => { const out = []; for (let t = 9 * 60; t + 45 <= 17 * 60; t += 45) out.push(t); return out; }, []);
+
+  const doReschedule = (a) => {
+    if (newDate == null || newSlot == null) return;
+    const when = new Date(newDate); when.setHours(Math.floor(newSlot / 60), newSlot % 60, 0, 0);
+    setAppts(appts.map((x) => x.id === a.id ? { ...x, start: newSlot, bookedFor: when.toISOString() } : x));
+    setReschedId(null); setNewDate(null); setNewSlot(null);
+    if (showToast) showToast("Appointment rescheduled.");
+  };
+  const doCancel = (a) => {
+    setAppts(appts.map((x) => x.id === a.id ? { ...x, status: "cancelled" } : x));
+    setCancelId(null);
+  };
+
+  // ---- phone confirmation gate ----
+  if (!confirmed) {
+    return (
+      <div className="fade-up">
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Manage your appointment</h2>
+        <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.5 }}>Enter the phone number you booked with. We'll text you a code — confirm it to see your appointments.</p>
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 14 }} />
+        <button className="lift" disabled={digits(phone).length < 10} onClick={() => setConfirmed(true)} style={{ width: "100%", background: digits(phone).length < 10 ? "var(--border)" : "var(--gold)", color: digits(phone).length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 15, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>CONFIRM PHONE →</button>
+        <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>In the live product a 6-digit code is texted to verify it's really you. No password needed.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fade-up">
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Your appointments</h2>
+      <p style={{ color: "var(--sub)", fontSize: 15, marginBottom: 22, fontWeight: 300 }}>{digits(phone).length === 10 ? `(${digits(phone).slice(0, 3)}) ${digits(phone).slice(3, 6)}-${digits(phone).slice(6)}` : phone}</p>
+
+      {mine.length === 0 && <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 6, padding: 24, textAlign: "center", color: "var(--sub)", fontSize: 14 }}>No upcoming appointments found for this number.</div>}
+
+      <div style={{ display: "grid", gap: 14 }}>
+        {mine.map((a) => {
+          const prov = providers.find((p) => p.id === a.providerId);
+          const changeable = canChange(a.bookedFor);
+          const hrs = Math.max(0, Math.round(hoursUntil(a.bookedFor)));
+          return (
+            <div key={a.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: 18 }}>
+              <div style={{ fontSize: 17, marginBottom: 4 }}>{fmtWhen(a.bookedFor)}</div>
+              <div style={{ fontSize: 14, color: "var(--sub)", marginBottom: 2 }}>{a.title}</div>
+              <div style={{ fontSize: 14, color: "var(--sub)" }}>with {prov ? prov.name : "your stylist"}</div>
+              {a.photos > 0 && <div style={{ fontSize: 15, color: "var(--sub)", marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}><ImageIcon size={14} style={{ color: "var(--gold)" }} /> {a.photos} photo{a.photos > 1 ? "s" : ""} attached</div>}
+
+              {/* reschedule picker inline */}
+              {reschedId === a.id ? (
+                <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+                  <div style={{ fontSize: 15, color: "var(--faint)", letterSpacing: 1, marginBottom: 8 }}>PICK A NEW DAY</div>
+                  <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 14 }}>
+                    {dateOptions.slice(0, 10).map((d, i) => { const on = newDate && d.toDateString() === newDate.toDateString(); return (
+                      <button key={i} onClick={() => { setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+                        <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
+                        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18 }}>{d.getDate()}</div>
+                      </button>
+                    ); })}
+                  </div>
+                  {newDate && (<>
+                    <div style={{ fontSize: 15, color: "var(--faint)", letterSpacing: 1, marginBottom: 8 }}>PICK A TIME</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                      {slots.map((t) => { const on = newSlot === t; return (<button key={t} onClick={() => setNewSlot(t)} style={{ padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", fontSize: 15 }}>{fmtTime(t)}</button>); })}
+                    </div>
+                  </>)}
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => { setReschedId(null); setNewDate(null); setNewSlot(null); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 15, letterSpacing: 1, borderRadius: 8 }}>BACK</button>
+                    <button className="lift" disabled={newDate == null || newSlot == null} onClick={() => doReschedule(a)} style={{ flex: 1, background: (newDate != null && newSlot != null) ? "var(--gold)" : "var(--border)", color: (newDate != null && newSlot != null) ? "var(--on-gold)" : "var(--faint)", padding: 13, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 8 }}>CONFIRM NEW TIME</button>
+                  </div>
+                </div>
+              ) : cancelId === a.id ? (
+                <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+                  <p style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5, marginBottom: 14 }}>Cancel this appointment? Per the policy, you're within the {windowHrs}-hour window, so there's no charge.</p>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => setCancelId(null)} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 15, letterSpacing: 1, borderRadius: 8 }}>KEEP IT</button>
+                    <button className="lift" onClick={() => doCancel(a)} style={{ flex: 1, background: "#C2563F", color: "#fff", padding: 13, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 8 }}>CANCEL APPOINTMENT</button>
+                  </div>
+                </div>
+              ) : changeable ? (
+                <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                  <button className="lift" onClick={() => { setReschedId(a.id); setNewDate(null); setNewSlot(null); }} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 15, letterSpacing: 1, fontWeight: 500, borderRadius: 8 }}>Reschedule</button>
+                  <button className="lift" onClick={() => setCancelId(a.id)} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 13, fontSize: 15, letterSpacing: 1, borderRadius: 8 }}>Cancel</button>
+                </div>
+              ) : (
+                <div style={{ marginTop: 16, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "13px 15px", fontSize: 15, color: "var(--sub)", lineHeight: 1.5 }}>
+                  This appointment is less than {windowHrs} hours away, so it can no longer be changed online. Please call us at {business.phone || "the studio"} and we'll help.
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <button onClick={onExit} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 16, fontSize: 15, letterSpacing: 1, marginTop: 22 }}>DONE</button>
+    </div>
+  );
+}
+
+// ============================================================
+// SHOP DASHBOARD — adds Menu editor + Settings
+// ============================================================
+function ShopDashboard({ business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, onExit }) {
+  const [tab, setTab] = useState("calendar");
+  const [activeClient, setActiveClient] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [msgTarget, setMsgTarget] = useState(null); // { clientId, draft } — opens a convo prefilled
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3400); };
+
+  // open a conversation (creating a lightweight client if needed) with a prefilled draft
+  const textPerson = ({ name, phone, provider, draft }) => {
+    const digits = (s) => (s || "").replace(/\D/g, "");
+    let target = clients.find((c) => digits(c.phone) === digits(phone));
+    if (!target) {
+      const provId = (providers.find((p) => p.name === provider) || {}).id || "dan";
+      target = { id: "wl-" + digits(phone), name: name || "Waitlist Client", phone, provider: provId, visits: 0, customDurations: {}, notes: "Added from the waitlist.", messages: [] };
+      setClients([...clients, target]);
+    }
+    setMsgTarget({ clientId: target.id, draft });
+    setTab("messages");
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10 }}>
+        <button onClick={onExit} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Exit</button>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, letterSpacing: 1.5, fontWeight: 500 }}>{business.name}</div>
+        <div style={{ width: 50 }} />
+      </div>
+      <div style={{ display: "none" }} />
+      <div style={{ flex: 1, maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 96px" }}>
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} />}
+        {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
+        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
+        {tab === "messages" && <MessagesView clients={clients} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} />}
+        {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
+        {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} />}
+        {tab === "settings" && <SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} clients={clients} theme={theme} setTheme={setTheme} showToast={showToast} />}
+      </div>
+
+      {/* fixed bottom tab bar */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "color-mix(in srgb, var(--bg) 82%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderTop: "1px solid var(--line)", boxShadow: "0 -8px 30px -12px var(--shadow)", display: "flex", justifyContent: "space-around", alignItems: "stretch", padding: "10px 4px calc(10px + env(safe-area-inset-bottom))", zIndex: 20 }}>
+        {[["calendar", "Calendar", Calendar], ["clients", "Clients", User], ["messages", "Messages", MessageSquare], ["waitlist", "Waitlist", Clock], ["menu", "Menu", ImageIcon], ["settings", "Settings", Settings]].map(([id, label, Icon]) => (
+          <button key={id} onClick={() => { setTab(id); setActiveClient(null); }} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
+            <div style={{ position: "relative" }}>
+              <Icon size={21} />
+              {id === "waitlist" && waitlist.length > 0 && <span style={{ position: "absolute", top: -5, right: -9, background: "var(--gold)", color: "var(--on-gold)", fontSize: 12, fontWeight: 600, borderRadius: 8, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{waitlist.length}</span>}
+            </div>
+            <span style={{ fontSize: 14.5, letterSpacing: 0.3 }}>{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {toast && <div className="fade-in" style={{ position: "fixed", bottom: 92, left: "50%", transform: "translateX(-50%)", background: "var(--gold)", color: "var(--on-gold)", padding: "14px 22px", borderRadius: 12, fontSize: 14, fontWeight: 500, boxShadow: "0 8px 30px rgba(0,0,0,.5)", maxWidth: "90%", textAlign: "center", zIndex: 30 }}>{toast}</div>}
+    </div>
+  );
+}
+
+// ---------- MENU EDITOR (add/edit/remove + photos) ----------
+function MenuEditor({ services, setServices, categories, setCategories, providers, business, showToast }) {
+  const [editing, setEditing] = useState(null); // service id or "new"
+  const [section, setSection] = useState(null); // null = hub, else "details"|"staff"|"customizations"|"booking"
+  const [picker, setPicker] = useState(null); // {target}
+  const cats = (categories && categories.length) ? categories : ["Services"];
+  const staffList = (providers || []).filter((p) => p.id !== "anyone");
+  // build a default staff map: everyone ON, no overrides (null = use service default)
+  const defaultStaffMap = () => { const m = {}; staffList.forEach((p) => { m[p.id] = { on: true, duration: null, price: null }; }); return m; };
+  const defaultBooking = () => ({ available: true, description: "", customPrice: false, promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false });
+  const blank = { id: "", name: "", price: "", duration: "", color: "sage", photo: "", category: cats[0], addonGroups: [], staff: {}, booking: defaultBooking() };
+  const [form, setForm] = useState(blank);
+
+  // ensure the form always has an entry for every current staff member
+  const ensureStaff = (s) => { const m = { ...(s.staff || {}) }; staffList.forEach((p) => { if (!m[p.id]) m[p.id] = { on: true, duration: null, price: null }; }); return m; };
+  const setStaff = (pid, patch) => setForm((f) => ({ ...f, staff: { ...f.staff, [pid]: { ...f.staff[pid], ...patch } } }));
+  const setBooking = (patch) => setForm((f) => ({ ...f, booking: { ...(f.booking || defaultBooking()), ...patch } }));
+
+  const openNew = () => { setForm({ ...blank, id: "svc-" + Date.now(), staff: defaultStaffMap(), booking: defaultBooking() }); setSection(null); setEditing("new"); };
+  const openEdit = (s) => { const copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; setForm(copy); setSection(null); setEditing(s.id); };
+  const save = () => {
+    if (!form.name || !form.price) { showToast("Name and price are required."); return; }
+    // clean staff overrides: blank → null (use default), else Number
+    const cleanStaff = {};
+    Object.keys(form.staff || {}).forEach((pid) => {
+      const e = form.staff[pid];
+      cleanStaff[pid] = {
+        on: e.on !== false,
+        duration: (e.duration === null || e.duration === "" || e.duration === undefined) ? null : Number(e.duration),
+        price: (e.price === null || e.price === "" || e.price === undefined) ? null : Number(e.price),
+      };
+    });
+    const clean = { ...form, price: Number(form.price), duration: Number(form.duration) || 30, staff: cleanStaff, booking: { ...defaultBooking(), ...(form.booking || {}) } };
+    if (editing === "new") setServices([...services, clean]);
+    else setServices(services.map((s) => (s.id === editing ? clean : s)));
+    setEditing(null); setSection(null); showToast(`Saved "${form.name}".`);
+  };
+  const remove = (id) => { setServices(services.filter((s) => s.id !== id)); showToast("Service removed."); };
+
+  // ---- shared building blocks ----
+  const SectionHeader = ({ title }) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
+      <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, fontSize: 16 }}><ChevronLeft size={20} /></button>
+      <div><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{form.name || "SERVICE"}</div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{title}</h2></div>
+    </div>
+  );
+  const SaveBar = () => (
+    <button className="lift" onClick={save} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 13, boxShadow: "var(--shadow-md)", marginTop: 26 }}>SAVE SERVICE</button>
+  );
+  const Toggle = ({ on, onClick }) => (
+    <button onClick={onClick} style={{ width: 48, height: 28, borderRadius: 16, background: on ? "var(--gold)" : "var(--border2)", position: "relative", transition: "background .2s", flexShrink: 0 }}>
+      <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
+    </button>
+  );
+
+  // ---- DETAILS section ----
+  const detailsSection = (
+    <>
+      <SectionHeader title="Details" />
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>SERVICE PHOTO</div>
+        <button onClick={() => setPicker({ target: "service" })} className="lift" style={{ width: "100%", height: 160, borderRadius: 14, border: "1px solid var(--border)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, padding: 0 }}>
+          {form.photo ? <img src={imgUrl(form.photo, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={28} /><span style={{ fontSize: 15 }}>Choose photo (library or upload)</span></>}
+        </button>
+        {form.photo && <button onClick={() => setPicker({ target: "service" })} style={{ background: "none", color: "var(--gold)", fontSize: 15, marginTop: 8 }}>Change photo</button>}
+      </div>
+      <div style={{ display: "grid", gap: 12, marginBottom: 18 }}>
+        <div><div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>NAME</div><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Signature Cut" style={inputStyle} /></div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ flex: 1 }}><div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>PRICE ($)</div><input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="42" style={inputStyle} /></div>
+          <div style={{ flex: 1 }}><div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>DURATION (MIN)</div><input type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="45" style={inputStyle} /></div>
+        </div>
+        <div>
+          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>CATEGORY</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {cats.map((c) => { const on = (form.category || cats[0]) === c; return (
+              <button key={c} onClick={() => setForm({ ...form, category: c })} style={{ background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, color: on ? "var(--gold)" : "var(--text)", padding: "8px 14px", borderRadius: 20, fontSize: 14, fontWeight: on ? 600 : 400 }}>{c}</button>
+            ); })}
+          </div>
+        </div>
+      </div>
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>CALENDAR COLOR</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {SERVICE_PALETTE.map((c) => { const on = (form.color || "sage") === c.id; return (
+            <button key={c.id} onClick={() => setForm({ ...form, color: c.id })} title={c.name} style={{ width: 34, height: 34, borderRadius: "50%", background: c.hex, border: on ? "2px solid var(--text)" : "2px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={15} style={{ color: "var(--on-gold)" }} />}</button>
+          ); })}
+        </div>
+        <p style={{ fontSize: 14, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Shows on the calendar before a client checks in. Once they're checked in or in service, the block switches to the status color.</p>
+      </div>
+      <SaveBar />
+    </>
+  );
+
+  // ---- STAFF section ----
+  const staffSection = (
+    <>
+      <SectionHeader title="Staff" />
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Everyone offers this by default. Turn someone off if they don't, or set their own time and price. Blank means they use the service default ({form.duration || "—"} min · ${form.price || "—"}).</p>
+      <div style={{ display: "grid", gap: 12 }}>
+        {staffList.map((p) => {
+          const e = form.staff[p.id] || { on: true, duration: null, price: null };
+          const on = e.on !== false;
+          return (
+            <div key={p.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, opacity: on ? 1 : 0.55 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: on ? 16 : 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ width: 30, height: 30, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 14 }}>{p.name.charAt(0)}</span>
+                  <span style={{ fontSize: 16, fontWeight: 600 }}>{p.name}</span>
+                </div>
+                <Toggle on={on} onClick={() => setStaff(p.id, { on: !on })} />
+              </div>
+              {on && (
+                <div style={{ display: "grid", gap: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)" }}>
+                    <span style={{ fontSize: 15, color: "var(--text2)" }}>Duration</span>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                        <input type="number" value={e.duration ?? ""} onChange={(ev) => setStaff(p.id, { duration: ev.target.value })} placeholder={String(form.duration || "—")} style={{ width: 60, background: "transparent", border: "none", color: "var(--gold)", fontSize: 17, fontWeight: 700, textAlign: "right", fontFamily: FONT_BODY }} />
+                        <span style={{ fontSize: 15, color: "var(--gold)", fontWeight: 700 }}>min</span>
+                      </div>
+                      {e.duration != null && e.duration !== "" && <button onClick={() => setStaff(p.id, { duration: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5 }}>Reset to default</button>}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)" }}>
+                    <span style={{ fontSize: 15, color: "var(--text2)" }}>Price</span>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 2, justifyContent: "flex-end" }}>
+                        <span style={{ fontSize: 17, color: "var(--text)" }}>$</span>
+                        <input type="number" value={e.price ?? ""} onChange={(ev) => setStaff(p.id, { price: ev.target.value })} placeholder={String(form.price || "—")} style={{ width: 70, background: "transparent", border: "none", color: "var(--text)", fontSize: 17, textAlign: "right", fontFamily: FONT_BODY }} />
+                      </div>
+                      {e.price != null && e.price !== "" && <button onClick={() => setStaff(p.id, { price: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5 }}>Reset to default</button>}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p style={{ fontSize: 14, color: "var(--faint)", marginTop: 16 }}>To add a service provider, go to Staff & Hours in Settings.</p>
+      <SaveBar />
+    </>
+  );
+
+  // ---- CUSTOMIZATIONS section (add-on groups) ----
+  const customizationsSection = (
+    <>
+      <SectionHeader title="Add-ons &amp; Customizations" />
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Option groups clients can pick when booking — a yes/no choice (like a skin fade) or an optional add-on (like a facial).</p>
+      {form.addonGroups.map((g, i) => (
+        <div key={i} style={{ background: "var(--panel)", borderRadius: 14, padding: 14, marginBottom: 10, border: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
+            {business.showAddonPhotos && <button onClick={() => setPicker({ target: i })} style={{ width: 44, height: 44, borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", color: "var(--faint)", flexShrink: 0, padding: 0 }}>{g.photo ? <img src={imgUrl(g.photo, 120)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={16} />}</button>}
+            <input value={g.label} onChange={(e) => setForm({ ...form, addonGroups: form.addonGroups.map((x, idx) => idx === i ? { ...x, label: e.target.value } : x) })} placeholder="Add-on question (e.g. Skinfade?)" style={{ ...inputStyle, padding: "10px 12px" }} />
+            <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", color: "#C2703D", flexShrink: 0 }}><Trash2 size={16} /></button>
+          </div>
+          <div style={{ fontSize: 14, color: "var(--faint)" }}>{g.type === "addon" ? "Optional tappable add-on" : "Yes/No choice"}</div>
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+        <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "choice", photo: "", options: [{ id: "yes", label: "Yes", price: 5, min: 0 }, { id: "no", label: "No", price: 0, min: 0 }] }] })} style={{ flex: 1, background: "transparent", border: "1px dashed var(--border2)", color: "var(--sub)", padding: 12, fontSize: 15, borderRadius: 12 }}>+ Yes/No add-on</button>
+        <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "Want an extra?", type: "addon", photo: "", item: { name: "New add-on", price: 20, min: 15, desc: "Description here." } }] })} style={{ flex: 1, background: "transparent", border: "1px dashed var(--border2)", color: "var(--sub)", padding: 12, fontSize: 15, borderRadius: 12 }}>+ Tappable add-on</button>
+      </div>
+      <SaveBar />
+    </>
+  );
+
+  // ---- ONLINE BOOKING section ----
+  const b = form.booking || defaultBooking();
+  const bookingRow = (label, key, help) => (
+    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "16px 0", borderTop: "1px solid var(--line)", gap: 16 }}>
+      <div style={{ flex: 1 }}><div style={{ fontSize: 15.5, color: "var(--text)" }}>{label}</div>{help && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 3, lineHeight: 1.4 }}>{help}</div>}</div>
+      <Toggle on={!!b[key]} onClick={() => setBooking({ [key]: !b[key] })} />
+    </div>
+  );
+  const bookingSection = (
+    <>
+      <SectionHeader title="Online Booking" />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0 16px" }}>
+        <div><div style={{ fontSize: 15.5, color: "var(--text)" }}>Available in online booking</div><div style={{ fontSize: 13, color: "var(--faint)", marginTop: 3 }}>Clients can book this service themselves.</div></div>
+        <Toggle on={!!b.available} onClick={() => setBooking({ available: !b.available })} />
+      </div>
+      <div style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+        <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 6 }}>DIRECT LINK</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", borderRadius: 10, padding: "11px 13px" }}>
+          <span style={{ flex: 1, fontSize: 14, color: "var(--gold)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>booking.meridian.app/{(business.name || "studio").toLowerCase().replace(/\s+/g, "")}/{form.id}</span>
+          <button onClick={() => showToast("Link copied.")} style={{ background: "none", color: "var(--sub)" }}><Copy size={16} /></button>
+        </div>
+      </div>
+      <div style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+        <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 8 }}>DESCRIPTION</div>
+        <textarea value={b.description} onChange={(e) => setBooking({ description: e.target.value })} rows={4} placeholder="Describe this service for clients booking online…" style={{ ...inputStyle, resize: "vertical", lineHeight: 1.55 }} />
+      </div>
+      {bookingRow("Customize price display", "customPrice", "Show a custom label instead of the exact price (e.g. “from $42”).")}
+      {bookingRow("Show prompt-to-call", "promptToCall", "Ask clients to call instead of booking this online.")}
+      {bookingRow("Require home address", "requireAddress", "For in-home or mobile services.")}
+      {bookingRow("Require a credit card", "requireCard", "Hold a card on file to book.")}
+      {bookingRow("Require payment at booking", "requirePayment", "Charge the full amount when booking online.")}
+      <SaveBar />
+    </>
+  );
+
+  // ---- HUB ----
+  const hubRows = [
+    { id: "details", label: "Details", sub: `$${form.price || "—"} · ${form.duration || "—"} min` },
+    { id: "staff", label: "Staff", sub: `${staffList.filter((p) => form.staff[p.id]?.on !== false).length} of ${staffList.length} offering` },
+    { id: "customizations", label: "Add-ons & Customizations", sub: `${form.addonGroups.length} option group${form.addonGroups.length !== 1 ? "s" : ""}` },
+    { id: "booking", label: "Online Booking", sub: b.available ? "Available" : "Off" },
+  ];
+
+  // ---- full-page service editor ----
+  if (editing) {
+    return (
+      <div className="appt-screen" style={{ paddingBottom: 40 }}>
+        {picker && <PhotoPicker onClose={() => setPicker(null)} onPick={(id) => {
+          if (picker.target === "service") setForm({ ...form, photo: id });
+          else setForm({ ...form, addonGroups: form.addonGroups.map((g, i) => i === picker.target ? { ...g, photo: id } : g) });
+        }} />}
+        {section === "details" ? detailsSection
+          : section === "staff" ? staffSection
+          : section === "customizations" ? customizationsSection
+          : section === "booking" ? bookingSection
+          : (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                <button onClick={() => setEditing(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
+                <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>SERVICES</span>
+              </div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, letterSpacing: -0.3, marginBottom: 22, paddingLeft: 26 }}>{form.name || (editing === "new" ? "New service" : "Service")}</h2>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+                {hubRows.map((r, i) => (
+                  <button key={r.id} onClick={() => setSection(r.id)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 18px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                    <div><div style={{ fontSize: 17 }}>{r.label}</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>{r.sub}</div></div>
+                    <ChevronRight size={20} style={{ color: "var(--faint)" }} />
+                  </button>
+                ))}
+              </div>
+              {editing === "new" && <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 14, lineHeight: 1.5 }}>Fill in Details and tap Save Service to add it to your menu.</p>}
+            </>
+          )}
+      </div>
+    );
+  }
+
+  // ---- reorder + category helpers ----
+  const moveService = (id, dir) => {
+    // reorder within the SAME category (dir: -1 up, +1 down)
+    const arr = [...services];
+    const idx = arr.findIndex((s) => s.id === id);
+    if (idx < 0) return;
+    const cat = arr[idx].category || cats[0];
+    // indices of services in this category, in order
+    const group = arr.map((s, i) => ({ s, i })).filter((x) => (x.s.category || cats[0]) === cat);
+    const posInGroup = group.findIndex((x) => x.s.id === id);
+    const swapWith = group[posInGroup + dir];
+    if (!swapWith) return;
+    const a = idx, b = swapWith.i;
+    [arr[a], arr[b]] = [arr[b], arr[a]];
+    setServices(arr);
+  };
+  const moveCategory = (name, dir) => {
+    const arr = [...cats]; const i = arr.indexOf(name); const j = i + dir;
+    if (j < 0 || j >= arr.length) return;
+    [arr[i], arr[j]] = [arr[j], arr[i]]; setCategories(arr);
+  };
+  const addCategory = () => {
+    const name = (prompt("New category name") || "").trim();
+    if (!name) return;
+    if (cats.includes(name)) { showToast("That category already exists."); return; }
+    setCategories([...cats, name]); showToast(`Added category "${name}".`);
+  };
+  const renameCategory = (oldName) => {
+    const name = (prompt("Rename category", oldName) || "").trim();
+    if (!name || name === oldName) return;
+    if (cats.includes(name)) { showToast("That category already exists."); return; }
+    setCategories(cats.map((c) => c === oldName ? name : c));
+    setServices(services.map((s) => (s.category || cats[0]) === oldName ? { ...s, category: name } : s));
+    showToast("Category renamed.");
+  };
+  const deleteCategory = (name) => {
+    if (cats.length <= 1) { showToast("Keep at least one category."); return; }
+    const fallback = cats.find((c) => c !== name);
+    setServices(services.map((s) => (s.category || cats[0]) === name ? { ...s, category: fallback } : s));
+    setCategories(cats.filter((c) => c !== name));
+    showToast(`Category "${name}" removed; its services moved to "${fallback}".`);
+  };
+  // drag-and-drop (works in the artifact frame; arrows are the mobile-safe fallback)
+  const dragId = useRef(null);
+  const onDragStart = (id) => (e) => { dragId.current = id; e.dataTransfer && (e.dataTransfer.effectAllowed = "move"); };
+  const onDropOn = (targetId, targetCat) => (e) => {
+    e.preventDefault();
+    const from = dragId.current; dragId.current = null;
+    if (!from || from === targetId) return;
+    const arr = [...services];
+    const fi = arr.findIndex((s) => s.id === from);
+    if (fi < 0) return;
+    const moved = { ...arr[fi], category: targetCat };
+    arr.splice(fi, 1);
+    const ti = arr.findIndex((s) => s.id === targetId);
+    arr.splice(ti < 0 ? arr.length : ti, 0, moved);
+    setServices(arr);
+  };
+
+  return (
+    <div className="fade-up">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500 }}>Menu</h2>
+        <button className="lift" onClick={openNew} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "10px 16px", borderRadius: 12, fontSize: 15, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> Add service</button>
+      </div>
+      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 20, fontWeight: 300 }}>Group services into categories, drag the handle (or use the arrows) to reorder. Changes show instantly on the client side.</p>
+
+      {cats.map((cat, ci) => {
+        const inCat = services.filter((s) => (s.category || cats[0]) === cat);
+        return (
+          <div key={cat} style={{ marginBottom: 26 }}>
+            {/* category header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <GripVertical size={16} style={{ color: "var(--faint)" }} />
+              <span style={{ fontSize: 13, letterSpacing: 2, color: "var(--text2)", fontWeight: 700, flex: 1 }}>{cat.toUpperCase()}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                <button onClick={() => moveCategory(cat, -1)} disabled={ci === 0} style={{ background: "none", color: ci === 0 ? "var(--faint)" : "var(--sub)", padding: 4, opacity: ci === 0 ? 0.4 : 1 }}><ChevronRight size={16} style={{ transform: "rotate(-90deg)" }} /></button>
+                <button onClick={() => moveCategory(cat, 1)} disabled={ci === cats.length - 1} style={{ background: "none", color: ci === cats.length - 1 ? "var(--faint)" : "var(--sub)", padding: 4, opacity: ci === cats.length - 1 ? 0.4 : 1 }}><ChevronRight size={16} style={{ transform: "rotate(90deg)" }} /></button>
+                <button onClick={() => renameCategory(cat)} style={{ background: "none", color: "var(--sub)", padding: 4 }}><Edit2 size={14} /></button>
+                <button onClick={() => deleteCategory(cat)} style={{ background: "none", color: "#C2703D", padding: 4 }}><Trash2 size={14} /></button>
+              </div>
+            </div>
+            {/* services in this category */}
+            <div style={{ display: "grid", gap: 10 }}>
+              {inCat.length === 0 && <div style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "6px 2px" }}>No services in this category yet.</div>}
+              {inCat.map((s, si) => (
+                <div key={s.id} draggable onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} className="card" style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 12 }}>
+                  <GripVertical size={18} style={{ color: "var(--border2)", cursor: "grab", flexShrink: 0 }} />
+                  <div style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", background: "var(--panel2)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.photo ? <img src={imgUrl(s.photo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={18} style={{ color: "var(--faint)" }} />}</div>
+                  <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--text)" }}>
+                    <div style={{ fontSize: 16, display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />{s.name}</div>
+                    <div style={{ fontSize: 14, color: "var(--sub)" }}>${s.price} · {s.duration} min · {s.addonGroups.length} add-on{s.addonGroups.length !== 1 ? "s" : ""}</div>
+                  </button>
+                  {/* up/down reorder (mobile-safe) */}
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <button onClick={() => moveService(s.id, -1)} disabled={si === 0} style={{ background: "none", color: si === 0 ? "var(--faint)" : "var(--sub)", padding: "2px 4px", opacity: si === 0 ? 0.4 : 1 }}><ChevronRight size={16} style={{ transform: "rotate(-90deg)" }} /></button>
+                    <button onClick={() => moveService(s.id, 1)} disabled={si === inCat.length - 1} style={{ background: "none", color: si === inCat.length - 1 ? "var(--faint)" : "var(--sub)", padding: "2px 4px", opacity: si === inCat.length - 1 ? 0.4 : 1 }}><ChevronRight size={16} style={{ transform: "rotate(90deg)" }} /></button>
+                  </div>
+                  <button onClick={() => remove(s.id)} style={{ background: "none", color: "#C2703D", padding: 6, flexShrink: 0 }}><Trash2 size={16} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      <button onClick={addCategory} className="lift" style={{ display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "1px dashed var(--border2)", color: "var(--gold)", padding: "13px 16px", borderRadius: 12, fontSize: 15, width: "100%", justifyContent: "center", fontWeight: 500 }}><Plus size={17} /> Add category</button>
+    </div>
+  );
+}
+
+// ---------- Online Booking rules: deep, fully-interactive editor ----------
+function fmtDur(totalMin) {
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
+}
+
+function bookingStatus(b) {
+  if (!b.enabled) return "Turned off";
+  const bits = [];
+  bits.push(b.requireCard ? "Card required" : "No card");
+  if (b.deposit.mode !== "none") bits.push(b.deposit.mode === "fixed" ? `$${b.deposit.amount} deposit` : `${b.deposit.amount}% deposit`);
+  bits.push(`${fmtDur(b.leadTimeMin)} notice`);
+  return bits.join(" · ");
+}
+
+// Two-column hours + minutes picker (minutes in 5-min increments)
+function HourMinutePicker({ totalMin, onChange, maxHours = 72 }) {
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  const setH = (nh) => onChange(Math.max(0, nh) * 60 + m);
+  const setM = (nm) => { let v = nm; if (v < 0) v = 55; if (v > 55) v = 0; onChange(h * 60 + v); };
+  const col = (label, val, dec, inc, display) => (
+    <div style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 8px" }}>
+      <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", textAlign: "center", marginBottom: 8 }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+        <button onClick={dec} style={{ width: 30, height: 30, borderRadius: 6, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 17, lineHeight: 1 }}>−</button>
+        <span style={{ fontSize: 19, color: "var(--text)", minWidth: 34, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>{display}</span>
+        <button onClick={inc} style={{ width: 30, height: 30, borderRadius: 6, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 17, lineHeight: 1 }}>+</button>
+      </div>
+    </div>
+  );
+  return (
+    <div style={{ display: "flex", gap: 10, width: 220 }}>
+      {col("HOURS", h, () => setH(h - 1), () => setH(Math.min(maxHours, h + 1)), h)}
+      {col("MINUTES", m, () => setM(m - 5), () => setM(m + 5), String(m).padStart(2, "0"))}
+    </div>
+  );
+}
+
+
+function Toggle({ on, onClick }) {
+  return (
+    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, border: "none" }}>
+      <span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} />
+    </button>
+  );
+}
+
+function Stepper({ value, onChange, min = 0, max = 999, step = 1, suffix }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <button onClick={() => onChange(Math.max(min, value - step))} style={{ width: 32, height: 32, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 18, lineHeight: 1 }}>−</button>
+      <span style={{ minWidth: 64, textAlign: "center", fontSize: 15, color: "var(--text)" }}>{value}{suffix ? ` ${suffix}` : ""}</span>
+      <button onClick={() => onChange(Math.min(max, value + step))} style={{ width: 32, height: 32, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 18, lineHeight: 1 }}>+</button>
+    </div>
+  );
+}
+
+function Segmented({ options, value, onChange }) {
+  return (
+    <div style={{ display: "flex", background: "var(--panel2)", borderRadius: 6, padding: 3, gap: 2 }}>
+      {options.map((o) => (
+        <button key={o.value} onClick={() => onChange(o.value)} style={{ flex: 1, padding: "8px 10px", borderRadius: 14, fontSize: 15, background: value === o.value ? "var(--gold)" : "transparent", color: value === o.value ? "var(--on-gold)" : "var(--sub)", fontWeight: value === o.value ? 500 : 400, whiteSpace: "nowrap" }}>{o.label}</button>
+      ))}
+    </div>
+  );
+}
+
+function Row({ title, desc, children }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 15 }}>{title}</div>
+        {desc && <div style={{ fontSize: 14.5, color: "var(--sub)", fontWeight: 300, marginTop: 2, lineHeight: 1.4 }}>{desc}</div>}
+      </div>
+      <div style={{ flexShrink: 0 }}>{children}</div>
+    </div>
+  );
+}
+
+function BookingRulesEditor({ b, onChange }) {
+  const set = (patch) => onChange({ ...b, ...patch });
+  const setDep = (patch) => onChange({ ...b, deposit: { ...b.deposit, ...patch } });
+
+  const preview = () => {
+    if (!b.enabled) return "Online booking is currently turned off — clients can't book themselves.";
+    const lead = b.leadTimeMin === 0 ? "any time" : `${fmtDur(b.leadTimeMin)}`;
+    let s = b.leadTimeMin === 0 ? `Clients can book right up to the appointment, up to ${b.horizonDays} days out` : `Clients must book at least ${lead} ahead, up to ${b.horizonDays} days out`;
+    if (b.sameDayCutoff) s += `, with no same-day booking after ${b.sameDayCutoff}`;
+    s += `. ${b.clientType === "all" ? "Open to everyone" : b.clientType === "returning" ? "Returning clients only" : "New clients only"}.`;
+    if (b.requireCard) s += " A card is required.";
+    if (b.deposit.mode === "fixed") s += ` $${b.deposit.amount} deposit taken at booking.`;
+    if (b.deposit.mode === "percent") s += ` ${b.deposit.amount}% deposit taken at booking.`;
+    if (b.bufferBefore || b.bufferAfter) s += ` Buffer ${b.bufferBefore}m before / ${b.bufferAfter}m after each visit.`;
+    if (b.dailyCap > 0) s += ` Max ${b.dailyCap} online bookings/day.`;
+    if (b.fillGapsFirst) s += " Gap-filling slots are offered first.";
+    return s;
+  };
+
+  return (
+    <div>
+      <Row title="Online booking" desc="Let clients book themselves through your page.">
+        <Toggle on={b.enabled} onClick={() => set({ enabled: !b.enabled })} />
+      </Row>
+
+      <div style={{ opacity: b.enabled ? 1 : 0.4, pointerEvents: b.enabled ? "auto" : "none" }}>
+        <div style={{ padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
+          <div style={{ fontSize: 15 }}>Minimum notice</div>
+          <div style={{ fontSize: 14.5, color: "var(--sub)", fontWeight: 300, marginTop: 2, marginBottom: 12, lineHeight: 1.4 }}>How far ahead a client must book. Set hours and minutes to anything you like.</div>
+          <HourMinutePicker totalMin={b.leadTimeMin} onChange={(v) => set({ leadTimeMin: v })} />
+        </div>
+
+        <Row title="Booking window" desc="How far in advance clients can book.">
+          <Stepper value={b.horizonDays} onChange={(v) => set({ horizonDays: v })} min={1} max={365} step={5} suffix="days" />
+        </Row>
+
+        <Row title="Same-day cutoff" desc="Block same-day bookings after this time (blank = allowed all day).">
+          <input type="time" value={b.sameDayCutoff} onChange={(e) => set({ sameDayCutoff: e.target.value })} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 6, padding: "8px 10px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
+        </Row>
+
+        <Row title="Multiple services" desc="Allow more than one service in a single booking.">
+          <Toggle on={b.allowMultiple} onClick={() => set({ allowMultiple: !b.allowMultiple })} />
+        </Row>
+
+        <Row title="Who can book" desc="Limit online booking by client type.">
+          <Segmented options={[{ value: "all", label: "All" }, { value: "returning", label: "Returning" }, { value: "new", label: "New" }]} value={b.clientType} onChange={(v) => set({ clientType: v })} />
+        </Row>
+
+        <Row title="Require a card" desc="Hold a card to reserve (your no-show protection).">
+          <Toggle on={b.requireCard} onClick={() => set({ requireCard: !b.requireCard })} />
+        </Row>
+
+        <Row title="Deposit" desc="Take a deposit at the time of booking.">
+          <Segmented options={[{ value: "none", label: "None" }, { value: "fixed", label: "$ Fixed" }, { value: "percent", label: "%" }]} value={b.deposit.mode} onChange={(v) => setDep({ mode: v })} />
+        </Row>
+        {b.deposit.mode !== "none" && (
+          <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 0 14px", borderBottom: "1px solid var(--line)" }}>
+            <Stepper value={b.deposit.amount} onChange={(v) => setDep({ amount: v })} min={0} max={b.deposit.mode === "percent" ? 100 : 500} step={5} suffix={b.deposit.mode === "percent" ? "%" : "$"} />
+          </div>
+        )}
+
+        <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--gold)", margin: "20px 0 4px" }}>SMART RULES</div>
+
+        <Row title="Buffer before" desc="Padding before each appointment.">
+          <Stepper value={b.bufferBefore} onChange={(v) => set({ bufferBefore: v })} min={0} max={60} step={5} suffix="min" />
+        </Row>
+        <Row title="Buffer after" desc="Cleanup / reset time after each appointment.">
+          <Stepper value={b.bufferAfter} onChange={(v) => set({ bufferAfter: v })} min={0} max={60} step={5} suffix="min" />
+        </Row>
+        <Row title="Daily online cap" desc="Max self-booked appointments per day (0 = unlimited).">
+          <Stepper value={b.dailyCap} onChange={(v) => set({ dailyCap: v })} min={0} max={30} suffix="" />
+        </Row>
+        <Row title="Fill gaps first" desc="Offer slots that tighten your day before opening fresh blocks.">
+          <Toggle on={b.fillGapsFirst} onClick={() => set({ fillGapsFirst: !b.fillGapsFirst })} />
+        </Row>
+        <Row title="Rebooking nudge" desc="Auto-suggest the next visit after this many weeks (0 = off).">
+          <Stepper value={b.rebookNudgeWeeks} onChange={(v) => set({ rebookNudgeWeeks: v })} min={0} max={16} suffix="wk" />
+        </Row>
+      </div>
+
+      <div style={{ marginTop: 18, background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 6, padding: "14px 16px" }}>
+        <div style={{ fontSize: 13, letterSpacing: 1, color: "var(--gold)", marginBottom: 6 }}>HOW THIS READS TO CLIENTS</div>
+        <div style={{ fontSize: 15, color: "var(--text2)", lineHeight: 1.6, fontWeight: 300 }}>{preview()}</div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// LOCATIONS EDITOR — optional; off by default for solo shops
+// ============================================================
+function LocationsEditor({ business, setForm }) {
+  const [openId, setOpenId] = useState(null);
+  const locations = business.locations || [];
+  const setLoc = (id, patch) => setForm({ ...business, locations: locations.map((l) => l.id === id ? { ...l, ...patch } : l) });
+  const addLoc = () => { const id = "loc" + Date.now(); setForm({ ...business, locations: [...locations, { id, name: "New Location", address: "", cityZip: "", phone: "", hours: "Mon–Fri · 9–5" }] }); setOpenId(id); };
+  const removeLoc = (id) => setForm({ ...business, locations: locations.filter((l) => l.id !== id) });
+  const F = ({ label, val, on }) => (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>{label}</label>
+      <input value={val} onChange={(e) => on(e.target.value)} style={inputStyle} />
+    </div>
+  );
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: business.multiLocation ? 18 : 0 }}>
+        <div style={{ paddingRight: 16 }}><div style={{ fontSize: 15 }}>Multiple locations</div><div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.5 }}>Turn on if you run more than one shop. Each location can have its own address, hours, and staff.</div></div>
+        <button onClick={() => setForm({ ...business, multiLocation: !business.multiLocation })} style={{ width: 44, height: 26, borderRadius: 13, background: business.multiLocation ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: business.multiLocation ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+      </div>
+
+      {business.multiLocation && (
+        <>
+          <div style={{ display: "grid", gap: 10 }}>
+            {locations.map((l) => {
+              const expanded = openId === l.id;
+              return (
+                <div key={l.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+                  <button onClick={() => setOpenId(expanded ? null : l.id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "none", color: "var(--text)", textAlign: "left" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <MapPinIcon size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                      <div><div style={{ fontSize: 15.5, fontWeight: 500 }}>{l.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{l.cityZip || "No address yet"}</div></div>
+                    </div>
+                    <ChevronRight size={18} style={{ color: "var(--faint)", transform: expanded ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+                  </button>
+                  {expanded && (
+                    <div style={{ padding: "4px 16px 18px", borderTop: "1px solid var(--line)" }}>
+                      <div style={{ height: 14 }} />
+                      <F label="Location name" val={l.name} on={(v) => setLoc(l.id, { name: v })} />
+                      <F label="Address" val={l.address} on={(v) => setLoc(l.id, { address: v })} />
+                      <F label="City, State ZIP" val={l.cityZip} on={(v) => setLoc(l.id, { cityZip: v })} />
+                      <F label="Phone" val={l.phone} on={(v) => setLoc(l.id, { phone: v })} />
+                      <F label="Hours (summary)" val={l.hours} on={(v) => setLoc(l.id, { hours: v })} />
+                      {locations.length > 1 && <button onClick={() => removeLoc(l.id)} style={{ marginTop: 4, background: "none", color: "#C2563F", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Trash2 size={14} /> Remove location</button>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <button className="lift" onClick={addLoc} style={{ width: "100%", marginTop: 12, background: "var(--panel2)", border: "1px dashed var(--border2)", color: "var(--text)", padding: 14, borderRadius: 10, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add location</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// MESSAGES EDITOR — edit the wording of each automated text/email
+// ============================================================
+const MERGE_TAGS = ["{client}", "{provider}", "{service}", "{date}", "{time}", "{business}"];
+const fillSample = (body, business) => body
+  .replace(/\{client\}/g, "Marcus")
+  .replace(/\{provider\}/g, "Dan")
+  .replace(/\{service\}/g, "Cut & Beard")
+  .replace(/\{date\}/g, "Thu, May 28")
+  .replace(/\{time\}/g, "12:50 PM")
+  .replace(/\{business\}/g, business?.legalName || "the studio");
+
+function MessagesEditor({ messages, onChange, business }) {
+  const [openId, setOpenId] = useState(null);
+  const update = (id, patch) => onChange(messages.map((m) => m.id === id ? { ...m, ...patch } : m));
+  const insertTag = (m, tag) => update(m.id, { body: (m.body || "") + (m.body && !m.body.endsWith(" ") ? " " : "") + tag });
+  const channelBadge = (ch) => {
+    const map = { text: ["Text", "#0A84FF"], email: ["Email", "var(--gold)"], both: ["Text + Email", "var(--sub)"] };
+    const [label, color] = map[ch] || map.text;
+    return <span style={{ fontSize: 11.5, letterSpacing: 0.5, color, border: `1px solid ${color}`, borderRadius: 20, padding: "2px 9px" }}>{label}</span>;
+  };
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300, marginBottom: 16 }}>Edit exactly what each automated message says. Tap a tag like {"{client}"} to drop in info the system fills automatically.</p>
+      <div style={{ display: "grid", gap: 10 }}>
+        {messages.map((m) => {
+          const expanded = openId === m.id;
+          return (
+            <div key={m.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden", opacity: m.enabled ? 1 : 0.6 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px" }}>
+                <button onClick={() => setOpenId(expanded ? null : m.id)} style={{ background: "none", color: "var(--text)", textAlign: "left", flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>{m.label}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{channelBadge(m.channel)}<span style={{ fontSize: 12.5, color: "var(--sub)" }}>{m.timing}</span></div>
+                </button>
+                <button onClick={() => update(m.id, { enabled: !m.enabled })} style={{ width: 44, height: 26, borderRadius: 13, background: m.enabled ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, marginLeft: 12 }}><span style={{ position: "absolute", top: 3, left: m.enabled ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+              </div>
+              {expanded && (
+                <div style={{ padding: "4px 16px 18px", borderTop: "1px solid var(--line)" }}>
+                  <label style={{ fontSize: 13, color: "var(--faint)", display: "block", margin: "14px 0 8px" }}>Send as</label>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                    {[["text", "Text"], ["email", "Email"], ["both", "Both"]].map(([id, label]) => { const on = m.channel === id; return (
+                      <button key={id} onClick={() => update(m.id, { channel: id })} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
+                    ); })}
+                  </div>
+
+                  <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>Message</label>
+                  <textarea value={m.body} onChange={(e) => update(m.id, { body: e.target.value })} rows={4} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", outline: "none", marginBottom: 10 }} />
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+                    {MERGE_TAGS.map((tag) => (
+                      <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "5px 11px", color: "var(--gold)" }}>{tag}</button>
+                    ))}
+                  </div>
+
+                  <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 8 }}>PREVIEW</div>
+                  <div style={{ background: m.channel === "email" ? "var(--panel)" : "#0A84FF", color: m.channel === "email" ? "var(--text)" : "#fff", border: m.channel === "email" ? "1px solid var(--border)" : "none", borderRadius: 16, borderBottomLeftRadius: m.channel === "email" ? 16 : 16, padding: "12px 15px", fontSize: 15, lineHeight: 1.45 }}>{fillSample(m.body, business)}</div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// TIPPING EDITOR — preset % options clients see at checkout
+// ============================================================
+function TippingEditor({ t, onChange }) {
+  const set = (patch) => onChange({ ...t, ...patch });
+  const setPreset = (i, val) => { const presets = [...t.presets]; presets[i] = Math.max(0, Math.min(100, parseInt(val) || 0)); onChange({ ...t, presets }); };
+  const sampleTotal = 50; // preview on a $50 ticket
+  const Toggle = ({ on, onClick }) => (
+    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+  );
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+        <div><div style={{ fontSize: 15 }}>Show tipping at checkout</div><div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>Clients pick a tip after their service.</div></div>
+        <Toggle on={t.enabled} onClick={() => set({ enabled: !t.enabled })} />
+      </div>
+
+      {t.enabled && (<>
+        <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>Preset percentages</label>
+        <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+          {t.presets.map((p, i) => (
+            <div key={i} style={{ flex: 1, position: "relative" }}>
+              <input type="number" value={p} onChange={(e) => setPreset(i, e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "13px 26px 13px 14px", color: "var(--text)", fontSize: 16, textAlign: "center", fontFamily: FONT_BODY }} />
+              <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--sub)", fontSize: 15, pointerEvents: "none" }}>%</span>
+            </div>
+          ))}
+        </div>
+
+        <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>Pre-highlighted suggestion</label>
+        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+          {t.presets.map((p, i) => { const on = t.smartDefault === p; return (
+            <button key={i} onClick={() => set({ smartDefault: p })} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{p}%</button>
+          ); })}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)" }}>
+          <span style={{ fontSize: 14.5 }}>Allow custom amount</span>
+          <Toggle on={t.allowCustom} onClick={() => set({ allowCustom: !t.allowCustom })} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)", marginBottom: 18 }}>
+          <span style={{ fontSize: 14.5 }}>Show "No tip" option</span>
+          <Toggle on={t.allowNoTip} onClick={() => set({ allowNoTip: !t.allowNoTip })} />
+        </div>
+
+        {/* live preview */}
+        <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WHAT CLIENTS SEE (on a ${sampleTotal} ticket)</div>
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: 16 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: t.allowNoTip || t.allowCustom ? 10 : 0 }}>
+            {t.presets.map((p, i) => { const on = t.smartDefault === p; return (
+              <div key={i} style={{ flex: 1, textAlign: "center", padding: "10px 4px", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)" }}>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>{p}%</div>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>${(sampleTotal * p / 100).toFixed(0)}</div>
+              </div>
+            ); })}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {t.allowCustom && <div style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel)", fontSize: 13, color: "var(--sub)" }}>Custom</div>}
+            {t.allowNoTip && <div style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel)", fontSize: 13, color: "var(--sub)" }}>No tip</div>}
+          </div>
+        </div>
+      </>)}
+    </div>
+  );
+}
+
+// Waitlist auto-notify rules — how the system reaches out when a slot frees up.
+function WaitlistRulesEditor({ w, onChange }) {
+  const set = (patch) => onChange({ ...w, ...patch });
+  const Opt = ({ active, title, sub, onClick }) => (
+    <button onClick={onClick} style={{ width: "100%", textAlign: "left", background: active ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", border: `1px solid ${active ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: 16, marginBottom: 10, display: "flex", alignItems: "flex-start", gap: 12 }}>
+      <span style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${active ? "var(--gold)" : "var(--border2)"}`, flexShrink: 0, marginTop: 2, display: "flex", alignItems: "center", justifyContent: "center" }}>{active && <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--gold)" }} />}</span>
+      <span><span style={{ fontSize: 15.5, fontWeight: 600, color: "var(--text)", display: "block" }}>{title}</span><span style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>{sub}</span></span>
+    </button>
+  );
+  const delays = [15, 30, 45, 60];
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 22 }}>When an appointment is cancelled, the system finds waitlisted clients whose preferred time and barber match the open slot, and reaches out with a link to book.</p>
+
+      <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>HOW IT SENDS</div>
+      <Opt active={w.mode === "ask"} title="Ask me first" sub="Show a confirmation listing who matches, and I send it." onClick={() => set({ mode: "ask" })} />
+      <Opt active={w.mode === "silent"} title="Send automatically (silent)" sub="The system notifies matching clients on its own — no prompt." onClick={() => set({ mode: "silent" })} />
+
+      <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", margin: "20px 0 10px" }}>WHO IT REACHES</div>
+      <Opt active={w.order === "longest"} title="Longest waiting first — one at a time" sub="Offer the slot to whoever has waited longest. If they don't book in time, it moves to the next person in line." onClick={() => set({ order: "longest" })} />
+      <Opt active={w.order === "all"} title="First come, first serve — notify all at once" sub="Notify every matching client at the same time. Whoever books first gets the slot." onClick={() => set({ order: "all" })} />
+
+      {w.order === "longest" && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WAIT BEFORE OFFERING TO THE NEXT PERSON</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {delays.map((d) => { const on = (w.delayMin || 30) === d; return (
+              <button key={d} onClick={() => set({ delayMin: d })} style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{d} min</button>
+            ); })}
+          </div>
+          <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Each client gets {w.delayMin || 30} minutes to claim the slot before it's offered to the next person in line.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Shop open hours — per-weekday on/off with start & end times.
+function BusinessHoursEditor({ hours, onChange }) {
+  const DAYNAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const h = hours || {};
+  const setDay = (d, patch) => onChange({ ...h, [d]: { ...(h[d] || { on: false, start: 540, end: 1020 }), ...patch } });
+  const Toggle = ({ on, onClick }) => (
+    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+  );
+  // time options every 30 min from 6:00 to 22:00
+  const opts = []; for (let t = 360; t <= 1320; t += 30) opts.push(t);
+  const TimeSel = ({ value, onPick }) => (
+    <select value={value} onChange={(e) => onPick(parseInt(e.target.value))} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }}>
+      {opts.map((t) => <option key={t} value={t}>{fmtTime(t)}</option>)}
+    </select>
+  );
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Set the days and hours the shop is open. This drives the times clients can book and what shows on your calendar.</p>
+      {DAYNAMES.map((name, d) => {
+        const day = h[d] || { on: false, start: 540, end: 1020 };
+        return (
+          <div key={d} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 0", borderTop: d === 0 ? "none" : "1px solid var(--line)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+              <Toggle on={day.on} onClick={() => setDay(d, { on: !day.on })} />
+              <span style={{ fontSize: 15.5, fontWeight: 500, color: day.on ? "var(--text)" : "var(--faint)", minWidth: 84 }}>{name}</span>
+            </div>
+            {day.on ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <TimeSel value={day.start} onPick={(t) => setDay(d, { start: t })} />
+                <span style={{ color: "var(--faint)", fontSize: 14 }}>–</span>
+                <TimeSel value={day.end} onPick={(t) => setDay(d, { end: t })} />
+              </div>
+            ) : <span style={{ fontSize: 14.5, color: "var(--faint)" }}>Closed</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function weekRange(ref = new Date()) {
+  const start = new Date(ref); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - start.getDay()); // Sunday
+  const end = new Date(start); end.setDate(start.getDate() + 7);
+  return { start, end };
+}
+
+// Scheduling Options — buffers, booking window, and minimum notice. These read
+// and write the same settings as Online Booking, so the two stay in sync.
+function SchedulingOptionsEditor({ b, onChange }) {
+  const set = (patch) => onChange({ ...b, ...patch });
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>Control the spacing and timing of appointments. Every value here is adjustable.</p>
+
+      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+        <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Buffer before each appointment</div>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>Padding held open before a visit — for setup or greeting.</div>
+        <Stepper value={b.bufferBefore || 0} onChange={(v) => set({ bufferBefore: v })} min={0} max={60} step={5} suffix="min" />
+      </div>
+
+      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+        <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Buffer after each appointment</div>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>Cleanup / turnover time before the next client.</div>
+        <Stepper value={b.bufferAfter || 0} onChange={(v) => set({ bufferAfter: v })} min={0} max={60} step={5} suffix="min" />
+      </div>
+
+      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+        <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Minimum notice</div>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>How far ahead a client must book. Set to any hours and minutes.</div>
+        <HourMinutePicker totalMin={b.leadTimeMin || 0} onChange={(v) => set({ leadTimeMin: v })} />
+      </div>
+
+      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
+        <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Booking window</div>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>How far in advance clients can book.</div>
+        <Stepper value={b.horizonDays || 0} onChange={(v) => set({ horizonDays: v })} min={1} max={365} step={1} suffix="days" />
+      </div>
+    </div>
+  );
+}
+
+// Phone Numbers — add, label, edit, and remove the shop's numbers.
+function PhoneNumbersEditor({ phones, onChange }) {
+  const list = phones || [];
+  const setPhone = (id, patch) => onChange(list.map((p) => p.id === id ? { ...p, ...patch } : p));
+  const addPhone = () => onChange([...list, { id: "ph" + Date.now(), label: "", number: "" }]);
+  const removePhone = (id) => onChange(list.filter((p) => p.id !== id));
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Numbers clients can reach you at. Label them however you like (Main, Booking, Texts).</p>
+      {list.map((p) => (
+        <div key={p.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 14, marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <input value={p.label} onChange={(e) => setPhone(p.id, { label: e.target.value })} placeholder="Label (e.g. Main)" style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 14, letterSpacing: 1, fontFamily: FONT_BODY, fontWeight: 600 }} />
+            <button onClick={() => removePhone(p.id)} style={{ background: "none", color: "var(--faint)" }}><Trash2 size={16} /></button>
+          </div>
+          <input value={p.number} onChange={(e) => setPhone(p.id, { number: e.target.value })} placeholder="(555) 000-0000" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+        </div>
+      ))}
+      <button className="lift" onClick={addPhone} style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 12, padding: 14, fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add phone number</button>
+    </div>
+  );
+}
+
+// Staff Selection — which staff appear as bookable in online booking.
+function StaffSelectionEditor({ providers, setProviders }) {
+  const staff = providers.filter((p) => p.id !== "anyone");
+  const toggle = (pid) => setProviders(providers.map((p) => p.id === pid ? { ...p, onlineBooking: !p.onlineBooking } : p));
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Choose who clients can book online. Turning someone off keeps them on your calendar but hides them from the public booking page.</p>
+      {staff.map((p, i) => (
+        <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 0", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Avatar size={40} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color} />
+            <div><div style={{ fontSize: 15.5, fontWeight: 500 }}>{p.name}</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>{p.role}</div></div>
+          </div>
+          <button onClick={() => toggle(p.id)} style={{ width: 44, height: 26, borderRadius: 13, background: p.onlineBooking ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: p.onlineBooking ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Checkout Settings — payment methods, signatures, receipts, and checkout behavior.
+function CheckoutSettingsEditor({ c, onChange }) {
+  const set = (patch) => onChange({ ...c, ...patch });
+  const methods = c.customMethods || [];
+  const setMethod = (i, val) => { const m = [...methods]; m[i] = val; set({ customMethods: m }); };
+  const addMethod = () => set({ customMethods: [...methods, ""] });
+  const removeMethod = (i) => set({ customMethods: methods.filter((_, j) => j !== i) });
+  const Toggle = ({ on, onClick }) => (
+    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+  );
+  const Card = ({ title, desc, children }) => (
+    <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+      <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: desc ? 4 : 12 }}>{title}</div>
+      {desc && <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>{desc}</div>}
+      {children}
+    </div>
+  );
+  const RowToggle = ({ title, desc, on, onClick, soon }) => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14, opacity: soon ? 0.7 : 1 }}>
+      <div><div style={{ fontSize: 15.5, fontWeight: 600 }}>{title} {soon && <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 20, padding: "1px 7px", marginLeft: 6 }}>WHEN LIVE</span>}</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{desc}</div></div>
+      <Toggle on={on} onClick={onClick} />
+    </div>
+  );
+  const sigOpts = [["never", "Never"], ["over", "Over an amount"], ["always", "Always"]];
+  const rcptOpts = [["ask", "Ask the client"], ["email", "Email"], ["text", "Text"], ["print", "Print"], ["none", "No receipt"]];
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>How checkout and payments behave. Items marked “when live” turn on once payment processing is connected.</p>
+
+      <Card title="Custom payment methods" desc="The payment types that appear at checkout.">
+        {methods.map((m, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <input value={m} onChange={(e) => setMethod(i, e.target.value)} placeholder="e.g. Cash, Venmo, Zelle" style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+            <button onClick={() => removeMethod(i)} style={{ background: "none", color: "var(--faint)", padding: "0 4px" }}><Trash2 size={16} /></button>
+          </div>
+        ))}
+        <button className="lift" onClick={addMethod} style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 10, padding: 11, fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 4 }}><Plus size={15} /> Add method</button>
+      </Card>
+
+      <div style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginBottom: 14, padding: "0 4px" }}>Tip buttons & options are set in <strong style={{ color: "var(--sub)" }}>Payments & Checkout → Tipping</strong>.</div>
+
+      <Card title="Signature required" desc="When to ask the client for a signature at checkout.">
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {sigOpts.map(([v, label]) => { const on = c.requireSignature === v; return (
+            <button key={v} onClick={() => set({ requireSignature: v })} style={{ flex: "1 1 30%", padding: "11px 8px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
+          ); })}
+        </div>
+        {c.requireSignature === "over" && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 8 }}>Ask for a signature on totals above:</div>
+            <Stepper value={c.signatureThreshold || 0} onChange={(v) => set({ signatureThreshold: v })} min={0} max={500} step={5} suffix="$" />
+          </div>
+        )}
+      </Card>
+
+      <RowToggle title="Change calculator for cash" desc="Show change-due math when a client pays cash." on={c.changeCalculator} onClick={() => set({ changeCalculator: !c.changeCalculator })} />
+      <RowToggle title="Require staff assignments" desc="Every item in a sale must be assigned to a staff member before checkout." on={c.requireStaffAssignment} onClick={() => set({ requireStaffAssignment: !c.requireStaffAssignment })} />
+      <RowToggle title="Client self-checkout" desc="Let clients review and pay on their own device." on={c.clientSelfCheckout} onClick={() => set({ clientSelfCheckout: !c.clientSelfCheckout })} soon />
+
+      <Card title="Default receipt" desc="What happens with the receipt after a sale.">
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {rcptOpts.map(([v, label]) => { const on = c.receiptDefault === v; return (
+            <button key={v} onClick={() => set({ receiptDefault: v })} style={{ flex: "1 1 30%", padding: "11px 8px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{label}</button>
+          ); })}
+        </div>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", margin: "14px 0 8px" }}>Receipt footer message</div>
+        <input value={c.receiptFooter || ""} onChange={(e) => set({ receiptFooter: e.target.value })} placeholder="Thank you for visiting!" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+      </Card>
+    </div>
+  );
+}
+
+// Waiting Room — how client check-in behaves (arrival → waiting → ready).
+function WaitingRoomEditor({ w, onChange }) {
+  const set = (patch) => onChange({ ...w, ...patch });
+  const Toggle = ({ on, onClick }) => (
+    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+  );
+  const RowToggle = ({ title, desc, on, onClick, soon }) => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14, opacity: soon ? 0.7 : 1 }}>
+      <div><div style={{ fontSize: 15.5, fontWeight: 600 }}>{title} {soon && <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 20, padding: "1px 7px", marginLeft: 6 }}>WHEN LIVE</span>}</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{desc}</div></div>
+      <Toggle on={on} onClick={onClick} />
+    </div>
+  );
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Controls how clients are checked in when they arrive, and how they're told you're ready for them.</p>
+
+      <RowToggle title="Notify staff on arrival" desc="Ping the barber when a client is checked in and waiting." on={w.notifyOnArrival} onClick={() => set({ notifyOnArrival: !w.notifyOnArrival })} />
+      <RowToggle title="Show waiting list" desc="Display a live list of clients who've checked in and are waiting." on={w.showWaitingList} onClick={() => set({ showWaitingList: !w.showWaitingList })} />
+      <RowToggle title="Client self check-in" desc="Let clients check themselves in from a link or QR code on arrival." on={w.selfCheckIn} onClick={() => set({ selfCheckIn: !w.selfCheckIn })} soon />
+
+      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: w.autoReadyMessage ? 14 : 0 }}>
+          <div><div style={{ fontSize: 15.5, fontWeight: 600 }}>Send "ready" message</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>When you tap Notify · Ready, let the client know you're ready for them.</div></div>
+          <Toggle on={w.autoReadyMessage} onClick={() => set({ autoReadyMessage: !w.autoReadyMessage })} />
+        </div>
+        {w.autoReadyMessage && (<>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 8 }}>Message wording</div>
+          <textarea value={w.readyMessage || ""} onChange={(e) => set({ readyMessage: e.target.value })} rows={3} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", resize: "vertical", lineHeight: 1.5 }} />
+          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Use <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> to drop in the barber's name automatically.</div>
+        </>)}
+      </div>
+    </div>
+  );
+}
+
+// Running Late Alerts — the "5 min left, want to tell your next client?" prompt.
+function RunningLateEditor({ r, onChange }) {
+  const set = (patch) => onChange({ ...r, ...patch });
+  const ranges = r.ranges || ["5–10", "10–15"];
+  const setRange = (i, val) => { const a = [...ranges]; a[i] = val; set({ ranges: a }); };
+  const addRange = () => set({ ranges: [...ranges, ""] });
+  const removeRange = (i) => set({ ranges: ranges.filter((_, j) => j !== i) });
+  const Toggle = ({ on, onClick }) => (
+    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+  );
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+        <div><div style={{ fontSize: 15.5, fontWeight: 600 }}>Running-late alerts</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>As you near the end of an appointment, get a prompt to let your next client know you're running a little behind.</div></div>
+        <Toggle on={r.enabled} onClick={() => set({ enabled: !r.enabled })} />
+      </div>
+
+      {r.enabled && (<>
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Remind me when this much time is left</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>How early in the appointment the prompt appears.</div>
+          <Stepper value={r.thresholdMin || 5} onChange={(v) => set({ thresholdMin: v })} min={1} max={30} step={1} suffix="min" />
+        </div>
+
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Delay options to offer</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>The "how far behind" choices you tap when sending the notice.</div>
+          {ranges.map((rg, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <input value={rg} onChange={(e) => setRange(i, e.target.value)} placeholder="e.g. 5–10" style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+              <button onClick={() => removeRange(i)} style={{ background: "none", color: "var(--faint)", padding: "0 4px" }}><Trash2 size={16} /></button>
+            </div>
+          ))}
+          <button className="lift" onClick={addRange} style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 10, padding: 11, fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 4 }}><Plus size={15} /> Add option</button>
+        </div>
+
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
+          <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Message to the client</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>Sent as an in-app notification — no text message.</div>
+          <textarea value={r.message || ""} onChange={(e) => set({ message: e.target.value })} rows={4} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", resize: "vertical", lineHeight: 1.5 }} />
+          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.5 }}>Tags you can use: <strong style={{ color: "var(--sub)" }}>{"{client}"}</strong> name, <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> barber, <strong style={{ color: "var(--sub)" }}>{"{shop}"}</strong>, <strong style={{ color: "var(--sub)" }}>{"{range}"}</strong> minutes behind.</div>
+        </div>
+      </>)}
+    </div>
+  );
+}
+
+// Import Data — demo flow for bringing clients/appointments from another system.
+// (Visual prototype: a real import runs once the app has a backend database.)
+function ImportDataEditor({ showToast }) {
+  const SYSTEMS = ["Square", "GlossGenius", "Vagaro", "Boulevard", "Booksy", "Acuity", "Other / CSV file"];
+  const [system, setSystem] = useState(null);
+  const [stage, setStage] = useState("pick"); // pick | upload | running | done
+  const [pct, setPct] = useState(0);
+  const startImport = () => {
+    setStage("running"); setPct(0);
+    const iv = setInterval(() => setPct((p) => {
+      const next = p + Math.random() * 18 + 6;
+      if (next >= 100) { clearInterval(iv); setStage("done"); if (showToast) showToast("Import complete (demo)."); return 100; }
+      return next;
+    }), 280);
+  };
+  const reset = () => { setSystem(null); setStage("pick"); setPct(0); };
+
+  return (
+    <div>
+      <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel2))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 14, padding: 14, marginBottom: 18, fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>Bring your clients, appointment history, and notes over from your old system. This is a preview — live importing turns on once your account is fully set up.</div>
+
+      {stage === "pick" && (<>
+        <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WHERE ARE YOU COMING FROM?</div>
+        <div style={{ display: "grid", gap: 8 }}>
+          {SYSTEMS.map((s) => { const on = system === s; return (
+            <button key={s} onClick={() => setSystem(s)} style={{ textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, display: "flex", justifyContent: "space-between", alignItems: "center" }}>{s}{on && <Check size={17} style={{ color: "var(--gold)" }} />}</button>
+          ); })}
+        </div>
+        <button className="lift" disabled={!system} onClick={() => setStage("upload")} style={{ width: "100%", marginTop: 16, background: system ? "var(--gold)" : "var(--border)", color: system ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none" }}>Continue</button>
+      </>)}
+
+      {stage === "upload" && (<>
+        <div style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 14, lineHeight: 1.5 }}>Export your data from <strong style={{ color: "var(--text)" }}>{system}</strong> (usually Settings → Export, which gives you a spreadsheet/CSV file), then upload it here.</div>
+        <button className="lift" onClick={startImport} style={{ width: "100%", border: "1px dashed var(--border2)", background: "var(--panel2)", borderRadius: 14, padding: "34px 16px", color: "var(--sub)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+          <Upload size={30} style={{ color: "var(--faint)" }} />
+          <span style={{ fontSize: 15, color: "var(--text)" }}>Upload export file</span>
+          <span style={{ fontSize: 13, color: "var(--faint)" }}>.csv or .xlsx — drag here or tap to choose (simulated)</span>
+        </button>
+        <button onClick={reset} style={{ width: "100%", marginTop: 12, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 8 }}>Back</button>
+      </>)}
+
+      {stage === "running" && (
+        <div style={{ textAlign: "center", padding: "20px 0" }}>
+          <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 14 }}>Importing from {system}…</div>
+          <div style={{ height: 10, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", overflow: "hidden", marginBottom: 10 }}>
+            <div style={{ height: "100%", width: `${pct}%`, background: "var(--gold)", transition: "width .25s var(--ease)" }} />
+          </div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{Math.round(pct)}% — matching clients, appointments, and notes</div>
+        </div>
+      )}
+
+      {stage === "done" && (
+        <div style={{ textAlign: "center", padding: "10px 0" }}>
+          <CheckCircle2 size={40} style={{ color: "#5E8C61", marginBottom: 12 }} />
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, marginBottom: 6 }}>Import complete</div>
+          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Brought over from {system}:</div>
+          <div style={{ display: "grid", gap: 8, marginBottom: 20, textAlign: "left" }}>
+            {[["1,240", "clients"], ["3,580", "past appointments"], ["612", "client notes"], ["48", "gift card balances"]].map(([n, label]) => (
+              <div key={label} style={{ display: "flex", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px" }}>
+                <span style={{ fontSize: 14.5, color: "var(--sub)" }}>{label}</span><span style={{ fontSize: 15, fontWeight: 600 }}>{n}</span>
+              </div>
+            ))}
+          </div>
+          <button className="lift" onClick={reset} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><RefreshCw size={16} /> IMPORT ANOTHER FILE</button>
+        </div>
+      )}
+    </div>
+  );
+}
+function serviceCommissionFor(comp, serviceSales) {
+  const sc = comp.service;
+  if (!sc || !sc.on) return 0;
+  if (sc.type === "basic") return serviceSales * (Number(sc.basicPct) || 0) / 100;
+  // sliding scale: tiers are [{upTo, pct}], last upTo === null means "and above"
+  // We apply the bracket the TOTAL falls into (whole-amount style, matching Mangomint's simple sliding scale).
+  const tiers = [...(sc.tiers || [])].sort((a, b) => (a.upTo == null ? 1 : b.upTo == null ? -1 : a.upTo - b.upTo));
+  let pct = 0;
+  for (const t of tiers) { pct = Number(t.pct) || 0; if (t.upTo == null || serviceSales <= t.upTo) break; }
+  return serviceSales * pct / 100;
+}
+function estimateEarnings(provider, appts, services, ref = new Date()) {
+  const comp = provider.comp || {};
+  const { start, end } = weekRange(ref);
+  // completed appointments for this provider this week
+  const mine = (appts || []).filter((a) => a.providerId === provider.id && (a.status === "done" || a.paid));
+  // Without real timestamps in the prototype, treat all completed appts as "this week" sample.
+  const serviceSales = mine.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+  const productSales = 0; // no product sales in prototype
+  const svcCommission = serviceCommissionFor(comp, serviceSales);
+  const prodCommission = (comp.product && comp.product.on) ? productSales * (Number(comp.product.defaultPct) || 0) / 100 : 0;
+  // hours worked from the provider's weekly schedule
+  let minutes = 0;
+  Object.values(provider.hours || {}).forEach((h) => { if (h && h.on) minutes += (h.end - h.start); });
+  const hours = minutes / 60;
+  const hourlyPay = (comp.hourly && comp.hourly.on) ? hours * (Number(comp.hourly.rate) || 0) : 0;
+  const commissionTotal = svcCommission + prodCommission;
+  // greater-of: pay the higher of hourly vs commission (only when hourly + greaterOf are on)
+  let total, basis;
+  if (comp.hourly && comp.hourly.on && comp.hourly.greaterOf) {
+    if (hourlyPay >= commissionTotal) { total = hourlyPay; basis = "Hourly (greater of)"; }
+    else { total = commissionTotal; basis = "Commission (greater of)"; }
+  } else {
+    total = hourlyPay + commissionTotal;
+    basis = "Hourly + commission";
+  }
+  return { serviceSales, productSales, svcCommission, prodCommission, hours, hourlyPay, commissionTotal, total, basis, count: mine.length, start, end };
+}
+
+// ============================================================
+// STAFF MEMBERS — Mangomint-style hub: list → member → sections
+// ============================================================
+function StaffMembersView({ providers, setProviders, services, setServices, appts, showToast }) {
+  const [openId, setOpenId] = useState(null);   // selected staff id (null = list)
+  const [section, setSection] = useState(null); // null = hub, else section key
+  const [showArchived, setShowArchived] = useState(false);
+  const [picker, setPicker] = useState(false);  // photo picker open
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [workWeekRef, setWorkWeekRef] = useState(new Date());
+
+  const staff = providers.filter((p) => p.id !== "anyone");
+  const active = staff.filter((p) => !p.archived);
+  const archived = staff.filter((p) => p.archived);
+  const person = providers.find((p) => p.id === openId);
+
+  const patch = (pid, obj) => setProviders(providers.map((p) => p.id === pid ? { ...p, ...obj } : p));
+  const patchComp = (pid, branch, obj) => setProviders(providers.map((p) => p.id === pid ? { ...p, comp: { ...defaultComp(), ...(p.comp || {}), [branch]: { ...defaultComp()[branch], ...((p.comp || {})[branch] || {}), ...obj } } } : p));
+  const patchNotif = (pid, obj) => setProviders(providers.map((p) => p.id === pid ? { ...p, notifications: { ...defaultStaffNotifications(), ...(p.notifications || {}), ...obj } } : p));
+  const patchDay = (pid, dow, obj) => setProviders(providers.map((p) => p.id === pid ? { ...p, hours: { ...p.hours, [dow]: { ...p.hours[dow], ...obj } } } : p));
+  const patchPerm = (pid, key) => setProviders(providers.map((p) => { if (p.id !== pid) return p; const cur = { ...defaultPermissions(p.userType), ...(p.permissions || {}) }; return { ...p, permissions: { ...cur, [key]: !cur[key] } }; }));
+
+  const addStaff = () => {
+    const colors = ["#C2703D", "#5E8C72", "#8064B5", "#3D9BE9", "#B14A5E"];
+    const id = "s" + Date.now();
+    setProviders([...providers, { id, name: "New Staff Member", role: "Stylist", color: colors[providers.length % colors.length], photo: STAFF_PORTRAITS[providers.length % STAFF_PORTRAITS.length], hours: { ...DEFAULT_HOURS }, email: "", phone: "", userType: "Staff", isProvider: true, onlineBooking: true, archived: false, notifications: defaultStaffNotifications(), comp: defaultComp(), permissions: defaultPermissions("Staff") }]);
+    setOpenId(id); setSection(null); showToast("Staff member added.");
+  };
+  const archive = (pid) => { patch(pid, { archived: true }); setOpenId(null); showToast("Staff member archived."); };
+  const restore = (pid) => { patch(pid, { archived: false }); showToast("Staff member restored."); };
+
+  // shared UI
+  const Toggle = ({ on, onClick, dim }) => (
+    <button onClick={onClick} style={{ width: 48, height: 28, borderRadius: 16, background: on ? "var(--gold)" : "var(--border2)", position: "relative", transition: "background .2s", flexShrink: 0, opacity: dim ? 0.5 : 1 }}>
+      <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
+    </button>
+  );
+  const SecHeader = ({ title, onBack, right }) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
+      <button onClick={onBack} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
+      <div style={{ flex: 1 }}><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{person ? person.name.toUpperCase() : "STAFF"}</div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{title}</h2></div>
+      {right}
+    </div>
+  );
+
+  // ---------- LIST ----------
+  if (!person) {
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300, margin: 0, flex: 1 }}>Manage your team — details, notifications, services, hours, and compensation.</p>
+          <button onClick={addStaff} className="lift" style={{ background: "var(--gold)", color: "var(--on-gold)", width: 38, height: 38, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 12 }}><Plus size={20} /></button>
+        </div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+          {active.map((p, i) => (
+            <button key={p.id} onClick={() => { setOpenId(p.id); setSection(null); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
+              <Avatar size={46} photo={p.id === "anyone" ? null : staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--gold)"} />
+              <div style={{ flex: 1 }}><div style={{ fontSize: 16.5, fontWeight: 600 }}>{p.name}</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>{p.role}</div></div>
+              <ChevronRight size={20} style={{ color: "var(--faint)" }} />
+            </button>
+          ))}
+        </div>
+
+        {archived.length > 0 && (
+          <button onClick={() => setShowArchived(!showArchived)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", color: "var(--text)" }}>
+            <span style={{ fontSize: 15.5, fontWeight: 600 }}>Show Archived Staff</span>
+            <ChevronRight size={18} style={{ color: "var(--faint)", transform: showArchived ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+          </button>
+        )}
+        {showArchived && archived.map((p) => (
+          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "12px 16px" }}>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY }}>{p.name.charAt(0)}</div>
+            <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 500 }}>{p.name}</div><div style={{ fontSize: 13, color: "var(--faint)" }}>Archived</div></div>
+            <button onClick={() => restore(p.id)} style={{ background: "none", color: "var(--gold)", fontSize: 14, fontWeight: 500 }}>Restore</button>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ---------- DETAILS ----------
+  if (section === "details") {
+    const ut = person.userType || "Staff";
+    return (
+      <div className="appt-screen" style={{ paddingBottom: 40 }}>
+        {picker && <StaffPhotoPicker hasPhoto={!!person.photo} onClose={() => setPicker(false)} onPick={(id) => { patch(person.id, { photo: id }); setPicker(false); }} onRemove={() => { patch(person.id, { photo: null }); setPicker(false); }} />}
+        <SecHeader title="Details" onBack={() => setSection(null)} right={<button onClick={() => setEditingDetails(!editingDetails)} style={{ background: "none", color: "var(--gold)", fontSize: 16, fontWeight: 500 }}>{editingDetails ? "Done" : "Edit"}</button>} />
+        {/* avatar */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 22 }}>
+          <button onClick={() => setPicker(true)} style={{ position: "relative", width: 96, height: 96, borderRadius: "50%", background: "none", border: "none", padding: 0 }}>
+            <Avatar size={96} photo={person.id === "anyone" ? null : staffPhoto(person)} initial={person.name.charAt(0)} color={person.color || "var(--gold)"} />
+            <span style={{ position: "absolute", bottom: 2, right: 2, width: 30, height: 30, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={14} /></span>
+          </button>
+        </div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "6px 18px" }}>
+          {editingDetails ? (
+            <div style={{ display: "grid", gap: 14, padding: "14px 0" }}>
+              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Name</div><input value={person.name} onChange={(e) => patch(person.id, { name: e.target.value })} style={inputStyle} /></div>
+              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Role / title</div><input value={person.role} onChange={(e) => patch(person.id, { role: e.target.value })} style={inputStyle} /></div>
+              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Email</div><input value={person.email || ""} onChange={(e) => patch(person.id, { email: e.target.value })} style={inputStyle} /></div>
+              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Phone</div><input value={person.phone || ""} onChange={(e) => patch(person.id, { phone: e.target.value })} style={inputStyle} /></div>
+              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>User type</div>
+                <div style={{ display: "flex", gap: 8 }}>{["Admin", "Staff", "Front Desk"].map((t) => (
+                  <button key={t} onClick={() => patch(person.id, { userType: t })} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${ut === t ? "var(--gold)" : "var(--border)"}`, background: ut === t ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel2)", color: ut === t ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: ut === t ? 600 : 400 }}>{t}</button>
+                ))}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ fontSize: 15 }}>Is service provider</span><Toggle on={person.isProvider !== false} onClick={() => patch(person.id, { isProvider: !(person.isProvider !== false) })} /></div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ fontSize: 15 }}>Enable in online booking</span><Toggle on={!!person.onlineBooking} onClick={() => patch(person.id, { onlineBooking: !person.onlineBooking })} /></div>
+            </div>
+          ) : (
+            <div>
+              {[["Email", person.email || "—"], ["Phone", person.phone || "—"], ["User type", ut], ["Is service provider", person.isProvider !== false ? "Yes" : "No"], ["Enable in online booking", person.onlineBooking ? "Yes" : "No"]].map(([k, v], i) => (
+                <div key={k} style={{ padding: "16px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                  <div style={{ fontSize: 14, color: "var(--faint)", marginBottom: 3 }}>{k}</div>
+                  <div style={{ fontSize: 16, color: k === "Email" ? "var(--gold)" : "var(--text)" }}>{v}</div>
+                </div>
+              ))}
+              <div style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+                <button onClick={() => showToast("iCal calendar URL copied.")} style={{ background: "none", color: "var(--gold)", fontSize: 15 }}>View iCal Calendar URL</button>
+              </div>
+              <div style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+                <div style={{ fontSize: 14, color: "var(--faint)", marginBottom: 6 }}>Online booking direct link</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ flex: 1, fontSize: 14, color: "var(--gold)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>booking.meridian.app/{person.id}</span>
+                  <button onClick={() => showToast("Link copied.")} style={{ background: "none", color: "var(--sub)" }}><Copy size={16} /></button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        <button onClick={() => archive(person.id)} style={{ marginTop: 18, background: "none", color: "#C2563F", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}><Trash2 size={14} /> Archive {person.name}</button>
+      </div>
+    );
+  }
+
+  // ---------- NOTIFICATIONS ----------
+  if (section === "notifications") {
+    const n = { ...defaultStaffNotifications(), ...(person.notifications || {}) };
+    const Row = ({ label, k }) => (
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, padding: "14px 0" }}>
+        <span style={{ fontSize: 15.5, flex: 1, lineHeight: 1.4 }}>{label}</span>
+        <Toggle on={!!n[k]} onClick={() => patchNotif(person.id, { [k]: !n[k] })} />
+      </div>
+    );
+    const Group = ({ title, children }) => (
+      <div style={{ marginBottom: 8 }}><div style={{ fontSize: 17, fontWeight: 700, margin: "18px 0 4px", fontFamily: FONT_DISPLAY }}>{title}</div>{children}</div>
+    );
+    return (
+      <div className="appt-screen" style={{ paddingBottom: 40 }}>
+        <SecHeader title="Notifications" onBack={() => setSection(null)} />
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "8px 18px 18px" }}>
+          <Group title="Send SMS when:"><Row label="Online bookings are created, changed, or removed" k="smsOnlineBooking" /><Row label="Other bookings are created, changed, or removed" k="smsOtherBooking" /></Group>
+          <Group title="Send email when:"><Row label="Online bookings are created" k="emailOnlineBooking" /></Group>
+          <Group title="Send mobile app notification when:"><Row label="New text message is received" k="appNewText" /><Row label="New web chat message is received" k="appNewChat" /><Row label="Missed call or voicemail is received" k="appMissedCall" /></Group>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- SERVICES (per-staff) — reads/writes the SAME service.staff store as the service editor ----------
+  if (section === "services") {
+    const entryFor = (s) => (s.staff && s.staff[person.id]) || { on: true, duration: null, price: null };
+    const setSvc = (sid, obj) => setServices(services.map((s) => {
+      if (s.id !== sid) return s;
+      const cur = (s.staff && s.staff[person.id]) || { on: true, duration: null, price: null };
+      return { ...s, staff: { ...(s.staff || {}), [person.id]: { ...cur, ...obj } } };
+    }));
+    const allOff = services.every((s) => entryFor(s).on === false);
+    return (
+      <div className="appt-screen" style={{ paddingBottom: 40 }}>
+        <SecHeader title="Services" onBack={() => setSection(null)} right={
+          <button onClick={() => { const next = !!allOff; services.forEach((s) => setSvc(s.id, { on: next })); }} style={{ background: "none", color: "var(--gold)", fontSize: 15, fontWeight: 500 }}>{allOff ? "Enable all" : "Disable all"}</button>
+        } />
+        <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginBottom: 14 }}>Same settings as each service's Staff tab — edit here or there, they stay in sync.</p>
+        <div style={{ display: "grid", gap: 14 }}>
+          {services.map((s) => {
+            const e = entryFor(s); const on = e.on !== false;
+            return (
+              <div key={s.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16, opacity: on ? 1 : 0.55 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: on ? 14 : 0 }}>
+                  <span style={{ fontSize: 16.5, fontWeight: 700 }}>{s.name}</span>
+                  <Toggle on={on} onClick={() => setSvc(s.id, { on: !on })} />
+                </div>
+                {on && (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)" }}>
+                      <span style={{ fontSize: 15, color: "var(--text2)" }}>Duration</span>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                          <input type="number" value={e.duration ?? ""} onChange={(ev) => setSvc(s.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} placeholder={String(s.duration)} style={{ width: 56, background: "transparent", border: "none", color: "var(--gold)", fontSize: 17, fontWeight: 700, textAlign: "right", fontFamily: FONT_BODY }} />
+                          <span style={{ fontSize: 15, color: "var(--gold)", fontWeight: 700 }}>min</span>
+                        </div>
+                        {e.duration != null && <button onClick={() => setSvc(s.id, { duration: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5 }}>Reset to default</button>}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)" }}>
+                      <span style={{ fontSize: 15, color: "var(--text2)" }}>Price</span>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 2, justifyContent: "flex-end" }}>
+                          <span style={{ fontSize: 17 }}>$</span>
+                          <input type="number" value={e.price ?? ""} onChange={(ev) => setSvc(s.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} placeholder={String(s.price)} style={{ width: 70, background: "transparent", border: "none", color: "var(--text)", fontSize: 17, textAlign: "right", fontFamily: FONT_BODY }} />
+                        </div>
+                        {e.price != null && <button onClick={() => setSvc(s.id, { price: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5 }}>Reset to default</button>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- WORK HOURS ----------
+  if (section === "hours") {
+    const { start } = weekRange(workWeekRef);
+    const days = [...Array(7)].map((_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; });
+    const fmtRange = (h) => `${fmtTime(h.start)} – ${fmtTime(h.end)}`;
+    const label = `${MONTHS[days[0].getMonth()].slice(0,3)} ${days[0].getDate()} – ${days[6].getDate()}, ${days[6].getFullYear()}`;
+    const shift = (delta) => { const d = new Date(workWeekRef); d.setDate(d.getDate() + delta * 7); setWorkWeekRef(d); };
+    return (
+      <div className="appt-screen" style={{ paddingBottom: 40 }}>
+        <SecHeader title="Work Hours" onBack={() => setSection(null)} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <span style={{ fontSize: 15, color: "var(--sub)" }}>{label}</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => shift(-1)} style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid var(--border)", background: "var(--panel)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronLeft size={18} /></button>
+            <button onClick={() => shift(1)} style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid var(--border)", background: "var(--panel)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronRight size={18} /></button>
+          </div>
+        </div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "8px 14px" }}>
+          {days.map((d, i) => { const dow = d.getDay(); const h = person.hours[dow] || { on: false, start: 540, end: 1020 }; return (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 4px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+              <div style={{ width: 52, flexShrink: 0 }}><div style={{ fontSize: 14.5, fontWeight: 700 }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</div><div style={{ fontSize: 12.5, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div></div>
+              <button onClick={() => patchDay(person.id, dow, { on: !h.on })} style={{ flex: 1, textAlign: "left", background: h.on ? "color-mix(in srgb, var(--gold) 8%, var(--panel2))" : "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: h.on ? "var(--text)" : "var(--faint)", fontSize: 15, fontStyle: h.on ? "normal" : "italic" }}>{h.on ? fmtRange(h) : "No shifts"}</button>
+              {h.on && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => patchDay(person.id, dow, { start: Math.max(0, h.start - 15) })} style={{ width: 26, height: 24, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", fontSize: 13, color: "var(--text)" }}>−</button>
+                    <button onClick={() => patchDay(person.id, dow, { start: h.start + 15 })} style={{ width: 26, height: 24, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", fontSize: 13, color: "var(--text)" }}>+</button>
+                  </div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => patchDay(person.id, dow, { end: Math.max(h.start + 15, h.end - 15) })} style={{ width: 26, height: 24, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", fontSize: 13, color: "var(--text)" }}>−</button>
+                    <button onClick={() => patchDay(person.id, dow, { end: h.end + 15 })} style={{ width: 26, height: 24, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", fontSize: 13, color: "var(--text)" }}>+</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ); })}
+        </div>
+        <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>The − / + buttons nudge each shift's start (top row) and end (bottom row) by 15 minutes. These hours drive the calendar and online booking availability.</p>
+      </div>
+    );
+  }
+
+  // ---------- COMPENSATION ----------
+  if (section === "comp") {
+    const comp = { ...defaultComp(), ...(person.comp || {}) };
+    const sc = { ...defaultComp().service, ...comp.service };
+    const pc = { ...defaultComp().product, ...comp.product };
+    const hr = { ...defaultComp().hourly, ...comp.hourly };
+    const est = estimateEarnings(person, appts, services, new Date());
+    const Card = ({ title, desc, on, onToggle, children }) => (
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
+          <div style={{ flex: 1 }}><div style={{ fontSize: 18, fontWeight: 700, fontFamily: FONT_DISPLAY }}>{title}</div><div style={{ fontSize: 14, color: "var(--sub)", marginTop: 4, lineHeight: 1.45 }}>{desc}</div></div>
+          <Toggle on={on} onClick={onToggle} />
+        </div>
+        {on && children}
+      </div>
+    );
+    return (
+      <div className="appt-screen" style={{ paddingBottom: 40 }}>
+        <SecHeader title="Compensation" onBack={() => setSection(null)} />
+
+        {/* Service Commission */}
+        <Card title="Service Commission" desc="Compensation is calculated as a percentage of service sales" on={sc.on} onToggle={() => patchComp(person.id, "service", { on: !sc.on })}>
+          <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+            <button onClick={() => patchComp(person.id, "service", { type: "basic" })} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", textAlign: "left", color: "var(--text)" }}>
+              <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${sc.type === "basic" ? "var(--gold)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{sc.type === "basic" && <span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--gold)" }} />}</span>
+              <span><span style={{ fontSize: 15.5, fontWeight: 600 }}>Basic Service Commission</span><br /><span style={{ fontSize: 13.5, color: "var(--sub)" }}>A flat percentage of total sales</span></span>
+            </button>
+            {sc.type === "basic" && (
+              <div style={{ paddingLeft: 34 }}>
+                <div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Default percentage</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 14px", maxWidth: 140 }}>
+                  <input type="number" value={sc.basicPct} onChange={(e) => patchComp(person.id, "service", { basicPct: Number(e.target.value) })} style={{ width: 50, background: "transparent", border: "none", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY }} /><span style={{ fontSize: 16, color: "var(--sub)" }}>%</span>
+                </div>
+              </div>
+            )}
+            <button onClick={() => patchComp(person.id, "service", { type: "sliding" })} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", textAlign: "left", color: "var(--text)" }}>
+              <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${sc.type === "sliding" ? "var(--gold)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{sc.type === "sliding" && <span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--gold)" }} />}</span>
+              <span><span style={{ fontSize: 15.5, fontWeight: 600 }}>Sliding Scale Service Commission</span><br /><span style={{ fontSize: 13.5, color: "var(--sub)" }}>Percentage depends on amount sold</span></span>
+            </button>
+            {sc.type === "sliding" && (
+              <div style={{ paddingLeft: 34, display: "grid", gap: 8 }}>
+                {sc.tiers.map((t, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13.5, color: "var(--sub)", width: 54 }}>{i === 0 ? "Up to" : t.upTo == null ? "Above" : "Up to"}</span>
+                    {t.upTo == null ? <span style={{ flex: 1, fontSize: 14, color: "var(--faint)" }}>(remaining)</span> : (
+                      <div style={{ display: "flex", alignItems: "center", gap: 3, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", flex: 1 }}>
+                        <span style={{ fontSize: 14, color: "var(--sub)" }}>$</span>
+                        <input type="number" value={t.upTo} onChange={(e) => { const tiers = sc.tiers.map((x, idx) => idx === i ? { ...x, upTo: Number(e.target.value) } : x); patchComp(person.id, "service", { tiers }); }} style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
+                      </div>
+                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 3, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", width: 76 }}>
+                      <input type="number" value={t.pct} onChange={(e) => { const tiers = sc.tiers.map((x, idx) => idx === i ? { ...x, pct: Number(e.target.value) } : x); patchComp(person.id, "service", { tiers }); }} style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} /><span style={{ fontSize: 14, color: "var(--sub)" }}>%</span>
+                    </div>
+                  </div>
+                ))}
+                <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5 }}>Whichever bracket the week's service sales fall into sets the rate.</p>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Product Commission */}
+        <Card title="Product Commission" desc="Compensation is calculated as a percentage of product sales" on={pc.on} onToggle={() => patchComp(person.id, "product", { on: !pc.on })}>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Default percentage</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 14px", maxWidth: 140, marginBottom: 16 }}>
+              <input type="number" value={pc.defaultPct} onChange={(e) => patchComp(person.id, "product", { defaultPct: Number(e.target.value) })} style={{ width: 50, background: "transparent", border: "none", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY }} /><span style={{ fontSize: 16, color: "var(--sub)" }}>%</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}><Toggle on={!!pc.overridesOn} onClick={() => patchComp(person.id, "product", { overridesOn: !pc.overridesOn })} /><span style={{ fontSize: 15 }}>Enable commission overrides</span></div>
+            <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Override the default rate for specific products or categories. The most specific rate applies.</p>
+          </div>
+        </Card>
+
+        {/* Hourly */}
+        <Card title="Hourly" desc="Compensation is calculated using a flat rate per hour" on={hr.on} onToggle={() => patchComp(person.id, "hourly", { on: !hr.on })}>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Amount per hour</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 14px", marginBottom: 16 }}>
+              <span style={{ fontSize: 16, color: "var(--sub)" }}>$</span><input type="number" value={hr.rate || ""} placeholder="e.g. 20" onChange={(e) => patchComp(person.id, "hourly", { rate: Number(e.target.value) })} style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY }} />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}><Toggle on={!!hr.greaterOf} onClick={() => patchComp(person.id, "hourly", { greaterOf: !hr.greaterOf })} /><span style={{ fontSize: 15 }}>Enable greater-of calculation</span></div>
+            <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Staff member is paid the higher value between their hourly rate and commission earnings.</p>
+          </div>
+        </Card>
+
+        {/* Live earnings readout */}
+        <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid var(--gold)", borderRadius: 16, padding: 18, marginTop: 6 }}>
+          <div style={{ fontSize: 12, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>ESTIMATED EARNINGS · THIS WEEK</div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 600, marginBottom: 4 }}>${est.total.toFixed(2)}</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 14 }}>{est.basis} · {est.count} completed appt{est.count !== 1 ? "s" : ""}</div>
+          {[["Service sales", `$${est.serviceSales.toFixed(2)}`], ["Service commission", `$${est.svcCommission.toFixed(2)}`], ["Hours scheduled", `${est.hours.toFixed(1)} h`], ["Hourly pay", `$${est.hourlyPay.toFixed(2)}`]].map(([k, v]) => (
+            <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", fontSize: 14.5, borderTop: "1px solid color-mix(in srgb, var(--gold) 20%, transparent)" }}><span style={{ color: "var(--sub)" }}>{k}</span><span style={{ fontWeight: 600 }}>{v}</span></div>
+          ))}
+          <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Live estimate from completed appointments using the settings above. Real payroll (taxes, tips, time clock, pay periods) requires the backend.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- PERMISSIONS ----------
+  if (section === "permissions") {
+    const perms = { ...defaultPermissions(person.userType), ...(person.permissions || {}) };
+    return (
+      <div className="appt-screen" style={{ paddingBottom: 40 }}>
+        <SecHeader title="Permissions" onBack={() => setSection(null)} />
+        <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginBottom: 16 }}>Control exactly what {person.name.split(" ")[0]} can see and do. Admins start with everything on; other roles start with everything off.</p>
+        <div style={{ display: "grid", gap: 14 }}>
+          {PERMISSION_SECTIONS.map((sec) => (
+            <div key={sec.group} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px 6px" }}>
+              <div style={{ fontSize: 18, fontWeight: 700, fontFamily: FONT_DISPLAY, marginBottom: 4 }}>{sec.group}</div>
+              {sec.items.map((it, i) => (
+                <div key={it.key} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, padding: "16px 0", borderTop: i ? "1px solid var(--line)" : "1px solid var(--line)" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15.5, color: "var(--text)" }}>{it.label}</div>
+                    <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.45 }}>{it.desc}</div>
+                  </div>
+                  <Toggle on={!!perms[it.key]} onClick={() => patchPerm(person.id, it.key)} />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- MEMBER HUB ----------
+  const hubRows = [
+    { id: "details", label: "Details" },
+    { id: "notifications", label: "Notifications" },
+    { id: "services", label: "Services" },
+    { id: "hours", label: "Work Hours" },
+    { id: "comp", label: "Compensation" },
+    { id: "permissions", label: "Permissions" },
+  ];
+  return (
+    <div className="appt-screen" style={{ paddingBottom: 40 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 18 }}>
+        <button onClick={() => setOpenId(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /> <span style={{ fontSize: 15 }}>Staff</span></button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
+        <div style={{ marginBottom: 12 }}><Avatar size={92} photo={person.id === "anyone" ? null : staffPhoto(person)} initial={person.name.charAt(0)} color={person.color || "var(--gold)"} /></div>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600 }}>{person.name}</div>
+        <div style={{ fontSize: 14, color: "var(--sub)" }}>{person.role}</div>
+      </div>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+        {hubRows.map((r, i) => (
+          <button key={r.id} onClick={() => { setSection(r.id); setEditingDetails(false); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 18px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
+            <span style={{ fontSize: 17 }}>{r.label}</span>
+            <ChevronRight size={20} style={{ color: "var(--faint)" }} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// STAFF EDITOR — per-person working hours and days off
+// ============================================================
+function StaffEditor({ providers, setProviders, showToast }) {
+  const [openId, setOpenId] = useState(null);
+  const staff = providers.filter((p) => p.id !== "anyone");
+  const setDay = (pid, dow, patch) => {
+    setProviders(providers.map((p) => p.id === pid ? { ...p, hours: { ...p.hours, [dow]: { ...p.hours[dow], ...patch } } } : p));
+  };
+  const addStaff = () => {
+    const colors = ["#C2703D", "#5E8C72", "#8064B5", "#3D9BE9", "#B14A5E"];
+    const id = "s" + Date.now();
+    setProviders([...providers, { id, name: "New Staff", role: "Stylist", color: colors[providers.length % colors.length], photo: STAFF_PORTRAITS[providers.length % STAFF_PORTRAITS.length], hours: { ...DEFAULT_HOURS } }]);
+    setOpenId(id);
+  };
+  const removeStaff = (pid) => { setProviders(providers.filter((p) => p.id !== pid)); setOpenId(null); showToast("Staff member removed."); };
+  const rename = (pid, name) => setProviders(providers.map((p) => p.id === pid ? { ...p, name } : p));
+  const setRole = (pid, role) => setProviders(providers.map((p) => p.id === pid ? { ...p, role } : p));
+  const TimeStep = ({ value, onChange }) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <button onClick={() => onChange(Math.max(0, value - 30))} style={{ width: 28, height: 28, borderRadius: 6, background: "var(--panel)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 16 }}>–</button>
+      <span style={{ fontSize: 14, minWidth: 64, textAlign: "center" }}>{fmtTime(value)}</span>
+      <button onClick={() => onChange(Math.min(1440, value + 30))} style={{ width: 28, height: 28, borderRadius: 6, background: "var(--panel)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 16 }}>+</button>
+    </div>
+  );
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300, marginBottom: 16 }}>Set who works and when. Each person's days and hours drive the calendar's open times and what clients can book online.</p>
+      <div style={{ display: "grid", gap: 10 }}>
+        {staff.map((p) => {
+          const expanded = openId === p.id;
+          return (
+            <div key={p.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+              <button onClick={() => setOpenId(expanded ? null : p.id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "none", color: "var(--text)", textAlign: "left" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: p.color }} />
+                  <div>
+                    <div style={{ fontSize: 15.5, fontWeight: 500 }}>{p.name}</div>
+                    <div style={{ fontSize: 13, color: "var(--sub)" }}>{p.role} · {daysSummary(p.hours)}</div>
+                  </div>
+                </div>
+                <ChevronRight size={18} style={{ color: "var(--faint)", transform: expanded ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+              </button>
+              {expanded && (
+                <div style={{ padding: "4px 16px 18px", borderTop: "1px solid var(--line)" }}>
+                  <label style={{ fontSize: 13, color: "var(--faint)", display: "block", margin: "14px 0 6px" }}>Name</label>
+                  <input value={p.name} onChange={(e) => rename(p.id, e.target.value)} style={{ ...inputStyle, marginBottom: 12 }} />
+                  <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Role / title</label>
+                  <input value={p.role} onChange={(e) => setRole(p.id, e.target.value)} style={{ ...inputStyle, marginBottom: 18 }} />
+
+                  <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 10 }}>Working hours</label>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {[1, 2, 3, 4, 5, 6, 0].map((dow) => { const h = p.hours[dow] || { on: false, start: 540, end: 1020 }; return (
+                      <div key={dow} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px" }}>
+                        <button onClick={() => setDay(p.id, dow, { on: !h.on })} style={{ display: "flex", alignItems: "center", gap: 9, background: "none", color: "var(--text)", flexShrink: 0 }}>
+                          <span style={{ width: 38, height: 22, borderRadius: 11, background: h.on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 2, left: h.on ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+                          <span style={{ fontSize: 13.5, width: 34 }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</span>
+                        </button>
+                        {h.on ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <TimeStep value={h.start} onChange={(v) => setDay(p.id, dow, { start: v })} />
+                            <span style={{ color: "var(--faint)", fontSize: 13 }}>–</span>
+                            <TimeStep value={h.end} onChange={(v) => setDay(p.id, dow, { end: v })} />
+                          </div>
+                        ) : <span style={{ fontSize: 13, color: "var(--faint)" }}>Day off</span>}
+                      </div>
+                    ); })}
+                  </div>
+
+                  <button onClick={() => removeStaff(p.id)} style={{ marginTop: 16, background: "none", color: "#C2563F", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Trash2 size={14} /> Remove {p.name}</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <button className="lift" onClick={addStaff} style={{ width: "100%", marginTop: 12, background: "var(--panel2)", border: "1px dashed var(--border2)", color: "var(--text)", padding: 14, borderRadius: 10, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add staff member</button>
+    </div>
+  );
+}
+
+// ---------- APPEARANCE PICKER (GlossGenius-style: Themes / Palette / Accent / Font) ----------
+const ACCENTS = [
+  { id: "ink", name: "Ink", hex: "#1A1A18" }, { id: "forest", name: "Forest", hex: "#1F5138" },
+  { id: "rose", name: "Rose", hex: "#B14A63" }, { id: "clay", name: "Clay", hex: "#B65A33" },
+  { id: "teal", name: "Teal", hex: "#2E7D74" }, { id: "plum", name: "Plum", hex: "#7A4E86" },
+  { id: "brass", name: "Brass", hex: "#B98740" }, { id: "navy", name: "Navy", hex: "#28406B" },
+];
+const FONT_PAIRS = [
+  { id: "atelier", name: "Atelier", disp: "'Cormorant Garamond', serif", body: "'Jost', sans-serif", note: "Editorial serif" },
+  { id: "fraunces", name: "Fraunces", disp: "'Fraunces', serif", body: "'Inter', sans-serif", note: "Modern serif" },
+  { id: "playfair", name: "Playfair", disp: "'Playfair Display', serif", body: "'Poppins', sans-serif", note: "High-contrast" },
+  { id: "oswald", name: "Oswald", disp: "'Oswald', sans-serif", body: "'Jost', sans-serif", note: "Bold condensed" },
+];
+
+function AppearancePicker({ theme, setTheme }) {
+  const [tab, setTab] = useState("themes");
+  const [accent, setAccent] = useState(null); // hex override or null
+  const [fontPair, setFontPair] = useState(null);
+
+  // apply accent / font overrides live on the themed root (inline beats the .theme- class)
+  useEffect(() => {
+    const root = document.getElementById("app-root"); if (!root) return;
+    if (accent) root.style.setProperty("--gold", accent);
+    else root.style.removeProperty("--gold");
+    return () => { const r = document.getElementById("app-root"); if (r) r.style.removeProperty("--gold"); };
+  }, [accent]);
+  useEffect(() => {
+    const root = document.getElementById("app-root"); if (!root) return;
+    if (fontPair) { root.style.setProperty("--font-disp", fontPair.disp); root.style.setProperty("--font-body", fontPair.body); }
+    else { root.style.removeProperty("--font-disp"); root.style.removeProperty("--font-body"); }
+    return () => { const r = document.getElementById("app-root"); if (r) { r.style.removeProperty("--font-disp"); r.style.removeProperty("--font-body"); } };
+  }, [fontPair]);
+
+  const TABS = [["themes","Themes"],["palette","Palette"],["accent","Accent"],["font","Font"]];
+
+  // a small realistic mini-mockup of the app painted in a given theme's palette
+  const Mock = ({ th, accentHex }) => {
+    const v = th.t; const acc = accentHex || v.gold;
+    const tint = (pct) => `color-mix(in srgb, ${acc} ${pct}%, ${v.panel})`;
+    return (
+      <div style={{ background: v.bg, padding: "20px 20px 22px", position: "relative", minHeight: 200 }}>
+        <div style={{ fontFamily: th.body, fontSize: 9.5, letterSpacing: 3, color: v.faint, marginBottom: 6, fontWeight: 600 }}>FRIDAY · TODAY</div>
+        <div style={{ fontFamily: th.disp, color: v.text, fontSize: 38, fontWeight: 500, letterSpacing: th.disp.includes("Oswald") ? 1 : -0.5, lineHeight: 0.95, marginBottom: 18 }}>Sanctuary</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 9, marginBottom: 18 }}>
+          <div style={{ background: tint(12), borderLeft: `3px solid ${acc}`, border: `1px solid color-mix(in srgb, ${acc} 26%, ${v.border})`, borderRadius: 12, padding: "11px 13px" }}>
+            <div style={{ fontFamily: th.body, fontSize: 13, fontWeight: 600, color: v.text, marginBottom: 4 }}>Marcus Webb</div>
+            <div style={{ fontFamily: th.body, fontSize: 11, color: v.sub }}>9:00 AM · Cut &amp; Beard</div>
+          </div>
+          <div style={{ background: v.panel, border: `1px solid ${v.border}`, borderRadius: 12, padding: "11px 13px" }}>
+            <div style={{ fontFamily: th.body, fontSize: 13, fontWeight: 600, color: v.text2, marginBottom: 4 }}>Tariq Allen</div>
+            <div style={{ fontFamily: th.body, fontSize: 11, color: v.faint }}>10:30 AM · Skin Fade</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ flex: 1, background: acc, color: v.onGold, fontFamily: th.body, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textAlign: "center", padding: "12px 0", borderRadius: 30 }}>BOOK NOW</div>
+          <div style={{ fontFamily: th.disp, color: acc, fontSize: 30, fontWeight: 600, lineHeight: 1 }}>Aa</div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      {/* tabs */}
+      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 20 }}>
+        {TABS.map(([id, label]) => { const on = tab === id; return (
+          <button key={id} onClick={() => setTab(id)} style={{ position: "relative", background: "none", color: on ? "var(--text)" : "var(--sub)", fontSize: 15, fontWeight: on ? 600 : 400, padding: "8px 14px 12px" }}>
+            {label}
+            {on && <span style={{ position: "absolute", left: 10, right: 10, bottom: -1, height: 2, background: "var(--gold)", borderRadius: 2 }} />}
+          </button>
+        ); })}
+      </div>
+
+      {tab === "themes" && (
+        <div style={{ display: "grid", gap: 18 }}>
+          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6 }}>Each theme is a complete look — palette and fonts together. Tap to apply it everywhere.</div>
+          {THEMES.map((th) => { const on = theme === th.id; return (
+            <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 20, border: on ? "2px solid var(--gold)" : "1px solid var(--border)", overflow: "hidden", textAlign: "left", background: th.t.bg, boxShadow: on ? "var(--shadow-lg)" : "var(--shadow-sm)", display: "block", width: "100%" }}>
+              <div style={{ position: "relative" }}>
+                <Mock th={th} />
+                {on && <div style={{ position: "absolute", top: 16, right: 16, width: 26, height: 26, borderRadius: "50%", background: th.t.gold, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 3px 10px rgba(0,0,0,0.3)" }}><Check size={15} style={{ color: th.t.onGold }} strokeWidth={3} /></div>}
+              </div>
+              <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel)", borderTop: "1px solid var(--line)" }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: on ? "var(--gold)" : "var(--text)", letterSpacing: -0.2 }}>{th.name}</div>
+                  <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>{th.tagline}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--faint)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 9px" }}>{th.dark ? "DARK" : "LIGHT"}</span>
+                  {on && <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--gold)", fontWeight: 600 }}>ACTIVE</span>}
+                </div>
+              </div>
+            </button>
+          ); })}
+        </div>
+      )}
+
+      {tab === "palette" && (
+        <div>
+          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 18 }}>Light or dark — pick the canvas. These are the same palettes grouped by mood.</div>
+          {["Light","Dark"].map((grp) => (
+            <div key={grp} style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 13, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>{grp.toUpperCase()}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {THEMES.filter((t) => t.group === grp).map((th) => { const on = theme === th.id; const v = th.t; return (
+                  <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 16, overflow: "hidden", border: on ? "2px solid var(--gold)" : "1px solid var(--border)", background: v.bg, textAlign: "left" }}>
+                    <div style={{ height: 64, background: v.bg, display: "flex", alignItems: "center", padding: "0 12px", gap: 6 }}>
+                      <span style={{ width: 22, height: 22, borderRadius: "50%", background: v.gold }} />
+                      <span style={{ width: 16, height: 16, borderRadius: "50%", background: v.panel2, border: `1px solid ${v.border2}` }} />
+                      <span style={{ fontFamily: th.disp, color: v.text, fontSize: 20, marginLeft: "auto" }}>Aa</span>
+                    </div>
+                    <div style={{ padding: "9px 12px", background: "var(--panel)", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 600, color: on ? "var(--gold)" : "var(--text)" }}>{th.name}</span>
+                      {on && <Check size={15} style={{ color: "var(--gold)" }} strokeWidth={3} />}
+                    </div>
+                  </button>
+                ); })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "accent" && (
+        <div>
+          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 18 }}>Override just the accent color used for buttons and highlights, keeping your current theme.</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 22 }}>
+            <button onClick={() => setAccent(null)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, background: "none" }}>
+              <span style={{ width: 52, height: 52, borderRadius: "50%", border: accent ? "1px solid var(--border)" : "2px solid var(--gold)", background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)", fontSize: 11 }}>Theme</span>
+              <span style={{ fontSize: 12, color: !accent ? "var(--gold)" : "var(--sub)", fontWeight: !accent ? 600 : 400 }}>Default</span>
+            </button>
+            {ACCENTS.map((a) => { const on = accent === a.hex; return (
+              <button key={a.id} onClick={() => setAccent(a.hex)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, background: "none" }}>
+                <span style={{ width: 52, height: 52, borderRadius: "50%", background: a.hex, border: on ? "2px solid var(--text)" : "1px solid rgba(0,0,0,0.1)", boxShadow: on ? "0 0 0 3px var(--bg), 0 0 0 5px " + a.hex : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={18} style={{ color: "#fff" }} strokeWidth={3} />}</span>
+                <span style={{ fontSize: 12, color: on ? "var(--text)" : "var(--sub)", fontWeight: on ? 600 : 400 }}>{a.name}</span>
+              </button>
+            ); })}
+          </div>
+          {/* live preview */}
+          <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}>
+            <Mock th={THEMES.find((t) => t.id === theme)} accentHex={accent} />
+          </div>
+        </div>
+      )}
+
+      {tab === "font" && (
+        <div>
+          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 18 }}>Swap the typeface pairing while keeping your colors.</div>
+          <div style={{ display: "grid", gap: 12 }}>
+            <button onClick={() => setFontPair(null)} className="lift" style={{ textAlign: "left", padding: "16px 18px", borderRadius: 14, border: !fontPair ? "2px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div><div style={{ fontSize: 15, fontWeight: 600, color: !fontPair ? "var(--gold)" : "var(--text)" }}>Theme default</div><div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>Use the font that ships with this theme</div></div>
+              {!fontPair && <Check size={17} style={{ color: "var(--gold)" }} strokeWidth={3} />}
+            </button>
+            {FONT_PAIRS.map((f) => { const on = fontPair && fontPair.id === f.id; return (
+              <button key={f.id} onClick={() => setFontPair(f)} className="lift" style={{ textAlign: "left", padding: "16px 18px", borderRadius: 14, border: on ? "2px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontFamily: f.disp, fontSize: 26, color: "var(--text)", lineHeight: 1 }}>Sanctuary</div>
+                  <div style={{ fontFamily: f.body, fontSize: 12.5, color: "var(--sub)", marginTop: 4 }}>{f.name} · {f.note}</div>
+                </div>
+                {on && <Check size={17} style={{ color: "var(--gold)" }} strokeWidth={3} />}
+              </button>
+            ); })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- SETTINGS ----------
+function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, appts, clients, theme, setTheme, showToast }) {
+  const [form, setForm] = useState(business);
+  const [openCard, setOpenCard] = useState(null);
+  const [query, setQuery] = useState("");
+  const save = (msg) => { setBusiness(form); showToast(msg || "Settings saved."); setOpenCard(null); };
+
+  const field = (label, key, multiline) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>{label}</div>
+      {multiline
+        ? <textarea value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} rows={5} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
+        : <input value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} style={inputStyle} />}
+    </div>
+  );
+
+  // Each card: status line (live) + the editor shown when expanded. Grouped by category.
+  const cards = [
+    {
+      id: "business", title: "Business Details", icon: User, category: "Business Setup",
+      status: form.legalName, keywords: "name address logo branding contact email business details",
+      editor: (<>
+        {field("BUSINESS NAME (LOGO)", "name")}
+        {field("DISPLAY NAME", "legalName")}
+        {field("ADDRESS", "address")}
+        {field("ADDRESS LINE 2", "address2")}
+        {field("CITY, STATE ZIP", "cityZip")}
+        {field("CONTACT EMAIL", "email")}
+      </>),
+    },
+    {
+      id: "hours", title: "Business Hours", icon: Clock, category: "Business Setup",
+      status: (() => { const days = ["Su","Mo","Tu","We","Th","Fr","Sa"]; const openDays = days.filter((_, d) => form.hours?.[d]?.on); return openDays.length ? `${openDays.length} days open` : "Closed"; })(),
+      keywords: "business hours open close days week schedule times when open availability",
+      editor: <BusinessHoursEditor hours={form.hours} onChange={(h) => setForm({ ...form, hours: h })} />,
+    },
+    {
+      id: "locations", title: "Locations", icon: MapPinIcon, category: "Business Setup",
+      status: form.multiLocation ? `${(form.locations || []).length} locations` : "Single location", keywords: "location locations multi multiple branch shop store address chain franchise",
+      editor: <LocationsEditor business={form} setForm={setForm} />,
+    },
+    {
+      id: "phones", title: "Phone Numbers", icon: Phone, category: "Business Setup",
+      status: `${(form.phones || []).length} number${(form.phones || []).length === 1 ? "" : "s"}`,
+      keywords: "phone numbers contact call text main booking line",
+      editor: <PhoneNumbersEditor phones={form.phones || []} onChange={(ph) => setForm({ ...form, phones: ph })} />,
+    },
+    {
+      id: "import", title: "Import Data", icon: Upload, category: "Business Setup",
+      status: "Bring clients & history over",
+      keywords: "import data migrate transfer clients appointments notes history switch from square glossgenius vagaro boulevard booksy csv export upload move",
+      editor: <ImportDataEditor showToast={showToast} />,
+    },
+    {
+      id: "staff", title: "Staff Members", icon: Users, category: "Business Setup",
+      status: `${providers.filter((p) => p.id !== "anyone").length} staff`, keywords: "staff team employees hours days off schedule availability who works barber stylist",
+      editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} showToast={showToast} />),
+    },
+    {
+      id: "appearance", title: "Logo & Branding", icon: (THEMES.find((x) => x.id === theme)?.dark) ? Moon : Sun, category: "Business Setup",
+      status: THEMES.find((x) => x.id === theme)?.name || "Theme", keywords: "theme appearance light dark mode color display look style vibe palette logo branding font accent wordmark",
+      editor: (<>
+        {field("LOGO WORDMARK (blank = business name)", "logoText")}
+        <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: -6, marginBottom: 18 }}>Shown as your logo across the app. Leave blank to use the business name.</p>
+        <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 12 }}>THEME</div>
+        <AppearancePicker theme={theme} setTheme={setTheme} />
+      </>),
+    },
+    {
+      id: "photos", title: "Display Preferences", icon: ImageIcon, category: "Calendar & Appointments",
+      status: form.showAddonPhotos ? "On" : "Off", keywords: "photos images add-ons menu pictures display preferences calendar week start day begins sunday monday first day",
+      editor: (
+        <>
+        <button onClick={() => setForm({ ...form, showAddonPhotos: !form.showAddonPhotos })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, color: "var(--text)", marginBottom: 18 }}>
+          <div style={{ textAlign: "left" }}><div style={{ fontSize: 15, marginBottom: 2 }}>Show photos on add-ons</div><div style={{ fontSize: 15, color: "var(--sub)", fontWeight: 300 }}>Display images next to add-on options for clients.</div></div>
+          <span style={{ width: 44, height: 26, borderRadius: 13, background: form.showAddonPhotos ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: form.showAddonPhotos ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+        </button>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Week starts on</div>
+        <div style={{ fontSize: 14, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>The first day shown on your calendar's week strip.</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((day, i) => { const on = (form.weekStartsOn ?? 0) === i; return (
+            <button key={i} onClick={() => setForm({ ...form, weekStartsOn: i })} style={{ flex: "1 1 30%", padding: "11px 4px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{day}</button>
+          ); })}
+        </div>
+        </>
+      ),
+    },
+    {
+      id: "scheduling", title: "Scheduling Options", icon: Clock, category: "Calendar & Appointments",
+      status: (() => { const bk = form.booking || {}; const parts = []; if (bk.bufferBefore || bk.bufferAfter) parts.push(`${bk.bufferBefore || 0}/${bk.bufferAfter || 0}m buffer`); parts.push(`${bk.horizonDays || 0}d window`); return parts.join(" · "); })(),
+      keywords: "scheduling buffer before after turnover cleanup gap minimum notice lead time booking window advance ahead days how far",
+      editor: <SchedulingOptionsEditor b={form.booking || defaultBooking()} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
+    },
+    {
+      id: "waitingroom", title: "Waiting Room", icon: Users, category: "Calendar & Appointments",
+      status: (form.waitingRoom?.selfCheckIn ? "Self check-in" : "Staff check-in") + (form.waitingRoom?.autoReadyMessage ? " · ready msg on" : ""),
+      keywords: "waiting room check in checkin arrival ready notify waiting list self check-in front desk client arrived",
+      editor: <WaitingRoomEditor w={form.waitingRoom || {}} onChange={(wr) => setForm({ ...form, waitingRoom: { ...(form.waitingRoom || {}), ...wr } })} />,
+    },
+    {
+      id: "runninglate", title: "Running Late Alerts", icon: Clock, category: "Calendar & Appointments",
+      status: form.runningLate?.enabled === false ? "Off" : `On · ${form.runningLate?.thresholdMin || 5} min warning`,
+      keywords: "running late behind next client wrapping up notify prompt delay minutes message schedule overrun",
+      editor: <RunningLateEditor r={form.runningLate || {}} onChange={(rl) => setForm({ ...form, runningLate: { ...(form.runningLate || {}), ...rl } })} />,
+    },
+    {
+      id: "policy", title: "Cancel & Reschedule", icon: AlertCircle, category: "Calendar & Appointments",
+      status: form.policy ? "Set" : "Not set", keywords: "cancellation no-show policy refund rules deposit charge reschedule",
+      editor: (<>
+        {field("CANCELLATION / NO-SHOW POLICY", "policy", true)}
+        <p style={{ fontSize: 14, color: "var(--faint)", lineHeight: 1.5 }}>Write this to match your own rules and your state's regulations. Shows on the booking screen.</p>
+      </>),
+    },
+    {
+      id: "waitlist", title: "Waitlist", icon: Clock, category: "Calendar & Appointments",
+      status: (form.waitlist?.mode === "silent" ? "Auto" : "Ask first") + (form.waitlist?.order === "longest" ? " · longest first" : " · first come"),
+      keywords: "waitlist auto notify automatic slot opened cancellation longest waiting queue order delay minutes silent ask first link book",
+      editor: <WaitlistRulesEditor w={form.waitlist || { mode: "ask", order: "longest", delayMin: 30 }} onChange={(wl) => setForm({ ...form, waitlist: wl })} />,
+    },
+    {
+      id: "tipping", title: "Tipping", icon: DollarSign, category: "Payments & Checkout",
+      status: form.tipping?.enabled ? `${(form.tipping.presets || []).join("/")}%` : "Off", keywords: "tip tipping gratuity percent checkout payment",
+      editor: <TippingEditor t={form.tipping || { enabled: true, presets: [18, 20, 25], allowCustom: true, allowNoTip: true, smartDefault: 20 }} onChange={(tp) => setForm({ ...form, tipping: tp })} />,
+    },
+    {
+      id: "checkout", title: "Checkout Settings", icon: CreditCard, category: "Payments & Checkout",
+      status: `${(form.checkout?.customMethods || []).length} payment methods`,
+      keywords: "checkout payment methods custom tip buttons signature change calculator cash receipt staff assignment self checkout checks advanced",
+      editor: <CheckoutSettingsEditor c={form.checkout || {}} onChange={(ck) => setForm({ ...form, checkout: { ...(form.checkout || {}), ...ck } })} />,
+    },
+    {
+      id: "booking", title: "Online Booking", icon: Calendar, category: "Online Booking",
+      status: bookingStatus(form.booking), keywords: "online booking link card required deposit lead time buffer cap gaps rebook setup",
+      editor: <BookingRulesEditor b={form.booking} onChange={(bk) => setForm({ ...form, booking: bk })} />,
+    },
+    {
+      id: "staffselection", title: "Staff Selection", icon: Users, category: "Online Booking",
+      status: `${providers.filter((p) => p.id !== "anyone" && p.onlineBooking).length} bookable online`,
+      keywords: "staff selection online booking bookable show hide who clients book provider barber availability public page",
+      editor: <StaffSelectionEditor providers={providers} setProviders={setProviders} />,
+    },
+    {
+      id: "messages", title: "Automated Messages", icon: MessageSquare, category: "Automated Messages",
+      status: `${(form.messages || []).filter((m) => m.enabled).length} active`, keywords: "automated messages reminders texts email confirmation check-in waitlist booked canceled rescheduled wording edit",
+      editor: <MessagesEditor messages={form.messages || []} onChange={(msgs) => setForm({ ...form, messages: msgs })} business={form} />,
+    },
+    {
+      id: "reports", title: "Reports", icon: BarChart3, category: "Reporting",
+      status: "Revenue, staff, retention",
+      keywords: "reports reporting analytics revenue sales staff performance retention average ticket dashboard insights numbers trends",
+      editor: <ReportsView appts={appts} clients={clients} providers={providers} services={services} business={form} />,
+    },
+  ];
+  const CATEGORY_ORDER = ["Business Setup", "Calendar & Appointments", "Payments & Checkout", "Online Booking", "Automated Messages", "Reporting"];
+
+  const q = query.trim().toLowerCase();
+  const filtered = q ? cards.filter((c) => (c.title + " " + c.keywords).toLowerCase().includes(q)) : cards;
+  const active = cards.find((c) => c.id === openCard);
+
+  // ---- full-page editor for the selected setting ----
+  if (active) {
+    const Icon = active.icon;
+    return (
+      <div className="appt-screen" style={{ maxWidth: 640, margin: "0 auto", padding: "12px 4px 40px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 26 }}>
+          <div style={{ width: 46, height: 46, borderRadius: 14, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={21} style={{ color: "var(--gold)" }} /></div>
+          <div>
+            <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500, marginBottom: 3 }}>SETTINGS</div>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: -0.3, lineHeight: 1 }}>{active.title}</h2>
+          </div>
+        </div>
+
+        {active.editor}
+
+        <button className="lift" onClick={() => save(`${active.title} saved.`)} style={{ width: "100%", marginTop: 28, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 14, boxShadow: "var(--shadow-md)" }}>DONE</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fade-up" style={{ maxWidth: 640, margin: "0 auto", padding: "12px 4px" }}>
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ fontSize: 12, letterSpacing: 3, color: "var(--faint)", marginBottom: 10, fontWeight: 500 }}>CONTROL PANEL</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -0.5, marginBottom: 14 }}>Settings</h2>
+        <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300, lineHeight: 1.5, maxWidth: 460 }}>Everything here is yours to shape — how the studio runs, looks, and speaks to clients.</p>
+      </div>
+
+      {/* search */}
+      <div style={{ position: "relative", marginBottom: 28 }}>
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search settings" style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px 16px 46px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY }} />
+        <Settings size={18} style={{ position: "absolute", left: 17, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
+      </div>
+
+      {/* grouped by category — flat when searching */}
+      {q ? (
+        <div style={{ background: "var(--panel)", borderRadius: 22, boxShadow: "var(--shadow-md)", overflow: "hidden", border: "1px solid var(--line)" }}>
+          {filtered.map((c, idx) => {
+            const Icon = c.icon;
+            return (
+              <div key={c.id} style={{ borderTop: idx === 0 ? "none" : "1px solid var(--line)" }}>
+                <button onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "none", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "20px 22px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 13, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={19} style={{ color: "var(--gold)" }} /></div>
+                    <div>
+                      <div style={{ fontSize: 16.5, fontWeight: 500, letterSpacing: -0.2 }}>{c.title}</div>
+                      <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{c.status}</div>
+                    </div>
+                  </div>
+                  <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        CATEGORY_ORDER.map((cat) => {
+          const group = cards.filter((c) => c.category === cat);
+          if (!group.length) return null;
+          return (
+            <div key={cat} style={{ marginBottom: 26 }}>
+              <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 12, paddingLeft: 4 }}>{cat.toUpperCase()}</div>
+              <div style={{ background: "var(--panel)", borderRadius: 22, boxShadow: "var(--shadow-md)", overflow: "hidden", border: "1px solid var(--line)" }}>
+                {group.map((c, idx) => {
+                  const Icon = c.icon;
+                  return (
+                    <div key={c.id} style={{ borderTop: idx === 0 ? "none" : "1px solid var(--line)" }}>
+                      <button onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "none", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "20px 22px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                          <div style={{ width: 44, height: 44, borderRadius: 13, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={19} style={{ color: "var(--gold)" }} /></div>
+                          <div>
+                            <div style={{ fontSize: 16.5, fontWeight: 500, letterSpacing: -0.2 }}>{c.title}</div>
+                            <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{c.status}</div>
+                          </div>
+                        </div>
+                        <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })
+      )}
+      {filtered.length === 0 && <p style={{ color: "var(--faint)", fontSize: 15, textAlign: "center", padding: "40px 0" }}>No settings match “{query}”.</p>}
+    </div>
+  );
+}
+
+// ---------- shared dashboard pieces ----------
+function WaitlistView({ waitlist, setWaitlist, onText, showToast }) {
+  const whenLabel = { early: "Early — open to 11am", midday: "Midday — 11am to 2pm", afternoon: "Afternoon — 2pm to close" };
+  const whenWord = { early: "morning", midday: "midday", afternoon: "afternoon" };
+  const [openId, setOpenId] = useState(null);
+  const open = waitlist.find((w, i) => (w.id || i) === openId);
+
+  // Send the client an in-app notification that a slot opened, including a booking link.
+  const notifyOpening = (w) => {
+    if (showToast) showToast(`In-app notification sent to ${(w.name || "client").split(" ")[0]} with a link to book.`);
+    setOpenId(null);
+  };
+  const removeEntry = (w, i) => { setWaitlist(waitlist.filter((x, j) => (x.id || j) !== (w.id || i))); setOpenId(null); };
+
+  return (
+    <>
+    <div className="fade-up">
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Waitlist</h2>
+      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 20, fontWeight: 300 }}>Clients hoping for an opening. Tap one to see their preferred time and notify them when a space frees up.</p>
+      {waitlist.length === 0 ? <div style={{ color: "var(--faint)", fontSize: 14, textAlign: "center", padding: "40px 0" }}>No one on the waitlist yet. It fills up when a client picks a fully-booked day in the booking flow.</div> : (
+        <div style={{ display: "grid", gap: 12 }}>{waitlist.map((w, i) => (
+          <button key={w.id || i} className="lift" onClick={() => setOpenId(w.id || i)} style={{ textAlign: "left", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 16, fontWeight: 500 }}>{w.name || "Client"}</div>
+              <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2 }}>{w.service}{w.provider ? ` · prefers ${w.provider}` : ""}</div>
+              {w.when && <div style={{ display: "inline-block", marginTop: 8, fontSize: 12.5, background: "rgba(176,141,87,0.12)", border: "1px solid rgba(176,141,87,0.3)", borderRadius: 20, padding: "4px 11px", color: "var(--gold)" }}>{whenLabel[w.when] || w.when}</div>}
+            </div>
+            <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+          </button>
+        ))}</div>
+      )}
+    </div>
+
+      {/* DETAIL — preferred time + notify with booking link */}
+      {open && (
+        <div className="fade-in" onClick={() => setOpenId(null)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, maxHeight: "85vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26 }}>{open.name || "Client"}</div>
+                  <div style={{ fontSize: 14.5, color: "var(--sub)", marginTop: 2 }}>{open.phone}</div>
+                </div>
+                <button onClick={() => setOpenId(null)} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
+              </div>
+
+              <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><Clock size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Preferred time:</span> <span style={{ fontWeight: 600 }}>{whenLabel[open.when] || open.when || "Any time"}</span></div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><Sparkles size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Service:</span> <span style={{ fontWeight: 600 }}>{open.service}</span></div>
+                {open.provider && <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><User size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Prefers:</span> <span style={{ fontWeight: 600 }}>{open.provider}</span></div>}
+                {open.day && <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><Calendar size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Day:</span> <span style={{ fontWeight: 600 }}>{open.day}</span></div>}
+                {open.at && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 2 }}>Added {open.at}</div>}
+              </div>
+
+              <button className="lift" onClick={() => notifyOpening(open)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Bell size={17} /> Notify a space opened up</button>
+              <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.45, marginBottom: 16 }}>Sends {(open.name || "the client").split(" ")[0]} an in-app notification with a link to book the open slot.</p>
+
+              <button onClick={() => removeEntry(open, waitlist.indexOf(open))} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Trash2 size={16} /> REMOVE FROM WAITLIST</button>
+            </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------- DAY CALENDAR: labeled hour rows, 15-min subdivisions ----------
+// Row-height control (Mangomint-style S/M/L/XL). Value = pixels PER HOUR.
+const ROW_SIZES = [
+  { id: "S", label: "S", pxPerHour: 80 },
+  { id: "M", label: "M", pxPerHour: 130 },
+  { id: "L", label: "L", pxPerHour: 200 },
+  { id: "XL", label: "XL", pxPerHour: 300 },
+];
+const DAY_START = 9 * 60;   // 9 AM
+const DAY_END = 15 * 60;    // 3 PM (scrolls)
+
+// ============================================================
+// CREATE POPOVER — appears at the long-press point, always on-screen
+// ============================================================
+function CreatePopover({ slot, providerName, onAppt, onBlock, onClose }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState({ left: -9999, top: -9999, ready: false });
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const M = 10;
+    const px = slot.x ?? vw / 2, py = slot.y ?? vh / 2;
+    let left = px - 16;
+    if (left + w > vw - M) left = vw - w - M;   // clamp right edge
+    if (left < M) left = M;                      // clamp left edge
+    let top = py + 14;
+    if (top + h > vh - M) top = py - h - 14;     // flip above if no room below
+    if (top < M) top = M;
+    setPos({ left, top, ready: true });
+  }, [slot]);
+  return (
+    <>
+      <div className="fade-in" onClick={onClose} style={{ position: "fixed", inset: 0, background: "transparent", zIndex: 55 }} />
+      <div ref={ref} style={{ position: "fixed", left: pos.left, top: pos.top, width: 240, maxWidth: "calc(100vw - 20px)", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 14, zIndex: 56, boxShadow: "var(--shadow-lg)", transformOrigin: "top left", animation: "popIn .2s var(--ease) both", opacity: pos.ready ? 1 : 0, boxSizing: "border-box" }}>
+        <div style={{ padding: "2px 4px 12px" }}>
+          <div style={{ fontSize: 16.5, fontWeight: 600, letterSpacing: -0.2 }}>{fmtTime(slot.start)}</div>
+          <div style={{ fontSize: 13, color: "var(--sub)" }}>with {providerName}</div>
+        </div>
+        <button className="lift" onClick={onAppt} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, background: "var(--gold)", color: "var(--on-gold)", padding: "12px 14px", borderRadius: 12, fontSize: 14.5, fontWeight: 600, marginBottom: 8, boxSizing: "border-box" }}><Calendar size={17} /> New appointment</button>
+        <button className="lift" onClick={onBlock} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", padding: "12px 14px", borderRadius: 12, fontSize: 14.5, fontWeight: 500, boxSizing: "border-box" }}><Clock size={17} style={{ color: "var(--sub)" }} /> Block off time</button>
+      </div>
+    </>
+  );
+}
+
+// ============================================================
+// NEW APPOINTMENT — pick client + service, then book (full page)
+// ============================================================
+function NewAppointmentForm({ slot, providers, clients, services, onClose, onBook, onBlock }) {
+  const [provId, setProvId] = useState(slot.providerId);
+  const staff = providers.filter((p) => p.role !== "owner-nonstaff");
+  const [client, setClient] = useState(null);
+  const [walkIn, setWalkIn] = useState(false);
+  const [walkInName, setWalkInName] = useState("");
+  const [service, setService] = useState(null);
+  const [note, setNote] = useState("");
+  const [startMin, setStartMin] = useState(slot.start);
+  const [q, setQ] = useState("");
+  const [openSvc, setOpenSvc] = useState(false);
+  // if the chosen service isn't offered by the current provider, switch to one who offers it
+  useEffect(() => {
+    if (!service || !service.staff) return;
+    if (provId === "anyone") return;
+    if (service.staff[provId]?.on === false) {
+      const firstOffering = staff.find((p) => p.id !== "anyone" && service.staff[p.id]?.on !== false);
+      if (firstOffering) setProvId(firstOffering.id);
+    }
+  }, [service]);
+  const fmtHM = (m) => fmtTime(m);
+  const dur = service ? getDuration(client, service, provId) : 0;
+  const price = service ? getPrice(service, provId) : 0;
+  const canBook = service && (client || walkIn);
+  const dateLabel = (() => { const d = new Date(); return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })();
+  const stepTime = (delta) => setStartMin((m) => Math.max(6 * 60, Math.min(21 * 60, m + delta)));
+
+  const [showTimePick, setShowTimePick] = useState(false);
+  const scrollRef = useRef(null);
+  useLayoutEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    try { window.scrollTo(0, 0); } catch (e) {}
+  }, []);
+  // search by first name, last name, OR any part of the phone number (digits only)
+  const qd = q.replace(/\D/g, "");
+  const matches = q.trim() ? clients.filter((c) => {
+    const nameHit = c.name.toLowerCase().includes(q.trim().toLowerCase());
+    const phoneHit = qd.length > 0 && (c.phone || "").replace(/\D/g, "").includes(qd);
+    return nameHit || phoneHit;
+  }) : clients;
+
+  // generate selectable times (every 15 min across the working day)
+  const timeOptions = [];
+  for (let m = 6 * 60; m <= 21 * 60; m += 15) timeOptions.push(m);
+
+  const fieldWrap = { padding: "26px 0", borderBottom: "1px solid var(--line)" };
+
+  return (
+    <div className="fade-in" style={{ position: "fixed", inset: 0, background: "var(--bg)", zIndex: 800, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* header bar — Cancel / title / Book */}
+      <div style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "17px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+        <button onClick={onClose} style={{ background: "none", color: "var(--on-gold)", fontSize: 16, opacity: 0.9 }}>Cancel</button>
+        <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.2 }}>New Appointment</span>
+        <button onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInName, note })} style={{ background: "none", color: "var(--on-gold)", fontSize: 16, fontWeight: 700, opacity: canBook ? 1 : 0.45 }}>Book</button>
+      </div>
+
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 22px 60px" }}>
+          {/* On [date] | At [time] split */}
+          <div style={{ display: "flex", borderBottom: "1px solid var(--line)" }}>
+            <div style={{ flex: 1, padding: "26px 0", borderRight: "1px solid var(--line)" }}>
+              <span style={{ fontSize: 17, color: "var(--faint)" }}>On </span>
+              <span style={{ fontSize: 19, fontWeight: 600 }}>{dateLabel}</span>
+            </div>
+            <button onClick={() => setShowTimePick(true)} style={{ flex: 1, padding: "26px 0", paddingLeft: 24, background: "none", textAlign: "left", color: "var(--text)" }}>
+              <span style={{ fontSize: 17, color: "var(--faint)" }}>At </span>
+              <span style={{ fontSize: 19, fontWeight: 600 }}>{fmtHM(startMin)}</span>
+            </button>
+          </div>
+
+          {/* provider chips — only those who offer the chosen service */}
+          {(() => {
+            const offering = service ? staff.filter((p) => !service.staff || service.staff[p.id]?.on !== false) : staff;
+            return offering.length > 1 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "22px 0 0" }}>
+              {offering.map((p) => { const on = p.id === provId; return (
+                <button key={p.id} onClick={() => setProvId(p.id)} style={{ display: "flex", alignItems: "center", gap: 7, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, color: "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14.5, fontWeight: on ? 600 : 400 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color || "var(--gold)" }} />{p.name}</button>
+              ); })}
+            </div>
+            );
+          })()}
+
+          {/* CLIENT */}
+          {client ? (
+            <div style={{ ...fieldWrap, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 17 }}>{client.name.charAt(0)}</div>
+                <div><div style={{ fontSize: 17, fontWeight: 500 }}>{client.name}</div><div style={{ fontSize: 14, color: "var(--sub)" }}>{client.phone || `${client.visits} visits`}</div></div>
+              </div>
+              <button onClick={() => setClient(null)} style={{ background: "none", color: "var(--gold)", fontSize: 14.5 }}>Change</button>
+            </div>
+          ) : walkIn ? (
+            <div style={fieldWrap}>
+              <input autoFocus value={walkInName} onChange={(e) => setWalkInName(e.target.value)} placeholder="Walk-in name (optional)" style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 18, fontFamily: FONT_BODY }} />
+              <button onClick={() => setWalkIn(false)} style={{ background: "none", color: "var(--sub)", fontSize: 13.5, marginTop: 10 }}>← Choose an existing client instead</button>
+            </div>
+          ) : (
+            <div style={fieldWrap}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search or create client" style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 18, fontFamily: FONT_BODY }} />
+                <button onClick={() => { setWalkIn(true); setClient(null); }} title="Walk-in / new" style={{ width: 30, height: 30, borderRadius: "50%", border: "1px solid var(--border2)", background: "none", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Plus size={17} /></button>
+              </div>
+              {q.trim() && (
+                <div style={{ display: "grid", gap: 6, maxHeight: 280, overflowY: "auto", marginTop: 16 }}>
+                  {matches.map((c) => (
+                    <button key={c.id} onClick={() => { setClient(c); setQ(""); }} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 14px", color: "var(--text)", textAlign: "left" }}>
+                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 14 }}>{c.name.charAt(0)}</div>
+                      <div style={{ flex: 1 }}><div style={{ fontSize: 15 }}>{c.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{c.phone || `${c.visits} visits`}</div></div>
+                    </button>
+                  ))}
+                  {matches.length === 0 && (
+                    <button onClick={() => { setWalkIn(true); setWalkInName(q); }} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5 }}><Plus size={16} style={{ color: "var(--gold)" }} /> Create “{q}” as a new client</button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SERVICE — inline dropdown */}
+          <div style={{ borderBottom: "1px solid var(--line)" }}>
+            <button onClick={() => setOpenSvc(!openSvc)} style={{ width: "100%", background: "none", display: "flex", alignItems: "center", justifyContent: "space-between", color: "var(--text)", textAlign: "left", padding: "26px 0" }}>
+              {service ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
+                  <span style={{ width: 11, height: 11, borderRadius: "50%", background: hexById(service.color) }} />
+                  <div><div style={{ fontSize: 17, fontWeight: 500 }}>{service.name}</div><div style={{ fontSize: 14, color: "var(--sub)" }}>${price} · {dur} min</div></div>
+                </div>
+              ) : (
+                <span style={{ color: "var(--faint)", fontSize: 18 }}>Select a service</span>
+              )}
+              <ChevronRight size={20} style={{ color: "var(--faint)", transform: openSvc ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+            </button>
+            {openSvc && (
+              <div style={{ display: "grid", gap: 8, paddingBottom: 22 }}>
+                {services.map((s) => { const on = service && service.id === s.id; return (
+                  <button key={s.id} onClick={() => { setService(s); setOpenSvc(false); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />
+                      <div><div style={{ fontSize: 15.5, fontWeight: on ? 600 : 500 }}>{s.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>${getPrice(s, provId)} · {getDuration(client, s, provId)} min</div></div>
+                    </div>
+                    {on && <Check size={18} style={{ color: "var(--gold)" }} />}
+                  </button>
+                ); })}
+              </div>
+            )}
+          </div>
+
+          {/* NOTE */}
+          <div style={fieldWrap}>
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note" style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 18, fontFamily: FONT_BODY }} />
+          </div>
+
+          {/* bottom action row */}
+          <button onClick={() => onBlock({ providerId: provId, start: startMin })} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", color: "var(--text)", padding: "26px 0", fontSize: 17 }}>
+            <span>Create time block</span>
+            <ChevronRight size={20} style={{ color: "var(--faint)" }} />
+          </button>
+        </div>
+      </div>
+
+      {/* time picker — fills the form from the top, always in view */}
+      {showTimePick && (
+        <div style={{ position: "absolute", inset: 0, background: "var(--bg)", zIndex: 5, display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "17px 18px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
+            <button onClick={() => setShowTimePick(false)} style={{ background: "none", color: "var(--gold)", fontSize: 16 }}>Cancel</button>
+            <span style={{ fontSize: 17, fontWeight: 600 }}>Start time</span>
+            <span style={{ width: 50 }} />
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 40px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxWidth: 460, margin: "0 auto" }}>
+              {timeOptions.map((m) => { const on = m === startMin; return (
+                <button key={m} onClick={() => { setStartMin(m); setShowTimePick(false); }} style={{ padding: "14px 0", borderRadius: 10, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{fmtHM(m)}</button>
+              ); })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CalendarView({ appts, setAppts, clients, providers, services, business, theme, showToast, waitlist = [], setWaitlist }) {
+  const [sizeId, setSizeId] = useState("L"); // default L
+  const [open, setOpen] = useState(null);
+  const [dayOffset, setDayOffset] = useState(0);
+  const [drag, setDrag] = useState(null);     // { id, deltaMin } while dragging
+  const [pending, setPending] = useState(null); // { appt, newStart, newEnd } awaiting confirm
+  const [createSlot, setCreateSlot] = useState(null); // { providerId, start } long-press to create
+  const [newApptSlot, setNewApptSlot] = useState(null); // { providerId, start } → opens the pick-client+service form
+  const [pressInd, setPressInd] = useState(null); // { providerId, start, y } live indicator while holding
+  const [checkout, setCheckout] = useState(null); // appt being checked out
+  const dragRef = useRef(null);                // mutable: { id, startY, origStart, dur, moved }
+  const pressRef = useRef(null);               // mutable: long-press timer + start info
+  const blockScrollRef = useRef((e) => { if (e.cancelable) e.preventDefault(); });
+
+  const setStatus = (id, status, msg) => { const freed = appts.find((a) => a.id === id); setAppts(appts.map((a) => (a.id === id ? { ...a, status } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status } : o); if (status === "cancelled" && freed) setTimeout(() => handleFreedSlot(freed), 350); };
+  // open checkout instead of silently completing
+  const startCheckout = (appt) => { setOpen(null); setCheckout(appt); };
+  const finishCheckout = (id, summary) => {
+    setAppts((cur) => {
+      const done = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary } : a);
+      // if they rebooked, drop a real future appointment on the calendar — confirmed, NOT prepaid
+      if (summary && (summary.rebookWeeks != null || summary.rebookDate)) {
+        const src = cur.find((a) => a.id === id);
+        if (src) {
+          const nd = summary.rebookDate ? new Date(summary.rebookDate + "T00:00:00") : (() => { const d = new Date(); d.setDate(d.getDate() + summary.rebookWeeks * 7); return d; })();
+          const dur = src.end - src.start;
+          const newAppt = { ...src, id: "rb" + Date.now(), status: "confirmed", paid: null, prepaid: false, rebookDiscount: (business?.rebook?.discount) || 0, bookedFor: nd.toISOString(), start: src.start, end: src.start + dur, photos: 0, hasPhotos: false, hasNote: false };
+          done.push(newAppt);
+        }
+      }
+      return done;
+    });
+    setCheckout(null);
+  };
+  const updateAppt = (id, patch) => { setAppts((cur) => cur.map((a) => a.id === id ? { ...a, ...patch } : a)); setOpen((o) => o && o.id === id ? { ...o, ...patch } : o); };
+  // When a slot frees up, find waitlisted clients whose requested window + barber
+  // match it, then act per the shop's Waitlist settings (Settings → Waitlist).
+  const WINDOW = { early: [DAY_START, 11 * 60], midday: [11 * 60, 14 * 60], afternoon: [14 * 60, DAY_END] };
+  const wlRules = (business && business.waitlist) || { mode: "ask", order: "longest", delayMin: 30 };
+  const [waitlistMatch, setWaitlistMatch] = useState(null); // { freed, matches } awaiting confirm
+  // parse the "at" timestamp so we can order by who's waited longest
+  const waitedSince = (w) => { const t = Date.parse(w.at); return isNaN(t) ? 0 : t; };
+  const findWaitlistMatches = (freed) => {
+    if (!freed) return [];
+    const prov = providers.find((p) => p.id === freed.providerId);
+    return (waitlist || []).filter((w) => {
+      const provOk = !w.provider || w.provider === "Any" || (prov && w.provider === prov.name);
+      let timeOk = true;
+      if (w.when && WINDOW[w.when]) { const [a, b] = WINDOW[w.when]; timeOk = freed.start < b && freed.end > a; }
+      return provOk && timeOk;
+    }).sort((a, b) => waitedSince(a) - waitedSince(b)); // longest-waiting first
+  };
+  // send the in-app notification (+ booking link). For "longest" order we notify
+  // one person; the rest are queued, each offered after delayMin if unclaimed.
+  const sendWaitlistNotices = (matches, freed) => {
+    if (!matches.length) return;
+    if (wlRules.order === "longest") {
+      const first = matches[0];
+      const rest = matches.length - 1;
+      showToast(rest > 0
+        ? `Sent ${first.name.split(" ")[0]} a booking link. ${rest} other${rest > 1 ? "s" : ""} queued — each offered after ${wlRules.delayMin || 30} min if unclaimed.`
+        : `Sent ${first.name.split(" ")[0]} an in-app notification with a booking link.`);
+    } else {
+      const names = matches.map((m) => (m.name || "client").split(" ")[0]).join(", ");
+      showToast(`Sent ${matches.length} in-app notification${matches.length > 1 ? "s" : ""} with a booking link: ${names}.`);
+    }
+    setWaitlistMatch(null);
+  };
+  const handleFreedSlot = (freed) => {
+    if (!freed || freed.status === "done" || freed.status === "block") return;
+    const matches = findWaitlistMatches(freed);
+    if (!matches.length) return;
+    if (wlRules.mode === "silent") sendWaitlistNotices(matches, freed); // auto-send, no prompt
+    else setWaitlistMatch({ freed, matches }); // ask first
+  };
+
+  const deleteAppt = (id) => {
+    const freed = appts.find((a) => a.id === id);
+    setAppts((cur) => cur.filter((a) => a.id !== id));
+    setOpen(null);
+    showToast("Appointment removed.");
+    if (freed) setTimeout(() => handleFreedSlot(freed), 350);
+  };
+
+  const pxPerHour = (ROW_SIZES.find((s) => s.id === sizeId) || ROW_SIZES[2]).pxPerHour;
+  const PPM = pxPerHour / 60; // pixels per minute
+  const totalMin = DAY_END - DAY_START;
+  const gridHeight = totalMin * PPM;
+
+  const snap5 = (min) => Math.round(min / 5) * 5;
+
+  // begin dragging a block
+  const startDrag = (e, a) => {
+    e.preventDefault();
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    dragRef.current = { id: a.id, startY: y, origStart: a.start, dur: a.end - a.start, moved: false };
+    setDrag({ id: a.id, deltaMin: 0 });
+  };
+
+  useEffect(() => {
+    if (!drag) return;
+    const move = (e) => {
+      const d = dragRef.current; if (!d) return;
+      const y = e.touches ? e.touches[0].clientY : e.clientY;
+      const rawDelta = (y - d.startY) / PPM;          // minutes moved
+      let newStart = snap5(d.origStart + rawDelta);
+      newStart = Math.max(DAY_START, Math.min(DAY_END - d.dur, newStart));
+      const deltaMin = newStart - d.origStart;
+      d.deltaMin = deltaMin;                           // remember on ref for reliable commit
+      if (Math.abs(y - d.startY) > 4) d.moved = true;
+      setDrag({ id: d.id, deltaMin });
+    };
+    const up = () => {
+      const d = dragRef.current; dragRef.current = null;
+      setDrag(null);
+      if (!d) return;
+      const appt = appts.find((a) => a.id === d.id);
+      if (!appt) return;
+      if (d.moved && d.deltaMin && d.deltaMin !== 0) {
+        const newStart = appt.start + d.deltaMin;
+        setPending({ appt, newStart, newEnd: newStart + (appt.end - appt.start) });
+      } else {
+        setOpen(appt);   // treated as a tap
+      }
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("touchend", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", up);
+    };
+  }, [drag, appts, PPM]);
+
+  const confirmMove = () => {
+    if (!pending) return;
+    setAppts(appts.map((a) => a.id === pending.appt.id ? { ...a, start: pending.newStart, end: pending.newEnd } : a));
+    showToast(`${pending.appt.name} moved to ${fmtTime(pending.newStart)}.`);
+    setPending(null);
+  };
+
+  // ---- Mangomint-style: long-press → beige block appears → drag to scrub time → release opens form ----
+  const clampStart = (clientY, rect) => {
+    const min = DAY_START + (clientY - rect.top) / PPM;
+    return Math.max(DAY_START, Math.min(DAY_END - 15, snap5(min)));
+  };
+  const NEW_DUR = 30; // default block length shown while scrubbing
+  const onSlotClick = (e, providerId, colEl) => {
+    // a plain tap (no long-press) still works as a quick shortcut
+    if (e.target.closest("[data-appt]")) return;
+    if (pressRef.current && pressRef.current.consumed) { pressRef.current = null; return; } // long-press already handled it
+    const rect = colEl.getBoundingClientRect();
+    const start = clampStart(e.clientY != null ? e.clientY : rect.top, rect);
+    setNewApptSlot({ providerId, start });
+  };
+  const onSlotDown = (e, providerId, colEl) => {
+    if (e.target.closest("[data-appt]")) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    const rect = colEl.getBoundingClientRect();
+    const start = clampStart(y, rect);
+    pressRef.current = { providerId, rect, start, y, scrubbing: false, consumed: false };
+    pressRef.current.timer = setTimeout(() => {
+      const p = pressRef.current; if (!p) return;
+      p.scrubbing = true; p.consumed = true;
+      if (navigator.vibrate) navigator.vibrate(15);
+      document.body.classList.add("scrub-lock");
+      // hard block: stop ALL page scrolling natively while scrubbing
+      document.addEventListener("touchmove", blockScrollRef.current, { passive: false });
+      setPressInd({ providerId: p.providerId, start: p.start });
+    }, 300);
+  };
+  const onSlotMove = (e) => {
+    const p = pressRef.current; if (!p) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    if (!p.scrubbing) {
+      if (Math.abs(y - p.y) > 14) { clearTimeout(p.timer); pressRef.current = null; } // moved before hold = scroll
+      return;
+    }
+    if (e.cancelable) e.preventDefault();
+    const start = clampStart(y, p.rect);
+    p.start = start;
+    setPressInd({ providerId: p.providerId, start });
+  };
+  const onSlotUp = () => {
+    const p = pressRef.current;
+    if (p) clearTimeout(p.timer);
+    document.body.classList.remove("scrub-lock");
+    document.removeEventListener("touchmove", blockScrollRef.current, { passive: false });
+    if (p && p.scrubbing) {
+      setNewApptSlot({ providerId: p.providerId, start: p.start }); // release → open the form at that time
+      setPressInd(null);
+      // keep p.consumed so the click that follows is ignored
+      setTimeout(() => { pressRef.current = null; }, 50);
+    } else {
+      setPressInd(null);
+    }
+  };
+  const startPress = () => {};
+  const cancelPress = () => {};
+  const endPress = () => {};
+  const onColMove = () => {};
+
+  // build a new appointment or time block at the chosen slot
+  const createAt = (kind) => {
+    if (!createSlot) return;
+    const { providerId, start } = createSlot;
+    if (kind === "appt") {
+      // open the full booking form to pick client + service
+      setNewApptSlot({ providerId, start });
+      setCreateSlot(null);
+      return;
+    }
+    const dur = 30;
+    const id = Math.max(0, ...appts.map((a) => a.id)) + 1;
+    const newAppt = { id, providerId, clientId: null, serviceId: null, start, end: start + dur, status: "block", vip: false, name: "Time Block", title: "Blocked", detail: "" };
+    setAppts([...appts, newAppt]);
+    setCreateSlot(null);
+    showToast(`Time block added at ${fmtTime(start)}.`);
+  };
+
+  // commit a fully-formed appointment from the booking form
+  const bookAppt = ({ providerId, start, client, service, walkInName, note }) => {
+    const id = Math.max(0, ...appts.map((a) => a.id)) + 1;
+    const dur = getDuration(client, service, providerId);
+    const price = getPrice(service, providerId);
+    const newAppt = { id, providerId, clientId: client ? client.id : null, serviceId: service.id, start, end: start + dur, status: "confirmed", vip: false, name: client ? client.name : (walkInName || "Walk-in"), title: service.name, detail: note || "", hasNote: !!(note && note.trim()), price, hasPhotos: false, photos: 0 };
+    setAppts([...appts, newAppt]);
+    setNewApptSlot(null);
+    showToast(`${newAppt.name} booked at ${fmtTime(start)}.`);
+  };
+
+  const allStaff = providers.filter((p) => p.id !== "anyone");
+  const [hidden, setHidden] = useState([]); // provider ids hidden from view
+  const staff = allStaff.filter((p) => !hidden.includes(p.id));
+  const toggleStaff = (id) => setHidden((h) => h.includes(id) ? h.filter((x) => x !== id) : (allStaff.length - h.length > 1 ? [...h, id] : h));
+
+  // hour rows + 15-min subdivision lines
+  const hours = [];
+  for (let t = DAY_START; t < DAY_END; t += 60) hours.push(t);
+  const quarterLines = [];
+  for (let t = DAY_START; t <= DAY_END; t += 15) quarterLines.push(t);
+
+  const weekStartsOn = (business && business.weekStartsOn != null) ? business.weekStartsOn : 0;
+  const week = useMemo(() => { const arr = []; const base = new Date(); const shift = (base.getDay() - weekStartsOn + 7) % 7; base.setDate(base.getDate() + dayOffset - shift); for (let i = 0; i < 7; i++) { const d = new Date(base); d.setDate(base.getDate() + i); arr.push(d); } return arr; }, [dayOffset, weekStartsOn]);
+  const today = new Date();
+
+  // find the first open 15-min slot for a provider today (falls back to DAY_START)
+  const nextFreeSlot = (providerId) => {
+    const booked = appts.filter((a) => a.providerId === providerId && a.status !== "done").sort((a, b) => a.start - b.start);
+    let t = DAY_START;
+    for (const a of booked) {
+      if (a.start >= t + 15) break;     // found a gap before this appt
+      if (a.end > t) t = a.end;          // push past this appt
+    }
+    return Math.min(t, DAY_END - 15);
+  };
+
+  return (
+    <div className="fade-up">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18 }}>
+        <div>
+          <div style={{ fontSize: 11.5, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 500 }}>{`${DAYS[today.getDay()]}, ${MONTHS[today.getMonth()]} ${today.getDate()}`.toUpperCase()}</div>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, letterSpacing: -0.5, lineHeight: 1 }}>Today</h2>
+        </div>
+        <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "11px 16px", borderRadius: 12, fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-sm)" }}><Plus size={17} /> New</button>
+      </div>
+      <div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 14, marginTop: -8 }}>Tap any empty spot on the calendar, or use <strong style={{ color: "var(--sub)", fontWeight: 600 }}>+ New</strong> above.</div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
+        {week.map((d, i) => { const isToday = d.toDateString() === today.toDateString(); return (
+          <div key={i} style={{ flex: "1 0 auto", minWidth: 42, textAlign: "center", padding: "8px 0", borderRadius: 6, background: isToday ? "var(--gold)" : "transparent", color: isToday ? "var(--on-gold)" : "var(--sub)" }}>
+            <div style={{ fontSize: 12, letterSpacing: 1 }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18 }}>{d.getDate()}</div>
+          </div>
+        ); })}
+      </div>
+
+      {/* row-height size control */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 14, color: "var(--faint)", letterSpacing: 1 }}>ROW SIZE</span>
+        <div style={{ display: "flex", background: "var(--panel)", borderRadius: 6, padding: 3, gap: 2 }}>
+          {ROW_SIZES.map((s) => (
+            <button key={s.id} onClick={() => setSizeId(s.id)} style={{ padding: "7px 14px", borderRadius: 14, fontSize: 15, background: sizeId === s.id ? "var(--gold)" : "transparent", color: sizeId === s.id ? "var(--on-gold)" : "var(--sub)", fontWeight: sizeId === s.id ? 500 : 400 }}>{s.label}</button>
+          ))}
+        </div>
+        <span style={{ fontSize: 14, color: "var(--faint)" }}>· 15-min lines</span>
+      </div>
+
+      {/* barber column picker */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 14, color: "var(--faint)", letterSpacing: 1 }}>SHOWING</span>
+        {allStaff.map((p) => {
+          const on = !hidden.includes(p.id);
+          return (
+            <button key={p.id} onClick={() => toggleStaff(p.id)} style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: 20, border: `1px solid ${on ? p.color : "var(--border)"}`, background: on ? p.color + "1F" : "transparent", color: on ? "var(--text)" : "var(--faint)", fontSize: 15 }}>
+              <span style={{ width: 9, height: 9, borderRadius: "50%", background: on ? p.color : "var(--border2)" }} /> {p.name}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* color legend */}
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 14, fontSize: 14, color: "var(--sub)" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 11, height: 11, borderRadius: 12, background: STATUS_COLORS["checked-in"] }} /> Checked in</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 11, height: 11, borderRadius: 12, background: STATUS_COLORS["in-service"] }} /> In service</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 11, height: 11, borderRadius: 12, border: "1px solid var(--border2)", background: "var(--panel2)" }} /> Done</span>
+        <span style={{ color: "var(--faint)" }}>· else by service</span>
+      </div>
+
+      {/* staff column headers */}
+      <div style={{ display: "flex", borderBottom: "1px solid var(--line)" }}>
+        <div style={{ width: 56, flexShrink: 0 }} />
+        {staff.map((p) => (
+          <div key={p.id} style={{ flex: 1, textAlign: "center", padding: "10px 0", fontSize: 15, color: p.color, fontFamily: FONT_DISPLAY, borderLeft: "1px solid var(--line)" }}>{p.name}</div>
+        ))}
+      </div>
+
+      {/* the timeline grid */}
+      <div style={{ display: "flex", position: "relative" }}>
+        {/* time gutter — bold hour labels */}
+        <div style={{ width: 56, flexShrink: 0, position: "relative", height: gridHeight }}>
+          {hours.map((t) => (
+            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, right: 8, fontSize: 14, color: "var(--sub)", fontWeight: 500, transform: "translateY(-1px)" }}>
+              {fmtTime(t).replace(":00", "")}
+            </div>
+          ))}
+        </div>
+
+        {/* columns */}
+        {staff.map((p) => {
+          const col = appts.filter((a) => a.providerId === p.id);
+          return (
+            <div key={p.id}
+              style={{ flex: 1, position: "relative", height: gridHeight, borderLeft: "1px solid var(--line)" }}>
+              {/* tap/long-press layer: tap opens form; long-press shows beige block to scrub time */}
+              <div
+                onClick={(e) => onSlotClick(e, p.id, e.currentTarget.parentElement)}
+                onMouseDown={(e) => onSlotDown(e, p.id, e.currentTarget.parentElement)}
+                onMouseMove={onSlotMove}
+                onMouseUp={onSlotUp}
+                onTouchStart={(e) => onSlotDown(e, p.id, e.currentTarget.parentElement)}
+                onTouchMove={onSlotMove}
+                onTouchEnd={onSlotUp}
+                style={{ position: "absolute", inset: 0, zIndex: 1 }}
+              />
+              {/* beige "New Appointment" block shown while long-pressing / scrubbing */}
+              {pressInd && pressInd.providerId === p.id && (
+                <div style={{ position: "absolute", top: (pressInd.start - DAY_START) * PPM, left: 3, right: 3, height: NEW_DUR * PPM - 2, background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", border: "1.5px solid var(--gold)", borderRadius: 12, padding: "8px 11px", zIndex: 30, pointerEvents: "none", boxShadow: "var(--shadow-md)" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--gold)" }}>{fmtTime(pressInd.start)}</div>
+                  <div style={{ fontSize: 13, color: "var(--text2)", fontWeight: 500 }}>New Appointment</div>
+                </div>
+              )}
+              {/* 15-min subdivision lines (faint) + bold hour lines */}
+              {quarterLines.map((t) => { const isHour = t % 60 === 0; return (
+                <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, left: 0, right: 0, borderTop: isHour ? "1px solid var(--line)" : "1px solid color-mix(in srgb, var(--line) 50%, transparent)", height: 0, pointerEvents: "none" }} />
+              ); })}
+              {/* appointment blocks */}
+              {col.map((a) => {
+                const isDragging = drag && drag.id === a.id;
+                const liveStart = isDragging ? a.start + drag.deltaMin : a.start;
+                const top = (liveStart - DAY_START) * PPM;
+                const height = (a.end - a.start) * PPM - 2;
+                const service = services.find((s) => s.id === a.serviceId);
+                const isBlock = a.status === "block";
+                let accent = hexById(service?.color);
+                if (a.status === "checked-in") accent = STATUS_COLORS["checked-in"];
+                else if (a.status === "in-service") accent = STATUS_COLORS["in-service"];
+                const isDone = a.status === "done";
+                // soft tinted background with a colored accent bar — clean & legible
+                const tint = `color-mix(in srgb, ${accent} 14%, var(--panel))`;
+                const onColor = "var(--text)";
+                const blockBg = "repeating-linear-gradient(45deg, var(--panel2), var(--panel2) 7px, var(--line) 7px, var(--line) 14px)";
+                return (
+                  <div key={a.id} data-appt
+                    onMouseDown={(e) => startDrag(e, a)} onTouchStart={(e) => startDrag(e, a)}
+                    className={isDragging ? "" : "lift"}
+                    style={{ position: "absolute", top, left: 3, right: 3, height, background: isBlock ? blockBg : (isDone ? "var(--panel2)" : tint), opacity: isDone ? 0.7 : 1, border: `1px solid ${isBlock ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`}`, borderLeft: `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : accent)}`, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "none", userSelect: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
+                    {/* name — always one line, never wraps or collides */}
+                    <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{a.name}</span>
+                    {/* time range — shown once room exists */}
+                    {height > 34 && <span style={{ fontSize: 12, color: "var(--sub)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fmtTime(liveStart)} – {fmtTime(liveStart + (a.end - a.start))}</span>}
+                    {/* service name */}
+                    {height > 58 && <div style={{ fontSize: 12.5, color: "var(--text2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.title}</div>}
+                    {/* add-on detail only on tall blocks */}
+                    {height > 84 && a.detail && <div style={{ fontSize: 12, color: "var(--sub)", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{a.detail}</div>}
+                    <div style={{ position: "absolute", bottom: 5, right: 6, display: "flex", gap: 5, alignItems: "center", color: "var(--sub)" }}>
+                      {a.hasNote && <Edit2 size={11} style={{ opacity: 0.7 }} />}
+                      {a.hasPhotos && <ImageIcon size={12} style={{ opacity: 0.7 }} />}
+                      {a.vip && <span style={{ fontSize: 13, color: accent }}>★</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 16, textAlign: "center" }}>Tap an appointment to check in, notify, or complete · drag it up or down to move it. ★ regular · ✎ note · ▱ photos.</p>
+
+      {/* drag-to-move confirmation — pinned so it's always visible on drop */}
+      {/* WAITLIST MATCH — a freed slot matches waitlisted clients; confirm to notify */}
+      {waitlistMatch && (
+        <div className="fade-in" onClick={() => setWaitlistMatch(null)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, maxHeight: "85vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}><Bell size={20} style={{ color: "var(--gold)" }} /><div style={{ fontFamily: FONT_DISPLAY, fontSize: 22 }}>A slot just opened</div></div>
+            <div style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 18, lineHeight: 1.45 }}>{fmtTime(waitlistMatch.freed.start)} – {fmtTime(waitlistMatch.freed.end)} is now free. {wlRules.order === "longest" ? "Offer it to the longest-waiting match first?" : `These waitlisted client${waitlistMatch.matches.length > 1 ? "s" : ""} asked for this window — notify them with a link to book?`}</div>
+            <div style={{ display: "grid", gap: 8, marginBottom: 18 }}>
+              {waitlistMatch.matches.map((m, i) => {
+                const queued = wlRules.order === "longest" && i > 0;
+                return (
+                <div key={m.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: `1px solid ${queued ? "var(--border)" : "var(--gold)"}`, borderRadius: 12, padding: "11px 14px", opacity: queued ? 0.6 : 1 }}>
+                  <div><div style={{ fontSize: 15, fontWeight: 600 }}>{m.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{m.service}{m.provider ? ` · ${m.provider}` : ""}</div></div>
+                  {wlRules.order === "longest"
+                    ? (i === 0 ? <span style={{ fontSize: 12, fontWeight: 600, color: "var(--gold)" }}>FIRST UP</span> : <span style={{ fontSize: 12, color: "var(--faint)" }}>in {(wlRules.delayMin || 30) * i} min</span>)
+                    : <Check size={16} style={{ color: "var(--gold)" }} />}
+                </div>
+              ); })}
+            </div>
+            <button className="lift" onClick={() => sendWaitlistNotices(waitlistMatch.matches, waitlistMatch.freed)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Bell size={17} /> {wlRules.order === "longest" ? `Notify ${waitlistMatch.matches[0].name.split(" ")[0]}` : `Notify ${waitlistMatch.matches.length > 1 ? `all ${waitlistMatch.matches.length}` : waitlistMatch.matches[0].name.split(" ")[0]}`}</button>
+            <button onClick={() => setWaitlistMatch(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "10px 0 2px" }}>Not now</button>
+          </div>
+        </div>
+      )}
+
+      {pending && (
+        <>
+          <div className="fade-in" onClick={() => setPending(null)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 55 }} />
+          <div className="fade-in" style={{ position: "fixed", left: 0, right: 0, top: 24, display: "flex", justifyContent: "center", padding: "0 16px", zIndex: 56, boxSizing: "border-box" }}>
+            <div style={{ width: "100%", maxWidth: 400, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, textAlign: "center", boxShadow: "0 18px 50px var(--shadow)" }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, marginBottom: 6 }}>Move appointment?</div>
+              <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, fontWeight: 300, marginBottom: 4 }}>{pending.appt.name} — {pending.appt.title}</div>
+              <div style={{ fontSize: 15, color: "var(--sub)", marginBottom: 18 }}>
+                <span style={{ textDecoration: "line-through", opacity: 0.6 }}>{fmtTime(pending.appt.start)}</span>
+                <span style={{ margin: "0 8px", color: "var(--gold)" }}>→</span>
+                <span style={{ color: "var(--text)", fontWeight: 600 }}>{fmtTime(pending.newStart)} – {fmtTime(pending.newEnd)}</span>
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => setPending(null)} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, letterSpacing: 1, borderRadius: 12 }}>CANCEL</button>
+                <button className="lift" onClick={confirmMove} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 12 }}>CONFIRM</button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* tap-to-create: menu anchored right under the tapped time/spot */}
+      {createSlot && (() => {
+        const MW = 230;
+        const vw = (document.documentElement.clientWidth || window.innerWidth || 390);
+        const vh = (document.documentElement.clientHeight || window.innerHeight || 800);
+        const tx = (createSlot.x != null ? createSlot.x : vw / 2);
+        const ty = (createSlot.y != null ? createSlot.y : vh / 2);
+        let left = tx - MW / 2;
+        if (left < 8) left = 8;
+        if (left + MW > vw - 8) left = Math.max(8, vw - MW - 8);
+        const approxH = 190;
+        let top = ty + 12;
+        if (top + approxH > vh - 8) top = Math.max(8, ty - approxH - 12);
+        if (top < 8) top = 8;
+        return (
+          <>
+            <div className="fade-in" onClick={() => setCreateSlot(null)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 55 }} />
+            <div style={{ position: "fixed", left, top, width: MW, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 16, padding: 12, zIndex: 56, boxShadow: "var(--shadow-lg)", boxSizing: "border-box", transformOrigin: "top center", animation: "popIn .18s var(--ease) both" }}>
+              <div style={{ padding: "2px 4px 10px" }}>
+                <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.2 }}>{fmtTime(createSlot.start)}</div>
+                <div style={{ fontSize: 12.5, color: "var(--sub)" }}>with {(providers.find((p) => p.id === createSlot.providerId) || {}).name}</div>
+              </div>
+              <button className="lift" onClick={() => createAt("appt")} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "var(--gold)", color: "var(--on-gold)", padding: "12px 13px", borderRadius: 11, fontSize: 14, fontWeight: 600, marginBottom: 7, boxSizing: "border-box" }}><Calendar size={16} /> New appointment</button>
+              <button className="lift" onClick={() => createAt("block")} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", padding: "12px 13px", borderRadius: 11, fontSize: 14, fontWeight: 500, boxSizing: "border-box" }}><Clock size={16} style={{ color: "var(--sub)" }} /> Block off time</button>
+            </div>
+          </>
+        );
+      })()}
+
+      {newApptSlot && (
+        <NewAppointmentForm
+          slot={newApptSlot}
+          providers={providers}
+          clients={clients}
+          services={services}
+          onClose={() => setNewApptSlot(null)}
+          onBook={bookAppt}
+          onBlock={({ providerId, start }) => {
+            const id = Math.max(0, ...appts.map((a) => a.id)) + 1;
+            setAppts([...appts, { id, providerId, clientId: null, serviceId: null, start, end: start + 30, status: "block", vip: false, name: "Time Block", title: "Blocked", detail: "" }]);
+            setNewApptSlot(null);
+            showToast(`Time block added at ${fmtTime(start)}.`);
+          }}
+        />
+      )}
+
+      {/* full appointment experience: detail · ••• menu · edit */}
+      {open && (
+        <AppointmentSheet
+          appt={open}
+          providers={providers}
+          clients={clients}
+          services={services}
+          business={business}
+          onClose={() => setOpen(null)}
+          appts={appts}
+          onSetStatus={setStatus}
+          onCheckout={startCheckout}
+          onUpdate={updateAppt}
+          onDelete={deleteAppt}
+          showToast={showToast}
+        />
+      )}
+
+      {checkout && (
+        <Checkout
+          appt={checkout}
+          service={services.find((s) => s.id === checkout.serviceId)}
+          provider={providers.find((p) => p.id === checkout.providerId)}
+          business={business}
+          onClose={() => setCheckout(null)}
+          onDone={finishCheckout}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// APPOINTMENT SHEET — full-screen detail · ••• menu · edit
+// Bright/clean by default with a light↔dark toggle. Charcoal accent.
+// ============================================================
+const APPT_STATUSES = [
+  { id: "confirmed", label: "Confirmed", dot: "#3FB8AF" },
+  { id: "checked-in", label: "Waiting", dot: "#A78BC8" },
+  { id: "in-service", label: "In Service", dot: "#E59BB3" },
+  { id: "done", label: "Done", dot: "#6FAE72" },
+  { id: "unconfirmed", label: "Unconfirmed", dot: "#E0A45E" },
+];
+
+// ============================================================
+// CHECKOUT — staged card-reader flow: charge → tap → tip → approved → rebook
+// ============================================================
+function Checkout({ appt, service, provider, business, onClose, onDone }) {
+  const tipCfg = business?.tipping || { enabled: true, presets: [18, 20, 25], allowCustom: true, allowNoTip: true, smartDefault: 20 };
+  const rebookCfg = business?.rebook || { enabled: true, discount: 5, weeks: [2, 3, 4, 6, 8] };
+  const base = service?.price || appt.price || 0;
+  const [stage, setStage] = useState("review"); // review → reader → tip → approving → approved → rebook → done
+  const [tipPct, setTipPct] = useState(tipCfg.smartDefault ?? tipCfg.presets[0]);
+  const [customTip, setCustomTip] = useState(null);
+  const [rebookWeeks, setRebookWeeks] = useState(null);
+  const [customDate, setCustomDate] = useState(null); // ISO date string when picked manually
+  const tipAmt = customTip != null ? customTip : +(base * tipPct / 100).toFixed(2);
+  const total = +(base + tipAmt).toFixed(2);
+  const money = (n) => `$${n.toFixed(2)}`;
+
+  const tapCard = () => { setStage("reader"); setTimeout(() => setStage(tipCfg.enabled ? "tip" : "approving"), 1700); };
+  const confirmTip = () => { setStage("approving"); setTimeout(() => setStage("approved"), 1400); };
+  useEffect(() => {
+    if (stage === "approved") { const t = setTimeout(() => setStage(rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
+    if (stage === "done") { const t = setTimeout(() => onDone(appt.id, { total, totalLabel: money(total), tip: tipAmt, rebookWeeks, rebookDate: customDate, rebookLabel: hasSelection ? selectionLabel : null }), 1200); return () => clearTimeout(t); }
+  }, [stage]);
+
+  const rebookDate = (weeks) => { const d = new Date(); d.setDate(d.getDate() + weeks * 7); return d; };
+  const fmtRebook = (weeks) => { const d = rebookDate(weeks); return `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
+  const fmtCustom = (iso) => { const d = new Date(iso + "T00:00:00"); return `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
+  const hasSelection = rebookWeeks != null || customDate != null;
+  const selectionLabel = customDate ? fmtCustom(customDate) : (rebookWeeks != null ? fmtRebook(rebookWeeks) : "");
+
+  const sheet = (inner, dismissable, top = true) => (
+    <div className="fade-in" onClick={dismissable ? onClose : undefined} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", alignItems: top ? "flex-start" : "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} className={top ? "appt-drop" : ""} style={{ background: "var(--bg)", borderBottomLeftRadius: 24, borderBottomRightRadius: 24, borderTopLeftRadius: top ? 0 : 24, borderTopRightRadius: top ? 0 : 24, width: "100%", maxWidth: 480, maxHeight: "92vh", overflowY: "auto", boxShadow: top ? "0 20px 60px var(--shadow)" : "0 -20px 60px var(--shadow)" }}>
+        {!top && <div style={{ display: "flex", justifyContent: "center", paddingTop: 10 }}><div style={{ width: 38, height: 4, borderRadius: 4, background: "var(--border2)" }} /></div>}
+        {inner}
+        {top && <div style={{ display: "flex", justifyContent: "center", paddingBottom: 10 }}><div style={{ width: 38, height: 4, borderRadius: 4, background: "var(--border2)" }} /></div>}
+      </div>
+    </div>
+  );
+
+  if (stage === "review") return sheet(
+    <div style={{ padding: "20px 24px 32px" }}>
+      <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 500 }}>CHECKOUT</div>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, letterSpacing: -0.5, marginBottom: 4 }}>{appt.name || "Walk-in"}</h2>
+      <p style={{ color: "var(--sub)", fontSize: 15, marginBottom: 24, fontWeight: 300 }}>{service?.name || appt.title} with {provider?.name}</p>
+      <div style={{ background: "var(--panel)", borderRadius: 18, border: "1px solid var(--line)", boxShadow: "var(--shadow-sm)", padding: "6px 18px", marginBottom: 24 }}>
+        <CheckoutRow label={service?.name || appt.title} val={money(base)} />
+        <div style={{ borderTop: "1px solid var(--line)" }}><CheckoutRow label="Total due" val={money(base)} bold /></div>
+      </div>
+      <button className="lift" onClick={tapCard} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: "var(--shadow-md)" }}><CreditCard size={18} /> CHARGE CARD</button>
+      <button onClick={onClose} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 6 }}>CANCEL</button>
+    </div>
+  , true, true);
+
+  if (stage === "reader") return sheet(
+    <div style={{ padding: "56px 28px 64px", textAlign: "center" }}>
+      <div style={{ position: "relative", width: 96, height: 96, margin: "0 auto 28px" }}>
+        <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", animation: "pulse 1.6s var(--ease) infinite" }} />
+        <div style={{ position: "absolute", inset: 16, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center" }}><CreditCard size={32} style={{ color: "var(--on-gold)" }} /></div>
+      </div>
+      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Insert or tap card</div>
+      <p style={{ color: "var(--sub)", fontSize: 15.5, fontWeight: 300, marginBottom: 4 }}>{money(base)} — waiting for card…</p>
+      <p style={{ color: "var(--faint)", fontSize: 13, marginTop: 18 }}>Simulated reader · advancing automatically</p>
+    </div>
+  , false, true);
+
+  if (stage === "tip") return sheet(
+    <div style={{ padding: "24px 24px 32px" }}>
+      <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 500, textAlign: "center" }}>CARD READ · ADD A TIP</div>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, textAlign: "center", marginBottom: 4 }}>Add a tip?</h2>
+      <p style={{ color: "var(--sub)", fontSize: 15, textAlign: "center", marginBottom: 24, fontWeight: 300 }}>{service?.name || appt.title} · {money(base)}</p>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        {tipCfg.presets.map((p) => { const on = customTip == null && tipPct === p; return (
+          <button key={p} onClick={() => { setCustomTip(null); setTipPct(p); }} style={{ flex: 1, padding: "18px 4px", borderRadius: 16, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{p}%</div>
+            <div style={{ fontSize: 13, color: on ? "var(--on-gold)" : "var(--sub)", marginTop: 3 }}>{money(+(base * p / 100).toFixed(2))}</div>
+          </button>
+        ); })}
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+        {tipCfg.allowCustom && <button onClick={() => { const v = prompt("Custom tip amount ($)"); if (v != null) setCustomTip(Math.max(0, parseFloat(v) || 0)); }} style={{ flex: 1, padding: "13px 4px", borderRadius: 12, border: `1px solid ${customTip != null && customTip !== 0 ? "var(--gold)" : "var(--border)"}`, background: customTip != null && customTip !== 0 ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel)", color: customTip != null && customTip !== 0 ? "var(--gold)" : "var(--text)", fontSize: 14 }}>{customTip != null && customTip !== 0 ? `Custom · ${money(customTip)}` : "Custom"}</button>}
+        {tipCfg.allowNoTip && <button onClick={() => setCustomTip(0)} style={{ flex: 1, padding: "13px 4px", borderRadius: 12, border: `1px solid ${customTip === 0 ? "var(--gold)" : "var(--border)"}`, background: customTip === 0 ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel)", color: customTip === 0 ? "var(--gold)" : "var(--sub)", fontSize: 14 }}>No tip</button>}
+      </div>
+      <button className="lift" onClick={confirmTip} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: "var(--shadow-md)" }}>{tipAmt > 0 ? `TIP ${money(tipAmt)} · TOTAL ${money(total)}` : `CONTINUE · ${money(total)}`}</button>
+    </div>
+  );
+
+  if (stage === "approving" || stage === "approved") return sheet(
+    <div style={{ padding: "64px 28px 72px", textAlign: "center" }}>
+      {stage === "approving" ? (
+        <>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", border: "3px solid var(--line)", borderTopColor: "var(--gold)", margin: "0 auto 24px", animation: "spin .8s linear infinite" }} />
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500 }}>Approving…</div>
+        </>
+      ) : (
+        <div className="fade-in">
+          <div style={{ width: 88, height: 88, borderRadius: "50%", background: "#3FA968", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px", animation: "popIn .4s var(--ease) both" }}><Check size={44} style={{ color: "#fff" }} strokeWidth={3} /></div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Approved</div>
+          <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300 }}>{money(total)} charged</p>
+        </div>
+      )}
+    </div>
+  );
+
+  if (stage === "rebook") return sheet(
+    <div style={{ padding: "28px 24px 32px" }}>
+      <div style={{ textAlign: "center", marginBottom: 26 }}>
+        <div style={{ width: 56, height: 56, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Repeat size={26} style={{ color: "var(--gold)" }} /></div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, lineHeight: 1.15 }}>Save {money(rebookCfg.discount)} by rebooking now?</h2>
+        <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300 }}>Lock in {appt.name ? appt.name.split(" ")[0] : "the next visit"}'s next {service?.name || "appointment"} and take {money(rebookCfg.discount)} off.</p>
+      </div>
+      <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WHEN?</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 12 }}>
+        {rebookCfg.weeks.map((w) => { const on = rebookWeeks === w && !customDate; return (
+          <button key={w} onClick={() => { setRebookWeeks(w); setCustomDate(null); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "var(--panel)", color: "var(--text)", textAlign: "left" }}>
+            <div><div style={{ fontSize: 16, fontWeight: 600 }}>{w} weeks</div><div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{fmtRebook(w)}</div></div>
+            {on && <Check size={18} style={{ color: "var(--gold)" }} />}
+          </button>
+        ); })}
+      </div>
+      {/* custom date — opens the device calendar/date picker */}
+      <label style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${customDate ? "var(--gold)" : "var(--border)"}`, background: customDate ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "var(--panel)", color: "var(--text)", marginBottom: 22, cursor: "pointer" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Calendar size={19} style={{ color: "var(--gold)" }} />
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>{customDate ? fmtCustom(customDate) : "Pick a custom date"}</div>
+            <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{customDate ? "Tap to change" : "Open the calendar"}</div>
+          </div>
+        </div>
+        {customDate ? <Check size={18} style={{ color: "var(--gold)" }} /> : <ChevronRight size={18} style={{ color: "var(--faint)" }} />}
+        <input type="date" value={customDate || ""} min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)} onChange={(e) => { if (e.target.value) { setCustomDate(e.target.value); setRebookWeeks(null); } }} style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
+      </label>
+      <button className="lift" disabled={!hasSelection} onClick={() => setStage("done")} style={{ width: "100%", background: !hasSelection ? "var(--panel2)" : "var(--gold)", color: !hasSelection ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: !hasSelection ? "none" : "var(--shadow-md)" }}>{!hasSelection ? "PICK A TIME" : `BOOK ${selectionLabel} · SAVE ${money(rebookCfg.discount)}`}</button>
+      {hasSelection && <p style={{ color: "var(--faint)", fontSize: 12.5, lineHeight: 1.5, textAlign: "center", marginTop: 10 }}>Nothing is charged today — the {money(rebookCfg.discount)} is taken off when they come in. We'll send the confirmation and reminders automatically.</p>}
+      <button onClick={() => { setRebookWeeks(null); setCustomDate(null); setStage("done"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 4 }}>NO THANKS</button>
+    </div>
+  );
+
+  return sheet(
+    <div className="fade-in" style={{ padding: "56px 28px 64px", textAlign: "center" }}>
+      <div style={{ width: 72, height: 72, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px" }}><Check size={34} style={{ color: "var(--gold)" }} /></div>
+      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 8 }}>All done</div>
+      <p style={{ color: "var(--sub)", fontSize: 15.5, fontWeight: 300 }}>{money(total)} charged for today’s visit · receipt sent to {appt.name || "the client"}.</p>
+
+      {hasSelection && (
+        <div style={{ marginTop: 24, textAlign: "left", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "18px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <Repeat size={18} style={{ color: "var(--gold)" }} />
+            <div style={{ fontSize: 15.5, fontWeight: 600 }}>Rebooked · {selectionLabel}</div>
+          </div>
+          {[
+            [Check, `Confirmation sent to ${appt.name ? appt.name.split(" ")[0] : "client"} now`],
+            [Bell, "Reminders will go out automatically before the visit"],
+            [DollarSign, `${money(rebookCfg.discount)} comes off at that visit — nothing charged today`],
+          ].map(([Ico, txt], i) => (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "6px 0" }}>
+              <Ico size={15} style={{ color: "var(--sub)", marginTop: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.45 }}>{txt}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+function CheckoutRow({ label, val, bold }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
+      <span style={{ fontSize: bold ? 17 : 15, fontWeight: bold ? 600 : 400, color: bold ? "var(--text)" : "var(--text2)" }}>{label}</span>
+      <span style={{ fontSize: bold ? 19 : 15, fontWeight: bold ? 700 : 500, fontFamily: bold ? FONT_DISPLAY : FONT_BODY }}>{val}</span>
+    </div>
+  );
+}
+
+function AppointmentSheet({ appt, appts, providers, clients, services, business, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
+  const [mode, setMode] = useState("detail"); // detail | edit
+  const [menuOpen, setMenuOpen] = useState(false);
+  const provider = providers.find((p) => p.id === appt.providerId) || providers[1];
+  const client = clients.find((c) => c.id === appt.clientId);
+  const service = services.find((s) => s.id === appt.serviceId);
+  const dur = appt.end - appt.start;
+
+  // ---- theme tokens: read straight from the active app theme ----
+  const T = {
+    bg: "var(--bg)", panel: "var(--panel)", line: "var(--line)", text: "var(--text)", sub: "var(--sub)",
+    faint: "var(--faint)", chip: "var(--panel2)", accent: "var(--gold)", accentText: "var(--on-gold)",
+    topbar: "var(--panel)", overlay: "var(--overlay)", danger: "#C2563F",
+  };
+
+  const status = APPT_STATUSES.find((s) => s.id === appt.status) || APPT_STATUSES[0];
+  const initials = appt.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  const fmtBookDate = "Booked online · confirmed by text";
+
+  // edit-mode local draft
+  const [draftStart, setDraftStart] = useState(appt.start);
+  const [draftDur, setDraftDur] = useState(dur);
+  const [draftProvider, setDraftProvider] = useState(appt.providerId);
+  const [draftNote, setDraftNote] = useState(appt.note || "");
+  const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setMode("edit"); setMenuOpen(false); };
+  const saveEdit = () => { onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote }); showToast("Appointment updated."); setMode("detail"); };
+
+  const staff = providers.filter((p) => p.id !== "anyone");
+
+  // ---- "running late" prompt ----
+  // The next client for this provider: the soonest later appointment that's
+  // still upcoming (confirmed) or already waiting (checked-in).
+  const nextClient = (appts || [])
+    .filter((a) => a.providerId === appt.providerId && a.id !== appt.id && a.start >= appt.start && (a.status === "confirmed" || a.status === "checked-in") && a.status !== "block")
+    .sort((a, b) => a.start - b.start)[0];
+  const nextIsWaiting = nextClient && nextClient.status === "checked-in";
+  const [lateOpen, setLateOpen] = useState(false);
+  const sendRunningLate = (range) => {
+    if (nextClient) onUpdate(nextClient.id, { lateNotified: range });
+    setLateOpen(false);
+    const rl = (business && business.runningLate) || {};
+    if (rl.message && nextClient) {
+      const filled = rl.message
+        .replace(/\{client\}/g, (nextClient.name || "there").split(" ")[0])
+        .replace(/\{provider\}/g, provider.name)
+        .replace(/\{shop\}/g, (business && business.name) || "the shop")
+        .replace(/\{range\}/g, range);
+      showToast(`Sent to ${nextClient.name}: "${filled}"`);
+    } else {
+      showToast(nextClient ? `In-app notice sent to ${nextClient.name}: running ${range} min behind.` : `Running-late notice sent.`);
+    }
+  };
+
+  // small building blocks
+  const TopBar = ({ left, title, right }) => (
+    <div style={{ background: T.topbar, borderBottom: `1px solid ${T.line}`, padding: "16px 18px calc(16px)", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 5 }}>
+      <div style={{ minWidth: 70 }}>{left}</div>
+      <div style={{ fontSize: 17, fontWeight: 600, color: T.text }}>{title}</div>
+      <div style={{ minWidth: 70, display: "flex", justifyContent: "flex-end", gap: 14, alignItems: "center" }}>{right}</div>
+    </div>
+  );
+
+  const Cell = ({ label, value }) => (
+    <div style={{ flex: 1, padding: "16px 18px" }}>
+      <span style={{ fontSize: 14, color: T.sub, fontStyle: "italic", marginRight: 8 }}>{label}</span>
+      <span style={{ fontSize: 17, color: T.text, fontWeight: 500 }}>{value}</span>
+    </div>
+  );
+
+  return (
+    <Portal>
+    <div className="appt-screen" style={{ position: "fixed", inset: 0, zIndex: 800, background: T.bg, display: "flex", flexDirection: "column", color: T.text, fontFamily: FONT_BODY }}>
+      <div style={{ width: "100%", maxWidth: 540, margin: "0 auto", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+        {mode === "detail" ? (
+          <>
+            <TopBar
+              left={<button onClick={onClose} style={{ background: "none", color: T.text, display: "flex", alignItems: "center", gap: 2, fontSize: 15 }}><ChevronLeft size={22} /></button>}
+              title="Appointment"
+              right={<>
+                <button onClick={() => setMenuOpen((v) => !v)} style={{ background: "none", color: T.text }}><MoreHorizontal size={22} /></button>
+                <button onClick={startEdit} style={{ background: "none", color: T.sub, fontSize: 15, fontWeight: 600 }}>Edit</button>
+              </>}
+            />
+
+            <div style={{ overflowY: "auto", flex: 1 }}>
+              {/* status + check-in */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px", borderBottom: `1px solid ${T.line}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ width: 13, height: 13, borderRadius: "50%", background: status.dot }} />
+                  <span style={{ fontSize: 18, fontWeight: 600 }}>{status.label}</span>
+                </div>
+                {appt.status === "confirmed" && <button className="lift" onClick={() => onSetStatus(appt.id, "checked-in", `${appt.name} checked in.`)} style={{ border: `1.5px solid ${T.line}`, color: T.text, background: "none", padding: "11px 22px", borderRadius: 30, fontSize: 15, letterSpacing: 1, fontWeight: 600 }}>CHECK-IN</button>}
+                {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} is ready for you and will meet you in front."; const msg = wr.autoReadyMessage === false ? `${appt.name} marked in service.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`; onSetStatus(appt.id, "in-service", msg); }} style={{ background: T.accent, color: T.accentText, padding: "11px 18px", borderRadius: 30, fontSize: 15, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>NOTIFY · READY</button>}
+                {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ background: T.accent, color: T.accentText, padding: "11px 22px", borderRadius: 30, fontSize: 15, letterSpacing: 1, fontWeight: 600, border: "none" }}>COMPLETE & CHECKOUT</button>}
+              </div>
+
+              {/* LAST TIME — surfaces the client's previous cut photo + notes on check-in/in-service */}
+              {(appt.status === "checked-in" || appt.status === "in-service") && client && (() => {
+                const g = (client.gallery || []);
+                const lastCut = g.length ? g[g.length - 1] : null;
+                const lastDur = client.customDurations && appt.serviceId ? client.customDurations[appt.serviceId] : null;
+                if (!lastCut && !client.notes && !lastDur) return null;
+                const daysAgo = lastCut ? Math.round((Date.now() - new Date(lastCut.date)) / 86400000) : null;
+                return (
+                  <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}`, background: "rgba(122,158,159,0.08)" }}>
+                    <div style={{ fontSize: 11.5, letterSpacing: 1.5, color: T.sub, fontWeight: 600, marginBottom: 10 }}>PICK UP WHERE YOU LEFT OFF</div>
+                    <div style={{ display: "flex", gap: 12 }}>
+                      {lastCut && <div style={{ width: 64, height: 64, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: T.chip }}><img src={imgUrl(lastCut.photo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {lastCut && <div style={{ fontSize: 14.5, color: T.text, fontWeight: 500, marginBottom: 2 }}>{lastCut.note || "Last visit"}</div>}
+                        {daysAgo != null && <div style={{ fontSize: 13, color: T.faint, marginBottom: client.notes ? 6 : 0 }}>{daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo} days ago`}{lastDur ? ` · usually ${lastDur} min` : ""}</div>}
+                        {client.notes && <div style={{ fontSize: 13.5, color: T.sub, lineHeight: 1.45 }}>{client.notes}</div>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* RUNNING LATE — shows when in service and the next client is already waiting */}
+              {appt.status === "in-service" && nextClient && ((business && business.runningLate ? business.runningLate.enabled !== false : true)) && (
+                <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}`, background: "rgba(176,141,87,0.08)" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <Clock size={18} style={{ color: T.accent, marginTop: 2, flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15.5, fontWeight: 600, color: T.text }}>{(business?.runningLate?.thresholdMin) || 5} min left in this appointment</div>
+                      <div style={{ fontSize: 14, color: T.sub, marginTop: 2, lineHeight: 1.45 }}>{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running late?</div>
+                      {nextClient.lateNotified ? (
+                        <div style={{ marginTop: 10, fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Check size={15} /> Notified · running {nextClient.lateNotified} min behind</div>
+                      ) : (
+                        <button className="lift" onClick={() => setLateOpen(true)} style={{ marginTop: 10, background: T.accent, color: T.accentText, padding: "9px 18px", borderRadius: 24, fontSize: 14, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>LET THEM KNOW</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* on / at */}
+              <div style={{ display: "flex", borderBottom: `1px solid ${T.line}` }}>
+                <Cell label="On" value={apptDateLabel()} />
+                <div style={{ width: 1, background: T.line }} />
+                <Cell label="At" value={fmtTime(appt.start)} />
+              </div>
+
+              {/* client card */}
+              <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ width: 54, height: 54, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, flexShrink: 0 }}>{initials}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, lineHeight: 1.1 }}>{appt.name} {appt.vip && <span style={{ color: status.dot }}>★</span>}</div>
+                    <div style={{ fontSize: 15, color: T.sub }}>{client ? `${client.visits} visits` : "New client"}</div>
+                  </div>
+                  <button onClick={() => showToast("Opening message thread…")} style={{ width: 44, height: 44, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center" }}><MessageSquare size={18} /></button>
+                </div>
+                {/* client's global note shows prominently when viewing an appointment */}
+                {client && client.notes && (
+                  <div style={{ marginTop: 14, background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "12px 14px", display: "flex", gap: 10 }}>
+                    <AlertCircle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+                    <div style={{ fontSize: 14, color: T.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{client.notes}</div>
+                  </div>
+                )}
+                <div style={{ marginTop: 16, display: "grid", gap: 9 }}>
+                  <DetailRow T={T} label="Phone" value={client?.phone || "—"} accent />
+                  <DetailRow T={T} label="Email" value={client ? `${appt.name.split(" ")[0].toLowerCase()}@email.com` : "—"} />
+                  <DetailRow T={T} label="Credit" value="Visa  ···7815   Exp 9/30" icon={<CreditCard size={13} style={{ color: T.faint }} />} />
+                </div>
+              </div>
+
+              {/* service block */}
+              <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22 }}>{service?.name || appt.title}</span>
+                  <span style={{ fontSize: 20, fontWeight: 600 }}>${service?.price ?? "—"}</span>
+                </div>
+                {appt.detail && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+                    {appt.detail.split(",").map((d, i) => (
+                      <span key={i} style={{ background: T.chip, color: T.text, padding: "8px 14px", borderRadius: 8, fontSize: 15 }}>{d.trim()}</span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ fontSize: 15, color: T.sub, lineHeight: 1.9 }}>
+                  <span style={{ fontStyle: "italic" }}>with </span><span style={{ color: T.text, fontWeight: 500 }}>{provider.name}</span>
+                  <span style={{ fontStyle: "italic" }}>   ·   at </span><span style={{ color: T.text, fontWeight: 500 }}>{fmtTime(appt.start)}</span>
+                  <span style={{ fontStyle: "italic" }}>   for </span><span style={{ color: T.text, fontWeight: 500 }}>{dur} min</span>
+                </div>
+              </div>
+
+              {/* client-uploaded photos */}
+              {appt.photos > 0 && (
+                <div style={{ padding: "0 18px 20px" }}>
+                  <div style={{ fontSize: 15, color: T.sub, letterSpacing: 0.3, marginBottom: 12 }}>Client Photos</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {Array.from({ length: Math.min(3, appt.photos) }).map((_, i) => (
+                      <div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: T.chip, border: `1px solid ${T.line}` }}>
+                        <img src={imgUrl(ALL_LIBRARY[(appt.id + i) % ALL_LIBRARY.length].id)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      </div>
+                    ))}
+                  </div>
+                  <p style={{ fontSize: 14, color: T.faint, marginTop: 8 }}>Uploaded by the client when booking.</p>
+                </div>
+              )}
+
+              {/* booking details */}
+              <div style={{ padding: "20px 18px 30px" }}>
+                <div style={{ fontSize: 15, color: T.sub, letterSpacing: 0.3, marginBottom: 12 }}>Booking Details</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14.5, color: T.text, marginBottom: 10 }}><Clock size={15} style={{ color: T.faint }} /> Booked Wed, May 20 at 9:02 AM</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14.5, color: T.text }}><User size={15} style={{ color: T.faint }} /> {fmtBookDate}</div>
+              </div>
+            </div>
+
+            {/* ••• action menu popover */}
+            {menuOpen && (
+              <>
+                <div onClick={() => setMenuOpen(false)} style={{ position: "absolute", inset: 0, zIndex: 8 }} />
+                <div className="fade-in" style={{ position: "absolute", top: 56, right: 14, width: 250, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,0.28)", zIndex: 9, overflow: "hidden", padding: "6px 0" }}>
+                  <MenuItem T={T} danger icon={<Trash2 size={17} />} label="Cancel / Delete" onClick={() => onDelete(appt.id)} />
+                  <MenuItem T={T} icon={<DollarSign size={17} />} label="Checkout" onClick={() => { setMenuOpen(false); showToast("Checkout — coming in the Payments build."); }} />
+                  <Divider T={T} />
+                  <MenuItem T={T} icon={<Repeat size={17} />} label="Make Repeating" onClick={() => { setMenuOpen(false); showToast("Repeating appointment set up."); }} />
+                  <MenuItem T={T} icon={<Copy size={17} />} label="Duplicate / Rebook" onClick={() => { setMenuOpen(false); showToast("Rebooked — duplicate created."); }} />
+                  <MenuItem T={T} icon={<Bell size={17} />} label="Resend Notifications" onClick={() => { setMenuOpen(false); showToast("Confirmation re-sent to client."); }} />
+                  <Divider T={T} />
+                  <div style={{ padding: "6px 16px 4px", fontSize: 13, letterSpacing: 1.2, color: T.faint }}>SET STATUS</div>
+                  {APPT_STATUSES.filter((s) => s.id !== "done").map((s) => (
+                    <button key={s.id} onClick={() => { onSetStatus(appt.id, s.id, `Marked ${s.label.toLowerCase()}.`); setMenuOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", background: appt.status === s.id ? T.chip : "none", color: T.text, fontSize: 15.5, textAlign: "left" }}>
+                      <span style={{ width: 12, height: 12, borderRadius: "50%", background: s.dot }} /> {s.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {lateOpen && (
+              <>
+                <div onClick={() => setLateOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 10 }} />
+                <div className="fade-in" style={{ position: "absolute", left: 16, right: 16, bottom: 16, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 11, padding: 20 }}>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, marginBottom: 4 }}>How far behind?</div>
+                  <div style={{ fontSize: 14, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>We'll send {nextClient ? nextClient.name : "your next client"} an in-app notification — no text message.</div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {((business?.runningLate?.ranges) || ["5–10", "10–15"]).map((r) => (
+                      <button key={r} className="lift" onClick={() => sendRunningLate(r)} style={{ flex: 1, background: T.chip, border: `1px solid ${T.line}`, color: T.text, padding: "16px 0", borderRadius: 14, fontSize: 16, fontWeight: 600 }}>{r} min</button>
+                    ))}
+                  </div>
+                  <button onClick={() => setLateOpen(false)} style={{ width: "100%", marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 14.5, padding: 8 }}>Cancel</button>
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          /* ---------- EDIT MODE ---------- */
+          <>
+            <TopBar
+              left={<button onClick={() => setMode("detail")} style={{ background: "none", color: T.sub, fontSize: 15.5 }}>Cancel</button>}
+              title="Edit Appointment"
+              right={<button onClick={saveEdit} style={{ background: "none", color: T.text, fontSize: 15.5, fontWeight: 700 }}>Save</button>}
+            />
+            <div style={{ overflowY: "auto", flex: 1 }}>
+              {/* on / at editable */}
+              <div style={{ display: "flex", borderBottom: `1px solid ${T.line}` }}>
+                <Cell label="On" value={apptDateLabel()} />
+                <div style={{ width: 1, background: T.line }} />
+                <div style={{ flex: 1, padding: "12px 18px" }}>
+                  <div style={{ fontSize: 14, color: T.sub, fontStyle: "italic", marginBottom: 6 }}>At</div>
+                  <EditStepperRow T={T} value={fmtTime(draftStart)} onDec={() => setDraftStart((v) => Math.max(DAY_START, v - 5))} onInc={() => setDraftStart((v) => Math.min(DAY_END - draftDur, v + 5))} />
+                </div>
+              </div>
+
+              {/* client card with remove */}
+              <div style={{ padding: "20px 18px", borderBottom: `1px solid ${T.line}`, display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 50, height: 50, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, fontWeight: 600 }}>{initials}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21 }}>{appt.name}</div>
+                  <div style={{ fontSize: 15, color: T.sub }}>{client?.phone || "New client"}</div>
+                </div>
+                <button onClick={() => showToast("Remove client — would clear the booking.")} style={{ background: "none", color: T.faint }}><Trash2 size={19} /></button>
+              </div>
+
+              {/* service editable */}
+              <div style={{ padding: "20px 18px", borderBottom: `1px solid ${T.line}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 21 }}>{service?.name || appt.title}</span>
+                  <button onClick={() => showToast("Remove service.")} style={{ background: "none", color: T.faint }}><Trash2 size={17} /></button>
+                </div>
+                {appt.detail && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+                    {appt.detail.split(",").map((d, i) => (
+                      <span key={i} style={{ background: T.chip, color: T.text, padding: "8px 13px", borderRadius: 8, fontSize: 15, display: "flex", alignItems: "center", gap: 7 }}>{d.trim()} <X size={13} style={{ color: T.faint }} /></span>
+                    ))}
+                    <button onClick={() => showToast("Add an add-on to this service.")} style={{ background: "none", color: T.text, fontSize: 14, fontWeight: 600, padding: "8px 4px" }}>+ Add-on</button>
+                  </div>
+                )}
+                {/* provider picker */}
+                <div style={{ fontSize: 15, color: T.sub, fontStyle: "italic", marginBottom: 8 }}>with</div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+                  {staff.map((p) => (
+                    <button key={p.id} onClick={() => setDraftProvider(p.id)} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: `1.5px solid ${draftProvider === p.id ? T.accent : T.line}`, background: draftProvider === p.id ? T.accent : "none", color: draftProvider === p.id ? T.accentText : T.text, fontSize: 15, fontWeight: draftProvider === p.id ? 600 : 400 }}>{p.name}</button>
+                  ))}
+                </div>
+                {/* duration */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 15, color: T.sub, fontStyle: "italic" }}>for</span>
+                  <EditStepperRow T={T} value={`${draftDur} min`} onDec={() => setDraftDur((v) => Math.max(5, v - 5))} onInc={() => setDraftDur((v) => Math.min(240, v + 5))} />
+                </div>
+              </div>
+
+              {/* add service + note */}
+              <button onClick={() => showToast("Add another service to this booking.")} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "20px", background: "none", color: T.sub, fontSize: 14, letterSpacing: 1, borderBottom: `1px solid ${T.line}` }}><Plus size={17} /> ADD SERVICE</button>
+              <div style={{ padding: "18px" }}>
+                <textarea value={draftNote} onChange={(e) => setDraftNote(e.target.value)} placeholder="Add a note" rows={3} style={{ width: "100%", background: "none", border: "none", color: T.text, fontSize: 16, fontFamily: FONT_BODY, resize: "vertical", outline: "none" }} />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+    </Portal>
+  );
+}
+
+function DetailRow({ T, label, value, accent, icon }) {
+  return (
+    <div style={{ display: "flex", gap: 14, fontSize: 15 }}>
+      <span style={{ color: T.sub, fontStyle: "italic", minWidth: 58 }}>{label}</span>
+      <span style={{ color: accent ? (T.text) : T.text, display: "flex", alignItems: "center", gap: 7, fontWeight: accent ? 500 : 400 }}>{icon}{value}</span>
+    </div>
+  );
+}
+function MenuItem({ T, icon, label, onClick, danger }) {
+  return (
+    <button onClick={onClick} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "12px 16px", background: "none", color: danger ? T.danger : T.text, fontSize: 15.5, textAlign: "left" }}>
+      {icon} {label}
+    </button>
+  );
+}
+function Divider({ T }) { return <div style={{ height: 1, background: T.line, margin: "5px 14px" }} />; }
+function EditStepperRow({ T, value, onDec, onInc }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <button onClick={onDec} style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${T.line}`, background: "none", color: T.text, fontSize: 19, lineHeight: 1 }}>−</button>
+      <span style={{ minWidth: 92, textAlign: "center", fontSize: 17, fontWeight: 500, color: T.text }}>{value}</span>
+      <button onClick={onInc} style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${T.line}`, background: "none", color: T.text, fontSize: 19, lineHeight: 1 }}>+</button>
+    </div>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = { confirmed: ["var(--sub)", "rgba(154,149,140,0.12)", "Confirmed"], "checked-in": ["var(--gold)", "rgba(176,141,87,0.14)", "Checked in"], "in-service": ["#7A9E9F", "rgba(122,158,159,0.16)", "In service"], done: ["#5E8C61", "rgba(94,140,97,0.16)", "Done"] };
+  const [color, bg, label] = map[status] || map.confirmed;
+  return <span style={{ color, background: bg, padding: "5px 12px", borderRadius: 20, fontSize: 14, whiteSpace: "nowrap" }}>{label}</span>;
+}
+function ActionBtn({ children, onClick, primary }) { return <button className="lift" onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 7, background: primary ? "var(--gold)" : "transparent", color: primary ? "var(--on-gold)" : "var(--text)", border: primary ? "none" : "1px solid var(--border)", padding: "9px 14px", borderRadius: 12, fontSize: 15, fontWeight: primary ? 500 : 400 }}>{children}</button>; }
+
+// Reports — owner dashboard. Computes live from real appointments + service
+// prices where possible; trend/retention use representative sample data until
+// the backend stores real sales history.
+function ReportsView({ appts, clients, providers, services, business }) {
+  const [range, setRange] = useState("week"); // today | week | month
+  const staff = providers.filter((p) => p.id !== "anyone");
+  const money = (n) => "$" + Math.round(n).toLocaleString();
+  const priceOf = (a) => { const s = services.find((x) => x.id === a.serviceId); return s ? s.price : 45; };
+
+  // ---- live figures from current appointments ----
+  const active = appts.filter((a) => a.status !== "block" && a.status !== "cancelled");
+  const todayRevenue = active.reduce((sum, a) => sum + priceOf(a), 0);
+  const todayCount = active.length;
+  const avgTicket = todayCount ? todayRevenue / todayCount : 0;
+  const cancelled = appts.filter((a) => a.status === "cancelled").length;
+
+  // per-staff (live)
+  const byStaff = staff.map((p) => {
+    const mine = active.filter((a) => a.providerId === p.id);
+    return { name: p.name, color: p.color, count: mine.length, revenue: mine.reduce((s, a) => s + priceOf(a), 0) };
+  }).sort((a, b) => b.revenue - a.revenue);
+
+  // ---- representative trend (sample — real history needs the backend) ----
+  const mult = range === "today" ? 1 : range === "week" ? 6 : 26;
+  const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const weekTrend = [820, 640, 910, 1180, 1540, 1720, 0].map((v) => Math.round(v * (todayRevenue ? todayRevenue / 700 : 1)));
+  const maxTrend = Math.max(...weekTrend, 1);
+  const periodRevenue = Math.round(todayRevenue * mult);
+  const periodAppts = todayCount * mult;
+  const retention90 = 68; // % returning within 90 days (sample)
+  const rebookRate = 54;  // % who rebooked on the spot (sample)
+  const topServices = [...services].slice(0, 5).map((s, i) => ({ name: s.name, sold: [38, 27, 19, 12, 8][i] || 5, rev: ([38, 27, 19, 12, 8][i] || 5) * (s.price || 40) }));
+  const maxSvc = Math.max(...topServices.map((s) => s.rev), 1);
+
+  const Stat = ({ label, value, sub }) => (
+    <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: 12.5, letterSpacing: 1, color: "var(--faint)", marginBottom: 6, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
+      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 27, lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 5 }}>{sub}</div>}
+    </div>
+  );
+
+  return (
+    <div className="fade-up" style={{ paddingBottom: 20 }}>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 4 }}>Reports</h2>
+      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 16, fontWeight: 300 }}>How the shop is performing at a glance.</p>
+
+      {/* range toggle */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+        {[["today", "Today"], ["week", "This week"], ["month", "This month"]].map(([v, label]) => { const on = range === v; return (
+          <button key={v} onClick={() => setRange(v)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
+        ); })}
+      </div>
+
+      {/* headline stats */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+        <Stat label="Revenue" value={money(periodRevenue)} sub={range === "today" ? "booked today" : "estimated"} />
+        <Stat label="Appointments" value={periodAppts} sub={`${cancelled} cancelled`} />
+      </div>
+      <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>
+        <Stat label="Avg ticket" value={money(avgTicket)} />
+        <Stat label="Rebooked" value={rebookRate + "%"} sub="on the spot" />
+      </div>
+
+      {/* revenue trend */}
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}><TrendingUp size={17} style={{ color: "var(--gold)" }} /><span style={{ fontSize: 15.5, fontWeight: 600 }}>Revenue this week</span></div>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8, height: 130 }}>
+          {weekTrend.map((v, i) => (
+            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, height: "100%", justifyContent: "flex-end" }}>
+              <div style={{ width: "100%", maxWidth: 30, height: `${Math.max(4, (v / maxTrend) * 100)}%`, background: i === 5 ? "var(--gold)" : "color-mix(in srgb, var(--gold) 35%, var(--panel2))", borderRadius: "6px 6px 0 0", transition: "height .3s var(--ease)" }} />
+              <span style={{ fontSize: 11.5, color: "var(--faint)" }}>{dayLabels[i]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* by staff */}
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}><Users size={17} style={{ color: "var(--gold)" }} /><span style={{ fontSize: 15.5, fontWeight: 600 }}>By staff member</span></div>
+        {byStaff.map((s) => { const max = Math.max(...byStaff.map((x) => x.revenue), 1); return (
+          <div key={s.name} style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}><span style={{ fontSize: 14.5 }}>{s.name}</span><span style={{ fontSize: 14, color: "var(--sub)" }}>{money(s.revenue)} · {s.count} appts</span></div>
+            <div style={{ height: 8, borderRadius: 4, background: "var(--panel2)", overflow: "hidden" }}><div style={{ height: "100%", width: `${(s.revenue / max) * 100}%`, background: s.color || "var(--gold)", borderRadius: 4 }} /></div>
+          </div>
+        ); })}
+      </div>
+
+      {/* top services */}
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}><BarChart3 size={17} style={{ color: "var(--gold)" }} /><span style={{ fontSize: 15.5, fontWeight: 600 }}>Top services</span></div>
+        {topServices.map((s) => (
+          <div key={s.name} style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}><span style={{ fontSize: 14.5 }}>{s.name}</span><span style={{ fontSize: 14, color: "var(--sub)" }}>{money(s.rev)} · {s.sold} sold</span></div>
+            <div style={{ height: 8, borderRadius: 4, background: "var(--panel2)", overflow: "hidden" }}><div style={{ height: "100%", width: `${(s.rev / maxSvc) * 100}%`, background: "var(--gold)", borderRadius: 4 }} /></div>
+          </div>
+        ))}
+      </div>
+
+      {/* retention */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+        <Stat label="Client retention" value={retention90 + "%"} sub="returned in 90 days" />
+        <Stat label="Total clients" value={clients.length.toLocaleString()} />
+      </div>
+
+      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, textAlign: "center", padding: "4px 10px" }}>Headline numbers and staff breakdown are calculated from your live appointments. Weekly trends and retention show representative figures until sales history is being stored.</p>
+    </div>
+  );
+}
+
+function ClientList({ clients, setClients, providers, onOpen, showToast }) {
+  const [query, setQuery] = useState("");
+  const [adding, setAdding] = useState(false);
+  const staff = providers.filter((p) => p.id !== "anyone");
+  const blank = { name: "", phone: "", email: "", provider: staff[0]?.id || "dan", notes: "" };
+  const [draft, setDraft] = useState(blank);
+
+  const q = query.trim().toLowerCase();
+  const shown = q ? clients.filter((c) => (c.name + " " + (c.phone || "") + " " + (c.email || "")).toLowerCase().includes(q)) : clients;
+
+  // Rebooking-rhythm radar: clients past their usual interval who aren't on the books.
+  const overdue = clients.map((c) => {
+    if (!c.cadenceDays || !c.lastVisit) return null;
+    const days = Math.round((Date.now() - new Date(c.lastVisit)) / 86400000);
+    const over = days - c.cadenceDays;
+    return over > 0 ? { c, days, over } : null;
+  }).filter(Boolean).sort((a, b) => b.over - a.over);
+  const [dismissed, setDismissed] = useState([]);
+  const radar = overdue.filter((o) => !dismissed.includes(o.c.id));
+  const nudge = (o) => { if (showToast) showToast(`Nudge sent to ${o.c.name.split(" ")[0]} — "time for your next visit?" with a booking link.`); setDismissed((d) => [...d, o.c.id]); };
+
+  const saveClient = () => {
+    if (!draft.name.trim()) { if (showToast) showToast("Please add a name."); return; }
+    const id = "c" + Date.now();
+    const newClient = { id, name: draft.name.trim(), phone: draft.phone.trim(), email: draft.email.trim(), provider: draft.provider, visits: 0, customDurations: {}, notes: draft.notes.trim(), messages: [], gallery: [], timeline: [] };
+    setClients([newClient, ...clients]);
+    setAdding(false); setDraft(blank);
+    if (showToast) showToast(`${newClient.name} added.`);
+  };
+
+  const inputS = { width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "13px 15px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, boxSizing: "border-box" };
+
+  return (
+    <>
+    <div className="fade-up">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500 }}>Clients</h2>
+        <button className="lift" onClick={() => { setDraft(blank); setAdding(true); }} aria-label="Add client" style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow-sm)", flexShrink: 0 }}><Plus size={22} /></button>
+      </div>
+
+      <div style={{ position: "relative", marginBottom: 18 }}>
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, phone, or email" style={{ ...inputS, paddingLeft: 44, borderRadius: 14 }} />
+        <User size={17} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
+      </div>
+
+      {!q && radar.length > 0 && (
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <Bell size={15} style={{ color: "var(--gold)" }} />
+            <span style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>DUE TO REBOOK</span>
+          </div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {radar.map((o) => { const provider = providers.find((p) => p.id === o.c.provider) || providers[1]; return (
+              <div key={o.c.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, padding: "12px 14px" }}>
+                <Avatar size={40} photo={clientPhoto(o.c)} initial={o.c.name.charAt(0)} color={provider.color} />
+                <div style={{ flex: 1, minWidth: 0 }} onClick={() => onOpen(o.c)}>
+                  <div style={{ fontSize: 15.5, fontWeight: 500 }}>{o.c.name}</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Usually every {o.c.cadenceDays}d · <span style={{ color: "var(--gold)", fontWeight: 600 }}>{o.over}d overdue</span></div>
+                </div>
+                <button className="lift" onClick={() => nudge(o)} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 20, padding: "8px 14px", fontSize: 13.5, fontWeight: 600, flexShrink: 0 }}>Nudge</button>
+              </div>
+            ); })}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gap: 10 }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} className="lift card" onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", color: "var(--text)", textAlign: "left" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={42} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provider.color} /><div><div style={{ fontSize: 16 }}>{c.name}</div><div style={{ fontSize: 15, color: "var(--sub)" }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)" }} /></button>); })}</div>
+      {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : "No clients yet — tap + to add your first."}</p>}
+    </div>
+
+    {adding && (
+      <div className="fade-in" onClick={() => setAdding(false)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, maxHeight: "88vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24 }}>New client</div>
+            <button onClick={() => setAdding(false)} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
+          </div>
+
+          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>NAME</label>
+          <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Full name" style={{ ...inputS, marginBottom: 14 }} />
+
+          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PHONE</label>
+          <input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} placeholder="(555) 000-0000" style={{ ...inputS, marginBottom: 14 }} />
+
+          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>EMAIL</label>
+          <input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} placeholder="name@email.com" style={{ ...inputS, marginBottom: 14 }} />
+
+          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PREFERRED BARBER</label>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+            {staff.map((p) => { const on = draft.provider === p.id; return (
+              <button key={p.id} onClick={() => setDraft({ ...draft, provider: p.id })} style={{ padding: "10px 16px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{p.name}</button>
+            ); })}
+          </div>
+
+          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>NOTES (optional)</label>
+          <textarea value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} rows={3} placeholder="Formula, preferences, anything to remember…" style={{ ...inputS, resize: "vertical", lineHeight: 1.5, marginBottom: 20 }} />
+
+          <button className="lift" onClick={saveClient} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none" }}>Add client</button>
+          <button onClick={() => setAdding(false)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 2px" }}>Cancel</button>
+        </div>
+      </div>
+    )}
+    </>
+  );
+}
+
+function ClientProfile({ client, clients, setClients, services, providers, appts, onBack, showToast }) {
+  const live = clients.find((c) => c.id === client.id);
+  const provider = providers.find((p) => p.id === live.provider) || providers[1];
+  const [selService, setSelService] = useState(services[0]?.id || "");
+  const sel = services.find((s) => s.id === selService);
+  // current value to prefill the time dropdowns: custom if set, else service default
+  const curMin = (live.customDurations[selService] != null) ? live.customDurations[selService] : (sel?.duration || 30);
+  const [selH, setSelH] = useState(Math.floor(curMin / 60));
+  const [selM, setSelM] = useState(curMin % 60);
+  // when the chosen service changes, reset the time dropdowns to that service's stored/default time
+  useEffect(() => {
+    const m = (live.customDurations[selService] != null) ? live.customDurations[selService] : (services.find((s) => s.id === selService)?.duration || 30);
+    setSelH(Math.floor(m / 60)); setSelM(m % 60);
+  }, [selService]);
+
+  const saveDuration = () => {
+    const val = selH * 60 + selM;
+    if (val < 5) { showToast("Pick at least 5 minutes."); return; }
+    setClients(clients.map((c) => c.id === client.id ? { ...c, customDurations: { ...c.customDurations, [selService]: val } } : c));
+    showToast(`Saved — ${sel.name} now books at ${fmtDur(val)} for ${live.name.split(" ")[0]}.`);
+  };
+  const clearDuration = (sid) => {
+    setClients(clients.map((c) => { if (c.id !== client.id) return c; const cd = { ...c.customDurations }; delete cd[sid]; return { ...c, customDurations: cd }; }));
+    showToast("Reverted to the default time.");
+  };
+  const customList = services.filter((s) => live.customDurations[s.id] != null);
+  const selectStyle = { flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 40px 13px 15px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 15px center" };
+
+  // ---- editable client note (Mangomint-style persistent profile note) ----
+  const [noteDraft, setNoteDraft] = useState(live.notes || "");
+  const [editingNote, setEditingNote] = useState(false);
+  const noteDirty = noteDraft !== (live.notes || "");
+  const saveNote = () => {
+    setClients(clients.map((c) => c.id === client.id ? { ...c, notes: noteDraft } : c));
+    setEditingNote(false);
+    showToast("Client note saved.");
+  };
+
+  // ---- timeline notes (dated entries: color formulas, product recs, etc.) ----
+  const [tlDraft, setTlDraft] = useState("");
+  const addTimelineNote = () => {
+    if (!tlDraft.trim()) return;
+    const entry = { id: "tn" + Date.now(), text: tlDraft.trim(), date: new Date().toISOString() };
+    setClients(clients.map((c) => c.id === client.id ? { ...c, timeline: [entry, ...(c.timeline || [])] } : c));
+    setTlDraft("");
+    showToast("Timeline note added.");
+  };
+  const removeTimelineNote = (id) => {
+    setClients(clients.map((c) => c.id === client.id ? { ...c, timeline: (c.timeline || []).filter((t) => t.id !== id) } : c));
+  };
+  const [tlFilter, setTlFilter] = useState("all"); // all | appointments | notes
+
+  // ---- profile photo + work gallery ----
+  const [picker, setPicker] = useState(false);
+  const setClientPhoto = (id) => { setClients(clients.map((c) => c.id === client.id ? { ...c, photo: id } : c)); setPicker(false); };
+  const removeClientPhoto = () => { setClients(clients.map((c) => c.id === client.id ? { ...c, photo: null } : c)); setPicker(false); };
+  const [galPicker, setGalPicker] = useState(false);
+  const [lightbox, setLightbox] = useState(null); // gallery entry being viewed full-size
+  const addGalleryPhoto = (id) => {
+    const entry = { id: "g" + Date.now(), photo: id, note: "", date: new Date().toISOString() };
+    setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: [entry, ...(c.gallery || [])] } : c));
+    setGalPicker(false);
+    showToast("Photo added to gallery.");
+  };
+  const removeGalleryPhoto = (gid) => {
+    setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: (c.gallery || []).filter((g) => g.id !== gid) } : c));
+    setLightbox(null);
+  };
+  const setGalleryNote = (gid, note) => {
+    setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: (c.gallery || []).map((g) => g.id === gid ? { ...g, note } : g) } : c));
+  };
+  const gallery = live.gallery || [];
+
+  // build a unified, date-sorted feed: appointments for this client + timeline notes
+  const myAppts = (appts || []).filter((a) => a.clientId === client.id && a.status !== "block");
+  const feed = [
+    ...myAppts.map((a) => ({ kind: "appt", date: new Date().toISOString(), appt: a, sortKey: a.start })),
+    ...(live.timeline || []).map((t) => ({ kind: "note", date: t.date, text: t.text, id: t.id, sortKey: 99999 })),
+  ];
+  const feedFiltered = feed.filter((f) => tlFilter === "all" || (tlFilter === "appointments" && f.kind === "appt") || (tlFilter === "notes" && f.kind === "note"));
+  const niceDate = (iso) => { const d = new Date(iso); return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; };
+
+  return (
+    <div className="fade-up">
+      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 22 }}><ArrowLeft size={16} /> All clients</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}><button onClick={() => setPicker(true)} style={{ position: "relative", width: 60, height: 60, borderRadius: "50%", background: "none", border: "none", flexShrink: 0, padding: 0 }}><Avatar size={60} photo={clientPhoto(live)} initial={live.name.charAt(0)} color={provider.color} /><span style={{ position: "absolute", bottom: -1, right: -1, width: 22, height: 22, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={11} /></span></button><div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500 }}>{live.name}</h2><div style={{ color: "var(--sub)", fontSize: 14 }}>{live.phone} · {live.visits} visits</div></div></div>
+      {picker && <StaffPhotoPicker hasPhoto={!!live.photo} onClose={() => setPicker(false)} onPick={setClientPhoto} onRemove={removeClientPhoto} />}
+      {galPicker && <PhotoPicker onClose={() => setGalPicker(false)} onPick={addGalleryPhoto} />}
+      {lightbox && (() => { const g = gallery.find((x) => x.id === lightbox); if (!g) return null; return (
+        <Sheet open={true} onClose={() => setLightbox(null)} maxWidth={560}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22 }}>{niceDate(g.date)}</div>
+            <button onClick={() => setLightbox(null)} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
+          </div>
+          <img src={imgUrl(g.photo, 800)} alt="" style={{ width: "100%", borderRadius: 14, marginBottom: 14, display: "block" }} />
+          <input value={g.note || ""} onChange={(e) => setGalleryNote(g.id, e.target.value)} placeholder="Add a note (e.g. skin fade #2, product used)…" style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", marginBottom: 12 }} />
+          <button onClick={() => removeGalleryPhoto(g.id)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Trash2 size={16} /> REMOVE FROM GALLERY</button>
+        </Sheet>
+      ); })()}
+
+      {/* CLIENT NOTE — always-visible, editable */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)" }}>CLIENT NOTE</div>
+          {!editingNote && <button onClick={() => setEditingNote(true)} style={{ background: "none", color: "var(--gold)", fontSize: 14, display: "flex", alignItems: "center", gap: 5 }}><Edit2 size={13} /> {live.notes ? "Edit" : "Add note"}</button>}
+        </div>
+        {editingNote ? (
+          <div>
+            <textarea autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Preferences, allergies, formulas, conversation topics — anything you want to remember about this client." rows={5} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", boxSizing: "border-box" }} />
+            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+              <button onClick={() => { setNoteDraft(live.notes || ""); setEditingNote(false); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 12, borderRadius: 10, fontSize: 14 }}>Cancel</button>
+              <button className="lift" onClick={saveNote} disabled={!noteDirty} style={{ flex: 1, background: noteDirty ? "var(--gold)" : "var(--panel2)", color: noteDirty ? "var(--on-gold)" : "var(--faint)", padding: 12, borderRadius: 10, fontSize: 14, fontWeight: 600 }}>Save note</button>
+            </div>
+          </div>
+        ) : (
+          <div onClick={() => setEditingNote(true)} style={{ background: live.notes ? "color-mix(in srgb, var(--gold) 7%, var(--panel))" : "var(--panel2)", border: `1px solid ${live.notes ? "color-mix(in srgb, var(--gold) 25%, var(--border))" : "var(--border)"}`, borderRadius: 12, padding: "14px 16px", cursor: "pointer", minHeight: 20 }}>
+            {live.notes
+              ? <p style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{live.notes}</p>
+              : <p style={{ fontSize: 14.5, color: "var(--faint)", fontStyle: "italic" }}>No note yet — tap to add preferences, allergies, or anything to remember.</p>}
+          </div>
+        )}
+      </div>
+
+      {/* GALLERY — photos of previous work */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)" }}>GALLERY</div>
+          <button onClick={() => setGalPicker(true)} style={{ background: "none", color: "var(--gold)", fontSize: 14, display: "flex", alignItems: "center", gap: 5 }}><Plus size={14} /> Add photo</button>
+        </div>
+        {gallery.length === 0 ? (
+          <button onClick={() => setGalPicker(true)} className="lift" style={{ width: "100%", background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 14, padding: "26px 16px", color: "var(--sub)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+            <Camera size={22} style={{ color: "var(--faint)" }} />
+            <span style={{ fontSize: 14.5 }}>No photos yet — add a shot of your work so you can look back next time.</span>
+          </button>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+            {gallery.map((g) => (
+              <button key={g.id} className="lift" onClick={() => setLightbox(g.id)} style={{ position: "relative", padding: 0, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", aspectRatio: "1", background: "var(--panel2)" }}>
+                <img src={imgUrl(g.photo, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "10px 6px 4px", fontSize: 10.5, color: "#fff", textAlign: "left", background: "linear-gradient(to top, rgba(0,0,0,0.55), transparent)" }}>{niceDate(g.date)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* TIMELINE — dated notes + appointment history (Mangomint-style) */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>TIMELINE</div>
+        {/* add a dated note */}
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 14 }}>
+          <textarea value={tlDraft} onChange={(e) => setTlDraft(e.target.value)} placeholder="Add an entry — color formula, product used, what you discussed…" rows={2} style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", boxSizing: "border-box" }} />
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
+            <button className="lift" onClick={addTimelineNote} disabled={!tlDraft.trim()} style={{ background: tlDraft.trim() ? "var(--gold)" : "var(--panel)", color: tlDraft.trim() ? "var(--on-gold)" : "var(--faint)", padding: "8px 18px", borderRadius: 10, fontSize: 13.5, fontWeight: 600, letterSpacing: 0.5 }}>ADD</button>
+          </div>
+        </div>
+        {/* filter chips */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          {[["all","All"],["appointments","Appointments"],["notes","Notes"]].map(([id, label]) => { const on = tlFilter === id; return (
+            <button key={id} onClick={() => setTlFilter(id)} style={{ background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "transparent", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, color: on ? "var(--gold)" : "var(--sub)", padding: "6px 14px", borderRadius: 20, fontSize: 13, fontWeight: on ? 600 : 400 }}>{label}</button>
+          ); })}
+        </div>
+        {/* feed */}
+        {feedFiltered.length === 0 ? (
+          <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "8px 2px" }}>Nothing here yet.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {feedFiltered.map((f, i) => f.kind === "appt" ? (
+              <div key={"a"+f.appt.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px" }}>
+                <div style={{ width: 30, height: 30, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Calendar size={14} style={{ color: "var(--gold)" }} /></div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 600 }}>{f.appt.title}</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>{fmtTime(f.appt.start)} – {fmtTime(f.appt.end)}{f.appt.detail ? ` · ${f.appt.detail}` : ""}</div>
+                </div>
+              </div>
+            ) : (
+              <div key={f.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", background: "color-mix(in srgb, var(--gold) 6%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 12, padding: "12px 14px" }}>
+                <div style={{ width: 30, height: 30, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 16%, var(--panel))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Edit2 size={13} style={{ color: "var(--gold)" }} /></div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, color: "var(--faint)", marginBottom: 3 }}>{niceDate(f.date)}</div>
+                  <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{f.text}</div>
+                </div>
+                <button onClick={() => removeTimelineNote(f.id)} style={{ background: "none", color: "var(--faint)", flexShrink: 0 }}><X size={15} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>REMEMBERED TIMING</div>
+        <p style={{ fontSize: 15, color: "var(--sub)", marginBottom: 16, fontWeight: 300, lineHeight: 1.5 }}>Set how long this client actually takes for a service. It overrides the default and tightens their future booking slots.</p>
+
+        {/* service dropdown */}
+        <label style={{ fontSize: 14, color: "var(--faint)", display: "block", marginBottom: 6 }}>Service</label>
+        <div style={{ position: "relative", marginBottom: 14 }}>
+          <select value={selService} onChange={(e) => setSelService(e.target.value)} style={{ ...selectStyle, width: "100%", paddingRight: 38 }}>
+            {services.map((s) => <option key={s.id} value={s.id}>{s.name}{live.customDurations[s.id] != null ? "  ✓" : ""}</option>)}
+          </select>
+          <ChevronRight size={16} style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%) rotate(90deg)", color: "var(--faint)", pointerEvents: "none" }} />
+        </div>
+
+        {/* time dropdowns: hours + minutes (5-min steps) */}
+        <label style={{ fontSize: 14, color: "var(--faint)", display: "block", marginBottom: 6 }}>Duration</label>
+        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          <div style={{ position: "relative", flex: 1 }}>
+            <select value={selH} onChange={(e) => setSelH(parseInt(e.target.value))} style={{ ...selectStyle, width: "100%", paddingRight: 38 }}>
+              {[0, 1, 2, 3].map((h) => <option key={h} value={h}>{h} hr</option>)}
+            </select>
+            <ChevronRight size={16} style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%) rotate(90deg)", color: "var(--faint)", pointerEvents: "none" }} />
+          </div>
+          <div style={{ position: "relative", flex: 1 }}>
+            <select value={selM} onChange={(e) => setSelM(parseInt(e.target.value))} style={{ ...selectStyle, width: "100%", paddingRight: 38 }}>
+              {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => <option key={m} value={m}>{m} min</option>)}
+            </select>
+            <ChevronRight size={16} style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%) rotate(90deg)", color: "var(--faint)", pointerEvents: "none" }} />
+          </div>
+        </div>
+
+        <button className="lift" onClick={saveDuration} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, borderRadius: 8, fontSize: 14, fontWeight: 600, letterSpacing: 0.5, marginBottom: 18 }}>Save timing</button>
+
+        {/* what's already customized */}
+        {customList.length > 0 && (
+          <div>
+            <div style={{ fontSize: 13, letterSpacing: 1, color: "var(--faint)", marginBottom: 8 }}>CUSTOM TIMES SET</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {customList.map((s) => (
+                <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "11px 14px" }}>
+                  <span style={{ fontSize: 14 }}>{s.name}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontSize: 14, color: "var(--gold)", fontWeight: 600 }}>{fmtDur(live.customDurations[s.id])}</span>
+                    <button onClick={() => clearDuration(s.id)} style={{ background: "none", color: "var(--faint)", display: "flex", alignItems: "center" }}><X size={15} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: 14, color: "var(--faint)", marginTop: 8, fontWeight: 300 }}>Everything else uses the menu default. Tap ✕ to revert one.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MessagesView({ clients, setClients, providers, msgTarget, clearTarget }) {
+  const [activeId, setActiveId] = useState(null); // null = list view
+  const [draft, setDraft] = useState("");
+  // jump straight into a conversation when sent from the waitlist
+  useEffect(() => {
+    if (msgTarget) { setActiveId(msgTarget.clientId); setDraft(msgTarget.draft || ""); if (clearTarget) clearTarget(); }
+  }, [msgTarget]);
+  const active = clients.find((c) => c.id === activeId);
+  const send = () => { if (!draft.trim()) return; const now = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); setClients(clients.map((c) => c.id === activeId ? { ...c, messages: [...(c.messages || []), { from: "shop", text: draft, time: now }] } : c)); setDraft(""); };
+  const provColor = (c) => (providers.find((p) => p.id === c.provider)?.color) || "var(--gold)";
+
+  // ---- conversation list ----
+  if (!active) {
+    return (
+      <div className="fade-up">
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 4 }}>Messages</h2>
+        <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 20, fontWeight: 300 }}>Your studio line. Tap a client to open the conversation.</p>
+        <div style={{ display: "grid", gap: 2, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+          {clients.map((c) => {
+            const msgs = c.messages || [];
+            const last = msgs[msgs.length - 1];
+            const unread = last && last.from === "client";
+            return (
+              <button key={c.id} className="lift" onClick={() => setActiveId(c.id)} style={{ display: "flex", alignItems: "center", gap: 14, background: "var(--panel)", padding: "15px 16px", textAlign: "left", color: "var(--text)", borderBottom: "1px solid var(--line)" }}>
+                <Avatar size={46} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provColor(c)} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                    <span style={{ fontSize: 15.5, fontWeight: unread ? 600 : 500 }}>{c.name}</span>
+                    {last && <span style={{ fontSize: 15.5, color: "var(--faint)", flexShrink: 0 }}>{last.time}</span>}
+                  </div>
+                  <div style={{ fontSize: 15, color: unread ? "var(--text2)" : "var(--sub)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: unread ? 500 : 300, marginTop: 2 }}>{last ? (last.from === "shop" ? "You: " : "") + last.text : "No messages yet"}</div>
+                </div>
+                {unread && <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ---- single conversation thread (full width) ----
+  const msgs = active.messages || [];
+  const lastMine = [...msgs].reverse().find((m) => m.from === "shop");
+  return (
+    <div className="fade-up" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 215px)", minHeight: 440, margin: "0 -20px", marginBottom: -96 }}>
+      {/* iMessage-style centered header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px 12px", borderBottom: "1px solid var(--line)", position: "relative" }}>
+        <button onClick={() => setActiveId(null)} style={{ background: "none", color: "#0A84FF", display: "flex", alignItems: "center", fontSize: 15, position: "absolute", left: 6, top: 8, zIndex: 2 }}><ChevronLeft size={26} /></button>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+          <Avatar size={50} photo={clientPhoto(active)} initial={active.name.charAt(0)} color={provColor(active)} />
+          <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 14.5, color: "var(--text)" }}>{active.name.split(" ")[0]} <ChevronRight size={13} style={{ color: "var(--faint)" }} /></div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, padding: "14px 14px 8px", display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", background: "var(--bg)" }}>
+        <div style={{ textAlign: "center", fontSize: 13, color: "var(--faint)", margin: "4px 0 12px" }}><b style={{ color: "var(--sub)" }}>iMessage</b> · Today {msgs[0]?.time || ""}</div>
+        {msgs.length === 0 && <div style={{ color: "var(--faint)", fontSize: 14, textAlign: "center", margin: "auto" }}>No messages yet. Say hello.</div>}
+        {msgs.map((m, i) => {
+          const mine = m.from === "shop";
+          const prev = msgs[i - 1];
+          const next = msgs[i + 1];
+          const firstOfGroup = !prev || prev.from !== m.from;
+          const lastOfGroup = !next || next.from !== m.from;
+          const isLastMine = mine && m === lastMine;
+          return (
+            <div key={i} style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "75%", marginTop: firstOfGroup ? 8 : 1 }}>
+              <div style={{
+                background: mine ? "#0A84FF" : "var(--panel2)", color: mine ? "#FFFFFF" : "var(--text)",
+                border: mine ? "none" : "1px solid var(--border)", padding: "8px 14px", fontSize: 16, lineHeight: 1.3,
+                borderRadius: 19,
+                borderBottomRightRadius: mine ? (lastOfGroup ? 5 : 19) : 19,
+                borderTopRightRadius: mine ? (firstOfGroup ? 19 : 5) : 19,
+                borderBottomLeftRadius: mine ? 19 : (lastOfGroup ? 5 : 19),
+                borderTopLeftRadius: mine ? 19 : (firstOfGroup ? 19 : 5),
+              }}>{m.text}</div>
+              {isLastMine && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 3, textAlign: "right", paddingInline: 4, fontWeight: 500 }}>Delivered</div>}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ padding: "10px 12px calc(12px + env(safe-area-inset-bottom))", borderTop: "1px solid var(--line)", display: "flex", gap: 8, alignItems: "center", background: "var(--bg)" }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", background: "var(--bg)", border: "1.5px solid var(--border)", borderRadius: 20 }}>
+          <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="iMessage" style={{ flex: 1, background: "none", border: "none", padding: "9px 14px", color: "var(--text)", fontSize: 16 }} />
+          {draft.trim() && <button className="lift" onClick={send} style={{ background: "#0A84FF", color: "#fff", width: 30, height: 30, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 4 }}><Send size={15} /></button>}
+        </div>
+      </div>
+    </div>
+  );
+}
