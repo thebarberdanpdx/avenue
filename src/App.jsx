@@ -360,6 +360,10 @@ const DEFAULT_SERVICES = [
         desc: "A hot towel treatment finished with a straight-razor line-up.",
       }},
     ],
+    beardTypes: [
+      { id: "standard", label: "Standard beard", desc: "Full or short, kept neat.", min: 0, images: ["photo-1517832606299-7ae9b720a186"] },
+      { id: "big", label: "Big beard", desc: "Long, needs shaping — a little more time.", min: 10, images: ["photo-1522556189639-b150ed9c4330"] },
+    ],
   },
   { id: "beard", name: "Beard Trim", category: "Services", price: 35, duration: 30, color: "clay", photo: "photo-1517832606299-7ae9b720a186", staff: { dan: { on: true, duration: null, price: null }, heather: { on: true, duration: null, price: null } }, addonGroups: [] },
   { id: "shave", name: "Straight Razor Shave", category: "Services", price: 30, duration: 30, color: "slate", photo: "photo-1596728325488-58c87691e9af", staff: { dan: { on: true, duration: null, price: null }, heather: { on: false, duration: null, price: null } }, addonGroups: [] },
@@ -526,7 +530,8 @@ export default function App() {
     supabase.from('app_state').select('data').eq('id', 'clients').single().then(({ data }) => { if (data && data.data) setClients(data.data); });
     supabase.from('app_state').select('data').eq('id', 'appointments').single().then(({ data }) => { if (data && data.data) setAppts(data.data); });
     supabase.from('app_state').select('data').eq('id', 'waitlist').single().then(({ data }) => { if (data && data.data) setWaitlist(data.data); });
-    supabase.from('app_state').select('data').eq('id', 'services').single().then(({ data }) => { if (data && data.data) setServices(data.data); });
+    // Services come from DEFAULT_SERVICES in code (cloud menu load disabled to avoid stale overrides).
+    // supabase.from('app_state').select('data').eq('id', 'services').single().then(({ data }) => { if (data && data.data) setServices(data.data); });
     supabase.from('app_state').select('data').eq('id', 'providers').single().then(({ data }) => { if (data && data.data) setProviders(data.data); });
   }, []);
 
@@ -562,6 +567,8 @@ export default function App() {
         .fade-up { animation: fadeUp .55s var(--ease) both; } .fade-in { animation: fadeIn .4s var(--ease) both; }
         .fade-up > * { animation: fadeUp .55s var(--ease) both; }
         .appt-screen { animation: slideInRight .3s var(--ease) both; }
+        @keyframes fadeInFixed { from { opacity:0; } to { opacity:1; } }
+        .appt-screen-fixed { animation: fadeInFixed .25s var(--ease) both; }
         .scrub-lock, .scrub-lock * { touch-action: none !important; overflow: hidden !important; overscroll-behavior: none !important; -webkit-user-select: none !important; user-select: none !important; }
         button { font-family: ${FONT_BODY}; cursor: pointer; border: none; transition: transform .2s var(--ease), box-shadow .25s var(--ease), background .2s var(--ease), border-color .2s var(--ease), opacity .2s var(--ease); }
         button:active { transform: scale(0.975); }
@@ -698,13 +705,17 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
 // CLIENT BOOKING FLOW
 // ============================================================
 function ClientFlow({ business, services, providers, clients, appts, setAppts, waitlist, setWaitlist, onExit }) {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
+  const [bookingFor, setBookingFor] = useState(null); // null until chosen: "self" or "other"
+  const [showWhoFor, setShowWhoFor] = useState(false); // who's-it-for screen for a matched returning client
+  const [showUsual, setShowUsual] = useState(false); // book-my-usual one-tap screen
   const [cart, setCart] = useState([]);
   const [intakeFor, setIntakeFor] = useState(null); // service object when running first-time intake
   const [draft, setDraft] = useState(null);
   const [draftAddons, setDraftAddons] = useState({});
   const [cutType, setCutType] = useState(null); // chosen cut-type id (for services with cutTypes)
-  const [cutPhase, setCutPhase] = useState("type"); // within step 2: "type" then "addons"
+  const [beardType, setBeardType] = useState(null); // chosen beard-type id (for services with beardTypes)
+  const [cutPhase, setCutPhase] = useState("type"); // within step 2: "type" -> "beard" -> "addons"
   const [cutCarousel, setCutCarousel] = useState({}); // per-cut-type image index
   const [phone, setPhone] = useState("");
   const [matched, setMatched] = useState(null);
@@ -729,6 +740,10 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
       const ct = entry.service.cutTypes.find((c) => c.id === entry.cutType);
       if (ct) { p = ct.price; m = getDuration(matched, entry.service) + (ct.min || 0); }
     }
+    if (entry.service.beardTypes && entry.beardType) {
+      const bt = entry.service.beardTypes.find((b) => b.id === entry.beardType);
+      if (bt) { m += (bt.min || 0); }
+    }
     entry.service.addonGroups.forEach((g) => {
       const sel = entry.addons[g.id];
       if (g.type === "choice" && sel) { const opt = g.options.find((o) => o.id === sel); if (opt) { p += opt.price; m += opt.min; } }
@@ -749,6 +764,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
     }
     const picks = [];
     if (entry.service.cutTypes && entry.cutType) { const ct = entry.service.cutTypes.find((c) => c.id === entry.cutType); if (ct) picks.push(ct.label); }
+    if (entry.service.beardTypes && entry.beardType) { const bt = entry.service.beardTypes.find((b) => b.id === entry.beardType); if (bt) picks.push(bt.label); }
     entry.service.addonGroups.forEach((g) => {
       const sel = entry.addons[g.id];
       if (g.type === "choice" && sel) picks.push(g.options.find((o) => o.id === sel)?.label);
@@ -771,7 +787,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
   }, [selectedDate, dateOptions, allSlots]);
   const dateIsFull = selectedDate && openSlots.length === 0;
 
-  const back = () => { setShowWaitlist(false); if (step <= 1) return onExit(); if (step === 2) { if (draft && draft.cutTypes && draft.cutTypes.length && cutPhase === "addons") { setCutPhase("type"); setCutType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setCutPhase("type"); setStep(1); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (showUsual) { setShowUsual(false); setShowWhoFor(true); return; } if (showWhoFor) { setShowWhoFor(false); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } setStep(step - 1); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -786,24 +802,43 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
           <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
           <div style={{ width: 50 }} />
         </div>
-        {step <= 5 && <Stepper active={0} />}
+        {step >= 1 && step <= 5 && <Stepper active={0} />}
         {step === 6 && <Stepper active={1} />}
         {step >= 7 && <Stepper active={2} />}
+
+        {/* STEP 0 — WELCOME / front door */}
+        {step === 0 && (
+          <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center", padding: "10px 4px 0" }}>
+            <div style={{ fontSize: 13, letterSpacing: 3, color: "var(--faint)", marginBottom: 14 }}>WELCOME TO</div>
+            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, lineHeight: 1.05, margin: "0 0 14px" }}>{business.name}</h1>
+            <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, margin: "0 auto 38px", maxWidth: 280 }}>Book your appointment in just a few taps.</p>
+            <button className="lift" onClick={() => { setBookingFor("self"); setStep(5); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "20px 18px", fontSize: 16, fontWeight: 500, borderRadius: 14, border: "none", marginBottom: 13, textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ fontSize: 17 }}>I'm a returning client</span>
+              <span style={{ fontSize: 13, opacity: 0.8, fontWeight: 300 }}>Pull up my details &amp; book faster</span>
+            </button>
+            <button className="lift" onClick={() => { setBookingFor(null); setMatched(null); setStep(1); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ fontSize: 17 }}>First time here</span>
+              <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>Browse the menu</span>
+            </button>
+          </div>
+        )}
 
         {/* STEP 1 — service menu WITH PHOTOS */}
         {step === 1 && (
           <div className="fade-up">
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 4 }}>Services</h2>
             <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300 }}>Choose your service to begin.</p>
-            <div style={{ display: "grid", gap: 14 }}>
+            <div style={{ display: "grid", gap: 10 }}>
               {services.map((s) => (
-                <button key={s.id} className="lift card" onClick={() => { if (s.firstTime && s.intake) { setIntakeFor(s); } else { setDraft(s); setDraftAddons({}); setCutType(null); setCutPhase("type"); setStep(2); } }} style={{ display: "block", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 0, color: "var(--text)", textAlign: "left", overflow: "hidden" }}>
-                  {s.photo && <div style={{ height: 150, overflow: "hidden" }}><img src={imgUrl(s.photo, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: s.booking && s.booking.description ? "16px 18px 0" : "16px 18px" }}>
-                    <div><div style={{ fontSize: 17, marginBottom: 2 }}>{s.name}</div><div style={{ color: "var(--faint)", fontSize: 15 }}>{s.duration} min</div></div>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)" }}>${s.price}</div>
+                <button key={s.id} className="lift card" onClick={() => { if (s.firstTime && s.intake) { setIntakeFor(s); } else { setDraft(s); setDraftAddons({}); setCutType(null); setCutPhase("type"); setStep(2); } }} style={{ display: "flex", alignItems: "stretch", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 0, color: "var(--text)", textAlign: "left", overflow: "hidden" }}>
+                  {s.photo && <div style={{ width: 63, flexShrink: 0, overflow: "hidden" }}><img src={imgUrl(s.photo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "12px 14px", minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                      <div style={{ minWidth: 0 }}><div style={{ fontSize: 16, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div><div style={{ color: "var(--faint)", fontSize: 14 }}>{s.duration} min</div></div>
+                      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, color: "var(--gold)", flexShrink: 0 }}>${s.price}</div>
+                    </div>
+                    {s.booking && s.booking.description && <p style={{ color: "var(--sub)", fontSize: 13, lineHeight: 1.45, fontWeight: 300, margin: "6px 0 0", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{s.booking.description}</p>}
                   </div>
-                  {s.booking && s.booking.description && <p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5, fontWeight: 300, padding: "8px 18px 16px", margin: 0 }}>{s.booking.description}</p>}
                 </button>
               ))}
             </div>
@@ -826,7 +861,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
         {step === 2 && draft && draft.cutTypes && draft.cutTypes.length > 0 && cutPhase === "type" && (
           <div className="fade-up">
             <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>{draft.name.toUpperCase()}</div>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Which cut would you like?</h2>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>First — what haircut are we doing?</h2>
             <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>Pick the style closest to what you want — your barber confirms the details in the chair.</p>
             <div style={{ display: "grid", gap: 24 }}>
               {draft.cutTypes.map((ct) => {
@@ -838,7 +873,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
                   <div key={ct.id}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       {imgs.length > 1 && <button aria-label="Previous example" onClick={() => flip(-1)} style={{ width: 34, height: 34, flexShrink: 0, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><ChevronLeft size={18} /></button>}
-                      <div style={{ flex: 1, position: "relative", aspectRatio: "1/1", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)" }}>
+                      <div style={{ flex: 1, position: "relative", aspectRatio: "1/1", maxWidth: 230, margin: "0 auto", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)" }}>
                         {img && <img src={imgUrl(img, 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
                         {imgs.length > 1 && <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, display: "flex", gap: 5, justifyContent: "center" }}>{imgs.map((_, di) => (<span key={di} style={{ width: 6, height: 6, borderRadius: "50%", background: di === idx ? "#fff" : "rgba(255,255,255,0.5)" }} />))}</div>}
                       </div>
@@ -848,7 +883,33 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
                       <div><div style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.2 }}>{ct.label}</div>{ct.desc && <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{ct.desc}</div>}</div>
                       <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, color: "var(--gold)", whiteSpace: "nowrap" }}>${ct.price}</div>
                     </div>
-                    <button className="lift" onClick={() => { setCutType(ct.id); setCutPhase("addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none" }}>CHOOSE THIS</button>
+                    <button className="lift" onClick={() => { setCutType(ct.id); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none" }}>CHOOSE THIS</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2 — beard type (own screen, for services with beardTypes) */}
+        {step === 2 && draft && draft.beardTypes && draft.beardTypes.length > 0 && cutPhase === "beard" && (
+          <div className="fade-up">
+            <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>{draft.name.toUpperCase()}</div>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Now — the beard</h2>
+            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>This helps us set aside the right amount of time.</p>
+            <div style={{ display: "grid", gap: 18 }}>
+              {draft.beardTypes.map((bt) => {
+                const img = (bt.images || [])[0];
+                return (
+                  <div key={bt.id}>
+                    <div style={{ aspectRatio: "1/1", maxWidth: 230, margin: "0 auto", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)" }}>
+                      {img && <img src={imgUrl(img, 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
+                    </div>
+                    <div style={{ margin: "14px 2px 12px" }}>
+                      <div style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.2 }}>{bt.label}</div>
+                      {bt.desc && <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{bt.desc}</div>}
+                    </div>
+                    <button className="lift" onClick={() => { setBeardType(bt.id); setCutPhase("addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none" }}>CHOOSE THIS</button>
                   </div>
                 );
               })}
@@ -862,7 +923,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
             <div style={{ background: "var(--panel)", borderRadius: 12, padding: "14px 18px", marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 16 }}>{draft.name}{draft.cutTypes && cutType ? ` · ${draft.cutTypes.find((c) => c.id === cutType)?.label}` : ""}</div>
-                <button onClick={() => { if (draft.cutTypes && draft.cutTypes.length) { setCutPhase("type"); setCutType(null); } else { setDraft(null); setStep(1); } }} style={{ background: "none", color: "var(--sub)", fontSize: 15, textDecoration: "underline", padding: 0, marginTop: 2 }}>Change</button>
+                <button onClick={() => { if (draft.beardTypes && draft.beardTypes.length) { setCutPhase("beard"); setBeardType(null); } else if (draft.cutTypes && draft.cutTypes.length) { setCutPhase("type"); setCutType(null); } else { setDraft(null); setStep(1); } }} style={{ background: "none", color: "var(--sub)", fontSize: 15, textDecoration: "underline", padding: 0, marginTop: 2 }}>Change</button>
               </div>
               <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, color: "var(--gold)" }}>${draft.cutTypes && cutType ? draft.cutTypes.find((c) => c.id === cutType)?.price : draft.price}</div>
             </div>
@@ -871,7 +932,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
             {draft.addonGroups.map((g) => (
               <div key={g.id} style={{ marginBottom: 28 }}>
                 <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 14 }}>
-                  {business.showAddonPhotos && g.photo && <img src={imgUrl(g.photo, 160)} alt="" style={{ width: 48, height: 48, borderRadius: 6, objectFit: "cover" }} />}
+                  {business.showAddonPhotos && g.photo && <img src={imgUrl(g.photo, 280)} alt="" style={{ width: 96, height: 96, borderRadius: 10, objectFit: "cover" }} />}
                   <div style={{ fontSize: 17 }}>{g.label}</div>
                 </div>
                 {g.type === "choice" && g.options.map((o) => { const on = draftAddons[g.id] === o.id; return (
@@ -881,7 +942,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
                   </button>); })}
                 {g.type === "addon" && (
                   <button onClick={() => setDraftAddons({ ...draftAddons, [g.id]: draftAddons[g.id] ? false : true })} style={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 14, background: draftAddons[g.id] ? "rgba(176,141,87,0.08)" : "none", border: `1px solid ${draftAddons[g.id] ? "rgba(176,141,87,0.3)" : "var(--border)"}`, borderRadius: 6, padding: 14, color: "var(--text)", textAlign: "left", overflow: "hidden" }}>
-                    {business.showAddonPhotos && g.photo && <img src={imgUrl(g.photo, 200)} alt="" style={{ width: 64, height: 64, borderRadius: 14, objectFit: "cover", flexShrink: 0 }} />}
+                    {business.showAddonPhotos && g.photo && <img src={imgUrl(g.photo, 360)} alt="" style={{ width: 128, height: 128, borderRadius: 16, objectFit: "cover", flexShrink: 0 }} />}
                     <div style={{ flex: 1 }}><div style={{ fontSize: 15, marginBottom: 4 }}>{g.item.name}</div><div style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.5, fontWeight: 300 }}>{g.item.desc}</div></div>
                     <span style={{ color: "var(--sub)", fontSize: 14, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>+ ${g.item.price} {draftAddons[g.id] ? <Check size={16} style={{ color: "var(--gold)" }} /> : <Plus size={16} />}</span>
                   </button>
@@ -898,7 +959,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 18 }}>Choose your provider</h2>
             <div style={{ display: "grid", gap: 10 }}>
               {providers.map((p) => (
-                <button key={p.id} className="lift" onClick={() => { setCart([...cart, { service: draft, addons: draftAddons, cutType, provider: p }]); setDraft(null); setDraftAddons({}); setCutType(null); setCutPhase("type"); setStep(4); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 18px", color: "var(--text)", textAlign: "left" }}>
+                <button key={p.id} className="lift" onClick={() => { setCart([...cart, { service: draft, addons: draftAddons, cutType, beardType, provider: p }]); setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(4); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 18px", color: "var(--text)", textAlign: "left" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}><div style={{ width: 44, height: 44, borderRadius: "50%", background: p.color + "22", color: p.color, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 18 }}>{p.id === "anyone" ? <User size={20} /> : p.name.charAt(0)}</div><div><div style={{ fontSize: 16 }}>{p.name}</div><div style={{ fontSize: 14, color: "var(--faint)", letterSpacing: 1 }}>{p.id === "anyone" ? "Any available day" : daysSummary(p.hours)}</div></div></div>
                   <ChevronRight size={18} style={{ color: "var(--faint)" }} />
                 </button>
@@ -915,18 +976,58 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
               {cart.map((e, i) => (<div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: i < cart.length - 1 ? "1px solid var(--line)" : "none" }}><div><div style={{ fontSize: 15 }}>{describeEntry(e)}</div><div style={{ fontSize: 15, color: "var(--sub)" }}>with {e.provider.name}</div></div><button onClick={() => setCart(cart.filter((_, idx) => idx !== i))} style={{ background: "none", color: "#C2703D", fontSize: 15 }}>Remove</button></div>))}
             </div>
             <p style={{ textAlign: "center", color: "var(--text)", fontSize: 16, marginBottom: 20 }}>Do you want to add another service?</p>
-            <div style={{ display: "flex", gap: 12 }}><button className="lift" onClick={() => setStep(1)} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 16, fontSize: 14, letterSpacing: 1, borderRadius: 10 }}>Yes</button><button className="lift" onClick={() => setStep(5)} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>No</button></div>
+            <div style={{ display: "flex", gap: 12 }}><button className="lift" onClick={() => setStep(1)} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 16, fontSize: 14, letterSpacing: 1, borderRadius: 10 }}>Yes</button><button className="lift" onClick={() => setStep(matched ? 6 : 5)} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>No</button></div>
           </div>
         )}
 
+        {/* BOOK MY USUAL — one-tap rebook for a recognized client */}
+        {showUsual && matched && (() => {
+          const mine = (appts || []).filter((a) => a.clientId === matched.id && a.serviceId && a.status !== "block");
+          const lastAppt = mine.length ? mine[mine.length - 1] : null;
+          const usualSvc = lastAppt ? services.find((s) => s.id === lastAppt.serviceId) : null;
+          const usualProv = providers.find((p) => p.id === (lastAppt?.providerId || matched.provider)) || providers[1];
+          if (!usualSvc) { setShowUsual(false); setStep(1); return null; }
+          const dur = getDuration(matched, usualSvc);
+          return (
+            <div className="fade-up">
+              <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>WELCOME BACK, {matched.name.split(" ")[0].toUpperCase()}</div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Book your usual?</h2>
+              <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.55 }}>One tap and we'll find your next opening.</p>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 20px", marginBottom: 16 }}>
+                <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{usualSvc.name}</div>
+                <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>{dur} min{usualProv && usualProv.id !== "anyone" ? ` · with ${usualProv.name}` : ""}{lastAppt.title ? ` · ${lastAppt.title}` : ""}</div>
+              </div>
+              <button className="lift" onClick={() => { setCart([{ service: usualSvc, addons: {}, cutType: null, beardType: null, provider: usualProv }]); setShowUsual(false); setStep(6); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 18, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 12 }}>BOOK MY USUAL →</button>
+              <button onClick={() => { setShowUsual(false); setStep(1); }} style={{ width: "100%", background: "none", border: "none", color: "var(--gold)", fontSize: 15, padding: 8 }}>Or browse the full menu</button>
+            </div>
+          );
+        })()}
+
         {/* STEP 5 — phone */}
-        {step === 5 && (
+        {step === 5 && !showWhoFor && !showUsual && (
           <div className="fade-up">
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Your number</h2>
             <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300 }}>We'll use this to recognize you and pull up your preferences.</p>
             <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             <p style={{ color: "var(--faint)", fontSize: 14, marginBottom: 22 }}>Try <span style={{ color: "var(--gold)", cursor: "pointer" }} onClick={() => setPhone("503-555-0142")}>503-555-0142</span> (returning client Marcus).</p>
-            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={() => { const digits = phone.replace(/\D/g, ""); setMatched(clients.find((c) => c.phone.replace(/\D/g, "") === digits) || null); setStep(6); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "var(--border)" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>CONTINUE →</button>
+            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={() => { const digits = phone.replace(/\D/g, ""); const found = clients.find((c) => c.phone.replace(/\D/g, "") === digits) || null; setMatched(found); if (found) { setShowWhoFor(true); } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "var(--border)" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>CONTINUE →</button>
+          </div>
+        )}
+
+        {/* WHO'S IT FOR — shown after a returning client is recognized */}
+        {showWhoFor && matched && (
+          <div className="fade-up">
+            <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>HI {matched.name.split(" ")[0].toUpperCase()}</div>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Who's this booking for?</h2>
+            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>So we set aside the right amount of time.</p>
+            <button className="lift" onClick={() => { setBookingFor("self"); setShowWhoFor(false); const mine = (appts || []).filter((a) => a.clientId === matched.id && a.serviceId && a.status !== "block"); if (mine.length && cart.length === 0) { setShowUsual(true); } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "20px 18px", fontSize: 16, fontWeight: 500, borderRadius: 14, border: "none", marginBottom: 13, textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ fontSize: 17 }}>For myself</span>
+              <span style={{ fontSize: 13, opacity: 0.8, fontWeight: 300 }}>Use my usual times &amp; details</span>
+            </button>
+            <button className="lift" onClick={() => { setBookingFor("other"); setMatched(null); setShowWhoFor(false); setStep(cart.length === 0 ? 1 : 6); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ fontSize: 17 }}>For someone else</span>
+              <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>A kid, partner, or friend</span>
+            </button>
           </div>
         )}
 
@@ -1364,7 +1465,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
       </div>
       <div style={{ display: "none" }} />
       <div style={{ flex: 1, maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
         {tab === "messages" && <MessagesView clients={clients} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} />}
@@ -3792,7 +3893,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
   );
 }
 
-function CalendarView({ appts, setAppts, clients, providers, services, business, theme, showToast, waitlist = [], setWaitlist }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, services, business, theme, showToast, waitlist = [], setWaitlist }) {
   const [sizeId, setSizeId] = useState("L"); // default L
   const [open, setOpen] = useState(null);
   const [dayOffset, setDayOffset] = useState(0);
@@ -3807,7 +3908,7 @@ function CalendarView({ appts, setAppts, clients, providers, services, business,
   const pressRef = useRef(null);               // mutable: long-press timer + start info
   const blockScrollRef = useRef((e) => { if (e.cancelable) e.preventDefault(); });
 
-  const setStatus = (id, status, msg) => { const freed = appts.find((a) => a.id === id); setAppts(appts.map((a) => (a.id === id ? { ...a, status } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status } : o); if (status === "cancelled" && freed) setTimeout(() => handleFreedSlot(freed), 350); };
+  const setStatus = (id, status, msg) => { const freed = appts.find((a) => a.id === id); setAppts(appts.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) setTimeout(() => handleFreedSlot(freed), 350); };
   // open checkout instead of silently completing
   const startCheckout = (appt) => { setOpen(null); setCheckout(appt); };
   const finishCheckout = (id, summary) => {
@@ -4353,6 +4454,9 @@ function CalendarView({ appts, setAppts, clients, providers, services, business,
           service={services.find((s) => s.id === checkout.serviceId)}
           provider={providers.find((p) => p.id === checkout.providerId)}
           business={business}
+          clients={clients}
+          setClients={setClients}
+          showToast={showToast}
           onClose={() => setCheckout(null)}
           onDone={finishCheckout}
         />
@@ -4376,7 +4480,22 @@ const APPT_STATUSES = [
 // ============================================================
 // CHECKOUT — staged card-reader flow: charge → tap → tip → approved → rebook
 // ============================================================
-function Checkout({ appt, service, provider, business, onClose, onDone }) {
+function Checkout({ appt, service, provider, business, clients, setClients, showToast, onClose, onDone }) {
+  // ---- auto-timing: measure actual service time, round UP to next 5 ----
+  const measuredMin = appt.serviceStartedAt ? Math.round((Date.now() - appt.serviceStartedAt) / 60000) : null;
+  const roundUp5 = (m) => Math.max(5, Math.ceil(m / 5) * 5);
+  const suggestedMin = measuredMin != null ? roundUp5(measuredMin) : null;
+  const liveClient = clients ? clients.find((c) => c.id === appt.clientId) : null;
+  const currentDur = liveClient && service ? (liveClient.customDurations && liveClient.customDurations[service.id] != null ? liveClient.customDurations[service.id] : service.duration) : null;
+  // only worth suggesting if we measured something sane and it differs from what's stored
+  const tooLong = measuredMin != null && measuredMin > 180; // likely forgot to check out
+  const showDurationSuggest = suggestedMin != null && !tooLong && liveClient && service && suggestedMin !== currentDur;
+  const [adjustMin, setAdjustMin] = useState(suggestedMin);
+  const saveDuration = (val) => {
+    if (!liveClient || !service) return;
+    setClients(clients.map((c) => c.id === liveClient.id ? { ...c, customDurations: { ...(c.customDurations || {}), [service.id]: val } } : c));
+    if (showToast) showToast(`Saved — ${service.name} now books at ${val} min for ${liveClient.name.split(" ")[0]}.`);
+  };
   const tipCfg = business?.tipping || { enabled: true, presets: [18, 20, 25], allowCustom: true, allowNoTip: true, smartDefault: 20 };
   const rebookCfg = business?.rebook || { enabled: true, discount: 5, weeks: [2, 3, 4, 6, 8] };
   const base = service?.price || appt.price || 0;
@@ -4392,7 +4511,7 @@ function Checkout({ appt, service, provider, business, onClose, onDone }) {
   const tapCard = () => { setStage("reader"); setTimeout(() => setStage(tipCfg.enabled ? "tip" : "approving"), 1700); };
   const confirmTip = () => { setStage("approving"); setTimeout(() => setStage("approved"), 1400); };
   useEffect(() => {
-    if (stage === "approved") { const t = setTimeout(() => setStage(rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
+    if (stage === "approved") { const t = setTimeout(() => setStage(showDurationSuggest ? "duration" : (rebookCfg.enabled ? "rebook" : "done")), 1300); return () => clearTimeout(t); }
     if (stage === "done") { const t = setTimeout(() => onDone(appt.id, { total, totalLabel: money(total), tip: tipAmt, rebookWeeks, rebookDate: customDate, rebookLabel: hasSelection ? selectionLabel : null }), 1200); return () => clearTimeout(t); }
   }, [stage]);
 
@@ -4476,6 +4595,23 @@ function Checkout({ appt, service, provider, business, onClose, onDone }) {
     </div>
   );
 
+  if (stage === "duration") return sheet(
+    <div style={{ padding: "28px 24px 32px" }}>
+      <div style={{ textAlign: "center", marginBottom: 22 }}>
+        <div style={{ width: 56, height: 56, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Clock size={26} style={{ color: "var(--gold)" }} /></div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, lineHeight: 1.15 }}>That took {measuredMin} min</h2>
+        <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.5 }}>Save <strong style={{ color: "var(--gold)" }}>{adjustMin} min</strong> as {(liveClient?.name || "this client").split(" ")[0]}'s time for {service?.name}? It books faster next time.</p>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 24 }}>
+        <button onClick={() => setAdjustMin((m) => Math.max(5, m - 5))} style={{ width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 22 }}>−</button>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 34, minWidth: 90, textAlign: "center" }}>{adjustMin} min</div>
+        <button onClick={() => setAdjustMin((m) => m + 5)} style={{ width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 22 }}>+</button>
+      </div>
+      <button className="lift" onClick={() => { saveDuration(adjustMin); setStage(rebookCfg.enabled ? "rebook" : "done"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 12 }}>SAVE {adjustMin} MIN</button>
+      <button onClick={() => setStage(rebookCfg.enabled ? "rebook" : "done")} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 15, padding: 6 }}>Discard — keep current time</button>
+    </div>
+  , false);
+
   if (stage === "rebook") return sheet(
     <div style={{ padding: "28px 24px 32px" }}>
       <div style={{ textAlign: "center", marginBottom: 26 }}>
@@ -4549,6 +4685,31 @@ function CheckoutRow({ label, val, bold }) {
 function AppointmentSheet({ appt, appts, providers, clients, services, business, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
+  const scrollTopRef = useRef(null);
+  useEffect(() => {
+    let raf1, raf2;
+    const reset = () => { if (scrollTopRef.current) scrollTopRef.current.scrollTop = 0; };
+    raf1 = requestAnimationFrame(() => { reset(); raf2 = requestAnimationFrame(reset); });
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+  }, [appt.id, mode]);
+  // Lock the page behind to the top so the fixed full-screen sheet sits at the very top (mobile Safari fix)
+  useEffect(() => {
+    const y = window.scrollY;
+    window.scrollTo(0, 0);
+    document.body.style.position = "fixed";
+    document.body.style.top = "0";
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+    document.body.style.width = "100%";
+    return () => {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.right = "";
+      document.body.style.width = "";
+      window.scrollTo(0, y);
+    };
+  }, []);
   const provider = providers.find((p) => p.id === appt.providerId) || providers[1];
   const client = clients.find((c) => c.id === appt.clientId);
   const service = services.find((s) => s.id === appt.serviceId);
@@ -4617,7 +4778,7 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
 
   return (
     <Portal>
-    <div className="appt-screen" style={{ position: "fixed", inset: 0, zIndex: 800, background: T.bg, display: "flex", flexDirection: "column", color: T.text, fontFamily: FONT_BODY }}>
+    <div className="appt-screen-fixed" style={{ position: "fixed", inset: 0, zIndex: 800, background: T.bg, display: "flex", flexDirection: "column", color: T.text, fontFamily: FONT_BODY }}>
       <div style={{ width: "100%", maxWidth: 540, margin: "0 auto", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {mode === "detail" ? (
@@ -4631,7 +4792,7 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
               </>}
             />
 
-            <div style={{ overflowY: "auto", flex: 1 }}>
+            <div ref={scrollTopRef} style={{ overflowY: "auto", flex: 1 }}>
               {/* status + check-in */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -4642,6 +4803,24 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                 {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} is ready for you and will meet you in front."; const msg = wr.autoReadyMessage === false ? `${appt.name} marked in service.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`; onSetStatus(appt.id, "in-service", msg); }} style={{ background: T.accent, color: T.accentText, padding: "11px 18px", borderRadius: 30, fontSize: 15, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>NOTIFY · READY</button>}
                 {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ background: T.accent, color: T.accentText, padding: "11px 22px", borderRadius: 30, fontSize: 15, letterSpacing: 1, fontWeight: 600, border: "none" }}>COMPLETE & CHECKOUT</button>}
               </div>
+
+              {/* RUNNING LATE — shows when in service and there's a next client (moved up for visibility) */}
+              {appt.status === "in-service" && nextClient && ((business && business.runningLate ? business.runningLate.enabled !== false : true)) && (
+                <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}`, background: "rgba(176,141,87,0.08)" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <Clock size={18} style={{ color: T.accent, marginTop: 2, flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15.5, fontWeight: 600, color: T.text }}>{(business?.runningLate?.thresholdMin) || 5} min left in this appointment</div>
+                      <div style={{ fontSize: 14, color: T.sub, marginTop: 2, lineHeight: 1.45 }}>{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running late?</div>
+                      {nextClient.lateNotified ? (
+                        <div style={{ marginTop: 10, fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Check size={15} /> Notified · running {nextClient.lateNotified} min behind</div>
+                      ) : (
+                        <button className="lift" onClick={() => setLateOpen(true)} style={{ marginTop: 10, background: T.accent, color: T.accentText, padding: "9px 18px", borderRadius: 24, fontSize: 14, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>LET THEM KNOW</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* LAST TIME — surfaces the client's previous cut photo + notes on check-in/in-service */}
               {(appt.status === "checked-in" || appt.status === "in-service") && client && (() => {
@@ -4664,24 +4843,6 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                   </div>
                 );
               })()}
-
-              {/* RUNNING LATE — shows when in service and the next client is already waiting */}
-              {appt.status === "in-service" && nextClient && ((business && business.runningLate ? business.runningLate.enabled !== false : true)) && (
-                <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}`, background: "rgba(176,141,87,0.08)" }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                    <Clock size={18} style={{ color: T.accent, marginTop: 2, flexShrink: 0 }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 15.5, fontWeight: 600, color: T.text }}>{(business?.runningLate?.thresholdMin) || 5} min left in this appointment</div>
-                      <div style={{ fontSize: 14, color: T.sub, marginTop: 2, lineHeight: 1.45 }}>{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running late?</div>
-                      {nextClient.lateNotified ? (
-                        <div style={{ marginTop: 10, fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Check size={15} /> Notified · running {nextClient.lateNotified} min behind</div>
-                      ) : (
-                        <button className="lift" onClick={() => setLateOpen(true)} style={{ marginTop: 10, background: T.accent, color: T.accentText, padding: "9px 18px", borderRadius: 24, fontSize: 14, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>LET THEM KNOW</button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* on / at */}
               <div style={{ display: "flex", borderBottom: `1px solid ${T.line}` }}>
@@ -4781,8 +4942,8 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
 
             {lateOpen && (
               <>
-                <div onClick={() => setLateOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 10 }} />
-                <div className="fade-in" style={{ position: "absolute", left: 16, right: 16, bottom: 16, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 11, padding: 20 }}>
+                <div onClick={() => setLateOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 20px 20px", boxSizing: "border-box" }}>
+                  <div className="fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 811, padding: 24 }}>
                   <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, marginBottom: 4 }}>How far behind?</div>
                   <div style={{ fontSize: 14, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>We'll send {nextClient ? nextClient.name : "your next client"} an in-app notification — no text message.</div>
                   <div style={{ display: "flex", gap: 10 }}>
@@ -4791,6 +4952,7 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                     ))}
                   </div>
                   <button onClick={() => setLateOpen(false)} style={{ width: "100%", marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 14.5, padding: 8 }}>Cancel</button>
+                  </div>
                 </div>
               </>
             )}
