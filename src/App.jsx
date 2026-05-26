@@ -367,30 +367,6 @@ const DEFAULT_SERVICES = [
   },
   { id: "beard", name: "Beard Trim", category: "Services", price: 35, duration: 30, color: "clay", photo: "photo-1517832606299-7ae9b720a186", staff: { dan: { on: true, duration: null, price: null }, heather: { on: true, duration: null, price: null } }, addonGroups: [] },
   { id: "shave", name: "Straight Razor Shave", category: "Services", price: 30, duration: 30, color: "slate", photo: "photo-1596728325488-58c87691e9af", staff: { dan: { on: true, duration: null, price: null }, heather: { on: false, duration: null, price: null } }, addonGroups: [] },
-  {
-    id: "firsttime", name: "First Time Client", category: "Services", price: 50, duration: 60, color: "gold", photo: "photo-1599351431202-1e0f0137899a",
-    firstTime: true, // launches the guided intake instead of the add-on flow
-    staff: { dan: { on: true, duration: null, price: null }, heather: { on: true, duration: null, price: null } },
-    addonGroups: [],
-    // Customizable guided intake — shop can edit questions, options, and image galleries.
-    intake: {
-      service: { // step 1: what service
-        label: "What are you booking?",
-        options: [
-          { id: "haircut", label: "Haircut only" },
-          { id: "haircutbeard", label: "Haircut & Beard" },
-        ],
-      },
-      style: { // step 2: which kind of cut (with example galleries)
-        label: "Which best describes the cut you want?",
-        options: [
-          { id: "standard", label: "Standard Cut", desc: "A classic, straightforward cut.", images: ["photo-1503951914875-452162b0f3f1", "photo-1605497788044-5a32c7078486", "photo-1622286342621-4bd786c2447c", "photo-1599351431202-1e0f0137899a", "photo-1517832606299-7ae9b720a186"] },
-          { id: "clean", label: "Basic Clean Cut", desc: "Crisp and tidy, neat lines.", images: ["photo-1621607512214-68297480165e", "photo-1503951914875-452162b0f3f1", "photo-1605497788044-5a32c7078486", "photo-1596728325488-58c87691e9af", "photo-1622286342621-4bd786c2447c"] },
-          { id: "fade", label: "Skin Fade / Specialty", desc: "Faded sides or a detailed, custom style.", images: ["photo-1605497788044-5a32c7078486", "photo-1622286342621-4bd786c2447c", "photo-1503951914875-452162b0f3f1", "photo-1621607512214-68297480165e", "photo-1599351431202-1e0f0137899a"] },
-        ],
-      },
-    },
-  },
 ];
 
 const CLIENTS = [
@@ -582,7 +558,7 @@ export default function App() {
       `}</style>
 
       {view === "landing" && <Landing business={business} onPick={setView} />}
-      {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("landing")} />}
+      {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("landing")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={() => setView("landing")} />}
       {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} onExit={() => setView("landing")} />}
     </div>
@@ -704,11 +680,15 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
 // ============================================================
 // CLIENT BOOKING FLOW
 // ============================================================
-function ClientFlow({ business, services, providers, clients, appts, setAppts, waitlist, setWaitlist, onExit }) {
+function ClientFlow({ business, services, providers, clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit }) {
   const [step, setStep] = useState(0);
   const [bookingFor, setBookingFor] = useState(null); // null until chosen: "self" or "other"
   const [showWhoFor, setShowWhoFor] = useState(false); // who's-it-for screen for a matched returning client
   const [showUsual, setShowUsual] = useState(false); // book-my-usual one-tap screen
+  const [activeMember, setActiveMember] = useState(null); // family member being booked for (their record)
+  const [addingMember, setAddingMember] = useState(false); // showing the add-new-person form
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberNote, setNewMemberNote] = useState("");
   const [cart, setCart] = useState([]);
   const [intakeFor, setIntakeFor] = useState(null); // service object when running first-time intake
   const [draft, setDraft] = useState(null);
@@ -734,11 +714,12 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
   const [wlService, setWlService] = useState("");
 
   const lineTotal = (entry) => {
-    let p = entry.service.price, m = getDuration(matched, entry.service);
+    const dc = activeMember || matched; // duration/notes come from the person being booked for
+    let p = entry.service.price, m = getDuration(dc, entry.service);
     // cut type overrides the base price/time when present
     if (entry.service.cutTypes && entry.cutType) {
       const ct = entry.service.cutTypes.find((c) => c.id === entry.cutType);
-      if (ct) { p = ct.price; m = getDuration(matched, entry.service) + (ct.min || 0); }
+      if (ct) { p = ct.price; m = getDuration(dc, entry.service) + (ct.min || 0); }
     }
     if (entry.service.beardTypes && entry.beardType) {
       const bt = entry.service.beardTypes.find((b) => b.id === entry.beardType);
@@ -787,7 +768,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
   }, [selectedDate, dateOptions, allSlots]);
   const dateIsFull = selectedDate && openSlots.length === 0;
 
-  const back = () => { setShowWaitlist(false); if (showUsual) { setShowUsual(false); setShowWhoFor(true); return; } if (showWhoFor) { setShowWhoFor(false); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setShowWhoFor(true); return; } if (showWhoFor) { setShowWhoFor(false); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } setStep(step - 1); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -812,7 +793,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
             <div style={{ fontSize: 13, letterSpacing: 3, color: "var(--faint)", marginBottom: 14 }}>WELCOME TO</div>
             <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, lineHeight: 1.05, margin: "0 0 14px" }}>{business.name}</h1>
             <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, margin: "0 auto 38px", maxWidth: 280 }}>Book your appointment in just a few taps.</p>
-            <button className="lift" onClick={() => { setBookingFor("self"); setStep(5); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "20px 18px", fontSize: 16, fontWeight: 500, borderRadius: 14, border: "none", marginBottom: 13, textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
+            <button className="lift" onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "20px 18px", fontSize: 16, fontWeight: 500, borderRadius: 14, border: "none", marginBottom: 13, textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
               <span style={{ fontSize: 17 }}>I'm a returning client</span>
               <span style={{ fontSize: 13, opacity: 0.8, fontWeight: 300 }}>Pull up my details &amp; book faster</span>
             </button>
@@ -982,23 +963,26 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
 
         {/* BOOK MY USUAL — one-tap rebook for a recognized client */}
         {showUsual && matched && (() => {
-          const mine = (appts || []).filter((a) => a.clientId === matched.id && a.serviceId && a.status !== "block");
+          const who = activeMember || matched;
+          const mine = activeMember
+            ? (appts || []).filter((a) => a.familyMemberId === activeMember.id && a.serviceId && a.status !== "block")
+            : (appts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block");
           const lastAppt = mine.length ? mine[mine.length - 1] : null;
           const usualSvc = lastAppt ? services.find((s) => s.id === lastAppt.serviceId) : null;
-          const usualProv = providers.find((p) => p.id === (lastAppt?.providerId || matched.provider)) || providers[1];
+          const usualProv = providers.find((p) => p.id === (lastAppt?.providerId || who.provider)) || providers[1];
           if (!usualSvc) { setShowUsual(false); setStep(1); return null; }
-          const dur = getDuration(matched, usualSvc);
+          const dur = getDuration(who, usualSvc);
           return (
             <div className="fade-up">
-              <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>WELCOME BACK, {matched.name.split(" ")[0].toUpperCase()}</div>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Book your usual?</h2>
-              <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.55 }}>One tap and we'll find your next opening.</p>
+              <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>{who.name.split(" ")[0].toUpperCase()}'S LAST VISIT</div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Same as last time?</h2>
+              <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.55 }}>Here's what {who.name.split(" ")[0]} got last visit.</p>
               <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 20px", marginBottom: 16 }}>
                 <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{usualSvc.name}</div>
                 <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>{dur} min{usualProv && usualProv.id !== "anyone" ? ` · with ${usualProv.name}` : ""}{lastAppt.title ? ` · ${lastAppt.title}` : ""}</div>
               </div>
-              <button className="lift" onClick={() => { setCart([{ service: usualSvc, addons: {}, cutType: null, beardType: null, provider: usualProv }]); setShowUsual(false); setStep(6); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 18, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 12 }}>BOOK MY USUAL →</button>
-              <button onClick={() => { setShowUsual(false); setStep(1); }} style={{ width: "100%", background: "none", border: "none", color: "var(--gold)", fontSize: 15, padding: 8 }}>Or browse the full menu</button>
+              <button className="lift" onClick={() => { setCart([{ service: usualSvc, addons: {}, cutType: null, beardType: null, provider: usualProv }]); setShowUsual(false); setStep(6); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 18, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 12 }}>YES — BOOK THE SAME →</button>
+              <button onClick={() => { setShowUsual(false); setStep(1); }} style={{ width: "100%", background: "none", border: "none", color: "var(--gold)", fontSize: 15, padding: 8 }}>Something different — show the menu</button>
             </div>
           );
         })()}
@@ -1015,38 +999,49 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
         )}
 
         {/* WHO'S IT FOR — shown after a returning client is recognized */}
-        {showWhoFor && matched && (
+        {showWhoFor && matched && !addingMember && (
           <div className="fade-up">
             <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>HI {matched.name.split(" ")[0].toUpperCase()}</div>
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Who's this booking for?</h2>
             <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>So we set aside the right amount of time.</p>
-            <button className="lift" onClick={() => { setBookingFor("self"); setShowWhoFor(false); const mine = (appts || []).filter((a) => a.clientId === matched.id && a.serviceId && a.status !== "block"); if (mine.length && cart.length === 0) { setShowUsual(true); } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "20px 18px", fontSize: 16, fontWeight: 500, borderRadius: 14, border: "none", marginBottom: 13, textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
+            <button className="lift" onClick={() => { setBookingFor("self"); setActiveMember(null); setShowWhoFor(false); const mine = (appts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && cart.length === 0) { setShowUsual(true); } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "18px", fontSize: 16, fontWeight: 500, borderRadius: 14, border: "none", marginBottom: 11, textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
               <span style={{ fontSize: 17 }}>For myself</span>
-              <span style={{ fontSize: 13, opacity: 0.8, fontWeight: 300 }}>Use my usual times &amp; details</span>
+              <span style={{ fontSize: 13, opacity: 0.8, fontWeight: 300 }}>{matched.name}</span>
             </button>
-            <button className="lift" onClick={() => { setBookingFor("other"); setMatched(null); setShowWhoFor(false); setStep(cart.length === 0 ? 1 : 6); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
-              <span style={{ fontSize: 17 }}>For someone else</span>
-              <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>A kid, partner, or friend</span>
+            {(matched.family || []).map((m) => (
+              <button key={m.id} className="lift" onClick={() => { setBookingFor("member"); setActiveMember(m); setShowWhoFor(false); const theirs = (appts || []).filter((a) => a.familyMemberId === m.id && a.serviceId && a.status !== "block"); if (theirs.length && cart.length === 0) { setShowUsual(true); } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", marginBottom: 11, textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
+                <span style={{ fontSize: 17 }}>{m.name}</span>
+                {m.note && <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>{m.note}</span>}
+              </button>
+            ))}
+            <button className="lift" onClick={() => { setNewMemberName(""); setNewMemberNote(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", color: "var(--gold)", padding: "18px", fontSize: 16, borderRadius: 14, border: "1px dashed var(--border2)", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}>
+              <Plus size={18} /> <span>Someone new</span>
             </button>
+          </div>
+        )}
+
+        {/* ADD A FAMILY MEMBER */}
+        {showWhoFor && matched && addingMember && (
+          <div className="fade-up">
+            <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>NEW PERSON</div>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Who are we adding?</h2>
+            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.55 }}>They'll be saved under your account for next time.</p>
+            <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>First name</label>
+            <input autoFocus value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="e.g. Leo" style={{ ...inputStyle, marginBottom: 16 }} />
+            <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Note (optional)</label>
+            <input value={newMemberNote} onChange={(e) => setNewMemberNote(e.target.value)} placeholder="e.g. son, age 8" style={{ ...inputStyle, marginBottom: 22 }} />
+            <button className="lift" disabled={!newMemberName.trim()} onClick={() => {
+              const member = { id: "fm" + Date.now(), name: newMemberName.trim(), note: newMemberNote.trim(), customDurations: {}, gallery: [], timeline: [] };
+              setClients(clients.map((c) => c.id === matched.id ? { ...c, family: [...(c.family || []), member] } : c));
+              setMatched({ ...matched, family: [...(matched.family || []), member] });
+              setActiveMember(member); setBookingFor("member"); setAddingMember(false); setShowWhoFor(false); setStep(cart.length === 0 ? 1 : 6);
+            }} style={{ width: "100%", background: newMemberName.trim() ? "var(--gold)" : "var(--border)", color: newMemberName.trim() ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, border: "none" }}>ADD &amp; CONTINUE →</button>
           </div>
         )}
 
         {/* STEP 6 — date/time + waitlist */}
         {step === 6 && (
           <div className="fade-up">
-            {matched && (() => {
-              const g = (matched.gallery || []); const last = g.length ? g[g.length - 1] : null;
-              const usualProv = providers.find((p) => p.id === matched.provider);
-              return (
-                <div style={{ background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 12, padding: "14px 16px", marginBottom: 20, display: "flex", gap: 12, alignItems: "flex-start" }}>
-                  <Sparkles size={18} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
-                  <div style={{ fontSize: 15, lineHeight: 1.5 }}>
-                    Welcome back, <strong>{matched.name.split(" ")[0]}</strong>. We've reserved <strong style={{ color: "var(--gold)" }}>{cartMin} min</strong> based on your past visits.
-                    {(last || usualProv) && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 6, lineHeight: 1.5 }}>{last && last.note ? `Last time: ${last.note}.` : ""}{usualProv && usualProv.id !== "anyone" ? ` Usually with ${usualProv.name}.` : ""}</div>}
-                  </div>
-                </div>
-              );
-            })()}
             {matched && matched.lastVisit && business.overdueBuffer && business.overdueBuffer.enabled !== false && (() => {
               const ob = business.overdueBuffer;
               const weeksAgo = (Date.now() - new Date(matched.lastVisit)) / (7 * 86400000);
@@ -1178,7 +1173,7 @@ function ClientFlow({ business, services, providers, clients, appts, setAppts, w
 
             <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 18 }}><div style={{ fontSize: 14, marginBottom: 8 }}>Cancellation policy</div><p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300 }}>{business.policy}</p></div>
             <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", color: "var(--text)", marginBottom: 24, fontSize: 14 }}><span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>I agree to the cancellation policy</button>
-            <button className="lift" disabled={!agreed} onClick={() => { const newId = Date.now(); const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(slot / 60), slot % 60, 0, 0); setAppts([...appts, { id: newId, providerId: provider.id === "anyone" ? "dan" : provider.id, clientId: matched?.id || "guest", serviceId: cart[0].service.id, start: slot, status: "confirmed", name: matched?.name || "New Client", title: cart.map(describeEntry).join(", "), bookedFor: bookedFor.toISOString(), photos, hasPhotos: photos > 0, phone }]); setBookedId(newId); setStep(8); }} style={{ width: "100%", background: agreed ? "var(--gold)" : "var(--border)", color: agreed ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>BOOK NOW</button>
+            <button className="lift" disabled={!agreed} onClick={() => { const newId = Date.now(); const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(slot / 60), slot % 60, 0, 0); const apptName = activeMember ? activeMember.name : (matched?.name || "New Client"); setAppts([...appts, { id: newId, providerId: provider.id === "anyone" ? "dan" : provider.id, clientId: matched?.id || "guest", familyMemberId: activeMember?.id || null, bookedByName: activeMember && matched ? matched.name : null, serviceId: cart[0].service.id, start: slot, status: "confirmed", name: apptName, title: cart.map(describeEntry).join(", "), bookedFor: bookedFor.toISOString(), photos, hasPhotos: photos > 0, phone }]); setBookedId(newId); setStep(8); }} style={{ width: "100%", background: agreed ? "var(--gold)" : "var(--border)", color: agreed ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>BOOK NOW</button>
           </div>
         )}
 
@@ -5280,6 +5275,23 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
 function ClientProfile({ client, clients, setClients, services, providers, appts, onBack, showToast }) {
   const live = clients.find((c) => c.id === client.id);
   const provider = providers.find((p) => p.id === live.provider) || providers[1];
+  const [pfTab, setPfTab] = useState("overview"); // overview | timeline | photos | times | family
+  const [openMember, setOpenMember] = useState(null); // family member mini-profile being viewed
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [mName, setMName] = useState("");
+  const [mNote, setMNote] = useState("");
+  const family = live.family || [];
+  const addFamilyMember = () => {
+    if (!mName.trim()) return;
+    const member = { id: "fm" + Date.now(), name: mName.trim(), note: mNote.trim(), customDurations: {}, gallery: [], timeline: [] };
+    setClients(clients.map((c) => c.id === live.id ? { ...c, family: [...(c.family || []), member] } : c));
+    setMName(""); setMNote(""); setAddMemberOpen(false);
+    showToast(`${member.name} added.`);
+  };
+  const removeFamilyMember = (id) => {
+    setClients(clients.map((c) => c.id === live.id ? { ...c, family: (c.family || []).filter((m) => m.id !== id) } : c));
+    setOpenMember(null);
+  };
   const [selService, setSelService] = useState(services[0]?.id || "");
   const sel = services.find((s) => s.id === selService);
   // current value to prefill the time dropdowns: custom if set, else service default
@@ -5362,7 +5374,14 @@ function ClientProfile({ client, clients, setClients, services, providers, appts
   return (
     <div className="fade-up">
       <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 22 }}><ArrowLeft size={16} /> All clients</button>
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}><button onClick={() => setPicker(true)} style={{ position: "relative", width: 60, height: 60, borderRadius: "50%", background: "none", border: "none", flexShrink: 0, padding: 0 }}><Avatar size={60} photo={clientPhoto(live)} initial={live.name.charAt(0)} color={provider.color} /><span style={{ position: "absolute", bottom: -1, right: -1, width: 22, height: 22, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={11} /></span></button><div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500 }}>{live.name}</h2><div style={{ color: "var(--sub)", fontSize: 14 }}>{live.phone} · {live.visits} visits</div></div></div>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}><button onClick={() => setPicker(true)} style={{ position: "relative", width: 52, height: 52, borderRadius: "50%", background: "none", border: "none", flexShrink: 0, padding: 0 }}><Avatar size={52} photo={clientPhoto(live)} initial={live.name.charAt(0)} color={provider.color} /><span style={{ position: "absolute", bottom: -1, right: -1, width: 20, height: 20, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={10} /></span></button><div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 25, fontWeight: 500, lineHeight: 1.1 }}>{live.name}</h2><div style={{ color: "var(--sub)", fontSize: 13.5 }}>{live.phone} · {live.visits} visits</div></div></div>
+
+      {/* TAB BAR */}
+      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--line)", marginBottom: 22, overflowX: "auto" }}>
+        {[["overview","Overview"],["timeline","Timeline"],["photos","Photos"],["times","Times"],["family","Family"]].map(([id, label]) => { const on = pfTab === id; return (
+          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontWeight: on ? 600 : 400, fontSize: 14.5, padding: "10px 10px" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
+        ); })}
+      </div>
       {picker && <StaffPhotoPicker hasPhoto={!!live.photo} onClose={() => setPicker(false)} onPick={setClientPhoto} onRemove={removeClientPhoto} />}
       {galPicker && <PhotoPicker onClose={() => setGalPicker(false)} onPick={addGalleryPhoto} />}
       {lightbox && (() => { const g = gallery.find((x) => x.id === lightbox); if (!g) return null; return (
@@ -5378,7 +5397,7 @@ function ClientProfile({ client, clients, setClients, services, providers, appts
       ); })()}
 
       {/* CLIENT NOTE — always-visible, editable */}
-      <div style={{ marginBottom: 28 }}>
+      {pfTab === "overview" && <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)" }}>CLIENT NOTE</div>
           {!editingNote && <button onClick={() => setEditingNote(true)} style={{ background: "none", color: "var(--gold)", fontSize: 14, display: "flex", alignItems: "center", gap: 5 }}><Edit2 size={13} /> {live.notes ? "Edit" : "Add note"}</button>}
@@ -5398,10 +5417,10 @@ function ClientProfile({ client, clients, setClients, services, providers, appts
               : <p style={{ fontSize: 14.5, color: "var(--faint)", fontStyle: "italic" }}>No note yet — tap to add preferences, allergies, or anything to remember.</p>}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* GALLERY — photos of previous work */}
-      <div style={{ marginBottom: 28 }}>
+      {pfTab === "photos" && <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)" }}>GALLERY</div>
           <button onClick={() => setGalPicker(true)} style={{ background: "none", color: "var(--gold)", fontSize: 14, display: "flex", alignItems: "center", gap: 5 }}><Plus size={14} /> Add photo</button>
@@ -5421,10 +5440,10 @@ function ClientProfile({ client, clients, setClients, services, providers, appts
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* TIMELINE — dated notes + appointment history (Mangomint-style) */}
-      <div style={{ marginBottom: 28 }}>
+      {pfTab === "timeline" && <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>TIMELINE</div>
         {/* add a dated note */}
         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 14 }}>
@@ -5464,9 +5483,9 @@ function ClientProfile({ client, clients, setClients, services, providers, appts
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
-      <div style={{ marginBottom: 28 }}>
+      {pfTab === "times" && <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>REMEMBERED TIMING</div>
         <p style={{ fontSize: 15, color: "var(--sub)", marginBottom: 16, fontWeight: 300, lineHeight: 1.5 }}>Set how long this client actually takes for a service. It overrides the default and tightens their future booking slots.</p>
 
@@ -5516,7 +5535,69 @@ function ClientProfile({ client, clients, setClients, services, providers, appts
             <p style={{ fontSize: 14, color: "var(--faint)", marginTop: 8, fontWeight: 300 }}>Everything else uses the menu default. Tap ✕ to revert one.</p>
           </div>
         )}
-      </div>
+      </div>}
+
+      {/* FAMILY TAB */}
+      {pfTab === "family" && !openMember && (
+        <div style={{ marginBottom: 28 }}>
+          <p style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 16, fontWeight: 300, lineHeight: 1.5 }}>People linked to {live.name.split(" ")[0]}'s account. Each keeps their own times, notes, and photos.</p>
+          {family.length === 0 && <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", marginBottom: 14 }}>No family members yet.</p>}
+          <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
+            {family.map((m) => (
+              <button key={m.id} className="lift" onClick={() => setOpenMember(m.id)} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", textAlign: "left", color: "var(--text)" }}>
+                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--panel2)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 17, flexShrink: 0 }}>{m.name.charAt(0)}</div>
+                <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15 }}>{m.name}</div>{m.note && <div style={{ fontSize: 13, color: "var(--sub)" }}>{m.note}</div>}</div>
+                <ChevronRight size={16} style={{ color: "var(--faint)" }} />
+              </button>
+            ))}
+          </div>
+          {addMemberOpen ? (
+            <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
+              <input autoFocus value={mName} onChange={(e) => setMName(e.target.value)} placeholder="First name" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", marginBottom: 10 }} />
+              <input value={mNote} onChange={(e) => setMNote(e.target.value)} placeholder="Note (e.g. son, age 8)" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", marginBottom: 12 }} />
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => { setAddMemberOpen(false); setMName(""); setMNote(""); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 11, borderRadius: 10, fontSize: 14 }}>Cancel</button>
+                <button className="lift" onClick={addFamilyMember} disabled={!mName.trim()} style={{ flex: 1, background: mName.trim() ? "var(--gold)" : "var(--panel)", color: mName.trim() ? "var(--on-gold)" : "var(--faint)", padding: 11, borderRadius: 10, fontSize: 14, fontWeight: 600 }}>Add</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setAddMemberOpen(true)} className="lift" style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add family member</button>
+          )}
+        </div>
+      )}
+
+      {/* FAMILY MEMBER MINI-PROFILE */}
+      {pfTab === "family" && openMember && (() => {
+        const m = family.find((x) => x.id === openMember);
+        if (!m) { setOpenMember(null); return null; }
+        const setMember = (patch) => setClients(clients.map((c) => c.id === live.id ? { ...c, family: (c.family || []).map((fm) => fm.id === m.id ? { ...fm, ...patch } : fm) } : c));
+        return (
+          <div style={{ marginBottom: 28 }}>
+            <button onClick={() => setOpenMember(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={15} /> Back to family</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 20 }}>
+              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--panel2)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 20, flexShrink: 0 }}>{m.name.charAt(0)}</div>
+              <div><div style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{m.name}</div>{m.note && <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{m.note}</div>}</div>
+            </div>
+            <div style={{ fontSize: 13, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>NOTE</div>
+            <textarea value={m.note || ""} onChange={(e) => setMember({ note: e.target.value })} placeholder="Anything to remember about this person…" rows={3} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", boxSizing: "border-box", marginBottom: 22 }} />
+            <div style={{ fontSize: 13, letterSpacing: 2, color: "var(--faint)", marginBottom: 10 }}>PHOTOS</div>
+            {(m.gallery || []).length === 0 ? (
+              <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", marginBottom: 22 }}>No photos yet for {m.name}.</p>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 22 }}>
+                {(m.gallery || []).map((g) => (
+                  <div key={g.id} style={{ aspectRatio: "1", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)" }}><img src={imgUrl(g.photo, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize: 13, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>VISIT HISTORY</div>
+            {(() => { const mh = (appts || []).filter((a) => a.familyMemberId === m.id && a.serviceId && a.status !== "block"); return mh.length === 0
+              ? <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", marginBottom: 22 }}>No visits yet.</p>
+              : <div style={{ display: "grid", gap: 8, marginBottom: 22 }}>{mh.map((a) => (<div key={a.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 14px" }}><div style={{ fontSize: 14.5 }}>{a.title}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{fmtTime(a.start)} – {fmtTime(a.end)}</div></div>))}</div>; })()}
+            <button onClick={() => removeFamilyMember(m.id)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Trash2 size={16} /> Remove {m.name}</button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
