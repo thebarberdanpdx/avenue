@@ -485,7 +485,30 @@ const inputStyle = { width: "100%", background: "var(--panel2)", border: "1px so
 
 // ============================================================
 export default function App() {
-  const [view, setView] = useState("landing");
+  const [view, setView] = useState("client");
+  const [shopUnlocked, setShopUnlocked] = useState(false);
+  const [shopPwPrompt, setShopPwPrompt] = useState(false);
+  const [pwEntry, setPwEntry] = useState("");
+  const [pwError, setPwError] = useState(false);
+  const SHOP_PASSWORD = "avenue2026"; // change this to whatever you want
+  // Staff reach the dashboard via a hidden URL: add #staff to the web address.
+  // Clients never see anything about staff — the app opens straight into booking.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash.toLowerCase() === "#staff") {
+      setShopPwPrompt(true);
+      // strip the hash WITHOUT adding a history entry, so phone "back" doesn't bounce around
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }, []);
+  const goView = (v) => {
+    if (v === "shop" && !shopUnlocked) { setPwEntry(""); setPwError(false); setShopPwPrompt(true); return; }
+    setView(v);
+  };
+  const tryUnlock = () => {
+    if (pwEntry === SHOP_PASSWORD) { setShopUnlocked(true); setShopPwPrompt(false); setView("shop"); }
+    else { setPwError(true); }
+  };
   const [clients, setClients] = useState(CLIENTS);
   const [appts, setAppts] = useState(TODAY_APPTS);
   const [waitlist, setWaitlist] = useState([
@@ -557,10 +580,23 @@ export default function App() {
         * { -webkit-tap-highlight-color: transparent; }
       `}</style>
 
-      {view === "landing" && <Landing business={business} onPick={setView} />}
-      {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("landing")} />}
+      {view === "landing" && <Landing business={business} onPick={goView} />}
+
+      {shopPwPrompt && (
+        <div onClick={() => { setShopPwPrompt(false); setPwEntry(""); setPwError(false); }} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 26, boxShadow: "0 24px 60px rgba(0,0,0,0.4)" }}>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Staff access</div>
+            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 18, fontWeight: 300, lineHeight: 1.5 }}>Enter the shop password to open the dashboard.</p>
+            <input autoFocus type="password" value={pwEntry} onChange={(e) => { setPwEntry(e.target.value); setPwError(false); }} onKeyDown={(e) => { if (e.key === "Enter") tryUnlock(); }} placeholder="Password" style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: `1px solid ${pwError ? "#c0392b" : "var(--border)"}`, borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, marginBottom: pwError ? 8 : 16 }} />
+            {pwError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Wrong password — try again.</p>}
+            <button className="lift" onClick={tryUnlock} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>UNLOCK</button>
+            <button onClick={() => { setShopPwPrompt(false); setPwEntry(""); setPwError(false); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14, padding: 6 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("client")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={() => setView("landing")} />}
-      {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} onExit={() => setView("landing")} />}
+      {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} onExit={() => { setShopUnlocked(false); setView("client"); }} />}
     </div>
   );
 }
@@ -687,6 +723,13 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [showUsual, setShowUsual] = useState(false); // book-my-usual one-tap screen
   const [activeMember, setActiveMember] = useState(null); // family member being booked for (their record)
   const [addingMember, setAddingMember] = useState(false); // showing the add-new-person form
+  // ---- Guided multi-person wizard ----
+  const [groupPeople, setGroupPeople] = useState([]);   // [{ id|null, name, isMember }] people being booked for
+  const [groupMode, setGroupMode] = useState(null);     // "together" | "separate"
+  const [wizardIdx, setWizardIdx] = useState(0);         // which person we're choosing a service for
+  const [showSchedChoice, setShowSchedChoice] = useState(false); // the together/separate screen
+  const [showWizardIntro, setShowWizardIntro] = useState(false); // "Let's start with X" screen
+  const [expandUsual, setExpandUsual] = useState(false); // expand the usual card to show details
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberNote, setNewMemberNote] = useState("");
   const [cart, setCart] = useState([]);
@@ -698,7 +741,10 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [cutPhase, setCutPhase] = useState("type"); // within step 2: "type" -> "beard" -> "addons"
   const [cutCarousel, setCutCarousel] = useState({}); // per-cut-type image index
   const [phone, setPhone] = useState("");
+  const [newName, setNewName] = useState("");   // first-timer name collected at the end
+  const [newEmail, setNewEmail] = useState(""); // first-timer email collected at the end
   const [matched, setMatched] = useState(null);
+  useEffect(() => { if (matched) { setNewName(matched.name || ""); setNewEmail(matched.email || ""); if (matched.phone) setPhone(matched.phone); } }, [matched]);
   const [selectedDate, setSelectedDate] = useState(null);
   const [slot, setSlot] = useState(null);
   const [agreed, setAgreed] = useState(false);
@@ -755,20 +801,91 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   };
   const provider = cart[0]?.provider || providers[0];
 
+  // ---------- REAL AVAILABILITY ENGINE ----------
+  // For a barber on a given date, return free start-times that fit `durMin`,
+  // based on their working hours minus appointments already booked that day.
+  const dayKey = (d) => d.toDateString();
+  const apptsOnDate = (provId, d) => (appts || []).filter((a) => {
+    if (a.status === "cancelled") return false;
+    if (a.providerId !== provId) return false;
+    const ad = a.bookedFor ? new Date(a.bookedFor) : null;
+    return ad && dayKey(ad) === dayKey(d);
+  }).map((a) => { const s = a.start; const dur = (a.end != null ? a.end - a.start : 30); return [s, s + (dur > 0 ? dur : 30)]; });
+
+  const freeSlotsFor = (prov, d, durMin, stepMin = 15) => {
+    if (!prov || prov.id === "anyone") prov = providers.find((p) => p.id === "dan") || providers[1];
+    const dow = d.getDay();
+    const h = prov.hours?.[dow];
+    if (!h || !h.on) return [];
+    const busy = apptsOnDate(prov.id, d);
+    const out = [];
+    for (let t = h.start; t + durMin <= h.end; t += stepMin) {
+      const clashes = busy.some(([bs, be]) => t < be && (t + durMin) > bs);
+      if (!clashes) out.push(t);
+    }
+    return out;
+  };
+
+  // Multi-person: given a list of { prov, durMin }, find combined options.
+  // Returns { sameTime: [startMin...], backToBack: [{ order:[{prov,start,dur}] }] }
+  const findGroupSlots = (people, d) => {
+    if (!people.length) return { sameTime: [], sequential: [] };
+    // same-time: a start where EVERY person's barber is free for their duration at that start
+    const perFree = people.map((p) => new Set(freeSlotsFor(p.prov, d, p.durMin)));
+    const first = freeSlotsFor(people[0].prov, d, people[0].durMin);
+    const sameTime = first.filter((t) => people.every((p, i) => perFree[i].has(t)));
+    // sequential (back-to-back, can be same barber): place person0, then person1 right after, etc.
+    const sequential = [];
+    const startCandidates = freeSlotsFor(people[0].prov, d, people[0].durMin);
+    for (const start of startCandidates) {
+      let cursor = start; const order = []; let ok = true;
+      for (const p of people) {
+        const free = new Set(freeSlotsFor(p.prov, d, p.durMin));
+        if (!free.has(cursor)) { ok = false; break; }
+        order.push({ provId: p.prov.id, start: cursor, dur: p.durMin });
+        cursor += p.durMin;
+      }
+      if (ok) sequential.push({ start, order });
+      if (sequential.length >= 6) break;
+    }
+    return { sameTime, sequential };
+  };
+
   const dateOptions = useMemo(() => { const arr = []; const base = new Date(); const worksOn = (dow) => providers.some((p) => p.id !== "anyone" && p.hours?.[dow]?.on); for (let i = 0; i < 14; i++) { const d = new Date(base); d.setDate(base.getDate() + i); if (!worksOn(d.getDay())) continue; arr.push(d); } return arr; }, [providers]);
+  // Group the cart by who each service is for → a "person" with their barber + total duration.
+  const people = useMemo(() => {
+    const groups = {};
+    cart.forEach((e) => {
+      const key = e.forMemberId || "self";
+      const dur = lineTotal(e).min;
+      if (!groups[key]) groups[key] = { key, name: e.forName || "Me", prov: e.provider && e.provider.id !== "anyone" ? e.provider : (providers.find((p) => p.id === "dan") || providers[1]), durMin: 0, items: [] };
+      groups[key].durMin += dur;
+      groups[key].items.push(e);
+    });
+    return Object.values(groups);
+  }, [cart, providers]);
+  const isMultiPerson = people.length > 1;
+
   const allSlots = useMemo(() => { if (!cartMin) return []; const out = []; for (let t = 9 * 60; t + cartMin <= 17 * 60; t += cartMin) out.push(t); return out; }, [cartMin]);
-  // open slots for the chosen date: the soonest two dates are simulated as fully booked
-  // so the "join the waitlist" path is visible; real product checks live appointments.
+  // Real availability. Single person → their free slots. Multiple people → group solve.
+  const groupSlots = useMemo(() => {
+    if (!selectedDate || !isMultiPerson) return null;
+    return findGroupSlots(people.map((p) => ({ prov: p.prov, durMin: p.durMin })), selectedDate);
+  }, [selectedDate, isMultiPerson, people, appts]);
   const openSlots = useMemo(() => {
     if (!selectedDate) return [];
-    const idx = dateOptions.findIndex((d) => d.toDateString() === selectedDate.toDateString());
-    if (idx <= 1) return [];               // first two bookable days are full
-    if (idx === 2) return allSlots.slice(-2); // next day nearly full
-    return allSlots;
-  }, [selectedDate, dateOptions, allSlots]);
+    if (isMultiPerson && groupSlots) {
+      // prefer same-time starts; fall back to the start of each back-to-back option
+      if (groupSlots.sameTime.length) return groupSlots.sameTime;
+      return groupSlots.sequential.map((s) => s.start);
+    }
+    const prov = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]);
+    return freeSlotsFor(prov, selectedDate, cartMin || 30, 15);
+  }, [selectedDate, provider, providers, cartMin, appts, isMultiPerson, groupSlots]);
+  const slotIsSameTime = isMultiPerson && groupSlots && slot != null && groupSlots.sameTime.includes(slot);
   const dateIsFull = selectedDate && openSlots.length === 0;
 
-  const back = () => { setShowWaitlist(false); if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setShowWhoFor(true); return; } if (showWhoFor) { setShowWhoFor(false); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setShowWhoFor(true); return; } if (showWhoFor) { setShowWhoFor(false); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } setStep(step - 1); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -779,7 +896,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
       <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button>
+          {step > 0 ? <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button> : <div style={{ width: 50 }} />}
           <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
           <div style={{ width: 50 }} />
         </div>
@@ -940,7 +1057,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 18 }}>Choose your provider</h2>
             <div style={{ display: "grid", gap: 10 }}>
               {providers.map((p) => (
-                <button key={p.id} className="lift" onClick={() => { setCart([...cart, { service: draft, addons: draftAddons, cutType, beardType, provider: p }]); setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(4); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 18px", color: "var(--text)", textAlign: "left" }}>
+                <button key={p.id} className="lift" onClick={() => { setCart([...cart, { service: draft, addons: draftAddons, cutType, beardType, provider: p, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }]); setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); if (groupPeople.length > 1) { if (wizardIdx < groupPeople.length - 1) { setWizardIdx(wizardIdx + 1); setShowWizardIntro(true); } else { setStep(6); } } else { setStep(4); } }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 18px", color: "var(--text)", textAlign: "left" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}><div style={{ width: 44, height: 44, borderRadius: "50%", background: p.color + "22", color: p.color, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 18 }}>{p.id === "anyone" ? <User size={20} /> : p.name.charAt(0)}</div><div><div style={{ fontSize: 16 }}>{p.name}</div><div style={{ fontSize: 14, color: "var(--faint)", letterSpacing: 1 }}>{p.id === "anyone" ? "Any available day" : daysSummary(p.hours)}</div></div></div>
                   <ChevronRight size={18} style={{ color: "var(--faint)" }} />
                 </button>
@@ -954,10 +1071,10 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           <div className="fade-up">
             <div style={{ background: "var(--panel)", borderRadius: 12, padding: 18, marginBottom: 28 }}>
               <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>YOUR SERVICES</div>
-              {cart.map((e, i) => (<div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: i < cart.length - 1 ? "1px solid var(--line)" : "none" }}><div><div style={{ fontSize: 15 }}>{describeEntry(e)}</div><div style={{ fontSize: 15, color: "var(--sub)" }}>with {e.provider.name}</div></div><button onClick={() => setCart(cart.filter((_, idx) => idx !== i))} style={{ background: "none", color: "#C2703D", fontSize: 15 }}>Remove</button></div>))}
+              {cart.map((e, i) => (<div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: i < cart.length - 1 ? "1px solid var(--line)" : "none" }}><div><div style={{ fontSize: 15 }}>{describeEntry(e)}</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>{e.forName ? `for ${e.forName.split(" ")[0]} · ` : ""}with {e.provider.name}</div></div><button onClick={() => setCart(cart.filter((_, idx) => idx !== i))} style={{ background: "none", color: "#C2703D", fontSize: 15 }}>Remove</button></div>))}
             </div>
-            <p style={{ textAlign: "center", color: "var(--text)", fontSize: 16, marginBottom: 20 }}>Do you want to add another service?</p>
-            <div style={{ display: "flex", gap: 12 }}><button className="lift" onClick={() => setStep(1)} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 16, fontSize: 14, letterSpacing: 1, borderRadius: 10 }}>Yes</button><button className="lift" onClick={() => setStep(matched ? 6 : 5)} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>No</button></div>
+            <p style={{ textAlign: "center", color: "var(--text)", fontSize: 16, marginBottom: 20 }}>Add another service{matched && (matched.family || []).length > 0 ? " — for you or someone else?" : "?"}</p>
+            <div style={{ display: "flex", gap: 12 }}><button className="lift" onClick={() => { if (matched && (matched.family || []).length > 0) { setShowWhoFor(true); } else { setStep(1); } }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 16, fontSize: 14, letterSpacing: 1, borderRadius: 10 }}>Yes</button><button className="lift" onClick={() => setStep(6)} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>No</button></div>
           </div>
         )}
 
@@ -988,37 +1105,63 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         })()}
 
         {/* STEP 5 — phone */}
-        {step === 5 && !showWhoFor && !showUsual && (
+        {step === 5 && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && (
           <div className="fade-up">
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Your number</h2>
             <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300 }}>We'll use this to recognize you and pull up your preferences.</p>
             <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             <p style={{ color: "var(--faint)", fontSize: 14, marginBottom: 22 }}>Try <span style={{ color: "var(--gold)", cursor: "pointer" }} onClick={() => setPhone("503-555-0142")}>503-555-0142</span> (returning client Marcus).</p>
-            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={() => { const digits = phone.replace(/\D/g, ""); const found = clients.find((c) => c.phone.replace(/\D/g, "") === digits) || null; setMatched(found); if (found) { setShowWhoFor(true); } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "var(--border)" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>CONTINUE →</button>
+            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={() => { const digits = phone.replace(/\D/g, ""); const found = clients.find((c) => c.phone.replace(/\D/g, "") === digits) || null; setMatched(found); if (found) { setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); setShowWhoFor(true); } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "var(--border)" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>CONTINUE →</button>
           </div>
         )}
 
         {/* WHO'S IT FOR — shown after a returning client is recognized */}
-        {showWhoFor && matched && !addingMember && (
-          <div className="fade-up">
-            <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>HI {matched.name.split(" ")[0].toUpperCase()}</div>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Who's this booking for?</h2>
-            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>So we set aside the right amount of time.</p>
-            <button className="lift" onClick={() => { setBookingFor("self"); setActiveMember(null); setShowWhoFor(false); const mine = (appts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && cart.length === 0) { setShowUsual(true); } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "18px", fontSize: 16, fontWeight: 500, borderRadius: 14, border: "none", marginBottom: 11, textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
-              <span style={{ fontSize: 17 }}>For myself</span>
-              <span style={{ fontSize: 13, opacity: 0.8, fontWeight: 300 }}>{matched.name}</span>
-            </button>
-            {(matched.family || []).map((m) => (
-              <button key={m.id} className="lift" onClick={() => { setBookingFor("member"); setActiveMember(m); setShowWhoFor(false); const theirs = (appts || []).filter((a) => a.familyMemberId === m.id && a.serviceId && a.status !== "block"); if (theirs.length && cart.length === 0) { setShowUsual(true); } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", marginBottom: 11, textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
-                <span style={{ fontSize: 17 }}>{m.name}</span>
-                {m.note && <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>{m.note}</span>}
+        {showWhoFor && matched && !addingMember && (() => {
+          const isSel = (key) => groupPeople.some((g) => (g.id || "self") === key);
+          const toggle = (person) => { const key = person.id || "self"; setGroupPeople((cur) => cur.some((g) => (g.id || "self") === key) ? cur.filter((g) => (g.id || "self") !== key) : [...cur, person]); };
+          const selfPerson = { id: null, name: matched.name, isMember: false };
+          const continueGroup = () => {
+            if (groupPeople.length === 0) return;
+            setShowWhoFor(false);
+            setWizardIdx(0);
+            if (groupPeople.length === 1) {
+              // single person → existing flow
+              const only = groupPeople[0];
+              if (only.id) { setBookingFor("member"); setActiveMember(only.isMember ? (matched.family || []).find((m) => m.id === only.id) : null); }
+              else { setBookingFor("self"); setActiveMember(null); }
+              const apptsFor = only.id ? (appts || []).filter((a) => a.familyMemberId === only.id && a.serviceId && a.status !== "block") : (appts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block");
+              if (apptsFor.length) setShowUsual(true); else setStep(1);
+            } else {
+              // multiple → ask together vs separate
+              setShowSchedChoice(true);
+            }
+          };
+          return (
+            <div className="fade-up">
+              <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>HI {matched.name.split(" ")[0].toUpperCase()}</div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Who's this booking for?</h2>
+              <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>Pick one or more — tap everyone you're booking today.</p>
+              {[selfPerson, ...(matched.family || []).map((m) => ({ id: m.id, name: m.name, note: m.note, isMember: true }))].map((person) => {
+                const key = person.id || "self"; const on = isSel(key);
+                return (
+                  <button key={key} className="lift" onClick={() => toggle(person)} style={{ width: "100%", background: on ? "color-mix(in srgb, var(--gold) 14%, var(--panel))" : "var(--panel)", color: "var(--text)", padding: "18px", fontSize: 16, borderRadius: 14, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, marginBottom: 11, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                    <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      <span style={{ fontSize: 17 }}>{person.id ? person.name : "Myself"}</span>
+                      <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>{person.id ? (person.note || "") : matched.name}</span>
+                    </span>
+                    <span style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={14} style={{ color: "var(--on-gold)" }} />}</span>
+                  </button>
+                );
+              })}
+              <button className="lift" onClick={() => { setNewMemberName(""); setNewMemberNote(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", color: "var(--gold)", padding: "18px", fontSize: 16, borderRadius: 14, border: "1px dashed var(--border2)", textAlign: "left", display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
+                <Plus size={18} /> <span>Someone new</span>
               </button>
-            ))}
-            <button className="lift" onClick={() => { setNewMemberName(""); setNewMemberNote(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", color: "var(--gold)", padding: "18px", fontSize: 16, borderRadius: 14, border: "1px dashed var(--border2)", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}>
-              <Plus size={18} /> <span>Someone new</span>
-            </button>
-          </div>
-        )}
+              <button className="lift" disabled={groupPeople.length === 0} onClick={continueGroup} style={{ width: "100%", background: groupPeople.length ? "var(--gold)" : "var(--border)", color: groupPeople.length ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 10 }}>
+                {groupPeople.length > 1 ? `CONTINUE — ${groupPeople.length} PEOPLE →` : "CONTINUE →"}
+              </button>
+            </div>
+          );
+        })()}
 
         {/* ADD A FAMILY MEMBER */}
         {showWhoFor && matched && addingMember && (
@@ -1034,10 +1177,109 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               const member = { id: "fm" + Date.now(), name: newMemberName.trim(), note: newMemberNote.trim(), customDurations: {}, gallery: [], timeline: [] };
               setClients(clients.map((c) => c.id === matched.id ? { ...c, family: [...(c.family || []), member] } : c));
               setMatched({ ...matched, family: [...(matched.family || []), member] });
-              setActiveMember(member); setBookingFor("member"); setAddingMember(false); setShowWhoFor(false); setStep(cart.length === 0 ? 1 : 6);
+              setGroupPeople((cur) => [...cur, { id: member.id, name: member.name, note: member.note, isMember: true }]);
+              setAddingMember(false); // back to the multi-select, now with this person added & selected
             }} style={{ width: "100%", background: newMemberName.trim() ? "var(--gold)" : "var(--border)", color: newMemberName.trim() ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, border: "none" }}>ADD &amp; CONTINUE →</button>
           </div>
         )}
+
+        {/* TOGETHER vs SEPARATE — only for multiple people */}
+        {showSchedChoice && (
+          <div className="fade-up">
+            <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>{groupPeople.map((p) => (p.id ? p.name : "You")).map((n) => n.split(" ")[0]).join(" & ").toUpperCase()}</div>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>How do you want to book?</h2>
+            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>We can get everyone in on the same visit, or just find the soonest opening for each.</p>
+            <button className="lift" onClick={() => { setGroupMode("together"); setShowSchedChoice(false); setShowWizardIntro(true); setWizardIdx(0); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", marginBottom: 13, textAlign: "left", display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 17, fontWeight: 500 }}>Together — same visit</span>
+              <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300, lineHeight: 1.45 }}>Same day, at the same time with different barbers — or back-to-back if needed.</span>
+            </button>
+            <button className="lift" onClick={() => { setGroupMode("separate"); setShowSchedChoice(false); setShowWizardIntro(true); setWizardIdx(0); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", textAlign: "left", display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 17, fontWeight: 500 }}>Separate — soonest for each</span>
+              <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300, lineHeight: 1.45 }}>Book each person their own day &amp; time, even if that's different days.</span>
+            </button>
+          </div>
+        )}
+
+        {/* WIZARD INTRO — "Let's start with Marcus" then their usual / something else */}
+        {showWizardIntro && groupPeople[wizardIdx] && (() => {
+          const person = groupPeople[wizardIdx];
+          const fm = person.id ? (matched.family || []).find((m) => m.id === person.id) : null;
+          const who = person.id ? fm : matched;
+          const theirAppts = person.id
+            ? (appts || []).filter((a) => a.familyMemberId === person.id && a.serviceId && a.status !== "block")
+            : (appts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block");
+          const lastAppt = theirAppts.length ? theirAppts[theirAppts.length - 1] : null;
+          const usualSvc = lastAppt ? services.find((s) => s.id === lastAppt.serviceId) : null;
+          const usualProv = lastAppt ? (providers.find((p) => p.id === lastAppt.providerId) || providers[1]) : (providers.find((p) => p.id === (who?.provider)) || providers[1]);
+          const first = person.id ? person.name.split(" ")[0] : matched.name.split(" ")[0];
+          const isFirst = wizardIdx === 0;
+          const goPickService = () => { if (person.id) { setBookingFor("member"); setActiveMember(fm); } else { setBookingFor("self"); setActiveMember(null); } setShowWizardIntro(false); setStep(1); };
+          // Reconstruct the FULL usual from the last appointment's saved detail
+          const usualLine = lastAppt && lastAppt.lineItems && lastAppt.lineItems[0] ? lastAppt.lineItems[0] : null;
+          const usualCutType = usualLine?.cutType || null;
+          const usualBeardType = usualLine?.beardType || null;
+          const usualAddons = usualLine?.addons || {};
+          // Build a readable list of what's included
+          const usualDetails = [];
+          if (usualSvc) {
+            if (usualSvc.cutTypes && usualCutType) { const ct = usualSvc.cutTypes.find((c) => c.id === usualCutType); if (ct) usualDetails.push({ label: ct.label, desc: ct.desc }); }
+            if (usualSvc.beardTypes && usualBeardType) { const bt = usualSvc.beardTypes.find((b) => b.id === usualBeardType); if (bt) usualDetails.push({ label: bt.label, desc: bt.desc }); }
+            (usualSvc.addonGroups || []).forEach((g) => { const sel = usualAddons[g.id]; if (g.type === "choice" && sel) { const o = g.options.find((x) => x.id === sel); if (o) usualDetails.push({ label: o.label, desc: o.desc }); } if (g.type === "addon" && sel) usualDetails.push({ label: g.item.name, desc: g.item.desc }); });
+          }
+          const advanceAfterAdd = () => { if (wizardIdx < groupPeople.length - 1) { setWizardIdx(wizardIdx + 1); setExpandUsual(false); } else { setShowWizardIntro(false); setStep(6); } };
+          const bookUsual = () => {
+            if (!usualSvc) { goPickService(); return; }
+            if (person.id) { setBookingFor("member"); setActiveMember(fm); } else { setBookingFor("self"); setActiveMember(null); }
+            setCart((cur) => [...cur, { service: usualSvc, addons: usualAddons, cutType: usualCutType, beardType: usualBeardType, provider: usualProv, forMemberId: person.id || null, forName: person.id ? person.name : matched.name }]);
+            advanceAfterAdd();
+          };
+          const tweakUsual = () => {
+            // Load the usual into the editor so they can drop/change add-ons, then land on the add-on step
+            if (person.id) { setBookingFor("member"); setActiveMember(fm); } else { setBookingFor("self"); setActiveMember(null); }
+            setDraft(usualSvc); setDraftAddons({ ...usualAddons }); setCutType(usualCutType); setBeardType(usualBeardType);
+            setCutPhase("addons"); setShowWizardIntro(false); setExpandUsual(false); setStep(2);
+          };
+          return (
+            <div className="fade-up">
+              <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>{isFirst ? "LET'S START WITH" : "NEXT UP"} · {first.toUpperCase()}</div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>{isFirst ? `Let's start with ${first}` : `Now let's get ${first} taken care of`}</h2>
+              <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>Person {wizardIdx + 1} of {groupPeople.length}.</p>
+              {usualSvc && (
+                <div style={{ border: "1.5px solid var(--gold)", borderRadius: 16, overflow: "hidden", marginBottom: 13 }}>
+                  <button onClick={() => setExpandUsual(!expandUsual)} style={{ width: "100%", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", color: "var(--text)", padding: "16px 18px", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, border: "none" }}>
+                    <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      <span style={{ fontSize: 17, fontWeight: 500 }}>{first}'s usual</span>
+                      <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300 }}>{usualSvc.name} · {getDuration(who, usualSvc)} min{usualProv && usualProv.id !== "anyone" ? ` · with ${usualProv.name}` : ""}</span>
+                    </span>
+                    <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0, transform: expandUsual ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+                  </button>
+                  {expandUsual && (
+                    <div style={{ padding: "4px 18px 16px", background: "var(--panel)" }}>
+                      {usualDetails.length > 0 ? (
+                        <div style={{ display: "grid", gap: 10, margin: "12px 0 16px" }}>
+                          {usualDetails.map((d, i) => (
+                            <div key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+                              <Check size={15} style={{ color: "var(--gold)", marginTop: 3, flexShrink: 0 }} />
+                              <div><div style={{ fontSize: 14.5 }}>{d.label}</div>{d.desc && <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.45 }}>{d.desc}</div>}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p style={{ fontSize: 13.5, color: "var(--sub)", margin: "12px 0 16px", lineHeight: 1.5 }}>Just the {usualSvc.name.toLowerCase()} — no extras last time.</p>
+                      )}
+                      <button className="lift" onClick={bookUsual} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none", marginBottom: 9 }}>BOOK THIS →</button>
+                      <button onClick={tweakUsual} style={{ width: "100%", background: "transparent", color: "var(--gold)", padding: 12, fontSize: 14.5, border: "1px solid var(--border2)", borderRadius: 10 }}>Tweak it — change add-ons</button>
+                    </div>
+                  )}
+                </div>
+              )}
+              <button className="lift" onClick={goPickService} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
+                <span style={{ fontSize: 17 }}>{usualSvc ? "Something else" : "Pick a service"}</span>
+                <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300 }}>Browse the full menu</span>
+              </button>
+            </div>
+          );
+        })()}
 
         {/* STEP 6 — date/time + waitlist */}
         {step === 6 && (
@@ -1072,6 +1314,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
             </div>
             {selectedDate && !dateIsFull && (<>
               <div style={{ fontSize: 14, color: "var(--sub)", marginBottom: 14 }}>Selected: <strong style={{ color: "var(--text)" }}>{relativeDate(selectedDate)}</strong>{relativeDate(selectedDate).includes(",") ? "" : `, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
+              {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 26 }}>{openSlots.map((t) => (<button key={t} className="lift" onClick={() => setSlot(t)} style={{ background: slot === t ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: slot === t ? "var(--gold)" : "var(--border)", borderRadius: 12, padding: "14px 8px", color: slot === t ? "var(--on-gold)" : "var(--text)", fontSize: 14 }}>{fmtTime(t)}</button>))}</div>
               {slot != null && <button className="lift" onClick={() => setStep(7)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 24 }}>CONTINUE →</button>}
             </>)}
@@ -1159,9 +1402,12 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <div style={{ fontSize: 14, color: "var(--sub)" }}>with {provider.name} at {fmtTime(slot)}</div>
               <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)", marginTop: 8 }}>${cartPrice}</div>
             </div>
-            <div style={{ display: "grid", gap: 12, marginBottom: 18 }}><input placeholder="First name" style={inputStyle} defaultValue={matched ? matched.name.split(" ")[0] : ""} /><input placeholder="Last name" style={inputStyle} defaultValue={matched ? matched.name.split(" ").slice(1).join(" ") : ""} /><input placeholder="Email" style={inputStyle} /></div>
-            <div style={{ fontSize: 15, color: "var(--faint)", marginBottom: 8 }}>Card on file (required to book)</div>
-            <div style={{ display: "grid", gap: 12, marginBottom: 18 }}><input placeholder="Card number" style={inputStyle} /><div style={{ display: "flex", gap: 12 }}><input placeholder="MM / YY" style={inputStyle} /><input placeholder="CVC" style={inputStyle} /></div></div>
+            <div style={{ fontSize: 15, color: "var(--faint)", marginBottom: 8 }}>{matched ? "Your details" : "Your details (so we can confirm your booking)"}</div>
+            <div style={{ display: "grid", gap: 12, marginBottom: 18 }}>
+              <input placeholder="Full name" style={inputStyle} value={newName} onChange={(e) => setNewName(e.target.value)} />
+              <input placeholder="Email" type="email" style={inputStyle} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+              <input placeholder="Phone number" type="tel" style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
 
             {/* photo upload — their choice: reference, current look, or a selfie */}
             <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 18 }}>
@@ -1173,7 +1419,48 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
 
             <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 18 }}><div style={{ fontSize: 14, marginBottom: 8 }}>Cancellation policy</div><p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300 }}>{business.policy}</p></div>
             <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", color: "var(--text)", marginBottom: 24, fontSize: 14 }}><span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>I agree to the cancellation policy</button>
-            <button className="lift" disabled={!agreed} onClick={() => { const newId = Date.now(); const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(slot / 60), slot % 60, 0, 0); const apptName = activeMember ? activeMember.name : (matched?.name || "New Client"); setAppts([...appts, { id: newId, providerId: provider.id === "anyone" ? "dan" : provider.id, clientId: matched?.id || "guest", familyMemberId: activeMember?.id || null, bookedByName: activeMember && matched ? matched.name : null, serviceId: cart[0].service.id, start: slot, status: "confirmed", name: apptName, title: cart.map(describeEntry).join(", "), bookedFor: bookedFor.toISOString(), photos, hasPhotos: photos > 0, phone }]); setBookedId(newId); setStep(8); }} style={{ width: "100%", background: agreed ? "var(--gold)" : "var(--border)", color: agreed ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>BOOK NOW</button>
+            <button className="lift" disabled={!agreed || !newName.trim() || !newEmail.trim() || phone.replace(/\D/g, "").length < 10} onClick={() => {
+              const baseId = Date.now();
+              let clientId = matched?.id || null;
+              // First-timer: create their client record now.
+              if (!matched && !activeMember) {
+                clientId = "c" + baseId;
+                const newClient = { id: clientId, name: newName.trim(), email: newEmail.trim(), phone: phone.trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
+                setClients((cur) => [newClient, ...cur]);
+              }
+              // Decide each person's start time. Same-time if this slot supports it, else back-to-back.
+              const newAppts = [];
+              const isSame = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
+              let cursor = slot;
+              people.forEach((person, pi) => {
+                const startMin = isMultiPerson ? (isSame ? slot : cursor) : slot;
+                const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
+                const prov = person.prov;
+                const title = person.items.map(describeEntry).join(", ");
+                newAppts.push({
+                  id: baseId + pi,
+                  providerId: prov.id === "anyone" ? "dan" : prov.id,
+                  clientId: person.key === "self" ? (clientId || "guest") : (clientId || "guest"),
+                  familyMemberId: person.key === "self" ? null : person.key,
+                  bookedByName: person.key === "self" ? null : (matched?.name || newName.trim()),
+                  serviceId: person.items[0].service.id,
+                  lineItems: person.items.map((e) => ({ serviceId: e.service.id, cutType: e.cutType || null, beardType: e.beardType || null, addons: e.addons || {} })),
+                  start: startMin,
+                  end: startMin + person.durMin,
+                  status: "confirmed",
+                  name: person.name,
+                  title,
+                  bookedFor: bookedFor.toISOString(),
+                  photos: pi === 0 ? photos : 0,
+                  hasPhotos: pi === 0 && photos > 0,
+                  phone,
+                  groupId: isMultiPerson ? baseId : null,
+                });
+                if (!isSame) cursor += person.durMin;
+              });
+              setAppts([...appts, ...newAppts]);
+              setBookedId(baseId); setStep(8);
+            }} style={{ width: "100%", background: (agreed && newName.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--gold)" : "var(--border)", color: (agreed && newName.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>BOOK NOW</button>
           </div>
         )}
 
@@ -1454,7 +1741,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <div style={{ borderBottom: "1px solid var(--line)", padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10 }}>
-        <button onClick={onExit} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Exit</button>
+        <button onClick={() => { setActiveClient(null); setTab("calendar"); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Calendar</button>
         <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, letterSpacing: 1.5, fontWeight: 500 }}>{business.name}</div>
         <div style={{ width: 50 }} />
       </div>
@@ -3939,7 +4226,12 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       let timeOk = true;
       if (w.when && WINDOW[w.when]) { const [a, b] = WINDOW[w.when]; timeOk = freed.start < b && freed.end > a; }
       return provOk && timeOk;
-    }).sort((a, b) => waitedSince(a) - waitedSince(b)); // longest-waiting first
+    }).sort((a, b) => {
+      const ap = (a.photos || 0) > 0 ? 1 : 0;
+      const bp = (b.photos || 0) > 0 ? 1 : 0;
+      if (ap !== bp) return bp - ap;            // attached a reference photo = higher priority
+      return waitedSince(a) - waitedSince(b);   // tie-break: longest-waiting first
+    });
   };
   // send the in-app notification (+ booking link). For "longest" order we notify
   // one person; the rest are queued, each offered after delayMin if unclaimed.
@@ -4238,7 +4530,6 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 11, height: 11, borderRadius: 12, background: STATUS_COLORS["checked-in"] }} /> Checked in</span>
         <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 11, height: 11, borderRadius: 12, background: STATUS_COLORS["in-service"] }} /> In service</span>
         <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 11, height: 11, borderRadius: 12, border: "1px solid var(--border2)", background: "var(--panel2)" }} /> Done</span>
-        <span style={{ color: "var(--faint)" }}>· else by service</span>
       </div>
 
       {/* staff column headers */}
