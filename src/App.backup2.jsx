@@ -526,7 +526,6 @@ export default function App() {
     supabase.from('app_state').select('data').eq('id', 'clients').single().then(({ data }) => { if (data && data.data) setClients(data.data); });
     supabase.from('app_state').select('data').eq('id', 'appointments').single().then(({ data }) => { if (data && data.data) setAppts(data.data); });
     supabase.from('app_state').select('data').eq('id', 'waitlist').single().then(({ data }) => { if (data && data.data) setWaitlist(data.data); });
-    supabase.from('app_state').select('data').eq('id', 'services').single().then(({ data }) => { if (data && data.data) setServices(data.data); });
     supabase.from('app_state').select('data').eq('id', 'providers').single().then(({ data }) => { if (data && data.data) setProviders(data.data); });
   }, []);
 
@@ -3803,7 +3802,6 @@ function CalendarView({ appts, setAppts, clients, providers, services, business,
   const [pressInd, setPressInd] = useState(null); // { providerId, start, y } live indicator while holding
   const [checkout, setCheckout] = useState(null); // appt being checked out
   const dragRef = useRef(null);                // mutable: { id, startY, origStart, dur, moved }
-  const holdTimerRef = useRef(null);           // press-and-hold timer for drag-to-reschedule
   const pressRef = useRef(null);               // mutable: long-press timer + start info
   const blockScrollRef = useRef((e) => { if (e.cancelable) e.preventDefault(); });
 
@@ -3886,78 +3884,37 @@ function CalendarView({ appts, setAppts, clients, providers, services, business,
 
   // begin dragging a block
   const startDrag = (e, a) => {
+    e.preventDefault();
     const y = e.touches ? e.touches[0].clientY : e.clientY;
-    const x = e.touches ? e.touches[0].clientX : e.clientX;
-    // Only arm a long-press. Do NOT capture the touch — scrolling stays completely normal.
-    // Tapping is handled separately by onClick. Dragging only starts after a long hold.
-    dragRef.current = { id: a.id, startY: y, startX: x, origStart: a.start, dur: a.end - a.start, didDrag: false, armed: false };
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    holdTimerRef.current = setTimeout(() => {
-      const d = dragRef.current;
-      if (d && d.id === a.id && !d.armed) {
-        d.armed = true;
-        setDrag({ id: a.id, deltaMin: 0, armed: true });
-        if (navigator.vibrate) navigator.vibrate(12);
-      }
-    }, 650);
+    dragRef.current = { id: a.id, startY: y, origStart: a.start, dur: a.end - a.start, moved: false };
+    setDrag({ id: a.id, deltaMin: 0 });
   };
-
-  useEffect(() => {
-    // Always watch for early movement so a scroll cancels the pending long-press.
-    const watchMove = (e) => {
-      const d = dragRef.current; if (!d || d.armed) return;
-      const y = e.touches ? e.touches[0].clientY : e.clientY;
-      const x = e.touches ? e.touches[0].clientX : e.clientX;
-      if (Math.abs(y - d.startY) > 3 || Math.abs(x - (d.startX || 0)) > 3) {
-        d.scrolled = true;
-        if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
-      }
-    };
-    const watchEnd = () => {
-      const d = dragRef.current;
-      if (d && !d.armed) {
-        if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
-        setTimeout(() => { if (dragRef.current && !dragRef.current.armed) dragRef.current = null; }, 300);
-      }
-    };
-    window.addEventListener("touchmove", watchMove, { passive: true });
-    window.addEventListener("mousemove", watchMove);
-    window.addEventListener("touchend", watchEnd);
-    window.addEventListener("mouseup", watchEnd);
-    return () => {
-      window.removeEventListener("touchmove", watchMove);
-      window.removeEventListener("mousemove", watchMove);
-      window.removeEventListener("touchend", watchEnd);
-      window.removeEventListener("mouseup", watchEnd);
-    };
-  }, []);
 
   useEffect(() => {
     if (!drag) return;
     const move = (e) => {
-      const d = dragRef.current; if (!d || !d.armed) return;
+      const d = dragRef.current; if (!d) return;
       const y = e.touches ? e.touches[0].clientY : e.clientY;
-      if (e.cancelable) e.preventDefault();   // only now, while actively dragging, block scroll
-      const rawDelta = (y - d.startY) / PPM;
+      const rawDelta = (y - d.startY) / PPM;          // minutes moved
       let newStart = snap5(d.origStart + rawDelta);
       newStart = Math.max(DAY_START, Math.min(DAY_END - d.dur, newStart));
       const deltaMin = newStart - d.origStart;
-      d.deltaMin = deltaMin;
-      d.didDrag = true;
-      setDrag({ id: d.id, deltaMin, armed: true });
+      d.deltaMin = deltaMin;                           // remember on ref for reliable commit
+      if (Math.abs(y - d.startY) > 4) d.moved = true;
+      setDrag({ id: d.id, deltaMin });
     };
     const up = () => {
-      if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
-      const d = dragRef.current;
+      const d = dragRef.current; dragRef.current = null;
       setDrag(null);
       if (!d) return;
       const appt = appts.find((a) => a.id === d.id);
-      if (appt && d.armed && d.deltaMin && d.deltaMin !== 0) {
+      if (!appt) return;
+      if (d.moved && d.deltaMin && d.deltaMin !== 0) {
         const newStart = appt.start + d.deltaMin;
         setPending({ appt, newStart, newEnd: newStart + (appt.end - appt.start) });
+      } else {
+        setOpen(appt);   // treated as a tap
       }
-      // clear shortly after so the onClick handler can see didDrag and suppress opening
-      setTimeout(() => { dragRef.current = null; }, 300);
     };
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
@@ -4194,7 +4151,7 @@ function CalendarView({ appts, setAppts, clients, providers, services, business,
               ); })}
               {/* appointment blocks */}
               {col.map((a) => {
-                const isDragging = drag && drag.id === a.id && drag.armed;
+                const isDragging = drag && drag.id === a.id;
                 const liveStart = isDragging ? a.start + drag.deltaMin : a.start;
                 const top = (liveStart - DAY_START) * PPM;
                 const height = (a.end - a.start) * PPM - 2;
@@ -4210,10 +4167,9 @@ function CalendarView({ appts, setAppts, clients, providers, services, business,
                 const blockBg = "repeating-linear-gradient(45deg, var(--panel2), var(--panel2) 7px, var(--line) 7px, var(--line) 14px)";
                 return (
                   <div key={a.id} data-appt
-                    onClick={() => { const d = dragRef.current; if (d && (d.didDrag || d.scrolled)) return; setOpen(a); }}
                     onMouseDown={(e) => startDrag(e, a)} onTouchStart={(e) => startDrag(e, a)}
                     className={isDragging ? "" : "lift"}
-                    style={{ position: "absolute", top, left: 3, right: 3, height, background: isBlock ? blockBg : (isDone ? "var(--panel2)" : tint), opacity: isDone ? 0.7 : 1, border: `1px solid ${isBlock ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`}`, borderLeft: `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : accent)}`, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "pan-y", userSelect: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
+                    style={{ position: "absolute", top, left: 3, right: 3, height, background: isBlock ? blockBg : (isDone ? "var(--panel2)" : tint), opacity: isDone ? 0.7 : 1, border: `1px solid ${isBlock ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`}`, borderLeft: `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : accent)}`, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "none", userSelect: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
                     {/* name — always one line, never wraps or collides */}
                     <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{a.name}</span>
                     {/* time range — shown once room exists */}
