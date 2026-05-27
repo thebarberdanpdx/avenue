@@ -97,6 +97,7 @@ const DEFAULT_BUSINESS = {
   phones: [{ id: "ph1", label: "Main", number: "(503) 555-0142" }],
   logoText: "", // optional custom logo wordmark (falls back to business name)
   showAddonPhotos: true, // owner preference toggle
+  aiCutHelper: false, // when ON, shows "Show us a photo" + "I'm not sure" on Pick Your Cut (needs reference photos uploaded first)
   weekStartsOn: 0, // 0=Sunday … 6=Saturday — first day of the calendar week
   // Shop open hours per weekday (0=Sun … 6=Sat), times in minutes from midnight
   hours: { 0: { on: true, start: 600, end: 900 }, 1: { on: true, start: 540, end: 1020 }, 2: { on: false, start: 540, end: 1020 }, 3: { on: false, start: 540, end: 1020 }, 4: { on: true, start: 540, end: 1020 }, 5: { on: true, start: 540, end: 1020 }, 6: { on: true, start: 540, end: 1020 } },
@@ -336,9 +337,9 @@ const DEFAULT_SERVICES = [
     id: "cut", name: "Haircut", category: "Services", price: 42, duration: 45, color: "sage", photo: "photo-1503951914875-452162b0f3f1",
     staff: { dan: { on: true, duration: 35, price: null }, heather: { on: true, duration: 45, price: null } },
     cutTypes: [
-      { id: "standard", label: "Standard Haircut", desc: "A classic, clean cut.", price: 42, min: 0, images: ["photo-1503951914875-452162b0f3f1", "photo-1622286342621-4bd786c2447c"] },
-      { id: "skinfade", label: "Skin Fade", desc: "Faded sides, blended to the skin.", price: 47, min: 5, images: ["photo-1605497788044-5a32c7078486", "photo-1599351431202-1e0f0137899a"] },
-      { id: "scissor", label: "Precision Scissor Cut", desc: "Scissor-only, textured and natural.", price: 45, min: 5, images: ["photo-1621607512214-68297480165e", "photo-1503951914875-452162b0f3f1"] },
+      { id: "standard", label: "Standard Haircut", desc: "Sides and back have at least SOME hair visible all the way down — even very short stubble or fuzz counts as hair. This is the right pick if you can see hair anywhere on the sides, no matter how short, even faded down close. Includes any taper, low fade, mid fade, or high fade where some hair remains at the bottom edge. The DEFAULT pick unless you can see truly bald scalp.", price: 42, min: 0, images: ["photo-1503951914875-452162b0f3f1", "photo-1622286342621-4bd786c2447c"] },
+      { id: "skinfade", label: "Skin Fade", desc: "ONLY pick this if the bottom of the sides/back is shaved COMPLETELY BALD with zero hair — no stubble, no fuzz, just smooth bare scalp like a clean shave. The skin should look the same as a shaved face. If you can see ANY hair stubble or short fuzz at the bottom edge (even very short), it is NOT a skin fade — pick Standard Haircut instead. When in doubt, do not pick this one.", price: 47, min: 5, images: ["photo-1605497788044-5a32c7078486", "photo-1599351431202-1e0f0137899a"] },
+      { id: "scissor", label: "Precision Scissor Cut", desc: "Hair is cut with scissors ONLY — no clippers used anywhere. No fading, no tapering, no buzzed sections. The sides have hair of similar length/density to the top, just shaped shorter with scissors. Looks soft and textured throughout, never sharply faded or buzzed.", price: 45, min: 5, images: ["photo-1621607512214-68297480165e", "photo-1503951914875-452162b0f3f1"] },
     ],
     addonGroups: [
       { id: "facial", label: "Want a facial?", type: "addon", photo: "photo-1570172619644-dfd03ed5d881", item: {
@@ -351,9 +352,9 @@ const DEFAULT_SERVICES = [
     id: "cutbeard", name: "Haircut + Beard", category: "Services", price: 58, duration: 60, color: "gold", photo: "photo-1621607512214-68297480165e",
     staff: { dan: { on: true, duration: 50, price: null }, heather: { on: true, duration: 60, price: null } },
     cutTypes: [
-      { id: "standard", label: "Standard Haircut", desc: "A classic, clean cut, with beard.", price: 58, min: 0, images: ["photo-1503951914875-452162b0f3f1", "photo-1622286342621-4bd786c2447c"] },
-      { id: "skinfade", label: "Skin Fade", desc: "Faded sides, blended to the skin, with beard.", price: 63, min: 5, images: ["photo-1605497788044-5a32c7078486", "photo-1599351431202-1e0f0137899a"] },
-      { id: "scissor", label: "Precision Scissor Cut", desc: "Scissor-only, textured, with beard.", price: 61, min: 5, images: ["photo-1621607512214-68297480165e", "photo-1503951914875-452162b0f3f1"] },
+      { id: "standard", label: "Standard Haircut", desc: "Sides and back have at least SOME hair visible all the way down — even very short stubble or fuzz counts. This is the right pick if you can see hair anywhere on the sides, even faded down close. Includes any taper, low fade, mid fade, or high fade where some hair remains at the bottom edge. The DEFAULT pick unless truly bald scalp is visible. Beard is shaped to match.", price: 58, min: 0, images: ["photo-1503951914875-452162b0f3f1", "photo-1622286342621-4bd786c2447c"] },
+      { id: "skinfade", label: "Skin Fade", desc: "ONLY pick this if the bottom of the sides/back is shaved COMPLETELY BALD with zero hair — no stubble, no fuzz, just smooth bare scalp like a clean shave. If you can see ANY hair stubble or short fuzz at the bottom edge, it is NOT a skin fade — pick Standard Haircut instead. When in doubt, do not pick this one. Beard is shaped to match.", price: 63, min: 5, images: ["photo-1605497788044-5a32c7078486", "photo-1599351431202-1e0f0137899a"] },
+      { id: "scissor", label: "Precision Scissor Cut", desc: "Hair is cut with scissors ONLY — no clippers used anywhere. No fading, no tapering, no buzzed sections. Sides have similar density to the top, just scissor-shaped shorter. Beard is shaped naturally.", price: 61, min: 5, images: ["photo-1621607512214-68297480165e", "photo-1503951914875-452162b0f3f1"] },
     ],
     addonGroups: [
       { id: "hottowel", label: "Hot Towel / Straight Razor Finish", type: "addon", photo: "photo-1493256338651-d82f7acb2b38", item: {
@@ -581,16 +582,33 @@ export default function App() {
         /* Screen container eases in as a whole (move-through-space feel) */
         .fade-up { animation: screenIn .42s var(--ease) both; }
         .fade-in { animation: fadeIn .4s var(--ease) both; }
+        /* Keyed screen swaps: deliberately OBVIOUS so motion is easy to confirm.
+           Once verified working, the distance (28px) and duration can be dialed back to taste. */
+        @keyframes screenSwap { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+        .screen-swap { animation: screenSwap .52s var(--spring) both; }
         /* Direct children cascade in with a gentle stagger + spring */
         .fade-up > * { animation: fadeUp .5s var(--spring) both; }
+        .screen-swap > * > * { animation: fadeUp .55s var(--spring) both; }
         .fade-up > *:nth-child(1){animation-delay:.02s} .fade-up > *:nth-child(2){animation-delay:.06s}
         .fade-up > *:nth-child(3){animation-delay:.10s} .fade-up > *:nth-child(4){animation-delay:.14s}
         .fade-up > *:nth-child(5){animation-delay:.18s} .fade-up > *:nth-child(6){animation-delay:.22s}
         .fade-up > *:nth-child(7){animation-delay:.26s} .fade-up > *:nth-child(8){animation-delay:.30s}
+        .screen-swap > * > *:nth-child(1){animation-delay:.06s} .screen-swap > * > *:nth-child(2){animation-delay:.12s}
+        .screen-swap > * > *:nth-child(3){animation-delay:.18s} .screen-swap > * > *:nth-child(4){animation-delay:.24s}
+        .screen-swap > * > *:nth-child(5){animation-delay:.30s} .screen-swap > * > *:nth-child(6){animation-delay:.36s}
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
         .appt-screen { animation: slideInRight .3s var(--ease) both; }
         @keyframes fadeInFixed { from { opacity:0; } to { opacity:1; } }
         .appt-screen-fixed { animation: fadeInFixed .25s var(--ease) both; }
+        /* Success bloom — used on the "You're in" check circle */
+        @keyframes successBloom { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        .success-bloom { animation: successBloom .65s var(--spring) both; }
+        /* Soft gold pulse — used on selected/active items to confirm */
+        @keyframes goldPulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 50%, transparent); } 100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--gold) 0%, transparent); } }
+        .gold-pulse { animation: goldPulse .8s var(--ease) both; }
+        /* Subtle drift-in — for the confirmation card */
+        @keyframes driftIn { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
+        .drift-in { animation: driftIn .55s var(--spring) both; animation-delay: .15s; }
         .scrub-lock, .scrub-lock * { touch-action: none !important; overflow: hidden !important; overscroll-behavior: none !important; -webkit-user-select: none !important; user-select: none !important; }
         button { font-family: ${FONT_BODY}; cursor: pointer; border: none; transition: transform .18s var(--ease), box-shadow .25s var(--ease), background .2s var(--ease), border-color .2s var(--ease), opacity .2s var(--ease); }
         button:active { transform: scale(0.96); }
@@ -598,7 +616,7 @@ export default function App() {
         input:focus, textarea:focus, select:focus { border-color: var(--gold) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 18%, transparent); }
         .lift { transition: transform .25s var(--spring), box-shadow .25s var(--ease), border-color .2s var(--ease), background .2s var(--ease); }
         .lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-        .lift:active { transform: scale(0.97); }
+        .lift:active { transform: scale(0.96); box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
         .card { box-shadow: var(--shadow-sm); }
         ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 8px; } ::-webkit-scrollbar-track { background: transparent; }
         * { -webkit-tap-highlight-color: transparent; }
@@ -803,6 +821,19 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [showSchedChoice, setShowSchedChoice] = useState(false); // the together/separate screen
   const [showWizardIntro, setShowWizardIntro] = useState(false); // "Let's start with X" screen
   const [expandUsual, setExpandUsual] = useState(false); // expand the usual card to show details
+  const [cameFromUsual, setCameFromUsual] = useState(false); // true when step 6/7 was reached via the welcome-back front door (so Back returns there)
+  const [newClientCategory, setNewClientCategory] = useState(null); // "hair" | "hairBeard" | "beard" — chosen on the editorial category screen
+  const [cutHelperOpen, setCutHelperOpen] = useState(null); // "photo" | "notSure" | null — opens the helper sheet on Pick Your Cut
+  const [helperPhotoUrl, setHelperPhotoUrl] = useState(null); // data URL of uploaded photo (held for later attaching to booking)
+  const helperPhotoInputRef = useRef(null);
+  const [notSureText, setNotSureText] = useState("");
+  const [notSureLoading, setNotSureLoading] = useState(false);
+  const [notSureResult, setNotSureResult] = useState(null); // { matchId, matchLabel, reason } | null
+  const [notSureError, setNotSureError] = useState(null);
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoResult, setPhotoResult] = useState(null); // { matchId, matchLabel, reason } | null
+  const [photoError, setPhotoError] = useState(null);
+  const [bookingPhoto, setBookingPhoto] = useState(null); // { dataUrl, mediaType } — attaches to the appointment
   // ---- SMS login verification (wired to Twilio/Supabase when approved; accepts any 6-digit code for now) ----
   const [showCodeEntry, setShowCodeEntry] = useState(false);
   const [codeEntry, setCodeEntry] = useState("");
@@ -936,6 +967,39 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   };
 
   const dateOptions = useMemo(() => { const arr = []; const base = new Date(); const worksOn = (dow) => providers.some((p) => p.id !== "anyone" && p.hours?.[dow]?.on); for (let i = 0; i < 14; i++) { const d = new Date(base); d.setDate(base.getDate() + i); if (!worksOn(d.getDay())) continue; arr.push(d); } return arr; }, [providers]);
+
+  // --- Regular front-door helpers (Piece 1) ---
+  // Soonest open { date, slot } for a given barber across the next 14 working days.
+  // slot is minutes-from-midnight (matches freeSlotsFor). Returns null if nothing open.
+  const findNextAvailable = (prov, durMin) => {
+    if (!prov) return null;
+    for (const d of dateOptions) {
+      const slots = freeSlotsFor(prov, d, durMin || 30, 15);
+      if (slots.length) return { date: d, slot: slots[0] };
+    }
+    return null;
+  };
+  // Soonest open slot with ANY OTHER barber, but only if it genuinely beats the
+  // usual barber's soonest (earlier date, or same date + earlier time). Returns
+  // { date, slot, provider } or null. Used for the gentle "sooner with someone else" line.
+  const findSoonerWithOther = (usualProv, durMin, usualResult) => {
+    let best = null;
+    for (const p of providers) {
+      if (!p || p.id === "anyone" || (usualProv && p.id === usualProv.id)) continue;
+      const r = findNextAvailable(p, durMin);
+      if (!r) continue;
+      if (!best || r.date < best.date || (+r.date === +best.date && r.slot < best.slot)) best = { ...r, provider: p };
+    }
+    if (!best) return null;
+    if (usualResult) {
+      const beatsDate = best.date < usualResult.date;
+      const sameDay = +best.date === +usualResult.date;
+      const beatsTime = sameDay && best.slot < usualResult.slot;
+      if (!beatsDate && !beatsTime) return null; // not actually sooner — don't show it
+    }
+    return best;
+  };
+
   // Group the cart by who each service is for → a "person" with their barber + total duration.
   const people = useMemo(() => {
     const groups = {};
@@ -969,12 +1033,31 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const slotIsSameTime = isMultiPerson && groupSlots && slot != null && groupSlots.sameTime.includes(slot);
   const dateIsFull = selectedDate && openSlots.length === 0;
 
-  const back = () => { setShowWaitlist(false); if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setShowWhoFor(true); return; } if (showWhoFor) { setShowWhoFor(false); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { setStep(4); return; } if (step === 7) { setStep(6); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(6); return; } setStep(step - 1); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
       {labels.map((l, i) => (<React.Fragment key={l}><span style={{ fontSize: 14, padding: "6px 16px", borderRadius: 20, background: active === i ? "var(--panel2)" : "transparent", color: active === i ? "var(--text)" : "var(--faint)", border: active === i ? "1px solid var(--border)" : "1px solid transparent" }}>{l}</span>{i < labels.length - 1 && <ChevronRight size={14} style={{ color: "var(--border2)" }} />}</React.Fragment>))}
     </div>); };
+
+  // A signature of whichever screen is currently visible. When it changes, the
+  // keyed wrapper below remounts the screen region, which RE-FIRES the entry
+  // animation every time (without a changing key, React reuses the same DOM
+  // node between steps and the animation only plays once, on first load).
+  const screenKey = [
+    "s" + step,
+    cutPhase,
+    showWhoFor ? "who" : "",
+    showUsual ? "usual" : "",
+    showSchedChoice ? "sched" : "",
+    showWizardIntro ? "wiz" + wizardIdx : "",
+    showCodeEntry ? "code" : "",
+    addingMember ? "addmem" : "",
+    intakeFor ? "intake" : "",
+  ].join("|");
+
+  // Scroll to top whenever the user navigates to a new screen so the back button & business name stay visible
+  useEffect(() => { try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { window.scrollTo(0, 0); } }, [screenKey]);
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
@@ -984,10 +1067,11 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
           <div style={{ width: 50 }} />
         </div>
-        {step >= 1 && step <= 5 && <Stepper active={0} />}
+        {step >= 3 && step <= 5 && <Stepper active={0} />}
         {step === 6 && <Stepper active={1} />}
         {step >= 7 && <Stepper active={2} />}
 
+        <div key={screenKey} className="screen-swap">
         {/* STEP 0 — WELCOME / front door */}
         {step === 0 && (
           <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center", padding: "10px 4px 0" }}>
@@ -1005,21 +1089,42 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           </div>
         )}
 
-        {/* STEP 1 — service menu WITH PHOTOS */}
+        {/* STEP 1 — EDITORIAL CATEGORY SCREEN (new client) */}
         {step === 1 && (
-          <div className="fade-up">
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 4 }}>Services</h2>
-            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300 }}>What are you in for today?</p>
-            <div style={{ display: "grid", gap: 10 }}>
-              {services.map((s) => (
-                <button key={s.id} className="lift card" onClick={() => { if (s.firstTime && s.intake) { setIntakeFor(s); } else { setDraft(s); setDraftAddons({}); setCutType(null); setCutPhase("type"); setStep(2); } }} style={{ display: "flex", alignItems: "stretch", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 0, color: "var(--text)", textAlign: "left", overflow: "hidden" }}>
-                  {s.photo && <div style={{ width: 63, flexShrink: 0, overflow: "hidden" }}><img src={imgUrl(s.photo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "12px 14px", minWidth: 0 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                      <div style={{ minWidth: 0 }}><div style={{ fontSize: 16, marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div><div style={{ color: "var(--faint)", fontSize: 14 }}>{s.duration} min</div></div>
-                      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, color: "var(--gold)", flexShrink: 0 }}>${s.price}</div>
-                    </div>
-                    {s.booking && s.booking.description && <p style={{ color: "var(--sub)", fontSize: 13, lineHeight: 1.45, fontWeight: 300, margin: "6px 0 0", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{s.booking.description}</p>}
+          <div className="fade-up" style={{ margin: "0 -22px" }}>
+            {/* Editorial masthead — no photo, type carries the page */}
+            <div style={{ padding: "36px 24px 28px", textAlign: "center", marginBottom: 8 }}>
+              <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 22px" }} />
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 14 }}>Welcome in.</div>
+              <div style={{ fontSize: 17, color: "var(--text)", lineHeight: 1.5, fontWeight: 400, maxWidth: 320, margin: "0 auto" }}>Glad you're here. What are we doing today?</div>
+            </div>
+            {/* Magazine-cover cards — tall photo with overlaid text */}
+            <div style={{ padding: "0 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+              {[
+                { key: "hair", label: "Hair", sub: "JUST THE CUT", photo: "photo-1605497788044-5a32c7078486" },
+                { key: "hairBeard", label: "Hair + Beard", sub: "THE FULL RESET", photo: "photo-1621607512214-68297480165e" },
+                { key: "beard", label: "Beard", sub: "JUST A TIDY-UP", photo: "photo-1503951914875-452162b0f3f1" },
+              ].map((cat) => (
+                <button key={cat.key} className="lift" onClick={() => {
+                  setNewClientCategory(cat.key);
+                  const lower = (s) => (s.name || "").toLowerCase();
+                  let match = null;
+                  if (cat.key === "hairBeard") match = services.find((s) => /haircut.*beard|cut.*beard|beard.*cut/.test(lower(s)));
+                  if (cat.key === "beard" && !match) match = services.find((s) => lower(s).includes("beard") && !lower(s).includes("cut"));
+                  if (cat.key === "hair" && !match) match = services.find((s) => /haircut|cut/.test(lower(s)) && !lower(s).includes("beard"));
+                  if (!match) match = services[0];
+                  if (match.firstTime && match.intake) { setIntakeFor(match); return; }
+                  setDraft(match); setDraftAddons({}); setCutType(null); setCutPhase("type"); setStep(2);
+                }} style={{ position: "relative", height: 130, width: "100%", border: "none", borderRadius: 16, padding: 0, overflow: "hidden", color: "#fff", textAlign: "left", boxShadow: "var(--shadow-md)", background: "var(--panel2)" }}>
+                  <img src={imgUrl(cat.photo, 700)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.20) 100%)" }} />
+                  <div style={{ position: "absolute", left: 22, top: 0, bottom: 0, right: 56, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                    <div style={{ width: 22, height: 1.5, background: "var(--gold)", marginBottom: 10 }} />
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.05 }}>{cat.label}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.78)", letterSpacing: 1.8, marginTop: 6 }}>{cat.sub}</div>
+                  </div>
+                  <div style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.14)", backdropFilter: "blur(6px)", border: "0.5px solid rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <ChevronRight size={18} style={{ color: "#fff" }} />
                   </div>
                 </button>
               ))}
@@ -1039,65 +1144,318 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           />
         )}
 
-        {/* STEP 2 — cut type (own screen), then add-ons (own screen) */}
+        {/* STEP 2 — cut type: clean, minimal cards. Tap the whole card to select. */}
         {step === 2 && draft && draft.cutTypes && draft.cutTypes.length > 0 && cutPhase === "type" && (
           <div className="fade-up">
-            <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>{draft.name.toUpperCase()}</div>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>First — what haircut are we doing?</h2>
-            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>Pick the style closest to what you want — your barber confirms the details in the chair.</p>
-            <div style={{ display: "grid", gap: 24 }}>
+            {/* Editorial masthead — matches screen 1 (centered, no photo) */}
+            <div style={{ padding: "8px 4px 26px", textAlign: "center", marginBottom: 8 }}>
+              <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 18px" }} />
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 38, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 12 }}>Pick your cut</h2>
+              <p style={{ color: "var(--text)", fontSize: 16, lineHeight: 1.5, fontWeight: 400, maxWidth: 320, margin: "0 auto" }}>Tap whichever's closest — your barber dials it in in the chair.</p>
+            </div>
+            {/* Cut cards — equal-height, photo forced to consistent ratio */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 26 }}>
               {draft.cutTypes.map((ct) => {
-                const imgs = ct.images || [];
-                const idx = cutCarousel[ct.id] || 0;
-                const img = imgs[idx];
-                const flip = (dir) => setCutCarousel((c) => { const cur = c[ct.id] || 0; let n = cur + dir; if (n < 0) n = imgs.length - 1; if (n >= imgs.length) n = 0; return { ...c, [ct.id]: n }; });
+                const img = (ct.images || [])[0];
                 return (
-                  <div key={ct.id} style={{ marginBottom: 8 }}>
-                    <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 18, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", boxShadow: "var(--shadow-sm)" }}>
-                      {img && <img src={imgUrl(img, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
-                      {imgs.length > 1 && (
-                        <>
-                          <button aria-label="Previous example" onClick={() => flip(-1)} style={{ position: "absolute", top: "50%", left: 10, transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.82)", backdropFilter: "blur(6px)", color: "#222", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}><ChevronLeft size={18} /></button>
-                          <button aria-label="Next example" onClick={() => flip(1)} style={{ position: "absolute", top: "50%", right: 10, transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.82)", backdropFilter: "blur(6px)", color: "#222", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}><ChevronRight size={18} /></button>
-                          <div style={{ position: "absolute", bottom: 12, left: 0, right: 0, display: "flex", gap: 6, justifyContent: "center" }}>{imgs.map((_, di) => (<span key={di} style={{ width: 7, height: 7, borderRadius: "50%", background: di === idx ? "#fff" : "rgba(255,255,255,0.5)", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />))}</div>
-                        </>
-                      )}
+                  <button key={ct.id} className="lift" onClick={() => { setCutType(ct.id); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 0, overflow: "hidden", display: "flex", alignItems: "stretch", color: "var(--text)", textAlign: "left", height: 92, boxShadow: "var(--shadow-sm)" }}>
+                    <div style={{ width: 92, height: 92, flexShrink: 0, overflow: "hidden", background: "var(--panel2)", position: "relative" }}>
+                      {img && <img src={imgUrl(img, 280)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
                     </div>
-                    <div style={{ textAlign: "center", margin: "18px 2px 16px" }}>
-                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
-                        <span style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.15 }}>{ct.label}</span>
-                        <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)" }}>${ct.price}</span>
+                    <div style={{ flex: 1, padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 3 }}>{ct.label}</div>
+                        <div style={{ fontSize: 13, color: "var(--gold)", fontWeight: 500 }}>${ct.price}</div>
                       </div>
-                      {ct.desc && <div style={{ fontSize: 15.5, color: "var(--sub)", marginTop: 6, lineHeight: 1.55, maxWidth: 320, marginLeft: "auto", marginRight: "auto" }}>{ct.desc}</div>}
+                      <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
                     </div>
-                    <button className="lift" onClick={() => { setCutType(ct.id); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>Choose this</button>
-                  </div>
+                  </button>
                 );
               })}
             </div>
+            {/* Helper options — only render when AI cut helper is enabled in shop settings */}
+            {business.aiCutHelper && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <input ref={helperPhotoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                // Resize photo before upload: max 1024px on the long side, JPEG 85%
+                const resize = (fileObj) => new Promise((resolve, reject) => {
+                  const fr = new FileReader();
+                  fr.onload = (ev) => {
+                    const img = new Image();
+                    img.onload = () => {
+                      const max = 1024;
+                      let w = img.width, h = img.height;
+                      if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+                      else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+                      const canvas = document.createElement("canvas");
+                      canvas.width = w; canvas.height = h;
+                      const ctx = canvas.getContext("2d");
+                      ctx.drawImage(img, 0, 0, w, h);
+                      const out = canvas.toDataURL("image/jpeg", 0.85);
+                      resolve({ dataUrl: out, mediaType: "image/jpeg" });
+                    };
+                    img.onerror = reject;
+                    img.src = ev.target.result;
+                  };
+                  fr.onerror = reject;
+                  fr.readAsDataURL(fileObj);
+                });
+                setCutHelperOpen("photo");
+                setPhotoResult(null);
+                setPhotoError(null);
+                setPhotoLoading(true);
+                resize(file).then(async ({ dataUrl, mediaType }) => {
+                  setHelperPhotoUrl(dataUrl);
+                  setBookingPhoto({ dataUrl, mediaType });
+                  const base64 = String(dataUrl).split(",")[1] || "";
+                  const cutList = draft.cutTypes.map((c) => ({ id: c.id, label: c.label, desc: c.desc || "" }));
+                  const callAI = async () => {
+                    const { data, error } = await supabase.functions.invoke("ai-suggest-cut", {
+                      body: { photoBase64: base64, photoMediaType: mediaType, services: cutList },
+                    });
+                    if (error) throw error;
+                    if (data && data.error) throw new Error(data.error);
+                    if (!data || !data.matchId) throw new Error("No match found");
+                    return data;
+                  };
+                  try {
+                    let data;
+                    try { data = await callAI(); }
+                    catch (firstErr) {
+                      console.warn("First AI attempt failed, retrying:", firstErr);
+                      await new Promise((r) => setTimeout(r, 800));
+                      data = await callAI();
+                    }
+                    setPhotoResult(data);
+                  } catch (err) {
+                    console.error("Photo AI failed after retry:", err);
+                    setPhotoError("Couldn't read the photo right now — pick whichever cut looks closest below and we'll save the photo for your barber.");
+                  } finally {
+                    setPhotoLoading(false);
+                  }
+                }).catch((err) => {
+                  console.error("Resize failed:", err);
+                  setPhotoError("Couldn't open that photo — try a different one.");
+                  setPhotoLoading(false);
+                });
+              }} />
+              <button onClick={() => helperPhotoInputRef.current && helperPhotoInputRef.current.click()} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 13, color: "var(--text)", textAlign: "left", fontSize: 14 }}>
+                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Camera size={17} style={{ color: "var(--gold)" }} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+                  <span style={{ fontWeight: 500, fontSize: 15 }}>Show us a photo</span>
+                  <span style={{ fontSize: 13, color: "var(--sub)" }}>Upload the look you want — we'll match it</span>
+                </div>
+                <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+              </button>
+              <button onClick={() => setCutHelperOpen("notSure")} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 13, color: "var(--text)", textAlign: "left", fontSize: 14 }}>
+                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 19, color: "var(--gold)", fontWeight: 500 }}>?</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+                  <span style={{ fontWeight: 500, fontSize: 15 }}>I'm not sure</span>
+                  <span style={{ fontSize: 13, color: "var(--sub)" }}>Help me pick — a couple quick questions</span>
+                </div>
+                <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+              </button>
+            </div>
+            )}
+            {/* Helper sheet — opens when they upload a photo or tap "I'm not sure" */}
+            {business.aiCutHelper && cutHelperOpen && (
+              <div onClick={() => setCutHelperOpen(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg)", width: "100%", maxWidth: 480, borderRadius: "20px 20px 0 0", padding: "22px 22px 30px", maxHeight: "85vh", overflowY: "auto" }}>
+                  <div style={{ width: 36, height: 4, background: "var(--border2)", borderRadius: 2, margin: "0 auto 18px" }} />
+                  {cutHelperOpen === "photo" && (
+                    <>
+                      <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+                      <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.1, marginBottom: 10 }}>Here's the look</h3>
+                      <p style={{ color: "var(--text)", fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>We'll save this photo to your appointment so your barber sees it before you sit down.</p>
+                      {helperPhotoUrl && (
+                        <div style={{ width: "100%", aspectRatio: "4/3", borderRadius: 14, overflow: "hidden", background: "var(--panel2)", marginBottom: 18 }}>
+                          <img src={helperPhotoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                        </div>
+                      )}
+                      {photoLoading && (
+                        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", marginBottom: 14, fontSize: 14, color: "var(--sub)", display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid var(--line)", borderTopColor: "var(--gold)", animation: "spin .8s linear infinite", flexShrink: 0 }} />
+                          <span>Finding your match…</span>
+                        </div>
+                      )}
+                      {photoError && (
+                        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 14px", fontSize: 13.5, color: "var(--sub)", marginBottom: 14, lineHeight: 1.5 }}>{photoError}</div>
+                      )}
+                      {photoResult && (() => {
+                        const match = draft.cutTypes.find((c) => c.id === photoResult.matchId);
+                        if (!match) return null;
+                        return (
+                          <div style={{ marginBottom: 14 }}>
+                            <div style={{ background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1.5px solid var(--gold)", borderRadius: 16, overflow: "hidden", marginBottom: 12 }}>
+                              <div style={{ display: "flex", alignItems: "stretch", height: 90 }}>
+                                <div style={{ width: 90, height: 90, flexShrink: 0, background: "var(--panel2)", position: "relative", overflow: "hidden" }}>
+                                  {match.images && match.images[0] && <img src={imgUrl(match.images[0], 240)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+                                </div>
+                                <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                                  <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 4 }}>YOUR MATCH</div>
+                                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>{photoResult.matchLabel}</div>
+                                </div>
+                              </div>
+                              {photoResult.reason && (
+                                <div style={{ padding: "12px 16px", borderTop: "1px solid color-mix(in srgb, var(--gold) 25%, transparent)", fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{photoResult.reason}</div>
+                              )}
+                            </div>
+                            <button className="lift" onClick={() => { setCutType(match.id); setCutHelperOpen(null); setPhotoResult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 9 }}>Sounds right — book this</button>
+                            <button onClick={() => helperPhotoInputRef.current && helperPhotoInputRef.current.click()} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", borderRadius: 12, padding: "12px", color: "var(--sub)", fontSize: 14 }}>Try a different photo</button>
+                          </div>
+                        );
+                      })()}
+                      {!photoLoading && !photoResult && (
+                        <>
+                          <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>OR PICK FROM THE LIST</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 9, marginBottom: 14 }}>
+                            {draft.cutTypes.map((ct) => (
+                              <button key={ct.id} className="lift" onClick={() => { setCutType(ct.id); setCutHelperOpen(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", color: "var(--text)", textAlign: "left" }}>
+                                <span style={{ fontSize: 15, fontWeight: 500 }}>{ct.label}</span>
+                                <ChevronRight size={18} style={{ color: "var(--gold)" }} />
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      <button onClick={() => { setHelperPhotoUrl(null); setBookingPhoto(null); setPhotoResult(null); setPhotoError(null); setCutHelperOpen(null); }} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", borderRadius: 12, padding: "12px", color: "var(--sub)", fontSize: 14 }}>Cancel</button>
+                    </>
+                  )}
+                  {cutHelperOpen === "notSure" && (
+                    <>
+                      <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+                      <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.1, marginBottom: 10 }}>No worries — describe what you want</h3>
+                      <p style={{ color: "var(--text)", fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>Just type it in your own words. We'll match it to the right cut.</p>
+                      <textarea
+                        value={notSureText}
+                        onChange={(e) => { setNotSureText(e.target.value); setNotSureResult(null); setNotSureError(null); }}
+                        placeholder="e.g. short on the sides, longer on top, no skin showing"
+                        rows={3}
+                        style={{ ...inputStyle, marginBottom: 12, resize: "vertical", minHeight: 80, fontFamily: FONT_BODY }}
+                      />
+                      {!notSureResult && (
+                        <button
+                          className="lift"
+                          disabled={!notSureText.trim() || notSureLoading}
+                          onClick={async () => {
+                            setNotSureLoading(true); setNotSureError(null); setNotSureResult(null);
+                            const cutList = draft.cutTypes.map((c) => ({ id: c.id, label: c.label, desc: c.desc || "" }));
+                            const callAI = async () => {
+                              const { data, error } = await supabase.functions.invoke("ai-suggest-cut", {
+                                body: { description: notSureText.trim(), services: cutList },
+                              });
+                              if (error) throw error;
+                              if (data && data.error) throw new Error(data.error);
+                              if (!data || !data.matchId) throw new Error("No match found");
+                              return data;
+                            };
+                            try {
+                              let data;
+                              try { data = await callAI(); }
+                              catch (firstErr) {
+                                console.warn("First AI attempt failed, retrying:", firstErr);
+                                await new Promise((r) => setTimeout(r, 800));
+                                data = await callAI();
+                              }
+                              setNotSureResult(data);
+                            } catch (e) {
+                              console.error("Text AI failed after retry:", e);
+                              setNotSureError("Couldn't get a suggestion right now — just pick whichever sounds closest below.");
+                            } finally {
+                              setNotSureLoading(false);
+                            }
+                          }}
+                          style={{ width: "100%", background: (notSureText.trim() && !notSureLoading) ? "var(--gold)" : "var(--border)", color: (notSureText.trim() && !notSureLoading) ? "var(--on-gold)" : "var(--faint)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 16 }}
+                        >
+                          {notSureLoading ? "One sec…" : "Find my match"}
+                        </button>
+                      )}
+                      {notSureError && (
+                        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 14px", fontSize: 13.5, color: "var(--sub)", marginBottom: 14, lineHeight: 1.5 }}>{notSureError}</div>
+                      )}
+                      {notSureResult && (() => {
+                        const match = draft.cutTypes.find((c) => c.id === notSureResult.matchId);
+                        if (!match) return null;
+                        return (
+                          <div style={{ marginBottom: 14 }}>
+                            <div style={{ background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1.5px solid var(--gold)", borderRadius: 16, overflow: "hidden", marginBottom: 12 }}>
+                              <div style={{ display: "flex", alignItems: "stretch", height: 90 }}>
+                                <div style={{ width: 90, height: 90, flexShrink: 0, background: "var(--panel2)", position: "relative", overflow: "hidden" }}>
+                                  {match.images && match.images[0] && <img src={imgUrl(match.images[0], 240)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+                                </div>
+                                <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                                  <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 4 }}>BEST MATCH</div>
+                                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>{notSureResult.matchLabel}</div>
+                                </div>
+                              </div>
+                              {notSureResult.reason && (
+                                <div style={{ padding: "12px 16px", borderTop: "1px solid color-mix(in srgb, var(--gold) 25%, transparent)", fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{notSureResult.reason}</div>
+                              )}
+                            </div>
+                            <button className="lift" onClick={() => { setCutType(match.id); setCutHelperOpen(null); setNotSureText(""); setNotSureResult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 9 }}>Sounds right — book this</button>
+                            <button onClick={() => { setNotSureResult(null); setNotSureText(""); }} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", borderRadius: 12, padding: "12px", color: "var(--sub)", fontSize: 14 }}>Try a different description</button>
+                          </div>
+                        );
+                      })()}
+                      {!notSureResult && notSureError && (
+                        <>
+                          <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10, marginTop: 4 }}>OR PICK FROM THE LIST</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+                            {draft.cutTypes.map((ct) => (
+                              <button key={ct.id} className="lift" onClick={() => { setCutType(ct.id); setCutHelperOpen(null); setNotSureText(""); setNotSureResult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 0, overflow: "hidden", display: "flex", alignItems: "stretch", color: "var(--text)", textAlign: "left", height: 80 }}>
+                                <div style={{ width: 80, height: 80, flexShrink: 0, overflow: "hidden", background: "var(--panel2)", position: "relative" }}>
+                                  {ct.images && ct.images[0] && <img src={imgUrl(ct.images[0], 240)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+                                </div>
+                                <div style={{ flex: 1, padding: "12px 16px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 3 }}>
+                                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{ct.label}</div>
+                                  <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.4 }}>{ct.desc || `$${ct.price}`}</div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      <button onClick={() => { setCutHelperOpen(null); setNotSureText(""); setNotSureResult(null); setNotSureError(null); }} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", borderRadius: 12, padding: "12px", color: "var(--sub)", fontSize: 14 }}>Never mind</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* STEP 2 — beard type (own screen, for services with beardTypes) */}
         {step === 2 && draft && draft.beardTypes && draft.beardTypes.length > 0 && cutPhase === "beard" && (
           <div className="fade-up">
-            <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>{draft.name.toUpperCase()}</div>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Now — the beard</h2>
-            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>This helps us set aside the right amount of time.</p>
-            <div style={{ display: "grid", gap: 18 }}>
+            {/* Editorial masthead matches Pick Your Cut */}
+            <div style={{ padding: "8px 4px 26px", textAlign: "center", marginBottom: 8 }}>
+              <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 18px" }} />
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 38, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 12 }}>Now the beard</h2>
+              <p style={{ color: "var(--text)", fontSize: 16, lineHeight: 1.5, fontWeight: 400, maxWidth: 320, margin: "0 auto" }}>Tap the one that's closest — we'll set aside the right amount of time.</p>
+            </div>
+            {/* Beard cards — equal-height, single tap to select */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 26 }}>
               {draft.beardTypes.map((bt) => {
                 const img = (bt.images || [])[0];
                 return (
-                  <div key={bt.id}>
-                    <div style={{ aspectRatio: "1/1", maxWidth: 230, margin: "0 auto", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)" }}>
-                      {img && <img src={imgUrl(img, 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
+                  <button key={bt.id} className="lift" onClick={() => { setBeardType(bt.id); setCutPhase("addons"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 0, overflow: "hidden", display: "flex", alignItems: "stretch", color: "var(--text)", textAlign: "left", height: 92, boxShadow: "var(--shadow-sm)" }}>
+                    <div style={{ width: 92, height: 92, flexShrink: 0, overflow: "hidden", background: "var(--panel2)", position: "relative" }}>
+                      {img && <img src={imgUrl(img, 280)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
                     </div>
-                    <div style={{ margin: "14px 2px 12px" }}>
-                      <div style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.2 }}>{bt.label}</div>
-                      {bt.desc && <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{bt.desc}</div>}
+                    <div style={{ flex: 1, padding: "14px 18px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 4, minWidth: 0 }}>
+                      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.15 }}>{bt.label}</div>
+                      {bt.desc && <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{bt.desc}</div>}
                     </div>
-                    <button className="lift" onClick={() => { setBeardType(bt.id); setCutPhase("addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none" }}>Choose this</button>
-                  </div>
+                    <div style={{ display: "flex", alignItems: "center", padding: "0 16px" }}>
+                      <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                    </div>
+                  </button>
                 );
               })}
             </div>
@@ -1140,26 +1498,109 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           </div>
         )}
 
-        {/* STEP 3 — provider */}
-        {step === 3 && draft && (
-          <div className="fade-up">
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 18 }}>Who'd you like to see?</h2>
-            <div style={{ display: "grid", gap: 10 }}>
-              {providers.map((p) => (
-                <button key={p.id} className="lift" onClick={() => { setCart([...cart, { service: draft, addons: draftAddons, cutType, beardType, provider: p, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }]); setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); if (groupPeople.length > 1) { if (wizardIdx < groupPeople.length - 1) { setWizardIdx(wizardIdx + 1); setShowWizardIntro(true); } else { setStep(6); } } else { setStep(4); } }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 18px", color: "var(--text)", textAlign: "left" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}><div style={{ width: 44, height: 44, borderRadius: "50%", background: p.color + "22", color: p.color, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 18 }}>{p.id === "anyone" ? <User size={20} /> : p.name.charAt(0)}</div><div><div style={{ fontSize: 16 }}>{p.name}</div><div style={{ fontSize: 14, color: "var(--faint)", letterSpacing: 1 }}>{p.id === "anyone" ? "Any available day" : daysSummary(p.hours)}</div></div></div>
-                  <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-                </button>
-              ))}
+        {/* STEP 3 — BARBER + TIME, TOGETHER. Each barber's card shows their soonest opening. One tap = who AND when. */}
+        {step === 3 && draft && (() => {
+          const who = activeMember || matched;
+          const ct = cutType && draft.cutTypes ? draft.cutTypes.find((c) => c.id === cutType) : null;
+          const bt = beardType && draft.beardTypes ? draft.beardTypes.find((b) => b.id === beardType) : null;
+          const draftDur = getDuration(who, draft) + (ct?.min || 0) + (bt?.min || 0);
+          const realProviders = providers.filter((p) => p.id !== "anyone");
+          // Compute each real barber's soonest opening
+          const cards = realProviders.map((p) => ({ p, next: findNextAvailable(p, draftDur) }));
+          // Soonest across all barbers (powers "Anyone")
+          const anyoneNext = cards
+            .filter((c) => c.next)
+            .reduce((best, c) => !best || c.next.date < best.next.date || (+c.next.date === +best.next.date && c.next.slot < best.next.slot) ? c : best, null);
+          const fmtNext = (next) => {
+            const d = next.date;
+            const day = relativeDate(d);
+            const lbl = day.includes(",") ? day : `${day}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+            return `${lbl} · ${fmtTime(next.slot)}`;
+          };
+          const commitWith = (prov, next) => {
+            const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: prov, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") };
+            setCart([...cart, entry]);
+            setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
+            // Multi-person flow: advance to next person, or go to time once everyone's picked
+            if (groupPeople.length > 1) {
+              if (wizardIdx < groupPeople.length - 1) { setWizardIdx(wizardIdx + 1); setShowWizardIntro(true); }
+              else { setStep(6); }
+              return;
+            }
+            // Single-person: skip step 4 (add-another), jump to confirm or calendar
+            if (next) { setSelectedDate(next.date); setSlot(next.slot); setStep(7); }
+            else { setStep(6); }
+          };
+          const openCalendarWith = (prov) => {
+            const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: prov, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") };
+            setCart([...cart, entry]);
+            setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
+            setSelectedDate(null); setSlot(null); setStep(6);
+          };
+          return (
+            <div className="fade-up">
+              <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 36, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Who and when</h2>
+              <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 26, fontWeight: 400, lineHeight: 1.5 }}>Tap a barber to lock in their next opening.</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {cards.map(({ p, next }) => (
+                  <div key={p.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+                    <button className="lift" onClick={() => commitWith(p, next)} style={{ width: "100%", display: "flex", alignItems: "stretch", background: "transparent", border: "none", padding: 0, color: "var(--text)", textAlign: "left" }}>
+                      <div style={{ width: 92, flexShrink: 0, overflow: "hidden", background: "var(--panel2)", position: "relative" }}>
+                        <img src={imgUrl(staffPhoto(p), 280)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      </div>
+                      <div style={{ flex: 1, padding: "16px 18px", display: "flex", flexDirection: "column", justifyContent: "center", minWidth: 0, gap: 6 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{p.name}</div>
+                            {p.role && <div style={{ fontSize: 12, color: "var(--faint)", letterSpacing: 1.5, marginTop: 3, textTransform: "uppercase" }}>{p.role}</div>}
+                          </div>
+                          <ChevronRight size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                        </div>
+                        {next ? (
+                          <div style={{ fontSize: 14, color: "var(--text)", marginTop: 4, display: "flex", alignItems: "center", gap: 7 }}>
+                            <Clock size={14} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                            <span style={{ fontWeight: 500 }}>{fmtNext(next)}</span>
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 4 }}>No openings in the next 2 weeks</div>
+                        )}
+                      </div>
+                    </button>
+                    {next && (
+                      <button onClick={() => openCalendarWith(p)} style={{ width: "100%", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "12px 18px", textAlign: "left", color: "var(--sub)", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span>See other times</span>
+                        <span style={{ color: "var(--gold)" }}>→</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {realProviders.length > 1 && anyoneNext && (
+                  <button className="lift" onClick={() => commitWith(anyoneNext.p, anyoneNext.next)} style={{ background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 16, padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", color: "var(--text)", textAlign: "left", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                      <div style={{ width: 50, height: 50, borderRadius: "50%", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid var(--border)" }}><Users size={22} /></div>
+                      <div>
+                        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>Anyone</div>
+                        <div style={{ fontSize: 13.5, color: "var(--text)", marginTop: 5, display: "flex", alignItems: "center", gap: 6 }}>
+                          <Clock size={13} style={{ color: "var(--gold)" }} />
+                          <span style={{ fontWeight: 500 }}>{fmtNext(anyoneNext.next)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* STEP 4 — add another */}
         {step === 4 && (
           <div className="fade-up">
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 6, lineHeight: 1.1 }}>Your visit so far</h2>
-            <p style={{ color: "var(--sub)", fontSize: 14.5, fontWeight: 300, marginBottom: 22, lineHeight: 1.5 }}>Add anything else, or carry on to pick a time.</p>
+            <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Your visit so far</h2>
+            <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 400, marginBottom: 24, lineHeight: 1.5 }}>Add anything else, or carry on to pick a time.</p>
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "8px 18px", marginBottom: 24 }}>
               {cart.map((e, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 0", borderBottom: i < cart.length - 1 ? "1px solid var(--line)" : "none", gap: 12 }}>
@@ -1176,7 +1617,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           </div>
         )}
 
-        {/* BOOK MY USUAL — one-tap rebook for a recognized client */}
+        {/* WELCOME BACK — regular front door: one-tap next available, or pick a different time */}
         {showUsual && matched && (() => {
           const who = activeMember || matched;
           const mine = activeMember
@@ -1189,38 +1630,61 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           const dur = getDuration(who, usualSvc);
           const usualLine2 = lastAppt && lastAppt.lineItems && lastAppt.lineItems[0] ? lastAppt.lineItems[0] : null;
           const lastPhoto = (who.gallery && who.gallery.length) ? who.gallery[who.gallery.length - 1].photo : null;
+          // Build the cart entry for their usual (used by both actions).
+          const usualEntry = { service: usualSvc, addons: usualLine2?.addons || {}, cutType: usualLine2?.cutType || null, beardType: usualLine2?.beardType || null, provider: usualProv };
+          // Soonest opening with THEIR barber (any day/time).
+          const nextAvail = findNextAvailable(usualProv, dur);
+          // Warm rhythm line: how long since their last visit, vs their known cadence.
+          let rhythmLine = "Good to have you back.";
+          const lastVisitIso = who.lastVisit || (lastAppt && lastAppt.bookedFor);
+          if (lastVisitIso) {
+            const days = Math.round((Date.now() - new Date(lastVisitIso)) / 86400000);
+            const cad = who.cadenceDays || 0;
+            if (days >= 0) {
+              if (cad && days >= cad - 3) rhythmLine = `It's been ${days < 14 ? days + " days" : Math.round(days / 7) + " weeks"} — you're about due.`;
+              else if (days < 14) rhythmLine = `It's been ${days} day${days === 1 ? "" : "s"}.`;
+              else rhythmLine = `It's been ${Math.round(days / 7)} weeks.`;
+            }
+          }
+          const nextLabel = nextAvail ? (() => { const d = nextAvail.date; const day = relativeDate(d); const lbl = day.includes(",") ? day : `${day}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; return `${lbl} · ${fmtTime(nextAvail.slot)}`; })() : null;
           return (
             <div className="fade-up">
               <div style={{ fontSize: 12, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 12 }}>WELCOME BACK</div>
               <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 8, lineHeight: 1.08 }}>Good to see you,<br/>{who.name.split(" ")[0]}.</h2>
-              <p style={{ color: "var(--sub)", fontSize: 15, marginBottom: 28, fontWeight: 300, lineHeight: 1.55 }}>Want the usual, or try something new today?</p>
+              <p style={{ color: "var(--sub)", fontSize: 15, marginBottom: 26, fontWeight: 300, lineHeight: 1.55 }}>{rhythmLine}</p>
 
-              {/* Card 1 — the usual (hero treatment with last-cut photo) */}
-              <button className="lift" onClick={() => { setCart([{ service: usualSvc, addons: usualLine2?.addons || {}, cutType: usualLine2?.cutType || null, beardType: usualLine2?.beardType || null, provider: usualProv }]); setShowUsual(false); setStep(6); }} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1.5px solid var(--gold)", borderRadius: 20, padding: 0, marginBottom: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)", display: "block" }}>
+              {/* Their usual (service + barber, no duration) with last-cut photo */}
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, overflow: "hidden", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
                 {lastPhoto && (
                   <div style={{ width: "100%", height: 150, overflow: "hidden", position: "relative" }}>
                     <img src={imgUrl(lastPhoto, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", color: "#fff", fontSize: 11, letterSpacing: 1.5, fontWeight: 600, padding: "5px 11px", borderRadius: 20 }}>YOUR LAST CUT</div>
                   </div>
                 )}
-                <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {!lastPhoto && <span style={{ fontSize: 11.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600 }}>THE USUAL</span>}
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{usualSvc.name}</span>
-                    <span style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>{dur} min{usualProv && usualProv.id !== "anyone" ? ` · with ${usualProv.name}` : ""}</span>
-                  </span>
-                  <span style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><ChevronRight size={22} /></span>
+                <div style={{ padding: "16px 20px" }}>
+                  <div style={{ fontSize: 11.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>YOUR USUAL</div>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{usualSvc.name}{usualProv && usualProv.id !== "anyone" ? ` with ${usualProv.name}` : ""}</div>
                 </div>
-              </button>
+              </div>
 
-              {/* Card 2 — something different */}
-              <button className="lift" onClick={() => { setShowUsual(false); setStep(1); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "1px solid var(--border2)", borderRadius: 20, padding: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 500, lineHeight: 1.1 }}>Something different</span>
-                  <span style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>Browse the full menu</span>
-                </span>
-                <span style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--panel2)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid var(--border)" }}><ChevronRight size={22} /></span>
-              </button>
+              {/* Primary action — book the next available with their barber */}
+              {nextAvail ? (
+                <button className="lift" onClick={() => { setCart([usualEntry]); setSelectedDate(nextAvail.date); setSlot(nextAvail.slot); setCameFromUsual(true); setShowUsual(false); setStep(7); }} style={{ width: "100%", textAlign: "left", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 16, padding: "16px 18px", marginBottom: 13, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <span style={{ fontSize: 15.5, fontWeight: 600 }}>Book next available{usualProv && usualProv.id !== "anyone" ? ` with ${usualProv.name}` : ""}</span>
+                    <span style={{ fontSize: 13, opacity: 0.85 }}>{nextLabel}</span>
+                  </span>
+                  <ChevronRight size={22} style={{ flexShrink: 0 }} />
+                </button>
+              ) : (
+                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginBottom: 13, fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>No open times with {usualProv.name} in the next two weeks — pick a different time below.</div>
+              )}
+
+              {/* Secondary action — open the calendar */}
+              <button className="lift" onClick={() => { setCart([usualEntry]); setCameFromUsual(true); setShowUsual(false); setStep(6); }} style={{ width: "100%", textAlign: "center", background: "transparent", border: "1px solid var(--border2)", color: "var(--text)", borderRadius: 16, padding: "15px", fontSize: 15, fontWeight: 500 }}>Pick a different time</button>
+
+              {/* Quiet third option — browse the full menu (try something new) */}
+              <button onClick={() => { setShowUsual(false); setStep(1); }} style={{ width: "100%", textAlign: "center", background: "none", color: "var(--sub)", padding: "16px 0 4px", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3 }}>Book something different</button>
             </div>
           );
         })()}
@@ -1228,8 +1692,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         {/* STEP 5 — phone */}
         {step === 5 && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && (
           <div className="fade-up">
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Your number</h2>
-            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300 }}>We'll text you a quick code to confirm it's you.</p>
+            <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Your number</h2>
+            <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>We'll text you a quick code to confirm it's you.</p>
             <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             <p style={{ color: "var(--faint)", fontSize: 14, marginBottom: 22 }}>Try <span style={{ color: "var(--gold)", cursor: "pointer" }} onClick={() => setPhone("503-555-0142")}>503-555-0142</span> (returning client Marcus).</p>
             <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={() => { const digits = phone.replace(/\D/g, ""); const found = clients.find((c) => c.phone.replace(/\D/g, "") === digits) || null; setPendingMatch(found); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "var(--border)" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Text me a code →</button>
@@ -1239,8 +1704,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         {/* CODE VERIFICATION — confirms the texted code (accepts any 6 digits until Twilio is live) */}
         {step === 5 && showCodeEntry && (
           <div className="fade-up">
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Enter your code</h2>
-            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 8, fontWeight: 300 }}>We sent a 6-digit code to <strong style={{ color: "var(--text)" }}>{phone}</strong>.</p>
+            <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Enter your code</h2>
+            <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 8, fontWeight: 400, lineHeight: 1.5 }}>We sent a 6-digit code to <strong>{phone}</strong>.</p>
             <p style={{ color: "var(--faint)", fontSize: 13, marginBottom: 24, fontWeight: 300, fontStyle: "italic" }}>Texting isn't live yet — enter any 6 digits to continue for now.</p>
             <input autoFocus inputMode="numeric" value={codeEntry} onChange={(e) => { setCodeEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(false); }} placeholder="• • • • • •" style={{ ...inputStyle, textAlign: "center", fontSize: 28, letterSpacing: 8, marginBottom: codeError ? 8 : 18 }} />
             {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Enter all 6 digits.</p>}
@@ -1272,9 +1738,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           };
           return (
             <div className="fade-up">
-              <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>HI {matched.name.split(" ")[0].toUpperCase()}</div>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Who are we taking care of?</h2>
-              <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>Pick one or more — tap everyone you're booking today.</p>
+              <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>HI {matched.name.split(" ")[0].toUpperCase()}</div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Who are we taking care of?</h2>
+              <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>Pick one or more — tap everyone you're booking today.</p>
               {[selfPerson, ...(matched.family || []).map((m) => ({ id: m.id, name: m.name, note: m.note, isMember: true }))].map((person) => {
                 const key = person.id || "self"; const on = isSel(key);
                 return (
@@ -1300,9 +1766,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         {/* ADD A FAMILY MEMBER */}
         {showWhoFor && matched && addingMember && (
           <div className="fade-up">
-            <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>NEW PERSON</div>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Who are we adding?</h2>
-            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.55 }}>They'll be saved under your account for next time.</p>
+            <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>NEW PERSON</div>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Who are we adding?</h2>
+            <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 22, fontWeight: 400, lineHeight: 1.5 }}>They'll be saved under your account for next time.</p>
             <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>First name</label>
             <input autoFocus value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="e.g. Leo" style={{ ...inputStyle, marginBottom: 16 }} />
             <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Note (optional)</label>
@@ -1320,9 +1786,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         {/* TOGETHER vs SEPARATE — only for multiple people */}
         {showSchedChoice && (
           <div className="fade-up">
-            <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>{groupPeople.map((p) => (p.id ? p.name : "You")).map((n) => n.split(" ")[0]).join(" & ").toUpperCase()}</div>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>How do you want to book?</h2>
-            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>We can get everyone in on the same visit, or just find the soonest opening for each.</p>
+            <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>{groupPeople.map((p) => (p.id ? p.name : "You")).map((n) => n.split(" ")[0]).join(" & ").toUpperCase()}</div>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>How do you want to book?</h2>
+            <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>We can get everyone in on the same visit, or just find the soonest opening for each.</p>
             <button className="lift" onClick={() => { setGroupMode("together"); setShowSchedChoice(false); setShowWizardIntro(true); setWizardIdx(0); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", marginBottom: 13, textAlign: "left", display: "flex", flexDirection: "column", gap: 4 }}>
               <span style={{ fontSize: 17, fontWeight: 500 }}>Together — same visit</span>
               <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300, lineHeight: 1.45 }}>Same day, at the same time with different barbers — or back-to-back if needed.</span>
@@ -1375,9 +1841,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           };
           return (
             <div className="fade-up">
-              <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>{isFirst ? "LET'S START WITH" : "NEXT UP"} · {first.toUpperCase()}</div>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>{isFirst ? `Let's start with ${first}` : `Now let's get ${first} taken care of`}</h2>
-              <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>Person {wizardIdx + 1} of {groupPeople.length}.</p>
+              <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>{isFirst ? "LET'S START WITH" : "NEXT UP"} · {first.toUpperCase()}</div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{isFirst ? `Let's start with ${first}` : `Now let's get ${first} taken care of`}</h2>
+              <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>Person {wizardIdx + 1} of {groupPeople.length}.</p>
               {usualSvc && (
                 <div style={{ border: "1.5px solid var(--gold)", borderRadius: 16, overflow: "hidden", marginBottom: 13 }}>
                   <button onClick={() => setExpandUsual(!expandUsual)} style={{ width: "100%", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", color: "var(--text)", padding: "16px 18px", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, border: "none" }}>
@@ -1416,7 +1882,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         })()}
 
         {/* STEP 6 — date/time + waitlist */}
-        {step === 6 && (
+        {step === 6 && !showUsual && (
           <div className="fade-up">
             {matched && matched.lastVisit && business.overdueBuffer && business.overdueBuffer.enabled !== false && (() => {
               const ob = business.overdueBuffer;
@@ -1433,8 +1899,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               );
             })()}
             <div style={{ marginBottom: 18 }}>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 6, lineHeight: 1.1 }}>Let's find a time</h2>
-              <p style={{ color: "var(--sub)", fontSize: 14.5, fontWeight: 300, lineHeight: 1.5 }}>Grab the soonest opening, or pick a day that works for you.</p>
+              <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Let's find a time</h2>
+              <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 400, lineHeight: 1.5 }}>Grab the soonest opening, or pick a day that works for you.</p>
             </div>
             {/* soonest available shortcut */}
             {(() => {
@@ -1453,30 +1920,28 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                 </button>
               );
             })()}
-            <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>OR PICK A DAY</div>
-            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 20 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 12, fontFamily: FONT_DISPLAY }}>Or pick another day</div>
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 22 }}>
               {dateOptions.map((d, i) => {
                 const on = selectedDate && d.toDateString() === selectedDate.toDateString();
                 const isToday = d.toDateString() === new Date().toDateString();
                 return (
-                  <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); }} style={{ flexShrink: 0, width: 64, padding: "10px 0", borderRadius: 8, background: on ? "var(--gold)" : "var(--panel2)", border: "2px solid", borderColor: on ? "var(--gold)" : (isToday ? "var(--gold)" : "var(--border)"), color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", position: "relative" }}>
-                    <div style={{ fontSize: 13, letterSpacing: 1, opacity: 0.7 }}>{DAYS[d.getDay()].slice(0, 3).toUpperCase()}</div>
+                  <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); }} style={{ flexShrink: 0, width: 60, padding: "10px 0", borderRadius: 12, background: on ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: on ? "var(--gold)" : (isToday ? "var(--gold)" : "var(--border)"), color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+                    <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{DAYS[d.getDay()].slice(0, 3).toUpperCase()}</div>
                     {isToday
-                      ? <div style={{ fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 600, color: on ? "var(--on-gold)" : "var(--gold)", lineHeight: "26px" }}>Today</div>
-                      : <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22 }}>{d.getDate()}</div>}
+                      ? <div style={{ fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 600, color: on ? "var(--on-gold)" : "var(--gold)", lineHeight: "24px" }}>Today</div>
+                      : <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, lineHeight: "24px" }}>{d.getDate()}</div>}
                     <div style={{ fontSize: 10.5, letterSpacing: 0.5, opacity: 0.6, marginTop: 1 }}>{MONTHS[d.getMonth()].slice(0, 3)}</div>
                   </button>
                 );
               })}
             </div>
             {selectedDate && !dateIsFull && (<>
-              {/* CRYSTAL-CLEAR full date so nobody shows up on the wrong day */}
-              <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 11 }}>
-                <Calendar size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
-                <div style={{ fontSize: 15, lineHeight: 1.4 }}><span style={{ fontWeight: 600 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</span> <span style={{ color: "var(--sub)" }}>· {daysFromNow(selectedDate)}</span></div>
-              </div>
+              {/* Selected day as a clean heading — keeps day-of-week + date + days-away phrasing for clarity */}
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
+              <div style={{ fontSize: 13.5, color: "var(--gold)", fontWeight: 500, marginBottom: 14 }}>{daysFromNow(selectedDate)}</div>
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 26 }}>{openSlots.map((t) => (<button key={t} className="lift" onClick={() => setSlot(t)} style={{ background: slot === t ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: slot === t ? "var(--gold)" : "var(--border)", borderRadius: 12, padding: "14px 8px", color: slot === t ? "var(--on-gold)" : "var(--text)", fontSize: 14 }}>{fmtTime(t)}</button>))}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{openSlots.map((t) => (<button key={t} className="lift" onClick={() => setSlot(t)} style={{ background: slot === t ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: slot === t ? "var(--gold)" : "var(--border)", borderRadius: 10, padding: "13px 4px", color: slot === t ? "var(--on-gold)" : "var(--text)", fontSize: 14 }}>{fmtTime(t)}</button>))}</div>
               {slot != null && <button className="lift" onClick={() => setStep(7)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 24 }}>Continue →</button>}
             </>)}
 
@@ -1578,16 +2043,32 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         )}
 
         {/* STEP 7 — contact + EDITABLE policy */}
-        {step === 7 && (
+        {step === 7 && !showUsual && (
           <div className="fade-up">
-            <div style={{ background: "var(--panel)", borderRadius: 12, padding: 18, marginBottom: 22, textAlign: "center" }}>
-              <div style={{ fontSize: 15, marginBottom: 6 }}>{relativeDate(selectedDate)}{relativeDate(selectedDate).includes(",") ? "" : `, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
-              <div style={{ fontSize: 14, color: "var(--sub)" }}>{cart.map(describeEntry).join(" · ")}</div>
-              <div style={{ fontSize: 14, color: "var(--sub)" }}>with {provider.name} at {fmtTime(slot)}</div>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)", marginTop: 8 }}>${cartPrice}</div>
+            <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{matched ? "Almost there" : "Last thing — your details"}</h2>
+            <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>{matched ? "Quick check before we lock this in." : "We'll text you a reminder before your visit."}</p>
+
+            {/* Editorial summary card with gold accent — the booking at a glance */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "20px 22px", marginBottom: 22, boxShadow: "var(--shadow-sm)" }}>
+              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>YOUR APPOINTMENT</div>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, lineHeight: 1.1, marginBottom: 6 }}>{relativeDate(selectedDate)}{relativeDate(selectedDate).includes(",") ? "" : `, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
+              <div style={{ fontSize: 15.5, color: "var(--text)", marginBottom: 14, lineHeight: 1.4 }}>{fmtTime(slot)} · with {provider.name}</div>
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+                {cart.map((e, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: i < cart.length - 1 ? 8 : 0, gap: 10 }}>
+                    <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.4 }}>{describeEntry(e)}</div>
+                  </div>
+                ))}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+                  <span style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 500 }}>TOTAL</span>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)", fontWeight: 500 }}>${cartPrice}</span>
+                </div>
+              </div>
             </div>
-            <div style={{ fontSize: 15, color: "var(--faint)", marginBottom: 8 }}>{matched ? "Your details" : "Your details (so we can confirm your booking)"}</div>
-            <div style={{ display: "grid", gap: 12, marginBottom: 18 }}>
+
+            <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 12 }}>{matched ? "CONFIRM YOUR INFO" : "YOUR DETAILS"}</div>
+            <div style={{ display: "grid", gap: 11, marginBottom: 20 }}>
               <input placeholder="Full name" style={inputStyle} value={newName} onChange={(e) => setNewName(e.target.value)} />
               <input placeholder="Email" type="email" style={inputStyle} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
               <input placeholder="Phone number" type="tel" style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
@@ -1595,26 +2076,33 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
 
             {/* photo upload — controlled by business.bookingPhotos.mode (off/optional/required) */}
             {business?.bookingPhotos?.mode !== "off" && (
-            <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 18 }}>
-              <div style={{ fontSize: 14, marginBottom: 4 }}>Add photos {business?.bookingPhotos?.mode === "required" ? "(required)" : "(optional)"}</div>
-              <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.5, fontWeight: 300, marginBottom: 14 }}>Up to 3 — a style you want, how your hair looks now, or anything that helps {provider.name === "Anyone" ? "your stylist" : provider.name}.</p>
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 14, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: i < photos ? "rgba(176,141,87,0.12)" : "transparent" }}>{i < photos ? <Check size={20} style={{ color: "var(--gold)" }} /> : <Camera size={18} style={{ color: "var(--faint)" }} />}</div>))}</div>
-              <button onClick={() => setPhotos(Math.min(3, photos + 1))} disabled={photos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: photos >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 15, letterSpacing: 1, borderRadius: 10 }}>{photos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${photos}/3)`}</button>
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginBottom: 18 }}>
+              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>PHOTOS {business?.bookingPhotos?.mode === "required" ? "· REQUIRED" : "· OPTIONAL"}</div>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 4 }}>Help us nail it</div>
+              <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Up to 3 — a style you want, how your hair looks now, or anything that helps {provider.name === "Anyone" ? "your barber" : provider.name}.</p>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 14, border: `1px dashed ${i < photos ? "var(--gold)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: i < photos ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent" }}>{i < photos ? <Check size={20} style={{ color: "var(--gold)" }} /> : <Camera size={18} style={{ color: "var(--faint)" }} />}</div>))}</div>
+              <button onClick={() => setPhotos(Math.min(3, photos + 1))} disabled={photos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: photos >= 3 ? "var(--faint)" : "var(--text)", padding: 12, fontSize: 13.5, letterSpacing: 1.5, fontWeight: 500, borderRadius: 11 }}>{photos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${photos}/3)`}</button>
             </div>
             )}
 
-            <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 18 }}><div style={{ fontSize: 14, marginBottom: 8 }}>Cancellation policy</div><p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300 }}>{business.policy}</p></div>
-            <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", color: "var(--text)", marginBottom: 24, fontSize: 14 }}><span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>I agree to the cancellation policy</button>
+            {/* Policy + agreement */}
+            <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", marginBottom: 16 }}>
+              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>CANCELLATION POLICY</div>
+              <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55 }}>{business.policy}</p>
+            </div>
+            <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", color: "var(--text)", marginBottom: 26, fontSize: 14.5, padding: "4px 2px", width: "100%", textAlign: "left" }}>
+              <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+              <span>I agree to the cancellation policy</span>
+            </button>
+
             <button className="lift" disabled={!agreed || !newName.trim() || !newEmail.trim() || phone.replace(/\D/g, "").length < 10} onClick={() => {
               const baseId = Date.now();
               let clientId = matched?.id || null;
-              // First-timer: create their client record now.
               if (!matched && !activeMember) {
                 clientId = "c" + baseId;
                 const newClient = { id: clientId, name: newName.trim(), email: newEmail.trim(), phone: phone.trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
                 setClients((cur) => [newClient, ...cur]);
               }
-              // Decide each person's start time. Same-time if this slot supports it, else back-to-back.
               const newAppts = [];
               const isSame = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
               let cursor = slot;
@@ -1646,13 +2134,14 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               });
               setAppts([...appts, ...newAppts]);
               setBookedId(baseId); setStep(8);
-            }} style={{ width: "100%", background: (agreed && newName.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--gold)" : "var(--border)", color: (agreed && newName.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Book it</button>
+            }} style={{ width: "100%", background: (agreed && newName.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--gold)" : "var(--border)", color: (agreed && newName.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--on-gold)" : "var(--faint)", padding: 17, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: (agreed && newName.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--shadow-md)" : "none" }}>LOCK IT IN</button>
           </div>
         )}
 
         {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartPrice} provider={provider} selectedDate={selectedDate} slot={slot} photos={photos} onManage={() => setStep(9)} onExit={onExit} />}
 
         {step === 9 && <ManageAppointment business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} initialPhone={phone} dateOptions={dateOptions} onExit={onExit} showToast={(m) => {}} />}
+        </div>
       </div>
     </div>
   );
@@ -1748,17 +2237,56 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
 function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider, selectedDate, slot, photos, onManage, onExit }) {
   const relDate = relativeDate(selectedDate);
   const relPlus = relDate.includes(",") ? relDate : `${relDate}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
-  const summaryLine = `${cart.map(describeEntry).join(", ")} with ${provider.name} at ${fmtTime(slot)}`;
   return (
-    <div className="fade-up" style={{ textAlign: "center", paddingTop: 16 }}>
-      <div style={{ width: 70, height: 70, borderRadius: "50%", background: "rgba(176,141,87,0.12)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}><Check size={32} style={{ color: "var(--gold)" }} /></div>
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 38, fontWeight: 500, marginBottom: 8 }}>You're booked</h2>
-      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300 }}>A confirmation has been sent to your phone and email.</p>
-      <div style={{ background: "var(--panel)", borderRadius: 14, padding: 20, marginBottom: 24 }}><div style={{ fontSize: 17, marginBottom: 2 }}>{relPlus}</div><div style={{ fontSize: 13.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>{daysFromNow(selectedDate)} · {fmtTime(slot)}</div><div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.6 }}>{summaryLine}</div><div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, color: "var(--gold)", marginTop: 8 }}>${cartPrice}</div>{photos > 0 && <div style={{ fontSize: 15, color: "var(--sub)", marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><ImageIcon size={14} style={{ color: "var(--gold)" }} /> {photos} photo{photos > 1 ? "s" : ""} attached</div>}</div>
-      <div style={{ textAlign: "left", marginBottom: 20 }}><div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 10 }}>CONFIRMATION TEXT (PREVIEW)</div><div style={{ background: "var(--panel2)", borderRadius: 14, borderBottomLeftRadius: 4, padding: "14px 16px", fontSize: 14, lineHeight: 1.5 }}>You're all set! You have an appointment with {provider.name} at {business.legalName} {relPlus} at {fmtTime(slot)}.<br /><br />Need to make a change? <span onClick={onManage} style={{ color: "var(--gold)", textDecoration: "underline", cursor: "pointer" }}>Tap here to reschedule or cancel.</span></div></div>
-      <button className="lift" onClick={onManage} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 500, borderRadius: 10, marginBottom: 12 }}>Manage my appointment</button>
-      <button className="lift" onClick={onExit} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 24 }}>Book another</button>
-      <div style={{ color: "var(--faint)", fontSize: 15, lineHeight: 1.7 }}><div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, color: "var(--sub)", marginBottom: 6 }}>{business.legalName}</div>{business.address}<br />{business.address2}<br />{business.cityZip}</div>
+    <div className="fade-up" style={{ paddingTop: 8 }}>
+      {/* Warm celebration moment — centered, big, no clinical icon */}
+      <div style={{ textAlign: "center", marginBottom: 32 }}>
+        <div className="success-bloom" style={{ width: 56, height: 56, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+          <Check size={26} style={{ color: "var(--gold)" }} strokeWidth={2.5} />
+        </div>
+        <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 14px" }} />
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 40, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 12 }}>You're in.</h2>
+        <p style={{ color: "var(--text)", fontSize: 16, lineHeight: 1.5, maxWidth: 340, margin: "0 auto", fontWeight: 400 }}>We'll text you a reminder closer to the day. See you soon.</p>
+      </div>
+
+      {/* The appointment card — editorial, with hierarchy */}
+      <div className="drift-in" style={{ background: "var(--panel)", border: "1.5px solid var(--gold)", borderRadius: 20, padding: "22px 24px", marginBottom: 18, boxShadow: "var(--shadow-md)" }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 12 }}>YOUR APPOINTMENT</div>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, lineHeight: 1.08, marginBottom: 4 }}>{relPlus}</div>
+        <div style={{ fontSize: 16, color: "var(--text)", marginBottom: 16 }}>{fmtTime(slot)} · with {provider.name}</div>
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+          {cart.map((e, i) => (
+            <div key={i} style={{ fontSize: 14.5, color: "var(--text)", marginBottom: i < cart.length - 1 ? 6 : 0, lineHeight: 1.4 }}>{describeEntry(e)}</div>
+          ))}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+            <span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 500 }}>TOTAL</span>
+            <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)", fontWeight: 500 }}>${cartPrice}</span>
+          </div>
+          {photos > 0 && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)", fontSize: 13.5, color: "var(--sub)", display: "flex", alignItems: "center", gap: 8 }}>
+              <ImageIcon size={14} style={{ color: "var(--gold)" }} />
+              <span>{photos} photo{photos > 1 ? "s" : ""} attached for your barber</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* What happens next — sets expectations warmly */}
+      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", marginBottom: 24 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>WHAT'S NEXT</div>
+        <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.55 }}>
+          A confirmation is on its way to your phone and email. We'll send a reminder the day before. If anything changes, you can always reschedule or cancel below.
+        </div>
+      </div>
+
+      <button className="lift" onClick={onManage} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 500, borderRadius: 14, marginBottom: 11 }}>Manage my appointment</button>
+      <button className="lift" onClick={onExit} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, marginBottom: 28, boxShadow: "var(--shadow-md)" }}>BOOK ANOTHER</button>
+
+      {/* Shop footer — subtle, branded */}
+      <div style={{ textAlign: "center", color: "var(--faint)", fontSize: 13.5, lineHeight: 1.7, paddingBottom: 8 }}>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 16, color: "var(--sub)", marginBottom: 4, letterSpacing: 0.3 }}>{business.legalName}</div>
+        {business.address}{business.address2 ? `, ${business.address2}` : ""}<br />{business.cityZip}
+      </div>
     </div>
   );
 }
@@ -1932,14 +2460,13 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <div style={{ borderBottom: "1px solid var(--line)", padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10 }}>
+    <div>
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
         <button onClick={() => { if (tab === "calendar" && !activeClient) { onExit(); } else { setActiveClient(null); setTab("calendar"); } }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> {tab === "calendar" && !activeClient ? "Home" : "Calendar"}</button>
         <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, letterSpacing: 1.5, fontWeight: 500 }}>{business.name}</div>
         <div style={{ width: 50 }} />
       </div>
-      <div style={{ display: "none" }} />
-      <div style={{ flex: 1, maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
+      <div style={{ maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
@@ -1949,7 +2476,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         {tab === "settings" && <SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} showToast={showToast} />}
       </div>
 
-      {/* fixed bottom tab bar */}
+      {/* fixed bottom tab bar — original pattern, anchors to viewport bottom */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "color-mix(in srgb, var(--bg) 82%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderTop: "1px solid var(--line)", boxShadow: "0 -8px 30px -12px var(--shadow)", display: "flex", justifyContent: "space-around", alignItems: "stretch", padding: "10px 4px calc(10px + env(safe-area-inset-bottom))", zIndex: 20 }}>
         {[["calendar", "Calendar", Calendar], ["clients", "Clients", User], ["messages", "Messages", MessageSquare], ["settings", "Settings", Settings]].map(([id, label, Icon]) => (
           <button key={id} onClick={() => { setTab(id); setActiveClient(null); }} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
@@ -3886,8 +4413,18 @@ function PhotoModeSetting({ mode, onChange }) {
 function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, showToast }) {
   const [form, setForm] = useState(business);
   const [openCard, setOpenCard] = useState(null);
+  const [openTile, setOpenTile] = useState(null);
   const [query, setQuery] = useState("");
-  const save = (msg) => { setBusiness(form); showToast(msg || "Settings saved."); setOpenCard(null); };
+
+  // When opening a setting card, reset the working form to the current saved business state
+  // so previous unsaved edits don't carry over.
+  useEffect(() => { if (openCard) setForm(business); }, [openCard]);
+
+  // Detect if the user has actually changed anything (so we only show DONE when needed)
+  const hasChanges = JSON.stringify(form) !== JSON.stringify(business);
+
+  const save = (msg) => { setBusiness(form); showToast(msg || "Settings saved."); setOpenCard(null); setOpenTile(null); };
+  const cancel = () => { setForm(business); setOpenCard(null); setOpenTile(null); };
 
   const field = (label, key, multiline) => (
     <div style={{ marginBottom: 14 }}>
@@ -3949,6 +4486,20 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 12 }}>THEME</div>
         <AppearancePicker theme={theme} setTheme={setTheme} />
       </>),
+    },
+    {
+      id: "aicuthelper", title: "AI Cut Helper", icon: Sparkles, category: "Client Experience",
+      status: form.aiCutHelper ? "On" : "Off",
+      keywords: "ai cut helper photo upload not sure show us a photo i'm not sure match suggest",
+      editor: (
+        <>
+        <button onClick={() => setForm({ ...form, aiCutHelper: !form.aiCutHelper })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, color: "var(--text)", marginBottom: 14 }}>
+          <div style={{ textAlign: "left" }}><div style={{ fontSize: 15, marginBottom: 2 }}>Photo + description matching</div><div style={{ fontSize: 14, color: "var(--sub)", fontWeight: 300, lineHeight: 1.4 }}>Lets new clients upload a photo or describe what they want — we suggest a matching cut from your menu.</div></div>
+          <span style={{ width: 44, height: 26, borderRadius: 13, background: form.aiCutHelper ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: form.aiCutHelper ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+        </button>
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "var(--sub)", lineHeight: 1.5 }}>For best results, upload 3 reference photos per cut showing what each style looks like at your shop. The matcher uses these to learn your work. <em>Reference photo upload is coming soon.</em></div>
+        </>
+      ),
     },
     {
       id: "photos", title: "Display Preferences", icon: ImageIcon, category: "Calendar & Appointments",
@@ -4079,34 +4630,82 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   ];
   const CATEGORY_ORDER = ["Business Setup", "Services & Menu", "Calendar & Appointments", "Payments & Checkout", "Online Booking", "Automated Messages", "Reporting"];
 
+  // ---- Tiles for the new settings landing — groups of settings shown as 2-per-row cards ----
+  // Each tile lists the setting IDs it contains. Settings drill into the existing editor on tap.
+  const TILES = [
+    { id: "shop", title: "Shop", desc: "Business name, address, phone numbers, locations, hours, logo and branding", icon: User, settings: ["business", "phones", "locations", "hours", "appearance"] },
+    { id: "team", title: "Team", desc: "Barbers, stylists, schedules, individual availability and service durations", icon: Users, settings: ["staff"] },
+    { id: "menu", title: "Services & Menu", desc: "Service list, categories, prices, durations, photos, add-ons and pairings", icon: ImageIcon, settings: ["servicesmenu"] },
+    { id: "booking", title: "Online Booking", desc: "Who can book, how far ahead, family bookings, staff selection, cancellation policy", icon: Calendar, settings: ["booking", "staffselection", "rebook_usual", "family", "policy"] },
+    { id: "calendar", title: "Calendar & Day", desc: "Scheduling buffers, smart timing, waitlist, waiting room, late and overdue alerts", icon: Clock, settings: ["scheduling", "waitingroom", "runninglate", "overduebuffer", "waitlist", "autotiming", "photos"] },
+    { id: "payments", title: "Payments", desc: "Tipping options, checkout flow, deposits, no-show charges, rebooking prompts", icon: CreditCard, settings: ["tipping", "checkout", "rebookco"] },
+    { id: "messages", title: "Messages", desc: "Booking confirmations, reminders, review requests, automated client messages", icon: MessageSquare, settings: ["messages"] },
+    { id: "smart", title: "Smart Features", desc: "AI cut helper, photo and description matching, future automations", icon: Sparkles, settings: ["aicuthelper"] },
+    { id: "data", title: "Reports & Data", desc: "Revenue and visit reports, client exports, data migration from other tools", icon: BarChart3, settings: ["reports", "import"] },
+  ];
+
   const q = query.trim().toLowerCase();
   const filtered = q ? cards.filter((c) => (c.title + " " + c.keywords).toLowerCase().includes(q)) : cards;
   const active = cards.find((c) => c.id === openCard);
+  const activeTile = TILES.find((t) => t.id === openTile);
 
   // ---- full-page editor for the selected setting ----
   if (active) {
     const Icon = active.icon;
     return (
       <div className="appt-screen" style={{ maxWidth: 640, margin: "0 auto", padding: "12px 4px 40px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 26 }}>
-          <div style={{ width: 46, height: 46, borderRadius: 14, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={21} style={{ color: "var(--gold)" }} /></div>
-          <div>
-            <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500, marginBottom: 3 }}>SETTINGS</div>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: -0.3, lineHeight: 1 }}>{active.title}</h2>
-          </div>
+        <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
+        <div style={{ marginBottom: 26 }}>
+          <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.4px", marginBottom: 6 }}>{active.title}</h2>
+          {active.status && <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.4 }}>{active.status}</div>}
         </div>
 
-        {active.editor}
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "20px 18px", boxShadow: "var(--shadow-sm)" }}>
+          {active.editor}
+        </div>
 
-        <button className="lift" onClick={() => save(`${active.title} saved.`)} style={{ width: "100%", marginTop: 28, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 14, boxShadow: "var(--shadow-md)" }}>DONE</button>
+        {hasChanges && (
+          <button className="lift" onClick={() => save(`${active.title} saved.`)} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 13.5, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: "var(--shadow-md)" }}>SAVE CHANGES</button>
+        )}
+      </div>
+    );
+  }
+
+  // ---- drilled into a tile: show its settings as a clean list ----
+  if (activeTile && !q) {
+    const tileCards = activeTile.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
+    return (
+      <div className="fade-up" style={{ maxWidth: 640, margin: "0 auto", padding: "12px 4px 40px" }}>
+        <button onClick={() => setOpenTile(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
+        <div style={{ marginBottom: 26 }}>
+          <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.4px", marginBottom: 8 }}>{activeTile.title}</h2>
+          <div style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.45 }}>{activeTile.desc}</div>
+        </div>
+        <div style={{ background: "var(--panel)", borderRadius: 18, boxShadow: "var(--shadow-sm)", overflow: "hidden", border: "1px solid var(--border)" }}>
+          {tileCards.map((c, idx) => {
+            const Icon = c.icon;
+            return (
+              <div key={c.id} style={{ borderTop: idx === 0 ? "none" : "1px solid var(--line)" }}>
+                <button onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "none", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "18px 20px" }}>
+                  <div>
+                    <div style={{ fontSize: 16.5, fontWeight: 500, letterSpacing: -0.2 }}>{c.title}</div>
+                    <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 280 }}>{c.status}</div>
+                  </div>
+                  <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="fade-up" style={{ maxWidth: 640, margin: "0 auto", padding: "12px 4px" }}>
+    <div className="fade-up" style={{ maxWidth: 720, margin: "0 auto", padding: "12px 4px" }}>
       <div style={{ marginBottom: 32 }}>
-        <div style={{ fontSize: 12, letterSpacing: 3, color: "var(--faint)", marginBottom: 10, fontWeight: 500 }}>CONTROL PANEL</div>
         <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -0.5, marginBottom: 14 }}>Settings</h2>
         <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300, lineHeight: 1.5, maxWidth: 460 }}>Everything here is yours to shape — how the studio runs, looks, and speaks to clients.</p>
       </div>
@@ -4117,7 +4716,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <Settings size={18} style={{ position: "absolute", left: 17, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
       </div>
 
-      {/* grouped by category — flat when searching */}
+      {/* When searching → flat list across all settings */}
       {q ? (
         <div style={{ background: "var(--panel)", borderRadius: 22, boxShadow: "var(--shadow-md)", overflow: "hidden", border: "1px solid var(--line)" }}>
           {filtered.map((c, idx) => {
@@ -4137,38 +4736,49 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
               </div>
             );
           })}
+          {filtered.length === 0 && <p style={{ color: "var(--faint)", fontSize: 15, textAlign: "center", padding: "40px 0" }}>No settings match “{query}”.</p>}
         </div>
       ) : (
-        CATEGORY_ORDER.map((cat) => {
-          const group = cards.filter((c) => c.category === cat);
-          if (!group.length) return null;
-          return (
-            <div key={cat} style={{ marginBottom: 26 }}>
-              <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 12, paddingLeft: 4 }}>{cat.toUpperCase()}</div>
-              <div style={{ background: "var(--panel)", borderRadius: 22, boxShadow: "var(--shadow-md)", overflow: "hidden", border: "1px solid var(--line)" }}>
-                {group.map((c, idx) => {
-                  const Icon = c.icon;
-                  return (
-                    <div key={c.id} style={{ borderTop: idx === 0 ? "none" : "1px solid var(--line)" }}>
-                      <button onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "none", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "20px 22px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                          <div style={{ width: 44, height: 44, borderRadius: 13, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={19} style={{ color: "var(--gold)" }} /></div>
-                          <div>
-                            <div style={{ fontSize: 16.5, fontWeight: 500, letterSpacing: -0.2 }}>{c.title}</div>
-                            <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{c.status}</div>
-                          </div>
-                        </div>
-                        <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })
+        // ---- Default: 2-per-row tile grid, uniform dark editorial treatment ----
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+          {TILES.map((t) => {
+            const tileCards = t.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
+            return (
+              <button
+                key={t.id}
+                className="lift"
+                onClick={() => { if (tileCards.length === 1) { setOpenCard(tileCards[0].id); } else { setOpenTile(t.id); } }}
+                style={{
+                  background: "linear-gradient(155deg, #1a1714 0%, #0f0d0b 100%)",
+                  border: "1px solid rgba(176,141,87,0.18)",
+                  borderRadius: 20,
+                  padding: "20px 16px 16px",
+                  textAlign: "center",
+                  color: "#f5efe6",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.05)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 0,
+                  height: 200,
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                <div style={{ width: 24, height: 2, background: "var(--gold)", marginBottom: 10 }} />
+                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.4px", color: "#f5efe6", marginBottom: 12 }}>{t.title}</div>
+                <div style={{ flex: 1, display: "flex", alignItems: "flex-start", padding: "0 4px" }}>
+                  <div style={{ fontSize: 12.5, color: "rgba(245,239,230,0.6)", lineHeight: 1.45, fontWeight: 400 }}>{t.desc}</div>
+                </div>
+                <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, paddingTop: 10, borderTop: "1px solid rgba(245,239,230,0.08)" }}>
+                  <span style={{ fontSize: 10, letterSpacing: 2, color: "rgba(245,239,230,0.45)", fontWeight: 600 }}>{tileCards.length} {tileCards.length === 1 ? "SETTING" : "SETTINGS"}</span>
+                  <ChevronRight size={14} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                </div>
+              </button>
+            );
+          })}
+        </div>
       )}
-      {filtered.length === 0 && <p style={{ color: "var(--faint)", fontSize: 15, textAlign: "center", padding: "40px 0" }}>No settings match “{query}”.</p>}
     </div>
   );
 }
