@@ -485,8 +485,8 @@ const inputStyle = { width: "100%", background: "var(--panel2)", border: "1px so
 
 // ============================================================
 export default function App() {
-  const [view, setView] = useState("client");
-  const [shopUnlocked, setShopUnlocked] = useState(false);
+  const [view, setView] = useState("landing");
+  const [shopUnlocked, setShopUnlocked] = useState(true);
   const [shopPwPrompt, setShopPwPrompt] = useState(false);
   const [pwEntry, setPwEntry] = useState("");
   const [pwError, setPwError] = useState(false);
@@ -497,10 +497,15 @@ export default function App() {
     if (typeof window === "undefined") return;
     const h = window.location.hash.toLowerCase();
     if (h === "#staff") {
-      setShopPwPrompt(true);
+      // No password until we go live — opens dashboard directly. (Re-enable the prompt before launch.)
+      setShopUnlocked(true);
+      setView("shop");
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     } else if (h === "#terms") {
       setView("terms");
+    } else if (h === "#book" || h === "#client") {
+      setView("client");
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
   }, []);
   const goView = (v) => {
@@ -550,6 +555,8 @@ export default function App() {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         #app-root { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; line-height: 1.5; letter-spacing: 0.1px; }
         #app-root h1, #app-root h2, #app-root h3 { letter-spacing: -0.2px; }
+        #app-root a, #app-root button { color: inherit; }
+        a[x-apple-data-detectors], a[href^="tel"] { color: inherit !important; text-decoration: none !important; }
         body, button, input, textarea { font-family: var(--font-body, 'Jost', sans-serif); }
         ${buildThemeCSS()}
         :root {
@@ -599,9 +606,9 @@ export default function App() {
         </div>
       )}
       {view === "terms" && <TermsPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
-      {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("client")} />}
+      {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("landing")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={() => setView("landing")} />}
-      {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} onExit={() => { setShopUnlocked(false); setView("client"); }} />}
+      {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} onExit={() => { setView("landing"); }} />}
     </div>
   );
 }
@@ -645,19 +652,29 @@ function TermsPage({ onExit }) {
 }
 
 function Landing({ business, onPick }) {
+  const tiles = [
+    { key: "client", label: "Book an appointment", desc: "The client booking experience", primary: true },
+    { key: "manage", label: "Manage my appointment", desc: "Reschedule, cancel, or check in" },
+    { key: "shop", label: "Business dashboard", desc: "Calendar, clients, menu & settings" },
+  ];
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, background: "radial-gradient(circle at 50% 0%, #1A1A1F 0%, var(--bg) 60%)" }}>
-      <div className="fade-up" style={{ textAlign: "center", maxWidth: 540 }}>
-        <div style={{ fontSize: 15, letterSpacing: 6, color: "var(--gold)", marginBottom: 18 }}>PROTOTYPE PREVIEW</div>
-        <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: "clamp(48px, 12vw, 88px)", fontWeight: 500, lineHeight: 1, letterSpacing: 2 }}>{business.name}</h1>
-        <div style={{ width: 40, height: 1, background: "var(--gold)", margin: "20px auto" }} />
-        <p style={{ color: "var(--sub)", fontSize: 15, lineHeight: 1.7, marginBottom: 44, fontWeight: 300 }}>Preview how a client books, or step into the studio dashboard to customize your menu, photos, and policies.</p>
-        <div style={{ display: "grid", gap: 14 }}>
-          <button className="lift" onClick={() => onPick("client")} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "18px 28px", fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>CLIENT BOOKING EXPERIENCE →</button>
-          <button className="lift" onClick={() => onPick("manage")} style={{ background: "transparent", color: "var(--text)", padding: "18px 28px", fontSize: 14, letterSpacing: 2, border: "1px solid var(--border)", borderRadius: 10 }}>MANAGE MY APPOINTMENT →</button>
-          <button className="lift" onClick={() => onPick("shop")} style={{ background: "transparent", color: "var(--text)", padding: "18px 28px", fontSize: 14, letterSpacing: 2, border: "1px solid var(--border)", borderRadius: 10 }}>STUDIO DASHBOARD →</button>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 22px", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY }}>
+      <div className="fade-up" style={{ width: "100%", maxWidth: 440 }}>
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: "clamp(40px, 13vw, 60px)", fontWeight: 500, lineHeight: 1, letterSpacing: 1 }}>{business.name}</h1>
+          <div style={{ width: 34, height: 1, background: "var(--gold)", margin: "18px auto 0", opacity: 0.5 }} />
         </div>
-        <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 28, lineHeight: 1.6 }}>Clickable prototype with sample data. No real texts, charges, or bookings are sent.</p>
+        <div style={{ display: "grid", gap: 13 }}>
+          {tiles.map((t) => (
+            <button key={t.key} className="lift" onClick={() => onPick(t.key)} style={{ width: "100%", textAlign: "left", background: t.primary ? "var(--gold)" : "var(--panel)", color: t.primary ? "var(--on-gold)" : "var(--text)", border: t.primary ? "none" : "1px solid var(--border)", borderRadius: 18, padding: "22px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, boxShadow: t.primary ? "var(--shadow-md)" : "var(--shadow-sm)" }}>
+              <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{t.label}</span>
+                <span style={{ fontSize: 14, opacity: t.primary ? 0.85 : 1, color: t.primary ? "inherit" : "var(--sub)", fontWeight: 300 }}>{t.desc}</span>
+              </span>
+              <ChevronRight size={22} style={{ flexShrink: 0, opacity: 0.7 }} />
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -933,7 +950,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const slotIsSameTime = isMultiPerson && groupSlots && slot != null && groupSlots.sameTime.includes(slot);
   const dateIsFull = selectedDate && openSlots.length === 0;
 
-  const back = () => { setShowWaitlist(false); if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setShowWhoFor(true); return; } if (showWhoFor) { setShowWhoFor(false); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setShowWhoFor(true); return; } if (showWhoFor) { setShowWhoFor(false); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } setStep(step - 1); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -1142,17 +1159,40 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           const usualProv = providers.find((p) => p.id === (lastAppt?.providerId || who.provider)) || providers[1];
           if (!usualSvc) { setShowUsual(false); setStep(1); return null; }
           const dur = getDuration(who, usualSvc);
+          const usualLine2 = lastAppt && lastAppt.lineItems && lastAppt.lineItems[0] ? lastAppt.lineItems[0] : null;
+          const lastPhoto = (who.gallery && who.gallery.length) ? who.gallery[who.gallery.length - 1].photo : null;
           return (
             <div className="fade-up">
-              <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>{who.name.split(" ")[0].toUpperCase()}'S LAST VISIT</div>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>Same as last time?</h2>
-              <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.55 }}>Here's what {who.name.split(" ")[0]} got last visit.</p>
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 20px", marginBottom: 16 }}>
-                <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{usualSvc.name}</div>
-                <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>{dur} min{usualProv && usualProv.id !== "anyone" ? ` · with ${usualProv.name}` : ""}{lastAppt.title ? ` · ${lastAppt.title}` : ""}</div>
-              </div>
-              <button className="lift" onClick={() => { setCart([{ service: usualSvc, addons: {}, cutType: null, beardType: null, provider: usualProv }]); setShowUsual(false); setStep(6); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 18, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 12 }}>YES — BOOK THE SAME →</button>
-              <button onClick={() => { setShowUsual(false); setStep(1); }} style={{ width: "100%", background: "none", border: "none", color: "var(--gold)", fontSize: 15, padding: 8 }}>Something different — show the menu</button>
+              <div style={{ fontSize: 12, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 12 }}>WELCOME BACK</div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 8, lineHeight: 1.08 }}>Good to see you,<br/>{who.name.split(" ")[0]}.</h2>
+              <p style={{ color: "var(--sub)", fontSize: 15, marginBottom: 28, fontWeight: 300, lineHeight: 1.55 }}>Want the usual, or try something new today?</p>
+
+              {/* Card 1 — the usual (hero treatment with last-cut photo) */}
+              <button className="lift" onClick={() => { setCart([{ service: usualSvc, addons: usualLine2?.addons || {}, cutType: usualLine2?.cutType || null, beardType: usualLine2?.beardType || null, provider: usualProv }]); setShowUsual(false); setStep(6); }} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1.5px solid var(--gold)", borderRadius: 20, padding: 0, marginBottom: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)", display: "block" }}>
+                {lastPhoto && (
+                  <div style={{ width: "100%", height: 150, overflow: "hidden", position: "relative" }}>
+                    <img src={imgUrl(lastPhoto, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", color: "#fff", fontSize: 11, letterSpacing: 1.5, fontWeight: 600, padding: "5px 11px", borderRadius: 20 }}>YOUR LAST CUT</div>
+                  </div>
+                )}
+                <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {!lastPhoto && <span style={{ fontSize: 11.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600 }}>THE USUAL</span>}
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{usualSvc.name}</span>
+                    <span style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>{dur} min{usualProv && usualProv.id !== "anyone" ? ` · with ${usualProv.name}` : ""}</span>
+                  </span>
+                  <span style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><ChevronRight size={22} /></span>
+                </div>
+              </button>
+
+              {/* Card 2 — something different */}
+              <button className="lift" onClick={() => { setShowUsual(false); setStep(1); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "1px solid var(--border2)", borderRadius: 20, padding: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 500, lineHeight: 1.1 }}>Something different</span>
+                  <span style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>Browse the full menu</span>
+                </span>
+                <span style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--panel2)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid var(--border)" }}><ChevronRight size={22} /></span>
+              </button>
             </div>
           );
         })()}
@@ -1176,7 +1216,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
             <p style={{ color: "var(--faint)", fontSize: 13, marginBottom: 24, fontWeight: 300, fontStyle: "italic" }}>Texting isn't live yet — enter any 6 digits to continue for now.</p>
             <input autoFocus inputMode="numeric" value={codeEntry} onChange={(e) => { setCodeEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(false); }} placeholder="• • • • • •" style={{ ...inputStyle, textAlign: "center", fontSize: 28, letterSpacing: 8, marginBottom: codeError ? 8 : 18 }} />
             {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Enter all 6 digits.</p>}
-            <button className="lift" onClick={() => { if (codeEntry.length < 6) { setCodeError(true); return; } const found = pendingMatch; setMatched(found); setShowCodeEntry(false); if (found) { setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); setShowWhoFor(true); } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 12 }}>VERIFY →</button>
+            <button className="lift" onClick={() => { if (codeEntry.length < 6) { setCodeError(true); return; } const found = pendingMatch; setMatched(found); setShowCodeEntry(false); if (found) { setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = (appts || []).filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 12 }}>VERIFY →</button>
             <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6 }}>Use a different number</button>
           </div>
         )}
@@ -1196,7 +1236,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               if (only.id) { setBookingFor("member"); setActiveMember(only.isMember ? (matched.family || []).find((m) => m.id === only.id) : null); }
               else { setBookingFor("self"); setActiveMember(null); }
               const apptsFor = only.id ? (appts || []).filter((a) => a.familyMemberId === only.id && a.serviceId && a.status !== "block") : (appts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block");
-              if (apptsFor.length) setShowUsual(true); else setStep(1);
+              if (apptsFor.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1);
             } else {
               // multiple → ask together vs separate
               setShowSchedChoice(true);
@@ -1475,13 +1515,15 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <input placeholder="Phone number" type="tel" style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
 
-            {/* photo upload — their choice: reference, current look, or a selfie */}
+            {/* photo upload — controlled by business.bookingPhotos.mode (off/optional/required) */}
+            {business?.bookingPhotos?.mode !== "off" && (
             <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 18 }}>
-              <div style={{ fontSize: 14, marginBottom: 4 }}>Add photos (optional)</div>
+              <div style={{ fontSize: 14, marginBottom: 4 }}>Add photos {business?.bookingPhotos?.mode === "required" ? "(required)" : "(optional)"}</div>
               <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.5, fontWeight: 300, marginBottom: 14 }}>Up to 3 — a style you want, how your hair looks now, or anything that helps {provider.name === "Anyone" ? "your stylist" : provider.name}.</p>
               <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 14, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: i < photos ? "rgba(176,141,87,0.12)" : "transparent" }}>{i < photos ? <Check size={20} style={{ color: "var(--gold)" }} /> : <Camera size={18} style={{ color: "var(--faint)" }} />}</div>))}</div>
               <button onClick={() => setPhotos(Math.min(3, photos + 1))} disabled={photos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: photos >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 15, letterSpacing: 1, borderRadius: 10 }}>{photos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${photos}/3)`}</button>
             </div>
+            )}
 
             <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 18 }}><div style={{ fontSize: 14, marginBottom: 8 }}>Cancellation policy</div><p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300 }}>{business.policy}</p></div>
             <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", color: "var(--text)", marginBottom: 24, fontSize: 14 }}><span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>I agree to the cancellation policy</button>
@@ -1807,7 +1849,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <div style={{ borderBottom: "1px solid var(--line)", padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10 }}>
-        <button onClick={() => { setActiveClient(null); setTab("calendar"); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Calendar</button>
+        <button onClick={() => { if (tab === "calendar" && !activeClient) { onExit(); } else { setActiveClient(null); setTab("calendar"); } }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> {tab === "calendar" && !activeClient ? "Home" : "Calendar"}</button>
         <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, letterSpacing: 1.5, fontWeight: 500 }}>{business.name}</div>
         <div style={{ width: 50 }} />
       </div>
@@ -3693,6 +3735,36 @@ function AppearancePicker({ theme, setTheme }) {
 }
 
 // ---------- SETTINGS ----------
+function ToggleSetting({ label, desc, on, onToggle }) {
+  return (
+    <div style={{ padding: "4px 2px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 5 }}>{label}</div>
+          <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>{desc}</div>
+        </div>
+        <button onClick={() => onToggle(!on)} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: on ? "var(--gold)" : "var(--border2)", position: "relative", transition: "background .2s", marginTop: 2 }}>
+          <span style={{ position: "absolute", top: 3, left: on ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PhotoModeSetting({ mode, onChange }) {
+  const opts = [["off", "Off", "Don't ask for photos"], ["optional", "Optional", "Clients can add a reference photo"], ["required", "Required", "Clients must add at least one photo"]];
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      {opts.map(([val, label, desc]) => { const on = mode === val; return (
+        <button key={val} onClick={() => onChange(val)} style={{ width: "100%", textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <span><span style={{ fontSize: 15.5, fontWeight: 500, display: "block" }}>{label}</span><span style={{ fontSize: 13.5, color: "var(--sub)" }}>{desc}</span></span>
+          <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} />}</span>
+        </button>
+      ); })}
+    </div>
+  );
+}
+
 function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, appts, clients, theme, setTheme, showToast }) {
   const [form, setForm] = useState(business);
   const [openCard, setOpenCard] = useState(null);
@@ -3816,6 +3888,30 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       status: (form.waitlist?.mode === "silent" ? "Auto" : "Ask first") + (form.waitlist?.order === "longest" ? " · longest first" : " · first come"),
       keywords: "waitlist auto notify automatic slot opened cancellation longest waiting queue order delay minutes silent ask first link book",
       editor: <WaitlistRulesEditor w={form.waitlist || { mode: "ask", order: "longest", delayMin: 30 }} onChange={(wl) => setForm({ ...form, waitlist: wl })} />,
+    },
+    {
+      id: "autotiming", title: "Smart Timing", icon: Clock, category: "Calendar & Appointments",
+      status: (form.autoTiming?.enabled === false) ? "Off" : "On — suggests durations",
+      keywords: "auto timing smart duration clock service time measure suggest save remembered learn how long takes",
+      editor: <ToggleSetting label="Suggest saving service times" desc="After checkout, offer to save how long the service actually took as that client's time, so future bookings get more accurate." on={form.autoTiming?.enabled !== false} onToggle={(v) => setForm({ ...form, autoTiming: { ...(form.autoTiming || {}), enabled: v } })} />,
+    },
+    {
+      id: "rebook_usual", title: "Book the Usual", icon: Repeat, category: "Online Booking",
+      status: (form.bookUsual?.enabled === false) ? "Off" : "On",
+      keywords: "usual same as last time rebook repeat returning client one tap quick book",
+      editor: <ToggleSetting label="Offer 'the usual' to returning clients" desc="When a returning client books, show their last service for one-tap rebooking before the full menu." on={form.bookUsual?.enabled !== false} onToggle={(v) => setForm({ ...form, bookUsual: { ...(form.bookUsual || {}), enabled: v } })} />,
+    },
+    {
+      id: "family", title: "Family & Group Booking", icon: User, category: "Online Booking",
+      status: (form.familyBooking?.enabled === false) ? "Off" : "On",
+      keywords: "family group multiple people kids children book for someone else who is this for partner",
+      editor: <ToggleSetting label="Let clients book for family / multiple people" desc="Recognized clients can save family members and book several people in one visit (together or back-to-back)." on={form.familyBooking?.enabled !== false} onToggle={(v) => setForm({ ...form, familyBooking: { ...(form.familyBooking || {}), enabled: v } })} />,
+    },
+    {
+      id: "photos", title: "Reference Photos", icon: Camera, category: "Online Booking",
+      status: form.bookingPhotos?.mode === "off" ? "Off" : (form.bookingPhotos?.mode === "required" ? "Required" : "Optional"),
+      keywords: "photo photos reference picture inspiration upload booking required optional off image",
+      editor: <PhotoModeSetting mode={form.bookingPhotos?.mode || "optional"} onChange={(m) => setForm({ ...form, bookingPhotos: { ...(form.bookingPhotos || {}), mode: m } })} />,
     },
     {
       id: "tipping", title: "Tipping", icon: DollarSign, category: "Payments & Checkout",
@@ -4841,7 +4937,7 @@ function Checkout({ appt, service, provider, business, clients, setClients, show
   const currentDur = liveClient && service ? (liveClient.customDurations && liveClient.customDurations[service.id] != null ? liveClient.customDurations[service.id] : service.duration) : null;
   // only worth suggesting if we measured something sane and it differs from what's stored
   const tooLong = measuredMin != null && measuredMin > 180; // likely forgot to check out
-  const showDurationSuggest = suggestedMin != null && !tooLong && liveClient && service && suggestedMin !== currentDur;
+  const showDurationSuggest = (business?.autoTiming?.enabled !== false) && suggestedMin != null && !tooLong && liveClient && service && suggestedMin !== currentDur;
   const [adjustMin, setAdjustMin] = useState(suggestedMin);
   const saveDuration = (val) => {
     if (!liveClient || !service) return;
