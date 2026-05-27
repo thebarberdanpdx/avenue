@@ -403,7 +403,7 @@ const THEMES = [
   // GlossGenius-inspired. Default = airy editorial serif on white (Energy/Zen).
   { id: "snow", name: "Atelier", tagline: "Airy editorial · serif on white", group: "Light", dark: false,
     disp: "'Cormorant Garamond', serif", body: "'Jost', sans-serif",
-    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F6F5F2", line:"#EFEDE8", border:"#E6E3DC", border2:"#CDC8BD", text:"#1A1A18", text2:"#3D3C38", sub:"#777268", faint:"#ADA89C", gold:"#1A1A18", onGold:"#FFFFFF", shadow:"rgba(20,18,12,.06)", overlay:"rgba(20,18,14,0.30)" } },
+    t: { bg:"#FCFBF9", panel:"#FFFFFF", panel2:"#F5F3EF", line:"#EDEAE4", border:"#E4E0D8", border2:"#CBC6BB", text:"#211F1B", text2:"#46443E", sub:"#7C766B", faint:"#B0AB9F", gold:"#1F1D19", onGold:"#FFFFFF", shadow:"rgba(20,18,12,.05)", overlay:"rgba(20,18,14,0.28)" } },
   { id: "sagespa", name: "Northside", tagline: "Cream & forest green", group: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Inter', sans-serif",
     t: { bg:"#F6F1E7", panel:"#FFFDF7", panel2:"#EEE7D6", line:"#E5DCC6", border:"#DBD0B6", border2:"#C2B695", text:"#1E2A20", text2:"#39463B", sub:"#6C7464", faint:"#A6A088", gold:"#1F5138", onGold:"#F8F4EA", shadow:"rgba(60,50,20,.08)", overlay:"rgba(30,42,32,0.34)" } },
@@ -495,10 +495,12 @@ export default function App() {
   // Clients never see anything about staff — the app opens straight into booking.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.location.hash.toLowerCase() === "#staff") {
+    const h = window.location.hash.toLowerCase();
+    if (h === "#staff") {
       setShopPwPrompt(true);
-      // strip the hash WITHOUT adding a history entry, so phone "back" doesn't bounce around
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    } else if (h === "#terms") {
+      setView("terms");
     }
   }, []);
   const goView = (v) => {
@@ -546,6 +548,8 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600&family=Oswald:wght@400;500;600&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        #app-root { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; line-height: 1.5; letter-spacing: 0.1px; }
+        #app-root h1, #app-root h2, #app-root h3 { letter-spacing: -0.2px; }
         body, button, input, textarea { font-family: var(--font-body, 'Jost', sans-serif); }
         ${buildThemeCSS()}
         :root {
@@ -594,9 +598,48 @@ export default function App() {
           </div>
         </div>
       )}
+      {view === "terms" && <TermsPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("client")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={() => setView("landing")} />}
       {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} onExit={() => { setShopUnlocked(false); setView("client"); }} />}
+    </div>
+  );
+}
+
+function TermsPage({ onExit }) {
+  const updated = "May 2026";
+  const H = ({ children }) => <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, margin: "26px 0 10px" }}>{children}</h2>;
+  const P = ({ children }) => <p style={{ fontSize: 15.5, color: "var(--text2)", lineHeight: 1.65, marginBottom: 12 }}>{children}</p>;
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY }}>
+      <div style={{ maxWidth: 680, margin: "0 auto", padding: "32px 22px 80px" }}>
+        <button onClick={onExit} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 24 }}><ArrowLeft size={16} /> Back</button>
+        <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>SANCTUARY BARBER CO</div>
+        <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.1, marginBottom: 8 }}>Terms &amp; Conditions</h1>
+        <p style={{ fontSize: 14, color: "var(--sub)", marginBottom: 8 }}>Last updated: {updated}</p>
+
+        <P>These terms govern your use of the booking and messaging services provided by Sanctuary Barber Co ("we," "us," "our"). By booking an appointment or providing your phone number, you agree to these terms.</P>
+
+        <H>Booking &amp; Appointments</H>
+        <P>When you book an appointment, you agree to provide accurate contact information. Appointments are subject to availability. We may contact you to confirm, remind, or update you about your appointment.</P>
+
+        <H>SMS / Text Messaging</H>
+        <P>By providing your mobile phone number, you consent to receive text messages from Sanctuary Barber Co related to your appointments — including booking confirmations, reminders, schedule changes, waitlist openings, and one-time login verification codes.</P>
+        <P>Message frequency varies based on your activity. Message and data rates may apply. You can opt out of non-essential texts at any time by replying STOP. For help, reply HELP. Opting out of verification codes may prevent you from logging in.</P>
+        <P>We do not sell or share your phone number with third parties for marketing. Your number is used only to provide and improve our services.</P>
+
+        <H>Cancellations &amp; No-Shows</H>
+        <P>We ask that you give reasonable notice if you need to cancel or reschedule. Repeated no-shows may affect your ability to book online.</P>
+
+        <H>Privacy</H>
+        <P>We collect only the information needed to provide our services — your name, contact details, appointment history, and any preferences or photos you choose to share. This information is stored securely and used only to serve you. We do not sell your personal information.</P>
+
+        <H>Changes</H>
+        <P>We may update these terms from time to time. Continued use of our booking and messaging services means you accept any changes.</P>
+
+        <H>Contact</H>
+        <P>Questions about these terms? Reach us at sanctuarybarberco@gmail.com.</P>
+      </div>
     </div>
   );
 }
@@ -730,6 +773,11 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [showSchedChoice, setShowSchedChoice] = useState(false); // the together/separate screen
   const [showWizardIntro, setShowWizardIntro] = useState(false); // "Let's start with X" screen
   const [expandUsual, setExpandUsual] = useState(false); // expand the usual card to show details
+  // ---- SMS login verification (wired to Twilio/Supabase when approved; accepts any 6-digit code for now) ----
+  const [showCodeEntry, setShowCodeEntry] = useState(false);
+  const [codeEntry, setCodeEntry] = useState("");
+  const [codeError, setCodeError] = useState(false);
+  const [pendingMatch, setPendingMatch] = useState(null); // the client we found, awaiting code verify
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberNote, setNewMemberNote] = useState("");
   const [cart, setCart] = useState([]);
@@ -885,7 +933,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const slotIsSameTime = isMultiPerson && groupSlots && slot != null && groupSlots.sameTime.includes(slot);
   const dateIsFull = selectedDate && openSlots.length === 0;
 
-  const back = () => { setShowWaitlist(false); if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setShowWhoFor(true); return; } if (showWhoFor) { setShowWhoFor(false); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setShowWhoFor(true); return; } if (showWhoFor) { setShowWhoFor(false); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } setStep(step - 1); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -968,20 +1016,25 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                 const img = imgs[idx];
                 const flip = (dir) => setCutCarousel((c) => { const cur = c[ct.id] || 0; let n = cur + dir; if (n < 0) n = imgs.length - 1; if (n >= imgs.length) n = 0; return { ...c, [ct.id]: n }; });
                 return (
-                  <div key={ct.id}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      {imgs.length > 1 && <button aria-label="Previous example" onClick={() => flip(-1)} style={{ width: 34, height: 34, flexShrink: 0, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><ChevronLeft size={18} /></button>}
-                      <div style={{ flex: 1, position: "relative", aspectRatio: "1/1", maxWidth: 230, margin: "0 auto", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)" }}>
-                        {img && <img src={imgUrl(img, 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
-                        {imgs.length > 1 && <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, display: "flex", gap: 5, justifyContent: "center" }}>{imgs.map((_, di) => (<span key={di} style={{ width: 6, height: 6, borderRadius: "50%", background: di === idx ? "#fff" : "rgba(255,255,255,0.5)" }} />))}</div>}
+                  <div key={ct.id} style={{ marginBottom: 8 }}>
+                    <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 18, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", boxShadow: "var(--shadow-sm)" }}>
+                      {img && <img src={imgUrl(img, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
+                      {imgs.length > 1 && (
+                        <>
+                          <button aria-label="Previous example" onClick={() => flip(-1)} style={{ position: "absolute", top: "50%", left: 10, transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.82)", backdropFilter: "blur(6px)", color: "#222", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}><ChevronLeft size={18} /></button>
+                          <button aria-label="Next example" onClick={() => flip(1)} style={{ position: "absolute", top: "50%", right: 10, transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.82)", backdropFilter: "blur(6px)", color: "#222", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}><ChevronRight size={18} /></button>
+                          <div style={{ position: "absolute", bottom: 12, left: 0, right: 0, display: "flex", gap: 6, justifyContent: "center" }}>{imgs.map((_, di) => (<span key={di} style={{ width: 7, height: 7, borderRadius: "50%", background: di === idx ? "#fff" : "rgba(255,255,255,0.5)", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />))}</div>
+                        </>
+                      )}
+                    </div>
+                    <div style={{ textAlign: "center", margin: "18px 2px 16px" }}>
+                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
+                        <span style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.15 }}>{ct.label}</span>
+                        <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)" }}>${ct.price}</span>
                       </div>
-                      {imgs.length > 1 && <button aria-label="Next example" onClick={() => flip(1)} style={{ width: 34, height: 34, flexShrink: 0, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><ChevronRight size={18} /></button>}
+                      {ct.desc && <div style={{ fontSize: 15.5, color: "var(--sub)", marginTop: 6, lineHeight: 1.55, maxWidth: 320, marginLeft: "auto", marginRight: "auto" }}>{ct.desc}</div>}
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", margin: "14px 2px 12px", gap: 12 }}>
-                      <div><div style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.2 }}>{ct.label}</div>{ct.desc && <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{ct.desc}</div>}</div>
-                      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, color: "var(--gold)", whiteSpace: "nowrap" }}>${ct.price}</div>
-                    </div>
-                    <button className="lift" onClick={() => { setCutType(ct.id); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none" }}>CHOOSE THIS</button>
+                    <button className="lift" onClick={() => { setCutType(ct.id); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>CHOOSE THIS</button>
                   </div>
                 );
               })}
@@ -1105,13 +1158,26 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         })()}
 
         {/* STEP 5 — phone */}
-        {step === 5 && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && (
+        {step === 5 && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && (
           <div className="fade-up">
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Your number</h2>
-            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300 }}>We'll use this to recognize you and pull up your preferences.</p>
+            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300 }}>We'll text you a quick code to confirm it's you.</p>
             <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             <p style={{ color: "var(--faint)", fontSize: 14, marginBottom: 22 }}>Try <span style={{ color: "var(--gold)", cursor: "pointer" }} onClick={() => setPhone("503-555-0142")}>503-555-0142</span> (returning client Marcus).</p>
-            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={() => { const digits = phone.replace(/\D/g, ""); const found = clients.find((c) => c.phone.replace(/\D/g, "") === digits) || null; setMatched(found); if (found) { setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); setShowWhoFor(true); } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "var(--border)" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>CONTINUE →</button>
+            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={() => { const digits = phone.replace(/\D/g, ""); const found = clients.find((c) => c.phone.replace(/\D/g, "") === digits) || null; setPendingMatch(found); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "var(--border)" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>TEXT ME A CODE →</button>
+          </div>
+        )}
+
+        {/* CODE VERIFICATION — confirms the texted code (accepts any 6 digits until Twilio is live) */}
+        {step === 5 && showCodeEntry && (
+          <div className="fade-up">
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Enter your code</h2>
+            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 8, fontWeight: 300 }}>We sent a 6-digit code to <strong style={{ color: "var(--text)" }}>{phone}</strong>.</p>
+            <p style={{ color: "var(--faint)", fontSize: 13, marginBottom: 24, fontWeight: 300, fontStyle: "italic" }}>Texting isn't live yet — enter any 6 digits to continue for now.</p>
+            <input autoFocus inputMode="numeric" value={codeEntry} onChange={(e) => { setCodeEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(false); }} placeholder="• • • • • •" style={{ ...inputStyle, textAlign: "center", fontSize: 28, letterSpacing: 8, marginBottom: codeError ? 8 : 18 }} />
+            {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Enter all 6 digits.</p>}
+            <button className="lift" onClick={() => { if (codeEntry.length < 6) { setCodeError(true); return; } const found = pendingMatch; setMatched(found); setShowCodeEntry(false); if (found) { setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); setShowWhoFor(true); } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 12 }}>VERIFY →</button>
+            <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6 }}>Use a different number</button>
           </div>
         )}
 
