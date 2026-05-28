@@ -1258,11 +1258,13 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           if (consult.step === "sides") {
             return (
               <div className="fade-up">
-                <Masthead title="Let's find your look" sub="A few quick questions and we'll land on the perfect cut. First up — how do you want the sides?" />
+                <Masthead eyebrow="STEP 1 OF 3" title="The sides" sub="How should we cut them?" />
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  <Card photo={ctImg("scissor")} title="Keep some length" blurb="Chill and natural — scissors, nothing buzzed. Easy to grow out." onTap={() => finish("scissor")} />
-                  <Card photo={ctImg("standard")} title="Tight and clean" blurb="That fresh, sharp look — we tighten up the sides and back." onTap={() => setConsult({ ...consult, sides: "tight", step: "bottom" })} />
-                  <button onClick={() => setConsult({ ...consult, step: "sidesHelp" })} style={{ background: "none", color: "var(--gold)", fontSize: 14.5, fontWeight: 500, padding: "6px 0", marginTop: 2 }}>Honestly? I'm not sure →</button>
+                  <div style={{ position: "relative" }}>
+                    <Card photo={ctImg("standard")} title="Clippers" blurb="Short on the sides, trimmed on top. The classic." onTap={() => setConsult({ ...consult, sides: "tight", step: "bottom" })} tall />
+                    <div style={{ position: "absolute", top: 14, right: 14, background: "var(--gold)", color: "var(--on-gold)", fontSize: 10, letterSpacing: 1.5, fontWeight: 700, padding: "5px 10px", borderRadius: 20 }}>MOST POPULAR</div>
+                  </div>
+                  <Card photo={ctImg("scissor")} title="Scissors only" blurb="No clippers — softer and longer all over." onTap={() => finish("scissor")} />
                 </div>
               </div>
             );
@@ -1271,52 +1273,61 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           if (consult.step === "sidesHelp") {
             return (
               <div className="fade-up">
-                <Masthead eyebrow="QUICK GUIDE" title="No worries — here's the gist" sub="It really comes down to the sides and back." />
+                <Masthead eyebrow="THE DIFFERENCE" title="It's all in the sides" sub="" />
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px" }}>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, marginBottom: 4 }}>Keep some length</div>
-                    <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>Softer, natural, grows out easy. No buzzed or faded sections — just shaped up with scissors.</p>
+                  <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 20px" }}>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, marginBottom: 5 }}>Clippers</div>
+                    <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>Short and clean on the sides, trimmed up top. What most guys get.</p>
                   </div>
-                  <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px" }}>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, marginBottom: 4 }}>Tight and clean</div>
-                    <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>The sharp, modern look. We blend the sides shorter as they go down. You'll pick exactly how short next.</p>
+                  <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 20px" }}>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, marginBottom: 5 }}>Scissors only</div>
+                    <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>Soft and natural, longer all over. No buzzed sides.</p>
                   </div>
-                  <button className="lift" onClick={() => setConsult({ ...consult, step: "sides" })} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 14, marginTop: 4 }}>GOT IT — LET'S PICK</button>
+                  <button className="lift" onClick={() => setConsult({ ...consult, step: "sides" })} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 14, marginTop: 4 }}>GOT IT</button>
                 </div>
               </div>
             );
           }
-          // ---- BOTTOM (skin vs not) ----
+          // ---- BOTTOM (skin vs not) — big side-by-side contrast ----
           if (consult.step === "bottom") {
+            const Half = ({ photo, tag, title, blurb, onTap }) => (
+              <button className="lift" onClick={onTap} style={{ position: "relative", flex: 1, border: "none", borderRadius: 18, padding: 0, overflow: "hidden", color: "#fff", textAlign: "left", height: 340, boxShadow: "var(--shadow-md)", background: "var(--panel2)" }}>
+                {photo && <img src={imgUrl(photo, 600)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.05) 100%)" }} />
+                <div style={{ position: "absolute", top: 16, left: 16, fontSize: 10, letterSpacing: 2, fontWeight: 700, color: "var(--gold)" }}>{tag}</div>
+                <div style={{ position: "absolute", left: 16, right: 16, bottom: 18 }}>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 25, fontWeight: 500, lineHeight: 1.0, marginBottom: 7 }}>{title}</div>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.4 }}>{blurb}</div>
+                </div>
+              </button>
+            );
             return (
               <div className="fade-up">
-                <Masthead title="How short at the bottom?" sub="This is the big one — it's the difference between a regular fade and a skin fade." />
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  <Card photo={ctImg("standard")} title="Short, but leave a little" blurb="Clean and easy. You'll still see a bit of hair at the edges — never bald." onTap={() => setConsult({ ...consult, bottom: "short", step: "condition" })} />
-                  <Card photo={ctImg("skinfade")} title="Take it all the way — smooth" blurb="The sharpest, cleanest look there is. Bald and smooth at the edges. Takes us a little extra time to get perfect — but no extra charge." onTap={() => setConsult({ ...consult, bottom: "skin", step: "condition" })} />
+                <Masthead eyebrow="STEP 2 OF 3" title="The bottom" sub="How far down do we take it?" />
+                <div style={{ display: "flex", gap: 12 }}>
+                  <Half photo={ctImg("standard")} tag="CLASSIC" title="Not bald" blurb="A little hair stays at the edges." onTap={() => setConsult({ ...consult, bottom: "short", step: "condition" })} />
+                  <Half photo={ctImg("skinfade")} tag="SHARPEST" title="To the skin" blurb="Smooth and bare. The cleanest finish." onTap={() => setConsult({ ...consult, bottom: "skin", step: "condition" })} />
                 </div>
+                <p style={{ textAlign: "center", fontSize: 13, color: "var(--faint)", marginTop: 16, lineHeight: 1.5 }}>The only real difference — how short it goes at the very bottom.</p>
               </div>
             );
           }
           // ---- CONDITION (transformation question) ----
           if (consult.step === "condition") {
             const cutId = consult.bottom === "skin" ? "skinfade" : "standard";
+            const Opt = ({ title, sub, gold, onTap }) => (
+              <button className="lift" onClick={onTap} style={{ width: "100%", background: "var(--panel)", border: `1px solid ${gold ? "var(--gold)" : "var(--border)"}`, borderRadius: 16, padding: "18px 20px", textAlign: "left", color: "var(--text)" }}>
+                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, marginBottom: 3 }}>{title}</div>
+                <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4 }}>{sub}</div>
+              </button>
+            );
             return (
               <div className="fade-up">
-                <Masthead title="How's the hair looking now?" sub="Last thing — this helps us set aside the right amount of time for you." />
+                <Masthead eyebrow="STEP 3 OF 3" title="Where you're at" sub="So we set aside the right time." />
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  <button className="lift" onClick={() => finish(cutId, 0)} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 20px", textAlign: "left", color: "var(--text)" }}>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, marginBottom: 3 }}>Pretty fresh</div>
-                    <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4 }}>Just need a tidy-up.</div>
-                  </button>
-                  <button className="lift" onClick={() => finish(cutId, 0)} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 20px", textAlign: "left", color: "var(--text)" }}>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, marginBottom: 3 }}>About normal</div>
-                    <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4 }}>Been a few weeks, the usual.</div>
-                  </button>
-                  <button className="lift" onClick={() => finish(cutId, 10)} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--gold)", borderRadius: 16, padding: "18px 20px", textAlign: "left", color: "var(--text)" }}>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, marginBottom: 3 }}>Real grown out</div>
-                    <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4 }}>Let's do a transformation.</div>
-                  </button>
+                  <Opt title="Just a touch-up" sub="Still pretty fresh." onTap={() => finish(cutId, 0)} />
+                  <Opt title="The usual" sub="Been a few weeks." onTap={() => finish(cutId, 0)} />
+                  <Opt title="A transformation" sub="Grown out — let's reset it." gold onTap={() => finish(cutId, 10)} />
                 </div>
               </div>
             );
@@ -1330,8 +1341,8 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                 <div style={{ textAlign: "center", padding: "10px 4px 22px" }}>
                   <div className="success-bloom" style={{ width: 50, height: 50, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Check size={24} style={{ color: "var(--gold)" }} strokeWidth={2.5} /></div>
                   <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 14px" }} />
-                  <div style={{ fontSize: 15.5, color: "var(--text)", marginBottom: 8 }}>Alright, here's what I'm thinking for you…</div>
-                  <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 38, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.5px" }}>{ct?.label}</h2>
+                  <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>YOUR MATCH</div>
+                  <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 40, fontWeight: 500, lineHeight: 1.0, letterSpacing: "-0.5px" }}>{ct?.label}</h2>
                 </div>
                 <div className="drift-in" style={{ borderRadius: 18, overflow: "hidden", marginBottom: 16, border: "1.5px solid var(--gold)", boxShadow: "var(--shadow-md)" }}>
                   {ct && (ct.images || [])[0] && <img src={imgUrl((ct.images || [])[0], 800)} alt="" style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }} />}
@@ -1344,16 +1355,15 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                 </div>
                 {extra > 0 && (
                   <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 14, padding: "14px 16px", marginBottom: 18, fontSize: 14, color: "var(--text)", lineHeight: 1.5 }}>
-                    <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>HEADS UP</div>
-                    Since we've got more to work with, we'll set aside about 10 extra minutes to nail it — don't worry, it's not extra. It's all part of the cut.
+                    <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>A LITTLE EXTRA TIME</div>
+                    We'll set aside 10 more minutes to do it right. No extra charge — it's part of the cut.
                   </div>
                 )}
                 <button className="lift" onClick={() => {
-                  // commit the consultation result and move into the normal flow at the addons/beard phase
                   setConsult(null);
                   setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons");
-                }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 14, marginBottom: 11, boxShadow: "var(--shadow-md)" }}>PERFECT, LET'S BOOK IT</button>
-                <button onClick={() => { setConsult(null); setCutType(null); setCutPhase("type"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 12, fontSize: 14, fontWeight: 500, borderRadius: 12 }}>Actually, let me pick myself</button>
+                }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 14, marginBottom: 11, boxShadow: "var(--shadow-md)" }}>BOOK IT</button>
+                <button onClick={() => { setConsult(null); setCutType(null); setCutPhase("type"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 12, fontSize: 14, fontWeight: 500, borderRadius: 12 }}>Let me choose myself</button>
               </div>
             );
           }
