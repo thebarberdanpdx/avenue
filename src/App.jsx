@@ -448,7 +448,7 @@ function Portal({ children }) {
 }
 
 // Sheet: a popup that opens centered in the viewport, never off-screen.
-function Sheet({ open, onClose, children, align = "center", maxWidth = 520 }) {
+function Sheet({ open, onClose, children, align = "top", maxWidth = 520 }) {
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -456,10 +456,11 @@ function Sheet({ open, onClose, children, align = "center", maxWidth = 520 }) {
     return () => { document.body.style.overflow = prev; };
   }, [open]);
   if (!open) return null;
-  const justify = align === "bottom" ? "flex-end" : "center";
+  const justify = align === "bottom" ? "flex-end" : align === "top" ? "flex-start" : "center";
+  const topPad = align === "top" ? "calc(env(safe-area-inset-top) + 8px)" : 0;
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 2000, display: "flex", alignItems: justify, justifyContent: "center", padding: align === "center" ? "20px" : 0, boxSizing: "border-box" }}>
-      <div onClick={(e) => e.stopPropagation()} className="appt-drop" style={{ width: "100%", maxWidth, background: "var(--bg)", borderRadius: align === "center" ? 22 : "22px 22px 0 0", padding: "16px 16px calc(20px + env(safe-area-inset-bottom))", maxHeight: "82vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 2000, display: "flex", alignItems: justify, justifyContent: "center", padding: align === "center" ? "20px" : `${topPad} 0 0 0`, boxSizing: "border-box" }}>
+      <div onClick={(e) => e.stopPropagation()} className="appt-drop" style={{ width: "100%", maxWidth, background: "var(--bg)", borderRadius: align === "top" ? "0 0 22px 22px" : (align === "center" ? 22 : "22px 22px 0 0"), padding: "20px 20px calc(20px + env(safe-area-inset-bottom))", maxHeight: align === "top" ? "92vh" : "82vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
         {children}
       </div>
     </div>
@@ -2497,6 +2498,11 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   const [toast, setToast] = useState(null);
   const [msgTarget, setMsgTarget] = useState(null); // { clientId, draft } — opens a convo prefilled
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3400); };
+
+  // Always land at the top of the screen when changing tabs or opening a profile.
+  useEffect(() => {
+    try { window.scrollTo({ top: 0, behavior: "instant" }); } catch { window.scrollTo(0, 0); }
+  }, [tab, activeClient]);
 
   // open a conversation (creating a lightweight client if needed) with a prefilled draft
   const textPerson = ({ name, phone, provider, draft }) => {
@@ -5586,6 +5592,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   const weekStartsOn = (business && business.weekStartsOn != null) ? business.weekStartsOn : 0;
   const week = useMemo(() => { const arr = []; const base = new Date(); const shift = (base.getDay() - weekStartsOn + 7) % 7; base.setDate(base.getDate() + dayOffset - shift); for (let i = 0; i < 7; i++) { const d = new Date(base); d.setDate(base.getDate() + i); arr.push(d); } return arr; }, [dayOffset, weekStartsOn]);
   const today = new Date();
+  // The day currently being shown on the calendar (controlled by dayOffset)
+  const selectedDate = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(0, 0, 0, 0); return d; }, [dayOffset]);
+  const sameDay = (iso, refDate) => { if (!iso) return false; const a = new Date(iso); return a.getFullYear() === refDate.getFullYear() && a.getMonth() === refDate.getMonth() && a.getDate() === refDate.getDate(); };
 
   // find the first open 15-min slot for a provider today (falls back to DAY_START)
   const nextFreeSlot = (providerId) => {
@@ -5601,10 +5610,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   return (
     <div className="fade-up">
       {showWaitlistPanel && (
-        <div onClick={() => setShowWaitlistPanel(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg)", borderTopLeftRadius: 22, borderTopRightRadius: 22, maxHeight: "85vh", overflowY: "auto", padding: "20px 20px 36px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500 }}>Waitlist</h2>
+        <div onClick={() => setShowWaitlistPanel(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg)", borderBottomLeftRadius: 22, borderBottomRightRadius: 22, maxHeight: "85vh", overflowY: "auto", padding: "calc(20px + env(safe-area-inset-top)) 22px 30px", boxShadow: "0 20px 40px rgba(0,0,0,0.4)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 10 }} />
+                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1 }}>Waitlist</h2>
+              </div>
               <button onClick={() => setShowWaitlistPanel(false)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: "50%", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={18} /></button>
             </div>
             <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={(p) => showToast && showToast(`Texting ${p.name || "client"}…`)} showToast={showToast} />
@@ -5659,27 +5671,33 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           </div>
         </div>
       )}
-      <div style={{ marginBottom: 24 }}>
+      {/* Editorial calendar header — two lines, no cramping */}
+      <div style={{ marginBottom: 22 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{`${DAYS[today.getDay()]}, ${MONTHS[today.getMonth()]} ${today.getDate()}`.toUpperCase()}</div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16 }}>
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>Today</h2>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 42, borderRadius: 12, fontSize: 13.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 7, position: "relative", letterSpacing: 0.3 }}><Clock size={15} style={{ color: "var(--gold)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
-            <button onClick={() => setShowCalendarOptions(true)} title="Calendar view" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 42, height: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}><Settings size={16} /></button>
-            <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 16px", height: 42, borderRadius: 12, fontSize: 13.5, fontWeight: 600, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)" }}><Plus size={16} strokeWidth={2.5} /> NEW</button>
-          </div>
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{`${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`.toUpperCase()}</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, letterSpacing: -0.7, lineHeight: 0.95, marginBottom: 16 }}>{relativeDate(selectedDate)}</h2>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 40, borderRadius: 11, fontSize: 13.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 7, position: "relative", letterSpacing: 0.3 }}><Clock size={14} style={{ color: "var(--gold)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
+          <button onClick={() => setShowCalendarOptions(true)} title="Calendar view" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 40, height: 40, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center" }}><Settings size={15} /></button>
+          <div style={{ flex: 1 }} />
+          <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 18px", height: 40, borderRadius: 11, fontSize: 13.5, fontWeight: 600, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)" }}><Plus size={15} strokeWidth={2.5} /> NEW</button>
         </div>
       </div>
 
-      {/* Editorial day strip — quiet ghosts with one bold today */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 22, padding: "4px 0" }}>
-        {week.map((d, i) => { const isToday = d.toDateString() === today.toDateString(); return (
-          <div key={i} style={{ flex: "1 0 0", textAlign: "center", padding: "10px 0", borderRadius: 12, background: isToday ? "var(--text)" : "transparent", color: isToday ? "var(--bg)" : "var(--sub)", border: isToday ? "1px solid var(--text)" : "1px solid transparent", transition: "all .2s" }}>
-            <div style={{ fontSize: 10.5, letterSpacing: 1.5, fontWeight: 500, marginBottom: 4, opacity: isToday ? 0.75 : 0.5 }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500 }}>{d.getDate()}</div>
-          </div>
-        ); })}
+      {/* Scrollable multi-week day strip — swipe horizontally, tap to pick */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 24, padding: "4px 2px", overflowX: "auto", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+        {Array.from({ length: 28 }, (_, i) => { // 4 weeks ahead, swipe to reach
+          const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i);
+          const isSelected = d.toDateString() === selectedDate.toDateString();
+          const isToday = i === 0;
+          return (
+            <button key={i} onClick={() => setDayOffset(i)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: "start", textAlign: "center", padding: "12px 4px 14px", borderRadius: 14, background: isSelected ? "var(--text)" : "transparent", color: isSelected ? "var(--bg)" : "var(--sub)", border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
+              <div style={{ fontSize: 10.5, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.8 : 0.55 }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, lineHeight: 1 }}>{d.getDate()}</div>
+              {!isSelected && isToday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "var(--gold)" }} />}
+            </button>
+          );
+        })}
       </div>
 
       {/* staff column headers */}
@@ -5703,7 +5721,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
 
         {/* columns */}
         {staff.map((p) => {
-          const col = appts.filter((a) => a.providerId === p.id);
+          const col = appts.filter((a) => a.providerId === p.id && sameDay(a.bookedFor, selectedDate));
           return (
             <div key={p.id}
               style={{ flex: 1, position: "relative", height: gridHeight, borderLeft: "1px solid var(--line)" }}>
