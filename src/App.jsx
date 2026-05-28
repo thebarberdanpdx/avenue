@@ -1241,9 +1241,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           const Head = ({ step: s, q, sub }) => (
             <div style={{ padding: "8px 2px 30px" }}>
               <div style={{ width: 34, height: 1.5, background: "var(--gold)", marginBottom: 18 }} />
-              <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 16 }}>{s}</div>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 36, fontWeight: 500, color: "var(--text)", lineHeight: 1.05, letterSpacing: "-0.4px", marginBottom: sub ? 14 : 0 }}>{q}</h2>
-              {sub && <p style={{ color: "var(--sub)", fontSize: 17, lineHeight: 1.45, fontWeight: 400 }}>{sub}</p>}
+              <div style={{ fontSize: 12, letterSpacing: 3, color: "var(--gold)", fontWeight: 700, marginBottom: 18 }}>{s}</div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 40, fontWeight: 500, color: "var(--text)", lineHeight: 1.04, letterSpacing: "-0.5px", marginBottom: sub ? 16 : 0 }}>{q}</h2>
+              {sub && <p style={{ color: "var(--text)", fontSize: 18, lineHeight: 1.45, fontWeight: 400, opacity: 0.78 }}>{sub}</p>}
             </div>
           );
           // Reusable option list: thin dividers, big serif title, readable description
@@ -1253,7 +1253,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                 <button key={i} className="lift-row" onClick={it.onTap} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, background: "none", border: "none", borderBottom: "1px solid var(--line)", padding: "22px 4px", textAlign: "left", color: "var(--text)" }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontFamily: FONT_DISPLAY, fontSize: 25, fontWeight: 500, lineHeight: 1.1, marginBottom: it.sub ? 6 : 0, color: it.gold ? "var(--gold)" : "var(--text)" }}>{it.title}</div>
-                    {it.sub && <div style={{ fontSize: 15.5, color: "var(--sub)", lineHeight: 1.45 }}>{it.sub}</div>}
+                    {it.sub && <div style={{ fontSize: 17, color: "var(--sub)", lineHeight: 1.45 }}>{it.sub}</div>}
                   </div>
                   <ChevronRight size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
                 </button>
@@ -1292,9 +1292,8 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <div className="fade-up">
                 <Head s="STEP 3 OF 3" q="How long since your last cut?" sub="So we save the right amount of time for you." />
                 <OptionList items={[
-                  { title: "A week or two", sub: "Still pretty fresh — just a clean-up.", onTap: () => finish(cutId, 0) },
-                  { title: "A month or so", sub: "The usual time between cuts.", onTap: () => finish(cutId, 0) },
-                  { title: "It's been a while", sub: "Grown out — let's do a full reset.", gold: true, onTap: () => finish(cutId, 10) },
+                  { title: "3–4 weeks", sub: "The usual time between cuts.", onTap: () => finish(cutId, 0) },
+                  { title: "It's been a while", sub: "Grown out — we'll be taking off a good amount.", gold: true, onTap: () => finish(cutId, 10) },
                 ]} />
               </div>
             );
@@ -1303,26 +1302,48 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           if (consult.step === "reveal") {
             const ct = draft.cutTypes.find((c) => c.id === (consultResult?.cutId));
             const extra = consult._extraMin || 0;
+            const heroImg = ct && (ct.images || [])[0];
             return (
               <div className="fade-up">
-                <div style={{ padding: "20px 2px 10px" }}>
-                  <div style={{ width: 34, height: 1.5, background: "var(--gold)", marginBottom: 18 }} />
-                  <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 16 }}>YOUR MATCH</div>
-                  <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, color: "var(--text)", lineHeight: 1.0, letterSpacing: "-0.6px", marginBottom: 18 }}>{ct?.label}</h2>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 30, color: "var(--gold)" }}>${ct?.price}</span>
+                <div style={{ textAlign: "center", paddingTop: 6, marginBottom: 22 }}>
+                  <div className="success-bloom" style={{ width: 46, height: 46, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Check size={22} style={{ color: "var(--gold)" }} strokeWidth={2.5} /></div>
+                  <div style={{ fontSize: 12, letterSpacing: 3, color: "var(--gold)", fontWeight: 700 }}>YOUR MATCH</div>
+                </div>
+
+                {/* Hero card — image if available, gorgeous typographic fallback if not */}
+                <div className="drift-in" style={{ borderRadius: 22, overflow: "hidden", marginBottom: 22, boxShadow: "var(--shadow-md)", position: "relative", minHeight: 320 }}>
+                  {heroImg ? (
+                    <>
+                      <img src={imgUrl(heroImg, 900)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.45) 45%, rgba(0,0,0,0.12) 100%)" }} />
+                    </>
+                  ) : (
+                    // Fallback: layered warm gradient with a giant ghosted serif initial
+                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(145deg, #1a1714 0%, #2a2420 55%, #0f0d0b 100%)" }}>
+                      <div style={{ position: "absolute", top: -40, right: -20, fontFamily: FONT_DISPLAY, fontSize: 320, lineHeight: 1, color: "color-mix(in srgb, var(--gold) 14%, transparent)", fontWeight: 500, userSelect: "none" }}>{ct?.label?.charAt(0)}</div>
+                      <div style={{ position: "absolute", top: 22, left: 24, width: 40, height: 1.5, background: "var(--gold)" }} />
+                    </div>
+                  )}
+                  <div style={{ position: "absolute", left: 24, right: 24, bottom: 24, color: "#fff" }}>
+                    <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 700, marginBottom: 10 }}>WE'D SET YOU UP WITH</div>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, lineHeight: 1.0, letterSpacing: "-0.5px", marginBottom: 14 }}>{ct?.label}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ fontFamily: FONT_DISPLAY, fontSize: 26, color: "#fff" }}>${ct?.price}</span>
+                      <span style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(255,255,255,0.5)" }} />
+                      <span style={{ fontSize: 14, color: "rgba(255,255,255,0.8)" }}>with {provider.name}</span>
+                    </div>
                   </div>
                 </div>
+
                 {extra > 0 && (
-                  <div style={{ borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "18px 2px", margin: "20px 0 24px" }}>
-                    <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>A LITTLE EXTRA TIME</div>
+                  <div style={{ borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "18px 2px", marginBottom: 24 }}>
+                    <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 700, marginBottom: 8 }}>A LITTLE EXTRA TIME</div>
                     <p style={{ fontSize: 16, color: "var(--text)", lineHeight: 1.5 }}>We'll set aside 10 more minutes to do it right. No extra charge — it's part of the cut.</p>
                   </div>
                 )}
-                <div style={{ marginTop: extra > 0 ? 0 : 28 }}>
-                  <button className="lift" onClick={() => { setConsult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 18, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, marginBottom: 12, boxShadow: "var(--shadow-md)" }}>BOOK IT</button>
-                  <button onClick={() => { setConsult(null); setCutType(null); setCutPhase("type"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 12, fontSize: 14.5, fontWeight: 500, borderRadius: 12 }}>Let me choose myself</button>
-                </div>
+
+                <button className="lift" onClick={() => { setConsult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 18, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, marginBottom: 12, boxShadow: "var(--shadow-md)" }}>BOOK IT</button>
+                <button onClick={() => { setConsult(null); setCutType(null); setCutPhase("type"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 12, fontSize: 14.5, fontWeight: 500, borderRadius: 12 }}>Let me choose myself</button>
               </div>
             );
           }
