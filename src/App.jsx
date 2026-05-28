@@ -458,9 +458,11 @@ function Sheet({ open, onClose, children, align = "top", maxWidth = 520 }) {
   if (!open) return null;
   const justify = align === "bottom" ? "flex-end" : align === "top" ? "flex-start" : "center";
   const topPad = align === "top" ? "calc(env(safe-area-inset-top) + 8px)" : 0;
+  // Calculate available space for the inner box, accounting for top padding
+  const innerMaxH = align === "top" ? "calc(100dvh - env(safe-area-inset-top) - 16px)" : (align === "center" ? "82vh" : "82vh");
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 2000, display: "flex", alignItems: justify, justifyContent: "center", padding: align === "center" ? "20px" : `${topPad} 0 0 0`, boxSizing: "border-box" }}>
-      <div onClick={(e) => e.stopPropagation()} className="appt-drop" style={{ width: "100%", maxWidth, background: "var(--bg)", borderRadius: align === "top" ? "0 0 22px 22px" : (align === "center" ? 22 : "22px 22px 0 0"), padding: "20px 20px calc(20px + env(safe-area-inset-bottom))", maxHeight: align === "top" ? "92vh" : "82vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
+      <div onClick={(e) => e.stopPropagation()} className="appt-drop" style={{ width: "100%", maxWidth, background: "var(--bg)", borderRadius: align === "top" ? "0 0 22px 22px" : (align === "center" ? 22 : "22px 22px 0 0"), padding: "20px 20px calc(20px + env(safe-area-inset-bottom))", maxHeight: innerMaxH, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", boxShadow: "0 20px 60px rgba(0,0,0,0.4)", boxSizing: "border-box" }}>
         {children}
       </div>
     </div>
@@ -5677,10 +5679,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{`${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`.toUpperCase()}</div>
         <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, letterSpacing: -0.7, lineHeight: 0.95, marginBottom: 16 }}>{relativeDate(selectedDate)}</h2>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 40, borderRadius: 11, fontSize: 13.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 7, position: "relative", letterSpacing: 0.3 }}><Clock size={14} style={{ color: "var(--gold)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
           <button onClick={() => setShowCalendarOptions(true)} title="Calendar view" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 40, height: 40, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center" }}><Settings size={15} /></button>
-          <div style={{ flex: 1 }} />
           <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 18px", height: 40, borderRadius: 11, fontSize: 13.5, fontWeight: 600, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)" }}><Plus size={15} strokeWidth={2.5} /> NEW</button>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 40, borderRadius: 11, fontSize: 13.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 7, position: "relative", letterSpacing: 0.3 }}><Clock size={14} style={{ color: "var(--gold)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
         </div>
       </div>
 
