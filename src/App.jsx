@@ -2521,7 +2521,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
       <div style={{ maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
-        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
+        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
         {tab === "messages" && <MessagesView clients={clients} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} />}
@@ -2750,11 +2750,107 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     </>
   );
 
-  // ---- HUB ----
+  // ---- REFERENCE PHOTOS section (AI training) ----
+  // Picker for which target gets the next picked photo: { kind: 'service' } or { kind: 'cutType', id }
+  const [refPickTarget, setRefPickTarget] = useState(null);
+  const addRefPhoto = (target, photoId) => {
+    if (!photoId) return;
+    if (target.kind === "service") {
+      const list = form.referencePhotos || [];
+      if (list.includes(photoId)) return;
+      setForm({ ...form, referencePhotos: [...list, photoId] });
+    } else if (target.kind === "cutType") {
+      const cuts = (form.cutTypes || []).map((c) => {
+        if (c.id !== target.id) return c;
+        const list = c.referencePhotos || [];
+        if (list.includes(photoId)) return c;
+        return { ...c, referencePhotos: [...list, photoId] };
+      });
+      setForm({ ...form, cutTypes: cuts });
+    }
+  };
+  const removeRefPhoto = (target, photoId) => {
+    if (target.kind === "service") {
+      setForm({ ...form, referencePhotos: (form.referencePhotos || []).filter((p) => p !== photoId) });
+    } else if (target.kind === "cutType") {
+      const cuts = (form.cutTypes || []).map((c) => c.id === target.id ? { ...c, referencePhotos: (c.referencePhotos || []).filter((p) => p !== photoId) } : c);
+      setForm({ ...form, cutTypes: cuts });
+    }
+  };
+  const refTile = ({ photoId, target }) => (
+    <div key={photoId} style={{ position: "relative", aspectRatio: "1/1", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)" }}>
+      <img src={imgUrl(photoId, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+      <button onClick={() => removeRefPhoto(target, photoId)} style={{ position: "absolute", top: 6, right: 6, width: 26, height: 26, borderRadius: "50%", background: "rgba(0,0,0,0.65)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", border: "none", padding: 0 }} aria-label="Remove from training"><Trash2 size={13} /></button>
+    </div>
+  );
+  const referencePhotosSection = (
+    <>
+      <SectionHeader title="Reference Photos for AI" />
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18 }}>Upload examples of what this cut looks like in real life. The AI uses these to match a client's photo to the right service. You can keep adding as you work — every photo makes future matches sharper.</p>
+
+      {form.cutTypes && form.cutTypes.length > 0 ? (
+        form.cutTypes.map((ct) => {
+          const list = ct.referencePhotos || [];
+          const target = { kind: "cutType", id: ct.id };
+          return (
+            <div key={ct.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16, marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.15 }}>{ct.label}</div>
+                <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>{list.length} PHOTO{list.length === 1 ? "" : "S"}</div>
+              </div>
+              {ct.desc && <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginBottom: 12 }}>{ct.desc}</p>}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {list.map((pid) => refTile({ photoId: pid, target }))}
+                <button onClick={() => setRefPickTarget(target)} style={{ aspectRatio: "1/1", borderRadius: 12, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 4, padding: 0 }}>
+                  <Plus size={20} />
+                  <span style={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 600 }}>ADD</span>
+                </button>
+              </div>
+            </div>
+          );
+        })
+      ) : (
+        (() => {
+          const list = form.referencePhotos || [];
+          const target = { kind: "service" };
+          return (
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16, marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500 }}>{form.name || "This service"}</div>
+                <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>{list.length} PHOTO{list.length === 1 ? "" : "S"}</div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {list.map((pid) => refTile({ photoId: pid, target }))}
+                <button onClick={() => setRefPickTarget(target)} style={{ aspectRatio: "1/1", borderRadius: 12, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 4, padding: 0 }}>
+                  <Plus size={20} />
+                  <span style={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 600 }}>ADD</span>
+                </button>
+              </div>
+            </div>
+          );
+        })()
+      )}
+
+      <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 14, padding: "14px 16px", fontSize: 13, color: "var(--text)", lineHeight: 1.5, marginTop: 10 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>HOW IT LEARNS</div>
+        Every time you finish a client and add their final photo, Vero automatically adds it here too. Over time, your library grows and the AI's matches get sharper. You can remove any photo with the trash icon if it shouldn't train future matches.
+      </div>
+
+      <SaveBar />
+    </>
+  );
+
+  const refPhotoCount = (() => {
+    if (form.cutTypes && form.cutTypes.length) {
+      return form.cutTypes.reduce((sum, ct) => sum + (ct.referencePhotos || []).length, 0);
+    }
+    return (form.referencePhotos || []).length;
+  })();
   const hubRows = [
     { id: "details", label: "Details", sub: `$${form.price || "—"} · ${form.duration || "—"} min` },
     { id: "staff", label: "Staff", sub: `${staffList.filter((p) => form.staff[p.id]?.on !== false).length} of ${staffList.length} offering` },
     { id: "customizations", label: "Add-ons & Customizations", sub: `${form.addonGroups.length} option group${form.addonGroups.length !== 1 ? "s" : ""}` },
+    { id: "refphotos", label: "Reference Photos for AI", sub: refPhotoCount === 0 ? "None yet" : `${refPhotoCount} photo${refPhotoCount === 1 ? "" : "s"}` },
     { id: "booking", label: "Online Booking", sub: b.available ? "Available" : "Off" },
   ];
 
@@ -2766,9 +2862,11 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           if (picker.target === "service") setForm({ ...form, photo: id });
           else setForm({ ...form, addonGroups: form.addonGroups.map((g, i) => i === picker.target ? { ...g, photo: id } : g) });
         }} />}
+        {refPickTarget && <PhotoPicker onClose={() => setRefPickTarget(null)} onPick={(id) => { addRefPhoto(refPickTarget, id); setRefPickTarget(null); }} />}
         {section === "details" ? detailsSection
           : section === "staff" ? staffSection
           : section === "customizations" ? customizationsSection
+          : section === "refphotos" ? referencePhotosSection
           : section === "booking" ? bookingSection
           : (
             <>
@@ -6643,7 +6741,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
   );
 }
 
-function ClientProfile({ client, clients, setClients, services, providers, appts, onBack, showToast }) {
+function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, onBack, showToast }) {
   const live = clients.find((c) => c.id === client.id);
   const provider = providers.find((p) => p.id === live.provider) || providers[1];
   const [pfTab, setPfTab] = useState("overview"); // overview | timeline | photos | times | family
@@ -6722,7 +6820,39 @@ function ClientProfile({ client, clients, setClients, services, providers, appts
     const entry = { id: "g" + Date.now(), photo: id, note: "", date: new Date().toISOString() };
     setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: [entry, ...(c.gallery || [])] } : c));
     setGalPicker(false);
-    showToast("Photo added to gallery.");
+
+    // Auto-train: add this photo to the AI reference library for the matching service / cut type.
+    // We use the client's most recent confirmed appointment to figure out which service + cut type.
+    let learned = false;
+    try {
+      const myAppts = (appts || []).filter((a) => a.clientId === client.id && a.status !== "block").sort((a, b) => (b.bookedFor || "").localeCompare(a.bookedFor || ""));
+      const lastAppt = myAppts[0];
+      const cutTypeId = lastAppt?.lineItems?.[0]?.cutType || null;
+      const serviceId = lastAppt?.serviceId;
+      if (serviceId && setServices) {
+        setServices(services.map((s) => {
+          if (s.id !== serviceId) return s;
+          // If service has cut types and we know which one, add to that cut type's referencePhotos
+          if (s.cutTypes && s.cutTypes.length && cutTypeId) {
+            const cuts = s.cutTypes.map((ct) => {
+              if (ct.id !== cutTypeId) return ct;
+              const list = ct.referencePhotos || [];
+              if (list.includes(id)) return ct;
+              learned = true;
+              return { ...ct, referencePhotos: [...list, id] };
+            });
+            return { ...s, cutTypes: cuts };
+          }
+          // Otherwise, add to the service's own referencePhotos
+          const list = s.referencePhotos || [];
+          if (list.includes(id)) return s;
+          learned = true;
+          return { ...s, referencePhotos: [...list, id] };
+        }));
+      }
+    } catch (err) { /* silent — gallery still saves */ }
+
+    showToast(learned ? "Photo saved — Vero just got a little smarter." : "Photo added to gallery.");
   };
   const removeGalleryPhoto = (gid) => {
     setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: (c.gallery || []).filter((g) => g.id !== gid) } : c));
