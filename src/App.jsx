@@ -847,6 +847,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [codeEntry, setCodeEntry] = useState("");
   const [codeError, setCodeError] = useState(false);
   const [pendingMatch, setPendingMatch] = useState(null); // the client we found, awaiting code verify
+  const [blockedNotice, setBlockedNotice] = useState(false); // shown when a blocked client tries to book
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberNote, setNewMemberNote] = useState("");
   const [cart, setCart] = useState([]);
@@ -1752,11 +1753,18 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
             <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>We'll text you a quick code to confirm it's you.</p>
             <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             <p style={{ color: "var(--faint)", fontSize: 14, marginBottom: 22 }}>Try <span style={{ color: "var(--gold)", cursor: "pointer" }} onClick={() => setPhone("503-555-0142")}>503-555-0142</span> (returning client Marcus).</p>
-            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={() => { const digits = phone.replace(/\D/g, ""); const found = clients.find((c) => c.phone.replace(/\D/g, "") === digits) || null; setPendingMatch(found); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "var(--border)" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Text me a code →</button>
+            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={() => { const digits = phone.replace(/\D/g, ""); const found = clients.find((c) => c.phone.replace(/\D/g, "") === digits) || null; if (found && found.blocked) { setBlockedNotice(true); return; } setPendingMatch(found); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "var(--border)" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Text me a code →</button>
           </div>
         )}
 
         {/* CODE VERIFICATION — confirms the texted code (accepts any 6 digits until Twilio is live) */}
+        <Sheet open={blockedNotice} onClose={() => setBlockedNotice(false)} align="top">
+          <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Let's connect directly</h2>
+          <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>We aren't able to take this booking online. Please give the shop a call or send a text and we'll take care of you from there.</p>
+          {business?.phone && <a href={`tel:${business.phone}`} style={{ display: "block", textAlign: "center", width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, textDecoration: "none", marginBottom: 10, boxSizing: "border-box" }}>CALL THE SHOP</a>}
+          <button onClick={() => setBlockedNotice(false)} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 12, fontSize: 14, fontWeight: 500, borderRadius: 12, border: "none" }}>Close</button>
+        </Sheet>
         {step === 5 && showCodeEntry && (
           <div className="fade-up">
             <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
@@ -6782,6 +6790,20 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
     setOpenMember(null);
   };
   const [selService, setSelService] = useState(services[0]?.id || "");
+
+  // ---- Block from booking ----
+  const [blockPrompt, setBlockPrompt] = useState(false);
+  const [blockReason, setBlockReason] = useState("");
+  const isBlocked = !!live.blocked;
+  const confirmBlock = () => {
+    setClients(clients.map((c) => c.id === live.id ? { ...c, blocked: true, blockReason: blockReason.trim(), blockedAt: new Date().toISOString() } : c));
+    setBlockPrompt(false); setBlockReason("");
+    showToast(`${live.name.split(" ")[0]} is blocked from booking.`);
+  };
+  const unblock = () => {
+    setClients(clients.map((c) => c.id === live.id ? { ...c, blocked: false, blockReason: "", blockedAt: null } : c));
+    showToast(`${live.name.split(" ")[0]} can book again.`);
+  };
   const sel = services.find((s) => s.id === selService);
   // current value to prefill the time dropdowns: custom if set, else service default
   const curMin = (live.customDurations[selService] != null) ? live.customDurations[selService] : (sel?.duration || 30);
@@ -7019,7 +7041,34 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
             ))}
           </div>
         )}
+
+        {/* Block from booking */}
+        <div style={{ marginTop: 26, paddingTop: 22, borderTop: "1px solid var(--line)" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 3, color: isBlocked ? "var(--danger, #c0392b)" : "var(--text)" }}>Block from booking</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>{isBlocked ? "This client can't book online. They can still be added manually." : "Prevent this client from booking online."}</div>
+            </div>
+            <button onClick={() => { if (isBlocked) { unblock(); } else { setBlockPrompt(true); } }} style={{ width: 44, height: 26, borderRadius: 13, background: isBlocked ? "var(--danger, #c0392b)" : "var(--border)", position: "relative", flexShrink: 0, border: "none", padding: 0, marginTop: 2 }}><span style={{ position: "absolute", top: 3, left: isBlocked ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+          </div>
+          {isBlocked && live.blockReason && (
+            <div style={{ marginTop: 12, background: "color-mix(in srgb, #c0392b 8%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 30%, var(--border))", borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--danger, #c0392b)", fontWeight: 600, marginBottom: 4 }}>REASON</div>
+              <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.45 }}>{live.blockReason}</div>
+            </div>
+          )}
+        </div>
       </div>}
+
+      {/* Block reason prompt */}
+      <Sheet open={blockPrompt} onClose={() => setBlockPrompt(false)} align="top">
+        <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Block {live.name.split(" ")[0]}?</h2>
+        <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>They won't be able to book online. Add a reason for your records — only you'll see it.</p>
+        <textarea value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="e.g. Repeated no-shows, payment issue…" rows={3} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, lineHeight: 1.5, resize: "none", marginBottom: 16, boxSizing: "border-box" }} />
+        <button onClick={confirmBlock} disabled={!blockReason.trim()} style={{ width: "100%", background: blockReason.trim() ? "#c0392b" : "var(--border)", color: blockReason.trim() ? "#fff" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>BLOCK FROM BOOKING</button>
+        <button onClick={() => setBlockPrompt(false)} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 12, fontSize: 14, fontWeight: 500, borderRadius: 12, border: "none" }}>Cancel</button>
+      </Sheet>
 
       {pfTab === "times" && <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>REMEMBERED TIMING</div>
