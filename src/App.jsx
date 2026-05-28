@@ -120,6 +120,11 @@ const DEFAULT_BUSINESS = {
     dailyCap: 0,             // 0 = unlimited online bookings per day
     fillGapsFirst: true,     // Boulevard-style: offer gap-filling slots first
     rebookNudgeWeeks: 4,     // suggest rebooking after N weeks (0 = off)
+    // Gap avoidance — strict back-to-back booking to eliminate dead time
+    avoidGaps: true,         // when true, only offer times flush with existing appts (or day start)
+    maxGapMin: 0,            // don't offer a slot if it would leave a gap LARGER than this on either side (0 = no max)
+    minGapMin: 0,            // don't offer a slot that would leave a gap SMALLER than this (0 = no min)
+    emptyDayMode: "all",     // "all" = offer all increments on empty days; "anchored" = only earliest of each shift
   },
   // ---- Waiting Room / check-in behavior (Calendar & Appointments → Waiting Room) ----
   waitingRoom: {
@@ -922,23 +927,70 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     return ad && dayKey(ad) === dayKey(d);
   }).map((a) => { const s = a.start; const dur = (a.end != null ? a.end - a.start : 30); return [s, s + (dur > 0 ? dur : 30)]; });
 
-  const freeSlotsFor = (prov, d, durMin, stepMin = 15) => {
+  const freeSlotsFor = (prov, d, durMin) => {
     if (!prov || prov.id === "anyone") prov = providers.find((p) => p.id === "dan") || providers[1];
     const dow = d.getDay();
     const h = prov.hours?.[dow];
     if (!h || !h.on) return [];
-    const busy = apptsOnDate(prov.id, d);
-    // If the day is today, don't offer times that have already passed (+ a small lead buffer).
+    const busy = apptsOnDate(prov.id, d).slice().sort((a, b) => a[0] - b[0]); // [[start,end], ...] sorted
     const isToday = d.toDateString() === new Date().toDateString();
-    const leadMin = (business?.booking?.leadTimeMin) || 0;
+    const bk = business?.booking || {};
+    const leadMin = bk.leadTimeMin || 0;
     const earliest = isToday ? (new Date().getHours() * 60 + new Date().getMinutes() + leadMin) : 0;
-    const out = [];
-    for (let t = h.start; t + durMin <= h.end; t += stepMin) {
-      if (t < earliest) continue;
-      const clashes = busy.some(([bs, be]) => t < be && (t + durMin) > bs);
-      if (!clashes) out.push(t);
+
+    const packTheDay = bk.avoidGaps !== false; // default ON
+    // Per-barber: allow ending after closing time (up to N minutes), only if it fits flush
+    const overrunMin = Math.max(0, Number(prov.overrunMin) || 0);
+    const dayEnd = h.end + overrunMin;
+
+    // Helper: a time t with duration durMin doesn't clash with any existing busy
+    const noClash = (t) => !busy.some(([bs, be]) => t < be && (t + durMin) > bs);
+
+    let candidates = new Set();
+
+    if (!packTheDay) {
+      // Loose: every 15-min increment from start to end of day
+      for (let t = h.start; t + durMin <= dayEnd; t += 15) candidates.add(t);
+    } else {
+      // Pack-the-day mode. Build a list of open runs (continuous blocks between busy appts).
+      const runs = []; // each: [runStart, runEnd]
+      let cursor = h.start;
+      busy.forEach(([bs, be]) => {
+        if (cursor < bs) runs.push([cursor, bs]);
+        cursor = Math.max(cursor, be);
+      });
+      if (cursor < dayEnd) runs.push([cursor, dayEnd]);
+
+      runs.forEach(([rs, re]) => {
+        const runLen = re - rs;
+        if (runLen < durMin) return; // service doesn't fit at all
+        // Always anchor the first slot at the start of the run (flush with whatever came before)
+        candidates.add(rs);
+        // If this run sits at the end of the day, also offer the last possible slot
+        // (so the day fills from both ends on empty days)
+        const lastFit = re - durMin;
+        if (lastFit > rs && Math.abs(re - dayEnd) < 1) {
+          candidates.add(lastFit);
+        }
+        // Smart middle anchor: only if the open run is at least 3× the service length.
+        // Snap to the nearest 30-min mark so the time looks clean (e.g. 1:00, 1:30, not 1:13).
+        if (runLen >= durMin * 3) {
+          let mid = rs + Math.floor(runLen / 2);
+          mid = Math.round(mid / 30) * 30;
+          if (mid >= rs && mid + durMin <= re && noClash(mid)) candidates.add(mid);
+        }
+      });
     }
-    return out;
+
+    const out = [];
+    candidates.forEach((t) => {
+      if (t < earliest) return;
+      if (t < h.start) return;
+      if (t + durMin > dayEnd) return;
+      if (!noClash(t)) return;
+      out.push(t);
+    });
+    return out.sort((a, b) => a - b);
   };
 
   // Multi-person: given a list of { prov, durMin }, find combined options.
@@ -3297,6 +3349,34 @@ function weekRange(ref = new Date()) {
 
 // Scheduling Options — buffers, booking window, and minimum notice. These read
 // and write the same settings as Online Booking, so the two stay in sync.
+function AvoidGapsEditor({ b, onChange }) {
+  const set = (patch) => onChange({ ...b, ...patch });
+  const enabled = b.avoidGaps !== false;
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>Vero packs your day for you. No gaps, no fragmented time, no babysitting your calendar.</p>
+
+      {/* Master toggle */}
+      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+        <button onClick={() => set({ avoidGaps: !enabled })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", color: "var(--text)", textAlign: "left" }}>
+          <div>
+            <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Pack the day</div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>Clients only see times that fill your day end-to-end. Empty days show a few smart anchor times so your calendar fills from multiple points at once.</div>
+          </div>
+          <span style={{ width: 44, height: 26, borderRadius: 13, background: enabled ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, marginLeft: 14 }}><span style={{ position: "absolute", top: 3, left: enabled ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+        </button>
+      </div>
+
+      {enabled && (
+        <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 14, padding: "14px 16px", fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>HOW IT WORKS</div>
+          On empty days, Vero shows clients a morning, midday, and end-of-day slot so the day fills from multiple points. After that, every new opening sits flush against an existing booking. No dead time, ever.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SchedulingOptionsEditor({ b, onChange }) {
   const set = (patch) => onChange({ ...b, ...patch });
   return (
@@ -4150,6 +4230,23 @@ function StaffEditor({ providers, setProviders, showToast }) {
                   <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Role / title</label>
                   <input value={p.role} onChange={(e) => setRole(p.id, e.target.value)} style={{ ...inputStyle, marginBottom: 18 }} />
 
+                  {/* End-of-day overrun — per-barber preference */}
+                  <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 14px", marginBottom: 18 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: (p.overrunMin || 0) > 0 ? 12 : 0 }}>
+                      <div>
+                        <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 2 }}>Allow end-of-day overrun</div>
+                        <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45 }}>Let clients book past your closing time if the slot fits flush against your last appointment. Good for catching after-work bookings.</div>
+                      </div>
+                      <button onClick={() => setProviders(providers.map((x) => x.id === p.id ? { ...x, overrunMin: (x.overrunMin || 0) > 0 ? 0 : 30 } : x))} style={{ width: 44, height: 26, borderRadius: 13, background: (p.overrunMin || 0) > 0 ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, padding: 0, border: "none" }}><span style={{ position: "absolute", top: 3, left: (p.overrunMin || 0) > 0 ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+                    </div>
+                    {(p.overrunMin || 0) > 0 && (
+                      <div>
+                        <div style={{ fontSize: 12.5, color: "var(--faint)", marginBottom: 6, letterSpacing: 1, fontWeight: 600 }}>UP TO</div>
+                        <Stepper value={p.overrunMin || 30} onChange={(v) => setProviders(providers.map((x) => x.id === p.id ? { ...x, overrunMin: v } : x))} min={15} max={120} step={15} suffix="min past closing" />
+                      </div>
+                    )}
+                  </div>
+
                   <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 10 }}>Working hours</label>
                   <div style={{ display: "grid", gap: 8 }}>
                     {[1, 2, 3, 4, 5, 6, 0].map((dow) => { const h = p.hours[dow] || { on: false, start: 540, end: 1020 }; return (
@@ -4527,6 +4624,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <SchedulingOptionsEditor b={form.booking || defaultBooking()} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
     },
     {
+      id: "avoidgaps", title: "Avoid Gaps Between Appointments", icon: Clock, category: "Calendar & Appointments",
+      status: (() => { const bk = form.booking || {}; if (bk.avoidGaps === false) return "Off"; const bits = ["On"]; if (bk.maxGapMin > 0) bits.push(`max ${bk.maxGapMin}m`); if (bk.minGapMin > 0) bits.push(`min ${bk.minGapMin}m`); if (bk.emptyDayMode === "anchored") bits.push("empty: first only"); return bits.join(" · "); })(),
+      keywords: "avoid gaps back to back fill no dead time tight schedule revenue optimize cluster anchor max min empty day first last",
+      editor: <AvoidGapsEditor b={form.booking || defaultBooking()} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
+    },
+    {
       id: "waitingroom", title: "Waiting Room", icon: Users, category: "Calendar & Appointments",
       status: (form.waitingRoom?.selfCheckIn ? "Self check-in" : "Staff check-in") + (form.waitingRoom?.autoReadyMessage ? " · ready msg on" : ""),
       keywords: "waiting room check in checkin arrival ready notify waiting list self check-in front desk client arrived",
@@ -4637,7 +4740,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     { id: "team", title: "Team", desc: "Barbers, stylists, schedules, individual availability and service durations", icon: Users, settings: ["staff"] },
     { id: "menu", title: "Services & Menu", desc: "Service list, categories, prices, durations, photos, add-ons and pairings", icon: ImageIcon, settings: ["servicesmenu"] },
     { id: "booking", title: "Online Booking", desc: "Who can book, how far ahead, family bookings, staff selection, cancellation policy", icon: Calendar, settings: ["booking", "staffselection", "rebook_usual", "family", "policy"] },
-    { id: "calendar", title: "Calendar & Day", desc: "Scheduling buffers, smart timing, waitlist, waiting room, late and overdue alerts", icon: Clock, settings: ["scheduling", "waitingroom", "runninglate", "overduebuffer", "waitlist", "autotiming", "photos"] },
+    { id: "calendar", title: "Calendar & Day", desc: "Scheduling buffers, gap-avoidance, smart timing, waitlist, waiting room, late and overdue alerts", icon: Clock, settings: ["scheduling", "avoidgaps", "waitingroom", "runninglate", "overduebuffer", "waitlist", "autotiming", "photos"] },
     { id: "payments", title: "Payments", desc: "Tipping options, checkout flow, deposits, no-show charges, rebooking prompts", icon: CreditCard, settings: ["tipping", "checkout", "rebookco"] },
     { id: "messages", title: "Messages", desc: "Booking confirmations, reminders, review requests, automated client messages", icon: MessageSquare, settings: ["messages"] },
     { id: "smart", title: "Smart Features", desc: "AI cut helper, photo and description matching, future automations", icon: Sparkles, settings: ["aicuthelper"] },
