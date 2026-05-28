@@ -6567,12 +6567,17 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
   return (
     <>
     <div className="fade-up">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500 }}>Clients</h2>
-        <button className="lift" onClick={() => { setDraft(blank); setAdding(true); }} aria-label="Add client" style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow-sm)", flexShrink: 0 }}><Plus size={22} /></button>
+      {/* Editorial masthead */}
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{clients.length} {clients.length === 1 ? "PERSON" : "PEOPLE"}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>Clients</h2>
+          <button className="lift" onClick={() => { setDraft(blank); setAdding(true); }} aria-label="Add client" style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", height: 42, padding: "0 16px", borderRadius: 12, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)", flexShrink: 0, fontSize: 13.5, fontWeight: 600, letterSpacing: 1.5 }}><Plus size={16} strokeWidth={2.5} /> ADD</button>
+        </div>
       </div>
 
-      <div style={{ position: "relative", marginBottom: 18 }}>
+      <div style={{ position: "relative", marginBottom: 22 }}>
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, phone, or email" style={{ ...inputS, paddingLeft: 44, borderRadius: 14 }} />
         <User size={17} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
       </div>
@@ -6739,8 +6744,23 @@ function ClientProfile({ client, clients, setClients, services, providers, appts
 
   return (
     <div className="fade-up">
-      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 22 }}><ArrowLeft size={16} /> All clients</button>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}><button onClick={() => setPicker(true)} style={{ position: "relative", width: 52, height: 52, borderRadius: "50%", background: "none", border: "none", flexShrink: 0, padding: 0 }}><Avatar size={52} photo={clientPhoto(live)} initial={live.name.charAt(0)} color={provider.color} /><span style={{ position: "absolute", bottom: -1, right: -1, width: 20, height: 20, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={10} /></span></button><div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 25, fontWeight: 500, lineHeight: 1.1 }}>{live.name}</h2><div style={{ color: "var(--sub)", fontSize: 13.5 }}>{live.phone} · {live.visits} visits</div></div></div>
+      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> All clients</button>
+
+      {/* Editorial profile header */}
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 10, fontWeight: 600 }}>{live.visits === 0 ? "FIRST VISIT" : live.visits === 1 ? "1 VISIT" : `${live.visits} VISITS`} · {provider.name.toUpperCase()}</div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
+          <button onClick={() => setPicker(true)} style={{ position: "relative", width: 64, height: 64, borderRadius: "50%", background: "none", border: "none", flexShrink: 0, padding: 0 }}>
+            <Avatar size={64} photo={clientPhoto(live)} initial={live.name.charAt(0)} color={provider.color} />
+            <span style={{ position: "absolute", bottom: -2, right: -2, width: 22, height: 22, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={11} /></span>
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.3px", marginBottom: 4 }}>{live.name}</h2>
+            <div style={{ color: "var(--sub)", fontSize: 13.5, lineHeight: 1.4 }}>{live.phone}{live.email ? ` · ${live.email}` : ""}</div>
+          </div>
+        </div>
+      </div>
 
       {/* TAB BAR */}
       <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--line)", marginBottom: 22, overflowX: "auto" }}>
@@ -6981,11 +7001,16 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget }
 
   // ---- conversation list ----
   if (!active) {
+    const totalUnread = clients.filter((c) => { const m = (c.messages || []); return m.length && m[m.length - 1].from === "client"; }).length;
     return (
       <div className="fade-up">
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 4 }}>Messages</h2>
-        <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 20, fontWeight: 300 }}>Your studio line. Tap a client to open the conversation.</p>
-        <div style={{ display: "grid", gap: 2, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{totalUnread > 0 ? `${totalUnread} UNREAD` : "ALL CAUGHT UP"}</div>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95, marginBottom: 8 }}>Messages</h2>
+          <p style={{ color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.5 }}>Your studio line. Tap a client to open the conversation.</p>
+        </div>
+        <div style={{ display: "grid", gap: 2, border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
           {clients.map((c) => {
             const msgs = c.messages || [];
             const last = msgs[msgs.length - 1];
