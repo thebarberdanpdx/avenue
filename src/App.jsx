@@ -1292,7 +1292,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <div className="fade-up">
                 <Head s="STEP 3 OF 3" q="How long since your last cut?" sub="So we save the right amount of time for you." />
                 <OptionList items={[
-                  { title: "3–4 weeks", sub: "The usual time between cuts.", onTap: () => finish(cutId, 0) },
+                  { title: "3–6 weeks", sub: "The usual time between cuts.", onTap: () => finish(cutId, 0) },
                   { title: "It's been a while", sub: "Grown out — we'll be taking off a good amount.", gold: true, onTap: () => finish(cutId, 10) },
                 ]} />
               </div>
