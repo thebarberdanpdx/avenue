@@ -5194,6 +5194,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
 function CalendarView({ appts, setAppts, clients, setClients, providers, services, business, theme, showToast, waitlist = [], setWaitlist }) {
   const sizeId = business?.calendarRowSize || "L";
   const [showWaitlistPanel, setShowWaitlistPanel] = useState(false);
+  const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   const [open, setOpen] = useState(null);
   const [dayOffset, setDayOffset] = useState(0);
   const [drag, setDrag] = useState(null);     // { id, deltaMin } while dragging
@@ -5512,6 +5513,54 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           </div>
         </div>
       )}
+      {showCalendarOptions && (
+        <div onClick={() => setShowCalendarOptions(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg)", borderBottomLeftRadius: 22, borderBottomRightRadius: 22, maxHeight: "85vh", overflowY: "auto", padding: "calc(20px + env(safe-area-inset-top)) 22px 30px", boxShadow: "0 20px 40px rgba(0,0,0,0.4)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <div>
+                <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 10 }} />
+                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1 }}>Calendar view</h2>
+              </div>
+              <button onClick={() => setShowCalendarOptions(false)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: "50%", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={18} /></button>
+            </div>
+
+            {/* Row size */}
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>ROW HEIGHT</div>
+              <div style={{ display: "flex", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 4, gap: 4 }}>
+                {ROW_SIZES.map((s) => { const on = sizeId === s.id; return (
+                  <button key={s.id} onClick={() => setBusiness({ ...business, calendarRowSize: s.id })} style={{ flex: 1, padding: "11px 0", borderRadius: 8, fontSize: 14, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--sub)", fontWeight: on ? 700 : 500, letterSpacing: 0.5 }}>{s.label}</button>
+                ); })}
+              </div>
+            </div>
+
+            {/* Staff filter */}
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>SHOWING</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {allStaff.map((p) => {
+                  const on = !hidden.includes(p.id);
+                  return (
+                    <button key={p.id} onClick={() => toggleStaff(p.id)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? p.color : "var(--border)"}`, background: on ? p.color + "1F" : "transparent", color: on ? "var(--text)" : "var(--faint)", fontSize: 14 }}>
+                      <span style={{ width: 9, height: 9, borderRadius: "50%", background: on ? p.color : "var(--border2)" }} /> {p.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div>
+              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>STATUS COLORS</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 9, fontSize: 14, color: "var(--text)" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: STATUS_COLORS["checked-in"] }} /> Checked in</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: STATUS_COLORS["in-service"] }} /> In service</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, border: "1px solid var(--border2)", background: "var(--panel2)" }} /> Done</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ marginBottom: 24 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{`${DAYS[today.getDay()]}, ${MONTHS[today.getMonth()]} ${today.getDate()}`.toUpperCase()}</div>
@@ -5519,6 +5568,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>Today</h2>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 42, borderRadius: 12, fontSize: 13.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 7, position: "relative", letterSpacing: 0.3 }}><Clock size={15} style={{ color: "var(--gold)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
+            <button onClick={() => setShowCalendarOptions(true)} title="Calendar view" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 42, height: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}><Settings size={16} /></button>
             <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 16px", height: 42, borderRadius: 12, fontSize: 13.5, fontWeight: 600, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)" }}><Plus size={16} strokeWidth={2.5} /> NEW</button>
           </div>
         </div>
