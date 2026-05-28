@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from './supabaseClient'
 import {
   Calendar, Phone, Check, ChevronRight, ChevronLeft, MessageSquare, Bell, User, Camera,
@@ -458,13 +459,14 @@ function Sheet({ open, onClose, children, align = "top", maxWidth = 520 }) {
   if (!open) return null;
   const justify = align === "bottom" ? "flex-end" : align === "top" ? "flex-start" : "center";
   // The outer flex container fills the screen; the inner box is capped and its body scrolls.
-  return (
+  // Rendered through a portal to document.body so a transformed ancestor (animations) can't
+  // trap the position:fixed overlay and cut off scrolling.
+  return createPortal((
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 2000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: justify, padding: align === "center" ? "20px" : "0", boxSizing: "border-box" }}>
       <div onClick={(e) => e.stopPropagation()} className="appt-drop" style={{
         width: "100%", maxWidth, background: "var(--bg)",
         borderRadius: align === "top" ? "0 0 22px 22px" : (align === "center" ? 22 : "22px 22px 0 0"),
         paddingTop: align === "top" ? "calc(env(safe-area-inset-top) + 16px)" : 20,
-        // Cap the box at the available screen height, then let the inner content scroll.
         maxHeight: align === "center" ? "85vh" : "92vh",
         display: "flex", flexDirection: "column",
         boxShadow: "0 20px 60px rgba(0,0,0,0.4)", boxSizing: "border-box", overflow: "hidden",
@@ -478,7 +480,7 @@ function Sheet({ open, onClose, children, align = "top", maxWidth = 520 }) {
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 
