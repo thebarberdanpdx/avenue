@@ -2522,7 +2522,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
-        {tab === "messages" && <MessagesView clients={clients} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} />}
+        {tab === "messages" && <MessagesView clients={clients} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} />}
         {tab === "settings" && <SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} showToast={showToast} />}
@@ -6988,7 +6988,7 @@ function ClientProfile({ client, clients, setClients, services, providers, appts
   );
 }
 
-function MessagesView({ clients, setClients, providers, msgTarget, clearTarget }) {
+function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, onOpenClient }) {
   const [activeId, setActiveId] = useState(null); // null = list view
   const [draft, setDraft] = useState("");
   // jump straight into a conversation when sent from the waitlist
@@ -7017,7 +7017,9 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget }
             const unread = last && last.from === "client";
             return (
               <button key={c.id} className="lift" onClick={() => setActiveId(c.id)} style={{ display: "flex", alignItems: "center", gap: 14, background: "var(--panel)", padding: "15px 16px", textAlign: "left", color: "var(--text)", borderBottom: "1px solid var(--line)" }}>
-                <Avatar size={46} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provColor(c)} />
+                <div onClick={(e) => { e.stopPropagation(); if (onOpenClient) onOpenClient(c); }} style={{ flexShrink: 0, cursor: "pointer" }} aria-label={`Open ${c.name}'s profile`}>
+                  <Avatar size={46} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provColor(c)} />
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                     <span style={{ fontSize: 15.5, fontWeight: unread ? 600 : 500 }}>{c.name}</span>
@@ -7042,10 +7044,10 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget }
       {/* iMessage-style centered header */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px 12px", borderBottom: "1px solid var(--line)", position: "relative" }}>
         <button onClick={() => setActiveId(null)} style={{ background: "none", color: "#0A84FF", display: "flex", alignItems: "center", fontSize: 15, position: "absolute", left: 6, top: 8, zIndex: 2 }}><ChevronLeft size={26} /></button>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+        <button onClick={() => { if (onOpenClient) onOpenClient(active); }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "none", border: "none", color: "var(--text)", padding: 0, cursor: "pointer" }} aria-label={`Open ${active.name}'s profile`}>
           <Avatar size={50} photo={clientPhoto(active)} initial={active.name.charAt(0)} color={provColor(active)} />
           <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 14.5, color: "var(--text)" }}>{active.name.split(" ")[0]} <ChevronRight size={13} style={{ color: "var(--faint)" }} /></div>
-        </div>
+        </button>
       </div>
 
       <div style={{ flex: 1, padding: "14px 14px 8px", display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", background: "var(--bg)" }}>
