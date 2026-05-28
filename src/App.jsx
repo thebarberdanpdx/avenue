@@ -457,13 +457,25 @@ function Sheet({ open, onClose, children, align = "top", maxWidth = 520 }) {
   }, [open]);
   if (!open) return null;
   const justify = align === "bottom" ? "flex-end" : align === "top" ? "flex-start" : "center";
-  const topPad = align === "top" ? "calc(env(safe-area-inset-top) + 8px)" : 0;
-  // Calculate available space for the inner box, accounting for top padding
-  const innerMaxH = align === "top" ? "calc(100dvh - env(safe-area-inset-top) - 16px)" : (align === "center" ? "82vh" : "82vh");
+  // The outer flex container fills the screen; the inner box is capped and its body scrolls.
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 2000, display: "flex", alignItems: justify, justifyContent: "center", padding: align === "center" ? "20px" : `${topPad} 0 0 0`, boxSizing: "border-box" }}>
-      <div onClick={(e) => e.stopPropagation()} className="appt-drop" style={{ width: "100%", maxWidth, background: "var(--bg)", borderRadius: align === "top" ? "0 0 22px 22px" : (align === "center" ? 22 : "22px 22px 0 0"), padding: "20px 20px calc(20px + env(safe-area-inset-bottom))", maxHeight: innerMaxH, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", boxShadow: "0 20px 60px rgba(0,0,0,0.4)", boxSizing: "border-box" }}>
-        {children}
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 2000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: justify, padding: align === "center" ? "20px" : "0", boxSizing: "border-box" }}>
+      <div onClick={(e) => e.stopPropagation()} className="appt-drop" style={{
+        width: "100%", maxWidth, background: "var(--bg)",
+        borderRadius: align === "top" ? "0 0 22px 22px" : (align === "center" ? 22 : "22px 22px 0 0"),
+        paddingTop: align === "top" ? "calc(env(safe-area-inset-top) + 16px)" : 20,
+        // Cap the box at the available screen height, then let the inner content scroll.
+        maxHeight: align === "center" ? "85vh" : "92vh",
+        display: "flex", flexDirection: "column",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.4)", boxSizing: "border-box", overflow: "hidden",
+      }}>
+        <div style={{
+          overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain",
+          padding: "0 20px calc(24px + env(safe-area-inset-bottom))",
+          minHeight: 0, flex: 1,
+        }}>
+          {children}
+        </div>
       </div>
     </div>
   );
