@@ -4600,20 +4600,31 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "photos", title: "Display Preferences", icon: ImageIcon, category: "Calendar & Appointments",
-      status: form.showAddonPhotos ? "On" : "Off", keywords: "photos images add-ons menu pictures display preferences calendar week start day begins sunday monday first day",
+      status: (() => { const bits = []; const rs = form.calendarRowSize || "L"; bits.push(`Row size ${rs}`); if (form.showAddonPhotos) bits.push("photos on"); return bits.join(" · "); })(),
+      keywords: "photos images add-ons menu pictures display preferences calendar week start day begins sunday monday first day row size height calendar large small zoom",
       editor: (
         <>
-        <button onClick={() => setForm({ ...form, showAddonPhotos: !form.showAddonPhotos })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, color: "var(--text)", marginBottom: 18 }}>
-          <div style={{ textAlign: "left" }}><div style={{ fontSize: 15, marginBottom: 2 }}>Show photos on add-ons</div><div style={{ fontSize: 15, color: "var(--sub)", fontWeight: 300 }}>Display images next to add-on options for clients.</div></div>
-          <span style={{ width: 44, height: 26, borderRadius: 13, background: form.showAddonPhotos ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: form.showAddonPhotos ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-        </button>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Week starts on</div>
-        <div style={{ fontSize: 14, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>The first day shown on your calendar's week strip.</div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {/* Row size — pinned at top */}
+        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>CALENDAR ROW SIZE</div>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>How tall each hour appears on your calendar. Larger rows give appointments room to breathe.</div>
+        <div style={{ display: "flex", background: "var(--panel2)", borderRadius: 12, padding: 4, gap: 4, marginBottom: 22, border: "1px solid var(--border)" }}>
+          {["S","M","L","XL"].map((s) => { const on = (form.calendarRowSize || "L") === s; return (
+            <button key={s} onClick={() => setForm({ ...form, calendarRowSize: s })} style={{ flex: 1, padding: "11px 0", borderRadius: 8, fontSize: 14, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--sub)", fontWeight: on ? 700 : 500, letterSpacing: 0.5 }}>{s}</button>
+          ); })}
+        </div>
+
+        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>WEEK STARTS ON</div>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>The first day shown on your calendar's week strip.</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 22 }}>
           {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((day, i) => { const on = (form.weekStartsOn ?? 0) === i; return (
             <button key={i} onClick={() => setForm({ ...form, weekStartsOn: i })} style={{ flex: "1 1 30%", padding: "11px 4px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{day}</button>
           ); })}
         </div>
+
+        <button onClick={() => setForm({ ...form, showAddonPhotos: !form.showAddonPhotos })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, color: "var(--text)" }}>
+          <div style={{ textAlign: "left" }}><div style={{ fontSize: 15, marginBottom: 2 }}>Show photos on add-ons</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>Display images next to add-on options for clients.</div></div>
+          <span style={{ width: 44, height: 26, borderRadius: 13, background: form.showAddonPhotos ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: form.showAddonPhotos ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+        </button>
         </>
       ),
     },
@@ -5181,9 +5192,8 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
 }
 
 function CalendarView({ appts, setAppts, clients, setClients, providers, services, business, theme, showToast, waitlist = [], setWaitlist }) {
-  const [sizeId, setSizeId] = useState("L"); // default L
+  const sizeId = business?.calendarRowSize || "L";
   const [showWaitlistPanel, setShowWaitlistPanel] = useState(false);
-  const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   const [open, setOpen] = useState(null);
   const [dayOffset, setDayOffset] = useState(0);
   const [drag, setDrag] = useState(null);     // { id, deltaMin } while dragging
@@ -5502,67 +5512,24 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           </div>
         </div>
       )}
-      {showCalendarOptions && (
-        <div onClick={() => setShowCalendarOptions(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg)", borderTopLeftRadius: 22, borderTopRightRadius: 22, maxHeight: "85vh", overflowY: "auto", padding: "20px 22px 36px" }}>
-            <div style={{ width: 36, height: 4, background: "var(--border2)", borderRadius: 2, margin: "0 auto 18px" }} />
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 4 }}>Calendar options</h2>
-            <p style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 20, lineHeight: 1.45 }}>How you'd like to see today.</p>
-
-            {/* Row size */}
-            <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>ROW HEIGHT</div>
-              <div style={{ display: "flex", background: "var(--panel)", borderRadius: 10, padding: 4, gap: 4 }}>
-                {ROW_SIZES.map((s) => (
-                  <button key={s.id} onClick={() => setSizeId(s.id)} style={{ flex: 1, padding: "10px 0", borderRadius: 8, fontSize: 14, background: sizeId === s.id ? "var(--gold)" : "transparent", color: sizeId === s.id ? "var(--on-gold)" : "var(--sub)", fontWeight: sizeId === s.id ? 600 : 400 }}>{s.label}</button>
-                ))}
-              </div>
-              <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 8 }}>Shows 15-minute lines for precision.</div>
-            </div>
-
-            {/* Staff filter */}
-            <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>SHOWING</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {allStaff.map((p) => {
-                  const on = !hidden.includes(p.id);
-                  return (
-                    <button key={p.id} onClick={() => toggleStaff(p.id)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? p.color : "var(--border)"}`, background: on ? p.color + "1F" : "transparent", color: on ? "var(--text)" : "var(--faint)", fontSize: 14 }}>
-                      <span style={{ width: 9, height: 9, borderRadius: "50%", background: on ? p.color : "var(--border2)" }} /> {p.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Legend */}
-            <div>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>COLOR LEGEND</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 9, fontSize: 14, color: "var(--text)" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: STATUS_COLORS["checked-in"] }} /> Checked in</span>
-                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: STATUS_COLORS["in-service"] }} /> In service</span>
-                <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, border: "1px solid var(--border2)", background: "var(--panel2)" }} /> Done</span>
-              </div>
-            </div>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{`${DAYS[today.getDay()]}, ${MONTHS[today.getMonth()]} ${today.getDate()}`.toUpperCase()}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16 }}>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>Today</h2>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 42, borderRadius: 12, fontSize: 13.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 7, position: "relative", letterSpacing: 0.3 }}><Clock size={15} style={{ color: "var(--gold)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
+            <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 16px", height: 42, borderRadius: 12, fontSize: 13.5, fontWeight: 600, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)" }}><Plus size={16} strokeWidth={2.5} /> NEW</button>
           </div>
         </div>
-      )}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 11.5, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 500 }}>{`${DAYS[today.getDay()]}, ${MONTHS[today.getMonth()]} ${today.getDate()}`.toUpperCase()}</div>
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, letterSpacing: -0.5, lineHeight: 1 }}>Today</h2>
-        </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={() => setShowWaitlistPanel(true)} title="Waitlist" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 40, height: 40, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><Clock size={17} />{waitlist.length > 0 && <span style={{ position: "absolute", top: -5, right: -5, background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, minWidth: 17, height: 17, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{waitlist.length}</span>}</button>
-          <button onClick={() => setShowCalendarOptions(true)} title="Calendar options" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 40, height: 40, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center" }}><Settings size={17} /></button>
-          <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 14px", height: 40, borderRadius: 11, fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, boxShadow: "var(--shadow-sm)" }}><Plus size={16} /> New</button>
-        </div>
       </div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 18, overflowX: "auto", paddingBottom: 4 }}>
+
+      {/* Editorial day strip — quiet ghosts with one bold today */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 22, padding: "4px 0" }}>
         {week.map((d, i) => { const isToday = d.toDateString() === today.toDateString(); return (
-          <div key={i} style={{ flex: "1 0 auto", minWidth: 42, textAlign: "center", padding: "8px 0", borderRadius: 6, background: isToday ? "var(--gold)" : "transparent", color: isToday ? "var(--on-gold)" : "var(--sub)" }}>
-            <div style={{ fontSize: 12, letterSpacing: 1 }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18 }}>{d.getDate()}</div>
+          <div key={i} style={{ flex: "1 0 0", textAlign: "center", padding: "10px 0", borderRadius: 12, background: isToday ? "var(--text)" : "transparent", color: isToday ? "var(--bg)" : "var(--sub)", border: isToday ? "1px solid var(--text)" : "1px solid transparent", transition: "all .2s" }}>
+            <div style={{ fontSize: 10.5, letterSpacing: 1.5, fontWeight: 500, marginBottom: 4, opacity: isToday ? 0.75 : 0.5 }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500 }}>{d.getDate()}</div>
           </div>
         ); })}
       </div>
