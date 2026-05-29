@@ -554,25 +554,53 @@ export default function App() {
   const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
   const [theme, setTheme] = useState("snow"); // clean light default, app-wide
 
-  // ---- Supabase load + save (debounced) for each piece of state ----
-  // Loads saved data on first open; saves automatically whenever it changes.
-  // Messages are stored inside each client, so saving clients covers messages too.
+  // ---- Supabase load + save (debounced) — shop-scoped tables (multi-tenant ready) ----
+  // Every row is stamped with shop_id so additional shops never collide. For now there's
+  // one shop: 'sanctuary'. Lists (clients/appointments/waitlist/providers/services) live
+  // as one row per item; settings live on the shops row. Messages are stored inside each
+  // client, so saving clients covers messages too.
+  const SHOP_ID = 'sanctuary';
+  const loadedRef = useRef(false); // blocks saves until the first load finishes (so seed data can't overwrite real data)
+
+  // Save a whole in-memory list to its shop-scoped table: clear this shop's rows, then insert current items.
+  const syncList = async (table, items) => {
+    await supabase.from(table).delete().eq('shop_id', SHOP_ID);
+    if (items && items.length) {
+      const rows = items.map((it, i) => ({ id: String(it.id ?? `${table}_${i}`), shop_id: SHOP_ID, data: it }));
+      await supabase.from(table).insert(rows);
+    }
+  };
+
   useEffect(() => {
-    supabase.from('app_state').select('data').eq('id', 'business').single().then(({ data }) => { if (data && data.data) setBusiness(data.data); });
-    supabase.from('app_state').select('data').eq('id', 'clients').single().then(({ data }) => { if (data && data.data) setClients(data.data); });
-    supabase.from('app_state').select('data').eq('id', 'appointments').single().then(({ data }) => { if (data && data.data) setAppts(data.data); });
-    supabase.from('app_state').select('data').eq('id', 'waitlist').single().then(({ data }) => { if (data && data.data) setWaitlist(data.data); });
-    // Services come from DEFAULT_SERVICES in code (cloud menu load disabled to avoid stale overrides).
-    // supabase.from('app_state').select('data').eq('id', 'services').single().then(({ data }) => { if (data && data.data) setServices(data.data); });
-    supabase.from('app_state').select('data').eq('id', 'providers').single().then(({ data }) => { if (data && data.data) setProviders(data.data); });
+    (async () => {
+      // Settings (business) live on the shops row.
+      const { data: shopRow } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).single();
+      if (shopRow && shopRow.settings && Object.keys(shopRow.settings).length) setBusiness(shopRow.settings);
+
+      // Load a list table → array of the stored item objects (null if the query failed).
+      const loadList = async (table) => {
+        const { data } = await supabase.from(table).select('data').eq('shop_id', SHOP_ID);
+        return data ? data.map((r) => r.data) : null;
+      };
+
+      // Client data: use whatever's saved, including empty (fresh start = empty lists).
+      const cl = await loadList('clients');      if (cl) setClients(cl);
+      const ap = await loadList('appointments'); if (ap) setAppts(ap);
+      const wl = await loadList('waitlist');     if (wl) setWaitlist(wl);
+      // Providers & services: keep the in-code defaults if nothing's saved yet (the app needs them to function).
+      const pr = await loadList('providers');    if (pr && pr.length) setProviders(pr);
+      const sv = await loadList('services');     if (sv && sv.length) setServices(sv);
+
+      loadedRef.current = true; // loads done — saves may now run
+    })();
   }, []);
 
-  useEffect(() => { const t = setTimeout(() => { supabase.from('app_state').upsert({ id: 'business', data: business }).then(() => {}); }, 800); return () => clearTimeout(t); }, [business]);
-  useEffect(() => { const t = setTimeout(() => { supabase.from('app_state').upsert({ id: 'clients', data: clients }).then(() => {}); }, 800); return () => clearTimeout(t); }, [clients]);
-  useEffect(() => { const t = setTimeout(() => { supabase.from('app_state').upsert({ id: 'appointments', data: appts }).then(() => {}); }, 800); return () => clearTimeout(t); }, [appts]);
-  useEffect(() => { const t = setTimeout(() => { supabase.from('app_state').upsert({ id: 'waitlist', data: waitlist }).then(() => {}); }, 800); return () => clearTimeout(t); }, [waitlist]);
-  useEffect(() => { const t = setTimeout(() => { supabase.from('app_state').upsert({ id: 'services', data: services }).then(() => {}); }, 800); return () => clearTimeout(t); }, [services]);
-  useEffect(() => { const t = setTimeout(() => { supabase.from('app_state').upsert({ id: 'providers', data: providers }).then(() => {}); }, 800); return () => clearTimeout(t); }, [providers]);
+  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || 'Sanctuary Barber Co', settings: business }).then(() => {}); }, 800); return () => clearTimeout(t); }, [business]);
+  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
+  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
+  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
+  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
+  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('providers', providers); }, 800); return () => clearTimeout(t); }, [providers]);
 
   return (
     <div id="app-root" className={`theme-${theme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
@@ -5737,8 +5765,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       return;
     }
     const dur = 30;
-    const id = Math.max(0, ...appts.map((a) => a.id)) + 1;
-    const newAppt = { id, providerId, clientId: null, serviceId: null, start, end: start + dur, status: "block", vip: false, name: "Time Block", title: "Blocked", detail: "" };
+    const id = "b" + Date.now() + Math.floor(Math.random() * 1000);
+    const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(start / 60), start % 60, 0, 0);
+    const newAppt = { id, providerId, clientId: null, serviceId: null, start, end: start + dur, bookedFor: bookedFor.toISOString(), status: "block", vip: false, name: "Time Block", title: "Blocked", detail: "" };
     setAppts([...appts, newAppt]);
     setCreateSlot(null);
     showToast(`Time block added at ${fmtTime(start)}.`);
@@ -5746,10 +5775,12 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
 
   // commit a fully-formed appointment from the booking form
   const bookAppt = ({ providerId, start, client, service, walkInName, note }) => {
-    const id = Math.max(0, ...appts.map((a) => a.id)) + 1;
+    const id = "a" + Date.now() + Math.floor(Math.random() * 1000); // collision-proof string id
     const dur = getDuration(client, service, providerId);
     const price = getPrice(service, providerId);
-    const newAppt = { id, providerId, clientId: client ? client.id : null, serviceId: service.id, start, end: start + dur, status: "confirmed", vip: false, name: client ? client.name : (walkInName || "Walk-in"), title: service.name, detail: note || "", hasNote: !!(note && note.trim()), price, hasPhotos: false, photos: 0 };
+    // Stamp the appointment with the day currently shown on the calendar, or it can't be placed on any date.
+    const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(start / 60), start % 60, 0, 0);
+    const newAppt = { id, providerId, clientId: client ? client.id : null, serviceId: service.id, start, end: start + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: client ? client.name : (walkInName || "Walk-in"), title: service.name, detail: note || "", hasNote: !!(note && note.trim()), price, hasPhotos: false, photos: 0 };
     setAppts([...appts, newAppt]);
     setNewApptSlot(null);
     showToast(`${newAppt.name} booked at ${fmtTime(start)}.`);
@@ -5887,13 +5918,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
 
       {/* the timeline grid */}
       <div style={{ display: "flex", position: "relative" }}>
-        {/* time gutter — bold hour labels */}
+        {/* time gutter — every 15 min; hours bold, quarters lighter */}
         <div style={{ width: 56, flexShrink: 0, position: "relative", height: gridHeight }}>
-          {hours.map((t) => (
-            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, right: 8, fontSize: 14, color: "var(--sub)", fontWeight: 500, transform: "translateY(-1px)" }}>
-              {fmtTime(t).replace(":00", "")}
+          {quarterLines.filter((t) => t < DAY_END).map((t) => { const isHour = t % 60 === 0; return (
+            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, right: 8, fontSize: isHour ? 14 : 11, color: isHour ? "var(--sub)" : "var(--faint)", fontWeight: isHour ? 600 : 400, transform: "translateY(-1px)" }}>
+              {isHour ? fmtTime(t).replace(":00", "") : fmtTime(t).replace(/\s?[AP]M/, "")}
             </div>
-          ))}
+          ); })}
         </div>
 
         {/* columns */}
@@ -5959,6 +5990,12 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
                       {a.hasPhotos && <ImageIcon size={12} style={{ opacity: 0.7 }} />}
                       {a.vip && <span style={{ fontSize: 13, color: accent }}>★</span>}
                     </div>
+                    {/* subtle end-of-appointment marker: hairline at the bottom edge + end time */}
+                    {!isBlock && height > 28 && (
+                      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, borderBottom: `1.5px solid color-mix(in srgb, ${accent} 55%, transparent)`, pointerEvents: "none" }}>
+                        <span style={{ position: "absolute", right: 6, bottom: 2, fontSize: 9.5, fontWeight: 600, letterSpacing: 0.3, color: `color-mix(in srgb, ${accent} 75%, var(--text))`, opacity: 0.75 }}>{fmtTime(liveStart + (a.end - a.start)).replace(/\s?[AP]M/, "")}</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -6829,7 +6866,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const staff = providers.filter((p) => p.id !== "anyone");
-  const blank = { name: "", phone: "", email: "", provider: staff[0]?.id || "dan", notes: "" };
+  const blank = { firstName: "", lastName: "", name: "", phone: "", email: "", provider: staff[0]?.id || "dan", notes: "" };
   const [draft, setDraft] = useState(blank);
 
   const q = query.trim().toLowerCase();
@@ -6847,9 +6884,12 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
   const nudge = (o) => { if (showToast) showToast(`Nudge sent to ${o.c.name.split(" ")[0]} — "time for your next visit?" with a booking link.`); setDismissed((d) => [...d, o.c.id]); };
 
   const saveClient = () => {
-    if (!draft.name.trim()) { if (showToast) showToast("Please add a name."); return; }
+    if (!draft.firstName || !draft.firstName.trim()) { if (showToast) showToast("Please enter a first name."); return; }
+    if (!draft.lastName || !draft.lastName.trim()) { if (showToast) showToast("Please enter a last name."); return; }
+    if (draft.phone.replace(/\D/g, "").length < 10) { if (showToast) showToast("Please enter a valid phone number."); return; }
     const id = "c" + Date.now();
-    const newClient = { id, name: draft.name.trim(), phone: draft.phone.trim(), email: draft.email.trim(), provider: draft.provider, visits: 0, customDurations: {}, notes: draft.notes.trim(), messages: [], gallery: [], timeline: [] };
+    const fullName = `${draft.firstName.trim()} ${draft.lastName.trim()}`;
+    const newClient = { id, name: fullName, firstName: draft.firstName.trim(), lastName: draft.lastName.trim(), phone: draft.phone.trim(), email: draft.email.trim(), provider: draft.provider, visits: 0, customDurations: {}, notes: draft.notes.trim(), messages: [], gallery: [], timeline: [] };
     setClients([newClient, ...clients]);
     setAdding(false); setDraft(blank);
     if (showToast) showToast(`${newClient.name} added.`);
@@ -6908,14 +6948,22 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
             <button onClick={() => setAdding(false)} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
           </div>
 
-          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>NAME</label>
-          <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Full name" style={{ ...inputS, marginBottom: 14 }} />
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>FIRST NAME</label>
+              <input value={draft.firstName || ""} onChange={(e) => setDraft({ ...draft, firstName: e.target.value })} placeholder="First" style={inputS} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>LAST NAME</label>
+              <input value={draft.lastName || ""} onChange={(e) => setDraft({ ...draft, lastName: e.target.value })} placeholder="Last" style={inputS} />
+            </div>
+          </div>
 
           <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PHONE</label>
-          <input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} placeholder="(555) 000-0000" style={{ ...inputS, marginBottom: 14 }} />
+          <input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} placeholder="(555) 000-0000" inputMode="tel" style={{ ...inputS, marginBottom: 14 }} />
 
-          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>EMAIL</label>
-          <input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} placeholder="name@email.com" style={{ ...inputS, marginBottom: 14 }} />
+          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>EMAIL (optional)</label>
+          <input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} placeholder="name@email.com" inputMode="email" style={{ ...inputS, marginBottom: 14 }} />
 
           <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PREFERRED BARBER</label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
