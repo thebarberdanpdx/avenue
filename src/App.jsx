@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "re
 import { createPortal } from "react-dom";
 import { supabase } from './supabaseClient'
 import {
-  Calendar, Phone, Check, ChevronRight, ChevronLeft, MessageSquare, Bell, User, Camera,
+  Calendar, Phone, Check, ChevronRight, ChevronLeft, ChevronDown, MessageSquare, Bell, User, Camera,
   Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock,
   Settings, Image as ImageIcon, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
@@ -5552,6 +5552,84 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
   );
 }
 
+// ---------- DATE PICKER SHEET ----------
+// Editorial month-grid picker used by the calendar's date header. Tapping a date calls onPick
+// with that JS Date; the caller converts to dayOffset. "Today" shortcut at the bottom.
+function DatePickerSheet({ selectedDate, onPick, onClose }) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const [viewMonth, setViewMonth] = useState(() => {
+    const base = selectedDate ? new Date(selectedDate) : today;
+    return new Date(base.getFullYear(), base.getMonth(), 1);
+  });
+
+  const year = viewMonth.getFullYear();
+  const monthIdx = viewMonth.getMonth();
+  const firstDow = new Date(year, monthIdx, 1).getDay(); // 0 = Sunday
+  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+
+  // Build a 6-row x 7-col grid (42 cells) so the layout doesn't shift between months.
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let day = 1; day <= daysInMonth; day++) cells.push(new Date(year, monthIdx, day));
+  while (cells.length < 42) cells.push(null);
+
+  const sameDay = (a, b) => a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const stepMonth = (delta) => { const m = new Date(viewMonth); m.setMonth(m.getMonth() + delta); setViewMonth(m); };
+
+  const navBtn = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 11, width: 40, height: 40, color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
+
+  return (
+    <div style={{ padding: "10px 4px 8px" }}>
+      {/* Month nav row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+        <button onClick={() => stepMonth(-1)} aria-label="Previous month" style={navBtn}><ChevronLeft size={17} /></button>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 4 }}>{year}</div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, letterSpacing: -0.3 }}>{MONTHS[monthIdx]}</div>
+        </div>
+        <button onClick={() => stepMonth(1)} aria-label="Next month" style={navBtn}><ChevronRight size={17} /></button>
+      </div>
+      {/* Day-of-week header */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6 }}>
+        {["S","M","T","W","T","F","S"].map((d, i) => (
+          <div key={i} style={{ textAlign: "center", fontSize: 10.5, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, padding: "6px 0" }}>{d}</div>
+        ))}
+      </div>
+      {/* Date grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={`b${i}`} />;
+          const isToday = sameDay(d, today);
+          const isSelected = sameDay(d, selectedDate);
+          return (
+            <button key={d.toISOString()} onClick={() => onPick(d)} style={{
+              aspectRatio: "1",
+              minHeight: 40,
+              border: isToday && !isSelected ? "1px solid var(--gold)" : "1px solid transparent",
+              background: isSelected ? "var(--text)" : "transparent",
+              color: isSelected ? "var(--bg)" : "var(--text)",
+              borderRadius: 10,
+              fontSize: 15,
+              fontFamily: FONT_BODY,
+              fontWeight: isSelected ? 600 : 400,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "background .15s, color .15s",
+            }}>{d.getDate()}</button>
+          );
+        })}
+      </div>
+      {/* Bottom actions */}
+      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+        <button onClick={() => { setViewMonth(new Date(today.getFullYear(), today.getMonth(), 1)); onPick(today); }} className="lift" style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 13, letterSpacing: 2, fontWeight: 600, borderRadius: 12, border: "none" }}>JUMP TO TODAY</button>
+        <button onClick={onClose} style={{ background: "var(--panel)", border: "1px solid var(--border)", color: "var(--text)", padding: "0 18px", borderRadius: 12, fontSize: 14, fontWeight: 500 }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 function CalendarView({ appts, setAppts, clients, setClients, providers, services, business, theme, showToast, waitlist = [], setWaitlist }) {
   const sizeId = business?.calendarRowSize || "L";
   const [showWaitlistPanel, setShowWaitlistPanel] = useState(false);
@@ -5564,10 +5642,21 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   const [newApptSlot, setNewApptSlot] = useState(null); // { providerId, start } → opens the pick-client+service form
   const [pressInd, setPressInd] = useState(null); // { providerId, start, y } live indicator while holding
   const [checkout, setCheckout] = useState(null); // appt being checked out
+  const [showDatePicker, setShowDatePicker] = useState(false); // month-grid date jumper triggered by tapping the date header
   const dragRef = useRef(null);                // mutable: { id, startY, origStart, dur, moved }
   const holdTimerRef = useRef(null);           // press-and-hold timer for drag-to-reschedule
   const pressRef = useRef(null);               // mutable: long-press timer + start info
   const blockScrollRef = useRef((e) => { if (e.cancelable) e.preventDefault(); });
+  const dayStripRef = useRef(null);            // ref on the horizontal day strip — used to scroll "today" into view on first mount
+  // On first render, position the day strip so today's button is the leftmost visible one.
+  // Without this, adding past-day buttons would leave the strip parked 14 days in the past on open.
+  // useLayoutEffect runs after DOM commit but before paint, so the user never sees the strip jump.
+  useLayoutEffect(() => {
+    const strip = dayStripRef.current;
+    if (!strip) return;
+    const todayBtn = strip.querySelector('[data-today="1"]');
+    if (todayBtn) strip.scrollLeft = todayBtn.offsetLeft - strip.offsetLeft;
+  }, []);
 
   const setStatus = (id, status, msg) => { const freed = appts.find((a) => a.id === id); setAppts(appts.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) setTimeout(() => handleFreedSlot(freed), 350); };
   // open checkout instead of silently completing
@@ -5941,11 +6030,29 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           </div>
         </div>
       )}
-      {/* Editorial calendar header — two lines, no cramping */}
+      <Sheet open={showDatePicker} onClose={() => setShowDatePicker(false)} align="top" maxWidth={420}>
+        <DatePickerSheet
+          selectedDate={selectedDate}
+          onClose={() => setShowDatePicker(false)}
+          onPick={(d) => {
+            const t = new Date(); t.setHours(0, 0, 0, 0);
+            const target = new Date(d); target.setHours(0, 0, 0, 0);
+            const diffDays = Math.round((target - t) / 86400000);
+            setDayOffset(diffDays);
+            setShowDatePicker(false);
+          }}
+        />
+      </Sheet>
+      {/* Editorial calendar header — two lines, no cramping. The date cluster is tappable to open the month picker. */}
       <div style={{ marginBottom: 22 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{`${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`.toUpperCase()}</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, letterSpacing: -0.7, lineHeight: 0.95, marginBottom: 16 }}>{relativeDate(selectedDate)}</h2>
+        <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, margin: 0, textAlign: "left", color: "inherit", cursor: "pointer", display: "block", width: "auto" }}>
+          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{`${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`.toUpperCase()}</div>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, letterSpacing: -0.7, lineHeight: 0.95, marginBottom: 16, display: "flex", alignItems: "baseline", gap: 10 }}>
+            <span>{relativeDate(selectedDate)}</span>
+            <ChevronDown size={22} style={{ color: "var(--faint)", flexShrink: 0, alignSelf: "center", marginTop: 6 }} />
+          </h2>
+        </button>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button onClick={() => setShowCalendarOptions(true)} title="Calendar view" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 40, height: 40, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center" }}><Settings size={15} /></button>
           <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 18px", height: 40, borderRadius: 11, fontSize: 13.5, fontWeight: 600, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)" }}><Plus size={15} strokeWidth={2.5} /> NEW</button>
@@ -5954,14 +6061,15 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         </div>
       </div>
 
-      {/* Scrollable multi-week day strip — swipe horizontally, tap to pick */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 24, padding: "4px 2px", overflowX: "auto", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
-        {Array.from({ length: 28 }, (_, i) => { // 4 weeks ahead, swipe to reach
-          const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i);
+      {/* Scrollable multi-week day strip — swipe horizontally, tap to pick. Includes 14 days back so barbers can look up past visits. */}
+      <div ref={dayStripRef} style={{ display: "flex", gap: 6, marginBottom: 24, padding: "4px 2px", overflowX: "auto", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+        {Array.from({ length: 14 + 28 }, (_, i) => { // 14 days back + 28 days ahead; today sits at index 14 and is pre-scrolled into view on mount
+          const offset = i - 14;
+          const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + offset);
           const isSelected = d.toDateString() === selectedDate.toDateString();
-          const isToday = i === 0;
+          const isToday = offset === 0;
           return (
-            <button key={i} onClick={() => setDayOffset(i)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: "start", textAlign: "center", padding: "12px 4px 14px", borderRadius: 14, background: isSelected ? "var(--text)" : "transparent", color: isSelected ? "var(--bg)" : "var(--sub)", border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
+            <button key={offset} data-today={isToday ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: "start", textAlign: "center", padding: "12px 4px 14px", borderRadius: 14, background: isSelected ? "var(--text)" : "transparent", color: isSelected ? "var(--bg)" : "var(--sub)", border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
               <div style={{ fontSize: 10.5, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.8 : 0.55 }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
               <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, lineHeight: 1 }}>{d.getDate()}</div>
               {!isSelected && isToday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "var(--gold)" }} />}
