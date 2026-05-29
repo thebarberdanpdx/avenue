@@ -952,10 +952,26 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [cutPhase, setCutPhase] = useState("type"); // within step 2: "type" -> "beard" -> "addons"
   const [cutCarousel, setCutCarousel] = useState({}); // per-cut-type image index
   const [phone, setPhone] = useState("");
-  const [newName, setNewName] = useState("");   // first-timer name collected at the end
-  const [newEmail, setNewEmail] = useState(""); // first-timer email collected at the end
+  const [newFirst, setNewFirst] = useState("");  // first-timer first name collected at the end
+  const [newLast, setNewLast] = useState("");    // first-timer last name collected at the end
+  const [newEmail, setNewEmail] = useState(""); // first-timer email collected at the end (optional)
+  // Derived full name — keeps older call sites that read `newName` working without rewrites.
+  const newName = `${newFirst.trim()} ${newLast.trim()}`.trim();
   const [matched, setMatched] = useState(null);
-  useEffect(() => { if (matched) { setNewName(matched.name || ""); setNewEmail(matched.email || ""); if (matched.phone) setPhone(matched.phone); } }, [matched]);
+  useEffect(() => {
+    if (!matched) return;
+    // Prefer the stored firstName/lastName if present; otherwise split the legacy `name` field on whitespace.
+    if (matched.firstName || matched.lastName) {
+      setNewFirst(matched.firstName || "");
+      setNewLast(matched.lastName || "");
+    } else if (matched.name) {
+      const parts = matched.name.trim().split(/\s+/);
+      setNewFirst(parts[0] || "");
+      setNewLast(parts.slice(1).join(" "));
+    }
+    setNewEmail(matched.email || "");
+    if (matched.phone) setPhone(matched.phone);
+  }, [matched]);
   const [selectedDate, setSelectedDate] = useState(null);
   const [slot, setSlot] = useState(null);
   const [agreed, setAgreed] = useState(false);
@@ -2353,7 +2369,10 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
 
             <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 12 }}>{matched ? "CONFIRM YOUR INFO" : "YOUR DETAILS"}</div>
             <div style={{ display: "grid", gap: 11, marginBottom: 20 }}>
-              <input placeholder="Full name" style={inputStyle} value={newName} onChange={(e) => setNewName(e.target.value)} />
+              <div style={{ display: "flex", gap: 11 }}>
+                <input placeholder="First name" style={{ ...inputStyle, flex: 1 }} value={newFirst} onChange={(e) => setNewFirst(e.target.value)} />
+                <input placeholder="Last name" style={{ ...inputStyle, flex: 1 }} value={newLast} onChange={(e) => setNewLast(e.target.value)} />
+              </div>
               <input placeholder="Email" type="email" style={inputStyle} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
               <input placeholder="Phone number" type="tel" style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
@@ -2379,13 +2398,17 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <span>I agree to the cancellation policy</span>
             </button>
 
-            <button className="lift" disabled={!agreed || !newName.trim() || !newEmail.trim() || phone.replace(/\D/g, "").length < 10} onClick={() => {
+            <button className="lift" disabled={!agreed || !newFirst.trim() || !newLast.trim() || !newEmail.trim() || phone.replace(/\D/g, "").length < 10} onClick={() => {
               const baseId = Date.now();
               let clientId = matched?.id || null;
               if (!matched && !activeMember) {
-                clientId = "c" + baseId;
-                const newClient = { id: clientId, name: newName.trim(), email: newEmail.trim(), phone: phone.trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
+                clientId = "c" + baseId + Math.floor(Math.random() * 1000);
+                const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: newEmail.trim(), phone: phone.trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
                 setClients((cur) => [newClient, ...cur]);
+              } else if (matched) {
+                // Returning client confirmed/updated their info — write it back so a barber-added profile gets an email on file
+                // (and so any corrected spelling persists for next time). Phone is the match key so it stays.
+                setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: newEmail.trim() } : c));
               }
               const newAppts = [];
               const isSame = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
@@ -2418,7 +2441,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               });
               setAppts([...appts, ...newAppts]);
               setBookedId(baseId); setStep(8);
-            }} style={{ width: "100%", background: (agreed && newName.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--gold)" : "var(--border)", color: (agreed && newName.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--on-gold)" : "var(--faint)", padding: 17, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: (agreed && newName.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--shadow-md)" : "none" }}>LOCK IT IN</button>
+            }} style={{ width: "100%", background: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--gold)" : "var(--border)", color: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--on-gold)" : "var(--faint)", padding: 17, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--shadow-md)" : "none" }}>LOCK IT IN</button>
           </div>
         )}
 
@@ -5369,7 +5392,8 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
   const staff = providers.filter((p) => p.role !== "owner-nonstaff");
   const [client, setClient] = useState(null);
   const [walkIn, setWalkIn] = useState(false);
-  const [walkInName, setWalkInName] = useState("");
+  const [walkInFirst, setWalkInFirst] = useState("");
+  const [walkInLast, setWalkInLast] = useState("");
   const [walkInPhone, setWalkInPhone] = useState("");
   const [walkInEmail, setWalkInEmail] = useState("");
   const [service, setService] = useState(null);
@@ -5389,7 +5413,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
   const fmtHM = (m) => fmtTime(m);
   const dur = service ? getDuration(client, service, provId) : 0;
   const price = service ? getPrice(service, provId) : 0;
-  const canBook = service && (client || (walkIn && walkInName.trim() && walkInPhone.replace(/\D/g, "").length >= 10));
+  const canBook = service && (client || (walkIn && walkInFirst.trim() && walkInLast.trim() && walkInPhone.replace(/\D/g, "").length >= 10));
   const dateLabel = (() => { const d = new Date(); return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })();
   const stepTime = (delta) => setStartMin((m) => Math.max(6 * 60, Math.min(21 * 60, m + delta)));
 
@@ -5419,7 +5443,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
       <div style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "17px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <button onClick={onClose} style={{ background: "none", color: "var(--on-gold)", fontSize: 16, opacity: 0.9 }}>Cancel</button>
         <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.2 }}>New Appointment</span>
-        <button onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInName, walkInPhone, walkInEmail, note })} style={{ background: "none", color: "var(--on-gold)", fontSize: 16, fontWeight: 700, opacity: canBook ? 1 : 0.45 }}>Book</button>
+        <button onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note })} style={{ background: "none", color: "var(--on-gold)", fontSize: 16, fontWeight: 700, opacity: canBook ? 1 : 0.45 }}>Book</button>
       </div>
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
@@ -5459,7 +5483,10 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
             </div>
           ) : walkIn ? (
             <div style={fieldWrap}>
-              <input autoFocus value={walkInName} onChange={(e) => setWalkInName(e.target.value)} placeholder="First and last name" style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 18, fontFamily: FONT_BODY, marginBottom: 12 }} />
+              <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+                <input autoFocus value={walkInFirst} onChange={(e) => setWalkInFirst(e.target.value)} placeholder="First name" style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 18, fontFamily: FONT_BODY }} />
+                <input value={walkInLast} onChange={(e) => setWalkInLast(e.target.value)} placeholder="Last name" style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 18, fontFamily: FONT_BODY }} />
+              </div>
               <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginBottom: 12 }}>
                 <input value={walkInPhone} onChange={(e) => setWalkInPhone(e.target.value)} placeholder="Phone number (required)" inputMode="tel" style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY }} />
               </div>
@@ -5483,7 +5510,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
                     </button>
                   ))}
                   {matches.length === 0 && (
-                    <button onClick={() => { setWalkIn(true); setWalkInName(q); }} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5 }}><Plus size={16} style={{ color: "var(--gold)" }} /> Create “{q}” as a new client</button>
+                    <button onClick={() => { setWalkIn(true); const parts = q.trim().split(/\s+/); setWalkInFirst(parts[0] || ""); setWalkInLast(parts.slice(1).join(" ")); }} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5 }}><Plus size={16} style={{ color: "var(--gold)" }} /> Create “{q}” as a new client</button>
                   )}
                 </div>
               )}
@@ -5670,7 +5697,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         if (src) {
           const nd = summary.rebookDate ? new Date(summary.rebookDate + "T00:00:00") : (() => { const d = new Date(); d.setDate(d.getDate() + summary.rebookWeeks * 7); return d; })();
           const dur = src.end - src.start;
-          const newAppt = { ...src, id: "rb" + Date.now(), status: "confirmed", paid: null, prepaid: false, rebookDiscount: (business?.rebook?.discountEnabled !== false ? (business?.rebook?.discount || 0) : 0), rebookDiscountType: business?.rebook?.discountType || "amount", bookedFor: nd.toISOString(), start: src.start, end: src.start + dur, photos: 0, hasPhotos: false, hasNote: false };
+          const newAppt = { ...src, id: "rb" + Date.now() + Math.floor(Math.random() * 1000), status: "confirmed", paid: null, prepaid: false, rebookDiscount: (business?.rebook?.discountEnabled !== false ? (business?.rebook?.discount || 0) : 0), rebookDiscountType: business?.rebook?.discountType || "amount", bookedFor: nd.toISOString(), start: src.start, end: src.start + dur, photos: 0, hasPhotos: false, hasNote: false };
           done.push(newAppt);
         }
       }
@@ -5915,7 +5942,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   };
 
   // commit a fully-formed appointment from the booking form
-  const bookAppt = ({ providerId, start, client, service, walkInName, walkInPhone, walkInEmail, note }) => {
+  const bookAppt = ({ providerId, start, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note }) => {
     const id = "a" + Date.now() + Math.floor(Math.random() * 1000); // collision-proof string id
     const dur = getDuration(client, service, providerId);
     const price = getPrice(service, providerId);
@@ -5924,9 +5951,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
 
     // If this is a brand-new person (not an existing client), save them as a real client too.
     let bookClient = client;
-    if (!client && walkInName && walkInName.trim()) {
-      const parts = walkInName.trim().split(/\s+/);
-      const newClient = { id: "c" + Date.now(), name: walkInName.trim(), firstName: parts[0], lastName: parts.slice(1).join(" "), phone: (walkInPhone || "").trim(), email: (walkInEmail || "").trim(), provider: providerId === "anyone" ? "dan" : providerId, visits: 0, customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
+    const firstTrim = (walkInFirst || "").trim();
+    const lastTrim = (walkInLast || "").trim();
+    const walkInName = `${firstTrim} ${lastTrim}`.trim();
+    if (!client && walkInName) {
+      const newClient = { id: "c" + Date.now() + Math.floor(Math.random() * 1000), name: walkInName, firstName: firstTrim, lastName: lastTrim, phone: (walkInPhone || "").trim(), email: (walkInEmail || "").trim(), provider: providerId === "anyone" ? "dan" : providerId, visits: 0, customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
       setClients([newClient, ...clients]);
       bookClient = newClient;
     }
@@ -7057,7 +7086,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
     if (!draft.firstName || !draft.firstName.trim()) { if (showToast) showToast("Please enter a first name."); return; }
     if (!draft.lastName || !draft.lastName.trim()) { if (showToast) showToast("Please enter a last name."); return; }
     if (draft.phone.replace(/\D/g, "").length < 10) { if (showToast) showToast("Please enter a valid phone number."); return; }
-    const id = "c" + Date.now();
+    const id = "c" + Date.now() + Math.floor(Math.random() * 1000);
     const fullName = `${draft.firstName.trim()} ${draft.lastName.trim()}`;
     const newClient = { id, name: fullName, firstName: draft.firstName.trim(), lastName: draft.lastName.trim(), phone: draft.phone.trim(), email: draft.email.trim(), provider: draft.provider, visits: 0, customDurations: {}, notes: draft.notes.trim(), messages: [], gallery: [], timeline: [] };
     setClients([newClient, ...clients]);
