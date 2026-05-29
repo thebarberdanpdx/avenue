@@ -559,43 +559,87 @@ export default function App() {
   // one shop: 'sanctuary'. Lists (clients/appointments/waitlist/providers/services) live
   // as one row per item; settings live on the shops row. Messages are stored inside each
   // client, so saving clients covers messages too.
+  // SAFETY DESIGN (added to prevent silent data loss):
+  //   1. syncList upserts FIRST, then deletes only rows we no longer have. We never start
+  //      by deleting, so a mid-save failure cannot wipe data — it leaves the prior state
+  //      on the server and the next save reconciles it.
+  //   2. loadedRef stays FALSE if ANY load failed, which blocks all saves until reload.
+  //      That prevents the in-memory seed defaults from overwriting real data when a load
+  //      hits a transient error.
+  //   3. savingRef serializes saves per table — if a save is in flight when another fires,
+  //      we just store the latest items and re-run after; older writes can't land on top
+  //      of newer ones.
   const SHOP_ID = 'sanctuary';
   const loadedRef = useRef(false); // blocks saves until the first load finishes (so seed data can't overwrite real data)
+  const savingRef = useRef({});    // per-table { running, queued } — guarantees in-order saves
 
-  // Save a whole in-memory list to its shop-scoped table: clear this shop's rows, then insert current items.
+  // Save a whole in-memory list to its shop-scoped table.
+  // Strategy: upsert current items first (never destroys data), then delete rows that aren't in the list.
+  // If anything fails, we log it and bail — existing server data is still intact, and the next save reconciles.
   const syncList = async (table, items) => {
-    await supabase.from(table).delete().eq('shop_id', SHOP_ID);
-    if (items && items.length) {
-      const rows = items.map((it, i) => ({ id: String(it.id ?? `${table}_${i}`), shop_id: SHOP_ID, data: it }));
-      await supabase.from(table).insert(rows);
+    // Serialize: if a save for this table is already running, remember the latest items and return.
+    const slot = savingRef.current[table] || { running: false, queued: null };
+    if (slot.running) { slot.queued = items; savingRef.current[table] = slot; return; }
+    slot.running = true; slot.queued = null; savingRef.current[table] = slot;
+    try {
+      const list = items || [];
+      const rows = list.map((it, i) => ({ id: String(it.id ?? `${table}_${i}`), shop_id: SHOP_ID, data: it }));
+      // 1. Upsert what we currently have — adds new rows, updates existing ones, destroys nothing.
+      if (rows.length) {
+        const { error: upErr } = await supabase.from(table).upsert(rows);
+        if (upErr) throw upErr;
+      }
+      // 2. Find any server rows we no longer have in memory and delete only those.
+      const keepIds = new Set(rows.map((r) => r.id));
+      const { data: existing, error: selErr } = await supabase.from(table).select('id').eq('shop_id', SHOP_ID);
+      if (selErr) throw selErr;
+      const toDelete = (existing || []).filter((r) => !keepIds.has(r.id)).map((r) => r.id);
+      if (toDelete.length) {
+        const { error: delErr } = await supabase.from(table).delete().eq('shop_id', SHOP_ID).in('id', toDelete);
+        if (delErr) throw delErr;
+      }
+    } catch (err) {
+      console.error(`[vero] save '${table}' failed (data on server unchanged):`, err);
+    } finally {
+      // Drain the queue: if more changes arrived while we were saving, run once more with the latest.
+      const next = savingRef.current[table].queued;
+      savingRef.current[table].running = false;
+      savingRef.current[table].queued = null;
+      if (next !== null && next !== undefined) syncList(table, next);
     }
   };
 
   useEffect(() => {
     (async () => {
-      // Settings (business) live on the shops row.
-      const { data: shopRow } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).single();
-      if (shopRow && shopRow.settings && Object.keys(shopRow.settings).length) setBusiness(shopRow.settings);
+      let allLoaded = true; // flipped to false on ANY real error — blocks saves so seeds can't overwrite real data
 
-      // Load a list table → array of the stored item objects (null if the query failed).
+      // Settings (business) live on the shops row. maybeSingle returns null (not error) when no row exists yet.
+      const { data: shopRow, error: shopErr } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle();
+      if (shopErr) { allLoaded = false; console.error('[vero] load shops failed:', shopErr); }
+      else if (shopRow && shopRow.settings && Object.keys(shopRow.settings).length) setBusiness(shopRow.settings);
+
+      // Load a list table → array of stored item objects. Returns null ONLY on a real DB error (so we can skip and refuse saves).
       const loadList = async (table) => {
-        const { data } = await supabase.from(table).select('data').eq('shop_id', SHOP_ID);
-        return data ? data.map((r) => r.data) : null;
+        const { data, error } = await supabase.from(table).select('data').eq('shop_id', SHOP_ID);
+        if (error) { allLoaded = false; console.error(`[vero] load ${table} failed:`, error); return null; }
+        return data ? data.map((r) => r.data) : [];
       };
 
-      // Client data: use whatever's saved, including empty (fresh start = empty lists).
-      const cl = await loadList('clients');      if (cl) setClients(cl);
-      const ap = await loadList('appointments'); if (ap) setAppts(ap);
-      const wl = await loadList('waitlist');     if (wl) setWaitlist(wl);
+      // Client data: use whatever's saved, including empty (fresh start = empty lists). Skip only on real error.
+      const cl = await loadList('clients');      if (cl !== null) setClients(cl);
+      const ap = await loadList('appointments'); if (ap !== null) setAppts(ap);
+      const wl = await loadList('waitlist');     if (wl !== null) setWaitlist(wl);
       // Providers & services: keep the in-code defaults if nothing's saved yet (the app needs them to function).
       const pr = await loadList('providers');    if (pr && pr.length) setProviders(pr);
       const sv = await loadList('services');     if (sv && sv.length) setServices(sv);
 
-      loadedRef.current = true; // loads done — saves may now run
+      // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
+      if (allLoaded) loadedRef.current = true;
+      else console.error('[vero] one or more loads failed — saves are blocked until the next page reload to protect existing data');
     })();
   }, []);
 
-  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || 'Sanctuary Barber Co', settings: business }).then(() => {}); }, 800); return () => clearTimeout(t); }, [business]);
+  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || 'Sanctuary Barber Co', settings: business }).then(({ error }) => { if (error) console.error('[vero] save shops failed:', error); }); }, 800); return () => clearTimeout(t); }, [business]);
   useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
   useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
@@ -7140,12 +7184,19 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
   // build a unified, date-sorted feed: appointments for this client + timeline notes
   const myAppts = (appts || []).filter((a) => a.clientId === client.id && a.status !== "block");
+  const now = Date.now();
+  // Upcoming = confirmed/checked-in appointments whose date is still in the future, soonest first.
+  const upcomingAppts = myAppts
+    .filter((a) => a.bookedFor && new Date(a.bookedFor).getTime() >= now && a.status !== "cancelled" && a.status !== "done")
+    .sort((a, b) => new Date(a.bookedFor) - new Date(b.bookedFor));
+  const nextAppt = upcomingAppts[0] || null;
   const feed = [
-    ...myAppts.map((a) => ({ kind: "appt", date: new Date().toISOString(), appt: a, sortKey: a.start })),
-    ...(live.timeline || []).map((t) => ({ kind: "note", date: t.date, text: t.text, id: t.id, sortKey: 99999 })),
-  ];
+    ...myAppts.map((a) => ({ kind: "appt", date: a.bookedFor || new Date().toISOString(), appt: a, sortKey: a.bookedFor ? new Date(a.bookedFor).getTime() : 0 })),
+    ...(live.timeline || []).map((t) => ({ kind: "note", date: t.date, text: t.text, id: t.id, sortKey: t.date ? new Date(t.date).getTime() : 0 })),
+  ].sort((a, b) => b.sortKey - a.sortKey); // most recent / soonest-future first
   const feedFiltered = feed.filter((f) => tlFilter === "all" || (tlFilter === "appointments" && f.kind === "appt") || (tlFilter === "notes" && f.kind === "note"));
   const niceDate = (iso) => { const d = new Date(iso); return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; };
+  const niceDateFull = (iso) => { const d = new Date(iso); return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; };
 
   return (
     <div className="fade-up">
@@ -7189,6 +7240,20 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {/* CLIENT NOTE — always-visible, editable */}
       {pfTab === "overview" && <div style={{ marginBottom: 28 }}>
+        {/* Upcoming appointment — the key thing to see at a glance */}
+        {nextAppt && (
+          <div style={{ background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 14, padding: "16px 18px", marginBottom: 22 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700, marginBottom: 8 }}>UPCOMING APPOINTMENT</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 18%, var(--panel))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Calendar size={17} style={{ color: "var(--gold)" }} /></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.2 }}>{niceDateFull(nextAppt.bookedFor)}</div>
+                <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{fmtTime(nextAppt.start)} · {nextAppt.title}{nextAppt.providerId ? ` · ${(providers.find((p) => p.id === nextAppt.providerId) || {}).name || ""}` : ""}</div>
+              </div>
+            </div>
+            {upcomingAppts.length > 1 && <div style={{ fontSize: 12.5, color: "var(--gold)", marginTop: 10, fontWeight: 500 }}>+{upcomingAppts.length - 1} more upcoming</div>}
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)" }}>CLIENT NOTE</div>
           {!editingNote && <button onClick={() => setEditingNote(true)} style={{ background: "none", color: "var(--gold)", fontSize: 14, display: "flex", alignItems: "center", gap: 5 }}><Edit2 size={13} /> {live.notes ? "Edit" : "Add note"}</button>}
@@ -7254,15 +7319,23 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "8px 2px" }}>Nothing here just yet.</p>
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
-            {feedFiltered.map((f, i) => f.kind === "appt" ? (
-              <div key={"a"+f.appt.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px" }}>
+            {feedFiltered.map((f, i) => f.kind === "appt" ? (() => {
+              const isUpcoming = f.appt.bookedFor && new Date(f.appt.bookedFor).getTime() >= now && f.appt.status !== "cancelled" && f.appt.status !== "done";
+              const isCancelled = f.appt.status === "cancelled";
+              return (
+              <div key={"a"+f.appt.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", background: isUpcoming ? "color-mix(in srgb, var(--gold) 8%, var(--panel))" : "var(--panel)", border: `1px solid ${isUpcoming ? "color-mix(in srgb, var(--gold) 28%, var(--border))" : "var(--border)"}`, borderRadius: 12, padding: "12px 14px", opacity: isCancelled ? 0.55 : 1 }}>
                 <div style={{ width: 30, height: 30, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Calendar size={14} style={{ color: "var(--gold)" }} /></div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14.5, fontWeight: 600 }}>{f.appt.title}</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>{fmtTime(f.appt.start)} – {fmtTime(f.appt.end)}{f.appt.detail ? ` · ${f.appt.detail}` : ""}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 14.5, fontWeight: 600, textDecoration: isCancelled ? "line-through" : "none" }}>{f.appt.title}</span>
+                    {isUpcoming && <span style={{ fontSize: 10, letterSpacing: 1, color: "var(--gold)", fontWeight: 700, background: "color-mix(in srgb, var(--gold) 16%, transparent)", padding: "2px 7px", borderRadius: 10 }}>UPCOMING</span>}
+                    {isCancelled && <span style={{ fontSize: 10, letterSpacing: 1, color: "var(--sub)", fontWeight: 600 }}>CANCELLED</span>}
+                  </div>
+                  <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{f.appt.bookedFor ? `${niceDate(f.appt.bookedFor)} · ` : ""}{fmtTime(f.appt.start)} – {fmtTime(f.appt.end)}{f.appt.detail ? ` · ${f.appt.detail}` : ""}</div>
                 </div>
               </div>
-            ) : (
+              );
+            })() : (
               <div key={f.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", background: "color-mix(in srgb, var(--gold) 6%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 12, padding: "12px 14px" }}>
                 <div style={{ width: 30, height: 30, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 16%, var(--panel))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Edit2 size={13} style={{ color: "var(--gold)" }} /></div>
                 <div style={{ flex: 1 }}>
