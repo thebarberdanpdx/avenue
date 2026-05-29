@@ -5326,6 +5326,8 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
   const [client, setClient] = useState(null);
   const [walkIn, setWalkIn] = useState(false);
   const [walkInName, setWalkInName] = useState("");
+  const [walkInPhone, setWalkInPhone] = useState("");
+  const [walkInEmail, setWalkInEmail] = useState("");
   const [service, setService] = useState(null);
   const [note, setNote] = useState("");
   const [startMin, setStartMin] = useState(slot.start);
@@ -5343,7 +5345,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
   const fmtHM = (m) => fmtTime(m);
   const dur = service ? getDuration(client, service, provId) : 0;
   const price = service ? getPrice(service, provId) : 0;
-  const canBook = service && (client || walkIn);
+  const canBook = service && (client || (walkIn && walkInName.trim() && walkInPhone.replace(/\D/g, "").length >= 10));
   const dateLabel = (() => { const d = new Date(); return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })();
   const stepTime = (delta) => setStartMin((m) => Math.max(6 * 60, Math.min(21 * 60, m + delta)));
 
@@ -5373,7 +5375,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
       <div style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "17px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <button onClick={onClose} style={{ background: "none", color: "var(--on-gold)", fontSize: 16, opacity: 0.9 }}>Cancel</button>
         <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.2 }}>New Appointment</span>
-        <button onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInName, note })} style={{ background: "none", color: "var(--on-gold)", fontSize: 16, fontWeight: 700, opacity: canBook ? 1 : 0.45 }}>Book</button>
+        <button onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInName, walkInPhone, walkInEmail, note })} style={{ background: "none", color: "var(--on-gold)", fontSize: 16, fontWeight: 700, opacity: canBook ? 1 : 0.45 }}>Book</button>
       </div>
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
@@ -5413,8 +5415,14 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
             </div>
           ) : walkIn ? (
             <div style={fieldWrap}>
-              <input autoFocus value={walkInName} onChange={(e) => setWalkInName(e.target.value)} placeholder="Walk-in name (optional)" style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 18, fontFamily: FONT_BODY }} />
-              <button onClick={() => setWalkIn(false)} style={{ background: "none", color: "var(--sub)", fontSize: 13.5, marginTop: 10 }}>← Choose an existing client instead</button>
+              <input autoFocus value={walkInName} onChange={(e) => setWalkInName(e.target.value)} placeholder="First and last name" style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 18, fontFamily: FONT_BODY, marginBottom: 12 }} />
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginBottom: 12 }}>
+                <input value={walkInPhone} onChange={(e) => setWalkInPhone(e.target.value)} placeholder="Phone number (required)" inputMode="tel" style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY }} />
+              </div>
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                <input value={walkInEmail} onChange={(e) => setWalkInEmail(e.target.value)} placeholder="Email (optional)" inputMode="email" style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY }} />
+              </div>
+              <button onClick={() => setWalkIn(false)} style={{ background: "none", color: "var(--sub)", fontSize: 13.5, marginTop: 12 }}>← Choose an existing client instead</button>
             </div>
           ) : (
             <div style={fieldWrap}>
@@ -5774,13 +5782,23 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   };
 
   // commit a fully-formed appointment from the booking form
-  const bookAppt = ({ providerId, start, client, service, walkInName, note }) => {
+  const bookAppt = ({ providerId, start, client, service, walkInName, walkInPhone, walkInEmail, note }) => {
     const id = "a" + Date.now() + Math.floor(Math.random() * 1000); // collision-proof string id
     const dur = getDuration(client, service, providerId);
     const price = getPrice(service, providerId);
     // Stamp the appointment with the day currently shown on the calendar, or it can't be placed on any date.
     const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(start / 60), start % 60, 0, 0);
-    const newAppt = { id, providerId, clientId: client ? client.id : null, serviceId: service.id, start, end: start + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: client ? client.name : (walkInName || "Walk-in"), title: service.name, detail: note || "", hasNote: !!(note && note.trim()), price, hasPhotos: false, photos: 0 };
+
+    // If this is a brand-new person (not an existing client), save them as a real client too.
+    let bookClient = client;
+    if (!client && walkInName && walkInName.trim()) {
+      const parts = walkInName.trim().split(/\s+/);
+      const newClient = { id: "c" + Date.now(), name: walkInName.trim(), firstName: parts[0], lastName: parts.slice(1).join(" "), phone: (walkInPhone || "").trim(), email: (walkInEmail || "").trim(), provider: providerId === "anyone" ? "dan" : providerId, visits: 0, customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
+      setClients([newClient, ...clients]);
+      bookClient = newClient;
+    }
+
+    const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start, end: start + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: service.name, detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), hasPhotos: false, photos: 0 };
     setAppts([...appts, newAppt]);
     setNewApptSlot(null);
     showToast(`${newAppt.name} booked at ${fmtTime(start)}.`);
