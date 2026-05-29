@@ -2903,10 +2903,288 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 }
 
 // ============================================================
+// PULSE — editorial dashboard. Today + this week at a glance.
+// Lands first when opening the shop dashboard. The "Vero spin": one
+// big headline number per section, mobile-first, comparisons built
+// in, action-oriented (overdue clients link to the nudge folder).
+// ============================================================
+function PulseView({ business, appts, clients, services, providers, onNavigate }) {
+  const now = new Date();
+
+  // --- Time window helpers ---
+  const sod = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  // Week starts Monday for a "business week" feel.
+  const sow = (d) => {
+    const x = sod(d);
+    const day = x.getDay(); // 0=Sun..6=Sat
+    const diff = day === 0 ? -6 : 1 - day;
+    x.setDate(x.getDate() + diff);
+    return x;
+  };
+  const som = (d) => { const x = sod(d); x.setDate(1); return x; };
+
+  const todayStart = sod(now);
+  const tomorrowStart = new Date(todayStart); tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+  const weekStart = sow(now);
+  const nextWeekStart = new Date(weekStart); nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+  const lastWeekStart = new Date(weekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const monthStart = som(now);
+  const nextMonthStart = new Date(monthStart); nextMonthStart.setMonth(nextMonthStart.getMonth() + 1);
+  const lastMonthStart = new Date(monthStart); lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+
+  // --- Per-appointment price (handles line items if present, otherwise the service default) ---
+  const apptPrice = (a) => {
+    if (a.lineItems && a.lineItems.length) {
+      return a.lineItems.reduce((sum, li) => {
+        const s = services.find((x) => x.id === li.serviceId);
+        return sum + (s ? getPrice(s, a.providerId) : 0);
+      }, 0);
+    }
+    const s = services.find((x) => x.id === a.serviceId);
+    return s ? getPrice(s, a.providerId) : 0;
+  };
+
+  // --- Status / range filters ---
+  const inRange = (a, start, end) => {
+    if (!a.bookedFor) return false;
+    const t = new Date(a.bookedFor).getTime();
+    return t >= start.getTime() && t < end.getTime();
+  };
+  const isBlock = (a) => a.status === "block";
+  const isRevenue = (a) => a.status === "done";
+  const isCancelled = (a) => a.status === "cancelled";
+
+  // --- Money totals (only "done" appts count as revenue) ---
+  const sumRevenue = (start, end) =>
+    appts
+      .filter((a) => !isBlock(a) && isRevenue(a) && inRange(a, start, end))
+      .reduce((sum, a) => sum + apptPrice(a), 0);
+
+  const todayMoney = sumRevenue(todayStart, tomorrowStart);
+  const thisWeekMoney = sumRevenue(weekStart, nextWeekStart);
+  const lastWeekMoney = sumRevenue(lastWeekStart, weekStart);
+  const thisMonthMoney = sumRevenue(monthStart, nextMonthStart);
+  const lastMonthMoney = sumRevenue(lastMonthStart, monthStart);
+
+  // --- Visit counts ---
+  const todayApptsAll = appts.filter((a) => !isBlock(a) && !isCancelled(a) && inRange(a, todayStart, tomorrowStart));
+  const todayCompleted = todayApptsAll.filter(isRevenue).length;
+  const todayTotal = todayApptsAll.length;
+
+  const thisWeekAppts = appts.filter((a) => !isBlock(a) && inRange(a, weekStart, nextWeekStart));
+  const weekBooked = thisWeekAppts.filter((a) => !isCancelled(a)).length;
+  const weekDone = thisWeekAppts.filter(isRevenue).length;
+  const weekCancelled = thisWeekAppts.filter(isCancelled).length;
+
+  // --- Chair occupancy this week (booked minutes / bookable minutes from providers' hours) ---
+  const bookableMinutesInRange = (start, end) => {
+    let total = 0;
+    const cursor = new Date(start);
+    while (cursor < end) {
+      const dow = cursor.getDay();
+      providers.forEach((p) => {
+        if (p.id === "anyone") return;
+        const h = p.hours?.[dow];
+        if (h?.on) total += (h.end - h.start);
+      });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return total;
+  };
+  const weekBookableMin = bookableMinutesInRange(weekStart, nextWeekStart);
+  const weekBookedMin = thisWeekAppts
+    .filter((a) => !isCancelled(a))
+    .reduce((sum, a) => sum + (a.end - a.start), 0);
+  const occupancyPct = weekBookableMin > 0 ? Math.round((weekBookedMin / weekBookableMin) * 100) : 0;
+
+  // --- Top service this week (by visit count of completed appointments) ---
+  const serviceCounts = {};
+  thisWeekAppts.filter(isRevenue).forEach((a) => {
+    const sid = a.serviceId;
+    if (!sid) return;
+    serviceCounts[sid] = (serviceCounts[sid] || 0) + 1;
+  });
+  const topServiceEntry = Object.entries(serviceCounts).sort(([, a], [, b]) => b - a)[0];
+  const topService = topServiceEntry ? { svc: services.find((s) => s.id === topServiceEntry[0]), count: topServiceEntry[1] } : null;
+
+  // --- Top client this week (skip "guest" placeholder appointments) ---
+  const clientCounts = {};
+  thisWeekAppts.filter(isRevenue).forEach((a) => {
+    const cid = a.clientId;
+    if (!cid || cid === "guest") return;
+    clientCounts[cid] = (clientCounts[cid] || 0) + 1;
+  });
+  const topClientEntry = Object.entries(clientCounts).sort(([, a], [, b]) => b - a)[0];
+  const topClient = topClientEntry ? { client: clients.find((c) => c.id === topClientEntry[0]), count: topClientEntry[1] } : null;
+
+  // --- Overdue-to-rebook count (matches the nudge folder's filter exactly) ---
+  const overdueCount = clients.filter((c) => {
+    if (!c.cadenceDays || !c.lastVisit) return false;
+    if (c.nudgeDismissedAt && new Date(c.nudgeDismissedAt) > new Date(c.lastVisit)) return false;
+    const days = Math.round((Date.now() - new Date(c.lastVisit)) / 86400000);
+    return (days - c.cadenceDays) > 0;
+  }).length;
+
+  // --- Formatters ---
+  const fmtMoney = (n) => `$${Math.round(n).toLocaleString()}`;
+  const computeDelta = (current, prior) => {
+    if (prior === 0 && current === 0) return null;
+    if (prior === 0) return { up: true, label: `vs $0 last period` };
+    const pct = Math.round(((current - prior) / prior) * 100);
+    return { up: pct >= 0, pct: Math.abs(pct), prior };
+  };
+  const weekDelta = computeDelta(thisWeekMoney, lastWeekMoney);
+  const monthDelta = computeDelta(thisMonthMoney, lastMonthMoney);
+  const todayLabel = `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
+
+  // --- Empty state for a brand-new shop ---
+  const hasAnyData = appts.some((a) => !isBlock(a) && a.bookedFor);
+  if (!hasAnyData) {
+    return (
+      <div className="fade-up">
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>PULSE</div>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{todayLabel}</h2>
+        </div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "32px 24px", textAlign: "center" }}>
+          <TrendingUp size={32} style={{ color: "var(--faint)", marginBottom: 14 }} />
+          <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 8 }}>Nothing to show yet</h3>
+          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto" }}>Pulse fills in as you start booking and completing appointments. Come back here for a clean snapshot of how the shop's running — money in, who's booked, what's slow.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // --- The full editorial render ---
+  return (
+    <div className="fade-up">
+      {/* Masthead */}
+      <div style={{ marginBottom: 30 }}>
+        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>PULSE</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{todayLabel}</h2>
+      </div>
+
+      {/* TODAY — the hero number */}
+      <div style={{ marginBottom: 36 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>TODAY</div>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 60, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.5, marginBottom: 8 }}>
+          {fmtMoney(todayMoney)}
+        </div>
+        <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>
+          {todayCompleted === 0 && todayTotal > 0 && `${todayTotal} visit${todayTotal > 1 ? "s" : ""} on the books`}
+          {todayCompleted === 0 && todayTotal === 0 && "No visits booked today"}
+          {todayCompleted > 0 && `${todayCompleted} of ${todayTotal} ${todayTotal === 1 ? "visit" : "visits"} complete`}
+        </div>
+      </div>
+
+      <div style={{ height: 1, background: "var(--line)", margin: "0 0 30px" }} />
+
+      {/* THIS WEEK */}
+      <div style={{ marginBottom: 36 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>THIS WEEK</div>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1, marginBottom: 6 }}>
+          {fmtMoney(thisWeekMoney)}
+        </div>
+        {weekDelta && (
+          <div style={{ fontSize: 13.5, color: weekDelta.up ? "var(--gold)" : "var(--sub)", marginBottom: 18, lineHeight: 1.5 }}>
+            {weekDelta.pct !== undefined ? (
+              <>{weekDelta.up ? "+" : "−"}{weekDelta.pct}% vs {fmtMoney(weekDelta.prior)} last week</>
+            ) : weekDelta.label}
+          </div>
+        )}
+        {!weekDelta && <div style={{ marginBottom: 18 }} />}
+
+        {/* Occupancy bar */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 13, color: "var(--sub)" }}>
+            <span>Chair time booked</span>
+            <span style={{ fontWeight: 600, color: "var(--text)" }}>{occupancyPct}%</span>
+          </div>
+          <div style={{ height: 6, background: "var(--panel2)", borderRadius: 3, overflow: "hidden" }}>
+            <div style={{ width: `${Math.min(100, occupancyPct)}%`, height: "100%", background: "var(--gold)" }} />
+          </div>
+        </div>
+
+        {/* Inline counts */}
+        <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
+          <span style={{ fontWeight: 600 }}>{weekBooked}</span> booked · <span style={{ fontWeight: 600 }}>{weekDone}</span> done
+          {weekCancelled > 0 && (<> · <span style={{ fontWeight: 600 }}>{weekCancelled}</span> cancelled</>)}
+        </div>
+      </div>
+
+      <div style={{ height: 1, background: "var(--line)", margin: "0 0 30px" }} />
+
+      {/* THIS MONTH */}
+      <div style={{ marginBottom: 36 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>THIS MONTH</div>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1, marginBottom: 6 }}>
+          {fmtMoney(thisMonthMoney)}
+        </div>
+        {monthDelta && (
+          <div style={{ fontSize: 13.5, color: monthDelta.up ? "var(--gold)" : "var(--sub)", lineHeight: 1.5 }}>
+            {monthDelta.pct !== undefined ? (
+              <>{monthDelta.up ? "+" : "−"}{monthDelta.pct}% vs {fmtMoney(monthDelta.prior)} last month</>
+            ) : monthDelta.label}
+          </div>
+        )}
+      </div>
+
+      {(topService || topClient) && <div style={{ height: 1, background: "var(--line)", margin: "0 0 30px" }} />}
+
+      {/* THIS WEEK'S TOP */}
+      {(topService || topClient) && (
+        <div style={{ marginBottom: 30 }}>
+          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>THIS WEEK'S TOP</div>
+          <div style={{ display: "grid", gap: 14 }}>
+            {topService && topService.svc && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
+                <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Service</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topService.svc.name}</div>
+                  <div style={{ fontSize: 13, color: "var(--faint)", flexShrink: 0 }}>{topService.count}×</div>
+                </div>
+              </div>
+            )}
+            {topClient && topClient.client && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
+                <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Client</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topClient.client.name}</div>
+                  <div style={{ fontSize: 13, color: "var(--faint)", flexShrink: 0 }}>{topClient.count}×</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Action CTA — overdue clients */}
+      {overdueCount > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />
+          <button onClick={() => onNavigate && onNavigate("clients")} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Bell size={17} style={{ color: "var(--gold)" }} />
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 15, fontWeight: 500 }}>{overdueCount} client{overdueCount > 1 ? "s" : ""} overdue to rebook</div>
+                <div style={{ fontSize: 13, color: "var(--sub)" }}>Open the nudge folder</div>
+              </div>
+            </div>
+            <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // SHOP DASHBOARD — adds Menu editor + Settings
 // ============================================================
 function ShopDashboard({ business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, onExit }) {
-  const [tab, setTab] = useState("calendar");
+  const [tab, setTab] = useState("pulse");
   const [activeClient, setActiveClient] = useState(null);
   const [toast, setToast] = useState(null);
   const [msgTarget, setMsgTarget] = useState(null); // { clientId, draft } — opens a convo prefilled
@@ -2933,11 +3211,12 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   return (
     <div>
       <div style={{ borderBottom: "1px solid var(--line)", padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
-        <button onClick={() => { if (tab === "calendar" && !activeClient) { onExit(); } else { setActiveClient(null); setTab("calendar"); } }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> {tab === "calendar" && !activeClient ? "Home" : "Calendar"}</button>
+        <button onClick={() => { if (tab === "pulse" && !activeClient) { onExit(); } else { setActiveClient(null); setTab("pulse"); } }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> {tab === "pulse" && !activeClient ? "Home" : "Pulse"}</button>
         <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, letterSpacing: 1.5, fontWeight: 500 }}>{business.name}</div>
         <div style={{ width: 50 }} />
       </div>
       <div style={{ maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
+        {tab === "pulse" && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} onNavigate={(t) => setTab(t)} />}
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
@@ -2949,7 +3228,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
 
       {/* fixed bottom tab bar — original pattern, anchors to viewport bottom */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "color-mix(in srgb, var(--bg) 82%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderTop: "1px solid var(--line)", boxShadow: "0 -8px 30px -12px var(--shadow)", display: "flex", justifyContent: "space-around", alignItems: "stretch", padding: "10px 4px calc(10px + env(safe-area-inset-bottom))", zIndex: 20 }}>
-        {[["calendar", "Calendar", Calendar], ["clients", "Clients", User], ["messages", "Messages", MessageSquare], ["settings", "Settings", Settings]].map(([id, label, Icon]) => (
+        {[["pulse", "Pulse", TrendingUp], ["calendar", "Calendar", Calendar], ["clients", "Clients", User], ["messages", "Messages", MessageSquare], ["settings", "Settings", Settings]].map(([id, label, Icon]) => (
           <button key={id} onClick={() => { setTab(id); setActiveClient(null); }} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
             <div style={{ position: "relative" }}>
               <Icon size={21} />
