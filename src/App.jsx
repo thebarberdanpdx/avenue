@@ -941,6 +941,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [codeError, setCodeError] = useState(false);
   const [pendingMatch, setPendingMatch] = useState(null); // the client we found, awaiting code verify
   const [blockedNotice, setBlockedNotice] = useState(false); // shown when a blocked client tries to book
+  const [clientTypeBlock, setClientTypeBlock] = useState(null); // "returning_only" | "new_only" | null — set when shop's online booking is restricted to one type and this client is the other
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberNote, setNewMemberNote] = useState("");
   const [cart, setCart] = useState([]);
@@ -1056,13 +1057,25 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     const leadMin = bk.leadTimeMin || 0;
     const earliest = isToday ? (new Date().getHours() * 60 + new Date().getMinutes() + leadMin) : 0;
 
+    // Same-day cutoff: if today and we're past the cutoff time, no more bookings today.
+    if (isToday && bk.sameDayCutoff) {
+      const [hh, mm] = bk.sameDayCutoff.split(':').map((x) => parseInt(x, 10) || 0);
+      const cutoffMin = hh * 60 + mm;
+      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+      if (nowMin >= cutoffMin) return [];
+    }
+
+    // Buffers: padding held open around each appointment (setup before / cleanup after).
+    const bufBefore = Math.max(0, Number(bk.bufferBefore) || 0);
+    const bufAfter = Math.max(0, Number(bk.bufferAfter) || 0);
+
     const packTheDay = bk.avoidGaps !== false; // default ON
     // Per-barber: allow ending after closing time (up to N minutes), only if it fits flush
     const overrunMin = Math.max(0, Number(prov.overrunMin) || 0);
     const dayEnd = h.end + overrunMin;
 
-    // Helper: a time t with duration durMin doesn't clash with any existing busy
-    const noClash = (t) => !busy.some(([bs, be]) => t < be && (t + durMin) > bs);
+    // Helper: a time t with duration durMin doesn't clash with any existing busy (accounting for buffers around the busy block).
+    const noClash = (t) => !busy.some(([bs, be]) => t < (be + bufAfter) && (t + durMin) > (bs - bufBefore));
 
     let candidates = new Set();
 
@@ -1136,7 +1149,20 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     return { sameTime, sequential };
   };
 
-  const dateOptions = useMemo(() => { const arr = []; const base = new Date(); const worksOn = (dow) => providers.some((p) => p.id !== "anyone" && p.hours?.[dow]?.on); for (let i = 0; i < 14; i++) { const d = new Date(base); d.setDate(base.getDate() + i); if (!worksOn(d.getDay())) continue; arr.push(d); } return arr; }, [providers]);
+  const dateOptions = useMemo(() => {
+    const arr = [];
+    const base = new Date();
+    const worksOn = (dow) => providers.some((p) => p.id !== "anyone" && p.hours?.[dow]?.on);
+    // Booking window: how far out clients can book. 0 = no cutoff (capped at 730 days for rendering sanity).
+    const horizon = (business?.booking?.horizonDays === 0) ? 730 : (Math.max(1, business?.booking?.horizonDays || 60));
+    for (let i = 0; i < horizon; i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      if (!worksOn(d.getDay())) continue;
+      arr.push(d);
+    }
+    return arr;
+  }, [providers, business]);
 
   // --- Regular front-door helpers (Piece 1) ---
   // Soonest open { date, slot } for a given barber across the next 14 working days.
@@ -1958,7 +1984,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                 </div>
               ))}
             </div>
-            <button className="lift" onClick={() => { if (matched && (matched.family || []).length > 0) { setShowWhoFor(true); } else { setStep(1); } }} style={{ width: "100%", background: "var(--panel)", border: "1px dashed var(--border2)", color: "var(--gold)", padding: 16, fontSize: 15, fontWeight: 500, borderRadius: 14, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}><Plus size={18} /> Add another{matched && (matched.family || []).length > 0 ? " (you or someone else)" : " service"}</button>
+            {(business?.booking?.allowMultiple !== false || (matched && (matched.family || []).length > 0)) && (
+              <button className="lift" onClick={() => { if (matched && (matched.family || []).length > 0) { setShowWhoFor(true); } else { setStep(1); } }} style={{ width: "100%", background: "var(--panel)", border: "1px dashed var(--border2)", color: "var(--gold)", padding: 16, fontSize: 15, fontWeight: 500, borderRadius: 14, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}><Plus size={18} /> Add another{matched && (matched.family || []).length > 0 ? " (you or someone else)" : " service"}</button>
+            )}
             <button className="lift" onClick={() => setStep(6)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 14 }}>That's everything — pick a time →</button>
           </div>
         )}
@@ -2054,6 +2082,13 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>We're not able to accept new appointments online at this time. Please check back later.</p>
           <button onClick={() => setBlockedNotice(false)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>OK</button>
         </Sheet>
+        {/* Client-type gate — fires when the shop's "Who can book" setting blocks this client type. */}
+        <Sheet open={!!clientTypeBlock} onClose={() => setClientTypeBlock(null)} align="top">
+          <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 8 }}>{clientTypeBlock === "returning_only" ? "Returning clients only" : "New clients only"}</h2>
+          <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>{clientTypeBlock === "returning_only" ? "Online booking at this shop is currently open to returning clients only. Please give us a call to book your first visit." : "Online booking at this shop is currently for new clients only. Please give us a call to book your next visit."}{business?.phones?.[0]?.number ? ` Phone: ${business.phones[0].number}.` : ""}</p>
+          <button onClick={() => setClientTypeBlock(null)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>OK</button>
+        </Sheet>
         {step === 5 && showCodeEntry && (
           <div className="fade-up">
             <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
@@ -2062,7 +2097,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
             <p style={{ color: "var(--faint)", fontSize: 13, marginBottom: 24, fontWeight: 300, fontStyle: "italic" }}>Texting isn't live yet — enter any 6 digits to continue for now.</p>
             <input autoFocus inputMode="numeric" value={codeEntry} onChange={(e) => { setCodeEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(false); }} placeholder="• • • • • •" style={{ ...inputStyle, textAlign: "center", fontSize: 28, letterSpacing: 8, marginBottom: codeError ? 8 : 18 }} />
             {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Enter all 6 digits.</p>}
-            <button className="lift" onClick={() => { if (codeEntry.length < 6) { setCodeError(true); return; } const found = pendingMatch; setMatched(found); setShowCodeEntry(false); if (found) { setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = (appts || []).filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 12 }}>Verify →</button>
+            <button className="lift" onClick={() => { if (codeEntry.length < 6) { setCodeError(true); return; } const found = pendingMatch; const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = (appts || []).filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 12 }}>Verify →</button>
             <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6 }}>Use a different number</button>
           </div>
         )}
@@ -2687,7 +2722,19 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
 // MANAGE — standalone wrapper (from landing page), supplies chrome + dates
 // ============================================================
 function ManageStandalone({ business, appts, setAppts, providers, services, onExit }) {
-  const dateOptions = useMemo(() => { const arr = []; const base = new Date(); const worksOn = (dow) => providers.some((p) => p.id !== "anyone" && p.hours?.[dow]?.on); for (let i = 0; i < 14; i++) { const d = new Date(base); d.setDate(base.getDate() + i); if (!worksOn(d.getDay())) continue; arr.push(d); } return arr; }, [providers]);
+  const dateOptions = useMemo(() => {
+    const arr = [];
+    const base = new Date();
+    const worksOn = (dow) => providers.some((p) => p.id !== "anyone" && p.hours?.[dow]?.on);
+    const horizon = (business?.booking?.horizonDays === 0) ? 730 : (Math.max(1, business?.booking?.horizonDays || 60));
+    for (let i = 0; i < horizon; i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      if (!worksOn(d.getDay())) continue;
+      arr.push(d);
+    }
+    return arr;
+  }, [providers, business]);
   return (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
       <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
@@ -3357,8 +3404,8 @@ function bookingStatus(b) {
   if (!b.enabled) return "Turned off";
   const bits = [];
   bits.push(b.requireCard ? "Card required" : "No card");
-  if (b.deposit.mode !== "none") bits.push(b.deposit.mode === "fixed" ? `$${b.deposit.amount} deposit` : `${b.deposit.amount}% deposit`);
-  bits.push(`${fmtDur(b.leadTimeMin)} notice`);
+  if (b.deposit?.mode && b.deposit.mode !== "none") bits.push(b.deposit.mode === "fixed" ? `$${b.deposit.amount} deposit` : `${b.deposit.amount}% deposit`);
+  if (b.leadTimeMin) bits.push(`${fmtDur(b.leadTimeMin)} notice`);
   return bits.join(" · ");
 }
 
@@ -3432,16 +3479,14 @@ function BookingRulesEditor({ b, onChange }) {
 
   const preview = () => {
     if (!b.enabled) return "Online booking is currently turned off — clients can't book themselves.";
-    const lead = b.leadTimeMin === 0 ? "any time" : `${fmtDur(b.leadTimeMin)}`;
-    let s = b.leadTimeMin === 0 ? `Clients can book right up to the appointment, up to ${b.horizonDays} days out` : `Clients must book at least ${lead} ahead, up to ${b.horizonDays} days out`;
+    const horizonLabel = b.horizonDays === 0 ? "no cutoff" : (b.horizonDays >= 90 ? `${Math.round(b.horizonDays / 30)} months` : `${b.horizonDays || 60} days`);
+    let s = `Clients can book online (${horizonLabel} ahead)`;
     if (b.sameDayCutoff) s += `, with no same-day booking after ${b.sameDayCutoff}`;
     s += `. ${b.clientType === "all" ? "Open to everyone" : b.clientType === "returning" ? "Returning clients only" : "New clients only"}.`;
+    if (b.allowMultiple === false) s += " One service per booking.";
     if (b.requireCard) s += " A card is required.";
-    if (b.deposit.mode === "fixed") s += ` $${b.deposit.amount} deposit taken at booking.`;
-    if (b.deposit.mode === "percent") s += ` ${b.deposit.amount}% deposit taken at booking.`;
-    if (b.bufferBefore || b.bufferAfter) s += ` Buffer ${b.bufferBefore}m before / ${b.bufferAfter}m after each visit.`;
-    if (b.dailyCap > 0) s += ` Max ${b.dailyCap} online bookings/day.`;
-    if (b.fillGapsFirst) s += " Gap-filling slots are offered first.";
+    if (b.deposit?.mode === "fixed") s += ` $${b.deposit.amount} deposit taken at booking.`;
+    if (b.deposit?.mode === "percent") s += ` ${b.deposit.amount}% deposit taken at booking.`;
     return s;
   };
 
@@ -3452,26 +3497,16 @@ function BookingRulesEditor({ b, onChange }) {
       </Row>
 
       <div style={{ opacity: b.enabled ? 1 : 0.4, pointerEvents: b.enabled ? "auto" : "none" }}>
-        <div style={{ padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
-          <div style={{ fontSize: 15 }}>Minimum notice</div>
-          <div style={{ fontSize: 14.5, color: "var(--sub)", fontWeight: 300, marginTop: 2, marginBottom: 12, lineHeight: 1.4 }}>How far ahead a client must book. Set hours and minutes to anything you like.</div>
-          <HourMinutePicker totalMin={b.leadTimeMin} onChange={(v) => set({ leadTimeMin: v })} />
-        </div>
-
-        <Row title="Booking window" desc="How far in advance clients can book.">
-          <Stepper value={b.horizonDays} onChange={(v) => set({ horizonDays: v })} min={1} max={365} step={5} suffix="days" />
-        </Row>
-
         <Row title="Same-day cutoff" desc="Block same-day bookings after this time (blank = allowed all day).">
-          <input type="time" value={b.sameDayCutoff} onChange={(e) => set({ sameDayCutoff: e.target.value })} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 6, padding: "8px 10px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
+          <input type="time" value={b.sameDayCutoff || ""} onChange={(e) => set({ sameDayCutoff: e.target.value })} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 6, padding: "8px 10px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
         </Row>
 
-        <Row title="Multiple services" desc="Allow more than one service in a single booking.">
-          <Toggle on={b.allowMultiple} onClick={() => set({ allowMultiple: !b.allowMultiple })} />
+        <Row title="Multiple services per booking" desc="Allow more than one service in a single appointment.">
+          <Toggle on={b.allowMultiple !== false} onClick={() => set({ allowMultiple: b.allowMultiple === false ? true : false })} />
         </Row>
 
         <Row title="Who can book" desc="Limit online booking by client type.">
-          <Segmented options={[{ value: "all", label: "All" }, { value: "returning", label: "Returning" }, { value: "new", label: "New" }]} value={b.clientType} onChange={(v) => set({ clientType: v })} />
+          <Segmented options={[{ value: "all", label: "All" }, { value: "returning", label: "Returning" }, { value: "new", label: "New" }]} value={b.clientType || "all"} onChange={(v) => set({ clientType: v })} />
         </Row>
 
         <Row title="Require a card" desc="Hold a card to reserve (your no-show protection).">
@@ -3479,31 +3514,17 @@ function BookingRulesEditor({ b, onChange }) {
         </Row>
 
         <Row title="Deposit" desc="Take a deposit at the time of booking.">
-          <Segmented options={[{ value: "none", label: "None" }, { value: "fixed", label: "$ Fixed" }, { value: "percent", label: "%" }]} value={b.deposit.mode} onChange={(v) => setDep({ mode: v })} />
+          <Segmented options={[{ value: "none", label: "None" }, { value: "fixed", label: "$ Fixed" }, { value: "percent", label: "%" }]} value={b.deposit?.mode || "none"} onChange={(v) => setDep({ mode: v })} />
         </Row>
-        {b.deposit.mode !== "none" && (
+        {b.deposit?.mode && b.deposit.mode !== "none" && (
           <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 0 14px", borderBottom: "1px solid var(--line)" }}>
             <Stepper value={b.deposit.amount} onChange={(v) => setDep({ amount: v })} min={0} max={b.deposit.mode === "percent" ? 100 : 500} step={5} suffix={b.deposit.mode === "percent" ? "%" : "$"} />
           </div>
         )}
 
-        <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--gold)", margin: "20px 0 4px" }}>SMART RULES</div>
-
-        <Row title="Buffer before" desc="Padding before each appointment.">
-          <Stepper value={b.bufferBefore} onChange={(v) => set({ bufferBefore: v })} min={0} max={60} step={5} suffix="min" />
-        </Row>
-        <Row title="Buffer after" desc="Cleanup / reset time after each appointment.">
-          <Stepper value={b.bufferAfter} onChange={(v) => set({ bufferAfter: v })} min={0} max={60} step={5} suffix="min" />
-        </Row>
-        <Row title="Daily online cap" desc="Max self-booked appointments per day (0 = unlimited).">
-          <Stepper value={b.dailyCap} onChange={(v) => set({ dailyCap: v })} min={0} max={30} suffix="" />
-        </Row>
-        <Row title="Fill gaps first" desc="Offer slots that tighten your day before opening fresh blocks.">
-          <Toggle on={b.fillGapsFirst} onClick={() => set({ fillGapsFirst: !b.fillGapsFirst })} />
-        </Row>
-        <Row title="Rebooking nudge" desc="Auto-suggest the next visit after this many weeks (0 = off).">
-          <Stepper value={b.rebookNudgeWeeks} onChange={(v) => set({ rebookNudgeWeeks: v })} min={0} max={16} suffix="wk" />
-        </Row>
+        <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginTop: 18, fontStyle: "italic" }}>
+          Buffer, minimum notice, and booking window live in Settings → Scheduling Options.
+        </p>
       </div>
 
       <div style={{ marginTop: 18, background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 6, padding: "14px 16px" }}>
@@ -3846,8 +3867,35 @@ function SchedulingOptionsEditor({ b, onChange }) {
 
       <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
         <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Booking window</div>
-        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>How far in advance clients can book.</div>
-        <Stepper value={b.horizonDays || 0} onChange={(v) => set({ horizonDays: v })} min={1} max={365} step={1} suffix="days" />
+        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>How far in advance clients can book. Up to 90 days shows in days; beyond that, in months. Or pick no cutoff.</div>
+        {(() => {
+          const days = b.horizonDays === 0 ? 0 : (b.horizonDays || 60);
+          const noCutoff = days === 0;
+          const fmt = (d) => d >= 90 ? `${Math.round(d / 30)} months` : `${d} ${d === 1 ? "day" : "days"}`;
+          const step = (n) => Math.abs(n) >= 30 ? 30 : 1;
+          const dec = () => { const cur = days || 60; const s = cur > 90 ? 30 : 1; set({ horizonDays: Math.max(1, cur - s) }); };
+          const inc = () => { const cur = days || 60; const s = cur >= 90 ? 30 : 1; set({ horizonDays: cur + s }); };
+          const btn = (label, onClick, disabled) => (
+            <button onClick={onClick} disabled={disabled} style={{ width: 38, height: 38, borderRadius: 11, border: "1px solid var(--border)", background: "var(--panel)", color: disabled ? "var(--faint)" : "var(--text)", fontSize: 20, fontWeight: 500, cursor: disabled ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>{label}</button>
+          );
+          return (
+            <>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <span style={{ fontSize: 14.5 }}>No cutoff (any future date)</span>
+                <Toggle on={noCutoff} onClick={() => set({ horizonDays: noCutoff ? 60 : 0 })} />
+              </div>
+              {!noCutoff && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                  <span style={{ fontSize: 15, fontWeight: 500 }}>{fmt(days || 60)}</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {btn("−", dec, (days || 60) <= 1)}
+                    {btn("+", inc, false)}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
@@ -5073,7 +5121,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "scheduling", title: "Scheduling Options", icon: Clock, category: "Calendar & Appointments",
-      status: (() => { const bk = form.booking || {}; const parts = []; if (bk.bufferBefore || bk.bufferAfter) parts.push(`${bk.bufferBefore || 0}/${bk.bufferAfter || 0}m buffer`); parts.push(`${bk.horizonDays || 0}d window`); return parts.join(" · "); })(),
+      status: (() => { const bk = form.booking || {}; const parts = []; if (bk.bufferBefore || bk.bufferAfter) parts.push(`${bk.bufferBefore || 0}/${bk.bufferAfter || 0}m buffer`); const hd = bk.horizonDays; const winLabel = hd === 0 ? "no cutoff" : (hd >= 90 ? `${Math.round(hd / 30)}mo window` : `${hd || 60}d window`); parts.push(winLabel); return parts.join(" · "); })(),
       keywords: "scheduling buffer before after turnover cleanup gap minimum notice lead time booking window advance ahead days how far",
       editor: <SchedulingOptionsEditor b={form.booking || defaultBooking()} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
     },
