@@ -1057,14 +1057,6 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     const leadMin = bk.leadTimeMin || 0;
     const earliest = isToday ? (new Date().getHours() * 60 + new Date().getMinutes() + leadMin) : 0;
 
-    // Same-day cutoff: if today and we're past the cutoff time, no more bookings today.
-    if (isToday && bk.sameDayCutoff) {
-      const [hh, mm] = bk.sameDayCutoff.split(':').map((x) => parseInt(x, 10) || 0);
-      const cutoffMin = hh * 60 + mm;
-      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-      if (nowMin >= cutoffMin) return [];
-    }
-
     // Buffers: padding held open around each appointment (setup before / cleanup after).
     const bufBefore = Math.max(0, Number(bk.bufferBefore) || 0);
     const bufAfter = Math.max(0, Number(bk.bufferAfter) || 0);
@@ -3481,7 +3473,6 @@ function BookingRulesEditor({ b, onChange }) {
     if (!b.enabled) return "Online booking is currently turned off — clients can't book themselves.";
     const horizonLabel = b.horizonDays === 0 ? "no cutoff" : (b.horizonDays >= 90 ? `${Math.round(b.horizonDays / 30)} months` : `${b.horizonDays || 60} days`);
     let s = `Clients can book online (${horizonLabel} ahead)`;
-    if (b.sameDayCutoff) s += `, with no same-day booking after ${b.sameDayCutoff}`;
     s += `. ${b.clientType === "all" ? "Open to everyone" : b.clientType === "returning" ? "Returning clients only" : "New clients only"}.`;
     if (b.allowMultiple === false) s += " One service per booking.";
     if (b.requireCard) s += " A card is required.";
@@ -3497,10 +3488,6 @@ function BookingRulesEditor({ b, onChange }) {
       </Row>
 
       <div style={{ opacity: b.enabled ? 1 : 0.4, pointerEvents: b.enabled ? "auto" : "none" }}>
-        <Row title="Same-day cutoff" desc="Block same-day bookings after this time (blank = allowed all day).">
-          <input type="time" value={b.sameDayCutoff || ""} onChange={(e) => set({ sameDayCutoff: e.target.value })} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 6, padding: "8px 10px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
-        </Row>
-
         <Row title="Multiple services per booking" desc="Allow more than one service in a single appointment.">
           <Toggle on={b.allowMultiple !== false} onClick={() => set({ allowMultiple: b.allowMultiple === false ? true : false })} />
         </Row>
@@ -7204,16 +7191,24 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
   const q = query.trim().toLowerCase();
   const shown = q ? clients.filter((c) => (c.name + " " + (c.phone || "") + " " + (c.email || "")).toLowerCase().includes(q)) : clients;
 
-  // Rebooking-rhythm radar: clients past their usual interval who aren't on the books.
+  // Rebooking-rhythm radar: clients past their usual interval, not already handled since their last visit.
+  // A client gets a `nudgeDismissedAt` stamp when you either Nudge them or X them out. If that stamp is more
+  // recent than their last visit, they're hidden from the folder. When they come in again, lastVisit jumps
+  // forward and they become eligible again — no manual reset needed.
   const overdue = clients.map((c) => {
     if (!c.cadenceDays || !c.lastVisit) return null;
+    if (c.nudgeDismissedAt && new Date(c.nudgeDismissedAt) > new Date(c.lastVisit)) return null;
     const days = Math.round((Date.now() - new Date(c.lastVisit)) / 86400000);
     const over = days - c.cadenceDays;
     return over > 0 ? { c, days, over } : null;
   }).filter(Boolean).sort((a, b) => b.over - a.over);
-  const [dismissed, setDismissed] = useState([]);
-  const radar = overdue.filter((o) => !dismissed.includes(o.c.id));
-  const nudge = (o) => { if (showToast) showToast(`Nudge sent to ${o.c.name.split(" ")[0]} — "time for your next visit?" with a booking link.`); setDismissed((d) => [...d, o.c.id]); };
+  const [showNudgeFolder, setShowNudgeFolder] = useState(false);
+  // Both Nudge and X mark the client as handled — they fall out of the list until their next visit.
+  const markHandled = (clientId) => {
+    setClients((cur) => cur.map((c) => c.id === clientId ? { ...c, nudgeDismissedAt: new Date().toISOString() } : c));
+  };
+  const nudge = (o) => { if (showToast) showToast(`Nudge sent to ${o.c.name.split(" ")[0]} — "time for your next visit?" with a booking link.`); markHandled(o.c.id); };
+  const dismiss = (o) => { markHandled(o.c.id); };
 
   const saveClient = () => {
     if (!draft.firstName || !draft.firstName.trim()) { if (showToast) showToast("Please enter a first name."); return; }
@@ -7238,7 +7233,13 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{clients.length} {clients.length === 1 ? "PERSON" : "PEOPLE"}</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
           <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>Clients</h2>
-          <button className="lift" onClick={() => { setDraft(blank); setAdding(true); }} aria-label="Add client" style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", height: 42, padding: "0 16px", borderRadius: 12, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)", flexShrink: 0, fontSize: 13.5, fontWeight: 600, letterSpacing: 1.5 }}><Plus size={16} strokeWidth={2.5} /> ADD</button>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "stretch" }}>
+            <button onClick={() => setShowNudgeFolder(true)} aria-label="Rebooking nudges" style={{ position: "relative", background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", height: 42, width: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <Bell size={17} style={{ color: overdue.length > 0 ? "var(--gold)" : "var(--sub)" }} />
+              {overdue.length > 0 && <span style={{ position: "absolute", top: -5, right: -5, background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 10, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", lineHeight: 1 }}>{overdue.length}</span>}
+            </button>
+            <button className="lift" onClick={() => { setDraft(blank); setAdding(true); }} aria-label="Add client" style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", height: 42, padding: "0 16px", borderRadius: 12, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)", fontSize: 13.5, fontWeight: 600, letterSpacing: 1.5 }}><Plus size={16} strokeWidth={2.5} /> ADD</button>
+          </div>
         </div>
       </div>
 
@@ -7246,27 +7247,6 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, phone, or email" style={{ ...inputS, paddingLeft: 44, borderRadius: 14 }} />
         <User size={17} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
       </div>
-
-      {!q && radar.length > 0 && (
-        <div style={{ marginBottom: 22 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <Bell size={15} style={{ color: "var(--gold)" }} />
-            <span style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>DUE TO REBOOK</span>
-          </div>
-          <div style={{ display: "grid", gap: 8 }}>
-            {radar.map((o) => { const provider = providers.find((p) => p.id === o.c.provider) || providers[1]; return (
-              <div key={o.c.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, padding: "12px 14px" }}>
-                <Avatar size={40} photo={clientPhoto(o.c)} initial={o.c.name.charAt(0)} color={provider.color} />
-                <div style={{ flex: 1, minWidth: 0 }} onClick={() => onOpen(o.c)}>
-                  <div style={{ fontSize: 15.5, fontWeight: 500 }}>{o.c.name}</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Usually every {o.c.cadenceDays}d · <span style={{ color: "var(--gold)", fontWeight: 600 }}>{o.over}d overdue</span></div>
-                </div>
-                <button className="lift" onClick={() => nudge(o)} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 20, padding: "8px 14px", fontSize: 13.5, fontWeight: 600, flexShrink: 0 }}>Nudge</button>
-              </div>
-            ); })}
-          </div>
-        </div>
-      )}
 
       <div style={{ display: "grid", gap: 10 }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} className="lift card" onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", color: "var(--text)", textAlign: "left" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={42} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provider.color} /><div><div style={{ fontSize: 16 }}>{c.name}</div><div style={{ fontSize: 15, color: "var(--sub)" }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)" }} /></button>); })}</div>
       {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : "No clients yet — tap + to add your first one."}</p>}
@@ -7312,6 +7292,38 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
         </div>
       </div>
     )}
+
+    {/* Rebooking nudges folder — opened by the bell button at the top of the Clients page. */}
+    <Sheet open={showNudgeFolder} onClose={() => setShowNudgeFolder(false)} align="top" maxWidth={480}>
+      <div style={{ padding: "18px 4px 12px" }}>
+        <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500 }}>Due to rebook</h2>
+          {overdue.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, padding: "3px 8px", lineHeight: 1 }}>{overdue.length}</span>}
+        </div>
+        <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 18, lineHeight: 1.5 }}>Clients past their usual rebooking rhythm. Send a nudge — or skip them with ×.</p>
+        {overdue.length === 0 ? (
+          <p style={{ color: "var(--faint)", fontSize: 14, textAlign: "center", padding: "30px 0" }}>Nobody's overdue right now.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 8, marginBottom: 8 }}>
+            {overdue.map((o) => {
+              const provider = providers.find((p) => p.id === o.c.provider) || providers[1];
+              return (
+                <div key={o.c.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, padding: "12px 14px" }}>
+                  <Avatar size={40} photo={clientPhoto(o.c)} initial={o.c.name.charAt(0)} color={provider.color} />
+                  <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => { setShowNudgeFolder(false); onOpen(o.c); }}>
+                    <div style={{ fontSize: 15.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.c.name}</div>
+                    <div style={{ fontSize: 13, color: "var(--sub)" }}>Usually every {o.c.cadenceDays}d · <span style={{ color: "var(--gold)", fontWeight: 600 }}>{o.over}d overdue</span></div>
+                  </div>
+                  <button className="lift" onClick={() => nudge(o)} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 20, padding: "8px 14px", fontSize: 13.5, fontWeight: 600, flexShrink: 0 }}>Nudge</button>
+                  <button onClick={() => dismiss(o)} aria-label="Skip" style={{ width: 36, height: 36, background: "var(--panel2)", color: "var(--sub)", border: "1px solid var(--border)", borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}><X size={16} /></button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </Sheet>
     </>
   );
 }
