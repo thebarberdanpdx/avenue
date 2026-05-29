@@ -972,6 +972,11 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     setNewEmail(matched.email || "");
     if (matched.phone) setPhone(matched.phone);
   }, [matched]);
+  // Returning-client contact-info conflict — when matched and the user changes phone or email,
+  // open a confirmation sheet asking which to keep on file. Defaults to the just-typed value.
+  const [contactConfirm, setContactConfirm] = useState(null); // null or { phone: bool, email: bool } — which fields differ
+  const [keepPhone, setKeepPhone] = useState("new"); // "file" | "new"
+  const [keepEmail, setKeepEmail] = useState("new"); // "file" | "new"
   const [selectedDate, setSelectedDate] = useState(null);
   const [slot, setSlot] = useState(null);
   const [agreed, setAgreed] = useState(false);
@@ -1223,6 +1228,53 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
 
   // Scroll to top whenever the user navigates to a new screen so the back button & business name stay visible
   useEffect(() => { try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { window.scrollTo(0, 0); } }, [screenKey]);
+
+  // Commits the booking with the resolved phone and email. Called either directly from LOCK IT IN
+  // (no conflict) or from the conflict-confirmation sheet (after the user picks which to keep).
+  const commitBooking = (finalPhone, finalEmail) => {
+    const baseId = Date.now();
+    let clientId = matched?.id || null;
+    if (!matched && !activeMember) {
+      clientId = "c" + baseId + Math.floor(Math.random() * 1000);
+      const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
+      setClients((cur) => [newClient, ...cur]);
+    } else if (matched) {
+      // Returning client confirmed/updated their info — write the chosen values to their profile
+      // so a barber-added record gets an email, a corrected name persists, etc.
+      setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: (finalEmail || "").trim(), phone: (finalPhone || "").trim() } : c));
+    }
+    const newAppts = [];
+    const isSame = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
+    let cursor = slot;
+    people.forEach((person, pi) => {
+      const startMin = isMultiPerson ? (isSame ? slot : cursor) : slot;
+      const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
+      const prov = person.prov;
+      const title = person.items.map(describeEntry).join(", ");
+      newAppts.push({
+        id: baseId + pi,
+        providerId: prov.id === "anyone" ? "dan" : prov.id,
+        clientId: person.key === "self" ? (clientId || "guest") : (clientId || "guest"),
+        familyMemberId: person.key === "self" ? null : person.key,
+        bookedByName: person.key === "self" ? null : (matched?.name || newName.trim()),
+        serviceId: person.items[0].service.id,
+        lineItems: person.items.map((e) => ({ serviceId: e.service.id, cutType: e.cutType || null, beardType: e.beardType || null, addons: e.addons || {} })),
+        start: startMin,
+        end: startMin + person.durMin,
+        status: "confirmed",
+        name: person.name,
+        title,
+        bookedFor: bookedFor.toISOString(),
+        photos: pi === 0 ? photos : 0,
+        hasPhotos: pi === 0 && photos > 0,
+        phone: finalPhone,
+        groupId: isMultiPerson ? baseId : null,
+      });
+      if (!isSame) cursor += person.durMin;
+    });
+    setAppts([...appts, ...newAppts]);
+    setBookedId(baseId); setStep(8);
+  };
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
@@ -2399,49 +2451,82 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
             </button>
 
             <button className="lift" disabled={!agreed || !newFirst.trim() || !newLast.trim() || !newEmail.trim() || phone.replace(/\D/g, "").length < 10} onClick={() => {
-              const baseId = Date.now();
-              let clientId = matched?.id || null;
-              if (!matched && !activeMember) {
-                clientId = "c" + baseId + Math.floor(Math.random() * 1000);
-                const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: newEmail.trim(), phone: phone.trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
-                setClients((cur) => [newClient, ...cur]);
-              } else if (matched) {
-                // Returning client confirmed/updated their info — write it back so a barber-added profile gets an email on file
-                // (and so any corrected spelling persists for next time). Phone is the match key so it stays.
-                setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: newEmail.trim() } : c));
+              const digits = (s) => (s || "").replace(/\D/g, "");
+              // Conflict only if matched and they CHANGED an existing value (not just adding a missing email).
+              const phoneChanged = !!matched && digits(phone) !== digits(matched.phone);
+              const emailChanged = !!matched && !!(matched.email && matched.email.trim()) && newEmail.trim() !== matched.email.trim();
+              if (phoneChanged || emailChanged) {
+                setKeepPhone("new"); setKeepEmail("new");
+                setContactConfirm({ phone: phoneChanged, email: emailChanged });
+                return;
               }
-              const newAppts = [];
-              const isSame = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
-              let cursor = slot;
-              people.forEach((person, pi) => {
-                const startMin = isMultiPerson ? (isSame ? slot : cursor) : slot;
-                const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
-                const prov = person.prov;
-                const title = person.items.map(describeEntry).join(", ");
-                newAppts.push({
-                  id: baseId + pi,
-                  providerId: prov.id === "anyone" ? "dan" : prov.id,
-                  clientId: person.key === "self" ? (clientId || "guest") : (clientId || "guest"),
-                  familyMemberId: person.key === "self" ? null : person.key,
-                  bookedByName: person.key === "self" ? null : (matched?.name || newName.trim()),
-                  serviceId: person.items[0].service.id,
-                  lineItems: person.items.map((e) => ({ serviceId: e.service.id, cutType: e.cutType || null, beardType: e.beardType || null, addons: e.addons || {} })),
-                  start: startMin,
-                  end: startMin + person.durMin,
-                  status: "confirmed",
-                  name: person.name,
-                  title,
-                  bookedFor: bookedFor.toISOString(),
-                  photos: pi === 0 ? photos : 0,
-                  hasPhotos: pi === 0 && photos > 0,
-                  phone,
-                  groupId: isMultiPerson ? baseId : null,
-                });
-                if (!isSame) cursor += person.durMin;
-              });
-              setAppts([...appts, ...newAppts]);
-              setBookedId(baseId); setStep(8);
+              commitBooking(phone, newEmail);
             }} style={{ width: "100%", background: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--gold)" : "var(--border)", color: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--on-gold)" : "var(--faint)", padding: 17, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--shadow-md)" : "none" }}>LOCK IT IN</button>
+
+            {/* Contact-info conflict — only opens when matched and the user changed an existing phone or email. */}
+            <Sheet open={!!contactConfirm && !!matched} onClose={() => setContactConfirm(null)} align="top" maxWidth={460}>
+              <div style={{ padding: "20px 4px 12px" }}>
+                <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 6 }}>Confirm your info</h2>
+                <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5, marginBottom: 22 }}>
+                  Reminders go to whatever you keep on file. Pick which to save.
+                </p>
+
+                {contactConfirm?.phone && matched && (
+                  <div style={{ marginBottom: 22 }}>
+                    <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>PHONE</div>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {[
+                        { id: "file", topLabel: "ON FILE", topColor: "var(--faint)", value: matched.phone },
+                        { id: "new", topLabel: "NEW", topColor: "var(--gold)", value: phone },
+                      ].map((opt) => {
+                        const on = keepPhone === opt.id;
+                        return (
+                          <button key={opt.id} onClick={() => setKeepPhone(opt.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer", width: "100%" }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 11, letterSpacing: 1.5, color: opt.topColor, fontWeight: 600, marginBottom: 4 }}>{opt.topLabel}</div>
+                              <div style={{ fontSize: 16 }}>{opt.value}</div>
+                            </div>
+                            {on && <Check size={18} style={{ color: "var(--gold)", flexShrink: 0, marginLeft: 8 }} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {contactConfirm?.email && matched && (
+                  <div style={{ marginBottom: 22 }}>
+                    <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>EMAIL</div>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {[
+                        { id: "file", topLabel: "ON FILE", topColor: "var(--faint)", value: matched.email },
+                        { id: "new", topLabel: "NEW", topColor: "var(--gold)", value: newEmail.trim() },
+                      ].map((opt) => {
+                        const on = keepEmail === opt.id;
+                        return (
+                          <button key={opt.id} onClick={() => setKeepEmail(opt.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer", width: "100%" }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 11, letterSpacing: 1.5, color: opt.topColor, fontWeight: 600, marginBottom: 4 }}>{opt.topLabel}</div>
+                              <div style={{ fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.value}</div>
+                            </div>
+                            {on && <Check size={18} style={{ color: "var(--gold)", flexShrink: 0, marginLeft: 8 }} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <button className="lift" onClick={() => {
+                  const finalPhone = (contactConfirm?.phone && keepPhone === "file") ? matched.phone : phone;
+                  const finalEmail = (contactConfirm?.email && keepEmail === "file") ? matched.email : newEmail.trim();
+                  setContactConfirm(null);
+                  commitBooking(finalPhone, finalEmail);
+                }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 13.5, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, border: "none", marginTop: 6 }}>SAVE & BOOK</button>
+                <button onClick={() => setContactConfirm(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px" }}>Cancel</button>
+              </div>
+            </Sheet>
           </div>
         )}
 
