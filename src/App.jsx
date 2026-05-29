@@ -484,7 +484,42 @@ function Sheet({ open, onClose, children, align = "top", maxWidth = 520 }) {
   ), document.body);
 }
 
+// Tap-to-call / Tap-to-text: render a phone number as a subtle button that opens a Sheet with Call + Text options.
+// Both buttons use native `tel:` and `sms:` URIs so mobile opens the dialer / Messages directly.
+function PhoneLink({ number, style }) {
+  const [open, setOpen] = useState(false);
+  if (!number) return null;
+  const clean = String(number);
+  const digits = clean.replace(/\D/g, "");
+  return (
+    <>
+      <button onClick={(e) => { e.stopPropagation(); setOpen(true); }} style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", ...style }}>{clean}</button>
+      <Sheet open={open} onClose={() => setOpen(false)} align="bottom" maxWidth={420}>
+        <div style={{ padding: "6px 4px 8px" }}>
+          <div style={{ textAlign: "center", marginBottom: 18 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CONTACT</div>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{clean}</div>
+          </div>
+          <a href={`tel:${digits}`} onClick={() => setOpen(false)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, textDecoration: "none", marginBottom: 10 }}>
+            <Phone size={17} /> CALL
+          </a>
+          <a href={`sms:${digits}`} onClick={() => setOpen(false)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, textDecoration: "none" }}>
+            <MessageSquare size={17} /> TEXT
+          </a>
+          <button onClick={() => setOpen(false)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 6 }}>Cancel</button>
+        </div>
+      </Sheet>
+    </>
+  );
+}
 
+// Tap-to-email: simple mailto: anchor. Opens the user's default mail app.
+function EmailLink({ email, style }) {
+  if (!email) return null;
+  return (
+    <a href={`mailto:${email}`} onClick={(e) => e.stopPropagation()} style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", ...style }}>{email}</a>
+  );
+}
 
 const fmtTime = (mins) => { const h = Math.floor(mins / 60), m = mins % 60; const ampm = h >= 12 ? "PM" : "AM"; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`; };
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -5433,7 +5468,7 @@ function WaitlistView({ waitlist, setWaitlist, onText, showToast }) {
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
                 <div>
                   <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26 }}>{open.name || "Client"}</div>
-                  <div style={{ fontSize: 14.5, color: "var(--sub)", marginTop: 2 }}>{open.phone}</div>
+                  <div style={{ fontSize: 14.5, color: "var(--sub)", marginTop: 2 }}><PhoneLink number={open.phone} /></div>
                 </div>
                 <button onClick={() => setOpenId(null)} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
               </div>
@@ -6879,8 +6914,8 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                   </div>
                 )}
                 <div style={{ marginTop: 16, display: "grid", gap: 9 }}>
-                  <DetailRow T={T} label="Phone" value={client?.phone || "—"} accent />
-                  <DetailRow T={T} label="Email" value={client ? `${appt.name.split(" ")[0].toLowerCase()}@email.com` : "—"} />
+                  <DetailRow T={T} label="Phone" value={client?.phone ? <PhoneLink number={client.phone} /> : "—"} accent />
+                  <DetailRow T={T} label="Email" value={client?.email ? <EmailLink email={client.email} /> : "—"} />
                   <DetailRow T={T} label="Credit" value="Visa  ···7815   Exp 9/30" icon={<CreditCard size={13} style={{ color: T.faint }} />} />
                 </div>
               </div>
@@ -7472,6 +7507,16 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
     .filter((a) => a.bookedFor && new Date(a.bookedFor).getTime() >= now && a.status !== "cancelled" && a.status !== "done")
     .sort((a, b) => new Date(a.bookedFor) - new Date(b.bookedFor));
   const nextAppt = upcomingAppts[0] || null;
+  // Recent visits = past appointments (date in the past, or marked done), newest first. Used by the Overview snapshot.
+  const pastAppts = myAppts
+    .filter((a) => a.bookedFor && (new Date(a.bookedFor).getTime() < now || a.status === "done") && a.status !== "cancelled")
+    .sort((a, b) => new Date(b.bookedFor) - new Date(a.bookedFor))
+    .slice(0, 4);
+  // Nudge handler for the Overview button — same persistence as the Clients-tab folder.
+  const nudgeFromProfile = () => {
+    setClients(clients.map((c) => c.id === client.id ? { ...c, nudgeDismissedAt: new Date().toISOString() } : c));
+    showToast(`Nudge sent to ${live.name.split(" ")[0]} — "time for your next visit?" with a booking link.`);
+  };
   const feed = [
     ...myAppts.map((a) => ({ kind: "appt", date: a.bookedFor || new Date().toISOString(), appt: a, sortKey: a.bookedFor ? new Date(a.bookedFor).getTime() : 0 })),
     ...(live.timeline || []).map((t) => ({ kind: "note", date: t.date, text: t.text, id: t.id, sortKey: t.date ? new Date(t.date).getTime() : 0 })),
@@ -7487,7 +7532,6 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       {/* Editorial profile header */}
       <div style={{ marginBottom: 22 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 10, fontWeight: 600 }}>{live.visits === 0 ? "FIRST VISIT" : live.visits === 1 ? "1 VISIT" : `${live.visits} VISITS`} · {provider.name.toUpperCase()}</div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
           <button onClick={() => setPicker(true)} style={{ position: "relative", width: 64, height: 64, borderRadius: "50%", background: "none", border: "none", flexShrink: 0, padding: 0 }}>
             <Avatar size={64} photo={clientPhoto(live)} initial={live.name.charAt(0)} color={provider.color} />
@@ -7495,7 +7539,12 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.3px", marginBottom: 4 }}>{live.name}</h2>
-            <div style={{ color: "var(--sub)", fontSize: 13.5, lineHeight: 1.4 }}>{live.phone}{live.email ? ` · ${live.email}` : ""}</div>
+            <div style={{ color: "var(--sub)", fontSize: 13.5, lineHeight: 1.4 }}>
+              {live.phone && <PhoneLink number={live.phone} />}
+              {live.phone && live.email && " · "}
+              {live.email && <EmailLink email={live.email} />}
+              {!live.phone && !live.email && <span style={{ color: "var(--faint)", fontStyle: "italic" }}>No contact info on file</span>}
+            </div>
           </div>
         </div>
       </div>
@@ -7522,6 +7571,10 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {/* CLIENT NOTE — always-visible, editable */}
       {pfTab === "overview" && <div style={{ marginBottom: 28 }}>
+        {/* Visit count + provider — moved down from the masthead. Plain text, no caps treatment. */}
+        <div style={{ fontSize: 13.5, color: "var(--faint)", marginBottom: 18 }}>
+          {live.visits === 0 ? "First visit" : live.visits === 1 ? "1 visit" : `${live.visits} visits`} with {provider.name}
+        </div>
         {/* Upcoming appointment — the key thing to see at a glance */}
         {nextAppt && (
           <div style={{ background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 14, padding: "16px 18px", marginBottom: 22 }}>
@@ -7536,6 +7589,38 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
             {upcomingAppts.length > 1 && <div style={{ fontSize: 12.5, color: "var(--gold)", marginTop: 10, fontWeight: 500 }}>+{upcomingAppts.length - 1} more upcoming</div>}
           </div>
         )}
+
+        {/* Nudge to rebook — shown when no upcoming visit but they've been in before */}
+        {!nextAppt && pastAppts.length > 0 && (
+          <button className="lift" onClick={nudgeFromProfile} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 13, fontWeight: 600, letterSpacing: 2, borderRadius: 12, border: "none", marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}>
+            <Bell size={15} /> NUDGE TO REBOOK
+          </button>
+        )}
+
+        {/* Recent visits — last few past appointments */}
+        {pastAppts.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>RECENT VISITS</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {pastAppts.map((a) => {
+                const apptProv = providers.find((p) => p.id === a.providerId);
+                return (
+                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px" }}>
+                    <div style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <Calendar size={14} style={{ color: "var(--sub)" }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 500 }}>{niceDateFull(a.bookedFor)}</div>
+                      <div style={{ fontSize: 13, color: "var(--sub)" }}>{a.title}{apptProv ? ` · ${apptProv.name}` : ""}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Client note — preferences, allergies, formulas */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)" }}>CLIENT NOTE</div>
           {!editingNote && <button onClick={() => setEditingNote(true)} style={{ background: "none", color: "var(--gold)", fontSize: 14, display: "flex", alignItems: "center", gap: 5 }}><Edit2 size={13} /> {live.notes ? "Edit" : "Add note"}</button>}
