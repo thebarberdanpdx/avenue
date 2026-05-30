@@ -6,7 +6,7 @@ import {
   Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock,
   Settings, Image as ImageIcon, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
-  BarChart3, TrendingUp
+  BarChart3, TrendingUp, Palette
 } from "lucide-react";
 
 // ============================================================
@@ -1069,6 +1069,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [expandUsual, setExpandUsual] = useState(false); // expand the usual card to show details
   const [cameFromUsual, setCameFromUsual] = useState(false); // true when step 6/7 was reached via the welcome-back front door (so Back returns there)
   const [newClientCategory, setNewClientCategory] = useState(null); // "hair" | "hairBeard" | "beard" — chosen on the editorial category screen
+  // --- Simple first-timer flow (the streamlined path): what -> who -> when -> details ---
+  const [simpleStep, setSimpleStep] = useState(null); // null = off; "what" | "who"
+  const [simplePref, setSimplePref] = useState(null);  // chosen provider id, or "anyone"
 
   // ---- Guided consultation (auto-launches for brand-new clients) ----
   const [consult, setConsult] = useState(null); // null = off; otherwise { step, sides, bottom, condition } answers
@@ -1370,7 +1373,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const slotIsSameTime = isMultiPerson && groupSlots && slot != null && groupSlots.sameTime.includes(slot);
   const dateIsFull = selectedDate && openSlots.length === 0;
 
-  const back = () => { setShowWaitlist(false); if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(6); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "who") { setSimpleStep("what"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(6); return; } setStep(step - 1); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -1466,10 +1469,89 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <span style={{ fontSize: 17 }}>I've been here before</span>
               <span style={{ fontSize: 13, opacity: 0.8, fontWeight: 300 }}>We'll pull up your details</span>
             </button>
-            <button className="lift" onClick={() => { setBookingFor(null); setMatched(null); setStep(1); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
+            <button className="lift" onClick={() => { setBookingFor(null); setMatched(null); setCart([]); setSimplePref(null); setSimpleStep("what"); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
               <span style={{ fontSize: 17 }}>It's my first time</span>
               <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>Welcome — let's take a look</span>
             </button>
+          </div>
+        )}
+
+        {/* ============ SIMPLE FIRST-TIMER FLOW ============ */}
+        {/* SIMPLE · WHAT — one clean question: what are you here for? */}
+        {simpleStep === "what" && (
+          <div className="fade-up">
+            <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>What are you here for?</h2>
+            <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 400, lineHeight: 1.5, marginBottom: 26 }}>Pick one to get started. You can tell your barber the details in the chair.</p>
+            <div style={{ display: "grid", gap: 12 }}>
+              {[
+                { key: "hair", label: "Hair", sub: "A haircut" },
+                { key: "hairBeard", label: "Hair + Beard", sub: "The full reset" },
+                { key: "beard", label: "Beard", sub: "Just a tidy-up" },
+              ].map((opt) => (
+                <button key={opt.key} className="lift" onClick={() => {
+                  const lower = (s) => (s.name || "").toLowerCase();
+                  let match = null;
+                  if (opt.key === "hairBeard") match = services.find((s) => /haircut.*beard|cut.*beard|beard.*cut/.test(lower(s)));
+                  if (opt.key === "beard" && !match) match = services.find((s) => lower(s).includes("beard") && !lower(s).includes("cut"));
+                  if (opt.key === "hair" && !match) match = services.find((s) => /haircut|cut/.test(lower(s)) && !lower(s).includes("beard"));
+                  if (!match) match = services[0];
+                  setNewClientCategory(opt.key);
+                  setDraft(match);
+                  // Build a clean cart entry (no cut-type maze, no add-ons) — provider set on the next screen.
+                  setCart([{ service: match, provider: providers.find((p) => p.id === "anyone") || providers[0], cutType: null, beardType: null, addons: {} }]);
+                  setSimpleStep("who");
+                }} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", boxShadow: "var(--shadow-sm)" }}>
+                  <span>
+                    <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{opt.label}</span>
+                    <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{opt.sub}</span>
+                  </span>
+                  <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* SIMPLE · WHO — anyone, or a specific person? Defaults make this a one-tap step. */}
+        {simpleStep === "who" && (
+          <div className="fade-up">
+            <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Anyone in particular?</h2>
+            <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 400, lineHeight: 1.5, marginBottom: 24 }}>No wrong answer — if you're not sure, we'll match you with whoever's free soonest.</p>
+            <div style={{ display: "grid", gap: 10 }}>
+              {/* No preference — the easy default, listed first */}
+              <button className="lift" onClick={() => {
+                const anyone = providers.find((p) => p.id === "anyone") || providers[0];
+                setSimplePref("anyone");
+                setCart((c) => c.map((e, i) => i === 0 ? { ...e, provider: anyone } : e));
+                setSelectedDate(null); setSlot(null);
+                setSimpleStep(null); setStep(6);
+              }} style={{ width: "100%", textAlign: "left", background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1.5px solid color-mix(in srgb, var(--gold) 40%, var(--border))", borderRadius: 14, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, color: "var(--text)" }}>
+                <span style={{ width: 46, height: 46, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 18%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Users size={20} style={{ color: "var(--gold)" }} /></span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", fontSize: 16.5, fontWeight: 500 }}>No preference</span>
+                  <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>First available — usually the soonest opening</span>
+                </span>
+                <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+              </button>
+              {/* Specific staff */}
+              {providers.filter((p) => p.id !== "anyone" && p.isProvider !== false && !p.archived && p.onlineBooking !== false).map((p) => (
+                <button key={p.id} className="lift" onClick={() => {
+                  setSimplePref(p.id);
+                  setCart((c) => c.map((e, i) => i === 0 ? { ...e, provider: p } : e));
+                  setSelectedDate(null); setSlot(null);
+                  setSimpleStep(null); setStep(6);
+                }} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, color: "var(--text)" }}>
+                  <Avatar size={46} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: "block", fontSize: 16.5, fontWeight: 500 }}>{p.name}</span>
+                    <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{p.role}</span>
+                  </span>
+                  <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -6782,27 +6864,29 @@ function AppearancePicker({ theme, setTheme }) {
       </div>
 
       {tab === "themes" && (
-        <div style={{ display: "grid", gap: 26 }}>
+        <div style={{ display: "grid", gap: 24 }}>
           <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6 }}>Each theme is a complete look — palette and fonts together, built for your trade. Tap to apply it everywhere.</div>
           {THEME_CATS.map((cat) => (
             <div key={cat}>
-              <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>{cat.toUpperCase()}</div>
-              <div style={{ display: "grid", gap: 16 }}>
-                {THEMES.filter((t) => t.cat === cat).map((th) => { const on = theme === th.id; return (
-                  <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 20, border: on ? "2px solid var(--gold)" : "1px solid var(--border)", overflow: "hidden", textAlign: "left", background: th.t.bg, boxShadow: on ? "var(--shadow-lg)" : "var(--shadow-sm)", display: "block", width: "100%" }}>
-                    <div style={{ position: "relative" }}>
-                      <Mock th={th} />
-                      {on && <div style={{ position: "absolute", top: 16, right: 16, width: 26, height: 26, borderRadius: "50%", background: th.t.gold, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 3px 10px rgba(0,0,0,0.3)" }}><Check size={15} style={{ color: th.t.onGold }} strokeWidth={3} /></div>}
+              <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 12 }}>{cat.toUpperCase()}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {THEMES.filter((t) => t.cat === cat).map((th) => { const on = theme === th.id; const v = th.t; return (
+                  <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 14, border: on ? "2px solid var(--gold)" : "1px solid var(--border)", overflow: "hidden", textAlign: "left", background: v.bg, display: "block", width: "100%" }}>
+                    {/* compact swatch — painted in the theme */}
+                    <div style={{ background: v.bg, padding: "14px 13px 12px", position: "relative", minHeight: 92 }}>
+                      {on && <div style={{ position: "absolute", top: 10, right: 10, width: 20, height: 20, borderRadius: "50%", background: v.gold, display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={12} style={{ color: v.onGold }} strokeWidth={3} /></div>}
+                      <div style={{ fontFamily: th.disp, color: v.text, fontSize: 22, fontWeight: 600, lineHeight: 1, letterSpacing: th.disp.includes("Bebas") ? 0.5 : -0.3, marginBottom: 12 }}>{th.name}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <span style={{ width: 18, height: 18, borderRadius: "50%", background: v.gold }} />
+                        <span style={{ width: 13, height: 13, borderRadius: "50%", background: v.panel }} />
+                        <span style={{ width: 13, height: 13, borderRadius: "50%", background: v.panel2, border: `1px solid ${v.border2}` }} />
+                        <span style={{ fontSize: 9, letterSpacing: 1, color: v.faint, marginLeft: "auto", fontWeight: 600 }}>{th.dark ? "DARK" : "LIGHT"}</span>
+                      </div>
                     </div>
-                    <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel)", borderTop: "1px solid var(--line)" }}>
-                      <div>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: on ? "var(--gold)" : "var(--text)", letterSpacing: -0.2 }}>{th.name}</div>
-                        <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>{th.tagline}</div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--faint)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 9px" }}>{th.dark ? "DARK" : "LIGHT"}</span>
-                        {on && <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--gold)", fontWeight: 600 }}>ACTIVE</span>}
-                      </div>
+                    {/* name strip in the app's current chrome (not the swatch theme) */}
+                    <div style={{ padding: "8px 12px", background: "var(--panel)", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 12.5, color: on ? "var(--gold)" : "var(--text)", lineHeight: 1.3 }}>{th.tagline}</span>
+                      {on && <span style={{ fontSize: 10, letterSpacing: 1, color: "var(--gold)", fontWeight: 600, flexShrink: 0, marginLeft: 6 }}>ON</span>}
                     </div>
                   </button>
                 ); })}
@@ -7011,14 +7095,17 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} showToast={showToast} />),
     },
     {
-      id: "appearance", title: "Logo & Branding", icon: (THEMES.find((x) => x.id === theme)?.dark) ? Moon : Sun, category: "Business Setup",
-      status: THEMES.find((x) => x.id === theme)?.name || "Theme", keywords: "theme appearance light dark mode color display look style vibe palette logo branding font accent wordmark",
+      id: "appearance", title: "Logo & Branding", icon: ImageIcon, category: "Business Setup",
+      status: form.logoText ? form.logoText : "Business name", keywords: "logo branding wordmark business name header",
       editor: (<>
         {field("LOGO WORDMARK (blank = business name)", "logoText")}
         <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: -6, marginBottom: 18 }}>Shown as your logo across the app. Leave blank to use the business name.</p>
-        <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 12 }}>THEME</div>
-        <AppearancePicker theme={theme} setTheme={setTheme} />
       </>),
+    },
+    {
+      id: "theme", title: "Theme", icon: (THEMES.find((x) => x.id === theme)?.dark) ? Moon : Sun, category: "Business Setup",
+      status: THEMES.find((x) => x.id === theme)?.name || "Theme", keywords: "theme appearance light dark mode color display look style vibe palette font accent barbershop tattoo spa salon",
+      editor: (<AppearancePicker theme={theme} setTheme={setTheme} />),
     },
     {
       id: "aicuthelper", title: "AI Cut Helper", icon: Sparkles, category: "Client Experience",
@@ -7208,7 +7295,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       title: "Setup",
       desc: "Set these once and forget. Your shop's identity, your team, your menu.",
       defaultOpen: true,
-      settings: ["business", "hours", "staff", "servicesmenu", "appearance", "phones", "locations"],
+      settings: ["business", "hours", "staff", "servicesmenu", "appearance", "theme", "phones", "locations"],
     },
     {
       id: "booking",
