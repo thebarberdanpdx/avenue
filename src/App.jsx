@@ -564,6 +564,8 @@ export default function App() {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     } else if (h === "#terms") {
       setView("terms");
+    } else if (h === "#privacy") {
+      setView("privacy");
     } else if (h === "#book" || h === "#client") {
       setView("client");
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -769,9 +771,63 @@ export default function App() {
         </div>
       )}
       {view === "terms" && <TermsPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
+      {view === "privacy" && <PrivacyPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("landing")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={() => setView("landing")} />}
       {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} onExit={() => { setView("landing"); }} />}
+    </div>
+  );
+}
+
+function PrivacyPage({ onExit }) {
+  const updated = "May 2026";
+  const H = ({ children }) => <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, margin: "26px 0 10px" }}>{children}</h2>;
+  const P = ({ children }) => <p style={{ fontSize: 15.5, color: "var(--text2)", lineHeight: 1.65, marginBottom: 12 }}>{children}</p>;
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY }}>
+      <div style={{ maxWidth: 680, margin: "0 auto", padding: "32px 22px 80px" }}>
+        <button onClick={onExit} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 24 }}><ArrowLeft size={16} /> Back</button>
+        <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>SANCTUARY BARBER CO</div>
+        <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.1, marginBottom: 8 }}>Privacy Policy</h1>
+        <p style={{ fontSize: 14, color: "var(--sub)", marginBottom: 8 }}>Last updated: {updated}</p>
+
+        <P>This policy explains what information Sanctuary Barber Co ("we," "us," "our") collects when you book an appointment with us, and how we use and protect it.</P>
+
+        <H>What we collect</H>
+        <P>When you book an appointment, we collect your name, mobile phone number, email address (optional), and any preferences, notes, or photos you choose to share. We also keep a record of your visit history with us.</P>
+
+        <H>How we use it</H>
+        <P>We use your information solely to provide our services:</P>
+        <ul style={{ fontSize: 15.5, color: "var(--text2)", lineHeight: 1.65, marginBottom: 12, paddingLeft: 22 }}>
+          <li style={{ marginBottom: 6 }}>To schedule, confirm, and manage your appointments</li>
+          <li style={{ marginBottom: 6 }}>To send appointment confirmations, reminders, and scheduling updates by text message and email</li>
+          <li style={{ marginBottom: 6 }}>To remember your preferences and visit history so we can serve you better next time</li>
+          <li style={{ marginBottom: 6 }}>To send one-time verification codes when you log in</li>
+        </ul>
+
+        <H>Text messages (SMS)</H>
+        <P>If you provide your phone number, you may receive text messages from Sanctuary Barber Co related to your appointments — including booking confirmations, reminders, scheduling updates, and one-time login verification codes. Message and data rates may apply. Message frequency varies based on your appointment activity.</P>
+        <P>You can opt out of text messages at any time by replying STOP. For help, reply HELP. We do not sell or share your phone number with third parties for marketing purposes. Mobile information will not be shared with third parties for marketing or promotional purposes.</P>
+
+        <H>Who can see your information</H>
+        <P>Your information is visible to Sanctuary Barber Co staff who need it to serve you. We use trusted service providers (such as our hosting platform, database, and SMS provider) to operate the booking app — they handle data only as needed to provide their services to us and are bound by confidentiality.</P>
+        <P>We do not sell your personal information to anyone.</P>
+
+        <H>How long we keep it</H>
+        <P>We keep your information for as long as you are an active client, and for a reasonable period after to handle returning visits or required record-keeping. You may request deletion at any time.</P>
+
+        <H>Your choices</H>
+        <P>You may request access to, correction of, or deletion of your personal information by contacting us at the email below. You can opt out of text messages at any time by replying STOP.</P>
+
+        <H>Children</H>
+        <P>Our booking service is for adults. If a parent or guardian books on behalf of a minor (e.g. a child's haircut), the parent or guardian is responsible for providing the contact information.</P>
+
+        <H>Changes</H>
+        <P>We may update this policy from time to time. The "last updated" date at the top of this page tells you when it was most recently changed.</P>
+
+        <H>Contact</H>
+        <P>Questions, requests, or concerns about your information? Reach us at sanctuarybarberco@gmail.com.</P>
+      </div>
     </div>
   );
 }
