@@ -7846,8 +7846,8 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
         <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.2 }}>New Appointment</span>
       </div>
 
-      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
-        <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 22px 60px" }}>
+      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 22px 24px" }}>
           {/* On [date] | At [time] split */}
           <div style={{ display: "flex", borderBottom: "1px solid var(--line)" }}>
             <div style={{ flex: 1, padding: "26px 0", borderRight: "1px solid var(--line)" }}>
@@ -7958,8 +7958,8 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
         </div>
       </div>
 
-      {/* sticky footer — Cancel (left) and Book (right) at the bottom of the form, easy thumb reach */}
-      <div style={{ flexShrink: 0, padding: "12px 18px 18px", background: "var(--bg)", borderTop: "1px solid var(--line)", display: "flex", gap: 10, boxSizing: "border-box" }}>
+      {/* sticky footer — Cancel (left) and Book (right) pinned to the viewport bottom; safe-area padding keeps the iOS Safari toolbar from covering it */}
+      <div style={{ flexShrink: 0, padding: "12px 18px max(18px, env(safe-area-inset-bottom))", background: "var(--bg)", borderTop: "1px solid var(--line)", display: "flex", gap: 10, boxSizing: "border-box" }}>
         <button onClick={onClose} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 15, letterSpacing: 1, borderRadius: 12 }}>CANCEL</button>
         <button className="lift" onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note })} disabled={!canBook} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 12, border: "none", opacity: canBook ? 1 : 0.45 }}>BOOK</button>
       </div>
@@ -8745,8 +8745,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       {pending && (
         <>
           <div className="fade-in" onClick={() => setPending(null)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 55 }} />
-          <div className="fade-in" style={{ position: "fixed", left: 0, right: 0, top: 24, display: "flex", justifyContent: "center", padding: "0 16px", zIndex: 56, boxSizing: "border-box" }}>
-            <div style={{ width: "100%", maxWidth: 400, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, textAlign: "center", boxShadow: "0 18px 50px var(--shadow)" }}>
+          <div className="fade-in" style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 56, boxSizing: "border-box", pointerEvents: "none" }}>
+            <div style={{ pointerEvents: "auto", width: "100%", maxWidth: 400, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, textAlign: "center", boxShadow: "0 18px 50px var(--shadow)" }}>
               <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, marginBottom: 6 }}>Move appointment?</div>
               <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, fontWeight: 300, marginBottom: 4 }}>{pending.appt.name} — {pending.appt.title}</div>
               <div style={{ fontSize: 15, color: "var(--sub)", marginBottom: 18 }}>
