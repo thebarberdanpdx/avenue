@@ -1069,9 +1069,10 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [expandUsual, setExpandUsual] = useState(false); // expand the usual card to show details
   const [cameFromUsual, setCameFromUsual] = useState(false); // true when step 6/7 was reached via the welcome-back front door (so Back returns there)
   const [newClientCategory, setNewClientCategory] = useState(null); // "hair" | "hairBeard" | "beard" — chosen on the editorial category screen
-  // --- Simple first-timer flow (the streamlined path): what -> who -> when -> details ---
-  const [simpleStep, setSimpleStep] = useState(null); // null = off; "what" | "who"
+  // --- Simple first-timer flow (the streamlined path): what -> cut -> change -> finish -> who -> when -> details ---
+  const [simpleStep, setSimpleStep] = useState(null); // null = off; "what" | "cut" | "change" | "finish" | "who"
   const [simplePref, setSimplePref] = useState(null);  // chosen provider id, or "anyone"
+  const [simpleChange, setSimpleChange] = useState(null); // "trim" | "fresh" — fresh look reserves extra chair time
 
   // ---- Guided consultation (auto-launches for brand-new clients) ----
   const [consult, setConsult] = useState(null); // null = off; otherwise { step, sides, bottom, condition } answers
@@ -1166,6 +1167,8 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   };
   const cartPrice = cart.reduce((s, e) => s + lineTotal(e).price, 0);
   const cartMin = cart.reduce((s, e) => s + lineTotal(e).min, 0);
+  // Effective duration for slot-finding: a "going a lot shorter" first-timer gets +15 min of chair time reserved (no charge).
+  const effMin = cartMin + (simpleChange === "fresh" ? 15 : 0);
   const describeEntry = (entry) => {
     // First-time intake answers (if present) read as the meaningful description
     if (entry.intakeAnswers && entry.service.intake) {
@@ -1350,8 +1353,10 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
       groups[key].durMin += dur;
       groups[key].items.push(e);
     });
+    // First-timer going a lot shorter → reserve +15 min on the (single) appointment so the chair isn't rushed.
+    if (simpleChange === "fresh") { const vals = Object.values(groups); if (vals.length === 1) vals[0].durMin += 15; }
     return Object.values(groups);
-  }, [cart, providers]);
+  }, [cart, providers, simpleChange]);
   const isMultiPerson = people.length > 1;
 
   const allSlots = useMemo(() => { if (!cartMin) return []; const out = []; for (let t = 9 * 60; t + cartMin <= 17 * 60; t += cartMin) out.push(t); return out; }, [cartMin]);
@@ -1368,12 +1373,12 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
       return groupSlots.sequential.map((s) => s.start);
     }
     const prov = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]);
-    return freeSlotsFor(prov, selectedDate, cartMin || 30, 15);
+    return freeSlotsFor(prov, selectedDate, effMin || 30, 15);
   }, [selectedDate, provider, providers, cartMin, appts, isMultiPerson, groupSlots]);
   const slotIsSameTime = isMultiPerson && groupSlots && slot != null && groupSlots.sameTime.includes(slot);
   const dateIsFull = selectedDate && openSlots.length === 0;
 
-  const back = () => { setShowWaitlist(false); if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "who") { setSimpleStep("what"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(6); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "change") { setSimpleStep((draft && draft.cutTypes && draft.cutTypes.length) ? "cut" : "what"); return; } if (simpleStep === "finish") { setSimpleStep("change"); return; } if (simpleStep === "who") { const hasFinish = draft && (draft.addonGroups || []).some((g) => g.type === "addon"); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(6); return; } setStep(step - 1); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -1437,6 +1442,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         bookedFor: bookedFor.toISOString(),
         photos: pi === 0 ? photos : 0,
         hasPhotos: pi === 0 && photos > 0,
+        bigChange: (simpleChange === "fresh" && people.length === 1) ? true : undefined,
         phone: finalPhone,
         groupId: isMultiPerson ? baseId : null,
       });
@@ -1469,7 +1475,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <span style={{ fontSize: 17 }}>I've been here before</span>
               <span style={{ fontSize: 13, opacity: 0.8, fontWeight: 300 }}>We'll pull up your details</span>
             </button>
-            <button className="lift" onClick={() => { setBookingFor(null); setMatched(null); setCart([]); setSimplePref(null); setSimpleStep("what"); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
+            <button className="lift" onClick={() => { setBookingFor(null); setMatched(null); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleStep("what"); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
               <span style={{ fontSize: 17 }}>It's my first time</span>
               <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>Welcome — let's take a look</span>
             </button>
@@ -1481,13 +1487,13 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         {simpleStep === "what" && (
           <div className="fade-up">
             <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>What are you here for?</h2>
-            <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 400, lineHeight: 1.5, marginBottom: 26 }}>Pick one to get started. You can tell your barber the details in the chair.</p>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Welcome in — what can we do for you?</h2>
+            <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 400, lineHeight: 1.5, marginBottom: 26 }}>Start here. We'll walk you through the rest, nice and easy.</p>
             <div style={{ display: "grid", gap: 12 }}>
               {[
-                { key: "hair", label: "Hair", sub: "A haircut" },
+                { key: "hair", label: "Hair", sub: "A fresh haircut" },
                 { key: "hairBeard", label: "Hair + Beard", sub: "The full reset" },
-                { key: "beard", label: "Beard", sub: "Just a tidy-up" },
+                { key: "beard", label: "Beard", sub: "Beard trim & shape-up" },
               ].map((opt) => (
                 <button key={opt.key} className="lift" onClick={() => {
                   const lower = (s) => (s.name || "").toLowerCase();
@@ -1498,9 +1504,12 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                   if (!match) match = services[0];
                   setNewClientCategory(opt.key);
                   setDraft(match);
-                  // Build a clean cart entry (no cut-type maze, no add-ons) — provider set on the next screen.
+                  setSimpleChange(null);
+                  // Build a clean cart entry; cut type + finishing touch get chosen on the next screens.
                   setCart([{ service: match, provider: providers.find((p) => p.id === "anyone") || providers[0], cutType: null, beardType: null, addons: {} }]);
-                  setSimpleStep("who");
+                  // Hair-based services have cut types → show the rich cut screen. Beard-only skips to the change question.
+                  const hasCuts = match.cutTypes && match.cutTypes.length > 0;
+                  setSimpleStep(hasCuts ? "cut" : "change");
                 }} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", boxShadow: "var(--shadow-sm)" }}>
                   <span>
                     <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{opt.label}</span>
@@ -1512,6 +1521,103 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
             </div>
           </div>
         )}
+
+        {/* SIMPLE · CUT — the rich, slow centerpiece: pick the cut with photo + plain description + price */}
+        {simpleStep === "cut" && draft && draft.cutTypes && (() => {
+          // Warm, client-friendly descriptions keyed off the cut id (falls back to the service desc).
+          const friendly = {
+            standard: "Sides blended or tapered, but never shaved to the skin — you keep a little length all the way down. The everyday classic.",
+            skinfade: "Taken all the way down to bare skin at the bottom and blended up. Sharp, clean, and easy to keep up.",
+            scissor: "Cut entirely with scissors, no clippers anywhere. The right call for longer hair and natural texture.",
+          };
+          const niceName = { standard: "Haircut", skinfade: "Skin Fade", scissor: "Scissor Only" };
+          return (
+            <div className="fade-up">
+              <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 10, lineHeight: 1.07, letterSpacing: "-0.3px" }}>Pick the cut that fits you</h2>
+              <p style={{ color: "var(--text)", fontSize: 15.5, fontWeight: 400, lineHeight: 1.5, marginBottom: 22 }}>No pressure — this just helps us set aside the right amount of time for you.</p>
+              <div style={{ display: "grid", gap: 13 }}>
+                {draft.cutTypes.map((ct, idx) => {
+                  const img = ct.images && ct.images[0];
+                  return (
+                    <button key={ct.id} className="lift" onClick={() => {
+                      setCart((c) => c.map((e, i) => i === 0 ? { ...e, cutType: ct.id } : e));
+                      setSimpleStep("change");
+                    }} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 13, display: "flex", gap: 13, alignItems: "center", color: "var(--text)", boxShadow: "var(--shadow-sm)" }}>
+                      <span style={{ width: 84, height: 84, borderRadius: 12, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {img ? <img src={imgUrl(img, 240)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <Camera size={22} style={{ color: "var(--faint)" }} />}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, lineHeight: 1.1 }}>{niceName[ct.id] || ct.label}</span>
+                          {idx === 1 && <span style={{ fontSize: 10.5, color: "var(--sub)", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 20, padding: "2px 8px", fontWeight: 500 }}>most booked</span>}
+                        </span>
+                        <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{friendly[ct.id] || ct.desc}</span>
+                        <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, color: "var(--gold)", marginTop: 6 }}>${ct.price}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* SIMPLE · CHANGE — the trim-vs-going-shorter question (required, reserves extra time, free) */}
+        {simpleStep === "change" && (() => {
+          const proceedAfterChange = () => {
+            // If the service offers a hot-towel / facial finishing touch, show it; otherwise go to who.
+            const hasFinish = draft && (draft.addonGroups || []).some((g) => g.type === "addon");
+            setSimpleStep(hasFinish ? "finish" : "who");
+          };
+          return (
+            <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column" }}>
+              <div style={{ width: 38, height: 3, background: "var(--gold)", marginBottom: 20, borderRadius: 2 }} />
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 33, fontWeight: 600, marginBottom: 14, lineHeight: 1.06, letterSpacing: "-0.4px" }}>Are you going a lot shorter today?</h2>
+              <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 400, lineHeight: 1.55 }}>If so, we'll set aside a few extra minutes for your appointment — so we never have to rush you.</p>
+              <div style={{ display: "grid", gap: 12, marginTop: "auto", paddingTop: 28 }}>
+                <button className="lift" onClick={() => { setSimpleChange("trim"); proceedAfterChange(); }} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 15, padding: 19, color: "var(--text)", fontSize: 17, fontWeight: 500, textAlign: "center" }}>No, about the same</button>
+                <button className="lift" onClick={() => { setSimpleChange("fresh"); proceedAfterChange(); }} style={{ width: "100%", background: "var(--gold)", border: "none", borderRadius: 15, padding: "16px 19px", color: "var(--on-gold)", textAlign: "center", lineHeight: 1.2 }}>
+                  <span style={{ display: "block", fontSize: 17, fontWeight: 600 }}>Yes, going shorter</span>
+                  <span style={{ display: "block", fontSize: 12.5, fontWeight: 500, opacity: 0.8, marginTop: 3 }}>(no extra charge)</span>
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* SIMPLE · FINISH — the tasteful hot-towel / straight-razor finishing-touch upgrade */}
+        {simpleStep === "finish" && draft && (() => {
+          const fin = (draft.addonGroups || []).find((g) => g.type === "addon");
+          if (!fin) { setSimpleStep("who"); return null; }
+          const item = fin.item || {};
+          const isOn = !!(cart[0] && cart[0].addons && cart[0].addons[fin.id]);
+          const toggle = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...e.addons, [fin.id]: e.addons && e.addons[fin.id] ? undefined : true } } : e));
+          const photo = fin.photo || item.photo;
+          return (
+            <div className="fade-up">
+              <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 10, lineHeight: 1.07, letterSpacing: "-0.3px" }}>Add the finishing touch?</h2>
+              <p style={{ color: "var(--text)", fontSize: 15.5, fontWeight: 400, lineHeight: 1.5, marginBottom: 22 }}>Optional — the classic way to round out your visit.</p>
+              <button onClick={toggle} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: isOn ? "2px solid var(--gold)" : "1px solid var(--border)", borderRadius: 18, overflow: "hidden", color: "var(--text)", padding: 0, display: "block" }}>
+                <span style={{ display: "block", height: 130, background: "var(--panel2)", position: "relative" }}>
+                  {photo ? <img src={imgUrl(photo, 700)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
+                  <span style={{ position: "absolute", top: 12, left: 14, fontSize: 10.5, letterSpacing: 1.5, color: "#fff", fontWeight: 600, textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>FINISHING TOUCH</span>
+                  {isOn && <span style={{ position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={16} style={{ color: "var(--on-gold)" }} strokeWidth={3} /></span>}
+                </span>
+                <span style={{ display: "block", padding: "15px 17px" }}>
+                  <span style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 600, lineHeight: 1.1 }}>Hot towel &amp; straight razor</span>
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, color: "var(--gold)", whiteSpace: "nowrap" }}>+$5</span>
+                  </span>
+                  <span style={{ display: "block", fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginTop: 6 }}>A hot towel and a straight-razor finish around the neck and cheeks. The barbershop ritual.</span>
+                  <span style={{ display: "block", marginTop: 13, background: isOn ? "var(--gold)" : "var(--panel2)", color: isOn ? "var(--on-gold)" : "var(--text)", textAlign: "center", padding: 12, borderRadius: 11, fontSize: 13.5, fontWeight: 600, border: isOn ? "none" : "1px solid var(--border)" }}>{isOn ? "Added to your visit" : "Add it"}</span>
+                </span>
+              </button>
+              <button className="lift" onClick={() => setSimpleStep("who")} style={{ width: "100%", marginTop: 14, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "10px 0", textAlign: "center" }}>{isOn ? "Continue" : "No thanks, skip this"} →</button>
+            </div>
+          );
+        })()}
 
         {/* SIMPLE · WHO — anyone, or a specific person? Defaults make this a one-tap step. */}
         {simpleStep === "who" && (
@@ -2519,7 +2625,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
             </div>
             {/* soonest available shortcut */}
             {(() => {
-              const firstOpen = dateOptions.find((d) => freeSlotsFor(provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]), d, cartMin || 30, 15).length > 0);
+              const firstOpen = dateOptions.find((d) => freeSlotsFor(provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]), d, effMin || 30, 15).length > 0);
               if (!firstOpen) return null;
               const isFirstToday = firstOpen.toDateString() === new Date().toDateString();
               const already = selectedDate && firstOpen.toDateString() === selectedDate.toDateString();
