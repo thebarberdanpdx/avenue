@@ -2974,7 +2974,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 // big headline number per section, mobile-first, comparisons built
 // in, action-oriented (overdue clients link to the nudge folder).
 // ============================================================
-function PulseView({ business, appts, clients, services, providers, onNavigate, onOpenRevenue, onOpenAppointments }) {
+function PulseView({ business, appts, clients, services, providers, onNavigate, onOpenRevenue, onOpenAppointments, onOpenClients }) {
   const now = new Date();
 
   // --- Time window helpers ---
@@ -3245,12 +3245,26 @@ function PulseView({ business, appts, clients, services, providers, onNavigate, 
 
       {/* Action CTA — appointments drill-in */}
       {onOpenAppointments && (
-        <button onClick={onOpenAppointments} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: overdueCount > 0 ? 14 : 0 }}>
+        <button onClick={onOpenAppointments} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <BarChart3 size={17} style={{ color: "var(--gold)" }} />
             <div style={{ textAlign: "left" }}>
               <div style={{ fontSize: 15, fontWeight: 500 }}>View appointments</div>
               <div style={{ fontSize: 13, color: "var(--sub)" }}>Counts, no-shows, busiest day &amp; hour</div>
+            </div>
+          </div>
+          <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+        </button>
+      )}
+
+      {/* Action CTA — clients drill-in */}
+      {onOpenClients && (
+        <button onClick={onOpenClients} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: overdueCount > 0 ? 14 : 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Users size={17} style={{ color: "var(--gold)" }} />
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 15, fontWeight: 500 }}>View clients</div>
+              <div style={{ fontSize: 13, color: "var(--sub)" }}>New vs returning, retention, top clients</div>
             </div>
           </div>
           <ChevronRight size={18} style={{ color: "var(--faint)" }} />
@@ -3772,6 +3786,298 @@ function AppointmentsView({ appts, providers, services, onBack }) {
 }
 
 // ============================================================
+// CLIENTS REPORT — third Pulse drill-in. Health metrics for the
+// client base: new vs returning, retention, top by visits + revenue,
+// lapsed list (with a direct path to the nudge folder).
+// ============================================================
+function ClientsReportView({ appts, clients, services, providers, onBack, onOpenNudge }) {
+  const [period, setPeriod] = useState("month"); // "week" | "month" | "year"
+  const now = new Date();
+
+  // --- Same date helpers as the other reports ---
+  const sod = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const sow = (d) => {
+    const x = sod(d);
+    const day = x.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    x.setDate(x.getDate() + diff);
+    return x;
+  };
+  const som = (d) => { const x = sod(d); x.setDate(1); return x; };
+
+  // --- Price-per-appt for revenue rankings ---
+  const apptPrice = (a) => {
+    if (a.lineItems && a.lineItems.length) {
+      return a.lineItems.reduce((sum, li) => {
+        const s = services.find((x) => x.id === li.serviceId);
+        return sum + (s ? getPrice(s, a.providerId) : 0);
+      }, 0);
+    }
+    const s = services.find((x) => x.id === a.serviceId);
+    return s ? getPrice(s, a.providerId) : 0;
+  };
+
+  // --- Period boundaries (this + prior) ---
+  let periodStart, periodEnd, priorStart, priorEnd;
+  if (period === "week") {
+    periodStart = sow(now);
+    periodEnd = new Date(periodStart); periodEnd.setDate(periodEnd.getDate() + 7);
+    priorStart = new Date(periodStart); priorStart.setDate(priorStart.getDate() - 7);
+    priorEnd = new Date(periodStart);
+  } else if (period === "month") {
+    periodStart = som(now);
+    periodEnd = new Date(periodStart); periodEnd.setMonth(periodEnd.getMonth() + 1);
+    priorStart = new Date(periodStart); priorStart.setMonth(priorStart.getMonth() - 1);
+    priorEnd = new Date(periodStart);
+  } else {
+    periodStart = new Date(now.getFullYear(), 0, 1);
+    periodEnd = new Date(now.getFullYear() + 1, 0, 1);
+    priorStart = new Date(now.getFullYear() - 1, 0, 1);
+    priorEnd = new Date(now.getFullYear(), 0, 1);
+  }
+
+  const inRange = (a, start, end) => {
+    if (!a.bookedFor) return false;
+    const t = new Date(a.bookedFor).getTime();
+    return t >= start.getTime() && t < end.getTime();
+  };
+  const isCountable = (a) => a.status !== "block" && a.status !== "cancelled" && a.status !== "no-show";
+
+  // --- Appointments grouped by client across all history (needed for "first visit ever" + retention) ---
+  const apptsByClient = {};
+  appts.forEach((a) => {
+    if (a.status === "block" || !a.clientId || a.clientId === "guest") return;
+    apptsByClient[a.clientId] = apptsByClient[a.clientId] || [];
+    apptsByClient[a.clientId].push(a);
+  });
+  Object.keys(apptsByClient).forEach((cid) => {
+    apptsByClient[cid].sort((a, b) => new Date(a.bookedFor) - new Date(b.bookedFor));
+  });
+
+  // --- New vs returning for this period ---
+  // A client is "new this period" if their FIRST appointment ever falls within this period.
+  // Otherwise they're "returning" (had any prior appointment before the period).
+  const periodAppts = appts.filter((a) => isCountable(a) && inRange(a, periodStart, periodEnd) && a.clientId && a.clientId !== "guest");
+  const seenClientsThisPeriod = new Set(periodAppts.map((a) => a.clientId));
+  let newThisPeriod = 0;
+  let returningThisPeriod = 0;
+  seenClientsThisPeriod.forEach((cid) => {
+    const list = apptsByClient[cid] || [];
+    const first = list[0];
+    if (!first) return;
+    const firstTime = new Date(first.bookedFor).getTime();
+    if (firstTime >= periodStart.getTime() && firstTime < periodEnd.getTime()) {
+      newThisPeriod += 1;
+    } else {
+      returningThisPeriod += 1;
+    }
+  });
+  const totalActive = newThisPeriod + returningThisPeriod;
+
+  // --- 60-day retention: of clients whose first-ever visit was 60-180 days ago,
+  //     what % came back within 60 days of that first visit? Window is rolling. ---
+  const sixtyDays = 60 * 24 * 60 * 60 * 1000;
+  const cohortEnd = new Date(now.getTime() - sixtyDays); // first visit must be at least 60d ago
+  const cohortStart = new Date(now.getTime() - 3 * sixtyDays); // and not older than 180d (so the metric stays current)
+  let cohortSize = 0;
+  let cohortReturned = 0;
+  Object.keys(apptsByClient).forEach((cid) => {
+    const list = apptsByClient[cid];
+    if (!list.length) return;
+    const first = new Date(list[0].bookedFor).getTime();
+    if (first < cohortStart.getTime() || first >= cohortEnd.getTime()) return;
+    cohortSize += 1;
+    // Did they have any other appt within 60 days of the first?
+    const within = list.slice(1).some((a) => {
+      const t = new Date(a.bookedFor).getTime();
+      return t > first && (t - first) <= sixtyDays;
+    });
+    if (within) cohortReturned += 1;
+  });
+  const retentionPct = cohortSize > 0 ? Math.round((cohortReturned / cohortSize) * 100) : null;
+
+  // --- Total clients on file (excludes blocked) ---
+  const totalClients = clients.filter((c) => !c.blocked).length;
+
+  // --- Top by visits (lifetime) and by revenue this period ---
+  const visitCounts = {};
+  Object.keys(apptsByClient).forEach((cid) => {
+    visitCounts[cid] = apptsByClient[cid].filter((a) => a.status === "done").length;
+  });
+  const topByVisits = Object.entries(visitCounts)
+    .map(([cid, count]) => ({ client: clients.find((c) => c.id === cid), count }))
+    .filter((x) => x.client && x.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+
+  const revByClient = {};
+  periodAppts.filter((a) => a.status === "done").forEach((a) => {
+    revByClient[a.clientId] = (revByClient[a.clientId] || 0) + apptPrice(a);
+  });
+  const topByRevenue = Object.entries(revByClient)
+    .map(([cid, revenue]) => ({ client: clients.find((c) => c.id === cid), revenue }))
+    .filter((x) => x.client && x.revenue > 0)
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 6);
+
+  // --- Lapsed (overdue-to-rebook) — same logic as the nudge folder for consistency ---
+  const lapsed = clients.filter((c) => {
+    if (c.blocked) return false;
+    if (!c.cadenceDays || !c.lastVisit) return false;
+    if (c.nudgeDismissedAt && new Date(c.nudgeDismissedAt) > new Date(c.lastVisit)) return false;
+    const days = Math.round((Date.now() - new Date(c.lastVisit)) / 86400000);
+    return (days - c.cadenceDays) > 0;
+  });
+
+  const fmtMoney = (n) => `$${Math.round(n).toLocaleString()}`;
+
+  return (
+    <div className="fade-up">
+      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> Back to Pulse</button>
+
+      {/* Masthead */}
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>CLIENTS</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
+      </div>
+
+      {/* Period toggle */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
+        {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
+          const on = period === id;
+          return (
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+          );
+        })}
+      </div>
+
+      {/* Hero — clients seen this period */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
+          {totalActive}
+        </div>
+        <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
+          {totalActive === 0 ? "No client visits this period yet." : <>{totalActive === 1 ? "client seen" : "clients seen"} · <span style={{ fontWeight: 600 }}>{totalClients}</span> total on file</>}
+        </div>
+      </div>
+
+      {/* NEW vs RETURNING bar */}
+      {totalActive > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>NEW vs RETURNING</div>
+            {/* Visual split bar */}
+            <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", background: "var(--panel2)", marginBottom: 16 }}>
+              {newThisPeriod > 0 && <div style={{ flex: newThisPeriod, background: "var(--gold)" }} />}
+              {returningThisPeriod > 0 && <div style={{ flex: returningThisPeriod, background: "color-mix(in srgb, var(--gold) 35%, var(--panel2))" }} />}
+            </div>
+            <div style={{ display: "grid", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--gold)" }} />
+                  <span style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>New</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{newThisPeriod}</span>
+                  <span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((newThisPeriod / totalActive) * 100)}%</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 2, background: "color-mix(in srgb, var(--gold) 35%, var(--panel2))" }} />
+                  <span style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Returning</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{returningThisPeriod}</span>
+                  <span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((returningThisPeriod / totalActive) * 100)}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* RETENTION */}
+      {retentionPct !== null && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>RETENTION</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 8 }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, lineHeight: 1, letterSpacing: -1, color: retentionPct >= 60 ? "var(--gold)" : "var(--text)" }}>{retentionPct}%</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>of first-timers came back within 60 days</div>
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5 }}>Based on {cohortSize} {cohortSize === 1 ? "client whose" : "clients whose"} first visit was 60–180 days ago.</div>
+          </div>
+        </>
+      )}
+
+      {/* LAPSED CTA */}
+      {lapsed.length > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />
+          <button onClick={onOpenNudge} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 30 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Bell size={17} style={{ color: "var(--gold)" }} />
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 15, fontWeight: 500 }}>{lapsed.length} client{lapsed.length > 1 ? "s" : ""} overdue to rebook</div>
+                <div style={{ fontSize: 13, color: "var(--sub)" }}>Open the nudge folder</div>
+              </div>
+            </div>
+            <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+          </button>
+        </>
+      )}
+
+      {/* TOP BY VISITS */}
+      {topByVisits.length > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>MOST VISITS (LIFETIME)</div>
+            <div style={{ display: "grid", gap: 10 }}>
+              {topByVisits.map((row) => (
+                <div key={row.client.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
+                  <div style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{row.client.name}</div>
+                  <div style={{ fontSize: 15, fontWeight: 500, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{row.count} {row.count === 1 ? "visit" : "visits"}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* TOP BY REVENUE */}
+      {topByRevenue.length > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>HIGHEST SPEND ({period === "week" ? "THIS WEEK" : period === "month" ? "THIS MONTH" : "THIS YEAR"})</div>
+            <div style={{ display: "grid", gap: 10 }}>
+              {topByRevenue.map((row) => (
+                <div key={row.client.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
+                  <div style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{row.client.name}</div>
+                  <div style={{ fontSize: 15, fontWeight: 500, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{fmtMoney(row.revenue)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Empty state */}
+      {totalActive === 0 && lapsed.length === 0 && topByVisits.length === 0 && (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "28px 22px", textAlign: "center", marginTop: 10 }}>
+          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto" }}>Once clients book and visit, you'll see new vs returning split, retention rate, and your top clients here.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // SHOP DASHBOARD — adds Menu editor + Settings
 // ============================================================
 function ShopDashboard({ business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, onExit }) {
@@ -3808,9 +4114,10 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         <div style={{ width: 50 }} />
       </div>
       <div style={{ maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
-        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
+        {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
