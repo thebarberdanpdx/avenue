@@ -8060,6 +8060,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   const WINDOW = { early: [DAY_START, 11 * 60], midday: [11 * 60, 14 * 60], afternoon: [14 * 60, DAY_END] };
   const wlRules = (business && business.waitlist) || { mode: "ask", order: "longest", delayMin: 30 };
   const [waitlistMatch, setWaitlistMatch] = useState(null); // { freed, matches } awaiting confirm
+  // Eye-level popup that fires when the provider tries to book/move an appointment on top of another.
+  // Shape: { mode: "create"|"move", bookData?, moveData?, conflicts:[...], nextSlot:number|null, dur:number }
+  const [conflictModal, setConflictModal] = useState(null);
   // parse the "at" timestamp so we can order by who's waited longest
   const waitedSince = (w) => { const t = Date.parse(w.at); return isNaN(t) ? 0 : t; };
   const findWaitlistMatches = (freed) => {
@@ -8203,11 +8206,50 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
     };
   }, [drag, appts, PPM]);
 
+  // ---- Conflict detection: find appointments that overlap a proposed time block on a given provider/day ----
+  // excludeId lets us ignore the appointment being moved (so it doesn't conflict with itself).
+  const findConflicts = (providerId, startMin, endMin, excludeId = null) => {
+    return appts.filter((a) =>
+      a.providerId === providerId
+      && sameDay(a.bookedFor, selectedDate)
+      && a.status !== "cancelled"
+      && a.status !== "done"
+      && a.id !== excludeId
+      && startMin < a.end
+      && endMin > a.start
+    );
+  };
+  // Earliest open slot of the given duration at or after `fromMin`, scanning past any conflicts on that provider.
+  const findNextFreeSlot = (providerId, fromMin, durMin, excludeId = null) => {
+    const dayAppts = appts
+      .filter((a) => a.providerId === providerId && sameDay(a.bookedFor, selectedDate) && a.status !== "cancelled" && a.status !== "done" && a.id !== excludeId)
+      .sort((a, b) => a.start - b.start);
+    let cursor = fromMin;
+    for (const a of dayAppts) {
+      if (a.end <= cursor) continue;                      // already past us
+      if (cursor + durMin <= a.start) return cursor;      // fits in the gap before this one
+      cursor = Math.max(cursor, a.end);                   // jump past this conflict and keep looking
+    }
+    return cursor;                                        // no more conflicts ahead — fits here
+  };
+
+  const commitMove = (p) => {
+    setAppts(appts.map((a) => a.id === p.appt.id ? { ...a, start: p.newStart, end: p.newEnd } : a));
+    showToast(`${p.appt.name} moved to ${fmtTime(p.newStart)}.`);
+    setPending(null);
+    setConflictModal(null);
+  };
   const confirmMove = () => {
     if (!pending) return;
-    setAppts(appts.map((a) => a.id === pending.appt.id ? { ...a, start: pending.newStart, end: pending.newEnd } : a));
-    showToast(`${pending.appt.name} moved to ${fmtTime(pending.newStart)}.`);
-    setPending(null);
+    const conflicts = findConflicts(pending.appt.providerId, pending.newStart, pending.newEnd, pending.appt.id);
+    if (conflicts.length > 0) {
+      const dur = pending.newEnd - pending.newStart;
+      const nextSlot = findNextFreeSlot(pending.appt.providerId, pending.newEnd, dur, pending.appt.id);
+      setConflictModal({ mode: "move", moveData: { ...pending }, conflicts, nextSlot, dur });
+      setPending(null);
+      return;
+    }
+    commitMove(pending);
   };
 
   // ---- Mangomint-style: long-press → beige block appears → drag to scrub time → release opens form ----
@@ -8290,13 +8332,15 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
     showToast(`Time block added at ${fmtTime(start)}.`);
   };
 
-  // commit a fully-formed appointment from the booking form
-  const bookAppt = ({ providerId, start, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note }) => {
+  // The actual save — runs after conflict has been resolved (no conflict, or provider chose to keep both).
+  // Accepts an optional `overrideStart` so the conflict modal can slide the booking to the next free slot in one tap.
+  const commitAppt = ({ providerId, start, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note }, overrideStart = null) => {
+    const useStart = overrideStart != null ? overrideStart : start;
     const id = "a" + Date.now() + Math.floor(Math.random() * 1000); // collision-proof string id
     const dur = getDuration(client, service, providerId);
     const price = getPrice(service, providerId);
     // Stamp the appointment with the day currently shown on the calendar, or it can't be placed on any date.
-    const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(start / 60), start % 60, 0, 0);
+    const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(useStart / 60), useStart % 60, 0, 0);
 
     // If this is a brand-new person (not an existing client), save them as a real client too.
     let bookClient = client;
@@ -8309,10 +8353,24 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       bookClient = newClient;
     }
 
-    const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start, end: start + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: service.name, detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), hasPhotos: false, photos: 0 };
+    const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: service.name, detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), hasPhotos: false, photos: 0 };
     setAppts([...appts, newAppt]);
     setNewApptSlot(null);
-    showToast(`${newAppt.name} booked at ${fmtTime(start)}.`);
+    setConflictModal(null);
+    showToast(`${newAppt.name} booked at ${fmtTime(useStart)}.`);
+  };
+
+  // commit a fully-formed appointment from the booking form — checks for conflict first
+  const bookAppt = (data) => {
+    const dur = getDuration(data.client, data.service, data.providerId);
+    const end = data.start + dur;
+    const conflicts = findConflicts(data.providerId, data.start, end);
+    if (conflicts.length > 0) {
+      const nextSlot = findNextFreeSlot(data.providerId, end, dur);
+      setConflictModal({ mode: "create", bookData: data, conflicts, nextSlot, dur });
+      return;
+    }
+    commitAppt(data);
   };
 
   const allStaff = providers.filter((p) => p.id !== "anyone");
@@ -8477,7 +8535,38 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
 
         {/* columns */}
         {staff.map((p) => {
-          const col = appts.filter((a) => a.providerId === p.id && sameDay(a.bookedFor, selectedDate));
+          // Lane-aware layout: when N appointments on this provider overlap in time,
+          // split that section of the column into N side-by-side lanes so nothing hides behind anything.
+          // Single appointments keep the full column width.
+          const col = (() => {
+            const list = appts
+              .filter((a) => a.providerId === p.id && sameDay(a.bookedFor, selectedDate))
+              .sort((aa, bb) => aa.start - bb.start || aa.end - bb.end);
+            if (list.length === 0) return [];
+            // Group into clusters where each cluster is a chain of mutually-overlapping appts.
+            const clusters = [];
+            let cur = []; let curEnd = -Infinity;
+            for (const a of list) {
+              if (a.start >= curEnd) { if (cur.length) clusters.push(cur); cur = [a]; curEnd = a.end; }
+              else { cur.push(a); curEnd = Math.max(curEnd, a.end); }
+            }
+            if (cur.length) clusters.push(cur);
+            // Within each cluster, greedy lane assignment.
+            const out = [];
+            for (const cluster of clusters) {
+              const laneEnds = []; // laneEnds[i] = the latest end time placed into lane i so far
+              const laneOf = new Map();
+              for (const a of cluster) {
+                let assigned = laneEnds.findIndex((e) => e <= a.start);
+                if (assigned === -1) { assigned = laneEnds.length; laneEnds.push(a.end); }
+                else laneEnds[assigned] = a.end;
+                laneOf.set(a.id, assigned);
+              }
+              const laneCount = laneEnds.length;
+              for (const a of cluster) out.push({ ...a, _lane: laneOf.get(a.id), _laneCount: laneCount });
+            }
+            return out;
+          })();
           return (
             <div key={p.id}
               style={{ flex: 1, position: "relative", height: gridHeight, borderLeft: "1px solid var(--line)" }}>
@@ -8519,12 +8608,18 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
                 const tint = `color-mix(in srgb, ${accent} 14%, var(--panel))`;
                 const onColor = "var(--text)";
                 const blockBg = "repeating-linear-gradient(45deg, var(--panel2), var(--panel2) 7px, var(--line) 7px, var(--line) 14px)";
+                // Horizontal lane positioning — full width when alone, split into N equal lanes when overlapping.
+                const laneCount = a._laneCount || 1;
+                const lane = a._lane || 0;
+                const lanePos = laneCount > 1
+                  ? { left: `calc(${(lane / laneCount) * 100}% + 2px)`, width: `calc(${100 / laneCount}% - 4px)` }
+                  : { left: 3, right: 3 };
                 return (
                   <div key={a.id} data-appt
                     onClick={() => { const d = dragRef.current; if (d && (d.didDrag || d.scrolled)) return; setOpen(a); }}
                     onMouseDown={(e) => startDrag(e, a)} onTouchStart={(e) => startDrag(e, a)}
                     className={isDragging ? "" : "lift"}
-                    style={{ position: "absolute", top, left: 3, right: 3, height, background: isBlock ? blockBg : (isDone ? "var(--panel2)" : tint), opacity: isDone ? 0.7 : 1, border: `1px solid ${isBlock ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`}`, borderLeft: `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : accent)}`, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "pan-y", userSelect: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
+                    style={{ position: "absolute", top, ...lanePos, height, background: isBlock ? blockBg : (isDone ? "var(--panel2)" : tint), opacity: isDone ? 0.7 : 1, border: `1px solid ${isBlock ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`}`, borderLeft: `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : accent)}`, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "pan-y", userSelect: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
                     {/* name — always one line, never wraps or collides */}
                     <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{a.name}</span>
                     {/* time range — shown once room exists */}
@@ -8599,6 +8694,44 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           </div>
         </>
       )}
+
+      {/* CONFLICT — eye-level popup when a manual booking or drag-move lands on top of an existing appointment.
+          Two buttons: slide the new appointment to the next free slot, or keep both (the explicit override).
+          Tap outside to dismiss without doing either. Client-side flow never reaches here — it filters at slot-pick time. */}
+      {conflictModal && (() => {
+        const first = conflictModal.conflicts[0];
+        const more = conflictModal.conflicts.length - 1;
+        const nextSlotTxt = conflictModal.nextSlot != null ? fmtTime(conflictModal.nextSlot) : null;
+        const onMove = () => {
+          if (conflictModal.mode === "create") {
+            commitAppt(conflictModal.bookData, conflictModal.nextSlot);
+          } else {
+            const md = conflictModal.moveData;
+            commitMove({ appt: md.appt, newStart: conflictModal.nextSlot, newEnd: conflictModal.nextSlot + conflictModal.dur });
+          }
+        };
+        const onKeepBoth = () => {
+          if (conflictModal.mode === "create") {
+            commitAppt(conflictModal.bookData);
+          } else {
+            commitMove(conflictModal.moveData);
+          }
+        };
+        return (
+          <div className="fade-in" onClick={() => setConflictModal(null)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, marginBottom: 8 }}>This overlaps an appointment</div>
+              <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 18 }}>
+                {first.name} is booked {fmtTime(first.start)} – {fmtTime(first.end)}{more > 0 ? ` (and ${more} more)` : ""}.{nextSlotTxt ? ` The next open slot is ${nextSlotTxt}.` : ""}
+              </div>
+              {nextSlotTxt && (
+                <button className="lift" onClick={onMove} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", letterSpacing: 0.5, marginBottom: 9 }}>Move to {nextSlotTxt}</button>
+              )}
+              <button onClick={onKeepBoth} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, fontWeight: 500, borderRadius: 12 }}>Keep both</button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* tap-to-create: menu anchored right under the tapped time/spot */}
       {createSlot && (() => {
