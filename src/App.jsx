@@ -6714,7 +6714,6 @@ function PhotoModeSetting({ mode, onChange }) {
 function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, showToast }) {
   const [form, setForm] = useState(business);
   const [openCard, setOpenCard] = useState(null);
-  const [openTile, setOpenTile] = useState(null);
   const [query, setQuery] = useState("");
 
   // When opening a setting card, reset the working form to the current saved business state
@@ -6724,8 +6723,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   // Detect if the user has actually changed anything (so we only show DONE when needed)
   const hasChanges = JSON.stringify(form) !== JSON.stringify(business);
 
-  const save = (msg) => { setBusiness(form); showToast(msg || "Settings saved."); setOpenCard(null); setOpenTile(null); };
-  const cancel = () => { setForm(business); setOpenCard(null); setOpenTile(null); };
+  const save = (msg) => { setBusiness(form); showToast(msg || "Settings saved."); setOpenCard(null); };
+  const cancel = () => { setForm(business); setOpenCard(null); };
 
   const field = (label, key, multiline) => (
     <div style={{ marginBottom: 14 }}>
@@ -6966,24 +6965,54 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   ];
   const CATEGORY_ORDER = ["Business Setup", "Services & Menu", "Calendar & Appointments", "Payments & Checkout", "Online Booking", "Automated Messages", "Reporting"];
 
-  // ---- Tiles for the new settings landing — groups of settings shown as 2-per-row cards ----
-  // Each tile lists the setting IDs it contains. Settings drill into the existing editor on tap.
-  const TILES = [
-    { id: "shop", title: "Shop", desc: "Business name, address, phone numbers, locations, hours, logo and branding", icon: User, settings: ["business", "phones", "locations", "hours", "appearance"] },
-    { id: "team", title: "Team", desc: "Barbers, stylists, schedules, individual availability and service durations", icon: Users, settings: ["staff"] },
-    { id: "menu", title: "Services & Menu", desc: "Service list, categories, prices, durations, photos, add-ons and pairings", icon: ImageIcon, settings: ["servicesmenu"] },
-    { id: "booking", title: "Online Booking", desc: "Who can book, how far ahead, family bookings, staff selection, cancellation policy", icon: Calendar, settings: ["booking", "newclient", "staffselection", "rebook_usual", "family", "policy"] },
-    { id: "calendar", title: "Calendar & Day", desc: "Scheduling buffers, gap-avoidance, smart timing, waitlist, waiting room, late and overdue alerts", icon: Clock, settings: ["scheduling", "avoidgaps", "waitingroom", "runninglate", "overduebuffer", "waitlist", "autotiming", "photos"] },
-    { id: "payments", title: "Payments", desc: "Tipping options, checkout flow, deposits, no-show charges, rebooking prompts", icon: CreditCard, settings: ["tipping", "checkout", "rebookco"] },
-    { id: "messages", title: "Messages", desc: "Booking confirmations, reminders, review requests, automated client messages", icon: MessageSquare, settings: ["messages"] },
-    { id: "smart", title: "Smart Features", desc: "AI cut helper, photo and description matching, future automations", icon: Sparkles, settings: ["aicuthelper"] },
-    { id: "data", title: "Reports & Data", desc: "Revenue and visit reports, client exports, data migration from other tools", icon: BarChart3, settings: ["reports", "import"] },
+  // ---- New editorial settings landing ----
+  // Three intent-driven sections, each a collapsible group. Each row shows
+  // its current "status" inline so you don't drill in just to check what's set.
+  const SECTIONS = [
+    {
+      id: "setup",
+      title: "Setup",
+      desc: "Set these once and forget. Your shop's identity, your team, your menu.",
+      defaultOpen: true,
+      // Order within a section = importance for a typical solo/small barber shop
+      settings: ["business", "hours", "staff", "servicesmenu", "appearance", "phones", "locations"],
+    },
+    {
+      id: "operations",
+      title: "Day to day",
+      desc: "How the calendar behaves, how clients book, how you get paid.",
+      defaultOpen: true,
+      settings: [
+        // Online booking rules first — most visible to clients
+        "booking", "policy", "staffselection", "newclient", "family",
+        // Then calendar behaviors that shape your day
+        "scheduling", "avoidgaps", "autotiming", "waitlist", "waitingroom", "runninglate", "overduebuffer",
+        // Payments and messaging — recurring touchpoints
+        "tipping", "checkout", "rebookco", "messages",
+        // Display preference (lives here because it affects every day)
+        "photos",
+      ],
+    },
+    {
+      id: "smart",
+      title: "Smart & data",
+      desc: "AI helpers, analytics, and getting your existing client list in.",
+      defaultOpen: false,
+      settings: ["aicuthelper", "reports", "import"],
+    },
   ];
+
+  // Track which sections are expanded. Initialize from each section's defaultOpen.
+  const [openSections, setOpenSections] = useState(() => {
+    const init = {};
+    SECTIONS.forEach((s) => { init[s.id] = s.defaultOpen; });
+    return init;
+  });
+  const toggleSection = (sid) => setOpenSections((cur) => ({ ...cur, [sid]: !cur[sid] }));
 
   const q = query.trim().toLowerCase();
   const filtered = q ? cards.filter((c) => (c.title + " " + c.keywords).toLowerCase().includes(q)) : cards;
   const active = cards.find((c) => c.id === openCard);
-  const activeTile = TILES.find((t) => t.id === openTile);
 
   // ---- full-page editor for the selected setting ----
   if (active) {
@@ -7008,109 +7037,89 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     );
   }
 
-  // ---- drilled into a tile: show its settings as a clean list ----
-  if (activeTile && !q) {
-    const tileCards = activeTile.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
-    return (
-      <div className="fade-up" style={{ maxWidth: 640, margin: "0 auto", padding: "12px 4px 40px" }}>
-        <button onClick={() => setOpenTile(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
-        <div style={{ marginBottom: 26 }}>
-          <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.4px", marginBottom: 8 }}>{activeTile.title}</h2>
-          <div style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.45 }}>{activeTile.desc}</div>
-        </div>
-        <div style={{ background: "var(--panel)", borderRadius: 18, boxShadow: "var(--shadow-sm)", overflow: "hidden", border: "1px solid var(--border)" }}>
-          {tileCards.map((c, idx) => {
-            const Icon = c.icon;
-            return (
-              <div key={c.id} style={{ borderTop: idx === 0 ? "none" : "1px solid var(--line)" }}>
-                <button onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "none", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "18px 20px" }}>
-                  <div>
-                    <div style={{ fontSize: 16.5, fontWeight: 500, letterSpacing: -0.2 }}>{c.title}</div>
-                    <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 280 }}>{c.status}</div>
-                  </div>
-                  <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fade-up" style={{ maxWidth: 720, margin: "0 auto", padding: "12px 4px" }}>
-      <div style={{ marginBottom: 32 }}>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -0.5, marginBottom: 14 }}>Settings</h2>
-        <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300, lineHeight: 1.5, maxWidth: 460 }}>Everything here is yours to shape — how the studio runs, looks, and speaks to clients.</p>
+      {/* Masthead — matches the editorial language of Pulse and Client profile */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>SETTINGS</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, lineHeight: 0.95, letterSpacing: "-0.6px", marginBottom: 12 }}>How the shop runs</h2>
+        <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.5, maxWidth: 460 }}>Everything that shapes how Vero looks, behaves, and speaks to clients.</p>
       </div>
 
-      {/* search */}
-      <div style={{ position: "relative", marginBottom: 28 }}>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search settings" style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px 16px 46px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY }} />
-        <Settings size={18} style={{ position: "absolute", left: 17, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
+      {/* Search — works the same as before, but stays out of the way when not used */}
+      <div style={{ position: "relative", marginBottom: 24 }}>
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search settings" style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 16px 13px 44px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+        <Settings size={17} style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
       </div>
 
-      {/* When searching → flat list across all settings */}
+      {/* SEARCHING — flat list of matching settings */}
       {q ? (
-        <div style={{ background: "var(--panel)", borderRadius: 22, boxShadow: "var(--shadow-md)", overflow: "hidden", border: "1px solid var(--line)" }}>
-          {filtered.map((c, idx) => {
-            const Icon = c.icon;
-            return (
-              <div key={c.id} style={{ borderTop: idx === 0 ? "none" : "1px solid var(--line)" }}>
-                <button onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "none", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "20px 22px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 13, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={19} style={{ color: "var(--gold)" }} /></div>
-                    <div>
-                      <div style={{ fontSize: 16.5, fontWeight: 500, letterSpacing: -0.2 }}>{c.title}</div>
-                      <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{c.status}</div>
+        <div>
+          {filtered.length === 0 ? (
+            <p style={{ color: "var(--faint)", fontSize: 15, textAlign: "center", padding: "40px 0", fontStyle: "italic" }}>No settings match "{query}".</p>
+          ) : (
+            <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
+              {filtered.map((c) => {
+                const Icon = c.icon;
+                return (
+                  <button key={c.id} onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", border: "none" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</div>
+                        <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</div>
+                      </div>
                     </div>
-                  </div>
-                  <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
-                </button>
-              </div>
-            );
-          })}
-          {filtered.length === 0 && <p style={{ color: "var(--faint)", fontSize: 15, textAlign: "center", padding: "40px 0" }}>No settings match “{query}”.</p>}
+                    <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : (
-        // ---- Default: 2-per-row tile grid, uniform dark editorial treatment ----
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
-          {TILES.map((t) => {
-            const tileCards = t.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
+        // NOT SEARCHING — three editorial sections, each collapsible
+        <div style={{ display: "grid", gap: 24 }}>
+          {SECTIONS.map((section) => {
+            const sectionCards = section.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
+            if (sectionCards.length === 0) return null;
+            const isOpen = openSections[section.id];
             return (
-              <button
-                key={t.id}
-                className="lift"
-                onClick={() => { if (tileCards.length === 1) { setOpenCard(tileCards[0].id); } else { setOpenTile(t.id); } }}
-                style={{
-                  background: "linear-gradient(155deg, #1a1714 0%, #0f0d0b 100%)",
-                  border: "1px solid rgba(176,141,87,0.18)",
-                  borderRadius: 20,
-                  padding: "20px 16px 16px",
-                  textAlign: "center",
-                  color: "#f5efe6",
-                  boxShadow: "0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.05)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 0,
-                  height: 200,
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-                <div style={{ width: 24, height: 2, background: "var(--gold)", marginBottom: 10 }} />
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.4px", color: "#f5efe6", marginBottom: 12 }}>{t.title}</div>
-                <div style={{ flex: 1, display: "flex", alignItems: "flex-start", padding: "0 4px" }}>
-                  <div style={{ fontSize: 12.5, color: "rgba(245,239,230,0.6)", lineHeight: 1.45, fontWeight: 400 }}>{t.desc}</div>
-                </div>
-                <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, paddingTop: 10, borderTop: "1px solid rgba(245,239,230,0.08)" }}>
-                  <span style={{ fontSize: 10, letterSpacing: 2, color: "rgba(245,239,230,0.45)", fontWeight: 600 }}>{tileCards.length} {tileCards.length === 1 ? "SETTING" : "SETTINGS"}</span>
-                  <ChevronRight size={14} style={{ color: "var(--gold)", flexShrink: 0 }} />
-                </div>
-              </button>
+              <div key={section.id}>
+                {/* Section header — tap to collapse/expand */}
+                <button onClick={() => toggleSection(section.id)} style={{ width: "100%", background: "none", border: "none", textAlign: "left", padding: "0 0 14px", color: "var(--text)", cursor: "pointer" }}>
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 14, marginBottom: 4 }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+                      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, letterSpacing: -0.3 }}>{section.title}</div>
+                      <div style={{ fontSize: 12, color: "var(--faint)", fontWeight: 500 }}>{sectionCards.length}</div>
+                    </div>
+                    <ChevronDown size={18} style={{ color: "var(--faint)", transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .2s ease" }} />
+                  </div>
+                  <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45, fontWeight: 300 }}>{section.desc}</div>
+                </button>
+
+                {/* Settings rows — only render when expanded */}
+                {isOpen && (
+                  <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)", marginTop: 4 }}>
+                    {sectionCards.map((c) => {
+                      const Icon = c.icon;
+                      return (
+                        <button key={c.id} onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", border: "none" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</div>
+                              <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</div>
+                            </div>
+                          </div>
+                          <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
