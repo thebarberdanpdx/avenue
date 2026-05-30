@@ -732,9 +732,12 @@ export default function App() {
         .screen-swap > * > *:nth-child(5){animation-delay:.30s} .screen-swap > * > *:nth-child(6){animation-delay:.36s}
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
         /* Stop iOS Safari from rubber-band overscrolling past the top/bottom of the page,
-           which was dragging the fixed bottom tab bar halfway up the viewport. */
-        html, body { overscroll-behavior-y: none; -webkit-overflow-scrolling: auto; }
-        body { position: relative; }
+           which was dragging the fixed bottom tab bar halfway up the viewport.
+           overscroll-behavior:contain stops scroll chaining; -webkit-overflow-scrolling:auto
+           turns off the elastic touch-scroll on iOS that was the visible glitch. */
+        html { overscroll-behavior: none; }
+        html, body { overscroll-behavior-y: contain; -webkit-overflow-scrolling: auto; }
+        body { position: relative; min-height: 100dvh; }
         .appt-screen { animation: slideInRight .3s var(--ease) both; }
         @keyframes fadeInFixed { from { opacity:0; } to { opacity:1; } }
         .appt-screen-fixed { animation: fadeInFixed .25s var(--ease) both; }
@@ -4356,7 +4359,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   };
 
   return (
-    <div>
+    <div style={{ position: "relative", minHeight: "100dvh" }}>
       <div style={{ borderBottom: "1px solid var(--line)", padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
         <button onClick={() => { if (pulseDetail) { setPulseDetail(null); return; } if (tab === "pulse" && !activeClient) { onExit(); return; } setActiveClient(null); setTab("pulse"); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> {pulseDetail ? "Pulse" : (tab === "pulse" && !activeClient ? "Home" : "Pulse")}</button>
         <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, letterSpacing: 1.5, fontWeight: 500 }}>{business.name}</div>
@@ -4377,8 +4380,8 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         {tab === "settings" && <SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} showToast={showToast} />}
       </div>
 
-      {/* fixed bottom tab bar — original pattern, anchors to viewport bottom */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "color-mix(in srgb, var(--bg) 82%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderTop: "1px solid var(--line)", boxShadow: "0 -8px 30px -12px var(--shadow)", display: "flex", justifyContent: "space-around", alignItems: "stretch", padding: "10px 4px calc(10px + env(safe-area-inset-bottom))", zIndex: 20 }}>
+      {/* fixed bottom tab bar — anchors to viewport bottom. transform:translateZ(0) puts it on its own GPU layer so iOS Safari doesn't let it drift during scroll/overscroll. */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "color-mix(in srgb, var(--bg) 82%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderTop: "1px solid var(--line)", boxShadow: "0 -8px 30px -12px var(--shadow)", display: "flex", justifyContent: "space-around", alignItems: "stretch", padding: "10px 4px calc(10px + env(safe-area-inset-bottom))", zIndex: 20, transform: "translateZ(0)", WebkitTransform: "translateZ(0)", willChange: "transform" }}>
         {[["pulse", "Pulse", TrendingUp], ["calendar", "Calendar", Calendar], ["clients", "Clients", User], ["messages", "Messages", MessageSquare], ["settings", "Settings", Settings]].map(([id, label, Icon]) => (
           <button key={id} onClick={() => { setTab(id); setActiveClient(null); setPulseDetail(null); }} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
             <div style={{ position: "relative" }}>
