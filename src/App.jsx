@@ -3063,8 +3063,12 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
   const fmtTime = (m) => { const h = Math.floor(m / 60); const mm = m % 60; const ampm = h >= 12 ? "PM" : "AM"; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12}:${mm.toString().padStart(2, "0")} ${ampm}`; };
 
   // --- Goals — only meaningful in per-person view, never shop-wide (different scales) ---
-  const dailyGoal = !isShopView && viewedProvider ? (viewedProvider.dailyGoal || 0) : 0;
-  const weeklyGoal = !isShopView && viewedProvider ? (viewedProvider.weeklyGoal || 0) : 0;
+  // Use a sensible default so the ring ALWAYS shows in personal view, even before a goal is set.
+  const rawDailyGoal = !isShopView && viewedProvider ? (viewedProvider.dailyGoal || 0) : 0;
+  const rawWeeklyGoal = !isShopView && viewedProvider ? (viewedProvider.weeklyGoal || 0) : 0;
+  const dailyGoal = rawDailyGoal > 0 ? rawDailyGoal : (isShopView ? 0 : 300);   // default $300/day target
+  const weeklyGoal = rawWeeklyGoal > 0 ? rawWeeklyGoal : (isShopView ? 0 : 1500); // default $1,500/week target
+  const goalIsDefault = rawDailyGoal === 0; // tells the UI to show a subtle "set your own" hint
   const dailyPct = dailyGoal > 0 ? Math.min(100, Math.round((todayMoney / dailyGoal) * 100)) : 0;
   const weeklyPct = weeklyGoal > 0 ? Math.min(100, Math.round((thisWeekMoney / weeklyGoal) * 100)) : 0;
 
@@ -3222,15 +3226,16 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
             </div>
           )}
         </div>
-        {/* Goal ring — only in per-person view with a daily goal set */}
-        {!isShopView && dailyGoal > 0 && (
+        {/* Goal ring — always shows in personal view (default target if none set) */}
+        {!isShopView && (
           <div style={{ textAlign: "center", flexShrink: 0 }}>
-            <svg width="92" height="92" viewBox="0 0 92 92">
-              <circle cx="46" cy="46" r="34" fill="none" stroke="var(--panel2)" strokeWidth="7" />
-              <circle cx="46" cy="46" r="34" fill="none" stroke="var(--gold)" strokeWidth="7" strokeLinecap="round" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} transform="rotate(-90 46 46)" style={{ transition: "stroke-dashoffset .4s ease" }} />
-              <text x="46" y="51" textAnchor="middle" fill="var(--text)" fontSize="21" fontFamily={FONT_DISPLAY} fontWeight="500">{dailyPct}%</text>
+            <svg width="96" height="96" viewBox="0 0 96 96">
+              <circle cx="48" cy="48" r="34" fill="none" stroke="var(--panel2)" strokeWidth="8" />
+              <circle cx="48" cy="48" r="34" fill="none" stroke="var(--gold)" strokeWidth="8" strokeLinecap="round" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} transform="rotate(-90 48 48)" style={{ transition: "stroke-dashoffset .4s ease" }} />
+              <text x="48" y="53" textAnchor="middle" fill="var(--text)" fontSize="22" fontFamily={FONT_DISPLAY} fontWeight="500">{dailyPct}%</text>
             </svg>
-            <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 1 }}>{fmtMoney(todayMoney)} / {fmtMoney(dailyGoal)}</div>
+            <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 2 }}>{fmtMoney(todayMoney)} / {fmtMoney(dailyGoal)}</div>
+            <div style={{ fontSize: 10, letterSpacing: 1.5, color: "var(--faint)", marginTop: 1, fontWeight: 600 }}>{goalIsDefault ? "DAILY (DEFAULT)" : "DAILY GOAL"}</div>
           </div>
         )}
       </div>
@@ -3327,7 +3332,7 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
         {!isShopView && weeklyGoal > 0 && (
           <div style={{ marginTop: 6 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-              <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>WEEKLY GOAL</div>
+              <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>{goalIsDefault ? "WEEKLY (DEFAULT)" : "WEEKLY GOAL"}</div>
               <div style={{ fontSize: 12.5, color: weeklyPct >= 100 ? "var(--gold)" : "var(--sub)", fontWeight: weeklyPct >= 100 ? 600 : 400 }}>
                 {weeklyPct >= 100 ? `🎯 ${fmtMoney(thisWeekMoney)} of ${fmtMoney(weeklyGoal)}` : `${fmtMoney(thisWeekMoney)} of ${fmtMoney(weeklyGoal)} · ${weeklyPct}%`}
               </div>
@@ -3337,10 +3342,10 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
             </div>
           </div>
         )}
-        {/* Gentle empty-state for goals — only shown in per-person view when neither goal is set */}
-        {!isShopView && dailyGoal === 0 && weeklyGoal === 0 && (
-          <div style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", marginTop: 10 }}>
-            Set a daily or weekly goal in Settings → Staff to track progress.
+        {/* When using the default goal, a subtle nudge to set a personal one */}
+        {!isShopView && goalIsDefault && (
+          <div style={{ fontSize: 12.5, color: "var(--faint)", fontStyle: "italic", marginTop: 12, lineHeight: 1.45 }}>
+            Using a default target. Set your own in Settings → Staff → your name → Compensation.
           </div>
         )}
       </div>
