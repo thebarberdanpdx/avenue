@@ -6966,32 +6966,37 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const CATEGORY_ORDER = ["Business Setup", "Services & Menu", "Calendar & Appointments", "Payments & Checkout", "Online Booking", "Automated Messages", "Reporting"];
 
   // ---- New editorial settings landing ----
-  // Three intent-driven sections, each a collapsible group. Each row shows
-  // its current "status" inline so you don't drill in just to check what's set.
+  // Five focused, intent-driven sections. Each shows its current status inline so
+  // you don't drill in just to check what's set. Order = how often a typical shop
+  // owner touches each one.
   const SECTIONS = [
     {
       id: "setup",
       title: "Setup",
       desc: "Set these once and forget. Your shop's identity, your team, your menu.",
       defaultOpen: true,
-      // Order within a section = importance for a typical solo/small barber shop
       settings: ["business", "hours", "staff", "servicesmenu", "appearance", "phones", "locations"],
     },
     {
-      id: "operations",
-      title: "Day to day",
-      desc: "How the calendar behaves, how clients book, how you get paid.",
-      defaultOpen: true,
-      settings: [
-        // Online booking rules first — most visible to clients
-        "booking", "policy", "staffselection", "newclient", "family",
-        // Then calendar behaviors that shape your day
-        "scheduling", "avoidgaps", "autotiming", "waitlist", "waitingroom", "runninglate", "overduebuffer",
-        // Payments and messaging — recurring touchpoints
-        "tipping", "checkout", "rebookco", "messages",
-        // Display preference (lives here because it affects every day)
-        "photos",
-      ],
+      id: "booking",
+      title: "Online booking",
+      desc: "What clients see and how they book — rules, who can book, the new-client flow.",
+      defaultOpen: false,
+      settings: ["booking", "policy", "staffselection", "newclient", "family"],
+    },
+    {
+      id: "calendar",
+      title: "Your calendar",
+      desc: "How the day behaves — buffers, gap-filling, smart timing, waitlist, alerts.",
+      defaultOpen: false,
+      settings: ["scheduling", "avoidgaps", "autotiming", "waitlist", "waitingroom", "runninglate", "overduebuffer", "photos"],
+    },
+    {
+      id: "money",
+      title: "Payments & messages",
+      desc: "Tipping, checkout, rebooking prompts, and the messages clients receive.",
+      defaultOpen: false,
+      settings: ["tipping", "checkout", "rebookco", "messages"],
     },
     {
       id: "smart",
