@@ -1140,7 +1140,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
   // waitlist join form
   const [wlName, setWlName] = useState("");
-  const [wlDay, setWlDay] = useState("");          // preferred day label
+  const [wlDays, setWlDays] = useState([]);        // preferred days (multi-select)
   const [wlWhen, setWlWhen] = useState("");         // early | midday | afternoon
   const [wlPhotos, setWlPhotos] = useState(0);
   const [wlAnyProvider, setWlAnyProvider] = useState(false); // false = only their provider (the respectful default)
@@ -2683,7 +2683,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                 </div>
 
                 {!showWaitlist ? (
-                  <button className="lift" onClick={() => { setShowWaitlist(true); setWlName(matched ? matched.name : ""); setWlDay(relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate) : `${relativeDate(selectedDate)}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`); setWlService(cart.map(describeEntry).join(", ")); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Join the waitlist →</button>
+                  <button className="lift" onClick={() => { setShowWaitlist(true); setWlName(matched ? matched.name : ""); setWlDays([relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate) : `${relativeDate(selectedDate)}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`]); setWlService(cart.map(describeEntry).join(", ")); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Join the waitlist →</button>
                 ) : (
                   <div style={{ background: "var(--panel)", borderRadius: 8, padding: 20, textAlign: "left" }}>
                     <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, marginBottom: 16 }}>Join the waitlist</div>
@@ -2694,10 +2694,10 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Phone</label>
                     <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 16 }} />
 
-                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Preferred day</label>
+                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Preferred days <span style={{ color: "var(--sub)", fontWeight: 400 }}>(tap any that work)</span></label>
                     <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 16 }}>
-                      {dateOptions.slice(0, 10).map((d, i) => { const lbl = relativeDate(d).includes(",") ? relativeDate(d) : `${relativeDate(d)}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; const on = wlDay === lbl; return (
-                        <button key={i} onClick={() => setWlDay(lbl)} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+                      {dateOptions.slice(0, 10).map((d, i) => { const lbl = relativeDate(d).includes(",") ? relativeDate(d) : `${relativeDate(d)}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; const on = wlDays.includes(lbl); return (
+                        <button key={i} onClick={() => setWlDays((prev) => prev.includes(lbl) ? prev.filter((x) => x !== lbl) : [...prev, lbl])} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
                           <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
                           <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18 }}>{d.getDate()}</div>
                         </button>
@@ -2750,12 +2750,12 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                     <button onClick={() => setWlPhotos(Math.min(3, wlPhotos + 1))} disabled={wlPhotos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: wlPhotos >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 13, letterSpacing: 1, borderRadius: 6, marginBottom: 20 }}>{wlPhotos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${wlPhotos}/3)`}</button>
                     </>)}
 
-                    <button className="lift" disabled={!wlName || phone.replace(/\D/g, "").length < 10 || !wlWhen} onClick={() => {
-                      const ready = wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen;
+                    <button className="lift" disabled={!wlName || phone.replace(/\D/g, "").length < 10 || !wlWhen || wlDays.length === 0} onClick={() => {
+                      const ready = wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0;
                       if (!ready) return;
-                      setWaitlist([...waitlist, { name: wlName, phone, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, day: wlDay, when: wlWhen, service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() }]);
+                      setWaitlist([...waitlist, { name: wlName, phone, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", when: wlWhen, service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() }]);
                       setWaitlistDone(true); setShowWaitlist(false);
-                    }} style={{ width: "100%", background: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen) ? "var(--gold)" : "var(--border)", color: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen) ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
+                    }} style={{ width: "100%", background: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--gold)" : "var(--border)", color: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
                   </div>
                 )}
               </div>
@@ -7674,7 +7674,7 @@ function WaitlistView({ waitlist, setWaitlist, onText, showToast }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><Clock size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Preferred time:</span> <span style={{ fontWeight: 600 }}>{whenLabel[open.when] || open.when || "Any time"}</span></div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><Sparkles size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Service:</span> <span style={{ fontWeight: 600 }}>{open.service}</span></div>
                 {open.provider && <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><User size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Prefers:</span> <span style={{ fontWeight: 600 }}>{open.provider}</span></div>}
-                {open.day && <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><Calendar size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Day:</span> <span style={{ fontWeight: 600 }}>{open.day}</span></div>}
+                {(() => { const allDays = (open.days && open.days.length > 0) ? open.days : (open.day ? [open.day] : []); return allDays.length > 0 && <div style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 15 }}><Calendar size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} /><span style={{ color: "var(--sub)" }}>{allDays.length > 1 ? "Days:" : "Day:"}</span> <span style={{ fontWeight: 600 }}>{allDays.join(" · ")}</span></div>; })()}
                 {open.at && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 2 }}>Added {open.at}</div>}
               </div>
 
