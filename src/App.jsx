@@ -3084,6 +3084,26 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
   const timelineSpan = Math.max(60, timelineEnd - timelineStart);
   const pctFor = (mins) => Math.max(0, Math.min(100, ((mins - timelineStart) / timelineSpan) * 100));
 
+  // --- Cockpit stat tiles: today's completed cuts, chair occupancy %, average ticket ---
+  const todayDone = todayApptsAll.filter((a) => a.status === "done");
+  const cutsToday = todayDone.length;
+  const avgTicket = cutsToday > 0 ? Math.round(todayMoney / cutsToday) : 0;
+  // Occupancy = booked minutes today / bookable minutes today (for the viewed scope)
+  const bookableTodayMin = (() => {
+    if (isShopView) {
+      let total = 0;
+      realProviders.forEach((p) => { const h = p.hours?.[now.getDay()]; if (h?.on) total += (h.end - h.start); });
+      return total;
+    }
+    const h = viewedProvider?.hours?.[now.getDay()];
+    return h?.on ? (h.end - h.start) : 0;
+  })();
+  const bookedTodayMin = todayApptsAll.reduce((sum, a) => sum + (a.end - a.start), 0);
+  const occupancyToday = bookableTodayMin > 0 ? Math.round((bookedTodayMin / bookableTodayMin) * 100) : 0;
+  // Goal ring geometry (daily goal) — circumference for r=34
+  const ringCirc = 2 * Math.PI * 34;
+  const ringOffset = ringCirc * (1 - (dailyPct / 100));
+
   // --- Greeting based on time of day ---
   const greeting = (() => {
     const h = now.getHours();
@@ -3185,37 +3205,51 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
         <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 36, fontWeight: 500, letterSpacing: -0.5, lineHeight: 0.98 }}>{headerName}</h2>
       </div>
 
-      {/* TODAY — your money */}
-      <div style={{ marginBottom: 30 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>{isShopView ? "TODAY · SHOP" : "TODAY · YOU"}</div>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 60, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.5, marginBottom: 8 }}>
-          {fmtMoney(todayMoney)}
-        </div>
-        {todayVsYesterday ? (
-          <div style={{ fontSize: 13.5, color: todayVsYesterday.up ? "var(--gold)" : "var(--sub)", lineHeight: 1.5 }}>
-            {todayVsYesterday.up ? "+" : "−"}{fmtMoney(todayVsYesterday.abs)} vs {fmtMoney(yesterdayMoney)} yesterday
+      {/* TODAY — money + goal ring side by side (the cockpit hero) */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 24 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 5, fontWeight: 600 }}>{isShopView ? "TODAY · SHOP" : "TODAY · YOU"}</div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 52, fontWeight: 500, color: "var(--text)", lineHeight: 0.95, letterSpacing: -1.3, marginBottom: 6 }}>
+            {fmtMoney(todayMoney)}
           </div>
-        ) : (
-          <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>
-            {todayApptsAll.length === 0 ? "Nothing booked today yet." : `${todayApptsAll.length} ${todayApptsAll.length === 1 ? "visit" : "visits"} on the books`}
+          {todayVsYesterday ? (
+            <div style={{ fontSize: 13, color: todayVsYesterday.up ? "var(--gold)" : "var(--sub)", lineHeight: 1.4 }}>
+              {todayVsYesterday.up ? "+" : "−"}{fmtMoney(todayVsYesterday.abs)} vs {fmtMoney(yesterdayMoney)} yesterday
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4 }}>
+              {todayApptsAll.length === 0 ? "Nothing booked today yet." : `${todayApptsAll.length} ${todayApptsAll.length === 1 ? "visit" : "visits"} booked`}
+            </div>
+          )}
+        </div>
+        {/* Goal ring — only in per-person view with a daily goal set */}
+        {!isShopView && dailyGoal > 0 && (
+          <div style={{ textAlign: "center", flexShrink: 0 }}>
+            <svg width="92" height="92" viewBox="0 0 92 92">
+              <circle cx="46" cy="46" r="34" fill="none" stroke="var(--panel2)" strokeWidth="7" />
+              <circle cx="46" cy="46" r="34" fill="none" stroke="var(--gold)" strokeWidth="7" strokeLinecap="round" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} transform="rotate(-90 46 46)" style={{ transition: "stroke-dashoffset .4s ease" }} />
+              <text x="46" y="51" textAnchor="middle" fill="var(--text)" fontSize="21" fontFamily={FONT_DISPLAY} fontWeight="500">{dailyPct}%</text>
+            </svg>
+            <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 1 }}>{fmtMoney(todayMoney)} / {fmtMoney(dailyGoal)}</div>
           </div>
         )}
       </div>
 
-      {/* DAILY GOAL — per-person only */}
-      {!isShopView && dailyGoal > 0 && (
-        <div style={{ marginBottom: 30 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600 }}>DAILY GOAL</div>
-            <div style={{ fontSize: 13, color: dailyPct >= 100 ? "var(--gold)" : "var(--sub)", fontWeight: dailyPct >= 100 ? 600 : 400 }}>
-              {dailyPct >= 100 ? `🎯 ${fmtMoney(todayMoney)} of ${fmtMoney(dailyGoal)}` : `${fmtMoney(todayMoney)} of ${fmtMoney(dailyGoal)} · ${dailyPct}%`}
-            </div>
-          </div>
-          <div style={{ height: 8, background: "var(--panel2)", borderRadius: 4, overflow: "hidden" }}>
-            <div style={{ width: `${dailyPct}%`, height: "100%", background: dailyPct >= 100 ? "var(--gold)" : "color-mix(in srgb, var(--gold) 70%, var(--panel2))", transition: "width .3s ease" }} />
-          </div>
+      {/* STAT TILES — cuts, chair occupancy, avg ticket */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 9, marginBottom: 26 }}>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 10px", textAlign: "center" }}>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{cutsToday}</div>
+          <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--sub)", marginTop: 4, fontWeight: 600 }}>CUTS</div>
         </div>
-      )}
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 10px", textAlign: "center" }}>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{occupancyToday}%</div>
+          <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--sub)", marginTop: 4, fontWeight: 600 }}>CHAIR FULL</div>
+        </div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 10px", textAlign: "center" }}>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{fmtMoney(avgTicket)}</div>
+          <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--sub)", marginTop: 4, fontWeight: 600 }}>AVG TICKET</div>
+        </div>
+      </div>
 
       {/* RIGHT NOW — what's happening on the chair */}
       <div style={{ marginBottom: 30, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, padding: "18px 20px" }}>
