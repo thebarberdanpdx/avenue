@@ -404,6 +404,9 @@ const TODAY_APPTS = [
 ];
 
 const FONT_DISPLAY = "var(--font-disp, 'Fraunces', Georgia, serif)";
+// Pulse cockpit numbers always use this elegant serif (matches the approved mockup),
+// independent of the active theme's display font (some themes use condensed sans).
+const FONT_NUMERAL = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";
 const FONT_BODY = "var(--font-body, 'Inter', -apple-system, sans-serif)";
 
 // ============================================================
@@ -2981,7 +2984,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 // Owners get a "viewing as" picker to flip between barbers or shop totals.
 // Barbers only see their own chair, period.
 // ============================================================
-function PulseView({ business, appts, clients, services, providers, me, isOwner, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onSignOut }) {
+function PulseView({ business, appts, clients, services, providers, setProviders, me, isOwner, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onSignOut }) {
   const now = new Date();
   const realProviders = providers.filter((p) => p.id !== "anyone");
 
@@ -3149,6 +3152,23 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
 
   // --- Picker state for the owner's "viewing as" dropdown ---
   const [pickerOpen, setPickerOpen] = useState(false);
+  // --- Inline goal editor: tap the ring (daily) or the week number (weekly) to set goals in place ---
+  const [goalEditor, setGoalEditor] = useState(null); // null | "daily" | "weekly"
+  const [goalInput, setGoalInput] = useState("");
+  const openGoalEditor = (which) => {
+    if (isShopView || !viewedProvider) return; // goals are personal; not editable in shop view
+    setGoalInput(String(which === "daily" ? (rawDailyGoal || "") : (rawWeeklyGoal || "")));
+    setGoalEditor(which);
+  };
+  const saveGoal = () => {
+    const val = Math.max(0, parseInt(goalInput || "0", 10) || 0);
+    const field = goalEditor === "daily" ? "dailyGoal" : "weeklyGoal";
+    setProviders(providers.map((p) => p.id === viewedProvider.id ? { ...p, [field]: val } : p));
+    setGoalEditor(null);
+  };
+  // Suggested goal amounts — helpful starting points based on typical barber days
+  const dailySuggestions = [200, 300, 400, 500];
+  const weeklySuggestions = [1000, 1500, 2000, 2500];
 
   return (
     <div className="fade-up">
@@ -3170,27 +3190,32 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
               </button>
               {pickerOpen && (
                 <>
-                  <div onClick={() => setPickerOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 900 }} />
-                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 210, background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,0.45)", zIndex: 901, padding: 6, overflow: "hidden" }}>
-                    <button onClick={() => { setPulseView("me"); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: pulseView === "me" ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "none", color: "var(--text)", border: "none", borderRadius: 10, fontSize: 14, textAlign: "left" }}>
+                  <div onClick={() => setPickerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.18)", zIndex: 900 }} />
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 220, background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,0.5)", zIndex: 901, padding: 6, overflow: "hidden", backgroundClip: "padding-box" }}>
+                    {/* solid fill behind the menu so it can never read as transparent on any theme/device */}
+                    <div style={{ position: "absolute", inset: 0, background: "var(--panel)", borderRadius: 14, zIndex: -1 }} />
+                    <button onClick={() => { setPulseView("me"); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: pulseView === "me" ? "var(--panel2)" : "transparent", color: "var(--text)", border: "none", borderRadius: 10, fontSize: 14, textAlign: "left", cursor: "pointer" }}>
                       <Avatar size={26} initial={me?.name?.charAt(0)} color={me?.color} photo={me?.photo} />
                       <span style={{ flex: 1 }}>{me?.name} (you)</span>
+                      {pulseView === "me" && <Check size={15} style={{ color: "var(--gold)" }} />}
                     </button>
                     {realProviders.filter((p) => p.id !== me?.id).map((p) => (
-                      <button key={p.id} onClick={() => { setPulseView(p.id); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: pulseView === p.id ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "none", color: "var(--text)", border: "none", borderRadius: 10, fontSize: 14, textAlign: "left" }}>
+                      <button key={p.id} onClick={() => { setPulseView(p.id); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: pulseView === p.id ? "var(--panel2)" : "transparent", color: "var(--text)", border: "none", borderRadius: 10, fontSize: 14, textAlign: "left", cursor: "pointer" }}>
                         <Avatar size={26} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
                         <span style={{ flex: 1 }}>{p.name}</span>
+                        {pulseView === p.id && <Check size={15} style={{ color: "var(--gold)" }} />}
                       </button>
                     ))}
                     <div style={{ height: 1, background: "var(--line)", margin: "4px 6px" }} />
-                    <button onClick={() => { setPulseView("shop"); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: pulseView === "shop" ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "none", color: "var(--text)", border: "none", borderRadius: 10, fontSize: 14, textAlign: "left" }}>
+                    <button onClick={() => { setPulseView("shop"); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: pulseView === "shop" ? "var(--panel2)" : "transparent", color: "var(--text)", border: "none", borderRadius: 10, fontSize: 14, textAlign: "left", cursor: "pointer" }}>
                       <div style={{ width: 26, height: 26, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 20%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={13} style={{ color: "var(--gold)" }} /></div>
                       <span style={{ flex: 1 }}>All shop (combined)</span>
+                      {pulseView === "shop" && <Check size={15} style={{ color: "var(--gold)" }} />}
                     </button>
                     {onSignOut && (
                       <>
                         <div style={{ height: 1, background: "var(--line)", margin: "4px 6px" }} />
-                        <button onClick={() => { setPickerOpen(false); onSignOut(); }} style={{ width: "100%", padding: "10px 12px", background: "none", color: "var(--sub)", border: "none", borderRadius: 10, fontSize: 13, textAlign: "left" }}>Sign in as someone else…</button>
+                        <button onClick={() => { setPickerOpen(false); onSignOut(); }} style={{ width: "100%", padding: "10px 12px", background: "transparent", color: "var(--sub)", border: "none", borderRadius: 10, fontSize: 13, textAlign: "left", cursor: "pointer" }}>Sign in as someone else…</button>
                       </>
                     )}
                   </div>
@@ -3206,14 +3231,14 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
           )}
         </div>
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{todayLabel.toUpperCase()}</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 36, fontWeight: 500, letterSpacing: -0.5, lineHeight: 0.98 }}>{headerName}</h2>
+        <h2 style={{ fontFamily: FONT_NUMERAL, fontSize: 40, fontWeight: 600, letterSpacing: -0.5, lineHeight: 0.98 }}>{headerName}</h2>
       </div>
 
       {/* TODAY — money + goal ring side by side (the cockpit hero) */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 24 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 5, fontWeight: 600 }}>{isShopView ? "TODAY · SHOP" : "TODAY · YOU"}</div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 52, fontWeight: 500, color: "var(--text)", lineHeight: 0.95, letterSpacing: -1.3, marginBottom: 6 }}>
+          <div style={{ fontFamily: FONT_NUMERAL, fontSize: 58, fontWeight: 600, color: "var(--text)", lineHeight: 0.92, letterSpacing: -1.5, marginBottom: 6 }}>
             {fmtMoney(todayMoney)}
           </div>
           {todayVsYesterday ? (
@@ -3226,62 +3251,62 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
             </div>
           )}
         </div>
-        {/* Goal ring — always shows in personal view (default target if none set) */}
+        {/* Goal ring — always shows in personal view (default target if none set). Tap to edit. */}
         {!isShopView && (
-          <div style={{ textAlign: "center", flexShrink: 0 }}>
+          <button onClick={() => openGoalEditor("daily")} style={{ textAlign: "center", flexShrink: 0, background: "none", border: "none", padding: 0, cursor: "pointer" }}>
             <svg width="96" height="96" viewBox="0 0 96 96">
               <circle cx="48" cy="48" r="34" fill="none" stroke="var(--panel2)" strokeWidth="8" />
               <circle cx="48" cy="48" r="34" fill="none" stroke="var(--gold)" strokeWidth="8" strokeLinecap="round" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} transform="rotate(-90 48 48)" style={{ transition: "stroke-dashoffset .4s ease" }} />
-              <text x="48" y="53" textAnchor="middle" fill="var(--text)" fontSize="22" fontFamily={FONT_DISPLAY} fontWeight="500">{dailyPct}%</text>
+              <text x="48" y="53" textAnchor="middle" fill="var(--text)" fontSize="23" fontFamily={FONT_NUMERAL} fontWeight="600">{dailyPct}%</text>
             </svg>
             <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 2 }}>{fmtMoney(todayMoney)} / {fmtMoney(dailyGoal)}</div>
-            <div style={{ fontSize: 10, letterSpacing: 1.5, color: "var(--faint)", marginTop: 1, fontWeight: 600 }}>{goalIsDefault ? "DAILY (DEFAULT)" : "DAILY GOAL"}</div>
-          </div>
+            <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--gold)", marginTop: 2, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> {goalIsDefault ? "SET GOAL" : "EDIT GOAL"}</div>
+          </button>
         )}
       </div>
 
       {/* STAT TILES — cuts, chair occupancy, avg ticket */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 9, marginBottom: 26 }}>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 10px", textAlign: "center" }}>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{cutsToday}</div>
-          <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--sub)", marginTop: 4, fontWeight: 600 }}>CUTS</div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 10px", textAlign: "center" }}>
+          <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, color: "var(--text)", lineHeight: 1 }}>{cutsToday}</div>
+          <div style={{ fontSize: 10, letterSpacing: 1.3, color: "var(--sub)", marginTop: 5, fontWeight: 600 }}>CUTS</div>
         </div>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 10px", textAlign: "center" }}>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{occupancyToday}%</div>
-          <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--sub)", marginTop: 4, fontWeight: 600 }}>CHAIR FULL</div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 10px", textAlign: "center" }}>
+          <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, color: "var(--text)", lineHeight: 1 }}>{occupancyToday}%</div>
+          <div style={{ fontSize: 10, letterSpacing: 1.3, color: "var(--sub)", marginTop: 5, fontWeight: 600 }}>CHAIR FULL</div>
         </div>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 10px", textAlign: "center" }}>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{fmtMoney(avgTicket)}</div>
-          <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--sub)", marginTop: 4, fontWeight: 600 }}>AVG TICKET</div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 10px", textAlign: "center" }}>
+          <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, color: "var(--text)", lineHeight: 1 }}>{fmtMoney(avgTicket)}</div>
+          <div style={{ fontSize: 10, letterSpacing: 1.3, color: "var(--sub)", marginTop: 5, fontWeight: 600 }}>AVG TICKET</div>
         </div>
       </div>
 
       {/* RIGHT NOW — what's happening on the chair */}
-      <div style={{ marginBottom: 30, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, padding: "18px 20px" }}>
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 10, fontWeight: 600 }}>RIGHT NOW</div>
+      <div style={{ marginBottom: 26, background: "color-mix(in srgb, var(--gold) 13%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 16, padding: "17px 19px" }}>
+        <div style={{ fontSize: 10.5, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 9, fontWeight: 600 }}>RIGHT NOW</div>
         {inChair ? (
           <>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 4, lineHeight: 1.2 }}>{inChair.name}</div>
-            <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
+            <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, marginBottom: 3, lineHeight: 1.1 }}>{inChair.name}</div>
+            <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>
               {inChair.title} · <span style={{ color: "var(--gold)", fontWeight: 600 }}>{minutesLeft} min left</span> · started {minutesInChair} min ago
             </div>
           </>
         ) : nextAppt ? (
           <>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 4, lineHeight: 1.2 }}>Up next: {nextAppt.name}</div>
-            <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
+            <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, marginBottom: 3, lineHeight: 1.1 }}>Up next: {nextAppt.name}</div>
+            <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>
               {nextAppt.title} at {fmtTime(nextAppt.start)} · <span style={{ color: "var(--gold)", fontWeight: 600 }}>in {minutesUntil} min</span>
             </div>
           </>
         ) : todayApptsAll.length > 0 ? (
           <>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 4, lineHeight: 1.2 }}>Day's done</div>
-            <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>No more bookings today. {fmtMoney(todayMoney)} in.</div>
+            <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, marginBottom: 3, lineHeight: 1.1 }}>Day's done</div>
+            <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>No more bookings today. {fmtMoney(todayMoney)} in.</div>
           </>
         ) : (
           <>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 4, lineHeight: 1.2 }}>Open chair</div>
-            <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>No appointments booked today.</div>
+            <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, marginBottom: 3, lineHeight: 1.1 }}>Open chair</div>
+            <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>No appointments booked today.</div>
           </>
         )}
       </div>
@@ -3320,14 +3345,20 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
       {/* THIS WEEK */}
       <div style={{ marginBottom: 30 }}>
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>THIS WEEK</div>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 36, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -0.8, marginBottom: 6 }}>
-          {fmtMoney(thisWeekMoney)}
-        </div>
+        <button onClick={() => openGoalEditor("weekly")} disabled={isShopView} style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: isShopView ? "default" : "pointer", display: "block" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+            <div style={{ fontFamily: FONT_NUMERAL, fontSize: 38, fontWeight: 600, color: "var(--text)", lineHeight: 1, letterSpacing: -0.8 }}>
+              {fmtMoney(thisWeekMoney)}
+            </div>
+            {!isShopView && <span style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--gold)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}><Edit2 size={9} /> GOAL</span>}
+          </div>
+        </button>
         {weekDelta && (
-          <div style={{ fontSize: 13.5, color: weekDelta.up ? "var(--gold)" : "var(--sub)", marginBottom: 14, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13.5, color: weekDelta.up ? "var(--gold)" : "var(--sub)", marginBottom: 14, marginTop: 6, lineHeight: 1.5 }}>
             {weekDelta.up ? "+" : "−"}{weekDelta.pct}% vs {fmtMoney(weekDelta.prior)} last week
           </div>
         )}
+        {!weekDelta && <div style={{ marginBottom: 8 }} />}
         {/* WEEKLY GOAL — per-person only */}
         {!isShopView && weeklyGoal > 0 && (
           <div style={{ marginTop: 6 }}>
@@ -3429,6 +3460,43 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
           </div>
           <ChevronRight size={18} style={{ color: "var(--faint)" }} />
         </button>
+      )}
+
+      {/* INLINE GOAL EDITOR — opens when you tap the ring (daily) or the week number (weekly) */}
+      {goalEditor && viewedProvider && (
+        <div onClick={() => setGoalEditor(null)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, background: "var(--panel)", borderTopLeftRadius: 22, borderTopRightRadius: 22, border: "1px solid var(--border)", borderBottom: "none", padding: "24px 22px calc(28px + env(safe-area-inset-bottom))", boxShadow: "0 -18px 50px rgba(0,0,0,0.4)" }}>
+            <div style={{ width: 36, height: 4, background: "var(--border2)", borderRadius: 2, margin: "0 auto 20px" }} />
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{goalEditor === "daily" ? "DAILY GOAL" : "WEEKLY GOAL"}</div>
+            <h2 style={{ fontFamily: FONT_NUMERAL, fontSize: 28, fontWeight: 600, marginBottom: 6, lineHeight: 1.05 }}>Set {viewedProvider.name === me?.name ? "your" : `${viewedProvider.name}'s`} {goalEditor} target</h2>
+            <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>
+              {goalEditor === "daily"
+                ? "How much do you want to earn on a good day? Pulse fills the ring automatically as you complete cuts — no logging needed."
+                : "What's a strong week look like for you? The bar tracks toward this as the week builds. Most full-time barbers land 5–6× their daily goal."}
+            </p>
+
+            {/* Big input */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
+              <span style={{ fontFamily: FONT_NUMERAL, fontSize: 32, fontWeight: 600, color: "var(--faint)" }}>$</span>
+              <input autoFocus type="number" inputMode="numeric" min="0" step={goalEditor === "daily" ? 25 : 50} value={goalInput} onChange={(e) => setGoalInput(e.target.value)} placeholder="0" style={{ flex: 1, background: "none", border: "none", color: "var(--text)", fontFamily: FONT_NUMERAL, fontSize: 32, fontWeight: 600, outline: "none", width: "100%" }} />
+            </div>
+
+            {/* Quick-pick suggestions */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 22 }}>
+              {(goalEditor === "daily" ? dailySuggestions : weeklySuggestions).map((amt) => (
+                <button key={amt} onClick={() => setGoalInput(String(amt))} style={{ flex: 1, padding: "10px 6px", borderRadius: 10, border: `1px solid ${String(amt) === goalInput ? "var(--gold)" : "var(--border)"}`, background: String(amt) === goalInput ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: String(amt) === goalInput ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>${amt.toLocaleString()}</button>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setGoalEditor(null)} style={{ flex: 1, padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "transparent", color: "var(--sub)", fontSize: 15, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
+              <button onClick={saveGoal} style={{ flex: 2, padding: "14px", borderRadius: 12, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Save goal</button>
+            </div>
+            {((goalEditor === "daily" && rawDailyGoal > 0) || (goalEditor === "weekly" && rawWeeklyGoal > 0)) && (
+              <button onClick={() => { const field = goalEditor === "daily" ? "dailyGoal" : "weeklyGoal"; setProviders(providers.map((p) => p.id === viewedProvider.id ? { ...p, [field]: 0 } : p)); setGoalEditor(null); }} style={{ width: "100%", marginTop: 12, background: "none", border: "none", color: "var(--faint)", fontSize: 13, cursor: "pointer" }}>Clear goal (use default)</button>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -4776,7 +4844,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         <div style={{ width: 50 }} />
       </div>
       <div style={{ maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
-        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
