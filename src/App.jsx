@@ -1450,7 +1450,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
       <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          {step > 0 ? <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button> : <div style={{ width: 50 }} />}
+          {(step > 0 || simpleStep) ? <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button> : <div style={{ width: 50 }} />}
           <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
           <div style={{ width: 50 }} />
         </div>
