@@ -2974,7 +2974,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 // big headline number per section, mobile-first, comparisons built
 // in, action-oriented (overdue clients link to the nudge folder).
 // ============================================================
-function PulseView({ business, appts, clients, services, providers, onNavigate, onOpenRevenue, onOpenAppointments, onOpenClients }) {
+function PulseView({ business, appts, clients, services, providers, onNavigate, onOpenRevenue, onOpenAppointments, onOpenClients, onOpenServices }) {
   const now = new Date();
 
   // --- Time window helpers ---
@@ -3259,12 +3259,26 @@ function PulseView({ business, appts, clients, services, providers, onNavigate, 
 
       {/* Action CTA — clients drill-in */}
       {onOpenClients && (
-        <button onClick={onOpenClients} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: overdueCount > 0 ? 14 : 0 }}>
+        <button onClick={onOpenClients} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Users size={17} style={{ color: "var(--gold)" }} />
             <div style={{ textAlign: "left" }}>
               <div style={{ fontSize: 15, fontWeight: 500 }}>View clients</div>
               <div style={{ fontSize: 13, color: "var(--sub)" }}>New vs returning, retention, top clients</div>
+            </div>
+          </div>
+          <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+        </button>
+      )}
+
+      {/* Action CTA — service mix drill-in */}
+      {onOpenServices && (
+        <button onClick={onOpenServices} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: overdueCount > 0 ? 14 : 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Sparkles size={17} style={{ color: "var(--gold)" }} />
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 15, fontWeight: 500 }}>View service mix</div>
+              <div style={{ fontSize: 13, color: "var(--sub)" }}>What drives revenue · $ per hour</div>
             </div>
           </div>
           <ChevronRight size={18} style={{ color: "var(--faint)" }} />
@@ -4078,6 +4092,241 @@ function ClientsReportView({ appts, clients, services, providers, onBack, onOpen
 }
 
 // ============================================================
+// SERVICE MIX — fourth Pulse drill-in. The "what to push" report:
+// which services drive revenue, which are highest-margin by time
+// (rev-per-hour), which run most often, and what's idle.
+// ============================================================
+function ServiceMixView({ appts, services, providers, onBack }) {
+  const [period, setPeriod] = useState("month");
+  const [sortBy, setSortBy] = useState("revenue"); // "revenue" | "visits" | "perhour"
+  const now = new Date();
+
+  const sod = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const sow = (d) => {
+    const x = sod(d);
+    const day = x.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    x.setDate(x.getDate() + diff);
+    return x;
+  };
+  const som = (d) => { const x = sod(d); x.setDate(1); return x; };
+
+  const apptPrice = (a) => {
+    if (a.lineItems && a.lineItems.length) {
+      return a.lineItems.reduce((sum, li) => {
+        const s = services.find((x) => x.id === li.serviceId);
+        return sum + (s ? getPrice(s, a.providerId) : 0);
+      }, 0);
+    }
+    const s = services.find((x) => x.id === a.serviceId);
+    return s ? getPrice(s, a.providerId) : 0;
+  };
+
+  let periodStart, periodEnd;
+  if (period === "week") {
+    periodStart = sow(now);
+    periodEnd = new Date(periodStart); periodEnd.setDate(periodEnd.getDate() + 7);
+  } else if (period === "month") {
+    periodStart = som(now);
+    periodEnd = new Date(periodStart); periodEnd.setMonth(periodEnd.getMonth() + 1);
+  } else {
+    periodStart = new Date(now.getFullYear(), 0, 1);
+    periodEnd = new Date(now.getFullYear() + 1, 0, 1);
+  }
+
+  const inRange = (a, start, end) => {
+    if (!a.bookedFor) return false;
+    const t = new Date(a.bookedFor).getTime();
+    return t >= start.getTime() && t < end.getTime();
+  };
+  const isRevenue = (a) => a.status === "done";
+
+  // Aggregate per-service: visits, revenue, minutes
+  const agg = {};
+  appts.filter((a) => isRevenue(a) && inRange(a, periodStart, periodEnd)).forEach((a) => {
+    // Honor line items if present — splits the appt into its components.
+    const items = (a.lineItems && a.lineItems.length) ? a.lineItems.map((li) => ({ sid: li.serviceId, mins: (li.duration != null ? li.duration : 0) })) : [{ sid: a.serviceId, mins: (a.end - a.start) }];
+    items.forEach((it) => {
+      if (!it.sid) return;
+      const svc = services.find((s) => s.id === it.sid);
+      if (!svc) return;
+      const r = getPrice(svc, a.providerId) || 0;
+      const m = it.mins || svc.duration || 0;
+      agg[it.sid] = agg[it.sid] || { svc, visits: 0, revenue: 0, minutes: 0 };
+      agg[it.sid].visits += 1;
+      agg[it.sid].revenue += r;
+      agg[it.sid].minutes += m;
+    });
+  });
+
+  // Add idle services (real services with zero activity this period) so user can see what's NOT working too
+  services.filter((s) => !s.hidden).forEach((s) => {
+    if (!agg[s.id]) agg[s.id] = { svc: s, visits: 0, revenue: 0, minutes: 0 };
+  });
+
+  // Derive rev-per-hour for each
+  const rows = Object.values(agg).map((row) => ({
+    ...row,
+    perHour: row.minutes > 0 ? (row.revenue / row.minutes) * 60 : 0,
+  }));
+
+  // Totals (only the active rows, not idle)
+  const activeRows = rows.filter((r) => r.visits > 0);
+  const totalRevenue = activeRows.reduce((sum, r) => sum + r.revenue, 0);
+  const totalVisits = activeRows.reduce((sum, r) => sum + r.visits, 0);
+  const totalMinutes = activeRows.reduce((sum, r) => sum + r.minutes, 0);
+  const avgPerHour = totalMinutes > 0 ? (totalRevenue / totalMinutes) * 60 : 0;
+
+  // Sort according to current toggle
+  const sortedActive = activeRows.slice().sort((a, b) => {
+    if (sortBy === "visits") return b.visits - a.visits;
+    if (sortBy === "perhour") return b.perHour - a.perHour;
+    return b.revenue - a.revenue;
+  });
+  const idleRows = rows.filter((r) => r.visits === 0).sort((a, b) => a.svc.name.localeCompare(b.svc.name));
+
+  // Top service highlights (the "what to push" headline)
+  const topByRevenue = activeRows.slice().sort((a, b) => b.revenue - a.revenue)[0];
+  const topByPerHour = activeRows.slice().sort((a, b) => b.perHour - a.perHour)[0];
+
+  const fmtMoney = (n) => `$${Math.round(n).toLocaleString()}`;
+  const fmtMoneyDec = (n) => `$${n.toFixed(n < 10 ? 2 : 0)}`;
+  const maxBarValue = sortedActive.length ? (
+    sortBy === "visits" ? Math.max(...sortedActive.map((r) => r.visits)) :
+    sortBy === "perhour" ? Math.max(...sortedActive.map((r) => r.perHour)) :
+    Math.max(...sortedActive.map((r) => r.revenue))
+  ) : 1;
+  const valueFor = (r) => sortBy === "visits" ? r.visits : sortBy === "perhour" ? r.perHour : r.revenue;
+  const labelFor = (r) => sortBy === "visits" ? `${r.visits}×` : sortBy === "perhour" ? `${fmtMoneyDec(r.perHour)}/hr` : fmtMoney(r.revenue);
+
+  return (
+    <div className="fade-up">
+      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> Back to Pulse</button>
+
+      {/* Masthead */}
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>SERVICE MIX</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
+      </div>
+
+      {/* Period toggle */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
+        {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
+          const on = period === id;
+          return (
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+          );
+        })}
+      </div>
+
+      {/* Hero — total visits, total revenue, avg rev/hr */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
+          {totalVisits}
+        </div>
+        <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
+          {totalVisits === 0 ? "No completed services this period yet." : <>{totalVisits === 1 ? "service performed" : "services performed"} · <span style={{ fontWeight: 600 }}>{fmtMoney(totalRevenue)}</span> total{avgPerHour > 0 && <> · <span style={{ fontWeight: 600 }}>{fmtMoneyDec(avgPerHour)}/hr</span> avg</>}</>}
+        </div>
+      </div>
+
+      {/* WHAT'S WORKING — editorial callouts for the standout services */}
+      {(topByRevenue || topByPerHour) && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>WHAT'S WORKING</div>
+            <div style={{ display: "grid", gap: 14 }}>
+              {topByRevenue && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
+                  <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic", flexShrink: 0 }}>Top earner</div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topByRevenue.svc.name}</div>
+                    <div style={{ fontSize: 13, color: "var(--faint)", flexShrink: 0 }}>{fmtMoney(topByRevenue.revenue)}</div>
+                  </div>
+                </div>
+              )}
+              {topByPerHour && topByPerHour.svc.id !== (topByRevenue && topByRevenue.svc.id) && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
+                  <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic", flexShrink: 0 }}>Best per hour</div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topByPerHour.svc.name}</div>
+                    <div style={{ fontSize: 13, color: "var(--faint)", flexShrink: 0 }}>{fmtMoneyDec(topByPerHour.perHour)}/hr</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Sort toggle + ranked list */}
+      {sortedActive.length > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 18px" }} />
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 12, fontWeight: 600 }}>RANKED BY</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+              {[["revenue", "Revenue"], ["visits", "Visits"], ["perhour", "$ per hour"]].map(([id, label]) => {
+                const on = sortBy === id;
+                return (
+                  <button key={id} onClick={() => setSortBy(id)} style={{ flex: 1, padding: "9px 10px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 12.5, fontWeight: on ? 600 : 400, letterSpacing: 0.3, cursor: "pointer" }}>{label}</button>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{ display: "grid", gap: 14, marginBottom: 32 }}>
+            {sortedActive.map((row) => {
+              const pct = maxBarValue > 0 ? (valueFor(row) / maxBarValue) * 100 : 0;
+              return (
+                <div key={row.svc.id}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14, marginBottom: 6 }}>
+                    <div style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 500 }}>{row.svc.name}</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{labelFor(row)}</div>
+                  </div>
+                  <div style={{ height: 5, background: "var(--panel2)", borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ width: `${pct}%`, height: "100%", background: "var(--gold)" }} />
+                  </div>
+                  {/* Secondary line — shows the other two metrics for context */}
+                  <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 5 }}>
+                    {sortBy !== "revenue" && <>{fmtMoney(row.revenue)} · </>}
+                    {sortBy !== "visits" && <>{row.visits}×{row.perHour > 0 && sortBy !== "perhour" && " · "}</>}
+                    {sortBy !== "perhour" && row.perHour > 0 && <>{fmtMoneyDec(row.perHour)}/hr</>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* IDLE — services with zero activity this period (only shown if there are any) */}
+      {idleRows.length > 0 && sortedActive.length > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 600 }}>IDLE THIS PERIOD</div>
+            <div style={{ fontSize: 12.5, color: "var(--faint)", marginBottom: 14, lineHeight: 1.5 }}>Services on your menu that haven't been booked.</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+              {idleRows.map((row) => (
+                <span key={row.svc.id} style={{ fontSize: 13, color: "var(--sub)", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: "5px 11px" }}>{row.svc.name}</span>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Empty state */}
+      {sortedActive.length === 0 && (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "28px 22px", textAlign: "center", marginTop: 10 }}>
+          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto" }}>Once services are completed (marked done) this period, you'll see which ones drive revenue, visits, and the highest dollar-per-hour here.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // SHOP DASHBOARD — adds Menu editor + Settings
 // ============================================================
 function ShopDashboard({ business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, onExit }) {
@@ -4114,10 +4363,11 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         <div style={{ width: 50 }} />
       </div>
       <div style={{ maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
-        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
+        {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
