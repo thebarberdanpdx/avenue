@@ -1460,7 +1460,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
 
         <div key={screenKey} className="screen-swap">
         {/* STEP 0 — WELCOME / front door */}
-        {step === 0 && (
+        {step === 0 && !simpleStep && (
           <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center", padding: "10px 4px 0" }}>
             <div style={{ fontSize: 13, letterSpacing: 3, color: "var(--faint)", marginBottom: 14 }}>WELCOME TO</div>
             <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, lineHeight: 1.05, margin: "0 0 14px" }}>{business.name}</h1>
@@ -3553,9 +3553,9 @@ function PulseView({ business, appts, clients, services, providers, setProviders
         </button>
       )}
 
-      {/* INLINE GOAL EDITOR — centered modal near the top (opens from the ring or week number) */}
+      {/* INLINE GOAL EDITOR — centered modal (opens from the ring or week number) */}
       {goalEditor && viewedProvider && (
-        <div onClick={() => setGoalEditor(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "max(64px, env(safe-area-inset-top)) 18px 18px", zIndex: 2000, overflowY: "auto" }}>
+        <div onClick={() => setGoalEditor(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 2000, overflowY: "auto" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, background: "var(--panel)", borderRadius: 20, border: "1px solid var(--border2)", padding: "24px 22px 26px", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>{goalEditor === "daily" ? "DAILY GOAL" : "WEEKLY GOAL"}</div>
@@ -3587,7 +3587,7 @@ function PulseView({ business, appts, clients, services, providers, setProviders
 
       {/* VIEW PICKER — centered modal (owner only). Replaces the old fragile dropdown. */}
       {pickerOpen && (
-        <div onClick={() => setPickerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "max(64px, env(safe-area-inset-top)) 18px 18px", zIndex: 2000, overflowY: "auto" }}>
+        <div onClick={() => setPickerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 2000, overflowY: "auto" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", borderRadius: 20, border: "1px solid var(--border2)", padding: "20px 16px", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px", marginBottom: 14 }}>
               <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>VIEWING AS</div>
