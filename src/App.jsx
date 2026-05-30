@@ -3166,8 +3166,8 @@ function PulseView({ business, appts, clients, services, providers, me, isOwner,
               </button>
               {pickerOpen && (
                 <>
-                  <div onClick={() => setPickerOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 50 }} />
-                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 200, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, boxShadow: "0 18px 40px rgba(0,0,0,0.25)", zIndex: 51, padding: 6, overflow: "hidden" }}>
+                  <div onClick={() => setPickerOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 900 }} />
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 210, background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,0.45)", zIndex: 901, padding: 6, overflow: "hidden" }}>
                     <button onClick={() => { setPulseView("me"); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: pulseView === "me" ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "none", color: "var(--text)", border: "none", borderRadius: 10, fontSize: 14, textAlign: "left" }}>
                       <Avatar size={26} initial={me?.name?.charAt(0)} color={me?.color} photo={me?.photo} />
                       <span style={{ flex: 1 }}>{me?.name} (you)</span>
@@ -6418,7 +6418,42 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
       <div className="appt-screen" style={{ paddingBottom: 40 }}>
         <SecHeader title="Compensation" onBack={() => setSection(null)} />
 
-        {/* Service Commission */}
+        {/* Pulse access — Owner sees all barbers + shop totals; Barber sees only their own chair. */}
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: FONT_DISPLAY, marginBottom: 4 }}>Pulse access</div>
+          <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, marginBottom: 14 }}>Owners see every barber's numbers and shop totals. Barbers see only their own chair on Pulse.</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[["barber", "Barber"], ["owner", "Owner"]].map(([id, label]) => {
+              const on = (person.pulseRole || "barber") === id;
+              return (
+                <button key={id} onClick={() => patch(person.id, { pulseRole: id })} style={{ flex: 1, padding: "11px 12px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{label}</button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Earnings goals — drive the Pulse goal ring + weekly bar. Personal to this barber. */}
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: FONT_DISPLAY, marginBottom: 4 }}>Earnings goals</div>
+          <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, marginBottom: 16 }}>Personal targets shown on {person.name}'s Pulse as a progress ring and weekly bar. Set to 0 to hide. Auto-tracks from completed appointments — no manual logging.</div>
+          <div style={{ display: "grid", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <label style={{ fontSize: 15, color: "var(--text)" }}>Daily goal</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 15, color: "var(--faint)" }}>$</span>
+                <input type="number" min="0" step="25" value={person.dailyGoal || 0} onChange={(e) => patch(person.id, { dailyGoal: Math.max(0, parseInt(e.target.value || "0", 10)) })} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, width: 100, textAlign: "right" }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <label style={{ fontSize: 15, color: "var(--text)" }}>Weekly goal</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 15, color: "var(--faint)" }}>$</span>
+                <input type="number" min="0" step="50" value={person.weeklyGoal || 0} onChange={(e) => patch(person.id, { weeklyGoal: Math.max(0, parseInt(e.target.value || "0", 10)) })} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, width: 100, textAlign: "right" }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
         <Card title="Service Commission" desc="Compensation is calculated as a percentage of service sales" on={sc.on} onToggle={() => patchComp(person.id, "service", { on: !sc.on })}>
           <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
             <button onClick={() => patchComp(person.id, "service", { type: "basic" })} style={{ display: "flex", alignItems: "center", gap: 12, background: "none", textAlign: "left", color: "var(--text)" }}>
@@ -6558,135 +6593,6 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
 // ============================================================
 // STAFF EDITOR — per-person working hours and days off
 // ============================================================
-function StaffEditor({ providers, setProviders, showToast }) {
-  const [openId, setOpenId] = useState(null);
-  const staff = providers.filter((p) => p.id !== "anyone");
-  const setDay = (pid, dow, patch) => {
-    setProviders(providers.map((p) => p.id === pid ? { ...p, hours: { ...p.hours, [dow]: { ...p.hours[dow], ...patch } } } : p));
-  };
-  const addStaff = () => {
-    const colors = ["#C2703D", "#5E8C72", "#8064B5", "#3D9BE9", "#B14A5E"];
-    const id = "s" + Date.now();
-    setProviders([...providers, { id, name: "New Staff", role: "Stylist", color: colors[providers.length % colors.length], photo: STAFF_PORTRAITS[providers.length % STAFF_PORTRAITS.length], hours: { ...DEFAULT_HOURS } }]);
-    setOpenId(id);
-  };
-  const removeStaff = (pid) => { setProviders(providers.filter((p) => p.id !== pid)); setOpenId(null); showToast("Staff member removed."); };
-  const rename = (pid, name) => setProviders(providers.map((p) => p.id === pid ? { ...p, name } : p));
-  const setRole = (pid, role) => setProviders(providers.map((p) => p.id === pid ? { ...p, role } : p));
-  const TimeStep = ({ value, onChange }) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <button onClick={() => onChange(Math.max(0, value - 30))} style={{ width: 28, height: 28, borderRadius: 6, background: "var(--panel)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 16 }}>–</button>
-      <span style={{ fontSize: 14, minWidth: 64, textAlign: "center" }}>{fmtTime(value)}</span>
-      <button onClick={() => onChange(Math.min(1440, value + 30))} style={{ width: 28, height: 28, borderRadius: 6, background: "var(--panel)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 16 }}>+</button>
-    </div>
-  );
-  return (
-    <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300, marginBottom: 16 }}>Set who works and when. Each person's days and hours drive the calendar's open times and what clients can book online.</p>
-      <div style={{ display: "grid", gap: 10 }}>
-        {staff.map((p) => {
-          const expanded = openId === p.id;
-          return (
-            <div key={p.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
-              <button onClick={() => setOpenId(expanded ? null : p.id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "none", color: "var(--text)", textAlign: "left" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: p.color }} />
-                  <div>
-                    <div style={{ fontSize: 15.5, fontWeight: 500 }}>{p.name}</div>
-                    <div style={{ fontSize: 13, color: "var(--sub)" }}>{p.role} · {daysSummary(p.hours)}</div>
-                  </div>
-                </div>
-                <ChevronRight size={18} style={{ color: "var(--faint)", transform: expanded ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
-              </button>
-              {expanded && (
-                <div style={{ padding: "4px 16px 18px", borderTop: "1px solid var(--line)" }}>
-                  <label style={{ fontSize: 13, color: "var(--faint)", display: "block", margin: "14px 0 6px" }}>Name</label>
-                  <input value={p.name} onChange={(e) => rename(p.id, e.target.value)} style={{ ...inputStyle, marginBottom: 12 }} />
-                  <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Role / title</label>
-                  <input value={p.role} onChange={(e) => setRole(p.id, e.target.value)} style={{ ...inputStyle, marginBottom: 18 }} />
-
-                  {/* Pulse permissions — Owner sees everyone's numbers + shop totals; Barber sees only their own chair. */}
-                  <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 14px", marginBottom: 14 }}>
-                    <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 4 }}>Pulse access</div>
-                    <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginBottom: 12 }}>Owners see all barbers and shop totals. Barbers see only their own chair.</div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {[["barber", "Barber"], ["owner", "Owner"]].map(([id, label]) => {
-                        const on = (p.pulseRole || "barber") === id;
-                        return (
-                          <button key={id} onClick={() => setProviders(providers.map((x) => x.id === p.id ? { ...x, pulseRole: id } : x))} style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{label}</button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Earnings goals — drive the Pulse goal progress bars */}
-                  <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 14px", marginBottom: 18 }}>
-                    <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 4 }}>Earnings goals</div>
-                    <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginBottom: 14 }}>Personal targets that show as progress bars on Pulse. Set to 0 to hide. Only {p.name} sees these.</div>
-                    <div style={{ display: "grid", gap: 10 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                        <label style={{ fontSize: 13, color: "var(--sub)" }}>Daily</label>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 14, color: "var(--faint)" }}>$</span>
-                          <input type="number" min="0" step="25" value={p.dailyGoal || 0} onChange={(e) => setProviders(providers.map((x) => x.id === p.id ? { ...x, dailyGoal: Math.max(0, parseInt(e.target.value || "0", 10)) } : x))} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, width: 90, textAlign: "right" }} />
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                        <label style={{ fontSize: 13, color: "var(--sub)" }}>Weekly</label>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 14, color: "var(--faint)" }}>$</span>
-                          <input type="number" min="0" step="50" value={p.weeklyGoal || 0} onChange={(e) => setProviders(providers.map((x) => x.id === p.id ? { ...x, weeklyGoal: Math.max(0, parseInt(e.target.value || "0", 10)) } : x))} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, width: 90, textAlign: "right" }} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 14px", marginBottom: 18 }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: (p.overrunMin || 0) > 0 ? 12 : 0 }}>
-                      <div>
-                        <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 2 }}>Allow end-of-day overrun</div>
-                        <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45 }}>Let clients book past your closing time if the slot fits flush against your last appointment. Good for catching after-work bookings.</div>
-                      </div>
-                      <button onClick={() => setProviders(providers.map((x) => x.id === p.id ? { ...x, overrunMin: (x.overrunMin || 0) > 0 ? 0 : 30 } : x))} style={{ width: 44, height: 26, borderRadius: 13, background: (p.overrunMin || 0) > 0 ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, padding: 0, border: "none" }}><span style={{ position: "absolute", top: 3, left: (p.overrunMin || 0) > 0 ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
-                    </div>
-                    {(p.overrunMin || 0) > 0 && (
-                      <div>
-                        <div style={{ fontSize: 12.5, color: "var(--faint)", marginBottom: 6, letterSpacing: 1, fontWeight: 600 }}>UP TO</div>
-                        <Stepper value={p.overrunMin || 30} onChange={(v) => setProviders(providers.map((x) => x.id === p.id ? { ...x, overrunMin: v } : x))} min={15} max={120} step={15} suffix="min past closing" />
-                      </div>
-                    )}
-                  </div>
-
-                  <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 10 }}>Working hours</label>
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {[1, 2, 3, 4, 5, 6, 0].map((dow) => { const h = p.hours[dow] || { on: false, start: 540, end: 1020 }; return (
-                      <div key={dow} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px" }}>
-                        <button onClick={() => setDay(p.id, dow, { on: !h.on })} style={{ display: "flex", alignItems: "center", gap: 9, background: "none", color: "var(--text)", flexShrink: 0 }}>
-                          <span style={{ width: 38, height: 22, borderRadius: 11, background: h.on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 2, left: h.on ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-                          <span style={{ fontSize: 13.5, width: 34 }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</span>
-                        </button>
-                        {h.on ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <TimeStep value={h.start} onChange={(v) => setDay(p.id, dow, { start: v })} />
-                            <span style={{ color: "var(--faint)", fontSize: 13 }}>–</span>
-                            <TimeStep value={h.end} onChange={(v) => setDay(p.id, dow, { end: v })} />
-                          </div>
-                        ) : <span style={{ fontSize: 13, color: "var(--faint)" }}>Day off</span>}
-                      </div>
-                    ); })}
-                  </div>
-
-                  <button onClick={() => removeStaff(p.id)} style={{ marginTop: 16, background: "none", color: "#C2563F", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Trash2 size={14} /> Remove {p.name}</button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <button className="lift" onClick={addStaff} style={{ width: "100%", marginTop: 12, background: "var(--panel2)", border: "1px dashed var(--border2)", color: "var(--text)", padding: 14, borderRadius: 10, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add staff member</button>
-    </div>
-  );
-}
-
 // ---------- APPEARANCE PICKER (GlossGenius-style: Themes / Palette / Accent / Font) ----------
 const ACCENTS = [
   { id: "ink", name: "Ink", hex: "#1A1A18" }, { id: "forest", name: "Forest", hex: "#1F5138" },
