@@ -3166,9 +3166,6 @@ function PulseView({ business, appts, clients, services, providers, setProviders
     setProviders(providers.map((p) => p.id === viewedProvider.id ? { ...p, [field]: val } : p));
     setGoalEditor(null);
   };
-  // Suggested goal amounts — helpful starting points based on typical barber days
-  const dailySuggestions = [200, 300, 400, 500];
-  const weeklySuggestions = [1000, 1500, 2000, 2500];
 
   return (
     <div className="fade-up">
@@ -3447,16 +3444,9 @@ function PulseView({ business, appts, clients, services, providers, setProviders
             </p>
 
             {/* Big input */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 14, padding: "14px 18px", marginBottom: 22 }}>
               <span style={{ fontFamily: FONT_NUMERAL, fontSize: 32, fontWeight: 600, color: "var(--faint)" }}>$</span>
               <input autoFocus type="number" inputMode="numeric" min="0" step={goalEditor === "daily" ? 25 : 50} value={goalInput} onChange={(e) => setGoalInput(e.target.value)} placeholder="0" style={{ flex: 1, background: "none", border: "none", color: "var(--text)", fontFamily: FONT_NUMERAL, fontSize: 32, fontWeight: 600, outline: "none", width: "100%" }} />
-            </div>
-
-            {/* Quick-pick suggestions */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 22 }}>
-              {(goalEditor === "daily" ? dailySuggestions : weeklySuggestions).map((amt) => (
-                <button key={amt} onClick={() => setGoalInput(String(amt))} style={{ flex: 1, padding: "10px 6px", borderRadius: 10, border: `1px solid ${String(amt) === goalInput ? "var(--gold)" : "var(--border)"}`, background: String(amt) === goalInput ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: String(amt) === goalInput ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>${amt.toLocaleString()}</button>
-              ))}
             </div>
 
             <div style={{ display: "flex", gap: 10 }}>
