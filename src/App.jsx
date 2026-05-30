@@ -1160,8 +1160,8 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     }
     entry.service.addonGroups.forEach((g) => {
       const sel = entry.addons[g.id];
-      if (g.type === "choice" && sel) { const opt = g.options.find((o) => o.id === sel); if (opt) { p += opt.price; m += opt.min; } }
-      if (g.type === "addon" && sel) { p += g.item.price; m += g.item.min; }
+      if (g.type === "choice" && sel) { const opt = g.options.find((o) => o.id === sel); if (opt) { p += Number(opt.price) || 0; m += Number(opt.min) || 0; } }
+      if (g.type === "addon" && sel) { if (g.item.addsPrice !== false) p += Number(g.item.price) || 0; if (g.item.addsTime !== false) m += Number(g.item.min) || 0; }
     });
     return { price: p, min: m };
   };
@@ -1588,12 +1588,18 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
 
         {/* SIMPLE · FINISH — the tasteful hot-towel / straight-razor finishing-touch upgrade */}
         {simpleStep === "finish" && draft && (() => {
-          const fin = (draft.addonGroups || []).find((g) => g.type === "addon");
+          const addons = (draft.addonGroups || []).filter((g) => g.type === "addon");
+          // Show the owner-featured add-on; fall back to the first one if none is featured.
+          const fin = addons.find((g) => g.featured) || addons[0];
           if (!fin) { setSimpleStep("who"); return null; }
           const item = fin.item || {};
           const isOn = !!(cart[0] && cart[0].addons && cart[0].addons[fin.id]);
           const toggle = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...e.addons, [fin.id]: e.addons && e.addons[fin.id] ? undefined : true } } : e));
           const photo = fin.photo || item.photo;
+          const addsMoney = item.addsPrice !== false && (Number(item.price) || 0) > 0;
+          const priceLabel = addsMoney ? `+$${Number(item.price) || 0}` : "Free";
+          const name = item.name || "Finishing touch";
+          const desc = item.desc || "";
           return (
             <div className="fade-up">
               <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
@@ -1607,10 +1613,10 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                 </span>
                 <span style={{ display: "block", padding: "15px 17px" }}>
                   <span style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 600, lineHeight: 1.1 }}>Hot towel &amp; straight razor</span>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, color: "var(--gold)", whiteSpace: "nowrap" }}>+$5</span>
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 600, lineHeight: 1.1 }}>{name}</span>
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, color: "var(--gold)", whiteSpace: "nowrap" }}>{priceLabel}</span>
                   </span>
-                  <span style={{ display: "block", fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginTop: 6 }}>A hot towel and a straight-razor finish around the neck and cheeks. The barbershop ritual.</span>
+                  {desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginTop: 6 }}>{desc}</span>}
                   <span style={{ display: "block", marginTop: 13, background: isOn ? "var(--gold)" : "var(--panel2)", color: isOn ? "var(--on-gold)" : "var(--text)", textAlign: "center", padding: 12, borderRadius: 11, fontSize: 13.5, fontWeight: 600, border: isOn ? "none" : "1px solid var(--border)" }}>{isOn ? "Added to your visit" : "Add it"}</span>
                 </span>
               </button>
@@ -5277,23 +5283,80 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   );
 
   // ---- CUSTOMIZATIONS section (add-on groups) ----
+  const setGroup = (i, patch) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => idx === i ? { ...x, ...patch } : x) }));
+  const setItem = (i, patch) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => idx === i ? { ...x, item: { ...(x.item || {}), ...patch } } : x) }));
+  const featureOnly = (i) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => ({ ...x, featured: idx === i ? !x.featured : false })) }));
   const customizationsSection = (
     <>
       <SectionHeader title="Add-ons &amp; Customizations" />
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Option groups clients can pick when booking — a yes/no choice (like a skin fade) or an optional add-on (like a facial).</p>
-      {form.addonGroups.map((g, i) => (
-        <div key={i} style={{ background: "var(--panel)", borderRadius: 14, padding: 14, marginBottom: 10, border: "1px solid var(--border)" }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-            {business.showAddonPhotos && <button onClick={() => setPicker({ target: i })} style={{ width: 44, height: 44, borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", color: "var(--faint)", flexShrink: 0, padding: 0 }}>{g.photo ? <img src={imgUrl(g.photo, 120)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={16} />}</button>}
-            <input value={g.label} onChange={(e) => setForm({ ...form, addonGroups: form.addonGroups.map((x, idx) => idx === i ? { ...x, label: e.target.value } : x) })} placeholder="Add-on question (e.g. Skinfade?)" style={{ ...inputStyle, padding: "10px 12px" }} />
-            <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", color: "#C2703D", flexShrink: 0 }}><Trash2 size={16} /></button>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Extras a client can add when booking — like a hot towel, a facial, or a wash. Choose if each one adds to the price, adds time, or both.</p>
+      {form.addonGroups.map((g, i) => {
+        if (g.type !== "addon") {
+          // Yes/No choice — kept simple
+          return (
+            <div key={i} style={{ background: "var(--panel)", borderRadius: 14, padding: 14, marginBottom: 10, border: "1px solid var(--border)" }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input value={g.label} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="Yes/No question (e.g. Skin fade?)" style={{ ...inputStyle, padding: "10px 12px" }} />
+                <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", color: "#C2703D", flexShrink: 0 }}><Trash2 size={16} /></button>
+              </div>
+              <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 8 }}>Yes/No choice</div>
+            </div>
+          );
+        }
+        const it = g.item || {};
+        const addsPrice = it.addsPrice !== false;
+        const addsTime = it.addsTime !== false;
+        return (
+          <div key={i} style={{ background: "var(--panel)", borderRadius: 16, padding: 16, marginBottom: 12, border: g.featured ? "1.5px solid var(--gold)" : "1px solid var(--border)" }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 14 }}>
+              <button onClick={() => setPicker({ target: i })} style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", color: "var(--faint)", flexShrink: 0, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{g.photo ? <img src={imgUrl(g.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={18} />}</button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <input value={it.name || ""} onChange={(e) => setItem(i, { name: e.target.value })} placeholder="Add-on name (e.g. Hot Towel Shave)" style={{ ...inputStyle, padding: "10px 12px", fontWeight: 600 }} />
+              </div>
+              <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", color: "#C2703D", flexShrink: 0, marginTop: 8 }}><Trash2 size={16} /></button>
+            </div>
+
+            <textarea value={it.desc || ""} onChange={(e) => setItem(i, { desc: e.target.value })} placeholder="Short description (optional) — shown to clients" rows={2} style={{ ...inputStyle, padding: "10px 12px", resize: "vertical", marginBottom: 14, lineHeight: 1.4 }} />
+
+            {/* Adds to the price? */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid var(--line)" }}>
+              <span style={{ fontSize: 15, color: "var(--text2)" }}>Adds to the price</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {addsPrice && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <span style={{ fontSize: 16, color: "var(--text)" }}>$</span>
+                    <input type="number" value={it.price ?? ""} onChange={(e) => setItem(i, { price: e.target.value })} placeholder="5" style={{ width: 56, background: "transparent", border: "none", color: "var(--text)", fontSize: 16, textAlign: "right", fontFamily: FONT_BODY }} />
+                  </div>
+                )}
+                <Toggle on={addsPrice} onClick={() => setItem(i, { addsPrice: !addsPrice })} />
+              </div>
+            </div>
+
+            {/* Adds time? */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid var(--line)" }}>
+              <span style={{ fontSize: 15, color: "var(--text2)" }}>Adds time to the appointment</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {addsTime && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <input type="number" value={it.min ?? ""} onChange={(e) => setItem(i, { min: e.target.value })} placeholder="10" style={{ width: 46, background: "transparent", border: "none", color: "var(--gold)", fontSize: 16, fontWeight: 700, textAlign: "right", fontFamily: FONT_BODY }} />
+                    <span style={{ fontSize: 14, color: "var(--gold)", fontWeight: 700 }}>min</span>
+                  </div>
+                )}
+                <Toggle on={addsTime} onClick={() => setItem(i, { addsTime: !addsTime })} />
+              </div>
+            </div>
+
+            {/* Feature in the first-timer booking flow */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0 2px", borderTop: "1px solid var(--line)" }}>
+              <span style={{ fontSize: 15, color: "var(--text2)", display: "flex", flexDirection: "column" }}>Feature for new clients<span style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Show this one in the first-time booking flow</span></span>
+              <Toggle on={!!g.featured} onClick={() => featureOnly(i)} />
+            </div>
           </div>
-          <div style={{ fontSize: 14, color: "var(--faint)" }}>{g.type === "addon" ? "Optional tappable add-on" : "Yes/No choice"}</div>
-        </div>
-      ))}
+        );
+      })}
       <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-        <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "choice", photo: "", options: [{ id: "yes", label: "Yes", price: 5, min: 0 }, { id: "no", label: "No", price: 0, min: 0 }] }] })} style={{ flex: 1, background: "transparent", border: "1px dashed var(--border2)", color: "var(--sub)", padding: 12, fontSize: 15, borderRadius: 12 }}>+ Yes/No add-on</button>
-        <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "Want an extra?", type: "addon", photo: "", item: { name: "New add-on", price: 20, min: 15, desc: "Description here." } }] })} style={{ flex: 1, background: "transparent", border: "1px dashed var(--border2)", color: "var(--sub)", padding: 12, fontSize: 15, borderRadius: 12 }}>+ Tappable add-on</button>
+        <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "choice", photo: "", options: [{ id: "yes", label: "Yes", price: 5, min: 0 }, { id: "no", label: "No", price: 0, min: 0 }] }] })} style={{ flex: 1, background: "transparent", border: "1px dashed var(--border2)", color: "var(--sub)", padding: 12, fontSize: 15, borderRadius: 12 }}>+ Yes/No choice</button>
+        <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "addon", photo: "", featured: false, item: { name: "", desc: "", addsPrice: true, price: 5, addsTime: true, min: 10 } }] })} style={{ flex: 1, background: "transparent", border: "1px dashed var(--border2)", color: "var(--sub)", padding: 12, fontSize: 15, borderRadius: 12 }}>+ Add-on</button>
       </div>
       <SaveBar />
     </>
