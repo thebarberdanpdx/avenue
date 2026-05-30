@@ -415,32 +415,75 @@ const FONT_BODY = "var(--font-body, 'Inter', -apple-system, sans-serif)";
 // and feel different, not just recolored.
 // ============================================================
 const THEMES = [
-  // GlossGenius-inspired. Default = airy editorial serif on white (Energy/Zen).
-  { id: "snow", name: "Atelier", tagline: "Airy editorial · serif on white", group: "Light", dark: false,
-    disp: "'Cormorant Garamond', serif", body: "'Jost', sans-serif",
-    t: { bg:"#FCFBF9", panel:"#FFFFFF", panel2:"#F5F3EF", line:"#EDEAE4", border:"#E4E0D8", border2:"#CBC6BB", text:"#211F1B", text2:"#46443E", sub:"#7C766B", faint:"#B0AB9F", gold:"#1F1D19", onGold:"#FFFFFF", shadow:"rgba(20,18,12,.05)", overlay:"rgba(20,18,14,0.28)" } },
-  { id: "sagespa", name: "Northside", tagline: "Cream & forest green", group: "Light", dark: false,
+  // ===== BARBERSHOP =====
+  { id: "fade", name: "Fade", tagline: "Graphite fading up to ash", cat: "Barbershop", dark: true,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif",
+    t: { bg:"#121417", panel:"#1A1E22", panel2:"#232830", line:"#2E343D", border:"#3A424C", border2:"#515C68", text:"#F1F4F7", text2:"#CDD4DB", sub:"#919BA6", faint:"#5A636E", gold:"#C9D4DD", onGold:"#121417", shadow:"rgba(0,0,0,.55)", overlay:"rgba(8,10,12,0.78)" } },
+  { id: "razor", name: "Straight Razor", tagline: "Cold gunmetal, one drop of red", cat: "Barbershop", dark: true,
+    disp: "'Oswald', sans-serif", body: "'Inter', sans-serif",
+    t: { bg:"#131312", panel:"#1C1C1A", panel2:"#252523", line:"#302F2C", border:"#3C3B37", border2:"#54524C", text:"#F1EFEB", text2:"#D0CDC6", sub:"#948F86", faint:"#58554E", gold:"#E0564A", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.55)", overlay:"rgba(0,0,0,0.78)" } },
+  { id: "bayrum", name: "Bay Rum", tagline: "Spiced amber & clove", cat: "Barbershop", dark: true,
     disp: "'Fraunces', serif", body: "'Inter', sans-serif",
-    t: { bg:"#F6F1E7", panel:"#FFFDF7", panel2:"#EEE7D6", line:"#E5DCC6", border:"#DBD0B6", border2:"#C2B695", text:"#1E2A20", text2:"#39463B", sub:"#6C7464", faint:"#A6A088", gold:"#1F5138", onGold:"#F8F4EA", shadow:"rgba(60,50,20,.08)", overlay:"rgba(30,42,32,0.34)" } },
-  { id: "blossom", name: "Bloom", tagline: "Soft blush & rose", group: "Light", dark: false,
-    disp: "'Playfair Display', serif", body: "'Poppins', sans-serif",
-    t: { bg:"#FBF3F2", panel:"#FFFAFA", panel2:"#F6E6E4", line:"#F0DAD8", border:"#E8CCC9", border2:"#D6ABA7", text:"#241419", text2:"#46292F", sub:"#8A6B6F", faint:"#C4A6A8", gold:"#B14A63", onGold:"#FFF7F6", shadow:"rgba(120,50,60,.08)", overlay:"rgba(36,20,25,0.34)" } },
-  { id: "sunset", name: "Canvas", tagline: "Warm sand & charcoal", group: "Light", dark: false,
-    disp: "'Fraunces', serif", body: "'Jost', sans-serif",
-    t: { bg:"#F4F1EC", panel:"#FCFAF6", panel2:"#EAE4D9", line:"#E0D8C9", border:"#D5CBB8", border2:"#BBAE96", text:"#222019", text2:"#403B30", sub:"#736C5C", faint:"#ADA48E", gold:"#2B2823", onGold:"#FAF8F3", shadow:"rgba(60,50,30,.07)", overlay:"rgba(34,32,25,0.32)" } },
-  { id: "midnight", name: "Onyx", tagline: "Black & warm ivory", group: "Dark", dark: true,
-    disp: "'Cormorant Garamond', serif", body: "'Jost', sans-serif",
-    t: { bg:"#100F0D", panel:"#1A1916", panel2:"#22201C", line:"#2E2B26", border:"#3A372F", border2:"#524E43", text:"#F4F1E9", text2:"#D4CFC2", sub:"#969080", faint:"#5C5749", gold:"#E8E3D6", onGold:"#100F0D", shadow:"rgba(0,0,0,.55)", overlay:"rgba(0,0,0,0.78)" } },
-  { id: "plum", name: "Velvet", tagline: "Aubergine & lilac", group: "Dark", dark: true,
+    t: { bg:"#1A1411", panel:"#241B16", panel2:"#2F241C", line:"#3B2E24", border:"#4A3A2D", border2:"#66503D", text:"#F6ECE0", text2:"#DECBB8", sub:"#A89079", faint:"#6B5542", gold:"#D8862F", onGold:"#1A1411", shadow:"rgba(0,0,0,.55)", overlay:"rgba(8,5,3,0.78)" } },
+  { id: "chrome", name: "Chrome", tagline: "White tile & polished steel", cat: "Barbershop", dark: false,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif",
+    t: { bg:"#F4F6F8", panel:"#FFFFFF", panel2:"#E9EDF1", line:"#DFE4E9", border:"#D2D9E0", border2:"#B3BDC7", text:"#15181C", text2:"#3A4047", sub:"#67707A", faint:"#9AA4AE", gold:"#2C3137", onGold:"#FFFFFF", shadow:"rgba(20,22,25,.06)", overlay:"rgba(20,22,25,0.3)" } },
+  { id: "pomade", name: "Pomade", tagline: "Wet-look gloss, a tin of teal", cat: "Barbershop", dark: true,
     disp: "'Playfair Display', serif", body: "'Jost', sans-serif",
-    t: { bg:"#16101A", panel:"#211826", panel2:"#2B2032", line:"#392B41", border:"#473551", border2:"#62496E", text:"#F1E9F2", text2:"#D4C4D9", sub:"#A48FAA", faint:"#67546D", gold:"#C9A0E0", onGold:"#170F1B", shadow:"rgba(0,0,0,.55)", overlay:"rgba(10,4,14,0.78)" } },
-  { id: "steel", name: "Deep Teal", tagline: "Teal & seafoam", group: "Dark", dark: true,
+    t: { bg:"#0F1211", panel:"#181C1B", panel2:"#202625", line:"#2B3231", border:"#37403E", border2:"#4D5856", text:"#EEF3F1", text2:"#C9D2CF", sub:"#8D9893", faint:"#535C5A", gold:"#34B89A", onGold:"#06201A", shadow:"rgba(0,0,0,.55)", overlay:"rgba(0,0,0,0.78)" } },
+
+  // ===== TATTOO =====
+  { id: "flash", name: "Flash", tagline: "Flash-sheet red on gallery black", cat: "Tattoo", dark: true,
+    disp: "'Bebas Neue', sans-serif", body: "'Inter', sans-serif",
+    t: { bg:"#141110", panel:"#1E1917", panel2:"#28211E", line:"#342B27", border:"#423632", border2:"#5C4B45", text:"#F5ECE7", text2:"#D8C7BE", sub:"#A18E84", faint:"#61524B", gold:"#E24A3D", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.55)", overlay:"rgba(0,0,0,0.78)" } },
+  { id: "linework", name: "Linework", tagline: "Bone-white on pure ink", cat: "Tattoo", dark: true,
+    disp: "'Cormorant Garamond', serif", body: "'Inter', sans-serif",
+    t: { bg:"#0D0D0E", panel:"#161618", panel2:"#1F1F22", line:"#2A2A2E", border:"#36363B", border2:"#4D4D54", text:"#F3F2EF", text2:"#CFCEC9", sub:"#92918D", faint:"#56555A", gold:"#EAE8E2", onGold:"#0D0D0E", shadow:"rgba(0,0,0,.6)", overlay:"rgba(0,0,0,0.8)" } },
+  { id: "neonsaint", name: "Neon Saint", tagline: "Candle gold & sacred crimson", cat: "Tattoo", dark: true,
+    disp: "'Playfair Display', serif", body: "'Jost', sans-serif",
+    t: { bg:"#100D17", panel:"#191525", panel2:"#221C31", line:"#2E2640", border:"#3B3151", border2:"#54466F", text:"#F2EDE6", text2:"#D4C9D8", sub:"#9D90A8", faint:"#61546F", gold:"#E0AC44", onGold:"#100D17", shadow:"rgba(0,0,0,.55)", overlay:"rgba(4,2,10,0.8)" } },
+  { id: "acid", name: "Acid", tagline: "Raw concrete, acid-green spray", cat: "Tattoo", dark: true,
+    disp: "'Oswald', sans-serif", body: "'Inter', sans-serif",
+    t: { bg:"#141513", panel:"#1D1F1C", panel2:"#262824", line:"#313430", border:"#3E423C", border2:"#565C52", text:"#F0F3ED", text2:"#CED3C7", sub:"#91978B", faint:"#585E54", gold:"#A6E62B", onGold:"#141513", shadow:"rgba(0,0,0,.55)", overlay:"rgba(0,0,0,0.78)" } },
+  { id: "stencil", name: "Stencil", tagline: "Crisp white studio, ink black", cat: "Tattoo", dark: false,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif",
+    t: { bg:"#F6F6F5", panel:"#FFFFFF", panel2:"#EDEDEB", line:"#E3E3E0", border:"#D6D6D2", border2:"#B7B7B1", text:"#16161A", text2:"#3B3B40", sub:"#6B6B71", faint:"#A2A2A8", gold:"#18181B", onGold:"#FFFFFF", shadow:"rgba(18,18,20,.06)", overlay:"rgba(18,18,20,0.3)" } },
+
+  // ===== SPA =====
+  { id: "onsen", name: "Onsen", tagline: "Cedar steam & river stone", cat: "Spa", dark: false,
+    disp: "'Cormorant Garamond', serif", body: "'Jost', sans-serif",
+    t: { bg:"#F3EFE8", panel:"#FCFAF5", panel2:"#E9E2D6", line:"#DED6C7", border:"#D0C6B4", border2:"#B3A892", text:"#1E231F", text2:"#41463F", sub:"#6F6F64", faint:"#A39C8A", gold:"#97713F", onGold:"#FCFAF5", shadow:"rgba(60,50,30,.07)", overlay:"rgba(30,34,28,0.34)" } },
+  { id: "float", name: "Float", tagline: "Weightless salt & palest blue", cat: "Spa", dark: false,
+    disp: "'Jost', sans-serif", body: "'Inter', sans-serif",
+    t: { bg:"#F2F5F6", panel:"#FFFFFF", panel2:"#E8EEF0", line:"#DFE6E9", border:"#D2DCDF", border2:"#B4C2C6", text:"#1A2123", text2:"#3C4548", sub:"#6C767A", faint:"#A2ADB1", gold:"#5E96A0", onGold:"#FFFFFF", shadow:"rgba(20,30,32,.05)", overlay:"rgba(20,30,32,0.3)" } },
+  { id: "hammam", name: "Hammam", tagline: "Warm marble & rose brass", cat: "Spa", dark: false,
+    disp: "'Playfair Display', serif", body: "'Inter', sans-serif",
+    t: { bg:"#F5EFEA", panel:"#FFFBF7", panel2:"#EDE1D8", line:"#E4D6CA", border:"#D8C7B8", border2:"#C0A993", text:"#261E18", text2:"#483B31", sub:"#80695D", faint:"#BBA796", gold:"#A86F49", onGold:"#FFFBF7", shadow:"rgba(120,80,50,.08)", overlay:"rgba(38,30,24,0.34)" } },
+  { id: "moss", name: "Moss", tagline: "Forest bathing at dusk", cat: "Spa", dark: true,
+    disp: "'Cormorant Garamond', serif", body: "'Jost', sans-serif",
+    t: { bg:"#12150F", panel:"#1A1E15", panel2:"#22271C", line:"#2D3326", border:"#3A4131", border2:"#515A45", text:"#EEF1E7", text2:"#CCD3C1", sub:"#8E9684", faint:"#565E4A", gold:"#A7B97D", onGold:"#12150F", shadow:"rgba(0,0,0,.55)", overlay:"rgba(2,4,1,0.78)" } },
+  { id: "saltwater", name: "Saltwater", tagline: "Sea glass & driftwood", cat: "Spa", dark: false,
+    disp: "'Jost', sans-serif", body: "'Inter', sans-serif",
+    t: { bg:"#EFF2F0", panel:"#FBFCFB", panel2:"#E3E9E6", line:"#D9E0DC", border:"#C9D3CE", border2:"#AAB8B1", text:"#1B211E", text2:"#3B443F", sub:"#6C766F", faint:"#A1ACA6", gold:"#4E8D81", onGold:"#FBFCFB", shadow:"rgba(30,50,45,.06)", overlay:"rgba(27,33,30,0.3)" } },
+
+  // ===== SALON =====
+  { id: "dollhouse", name: "Dollhouse", tagline: "Hot pink & bubblegum, unapologetic", cat: "Salon", dark: false,
+    disp: "'Poppins', sans-serif", body: "'Poppins', sans-serif",
+    t: { bg:"#FDEFF4", panel:"#FFFFFF", panel2:"#FBE0EB", line:"#F6D2E1", border:"#EFBCD3", border2:"#E394B8", text:"#2A0E1B", text2:"#5B2740", sub:"#9B5A78", faint:"#D396B2", gold:"#E91E7B", onGold:"#FFFFFF", shadow:"rgba(180,40,110,.1)", overlay:"rgba(42,14,27,0.34)" } },
+  { id: "platinum", name: "Platinum", tagline: "Icy pearl & cool silver", cat: "Salon", dark: false,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif",
+    t: { bg:"#F4F4F6", panel:"#FFFFFF", panel2:"#EAEAEE", line:"#E0E0E6", border:"#D3D3DB", border2:"#B6B6C1", text:"#18181C", text2:"#3B3B42", sub:"#6E6E78", faint:"#A4A4AE", gold:"#6E6A82", onGold:"#FFFFFF", shadow:"rgba(20,20,28,.05)", overlay:"rgba(20,20,28,0.3)" } },
+  { id: "gloss", name: "Gloss", tagline: "Patent white & lacquer red", cat: "Salon", dark: false,
+    disp: "'Playfair Display', serif", body: "'Inter', sans-serif",
+    t: { bg:"#F7F4F2", panel:"#FFFFFF", panel2:"#EFE9E6", line:"#E6DEDA", border:"#DACFCA", border2:"#C2B2AC", text:"#1C1614", text2:"#41332F", sub:"#7C6C67", faint:"#B7A59F", gold:"#CE2F3A", onGold:"#FFFFFF", shadow:"rgba(120,40,45,.07)", overlay:"rgba(28,22,20,0.32)" } },
+  { id: "copper", name: "Copper", tagline: "Fresh copper & cinnamon", cat: "Salon", dark: true,
     disp: "'Fraunces', serif", body: "'Inter', sans-serif",
-    t: { bg:"#0B1819", panel:"#122324", panel2:"#182E2F", line:"#223C3D", border:"#2D4B4D", border2:"#406A6C", text:"#E6F2F1", text2:"#BFD7D5", sub:"#7C9A98", faint:"#496765", gold:"#5FD0BE", onGold:"#04201C", shadow:"rgba(0,0,0,.5)", overlay:"rgba(4,16,16,0.78)" } },
-  { id: "barber", name: "Espresso", tagline: "Mocha & brass", group: "Dark", dark: true,
-    disp: "'Oswald', sans-serif", body: "'Jost', sans-serif",
-    t: { bg:"#181310", panel:"#221A15", panel2:"#2C221B", line:"#382C23", border:"#45372E", border2:"#5D4B3E", text:"#F3E9DD", text2:"#D6C6B4", sub:"#9C8B78", faint:"#615142", gold:"#CD9551", onGold:"#1A120A", shadow:"rgba(0,0,0,.55)", overlay:"rgba(0,0,0,0.76)" } },
+    t: { bg:"#17110D", panel:"#211711", panel2:"#2C2016", line:"#382920", border:"#483528", border2:"#654A37", text:"#F7ECE1", text2:"#DFC8B4", sub:"#A98C74", faint:"#6B503C", gold:"#D2743E", onGold:"#17110D", shadow:"rgba(0,0,0,.55)", overlay:"rgba(6,3,1,0.78)" } },
+  { id: "mulberry", name: "Mulberry", tagline: "Wine, plum & fashion noir", cat: "Salon", dark: true,
+    disp: "'Playfair Display', serif", body: "'Jost', sans-serif",
+    t: { bg:"#160E13", panel:"#20151D", panel2:"#2A1D26", line:"#372733", border:"#463141", border2:"#634459", text:"#F4EAF0", text2:"#DAC4D2", sub:"#A88CA2", faint:"#6A4F62", gold:"#CE6F98", onGold:"#160E13", shadow:"rgba(0,0,0,.55)", overlay:"rgba(8,3,7,0.78)" } },
 ];
+const THEME_CATS = ["Barbershop", "Tattoo", "Spa", "Salon"];
 const THEME_IDS = THEMES.map((t) => t.id);
 const buildThemeCSS = () => THEMES.map((th) => {
   const v = th.t;
@@ -595,8 +638,8 @@ export default function App() {
   const [services, setServices] = useState(DEFAULT_SERVICES);
   const [categories, setCategories] = useState(["Services"]); // ordered list of category names
   const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
-  // Theme: stored on business.theme so it syncs across devices via Supabase. Fallback "snow" until loaded/set.
-  const theme = business?.theme || "snow";
+  // Theme: stored on business.theme so it syncs across devices via Supabase. Falls back to "chrome" until loaded/set or if an old/unknown id is stored.
+  const theme = (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "chrome";
   const setTheme = (newTheme) => setBusiness((b) => ({ ...(b || {}), theme: newTheme }));
 
   // ---- Supabase load + save (debounced) — shop-scoped tables (multi-tenant ready) ----
@@ -694,7 +737,7 @@ export default function App() {
   return (
     <div id="app-root" className={`theme-${theme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600&family=Oswald:wght@400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Oswald:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         #app-root { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; line-height: 1.5; letter-spacing: 0.1px; }
         #app-root h1, #app-root h2, #app-root h3 { letter-spacing: -0.2px; }
@@ -6739,37 +6782,44 @@ function AppearancePicker({ theme, setTheme }) {
       </div>
 
       {tab === "themes" && (
-        <div style={{ display: "grid", gap: 18 }}>
-          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6 }}>Each theme is a complete look — palette and fonts together. Tap to apply it everywhere.</div>
-          {THEMES.map((th) => { const on = theme === th.id; return (
-            <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 20, border: on ? "2px solid var(--gold)" : "1px solid var(--border)", overflow: "hidden", textAlign: "left", background: th.t.bg, boxShadow: on ? "var(--shadow-lg)" : "var(--shadow-sm)", display: "block", width: "100%" }}>
-              <div style={{ position: "relative" }}>
-                <Mock th={th} />
-                {on && <div style={{ position: "absolute", top: 16, right: 16, width: 26, height: 26, borderRadius: "50%", background: th.t.gold, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 3px 10px rgba(0,0,0,0.3)" }}><Check size={15} style={{ color: th.t.onGold }} strokeWidth={3} /></div>}
+        <div style={{ display: "grid", gap: 26 }}>
+          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6 }}>Each theme is a complete look — palette and fonts together, built for your trade. Tap to apply it everywhere.</div>
+          {THEME_CATS.map((cat) => (
+            <div key={cat}>
+              <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>{cat.toUpperCase()}</div>
+              <div style={{ display: "grid", gap: 16 }}>
+                {THEMES.filter((t) => t.cat === cat).map((th) => { const on = theme === th.id; return (
+                  <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 20, border: on ? "2px solid var(--gold)" : "1px solid var(--border)", overflow: "hidden", textAlign: "left", background: th.t.bg, boxShadow: on ? "var(--shadow-lg)" : "var(--shadow-sm)", display: "block", width: "100%" }}>
+                    <div style={{ position: "relative" }}>
+                      <Mock th={th} />
+                      {on && <div style={{ position: "absolute", top: 16, right: 16, width: 26, height: 26, borderRadius: "50%", background: th.t.gold, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 3px 10px rgba(0,0,0,0.3)" }}><Check size={15} style={{ color: th.t.onGold }} strokeWidth={3} /></div>}
+                    </div>
+                    <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel)", borderTop: "1px solid var(--line)" }}>
+                      <div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: on ? "var(--gold)" : "var(--text)", letterSpacing: -0.2 }}>{th.name}</div>
+                        <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>{th.tagline}</div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--faint)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 9px" }}>{th.dark ? "DARK" : "LIGHT"}</span>
+                        {on && <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--gold)", fontWeight: 600 }}>ACTIVE</span>}
+                      </div>
+                    </div>
+                  </button>
+                ); })}
               </div>
-              <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel)", borderTop: "1px solid var(--line)" }}>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: on ? "var(--gold)" : "var(--text)", letterSpacing: -0.2 }}>{th.name}</div>
-                  <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>{th.tagline}</div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--faint)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 9px" }}>{th.dark ? "DARK" : "LIGHT"}</span>
-                  {on && <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--gold)", fontWeight: 600 }}>ACTIVE</span>}
-                </div>
-              </div>
-            </button>
-          ); })}
+            </div>
+          ))}
         </div>
       )}
 
       {tab === "palette" && (
         <div>
-          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 18 }}>Light or dark — pick the canvas. These are the same palettes grouped by mood.</div>
-          {["Light","Dark"].map((grp) => (
+          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 18 }}>Light or dark — pick the canvas. The same themes, grouped by mood.</div>
+          {[["Light", false], ["Dark", true]].map(([grp, isDark]) => (
             <div key={grp} style={{ marginBottom: 22 }}>
               <div style={{ fontSize: 13, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>{grp.toUpperCase()}</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {THEMES.filter((t) => t.group === grp).map((th) => { const on = theme === th.id; const v = th.t; return (
+                {THEMES.filter((t) => t.dark === isDark).map((th) => { const on = theme === th.id; const v = th.t; return (
                   <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 16, overflow: "hidden", border: on ? "2px solid var(--gold)" : "1px solid var(--border)", background: v.bg, textAlign: "left" }}>
                     <div style={{ height: 64, background: v.bg, display: "flex", alignItems: "center", padding: "0 12px", gap: 6 }}>
                       <span style={{ width: 22, height: 22, borderRadius: "50%", background: v.gold }} />
