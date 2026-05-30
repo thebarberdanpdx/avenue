@@ -2968,7 +2968,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 // big headline number per section, mobile-first, comparisons built
 // in, action-oriented (overdue clients link to the nudge folder).
 // ============================================================
-function PulseView({ business, appts, clients, services, providers, onNavigate, onOpenRevenue }) {
+function PulseView({ business, appts, clients, services, providers, onNavigate, onOpenRevenue, onOpenAppointments }) {
   const now = new Date();
 
   // --- Time window helpers ---
@@ -3224,7 +3224,7 @@ function PulseView({ business, appts, clients, services, providers, onNavigate, 
       {onOpenRevenue && (
         <>
           <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />
-          <button onClick={onOpenRevenue} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: overdueCount > 0 ? 14 : 0 }}>
+          <button onClick={onOpenRevenue} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <TrendingUp size={17} style={{ color: "var(--gold)" }} />
               <div style={{ textAlign: "left" }}>
@@ -3237,21 +3237,32 @@ function PulseView({ business, appts, clients, services, providers, onNavigate, 
         </>
       )}
 
+      {/* Action CTA — appointments drill-in */}
+      {onOpenAppointments && (
+        <button onClick={onOpenAppointments} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: overdueCount > 0 ? 14 : 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <BarChart3 size={17} style={{ color: "var(--gold)" }} />
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 15, fontWeight: 500 }}>View appointments</div>
+              <div style={{ fontSize: 13, color: "var(--sub)" }}>Counts, no-shows, busiest day &amp; hour</div>
+            </div>
+          </div>
+          <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+        </button>
+      )}
+
       {/* Action CTA — overdue clients */}
       {overdueCount > 0 && (
-        <>
-          {!onOpenRevenue && <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />}
-          <button onClick={() => onNavigate && onNavigate("clients")} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Bell size={17} style={{ color: "var(--gold)" }} />
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: 15, fontWeight: 500 }}>{overdueCount} client{overdueCount > 1 ? "s" : ""} overdue to rebook</div>
-                <div style={{ fontSize: 13, color: "var(--sub)" }}>Open the nudge folder</div>
-              </div>
+        <button onClick={() => onNavigate && onNavigate("clients")} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Bell size={17} style={{ color: "var(--gold)" }} />
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 15, fontWeight: 500 }}>{overdueCount} client{overdueCount > 1 ? "s" : ""} overdue to rebook</div>
+              <div style={{ fontSize: 13, color: "var(--sub)" }}>Open the nudge folder</div>
             </div>
-            <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-          </button>
-        </>
+          </div>
+          <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+        </button>
       )}
     </div>
   );
@@ -3523,6 +3534,238 @@ function RevenueView({ appts, clients, services, providers, onBack }) {
 }
 
 // ============================================================
+// APPOINTMENTS — second Pulse drill-in. Volumes, no-show + cancellation
+// rates, and a heatmap of which day×hour combos are most booked.
+// ============================================================
+function AppointmentsView({ appts, providers, services, onBack }) {
+  const [period, setPeriod] = useState("month"); // "week" | "month" | "year"
+  const now = new Date();
+
+  // --- Date helpers (kept local for self-containment, same as Pulse/Revenue) ---
+  const sod = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const sow = (d) => {
+    const x = sod(d);
+    const day = x.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    x.setDate(x.getDate() + diff);
+    return x;
+  };
+  const som = (d) => { const x = sod(d); x.setDate(1); return x; };
+
+  // --- Period boundaries ---
+  let periodStart, periodEnd;
+  if (period === "week") {
+    periodStart = sow(now);
+    periodEnd = new Date(periodStart); periodEnd.setDate(periodEnd.getDate() + 7);
+  } else if (period === "month") {
+    periodStart = som(now);
+    periodEnd = new Date(periodStart); periodEnd.setMonth(periodEnd.getMonth() + 1);
+  } else {
+    periodStart = new Date(now.getFullYear(), 0, 1);
+    periodEnd = new Date(now.getFullYear() + 1, 0, 1);
+  }
+
+  const inRange = (a, start, end) => {
+    if (!a.bookedFor) return false;
+    const t = new Date(a.bookedFor).getTime();
+    return t >= start.getTime() && t < end.getTime();
+  };
+  const isBlock = (a) => a.status === "block";
+
+  // --- Filter: all real appointments in range (excludes blocks) ---
+  const periodAppts = appts.filter((a) => !isBlock(a) && inRange(a, periodStart, periodEnd));
+
+  // --- Counts by status ---
+  // Booked = everything that wasn't blocked and wasn't cancelled (so: done, no-show, confirmed, checked-in, in-service all count)
+  const booked = periodAppts.filter((a) => a.status !== "cancelled").length;
+  const done = periodAppts.filter((a) => a.status === "done").length;
+  const cancelled = periodAppts.filter((a) => a.status === "cancelled").length;
+  const noShow = periodAppts.filter((a) => a.status === "no-show").length;
+  // Pending = future-dated, not cancelled, not yet completed
+  const pending = periodAppts.filter((a) => {
+    if (a.status === "cancelled" || a.status === "done" || a.status === "no-show") return false;
+    return new Date(a.bookedFor).getTime() >= now.getTime();
+  }).length;
+
+  // --- Rates (% of finished bookings) ---
+  const finished = done + noShow + cancelled;
+  const noShowRate = finished > 0 ? Math.round((noShow / finished) * 100) : 0;
+  const cancelRate = finished > 0 ? Math.round((cancelled / finished) * 100) : 0;
+
+  // --- Day × hour heatmap (7 rows × N hours). Only counts non-cancelled bookings. ---
+  // Determine the hour range from the providers' schedules so the heatmap is right-sized for this shop.
+  let minHour = 24, maxHour = 0;
+  providers.forEach((p) => {
+    if (p.id === "anyone") return;
+    Object.values(p.hours || {}).forEach((h) => {
+      if (!h?.on) return;
+      const startH = Math.floor(h.start / 60);
+      const endH = Math.ceil(h.end / 60);
+      if (startH < minHour) minHour = startH;
+      if (endH > maxHour) maxHour = endH;
+    });
+  });
+  if (minHour === 24) { minHour = 9; maxHour = 19; } // fallback
+  const hourLabels = [];
+  for (let h = minHour; h < maxHour; h++) hourLabels.push(h);
+  // grid[dow][hourIdx] = count
+  const grid = Array.from({ length: 7 }, () => Array(hourLabels.length).fill(0));
+  periodAppts.filter((a) => a.status !== "cancelled" && a.bookedFor).forEach((a) => {
+    const d = new Date(a.bookedFor);
+    const dow = d.getDay();
+    const hr = d.getHours();
+    const hourIdx = hourLabels.indexOf(hr);
+    if (hourIdx >= 0) grid[dow][hourIdx] += 1;
+  });
+  // Re-order so Monday is first column on the chart (matches "business week")
+  const dowOrder = [1, 2, 3, 4, 5, 6, 0];
+  const dowLabels = ["M", "T", "W", "T", "F", "S", "S"];
+  const orderedGrid = dowOrder.map((d) => grid[d]);
+  const maxCell = Math.max(1, ...orderedGrid.flat());
+
+  // --- Busiest day & hour pulled straight from the grid ---
+  const dayTotals = orderedGrid.map((row, i) => ({ dow: dowOrder[i], label: dowLabels[i], total: row.reduce((a, b) => a + b, 0) }));
+  const busiestDay = dayTotals.slice().sort((a, b) => b.total - a.total)[0];
+  const dayFull = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const hourTotals = hourLabels.map((h, i) => ({ hour: h, total: orderedGrid.reduce((sum, row) => sum + row[i], 0) }));
+  const busiestHour = hourTotals.slice().sort((a, b) => b.total - a.total)[0];
+  const fmtHour = (h) => { const ap = h >= 12 ? "PM" : "AM"; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12} ${ap}`; };
+
+  // --- Heatmap geometry ---
+  const cellW = 28;
+  const cellH = 22;
+  const gap = 3;
+  const leftLabel = 36;
+  const topLabel = 22;
+  const gridW = leftLabel + hourLabels.length * (cellW + gap) - gap;
+  const gridH = topLabel + 7 * (cellH + gap) - gap;
+
+  const heatmapHasData = orderedGrid.flat().some((v) => v > 0);
+
+  return (
+    <div className="fade-up">
+      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> Back to Pulse</button>
+
+      {/* Masthead */}
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>APPOINTMENTS</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
+      </div>
+
+      {/* Period toggle */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
+        {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
+          const on = period === id;
+          return (
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+          );
+        })}
+      </div>
+
+      {/* Hero number — total booked */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
+          {booked}
+        </div>
+        <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
+          {booked === 0 ? "No appointments this period." : <>{booked === 1 ? "appointment booked" : "appointments booked"}{pending > 0 && <> · <span style={{ fontWeight: 600 }}>{pending}</span> still upcoming</>}</>}
+        </div>
+      </div>
+
+      {/* Breakdown — quick row of counts */}
+      {periodAppts.length > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>BREAKDOWN</div>
+            <div style={{ display: "grid", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Completed</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{done}</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Cancelled</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{cancelled}</span>
+                  {cancelRate > 0 && <span style={{ fontSize: 12.5, color: "var(--faint)" }}>{cancelRate}% of finished</span>}
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>No-shows</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, color: noShow > 0 ? "var(--gold)" : "var(--text)" }}>{noShow}</span>
+                  {noShowRate > 0 && <span style={{ fontSize: 12.5, color: noShow > 0 ? "var(--gold)" : "var(--faint)", fontWeight: noShow > 0 ? 600 : 400 }}>{noShowRate}% of finished</span>}
+                </div>
+              </div>
+              {pending > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Upcoming</div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{pending}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* When */}
+      {heatmapHasData && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 26 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>WHEN</div>
+            <div style={{ fontSize: 14, color: "var(--text2)", marginBottom: 18, lineHeight: 1.5 }}>
+              Busiest is <span style={{ fontWeight: 600 }}>{dayFull[busiestDay.dow]}</span>
+              {busiestHour && busiestHour.total > 0 && <> around <span style={{ fontWeight: 600 }}>{fmtHour(busiestHour.hour)}</span></>}.
+            </div>
+
+            {/* Heatmap */}
+            <div style={{ overflowX: "auto", paddingBottom: 6 }}>
+              <svg viewBox={`0 0 ${gridW} ${gridH}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: 240, display: "block", minWidth: 320 }}>
+                {/* Hour labels along the top */}
+                {hourLabels.map((h, i) => (
+                  <text key={`h-${i}`} x={leftLabel + i * (cellW + gap) + cellW / 2} y={topLabel - 8} textAnchor="middle" fontSize="9" fill="var(--faint)">{h % 12 === 0 ? 12 : h % 12}{h >= 12 ? "p" : "a"}</text>
+                ))}
+                {/* Day labels along the left */}
+                {dowLabels.map((lbl, i) => (
+                  <text key={`d-${i}`} x={leftLabel - 10} y={topLabel + i * (cellH + gap) + cellH / 2 + 3} textAnchor="end" fontSize="11" fill="var(--faint)">{lbl}</text>
+                ))}
+                {/* Cells */}
+                {orderedGrid.map((row, di) => row.map((v, hi) => {
+                  const x = leftLabel + hi * (cellW + gap);
+                  const y = topLabel + di * (cellH + gap);
+                  // Color ramp: empty cells barely visible, busiest cells full gold.
+                  const intensity = v === 0 ? 0 : Math.max(0.15, v / maxCell);
+                  const fill = v === 0 ? "var(--panel2)" : `color-mix(in srgb, var(--gold) ${Math.round(intensity * 100)}%, var(--panel2))`;
+                  return (
+                    <g key={`c-${di}-${hi}`}>
+                      <rect x={x} y={y} width={cellW} height={cellH} rx="3" fill={fill} />
+                      {v > 0 && <text x={x + cellW / 2} y={y + cellH / 2 + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill={intensity > 0.55 ? "var(--on-gold)" : "var(--text)"}>{v}</text>}
+                    </g>
+                  );
+                }))}
+              </svg>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Empty period state */}
+      {periodAppts.length === 0 && (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "28px 22px", textAlign: "center", marginTop: 10 }}>
+          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto" }}>Once you have appointments in this period, breakdowns and the busiest-times heatmap show up here.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // SHOP DASHBOARD — adds Menu editor + Settings
 // ============================================================
 function ShopDashboard({ business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, onExit }) {
@@ -3559,8 +3802,9 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         <div style={{ width: 50 }} />
       </div>
       <div style={{ maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
-        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
+        {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
@@ -7120,6 +7364,8 @@ const APPT_STATUSES = [
   { id: "in-service", label: "In Service", dot: "#E59BB3" },
   { id: "done", label: "Done", dot: "#6FAE72" },
   { id: "unconfirmed", label: "Unconfirmed", dot: "#E0A45E" },
+  { id: "no-show", label: "No-show", dot: "#C66B5C" },
+  { id: "cancelled", label: "Cancelled", dot: "#888" },
 ];
 
 // ============================================================
