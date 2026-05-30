@@ -2908,7 +2908,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 // big headline number per section, mobile-first, comparisons built
 // in, action-oriented (overdue clients link to the nudge folder).
 // ============================================================
-function PulseView({ business, appts, clients, services, providers, onNavigate }) {
+function PulseView({ business, appts, clients, services, providers, onNavigate, onOpenRevenue }) {
   const now = new Date();
 
   // --- Time window helpers ---
@@ -3160,10 +3160,27 @@ function PulseView({ business, appts, clients, services, providers, onNavigate }
         </div>
       )}
 
+      {/* Action CTA — revenue drill-in */}
+      {onOpenRevenue && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />
+          <button onClick={onOpenRevenue} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: overdueCount > 0 ? 14 : 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <TrendingUp size={17} style={{ color: "var(--gold)" }} />
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 15, fontWeight: 500 }}>View revenue trend</div>
+                <div style={{ fontSize: 13, color: "var(--sub)" }}>Week, month, year — top services and clients</div>
+              </div>
+            </div>
+            <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+          </button>
+        </>
+      )}
+
       {/* Action CTA — overdue clients */}
       {overdueCount > 0 && (
         <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />
+          {!onOpenRevenue && <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />}
           <button onClick={() => onNavigate && onNavigate("clients")} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <Bell size={17} style={{ color: "var(--gold)" }} />
@@ -3181,19 +3198,285 @@ function PulseView({ business, appts, clients, services, providers, onNavigate }
 }
 
 // ============================================================
+// REVENUE — first Pulse drill-in. Period toggle (week/month/year),
+// editorial bar chart, top services + top clients for the period.
+// ============================================================
+function RevenueView({ appts, clients, services, providers, onBack }) {
+  const [period, setPeriod] = useState("month"); // "week" | "month" | "year"
+  const now = new Date();
+
+  // --- Same date helpers as PulseView (kept local for self-containment) ---
+  const sod = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const sow = (d) => {
+    const x = sod(d);
+    const day = x.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    x.setDate(x.getDate() + diff);
+    return x;
+  };
+  const som = (d) => { const x = sod(d); x.setDate(1); return x; };
+
+  // Price-per-appt — same as Pulse
+  const apptPrice = (a) => {
+    if (a.lineItems && a.lineItems.length) {
+      return a.lineItems.reduce((sum, li) => {
+        const s = services.find((x) => x.id === li.serviceId);
+        return sum + (s ? getPrice(s, a.providerId) : 0);
+      }, 0);
+    }
+    const s = services.find((x) => x.id === a.serviceId);
+    return s ? getPrice(s, a.providerId) : 0;
+  };
+
+  const inRange = (a, start, end) => {
+    if (!a.bookedFor) return false;
+    const t = new Date(a.bookedFor).getTime();
+    return t >= start.getTime() && t < end.getTime();
+  };
+  const isBlock = (a) => a.status === "block";
+  const isRevenue = (a) => a.status === "done";
+
+  const sumRevenue = (start, end) =>
+    appts
+      .filter((a) => !isBlock(a) && isRevenue(a) && inRange(a, start, end))
+      .reduce((sum, a) => sum + apptPrice(a), 0);
+
+  // --- Period boundaries (current + prior) ---
+  let periodStart, periodEnd, priorStart, priorEnd, priorLabel;
+  if (period === "week") {
+    periodStart = sow(now);
+    periodEnd = new Date(periodStart); periodEnd.setDate(periodEnd.getDate() + 7);
+    priorStart = new Date(periodStart); priorStart.setDate(priorStart.getDate() - 7);
+    priorEnd = new Date(periodStart);
+    priorLabel = "last week";
+  } else if (period === "month") {
+    periodStart = som(now);
+    periodEnd = new Date(periodStart); periodEnd.setMonth(periodEnd.getMonth() + 1);
+    priorStart = new Date(periodStart); priorStart.setMonth(priorStart.getMonth() - 1);
+    priorEnd = new Date(periodStart);
+    priorLabel = "last month";
+  } else {
+    periodStart = new Date(now.getFullYear(), 0, 1);
+    periodEnd = new Date(now.getFullYear() + 1, 0, 1);
+    priorStart = new Date(now.getFullYear() - 1, 0, 1);
+    priorEnd = new Date(now.getFullYear(), 0, 1);
+    priorLabel = "last year";
+  }
+
+  const periodTotal = sumRevenue(periodStart, periodEnd);
+  const priorTotal = sumRevenue(priorStart, priorEnd);
+  const periodVisits = appts.filter((a) => !isBlock(a) && isRevenue(a) && inRange(a, periodStart, periodEnd));
+  const visitCount = periodVisits.length;
+  const avgTicket = visitCount > 0 ? Math.round(periodTotal / visitCount) : 0;
+
+  // --- Bucket the chart depending on period ---
+  const buckets = (() => {
+    if (period === "week") {
+      const start = sow(now);
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(start); d.setDate(d.getDate() + i);
+        const nd = new Date(d); nd.setDate(nd.getDate() + 1);
+        return { start: d, end: nd, label: ["M", "T", "W", "T", "F", "S", "S"][i], isCurrent: d.toDateString() === now.toDateString() };
+      });
+    }
+    if (period === "month") {
+      const start = som(now);
+      const monthEnd = new Date(start); monthEnd.setMonth(monthEnd.getMonth() + 1);
+      const out = [];
+      let cursor = new Date(start);
+      let wkIdx = 1;
+      while (cursor < monthEnd) {
+        const wkEnd = new Date(cursor); wkEnd.setDate(wkEnd.getDate() + 7);
+        const realEnd = wkEnd > monthEnd ? new Date(monthEnd) : wkEnd;
+        out.push({ start: new Date(cursor), end: realEnd, label: `W${wkIdx}`, isCurrent: now >= cursor && now < realEnd });
+        cursor = realEnd; wkIdx++;
+      }
+      return out;
+    }
+    // year
+    return Array.from({ length: 12 }, (_, i) => {
+      const start = new Date(now.getFullYear(), i, 1);
+      const end = new Date(now.getFullYear(), i + 1, 1);
+      return { start, end, label: ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"][i], isCurrent: i === now.getMonth() };
+    });
+  })();
+  const bucketValues = buckets.map((b) => sumRevenue(b.start, b.end));
+  const maxValue = Math.max(1, ...bucketValues);
+
+  // --- Top services / top clients for this period ---
+  const svcAgg = {};
+  periodVisits.forEach((a) => {
+    const sid = a.serviceId;
+    if (!sid) return;
+    svcAgg[sid] = svcAgg[sid] || { count: 0, revenue: 0 };
+    svcAgg[sid].count += 1;
+    svcAgg[sid].revenue += apptPrice(a);
+  });
+  const topServices = Object.entries(svcAgg)
+    .map(([sid, agg]) => ({ svc: services.find((s) => s.id === sid), ...agg }))
+    .filter((x) => x.svc)
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 6);
+
+  const clientAgg = {};
+  periodVisits.forEach((a) => {
+    const cid = a.clientId;
+    if (!cid || cid === "guest") return;
+    clientAgg[cid] = clientAgg[cid] || { count: 0, revenue: 0 };
+    clientAgg[cid].count += 1;
+    clientAgg[cid].revenue += apptPrice(a);
+  });
+  const topClients = Object.entries(clientAgg)
+    .map(([cid, agg]) => ({ client: clients.find((c) => c.id === cid), ...agg }))
+    .filter((x) => x.client)
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 6);
+
+  // --- Delta ---
+  const delta = (() => {
+    if (priorTotal === 0 && periodTotal === 0) return null;
+    if (priorTotal === 0) return { label: `vs $0 ${priorLabel}` };
+    const pct = Math.round(((periodTotal - priorTotal) / priorTotal) * 100);
+    return { up: pct >= 0, pct: Math.abs(pct), prior: priorTotal };
+  })();
+
+  const fmtMoney = (n) => `$${Math.round(n).toLocaleString()}`;
+
+  // --- Bar chart geometry ---
+  const barWidth = period === "year" ? 18 : period === "month" ? 28 : 24;
+  const gap = period === "year" ? 8 : period === "month" ? 14 : 14;
+  const padX = 4;
+  const chartH = 160;
+  const labelY = chartH + 18;
+  const svgW = padX * 2 + buckets.length * (barWidth + gap) - gap;
+  const svgH = labelY + 10;
+
+  return (
+    <div className="fade-up">
+      {/* Inner back button — matches the ClientProfile pattern */}
+      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> Back to Pulse</button>
+
+      {/* Masthead */}
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>REVENUE</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
+      </div>
+
+      {/* Period toggle */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
+        {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
+          const on = period === id;
+          return (
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+          );
+        })}
+      </div>
+
+      {/* Hero number */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
+          {fmtMoney(periodTotal)}
+        </div>
+        {delta && (
+          <div style={{ fontSize: 13.5, color: delta.up !== undefined ? (delta.up ? "var(--gold)" : "var(--sub)") : "var(--sub)", lineHeight: 1.5, marginBottom: 6 }}>
+            {delta.pct !== undefined ? <>{delta.up ? "+" : "−"}{delta.pct}% vs {fmtMoney(delta.prior)} {priorLabel}</> : delta.label}
+          </div>
+        )}
+        <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
+          {visitCount === 0 ? "No completed visits this period yet." : <><span style={{ fontWeight: 600 }}>{fmtMoney(avgTicket)}</span> avg per visit · <span style={{ fontWeight: 600 }}>{visitCount}</span> {visitCount === 1 ? "visit" : "visits"}</>}
+        </div>
+      </div>
+
+      {/* Bar chart */}
+      {visitCount > 0 && (
+        <div style={{ marginBottom: 36, overflowX: "auto" }}>
+          <svg viewBox={`0 0 ${svgW} ${svgH}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: 200, display: "block" }}>
+            {buckets.map((b, i) => {
+              const v = bucketValues[i];
+              const h = (v / maxValue) * chartH;
+              const x = padX + i * (barWidth + gap);
+              const y = chartH - h;
+              const fill = b.isCurrent ? "var(--gold)" : "color-mix(in srgb, var(--gold) 28%, var(--panel2))";
+              return (
+                <g key={i}>
+                  {h > 0 && <rect x={x} y={y} width={barWidth} height={h} rx="3" fill={fill} />}
+                  {h === 0 && <rect x={x} y={chartH - 2} width={barWidth} height={2} rx="1" fill="var(--line)" />}
+                  <text x={x + barWidth / 2} y={labelY} textAnchor="middle" fontSize="11" fill={b.isCurrent ? "var(--gold)" : "var(--faint)"} fontWeight={b.isCurrent ? 600 : 400}>{b.label}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      )}
+
+      {/* By service */}
+      {topServices.length > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>BY SERVICE</div>
+            <div style={{ display: "grid", gap: 10 }}>
+              {topServices.map((row) => (
+                <div key={row.svc.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
+                  <div style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{row.svc.name}</span>
+                    <span style={{ fontSize: 13, color: "var(--faint)", marginLeft: 8 }}>{row.count}×</span>
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 500, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{fmtMoney(row.revenue)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Top clients */}
+      {topClients.length > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>TOP CLIENTS</div>
+            <div style={{ display: "grid", gap: 10 }}>
+              {topClients.map((row) => (
+                <div key={row.client.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
+                  <div style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{row.client.name}</span>
+                    <span style={{ fontSize: 13, color: "var(--faint)", marginLeft: 8 }}>{row.count}×</span>
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 500, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{fmtMoney(row.revenue)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Empty period state */}
+      {visitCount === 0 && (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "28px 22px", textAlign: "center", marginTop: 10 }}>
+          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto" }}>Once you start completing visits in this period, revenue, top services, and top clients show up here.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // SHOP DASHBOARD — adds Menu editor + Settings
 // ============================================================
 function ShopDashboard({ business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, onExit }) {
   const [tab, setTab] = useState("pulse");
   const [activeClient, setActiveClient] = useState(null);
+  const [pulseDetail, setPulseDetail] = useState(null); // null | "revenue" — drill-in from Pulse
   const [toast, setToast] = useState(null);
   const [msgTarget, setMsgTarget] = useState(null); // { clientId, draft } — opens a convo prefilled
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3400); };
 
-  // Always land at the top of the screen when changing tabs or opening a profile.
+  // Always land at the top of the screen when changing tabs, opening a profile, or drilling into a Pulse detail.
   useEffect(() => {
     try { window.scrollTo({ top: 0, behavior: "instant" }); } catch { window.scrollTo(0, 0); }
-  }, [tab, activeClient]);
+  }, [tab, activeClient, pulseDetail]);
 
   // open a conversation (creating a lightweight client if needed) with a prefilled draft
   const textPerson = ({ name, phone, provider, draft }) => {
@@ -3211,12 +3494,13 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   return (
     <div>
       <div style={{ borderBottom: "1px solid var(--line)", padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
-        <button onClick={() => { if (tab === "pulse" && !activeClient) { onExit(); } else { setActiveClient(null); setTab("pulse"); } }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> {tab === "pulse" && !activeClient ? "Home" : "Pulse"}</button>
+        <button onClick={() => { if (pulseDetail) { setPulseDetail(null); return; } if (tab === "pulse" && !activeClient) { onExit(); return; } setActiveClient(null); setTab("pulse"); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> {pulseDetail ? "Pulse" : (tab === "pulse" && !activeClient ? "Home" : "Pulse")}</button>
         <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, letterSpacing: 1.5, fontWeight: 500 }}>{business.name}</div>
         <div style={{ width: 50 }} />
       </div>
       <div style={{ maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
-        {tab === "pulse" && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} onNavigate={(t) => setTab(t)} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} />}
+        {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
@@ -3229,7 +3513,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
       {/* fixed bottom tab bar — original pattern, anchors to viewport bottom */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "color-mix(in srgb, var(--bg) 82%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderTop: "1px solid var(--line)", boxShadow: "0 -8px 30px -12px var(--shadow)", display: "flex", justifyContent: "space-around", alignItems: "stretch", padding: "10px 4px calc(10px + env(safe-area-inset-bottom))", zIndex: 20 }}>
         {[["pulse", "Pulse", TrendingUp], ["calendar", "Calendar", Calendar], ["clients", "Clients", User], ["messages", "Messages", MessageSquare], ["settings", "Settings", Settings]].map(([id, label, Icon]) => (
-          <button key={id} onClick={() => { setTab(id); setActiveClient(null); }} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
+          <button key={id} onClick={() => { setTab(id); setActiveClient(null); setPulseDetail(null); }} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
             <div style={{ position: "relative" }}>
               <Icon size={21} />
               {id === "waitlist" && waitlist.length > 0 && <span style={{ position: "absolute", top: -5, right: -9, background: "var(--gold)", color: "var(--on-gold)", fontSize: 12, fontWeight: 600, borderRadius: 8, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{waitlist.length}</span>}
