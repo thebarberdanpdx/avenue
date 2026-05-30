@@ -1411,12 +1411,12 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     let clientId = matched?.id || null;
     if (!matched && !activeMember) {
       clientId = "c" + baseId + Math.floor(Math.random() * 1000);
-      const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
+      const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
       setClients((cur) => [newClient, ...cur]);
     } else if (matched) {
       // Returning client confirmed/updated their info — write the chosen values to their profile
       // so a barber-added record gets an email, a corrected name persists, etc.
-      setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: (finalEmail || "").trim(), phone: (finalPhone || "").trim() } : c));
+      setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), lastActivity: new Date().toISOString() } : c));
     }
     const newAppts = [];
     const isSame = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
@@ -2119,9 +2119,12 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                                 <div style={{ width: 80, height: 80, flexShrink: 0, overflow: "hidden", background: "var(--panel2)", position: "relative" }}>
                                   {ct.images && ct.images[0] && <img src={imgUrl(ct.images[0], 240)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
                                 </div>
-                                <div style={{ flex: 1, padding: "12px 16px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 3 }}>
-                                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{ct.label}</div>
-                                  <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.4 }}>{ct.desc || `$${ct.price}`}</div>
+                                <div style={{ flex: 1, padding: "12px 16px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 3, minWidth: 0 }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ct.label}</div>
+                                    <div style={{ fontSize: 14, color: "var(--text)", fontWeight: 500, flexShrink: 0 }}>${ct.price}</div>
+                                  </div>
+                                  {ct.desc && <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ct.desc}</div>}
                                 </div>
                               </button>
                             ))}
@@ -7788,11 +7791,9 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
 
   return (
     <div className="fade-in" style={{ position: "fixed", inset: 0, background: "var(--bg)", zIndex: 800, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      {/* header bar — Cancel / title / Book */}
-      <div style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "17px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <button onClick={onClose} style={{ background: "none", color: "var(--on-gold)", fontSize: 16, opacity: 0.9 }}>Cancel</button>
+      {/* header bar — title only; Book/Cancel moved to the sticky footer below so the thumb reach is natural */}
+      <div style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "17px 18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.2 }}>New Appointment</span>
-        <button onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note })} style={{ background: "none", color: "var(--on-gold)", fontSize: 16, fontWeight: 700, opacity: canBook ? 1 : 0.45 }}>Book</button>
       </div>
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
@@ -7905,6 +7906,12 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
             <ChevronRight size={20} style={{ color: "var(--faint)" }} />
           </button>
         </div>
+      </div>
+
+      {/* sticky footer — Cancel (left) and Book (right) at the bottom of the form, easy thumb reach */}
+      <div style={{ flexShrink: 0, padding: "12px 18px 18px", background: "var(--bg)", borderTop: "1px solid var(--line)", display: "flex", gap: 10, boxSizing: "border-box" }}>
+        <button onClick={onClose} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 15, letterSpacing: 1, borderRadius: 12 }}>CANCEL</button>
+        <button className="lift" onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note })} disabled={!canBook} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 12, border: "none", opacity: canBook ? 1 : 0.45 }}>BOOK</button>
       </div>
 
       {/* time picker — fills the form from the top, always in view */}
@@ -8348,9 +8355,12 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
     const lastTrim = (walkInLast || "").trim();
     const walkInName = `${firstTrim} ${lastTrim}`.trim();
     if (!client && walkInName) {
-      const newClient = { id: "c" + Date.now() + Math.floor(Math.random() * 1000), name: walkInName, firstName: firstTrim, lastName: lastTrim, phone: (walkInPhone || "").trim(), email: (walkInEmail || "").trim(), provider: providerId === "anyone" ? "dan" : providerId, visits: 0, customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
-      setClients([newClient, ...clients]);
+      const newClient = { id: "c" + Date.now() + Math.floor(Math.random() * 1000), name: walkInName, firstName: firstTrim, lastName: lastTrim, phone: (walkInPhone || "").trim(), email: (walkInEmail || "").trim(), provider: providerId === "anyone" ? "dan" : providerId, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
+      setClients((cur) => [newClient, ...cur]);
       bookClient = newClient;
+    } else if (bookClient) {
+      // Existing client — bump their lastActivity so they rise to the top of the clients list
+      setClients((cur) => cur.map((c) => c.id === bookClient.id ? { ...c, lastActivity: new Date().toISOString() } : c));
     }
 
     const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: service.name, detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), hasPhotos: false, photos: 0 };
@@ -8633,6 +8643,14 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
                       {a.hasPhotos && <ImageIcon size={12} style={{ opacity: 0.7 }} />}
                       {a.vip && <span style={{ fontSize: 13, color: accent }}>★</span>}
                     </div>
+                    {/* NEW pill — top-right — fires when this is the client's first-ever visit, or it's a walk-in with no client record */}
+                    {(() => {
+                      const isFirstTime = !a.clientId || (() => { const c = clients.find((cl) => cl.id === a.clientId); return c && (c.visits || 0) === 0; })();
+                      if (!isFirstTime || isBlock || isDone) return null;
+                      return (
+                        <span style={{ position: "absolute", top: 5, right: 6, fontSize: 9.5, fontWeight: 700, letterSpacing: 1, color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 4, padding: "1px 5px", lineHeight: 1.3, background: "color-mix(in srgb, var(--gold) 8%, transparent)" }}>NEW</span>
+                      );
+                    })()}
                     {/* subtle end-of-appointment marker: hairline at the bottom edge + end time */}
                     {!isBlock && height > 28 && (
                       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, borderBottom: `1.5px solid color-mix(in srgb, ${accent} 55%, transparent)`, pointerEvents: "none" }}>
@@ -8718,7 +8736,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           }
         };
         return (
-          <div className="fade-in" onClick={() => setConflictModal(null)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+          <div className="fade-in" onClick={() => setConflictModal(null)} style={{ position: "fixed", inset: 0, zIndex: 900, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
               <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, marginBottom: 8 }}>This overlaps an appointment</div>
               <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 18 }}>
@@ -9553,7 +9571,9 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
   const [draft, setDraft] = useState(blank);
 
   const q = query.trim().toLowerCase();
-  const shown = q ? clients.filter((c) => (c.name + " " + (c.phone || "") + " " + (c.email || "")).toLowerCase().includes(q)) : clients;
+  // Most-recent activity first. Falls back to lastVisit, then to 0 for older records with neither stamp.
+  const lastTouch = (c) => { const t = c.lastActivity || c.lastVisit; return t ? new Date(t).getTime() : 0; };
+  const shown = (q ? clients.filter((c) => (c.name + " " + (c.phone || "") + " " + (c.email || "")).toLowerCase().includes(q)) : clients).slice().sort((a, b) => lastTouch(b) - lastTouch(a));
 
   // Rebooking-rhythm radar: clients past their usual interval, not already handled since their last visit.
   // A client gets a `nudgeDismissedAt` stamp when you either Nudge them or X them out. If that stamp is more
@@ -9580,7 +9600,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
     if (draft.phone.replace(/\D/g, "").length < 10) { if (showToast) showToast("Please enter a valid phone number."); return; }
     const id = "c" + Date.now() + Math.floor(Math.random() * 1000);
     const fullName = `${draft.firstName.trim()} ${draft.lastName.trim()}`;
-    const newClient = { id, name: fullName, firstName: draft.firstName.trim(), lastName: draft.lastName.trim(), phone: draft.phone.trim(), email: draft.email.trim(), provider: draft.provider, visits: 0, customDurations: {}, notes: draft.notes.trim(), messages: [], gallery: [], timeline: [] };
+    const newClient = { id, name: fullName, firstName: draft.firstName.trim(), lastName: draft.lastName.trim(), phone: draft.phone.trim(), email: draft.email.trim(), provider: draft.provider, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: draft.notes.trim(), messages: [], gallery: [], timeline: [] };
     setClients([newClient, ...clients]);
     setAdding(false); setDraft(blank);
     if (showToast) showToast(`${newClient.name} added.`);
