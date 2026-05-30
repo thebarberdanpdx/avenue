@@ -589,7 +589,9 @@ export default function App() {
   const [services, setServices] = useState(DEFAULT_SERVICES);
   const [categories, setCategories] = useState(["Services"]); // ordered list of category names
   const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
-  const [theme, setTheme] = useState("snow"); // clean light default, app-wide
+  // Theme: stored on business.theme so it syncs across devices via Supabase. Fallback "snow" until loaded/set.
+  const theme = business?.theme || "snow";
+  const setTheme = (newTheme) => setBusiness((b) => ({ ...(b || {}), theme: newTheme }));
 
   // ---- Supabase load + save (debounced) — shop-scoped tables (multi-tenant ready) ----
   // Every row is stamped with shop_id so additional shops never collide. For now there's
@@ -729,6 +731,10 @@ export default function App() {
         .screen-swap > * > *:nth-child(3){animation-delay:.18s} .screen-swap > * > *:nth-child(4){animation-delay:.24s}
         .screen-swap > * > *:nth-child(5){animation-delay:.30s} .screen-swap > * > *:nth-child(6){animation-delay:.36s}
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+        /* Stop iOS Safari from rubber-band overscrolling past the top/bottom of the page,
+           which was dragging the fixed bottom tab bar halfway up the viewport. */
+        html, body { overscroll-behavior-y: none; -webkit-overflow-scrolling: auto; }
+        body { position: relative; }
         .appt-screen { animation: slideInRight .3s var(--ease) both; }
         @keyframes fadeInFixed { from { opacity:0; } to { opacity:1; } }
         .appt-screen-fixed { animation: fadeInFixed .25s var(--ease) both; }
