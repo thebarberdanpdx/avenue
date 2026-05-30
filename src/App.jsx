@@ -7839,7 +7839,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
 
   const fieldWrap = { padding: "26px 0", borderBottom: "1px solid var(--line)" };
 
-  return (
+  return createPortal((
     <div className="fade-in" style={{ position: "fixed", inset: 0, background: "var(--bg)", zIndex: 800, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* header bar — title only; Book/Cancel moved to the sticky footer below so the thumb reach is natural */}
       <div style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "17px 18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -7982,7 +7982,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
         </div>
       )}
     </div>
-  );
+  ), document.body);
 }
 
 // ---------- DATE PICKER SHEET ----------
@@ -8719,7 +8719,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
 
       {/* drag-to-move confirmation — pinned so it's always visible on drop */}
       {/* WAITLIST MATCH — a freed slot matches waitlisted clients; confirm to notify */}
-      {waitlistMatch && (
+      {waitlistMatch && createPortal((
         <div className="fade-in" onClick={() => setWaitlistMatch(null)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, maxHeight: "85vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}><Bell size={20} style={{ color: "var(--gold)" }} /><div style={{ fontFamily: FONT_DISPLAY, fontSize: 22 }}>A slot just opened</div></div>
@@ -8740,9 +8740,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
             <button onClick={() => setWaitlistMatch(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "10px 0 2px" }}>Not now</button>
           </div>
         </div>
-      )}
+      ), document.body)}
 
-      {pending && (
+      {pending && createPortal((
         <>
           <div className="fade-in" onClick={() => setPending(null)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 55 }} />
           <div className="fade-in" style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 56, boxSizing: "border-box", pointerEvents: "none" }}>
@@ -8761,7 +8761,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
             </div>
           </div>
         </>
-      )}
+      ), document.body)}
 
       {/* CONFLICT — eye-level popup when a manual booking or drag-move lands on top of an existing appointment.
           Two buttons: slide the new appointment to the next free slot, or keep both (the explicit override).
@@ -8785,7 +8785,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
             commitMove(conflictModal.moveData);
           }
         };
-        return (
+        return createPortal((
           <div className="fade-in" onClick={() => setConflictModal(null)} style={{ position: "fixed", inset: 0, zIndex: 900, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
               <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, marginBottom: 8 }}>This overlaps an appointment</div>
@@ -8798,7 +8798,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
               <button onClick={onKeepBoth} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, fontWeight: 500, borderRadius: 12 }}>Keep both</button>
             </div>
           </div>
-        );
+        ), document.body);
       })()}
 
       {/* tap-to-create: menu anchored right under the tapped time/spot */}
