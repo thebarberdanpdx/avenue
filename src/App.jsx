@@ -325,10 +325,13 @@ const DEFAULT_PROVIDERS = [
   { id: "anyone", name: "Anyone", role: "First available", color: "var(--sub)", hours: DEFAULT_HOURS },
   { id: "dan", name: "Dan", role: "Master Barber", color: "var(--gold)", hours: DEFAULT_HOURS,
     email: "sanctuarybarberco@gmail.com", phone: "+1 503 840 2389", userType: "Admin", isProvider: true, onlineBooking: true, archived: false, photo: "photo-1622286342621-4bd786c2447c",
-    notifications: defaultStaffNotifications(), comp: { ...defaultComp(), hourly: { on: true, rate: 0, greaterOf: false } }, permissions: defaultPermissions("Admin") },
+    notifications: defaultStaffNotifications(), comp: { ...defaultComp(), hourly: { on: true, rate: 0, greaterOf: false } }, permissions: defaultPermissions("Admin"),
+    // Pulse 2.0 fields — "owner" can see other barbers + shop totals; "barber" only sees their own chair.
+    pulseRole: "owner", dailyGoal: 0, weeklyGoal: 0 },
   { id: "heather", name: "Heather", role: "Stylist", color: "#7A9E9F", hours: { ...DEFAULT_HOURS, 1: { on: false, start: 540, end: 1020 }, 6: { on: true, start: 600, end: 840 } },
     email: "sanctuarybarberco@gmail.com", phone: "+1 503 840 2390", userType: "Admin", isProvider: true, onlineBooking: true, archived: false, photo: "photo-1595959183082-7b570b7e08e2",
-    notifications: defaultStaffNotifications(), comp: { ...defaultComp(), service: { on: true, type: "basic", basicPct: 40, tiers: [{ upTo: 500, pct: 30 }, { upTo: null, pct: 40 }] } }, permissions: defaultPermissions("Admin") },
+    notifications: defaultStaffNotifications(), comp: { ...defaultComp(), service: { on: true, type: "basic", basicPct: 40, tiers: [{ upTo: 500, pct: 30 }, { upTo: null, pct: 40 }] } }, permissions: defaultPermissions("Admin"),
+    pulseRole: "barber", dailyGoal: 0, weeklyGoal: 0 },
 ];
 // human-readable summary of which days a provider works
 const DAY_ABBR = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -2972,36 +2975,41 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 }
 
 // ============================================================
-// PULSE — editorial dashboard. Today + this week at a glance.
-// Lands first when opening the shop dashboard. The "Vero spin": one
-// big headline number per section, mobile-first, comparisons built
-// in, action-oriented (overdue clients link to the nudge folder).
+// PULSE 2.0 — the heartbeat of the shop. Per-barber by default.
+// Greeting + today's YOUR money + "right now" status + day timeline
+// + daily/weekly goal progress + the report drill-ins below.
+// Owners get a "viewing as" picker to flip between barbers or shop totals.
+// Barbers only see their own chair, period.
 // ============================================================
-function PulseView({ business, appts, clients, services, providers, onNavigate, onOpenRevenue, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers }) {
+function PulseView({ business, appts, clients, services, providers, me, isOwner, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onSignOut }) {
   const now = new Date();
+  const realProviders = providers.filter((p) => p.id !== "anyone");
+
+  // Resolve who/what we're showing:
+  // - "me" → just the signed-in provider's chair
+  // - "shop" → combined across all barbers (owner only)
+  // - "<providerId>" → another specific barber (owner only)
+  let viewedProvider = me;
+  let isShopView = false;
+  if (isOwner && pulseView === "shop") {
+    isShopView = true;
+    viewedProvider = null;
+  } else if (isOwner && pulseView !== "me" && pulseView !== "shop") {
+    viewedProvider = providers.find((p) => p.id === pulseView) || me;
+  }
 
   // --- Time window helpers ---
   const sod = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-  // Week starts Monday for a "business week" feel.
-  const sow = (d) => {
-    const x = sod(d);
-    const day = x.getDay(); // 0=Sun..6=Sat
-    const diff = day === 0 ? -6 : 1 - day;
-    x.setDate(x.getDate() + diff);
-    return x;
-  };
-  const som = (d) => { const x = sod(d); x.setDate(1); return x; };
+  const sow = (d) => { const x = sod(d); const day = x.getDay(); const diff = day === 0 ? -6 : 1 - day; x.setDate(x.getDate() + diff); return x; };
 
   const todayStart = sod(now);
   const tomorrowStart = new Date(todayStart); tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+  const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1);
   const weekStart = sow(now);
   const nextWeekStart = new Date(weekStart); nextWeekStart.setDate(nextWeekStart.getDate() + 7);
   const lastWeekStart = new Date(weekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-  const monthStart = som(now);
-  const nextMonthStart = new Date(monthStart); nextMonthStart.setMonth(nextMonthStart.getMonth() + 1);
-  const lastMonthStart = new Date(monthStart); lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
 
-  // --- Per-appointment price (handles line items if present, otherwise the service default) ---
+  // --- Price-per-appt ---
   const apptPrice = (a) => {
     if (a.lineItems && a.lineItems.length) {
       return a.lineItems.reduce((sum, li) => {
@@ -3013,298 +3021,366 @@ function PulseView({ business, appts, clients, services, providers, onNavigate, 
     return s ? getPrice(s, a.providerId) : 0;
   };
 
-  // --- Status / range filters ---
+  const isBlock = (a) => a.status === "block";
+  const isRevenue = (a) => a.status === "done";
   const inRange = (a, start, end) => {
     if (!a.bookedFor) return false;
     const t = new Date(a.bookedFor).getTime();
     return t >= start.getTime() && t < end.getTime();
   };
-  const isBlock = (a) => a.status === "block";
-  const isRevenue = (a) => a.status === "done";
-  const isCancelled = (a) => a.status === "cancelled";
+  // Filter to the viewed scope (my chair / a specific barber / shop-wide)
+  const scopeFilter = (a) => {
+    if (isShopView) return !isBlock(a);
+    if (!viewedProvider) return false;
+    return !isBlock(a) && a.providerId === viewedProvider.id;
+  };
 
-  // --- Money totals (only "done" appts count as revenue) ---
-  const sumRevenue = (start, end) =>
-    appts
-      .filter((a) => !isBlock(a) && isRevenue(a) && inRange(a, start, end))
-      .reduce((sum, a) => sum + apptPrice(a), 0);
+  // --- Money totals (revenue = status "done") ---
+  const sumRevenue = (start, end) => appts
+    .filter((a) => scopeFilter(a) && isRevenue(a) && inRange(a, start, end))
+    .reduce((sum, a) => sum + apptPrice(a), 0);
 
   const todayMoney = sumRevenue(todayStart, tomorrowStart);
+  const yesterdayMoney = sumRevenue(yesterdayStart, todayStart);
   const thisWeekMoney = sumRevenue(weekStart, nextWeekStart);
   const lastWeekMoney = sumRevenue(lastWeekStart, weekStart);
-  const thisMonthMoney = sumRevenue(monthStart, nextMonthStart);
-  const lastMonthMoney = sumRevenue(lastMonthStart, monthStart);
 
-  // --- Visit counts ---
-  const todayApptsAll = appts.filter((a) => !isBlock(a) && !isCancelled(a) && inRange(a, todayStart, tomorrowStart));
-  const todayCompleted = todayApptsAll.filter(isRevenue).length;
-  const todayTotal = todayApptsAll.length;
+  // --- Today's appointments in scope, time-sorted ---
+  const todayApptsAll = appts
+    .filter((a) => scopeFilter(a) && a.status !== "cancelled" && inRange(a, todayStart, tomorrowStart))
+    .sort((a, b) => a.start - b.start);
 
-  const thisWeekAppts = appts.filter((a) => !isBlock(a) && inRange(a, weekStart, nextWeekStart));
-  const weekBooked = thisWeekAppts.filter((a) => !isCancelled(a)).length;
-  const weekDone = thisWeekAppts.filter(isRevenue).length;
-  const weekCancelled = thisWeekAppts.filter(isCancelled).length;
+  // --- "Right now" detection — what's on the chair, what's next, or when free until ---
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  // In-chair: an appt whose start is in the past and end is in the future today, not cancelled/done
+  const inChair = todayApptsAll.find((a) => a.start <= nowMin && a.end > nowMin && a.status !== "done");
+  const nextAppt = todayApptsAll.find((a) => a.start > nowMin && a.status !== "done");
+  const minutesUntil = nextAppt ? (nextAppt.start - nowMin) : null;
+  const minutesLeft = inChair ? (inChair.end - nowMin) : null;
+  const minutesInChair = inChair ? (nowMin - inChair.start) : null;
 
-  // --- Chair occupancy this week (booked minutes / bookable minutes from providers' hours) ---
-  const bookableMinutesInRange = (start, end) => {
-    let total = 0;
-    const cursor = new Date(start);
-    while (cursor < end) {
-      const dow = cursor.getDay();
-      providers.forEach((p) => {
-        if (p.id === "anyone") return;
-        const h = p.hours?.[dow];
-        if (h?.on) total += (h.end - h.start);
-      });
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    return total;
-  };
-  const weekBookableMin = bookableMinutesInRange(weekStart, nextWeekStart);
-  const weekBookedMin = thisWeekAppts
-    .filter((a) => !isCancelled(a))
-    .reduce((sum, a) => sum + (a.end - a.start), 0);
-  const occupancyPct = weekBookableMin > 0 ? Math.round((weekBookedMin / weekBookableMin) * 100) : 0;
+  // --- "Free until" calc — only meaningful if not currently in chair and there's a next appt ---
+  const fmtTime = (m) => { const h = Math.floor(m / 60); const mm = m % 60; const ampm = h >= 12 ? "PM" : "AM"; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12}:${mm.toString().padStart(2, "0")} ${ampm}`; };
 
-  // --- Top service this week (by visit count of completed appointments) ---
-  const serviceCounts = {};
-  thisWeekAppts.filter(isRevenue).forEach((a) => {
-    const sid = a.serviceId;
-    if (!sid) return;
-    serviceCounts[sid] = (serviceCounts[sid] || 0) + 1;
-  });
-  const topServiceEntry = Object.entries(serviceCounts).sort(([, a], [, b]) => b - a)[0];
-  const topService = topServiceEntry ? { svc: services.find((s) => s.id === topServiceEntry[0]), count: topServiceEntry[1] } : null;
+  // --- Goals — only meaningful in per-person view, never shop-wide (different scales) ---
+  const dailyGoal = !isShopView && viewedProvider ? (viewedProvider.dailyGoal || 0) : 0;
+  const weeklyGoal = !isShopView && viewedProvider ? (viewedProvider.weeklyGoal || 0) : 0;
+  const dailyPct = dailyGoal > 0 ? Math.min(100, Math.round((todayMoney / dailyGoal) * 100)) : 0;
+  const weeklyPct = weeklyGoal > 0 ? Math.min(100, Math.round((thisWeekMoney / weeklyGoal) * 100)) : 0;
 
-  // --- Top client this week (skip "guest" placeholder appointments) ---
-  const clientCounts = {};
-  thisWeekAppts.filter(isRevenue).forEach((a) => {
-    const cid = a.clientId;
-    if (!cid || cid === "guest") return;
-    clientCounts[cid] = (clientCounts[cid] || 0) + 1;
-  });
-  const topClientEntry = Object.entries(clientCounts).sort(([, a], [, b]) => b - a)[0];
-  const topClient = topClientEntry ? { client: clients.find((c) => c.id === topClientEntry[0]), count: topClientEntry[1] } : null;
+  // --- Day timeline geometry — show the working hours for the viewed provider (or 9-7 fallback) ---
+  let timelineStart = 9 * 60, timelineEnd = 19 * 60;
+  if (!isShopView && viewedProvider) {
+    const h = viewedProvider.hours?.[now.getDay()];
+    if (h?.on) { timelineStart = h.start; timelineEnd = h.end; }
+  } else if (isShopView) {
+    let minS = 24 * 60, maxE = 0;
+    realProviders.forEach((p) => {
+      const h = p.hours?.[now.getDay()];
+      if (h?.on) { if (h.start < minS) minS = h.start; if (h.end > maxE) maxE = h.end; }
+    });
+    if (maxE > 0) { timelineStart = minS; timelineEnd = maxE; }
+  }
+  const timelineSpan = Math.max(60, timelineEnd - timelineStart);
+  const pctFor = (mins) => Math.max(0, Math.min(100, ((mins - timelineStart) / timelineSpan) * 100));
 
-  // --- Overdue-to-rebook count (matches the nudge folder's filter exactly) ---
+  // --- Greeting based on time of day ---
+  const greeting = (() => {
+    const h = now.getHours();
+    if (h < 5) return "Late night";
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    if (h < 22) return "Good evening";
+    return "Late night";
+  })();
+  const displayName = isShopView ? business?.name || "the shop" : (viewedProvider?.name || "");
+  const headerName = isShopView ? `${business?.name || "Shop"} · combined` : (pulseView !== "me" ? `Viewing ${viewedProvider?.name}` : `${greeting}, ${viewedProvider?.name || ""}`);
+
+  // --- Overdue clients (for the CTA at the bottom) — owner sees overall, barber sees their own ---
   const overdueCount = clients.filter((c) => {
     if (!c.cadenceDays || !c.lastVisit) return false;
     if (c.nudgeDismissedAt && new Date(c.nudgeDismissedAt) > new Date(c.lastVisit)) return false;
+    if (!isOwner && c.provider && c.provider !== viewedProvider?.id) return false;
     const days = Math.round((Date.now() - new Date(c.lastVisit)) / 86400000);
     return (days - c.cadenceDays) > 0;
   }).length;
 
   // --- Formatters ---
   const fmtMoney = (n) => `$${Math.round(n).toLocaleString()}`;
-  const computeDelta = (current, prior) => {
-    if (prior === 0 && current === 0) return null;
-    if (prior === 0) return { up: true, label: `vs $0 last period` };
-    const pct = Math.round(((current - prior) / prior) * 100);
-    return { up: pct >= 0, pct: Math.abs(pct), prior };
-  };
-  const weekDelta = computeDelta(thisWeekMoney, lastWeekMoney);
-  const monthDelta = computeDelta(thisMonthMoney, lastMonthMoney);
   const todayLabel = `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
 
-  // --- Empty state for a brand-new shop ---
-  const hasAnyData = appts.some((a) => !isBlock(a) && a.bookedFor);
-  if (!hasAnyData) {
-    return (
-      <div className="fade-up">
-        <div style={{ marginBottom: 22 }}>
-          <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>PULSE</div>
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{todayLabel}</h2>
-        </div>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "32px 24px", textAlign: "center" }}>
-          <TrendingUp size={32} style={{ color: "var(--faint)", marginBottom: 14 }} />
-          <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 8 }}>Nothing to show yet</h3>
-          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto" }}>Pulse fills in as you start booking and completing appointments. Come back here for a clean snapshot of how the shop's running — money in, who's booked, what's slow.</p>
-        </div>
-      </div>
-    );
-  }
+  // --- "Vs yesterday / last week" deltas ---
+  const todayVsYesterday = (() => {
+    if (yesterdayMoney === 0 && todayMoney === 0) return null;
+    if (yesterdayMoney === 0) return null;
+    const diff = todayMoney - yesterdayMoney;
+    return { diff, up: diff >= 0, abs: Math.abs(diff) };
+  })();
+  const weekDelta = (() => {
+    if (lastWeekMoney === 0 && thisWeekMoney === 0) return null;
+    if (lastWeekMoney === 0) return null;
+    const pct = Math.round(((thisWeekMoney - lastWeekMoney) / lastWeekMoney) * 100);
+    return { up: pct >= 0, pct: Math.abs(pct), prior: lastWeekMoney };
+  })();
 
-  // --- The full editorial render ---
+  // --- Picker state for the owner's "viewing as" dropdown ---
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   return (
     <div className="fade-up">
-      {/* Masthead */}
-      <div style={{ marginBottom: 30 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>PULSE</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{todayLabel}</h2>
+      {/* MASTHEAD — greeting + owner view picker */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+          <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginTop: 12 }} />
+          {/* Owner-only "viewing as" picker. Barbers see only their avatar + name (no toggle). */}
+          {isOwner && realProviders.length > 1 ? (
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setPickerOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 24, padding: "6px 12px 6px 6px", cursor: "pointer" }}>
+                {isShopView ? (
+                  <div style={{ width: 26, height: 26, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 20%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={13} style={{ color: "var(--gold)" }} /></div>
+                ) : (
+                  <Avatar size={26} initial={viewedProvider?.name?.charAt(0)} color={viewedProvider?.color} photo={viewedProvider?.photo} />
+                )}
+                <span style={{ fontSize: 13, color: "var(--text)", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isShopView ? "All shop" : (pulseView === "me" ? viewedProvider?.name : viewedProvider?.name)}</span>
+                <ChevronDown size={14} style={{ color: "var(--faint)" }} />
+              </button>
+              {pickerOpen && (
+                <>
+                  <div onClick={() => setPickerOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 50 }} />
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 200, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, boxShadow: "0 18px 40px rgba(0,0,0,0.25)", zIndex: 51, padding: 6, overflow: "hidden" }}>
+                    <button onClick={() => { setPulseView("me"); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: pulseView === "me" ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "none", color: "var(--text)", border: "none", borderRadius: 10, fontSize: 14, textAlign: "left" }}>
+                      <Avatar size={26} initial={me?.name?.charAt(0)} color={me?.color} photo={me?.photo} />
+                      <span style={{ flex: 1 }}>{me?.name} (you)</span>
+                    </button>
+                    {realProviders.filter((p) => p.id !== me?.id).map((p) => (
+                      <button key={p.id} onClick={() => { setPulseView(p.id); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: pulseView === p.id ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "none", color: "var(--text)", border: "none", borderRadius: 10, fontSize: 14, textAlign: "left" }}>
+                        <Avatar size={26} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
+                        <span style={{ flex: 1 }}>{p.name}</span>
+                      </button>
+                    ))}
+                    <div style={{ height: 1, background: "var(--line)", margin: "4px 6px" }} />
+                    <button onClick={() => { setPulseView("shop"); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: pulseView === "shop" ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "none", color: "var(--text)", border: "none", borderRadius: 10, fontSize: 14, textAlign: "left" }}>
+                      <div style={{ width: 26, height: 26, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 20%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={13} style={{ color: "var(--gold)" }} /></div>
+                      <span style={{ flex: 1 }}>All shop (combined)</span>
+                    </button>
+                    {onSignOut && (
+                      <>
+                        <div style={{ height: 1, background: "var(--line)", margin: "4px 6px" }} />
+                        <button onClick={() => { setPickerOpen(false); onSignOut(); }} style={{ width: "100%", padding: "10px 12px", background: "none", color: "var(--sub)", border: "none", borderRadius: 10, fontSize: 13, textAlign: "left" }}>Sign in as someone else…</button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            /* Barber view — small avatar + name, no toggle */
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 24, padding: "6px 12px 6px 6px" }}>
+              <Avatar size={26} initial={viewedProvider?.name?.charAt(0)} color={viewedProvider?.color} photo={viewedProvider?.photo} />
+              <span style={{ fontSize: 13, color: "var(--text)" }}>{viewedProvider?.name}</span>
+            </div>
+          )}
+        </div>
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{todayLabel.toUpperCase()}</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 36, fontWeight: 500, letterSpacing: -0.5, lineHeight: 0.98 }}>{headerName}</h2>
       </div>
 
-      {/* TODAY — the hero number */}
-      <div style={{ marginBottom: 36 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>TODAY</div>
+      {/* TODAY — your money */}
+      <div style={{ marginBottom: 30 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>{isShopView ? "TODAY · SHOP" : "TODAY · YOU"}</div>
         <div style={{ fontFamily: FONT_DISPLAY, fontSize: 60, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.5, marginBottom: 8 }}>
           {fmtMoney(todayMoney)}
         </div>
-        <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>
-          {todayCompleted === 0 && todayTotal > 0 && `${todayTotal} visit${todayTotal > 1 ? "s" : ""} on the books`}
-          {todayCompleted === 0 && todayTotal === 0 && "No visits booked today"}
-          {todayCompleted > 0 && `${todayCompleted} of ${todayTotal} ${todayTotal === 1 ? "visit" : "visits"} complete`}
-        </div>
+        {todayVsYesterday ? (
+          <div style={{ fontSize: 13.5, color: todayVsYesterday.up ? "var(--gold)" : "var(--sub)", lineHeight: 1.5 }}>
+            {todayVsYesterday.up ? "+" : "−"}{fmtMoney(todayVsYesterday.abs)} vs {fmtMoney(yesterdayMoney)} yesterday
+          </div>
+        ) : (
+          <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>
+            {todayApptsAll.length === 0 ? "Nothing booked today yet." : `${todayApptsAll.length} ${todayApptsAll.length === 1 ? "visit" : "visits"} on the books`}
+          </div>
+        )}
       </div>
+
+      {/* DAILY GOAL — per-person only */}
+      {!isShopView && dailyGoal > 0 && (
+        <div style={{ marginBottom: 30 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600 }}>DAILY GOAL</div>
+            <div style={{ fontSize: 13, color: dailyPct >= 100 ? "var(--gold)" : "var(--sub)", fontWeight: dailyPct >= 100 ? 600 : 400 }}>
+              {dailyPct >= 100 ? `🎯 ${fmtMoney(todayMoney)} of ${fmtMoney(dailyGoal)}` : `${fmtMoney(todayMoney)} of ${fmtMoney(dailyGoal)} · ${dailyPct}%`}
+            </div>
+          </div>
+          <div style={{ height: 8, background: "var(--panel2)", borderRadius: 4, overflow: "hidden" }}>
+            <div style={{ width: `${dailyPct}%`, height: "100%", background: dailyPct >= 100 ? "var(--gold)" : "color-mix(in srgb, var(--gold) 70%, var(--panel2))", transition: "width .3s ease" }} />
+          </div>
+        </div>
+      )}
+
+      {/* RIGHT NOW — what's happening on the chair */}
+      <div style={{ marginBottom: 30, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, padding: "18px 20px" }}>
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 10, fontWeight: 600 }}>RIGHT NOW</div>
+        {inChair ? (
+          <>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 4, lineHeight: 1.2 }}>{inChair.name}</div>
+            <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
+              {inChair.title} · <span style={{ color: "var(--gold)", fontWeight: 600 }}>{minutesLeft} min left</span> · started {minutesInChair} min ago
+            </div>
+          </>
+        ) : nextAppt ? (
+          <>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 4, lineHeight: 1.2 }}>Up next: {nextAppt.name}</div>
+            <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
+              {nextAppt.title} at {fmtTime(nextAppt.start)} · <span style={{ color: "var(--gold)", fontWeight: 600 }}>in {minutesUntil} min</span>
+            </div>
+          </>
+        ) : todayApptsAll.length > 0 ? (
+          <>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 4, lineHeight: 1.2 }}>Day's done</div>
+            <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>No more bookings today. {fmtMoney(todayMoney)} in.</div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 4, lineHeight: 1.2 }}>Open chair</div>
+            <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>No appointments booked today.</div>
+          </>
+        )}
+      </div>
+
+      {/* DAY TIMELINE — horizontal bar showing today's bookings */}
+      {todayApptsAll.length > 0 && (
+        <div style={{ marginBottom: 30 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600 }}>TODAY AT A GLANCE</div>
+            <div style={{ fontSize: 11, color: "var(--faint)" }}>{fmtTime(timelineStart)} → {fmtTime(timelineEnd)}</div>
+          </div>
+          <button onClick={() => onNavigate && onNavigate("calendar")} style={{ width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+            <div style={{ position: "relative", height: 30, background: "var(--panel2)", borderRadius: 6, overflow: "hidden" }}>
+              {todayApptsAll.map((a) => {
+                const left = pctFor(a.start);
+                const width = pctFor(a.end) - left;
+                if (width <= 0) return null;
+                return (
+                  <div key={a.id} title={`${a.name} · ${fmtTime(a.start)}`} style={{ position: "absolute", left: `${left}%`, width: `${width}%`, top: 3, bottom: 3, background: "var(--gold)", borderRadius: 3, opacity: a.status === "done" ? 0.5 : 1 }} />
+                );
+              })}
+              {/* "Now" line — only show if we're within the timeline range */}
+              {nowMin >= timelineStart && nowMin <= timelineEnd && (
+                <div style={{ position: "absolute", left: `${pctFor(nowMin)}%`, top: 0, bottom: 0, width: 2, background: "var(--text)", boxShadow: "0 0 0 2px var(--bg)" }} />
+              )}
+            </div>
+          </button>
+          <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 6, lineHeight: 1.4 }}>
+            {todayApptsAll.filter((a) => a.status === "done").length} done · {todayApptsAll.filter((a) => a.status !== "done").length} to go
+          </div>
+        </div>
+      )}
 
       <div style={{ height: 1, background: "var(--line)", margin: "0 0 30px" }} />
 
       {/* THIS WEEK */}
-      <div style={{ marginBottom: 36 }}>
+      <div style={{ marginBottom: 30 }}>
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>THIS WEEK</div>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1, marginBottom: 6 }}>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 36, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -0.8, marginBottom: 6 }}>
           {fmtMoney(thisWeekMoney)}
         </div>
         {weekDelta && (
-          <div style={{ fontSize: 13.5, color: weekDelta.up ? "var(--gold)" : "var(--sub)", marginBottom: 18, lineHeight: 1.5 }}>
-            {weekDelta.pct !== undefined ? (
-              <>{weekDelta.up ? "+" : "−"}{weekDelta.pct}% vs {fmtMoney(weekDelta.prior)} last week</>
-            ) : weekDelta.label}
+          <div style={{ fontSize: 13.5, color: weekDelta.up ? "var(--gold)" : "var(--sub)", marginBottom: 14, lineHeight: 1.5 }}>
+            {weekDelta.up ? "+" : "−"}{weekDelta.pct}% vs {fmtMoney(weekDelta.prior)} last week
           </div>
         )}
-        {!weekDelta && <div style={{ marginBottom: 18 }} />}
-
-        {/* Occupancy bar */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 13, color: "var(--sub)" }}>
-            <span>Chair time booked</span>
-            <span style={{ fontWeight: 600, color: "var(--text)" }}>{occupancyPct}%</span>
-          </div>
-          <div style={{ height: 6, background: "var(--panel2)", borderRadius: 3, overflow: "hidden" }}>
-            <div style={{ width: `${Math.min(100, occupancyPct)}%`, height: "100%", background: "var(--gold)" }} />
-          </div>
-        </div>
-
-        {/* Inline counts */}
-        <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
-          <span style={{ fontWeight: 600 }}>{weekBooked}</span> booked · <span style={{ fontWeight: 600 }}>{weekDone}</span> done
-          {weekCancelled > 0 && (<> · <span style={{ fontWeight: 600 }}>{weekCancelled}</span> cancelled</>)}
-        </div>
-      </div>
-
-      <div style={{ height: 1, background: "var(--line)", margin: "0 0 30px" }} />
-
-      {/* THIS MONTH */}
-      <div style={{ marginBottom: 36 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>THIS MONTH</div>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1, marginBottom: 6 }}>
-          {fmtMoney(thisMonthMoney)}
-        </div>
-        {monthDelta && (
-          <div style={{ fontSize: 13.5, color: monthDelta.up ? "var(--gold)" : "var(--sub)", lineHeight: 1.5 }}>
-            {monthDelta.pct !== undefined ? (
-              <>{monthDelta.up ? "+" : "−"}{monthDelta.pct}% vs {fmtMoney(monthDelta.prior)} last month</>
-            ) : monthDelta.label}
-          </div>
-        )}
-      </div>
-
-      {(topService || topClient) && <div style={{ height: 1, background: "var(--line)", margin: "0 0 30px" }} />}
-
-      {/* THIS WEEK'S TOP */}
-      {(topService || topClient) && (
-        <div style={{ marginBottom: 30 }}>
-          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>THIS WEEK'S TOP</div>
-          <div style={{ display: "grid", gap: 14 }}>
-            {topService && topService.svc && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
-                <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Service</div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topService.svc.name}</div>
-                  <div style={{ fontSize: 13, color: "var(--faint)", flexShrink: 0 }}>{topService.count}×</div>
-                </div>
-              </div>
-            )}
-            {topClient && topClient.client && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
-                <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Client</div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topClient.client.name}</div>
-                  <div style={{ fontSize: 13, color: "var(--faint)", flexShrink: 0 }}>{topClient.count}×</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Action CTA — revenue drill-in */}
-      {onOpenRevenue && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />
-          <button onClick={onOpenRevenue} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <TrendingUp size={17} style={{ color: "var(--gold)" }} />
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: 15, fontWeight: 500 }}>View revenue trend</div>
-                <div style={{ fontSize: 13, color: "var(--sub)" }}>Week, month, year — top services and clients</div>
+        {/* WEEKLY GOAL — per-person only */}
+        {!isShopView && weeklyGoal > 0 && (
+          <div style={{ marginTop: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+              <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>WEEKLY GOAL</div>
+              <div style={{ fontSize: 12.5, color: weeklyPct >= 100 ? "var(--gold)" : "var(--sub)", fontWeight: weeklyPct >= 100 ? 600 : 400 }}>
+                {weeklyPct >= 100 ? `🎯 ${fmtMoney(thisWeekMoney)} of ${fmtMoney(weeklyGoal)}` : `${fmtMoney(thisWeekMoney)} of ${fmtMoney(weeklyGoal)} · ${weeklyPct}%`}
               </div>
             </div>
-            <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-          </button>
+            <div style={{ height: 6, background: "var(--panel2)", borderRadius: 3, overflow: "hidden" }}>
+              <div style={{ width: `${weeklyPct}%`, height: "100%", background: weeklyPct >= 100 ? "var(--gold)" : "color-mix(in srgb, var(--gold) 70%, var(--panel2))", transition: "width .3s ease" }} />
+            </div>
+          </div>
+        )}
+        {/* Gentle empty-state for goals — only shown in per-person view when neither goal is set */}
+        {!isShopView && dailyGoal === 0 && weeklyGoal === 0 && (
+          <div style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", marginTop: 10 }}>
+            Set a daily or weekly goal in Settings → Staff to track progress.
+          </div>
+        )}
+      </div>
+
+      {/* OWNER-ONLY REPORTS — hidden for barbers */}
+      {isOwner && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />
+          {onOpenRevenue && (
+            <button onClick={onOpenRevenue} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <TrendingUp size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>View revenue trend</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Week, month, year — top services and clients</div>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          )}
+          {onOpenAppointments && (
+            <button onClick={onOpenAppointments} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <BarChart3 size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>View appointments</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Counts, no-shows, busiest day &amp; hour</div>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          )}
+          {onOpenClients && (
+            <button onClick={onOpenClients} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Users size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>View clients</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>New vs returning, retention, top clients</div>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          )}
+          {onOpenServices && (
+            <button onClick={onOpenServices} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Sparkles size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>View service mix</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>What drives revenue · $ per hour</div>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          )}
+          {onOpenBarbers && realProviders.length > 1 && (
+            <button onClick={onOpenBarbers} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: overdueCount > 0 ? 14 : 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Users size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>View per barber</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Each barber's revenue, occupancy &amp; retention</div>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          )}
         </>
       )}
 
-      {/* Action CTA — appointments drill-in */}
-      {onOpenAppointments && (
-        <button onClick={onOpenAppointments} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <BarChart3 size={17} style={{ color: "var(--gold)" }} />
-            <div style={{ textAlign: "left" }}>
-              <div style={{ fontSize: 15, fontWeight: 500 }}>View appointments</div>
-              <div style={{ fontSize: 13, color: "var(--sub)" }}>Counts, no-shows, busiest day &amp; hour</div>
-            </div>
-          </div>
-          <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-        </button>
-      )}
-
-      {/* Action CTA — clients drill-in */}
-      {onOpenClients && (
-        <button onClick={onOpenClients} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Users size={17} style={{ color: "var(--gold)" }} />
-            <div style={{ textAlign: "left" }}>
-              <div style={{ fontSize: 15, fontWeight: 500 }}>View clients</div>
-              <div style={{ fontSize: 13, color: "var(--sub)" }}>New vs returning, retention, top clients</div>
-            </div>
-          </div>
-          <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-        </button>
-      )}
-
-      {/* Action CTA — service mix drill-in */}
-      {onOpenServices && (
-        <button onClick={onOpenServices} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Sparkles size={17} style={{ color: "var(--gold)" }} />
-            <div style={{ textAlign: "left" }}>
-              <div style={{ fontSize: 15, fontWeight: 500 }}>View service mix</div>
-              <div style={{ fontSize: 13, color: "var(--sub)" }}>What drives revenue · $ per hour</div>
-            </div>
-          </div>
-          <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-        </button>
-      )}
-
-      {/* Action CTA — per-barber drill-in (only shown when there's more than one provider) */}
-      {onOpenBarbers && providers.filter((p) => p.id !== "anyone").length > 1 && (
-        <button onClick={onOpenBarbers} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: overdueCount > 0 ? 14 : 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Users size={17} style={{ color: "var(--gold)" }} />
-            <div style={{ textAlign: "left" }}>
-              <div style={{ fontSize: 15, fontWeight: 500 }}>View per barber</div>
-              <div style={{ fontSize: 13, color: "var(--sub)" }}>Each barber's revenue, occupancy &amp; retention</div>
-            </div>
-          </div>
-          <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-        </button>
-      )}
-
-      {/* Action CTA — overdue clients */}
+      {/* OVERDUE CTA — shown to everyone in their scope */}
       {overdueCount > 0 && (
-        <button onClick={() => onNavigate && onNavigate("clients")} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer" }}>
+        <button onClick={() => onNavigate && onNavigate("clients")} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginTop: isOwner ? 0 : 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Bell size={17} style={{ color: "var(--gold)" }} />
             <div style={{ textAlign: "left" }}>
@@ -4597,6 +4673,44 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   const [msgTarget, setMsgTarget] = useState(null); // { clientId, draft } — opens a convo prefilled
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3400); };
 
+  // --- Pulse 2.0: "signed in as" picker. Until real auth, each device remembers which
+  // barber is using it (localStorage). Owners can also pick "All shop" for a combined view.
+  const realProviders = providers.filter((p) => p.id !== "anyone");
+  const [signedInAs, setSignedInAs] = useState(() => {
+    if (typeof window === "undefined") return realProviders[0]?.id || null;
+    const saved = window.localStorage.getItem("vero_signed_in_as");
+    if (saved && providers.some((p) => p.id === saved)) return saved;
+    // Default: first owner, falling back to first provider
+    const firstOwner = realProviders.find((p) => p.pulseRole === "owner") || realProviders[0];
+    return firstOwner?.id || null;
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined" && signedInAs) {
+      window.localStorage.setItem("vero_signed_in_as", signedInAs);
+    }
+  }, [signedInAs]);
+  // If the currently-signed-in provider gets deleted, fall back gracefully
+  useEffect(() => {
+    if (signedInAs && !providers.some((p) => p.id === signedInAs)) {
+      setSignedInAs(realProviders[0]?.id || null);
+    }
+  }, [providers, signedInAs]);
+  const me = providers.find((p) => p.id === signedInAs);
+  const isOwner = me?.pulseRole === "owner";
+  // Pulse 2.0: owners can also "view as" another barber or "shop" totals. Barbers can't.
+  const [pulseView, setPulseView] = useState("me"); // "me" | "shop" | <providerId>
+  // Reset pulseView whenever the signed-in user changes
+  useEffect(() => { setPulseView("me"); }, [signedInAs]);
+  // Modal picker for switching the signed-in barber (shown via Pulse owner menu)
+  const [showSignInPicker, setShowSignInPicker] = useState(false);
+  // First-load: if no provider has ever been "signed in" before, prompt the user
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!window.localStorage.getItem("vero_signed_in_as") && realProviders.length > 1) {
+      setShowSignInPicker(true);
+    }
+  }, []);
+
   // Always land at the top of the screen when changing tabs, opening a profile, or drilling into a Pulse detail.
   useEffect(() => {
     try { window.scrollTo({ top: 0, behavior: "instant" }); } catch { window.scrollTo(0, 0); }
@@ -4623,7 +4737,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         <div style={{ width: 50 }} />
       </div>
       <div style={{ maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
-        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
@@ -4650,6 +4764,29 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
           </button>
         ))}
       </div>
+
+      {/* SIGN-IN PICKER — appears on first load (if multiple providers), or when user picks "Sign in as someone else" from Pulse menu. Pre-auth honor-system version. */}
+      {showSignInPicker && (
+        <div onClick={() => signedInAs && setShowSignInPicker(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "26px 22px", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
+            <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 6 }}>Who's at the chair?</h2>
+            <p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5, marginBottom: 20 }}>Tap your name. This device remembers, so you only see this once.</p>
+            <div style={{ display: "grid", gap: 8 }}>
+              {realProviders.map((p) => (
+                <button key={p.id} onClick={() => { setSignedInAs(p.id); setShowSignInPicker(false); }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: signedInAs === p.id ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1px solid ${signedInAs === p.id ? "var(--gold)" : "var(--border)"}`, color: "var(--text)", borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
+                  <Avatar size={36} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15.5, fontWeight: 500 }}>{p.name}</div>
+                    <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{p.role}{p.pulseRole === "owner" ? " · Owner" : ""}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            {signedInAs && <button onClick={() => setShowSignInPicker(false)} style={{ width: "100%", marginTop: 16, background: "none", color: "var(--sub)", border: "none", padding: 10, fontSize: 14 }}>Cancel</button>}
+          </div>
+        </div>
+      )}
 
       {toast && <div className="fade-in" style={{ position: "fixed", bottom: 92, left: "50%", transform: "translateX(-50%)", background: "var(--gold)", color: "var(--on-gold)", padding: "14px 22px", borderRadius: 12, fontSize: 14, fontWeight: 500, boxShadow: "0 8px 30px rgba(0,0,0,.5)", maxWidth: "90%", textAlign: "center", zIndex: 30 }}>{toast}</div>}
     </div>
@@ -6434,7 +6571,41 @@ function StaffEditor({ providers, setProviders, showToast }) {
                   <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Role / title</label>
                   <input value={p.role} onChange={(e) => setRole(p.id, e.target.value)} style={{ ...inputStyle, marginBottom: 18 }} />
 
-                  {/* End-of-day overrun — per-barber preference */}
+                  {/* Pulse permissions — Owner sees everyone's numbers + shop totals; Barber sees only their own chair. */}
+                  <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 14px", marginBottom: 14 }}>
+                    <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 4 }}>Pulse access</div>
+                    <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginBottom: 12 }}>Owners see all barbers and shop totals. Barbers see only their own chair.</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {[["barber", "Barber"], ["owner", "Owner"]].map(([id, label]) => {
+                        const on = (p.pulseRole || "barber") === id;
+                        return (
+                          <button key={id} onClick={() => setProviders(providers.map((x) => x.id === p.id ? { ...x, pulseRole: id } : x))} style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{label}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Earnings goals — drive the Pulse goal progress bars */}
+                  <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 14px", marginBottom: 18 }}>
+                    <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 4 }}>Earnings goals</div>
+                    <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginBottom: 14 }}>Personal targets that show as progress bars on Pulse. Set to 0 to hide. Only {p.name} sees these.</div>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                        <label style={{ fontSize: 13, color: "var(--sub)" }}>Daily</label>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 14, color: "var(--faint)" }}>$</span>
+                          <input type="number" min="0" step="25" value={p.dailyGoal || 0} onChange={(e) => setProviders(providers.map((x) => x.id === p.id ? { ...x, dailyGoal: Math.max(0, parseInt(e.target.value || "0", 10)) } : x))} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, width: 90, textAlign: "right" }} />
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                        <label style={{ fontSize: 13, color: "var(--sub)" }}>Weekly</label>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 14, color: "var(--faint)" }}>$</span>
+                          <input type="number" min="0" step="50" value={p.weeklyGoal || 0} onChange={(e) => setProviders(providers.map((x) => x.id === p.id ? { ...x, weeklyGoal: Math.max(0, parseInt(e.target.value || "0", 10)) } : x))} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, width: 90, textAlign: "right" }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 14px", marginBottom: 18 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: (p.overrunMin || 0) > 0 ? 12 : 0 }}>
                       <div>
