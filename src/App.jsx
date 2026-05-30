@@ -740,7 +740,7 @@ export default function App() {
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Oswald:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         #app-root { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; line-height: 1.5; letter-spacing: 0.1px; }
-        #app-root h1, #app-root h2, #app-root h3 { letter-spacing: -0.2px; }
+        #app-root h1, #app-root h2, #app-root h3 { letter-spacing: -0.2px; color: var(--text); }
         #app-root a, #app-root button { color: inherit; }
         a[x-apple-data-detectors], a[href^="tel"] { color: inherit !important; text-decoration: none !important; }
         body, button, input, textarea { font-family: var(--font-body, 'Jost', sans-serif); }
@@ -3320,7 +3320,7 @@ function PulseView({ business, appts, clients, services, providers, setProviders
           )}
         </div>
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{todayLabel.toUpperCase()}</div>
-        <h2 style={{ fontFamily: FONT_NUMERAL, fontSize: 40, fontWeight: 600, letterSpacing: -0.5, lineHeight: 0.98 }}>{headerName}</h2>
+        <h2 style={{ fontFamily: FONT_NUMERAL, fontSize: 40, fontWeight: 600, letterSpacing: -0.5, lineHeight: 0.98, color: "var(--text)" }}>{headerName}</h2>
       </div>
 
       {/* TODAY — money + goal ring side by side (the cockpit hero) */}
