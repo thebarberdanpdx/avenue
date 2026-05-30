@@ -3224,7 +3224,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 // Owners get a "viewing as" picker to flip between barbers or shop totals.
 // Barbers only see their own chair, period.
 // ============================================================
-function PulseView({ business, appts, clients, services, providers, setProviders, me, isOwner, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onSignOut }) {
+function PulseView({ business, appts, setAppts, clients, setClients, services, providers, setProviders, me, isOwner, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onSignOut, showToast }) {
   const now = new Date();
   const realProviders = providers.filter((p) => p.id !== "anyone");
 
@@ -3514,6 +3514,56 @@ function PulseView({ business, appts, clients, services, providers, setProviders
           </>
         )}
       </div>
+
+      {/* RUNNING LATE — surfaces on Pulse when the in-chair appointment is within the threshold of overrunning the next one,
+          so the provider can text the next client without digging through the calendar. */}
+      {inChair && nextAppt && minutesLeft != null && minutesLeft <= ((business?.runningLate?.thresholdMin) || 5) && (business?.runningLate?.enabled !== false) && !nextAppt.lateNotified && (
+        <div style={{ marginBottom: 16, background: "color-mix(in srgb, var(--gold) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "14px 16px" }}>
+          <div style={{ fontSize: 10.5, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 6, fontWeight: 600 }}>RUNNING LATE?</div>
+          <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 10 }}>
+            {minutesLeft} min left with {inChair.name}. {(nextAppt.name || "").split(" ")[0]} is up next at {fmtTime(nextAppt.start)}. Want to give them a heads-up?
+          </div>
+          <button onClick={() => {
+            const lateMin = (business?.runningLate?.defaultMin) || 10;
+            setAppts((cur) => cur.map((a) => a.id === nextAppt.id ? { ...a, lateNotified: lateMin } : a));
+            if (showToast) showToast(`Sent ${(nextAppt.name || "").split(" ")[0]} a heads-up — running ${lateMin} min behind.`);
+          }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "9px 16px", borderRadius: 22, fontSize: 13.5, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>LET THEM KNOW</button>
+        </div>
+      )}
+
+      {/* VERIFY TIME — duration suggestions land here after a checkout (instead of popping up in front of the client at checkout).
+          Only shown in personal or per-provider view, never shop-wide, because the action is "save this person's custom time". */}
+      {viewedProvider && (() => {
+        const pendingDuration = appts.filter((a) => a.providerId === viewedProvider.id && a.status === "done" && a.pendingDurationSave);
+        if (pendingDuration.length === 0) return null;
+        return (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>VERIFY TIME</div>
+            {pendingDuration.map((a) => {
+              const d = a.pendingDurationSave;
+              const onSave = () => {
+                setClients((cur) => cur.map((c) => c.id === d.clientId ? { ...c, customDurations: { ...(c.customDurations || {}), [d.serviceId]: d.suggestedMin } } : c));
+                setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, pendingDurationSave: null } : x));
+                if (showToast) showToast(`Saved — ${d.serviceName} books at ${d.suggestedMin} min for ${(d.clientName || "").split(" ")[0]}.`);
+              };
+              const onDismiss = () => {
+                setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, pendingDurationSave: null } : x));
+              };
+              return (
+                <div key={a.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", marginBottom: 8 }}>
+                  <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 12 }}>
+                    <strong>{d.clientName}</strong>'s {d.serviceName} took <strong style={{ color: "var(--gold)" }}>{d.measuredMin} min</strong>{d.currentDur != null ? ` (was scheduled for ${d.currentDur} min)` : ""}. Save {d.suggestedMin} min as their new time?
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="lift" onClick={onSave} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: "10px 14px", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", letterSpacing: 0.5 }}>SAVE {d.suggestedMin} MIN</button>
+                    <button onClick={onDismiss} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: "10px 14px", borderRadius: 10, fontSize: 14 }}>Discard</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* DAY TIMELINE — horizontal bar showing today's bookings */}
       {todayApptsAll.length > 0 && (
@@ -5083,7 +5133,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         <div style={{ width: 50 }} />
       </div>
       <div style={{ maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
-        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} clients={clients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
@@ -8046,7 +8096,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   const startCheckout = (appt) => { setOpen(null); setCheckout(appt); };
   const finishCheckout = (id, summary) => {
     setAppts((cur) => {
-      const done = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary } : a);
+      const done = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a);
       // if they rebooked, drop a real future appointment on the calendar — confirmed, NOT prepaid
       if (summary && (summary.rebookWeeks != null || summary.rebookDate)) {
         const src = cur.find((a) => a.id === id);
@@ -8885,9 +8935,9 @@ function Checkout({ appt, service, provider, business, clients, setClients, show
   const tapCard = () => { setStage("reader"); setTimeout(() => setStage(tipCfg.enabled ? "tip" : "approving"), 1700); };
   const confirmTip = () => { setStage("approving"); setTimeout(() => setStage("approved"), 1400); };
   useEffect(() => {
-    if (stage === "approved") { const t = setTimeout(() => setStage(showDurationSuggest ? "duration" : (rebookCfg.enabled ? "rebook" : "done")), 1300); return () => clearTimeout(t); }
+    if (stage === "approved") { const t = setTimeout(() => setStage(rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
     if (stage === "rebook" && rhythmWeek != null && rebookWeeks == null && !customDate) { setRebookWeeks(rhythmWeek); }
-    if (stage === "done") { const t = setTimeout(() => onDone(appt.id, { total, totalLabel: money(total), tip: tipAmt, rebookWeeks, rebookDate: customDate, rebookLabel: hasSelection ? selectionLabel : null }), 1200); return () => clearTimeout(t); }
+    if (stage === "done") { const t = setTimeout(() => onDone(appt.id, { total, totalLabel: money(total), tip: tipAmt, rebookWeeks, rebookDate: customDate, rebookLabel: hasSelection ? selectionLabel : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null }), 1200); return () => clearTimeout(t); }
   }, [stage]);
 
   const rebookDate = (weeks) => { const d = new Date(); d.setDate(d.getDate() + weeks * 7); return d; };
@@ -8969,23 +9019,6 @@ function Checkout({ appt, service, provider, business, clients, setClients, show
       )}
     </div>
   );
-
-  if (stage === "duration") return sheet(
-    <div style={{ padding: "28px 24px 32px" }}>
-      <div style={{ textAlign: "center", marginBottom: 22 }}>
-        <div style={{ width: 56, height: 56, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Clock size={26} style={{ color: "var(--gold)" }} /></div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, lineHeight: 1.15 }}>That took {measuredMin} min</h2>
-        <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.5 }}>Save <strong style={{ color: "var(--gold)" }}>{adjustMin} min</strong> as {(liveClient?.name || "this client").split(" ")[0]}'s time for {service?.name}? It books faster next time.</p>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 24 }}>
-        <button onClick={() => setAdjustMin((m) => Math.max(5, m - 5))} style={{ width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 22 }}>−</button>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 34, minWidth: 90, textAlign: "center" }}>{adjustMin} min</div>
-        <button onClick={() => setAdjustMin((m) => m + 5)} style={{ width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 22 }}>+</button>
-      </div>
-      <button className="lift" onClick={() => { saveDuration(adjustMin); setStage(rebookCfg.enabled ? "rebook" : "done"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 12 }}>SAVE {adjustMin} MIN</button>
-      <button onClick={() => setStage(rebookCfg.enabled ? "rebook" : "done")} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 15, padding: 6 }}>Discard — keep current time</button>
-    </div>
-  , false);
 
   if (stage === "rebook") return sheet(
     <div style={{ padding: "28px 24px 32px" }}>
