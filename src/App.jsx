@@ -7745,20 +7745,20 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <WaitingRoomEditor w={form.waitingRoom || {}} onChange={(wr) => setForm({ ...form, waitingRoom: { ...(form.waitingRoom || {}), ...wr } })} />,
     },
     {
-      id: "runninglate", title: "Running Late Alerts", icon: Clock, category: "Calendar & Appointments",
+      id: "runninglate", title: "Running Late Alerts", smart: true, icon: Clock, category: "Calendar & Appointments",
       status: form.runningLate?.enabled === false ? "Off" : `On · ${form.runningLate?.thresholdMin || 5} min warning`,
       keywords: "running late behind next client wrapping up notify prompt delay minutes message schedule overrun",
       editor: <RunningLateEditor r={form.runningLate || {}} onChange={(rl) => setForm({ ...form, runningLate: { ...(form.runningLate || {}), ...rl } })} />,
     },
     {
-      id: "overduebuffer", title: "It's Been a While", icon: Clock, category: "Calendar & Appointments",
+      id: "overduebuffer", title: "It's Been a While", smart: true, icon: Clock, category: "Calendar & Appointments",
       status: form.overdueBuffer?.enabled === false ? "Off" : `+${form.overdueBuffer?.addMinutes || 10} min after ${form.overdueBuffer?.thresholdWeeks || 8} wks`,
       keywords: "overdue buffer been a while extra time add minutes long time since last visit haircut more to cut charge free bonus perceived value lapsed returning",
       editor: <OverdueBufferEditor b={form.overdueBuffer || {}} onChange={(ob) => setForm({ ...form, overdueBuffer: { ...(form.overdueBuffer || {}), ...ob } })} />,
     },
     {
-      id: "policy", title: "Cancel & Reschedule", icon: AlertCircle, category: "Calendar & Appointments",
-      status: form.policy ? "Set" : "Not set", keywords: "cancellation no-show policy refund rules deposit charge reschedule",
+      id: "policy", title: "No-show Protection", subtitle: "Cancellation & reschedule policy", icon: AlertCircle, category: "Calendar & Appointments",
+      status: form.policy ? "Set" : "Not set", keywords: "cancellation no-show no show policy refund rules deposit charge fee reschedule late cancel card on file protect revenue window cutoff",
       editor: (<>
         {field("CANCELLATION / NO-SHOW POLICY", "policy", true)}
         <p style={{ fontSize: 14, color: "var(--faint)", lineHeight: 1.5 }}>Write this to match your own rules and your state's regulations. Shows on the booking screen.</p>
@@ -7771,9 +7771,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <WaitlistRulesEditor w={form.waitlist || { mode: "ask", order: "longest", delayMin: 30 }} onChange={(wl) => setForm({ ...form, waitlist: wl })} />,
     },
     {
-      id: "autotiming", title: "Smart Timing", icon: Clock, category: "Calendar & Appointments",
-      status: (form.autoTiming?.enabled === false) ? "Off" : "On — suggests durations",
-      keywords: "auto timing smart duration clock service time measure suggest save remembered learn how long takes",
+      id: "autotiming", title: "Smart Timing", smart: true, icon: Clock, category: "Calendar & Appointments",
+      status: (form.autoTiming?.enabled === false) ? "Off" : "On — learns each service's real time",
+      keywords: "auto timing smart duration clock service time measure suggest save remembered learn how long takes efficient fit more clients accurate",
       editor: <ToggleSetting label="Suggest saving service times" desc="After checkout, offer to save how long the service actually took as that client's time, so future bookings get more accurate." on={form.autoTiming?.enabled !== false} onToggle={(v) => setForm({ ...form, autoTiming: { ...(form.autoTiming || {}), enabled: v } })} />,
     },
     {
@@ -7789,7 +7789,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <ToggleSetting label="Let clients book for family / multiple people" desc="Recognized clients can save family members and book several people in one visit (together or back-to-back)." on={form.familyBooking?.enabled !== false} onToggle={(v) => setForm({ ...form, familyBooking: { ...(form.familyBooking || {}), enabled: v } })} />,
     },
     {
-      id: "photos", title: "Reference Photos", icon: Camera, category: "Online Booking",
+      id: "refphotos", title: "Reference Photos", icon: Camera, category: "Online Booking",
       status: form.bookingPhotos?.mode === "off" ? "Off" : (form.bookingPhotos?.mode === "required" ? "Required" : "Optional"),
       keywords: "photo photos reference picture inspiration upload booking required optional off image",
       editor: <PhotoModeSetting mode={form.bookingPhotos?.mode || "optional"} onChange={(m) => setForm({ ...form, bookingPhotos: { ...(form.bookingPhotos || {}), mode: m } })} />,
@@ -7818,8 +7818,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <RebookCheckoutEditor r={form.rebook || { enabled: true, discountEnabled: true, discountType: "amount", discount: 5, weeks: [2,3,4,6,8] }} onChange={(rb) => setForm({ ...form, rebook: { ...(form.rebook || {}), ...rb } })} />,
     },
     {
-      id: "booking", title: "Online Booking", icon: Calendar, category: "Online Booking",
-      status: bookingStatus(form.booking), keywords: "online booking link card required deposit lead time buffer cap gaps rebook setup",
+      id: "booking", title: "Online Booking", subtitle: "What clients see when booking", icon: Calendar, category: "Online Booking",
+      status: bookingStatus(form.booking), keywords: "online booking link card required deposit lead time buffer cap gaps rebook setup how early advance days ahead far minimum notice times slots increments what clients see",
       editor: <BookingRulesEditor b={form.booking} onChange={(bk) => setForm({ ...form, booking: bk })} />,
     },
     {
@@ -7852,7 +7852,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <MessagesEditor messages={form.messages || []} onChange={(msgs) => setForm({ ...form, messages: msgs })} business={form} />,
     },
     {
-      id: "reports", title: "Reports", icon: BarChart3, category: "Reporting",
+      id: "reports", title: "Reports & Insights", icon: BarChart3, category: "Reporting",
       status: "Revenue, staff, retention",
       keywords: "reports reporting analytics revenue sales staff performance retention average ticket dashboard insights numbers trends",
       editor: <ReportsView appts={appts} clients={clients} providers={providers} services={services} business={form} />,
@@ -7863,18 +7863,21 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   // ---- Category grid: concrete, plain-named buckets. Every setting lives in exactly one,
   // so nothing falls through to search-only. Tap a tile → that category's list. ----
   const CATS = [
-    { id: "shop",  label: "Your Shop", icon: User,       desc: "Identity, team, hours, branding", settings: ["business", "hours", "staff", "locations", "phones", "appearance", "theme"] },
-    { id: "book",  label: "Booking",   icon: Calendar,   desc: "How clients book themselves",     settings: ["booking", "staffselection", "newclient", "family", "policy", "rebook_usual"] },
-    { id: "cal",   label: "Calendar",  icon: Clock,      desc: "How the day behaves",             settings: ["scheduling", "avoidgaps", "autotiming", "waitlist", "waitingroom", "runninglate", "overduebuffer", "photos"] },
-    { id: "pay",   label: "Checkout",  icon: CreditCard, desc: "Tipping, payments, rebooking",    settings: ["tipping", "checkout", "rebookco"] },
-    { id: "msg",   label: "Messages",  icon: Bell,       desc: "What goes out, and how",          settings: ["notifications", "messages"] },
-    { id: "menu",  label: "Services & Menu", icon: ImageIcon, desc: "Your service list & pricing", settings: ["servicesmenu"] },
-    { id: "data",  label: "Insights & Data", icon: BarChart3, desc: "Reports, AI, importing",     settings: ["reports", "aicuthelper", "import"] },
+    { id: "shop",  label: "Your Shop", icon: User,       desc: "Your name, hours, branding & logo", settings: ["business", "hours", "appearance", "theme", "locations", "phones"] },
+    { id: "staff", label: "Staff",      icon: Users,      desc: "Everyone who works here, their access & pay", settings: ["staff", "staffselection"] },
+    { id: "book",  label: "Online Booking", tag: "What clients see when booking", icon: Calendar, desc: "How clients book you online", settings: ["booking", "newclient", "family", "refphotos", "waitlist", "rebook_usual"] },
+    { id: "smart", label: "Smart Timing", smart: true, icon: Sparkles, desc: "The scheduling smarts that save you time", settings: ["autotiming", "overduebuffer", "runninglate"] },
+    { id: "dayof", label: "Day-of Tools", icon: Clock,    desc: "Managing the day as it happens", settings: ["scheduling", "avoidgaps", "waitingroom", "photos"] },
+    { id: "pay",   label: "Checkout & Money", icon: CreditCard, desc: "Tipping, payments, rebooking & no-show protection", settings: ["tipping", "checkout", "rebookco", "policy"] },
+    { id: "msg",   label: "Messages clients get", icon: Bell, desc: "Every automatic text & email, in your words", settings: ["notifications", "messages"] },
+    { id: "menu",  label: "Services & Menu", icon: ImageIcon, desc: "Your services, add-ons, photos & pricing", settings: ["servicesmenu"] },
+    { id: "data",  label: "Reports & Insights", icon: BarChart3, desc: "Your numbers, AI tools & importing", settings: ["reports", "aicuthelper", "import"] },
   ];
-  // Safety net: any card not placed above still appears (appended to Insights & Data) so nothing is ever lost.
+  // Safety net: any card not placed above still appears (appended to Reports & Insights) so nothing is ever lost.
   const placed = new Set(CATS.flatMap((c) => c.settings));
   const orphans = cards.filter((c) => !placed.has(c.id)).map((c) => c.id);
   if (orphans.length) CATS[CATS.length - 1].settings.push(...orphans);
+
 
   const [openCat, setOpenCat] = useState(null);
   const [cockpitHidden, setCockpitHidden] = useState(false);
@@ -7910,7 +7913,14 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const showCockpit = (setupLeft.length + testLeft.length) > 0 && !cockpitHidden && !query.trim();
 
   const q = query.trim().toLowerCase();
-  const filtered = q ? cards.filter((c) => (c.title + " " + c.keywords).toLowerCase().includes(q)) : cards;
+  // Smart search: match a card on its title, plain-English subtitle, keyword synonyms,
+  // AND the name + tag of the section it lives in — so typing the area name surfaces its settings too.
+  const catOf = (cardId) => CATS.find((cat) => cat.settings.includes(cardId));
+  const filtered = q ? cards.filter((c) => {
+    const cat = catOf(c.id);
+    const hay = [c.title, c.subtitle, c.keywords, cat?.label, cat?.tag, cat?.desc].filter(Boolean).join(" ").toLowerCase();
+    return hay.includes(q);
+  }) : cards;
   const active = cards.find((c) => c.id === openCard);
 
   // ---- full-page editor for the selected setting ----
@@ -7921,8 +7931,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
         <div style={{ marginBottom: 26 }}>
           <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.4px", marginBottom: 6 }}>{active.title}</h2>
-          {active.status && <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.4 }}>{active.status}</div>}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.4px" }}>{active.title}</h2>
+            {active.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "3px 7px" }}>SMART</span>}
+          </div>
+          {active.subtitle && <div style={{ fontSize: 15, color: "var(--gold)", marginTop: 6, fontWeight: 500 }}>{active.subtitle}</div>}
+          {active.status && <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.4, marginTop: 6 }}>{active.status}</div>}
         </div>
 
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "20px 18px", boxShadow: "var(--shadow-sm)" }}>
@@ -8007,8 +8021,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                     <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
                       <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</div>
-                        <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</span>
+                          {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
+                        </div>
+                        <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>
                       </div>
                     </div>
                     <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
@@ -8027,7 +8044,10 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             <div className="screen-swap">
               <button onClick={() => setOpenCat(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14.5, marginBottom: 20, padding: 0, border: "none" }}><ArrowLeft size={16} /> All settings</button>
               <div style={{ marginBottom: 22 }}>
-                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, letterSpacing: "-0.4px", marginBottom: 6 }}>{cat.label}</h2>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                  <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, letterSpacing: "-0.4px" }}>{cat.label}</h2>
+                  {cat.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "3px 7px" }}>SMART</span>}
+                </div>
                 <p style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300, lineHeight: 1.45 }}>{cat.desc}</p>
               </div>
               <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
@@ -8038,8 +8058,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                       <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
                         <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</div>
-                          <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</span>
+                            {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
+                          </div>
+                          <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>
                         </div>
                       </div>
                       <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
@@ -8073,13 +8096,25 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           </div>
 
           <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" }}>OR BROWSE BY AREA</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 9 }}>
-            {CATS.map((cat) => (
-              <button key={cat.id} onClick={() => setOpenCat(cat.id)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px", borderRadius: 12, background: "var(--panel)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 14 }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--gold)" }} />
-                {cat.label}
-              </button>
-            ))}
+          <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
+            {CATS.map((cat) => {
+              const Icon = cat.icon || Settings;
+              return (
+                <button key={cat.id} onClick={() => setOpenCat(cat.id)} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", border: "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 11, background: cat.smart ? "color-mix(in srgb, var(--gold) 20%, transparent)" : "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={17} style={{ color: "var(--gold)" }} /></div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 15.5, fontWeight: 500 }}>{cat.label}</span>
+                        {cat.smart && <span style={{ fontSize: 9.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 6px" }}>SMART</span>}
+                      </div>
+                      <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.tag || cat.desc}</div>
+                    </div>
+                  </div>
+                  <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
