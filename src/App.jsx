@@ -600,8 +600,8 @@ function TimeScrollPicker({ value, onChange, step = 15, minMin = 0, maxMin = 24 
   }, [open]);
   return (
     <>
-      <button onClick={() => setOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: compact ? "8px 12px" : "11px 15px", color: "var(--text)", fontSize: compact ? 14.5 : 15.5, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" }}>
-        <Clock size={compact ? 14 : 15} style={{ color: "var(--gold)" }} /> {fmtTime(value)}
+      <button onClick={() => setOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: compact ? "8px 11px" : "11px 15px", color: "var(--text)", fontSize: compact ? 14 : 15.5, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" }}>
+        {!compact && <Clock size={15} style={{ color: "var(--gold)" }} />} {fmtTime(value)}
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} align="center" maxWidth={300}>
         <div style={{ padding: "4px 0 6px" }}>
@@ -7327,29 +7327,26 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         </div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "8px 14px" }}>
           {days.map((d, i) => { const dow = d.getDay(); const h = person.hours[dow] || { on: false, start: 540, end: 1020 }; return (
-            <div key={i} style={{ padding: "14px 4px", borderTop: i ? "1px solid var(--line)" : "none" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 52, flexShrink: 0 }}><div style={{ fontSize: 14.5, fontWeight: 700 }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</div><div style={{ fontSize: 12.5, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div></div>
-                <button onClick={() => patchDay(person.id, dow, { on: !h.on })} aria-label={h.on ? "Turn day off" : "Turn day on"} style={{ width: 50, height: 29, borderRadius: 29, border: "none", flexShrink: 0, background: h.on ? "var(--gold)" : "var(--border2)", position: "relative", cursor: "pointer" }}>
-                  <span style={{ position: "absolute", top: 3, left: h.on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
-                </button>
-                {h.on
-                  ? <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, justifyContent: "flex-end", flexWrap: "wrap" }}>
-                      <TimeScrollPicker value={h.start} onChange={(v) => patchDay(person.id, dow, { start: v, end: Math.max(v + 15, h.end) })} label={`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} start`} compact />
-                      <span style={{ color: "var(--faint)", fontSize: 14 }}>–</span>
-                      <TimeScrollPicker value={h.end} onChange={(v) => patchDay(person.id, dow, { end: v })} minMin={h.start + 15} label={`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} end`} compact />
-                    </div>
-                  : <span style={{ flex: 1, textAlign: "right", fontSize: 14.5, color: "var(--faint)", fontStyle: "italic" }}>No shifts</span>}
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 2px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+              <button onClick={() => patchDay(person.id, dow, { on: !h.on })} aria-label={h.on ? "Turn day off" : "Turn day on"} style={{ width: 46, height: 27, borderRadius: 27, border: "none", flexShrink: 0, background: h.on ? "var(--gold)" : "var(--border2)", position: "relative", cursor: "pointer", transition: "background .2s" }}>
+                <span style={{ position: "absolute", top: 3, left: h.on ? 22 : 3, width: 21, height: 21, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 2px rgba(0,0,0,0.25)" }} />
+              </button>
+              <div style={{ width: 42, flexShrink: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: h.on ? "var(--text)" : "var(--faint)" }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</div>
+                <div style={{ fontSize: 11.5, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div>
               </div>
-              {h.on && (
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-                  <button onClick={() => setRepeatFor({ dow, h })} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}><Repeat size={13} /> Repeat these hours…</button>
-                </div>
-              )}
+              {h.on
+                ? <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, minWidth: 0 }}>
+                    <TimeScrollPicker value={h.start} onChange={(v) => patchDay(person.id, dow, { start: v, end: Math.max(v + 15, h.end) })} label={`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} start`} compact />
+                    <span style={{ color: "var(--faint)", fontSize: 13, flexShrink: 0 }}>–</span>
+                    <TimeScrollPicker value={h.end} onChange={(v) => patchDay(person.id, dow, { end: v })} minMin={h.start + 15} label={`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} end`} compact />
+                    <button onClick={() => setRepeatFor({ dow, h })} aria-label="Repeat these hours on other days" title="Repeat on other days" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 9, background: "transparent", border: "1px solid var(--border)", color: "var(--gold)", flexShrink: 0, cursor: "pointer" }}><Repeat size={15} /></button>
+                  </div>
+                : <span style={{ flex: 1, textAlign: "right", fontSize: 14.5, color: "var(--faint)" }}>Off</span>}
             </div>
           ); })}
         </div>
-        <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Tap a time to scroll and pick it in 15-minute steps. Use "Repeat these hours" to copy a day's shift to other days at once. These hours drive the calendar and online booking availability.</p>
+        <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Tap a time to set it in 15-minute steps. Tap the repeat icon to copy a day's hours to other days.</p>
 
         {/* Repeat-on-days popup */}
         {repeatFor && (() => {
@@ -8223,7 +8220,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   // so nothing falls through to search-only. Tap a tile → that category's list. ----
   const CATS = [
     { id: "shop",  label: "Your Shop", icon: User,       desc: "Your name, hours, branding & logo", settings: ["business", "hours", "appearance", "theme", "locations", "phones"] },
-    { id: "staff", label: "Staff",      icon: Users,      desc: "Everyone who works here, their access & pay", settings: ["staff", "staffselection"] },
+    { id: "staff", label: "Staff",      icon: Users,      desc: "Add or edit staff — hours, access, pay & booking", settings: ["staff"] },
     { id: "book",  label: "Online Booking", tag: "What clients see when booking", icon: Calendar, desc: "How clients book you online", settings: ["booking", "newclient", "family", "refphotos", "waitlist", "rebook_usual"] },
     { id: "smart", label: "Smart Timing", smart: true, icon: Sparkles, desc: "The scheduling smarts that save you time", settings: ["autotiming", "overduebuffer", "runninglate"] },
     { id: "dayof", label: "Day-of Tools", icon: Clock,    desc: "Managing the day as it happens", settings: ["scheduling", "avoidgaps", "waitingroom", "photos"] },
@@ -8234,8 +8231,10 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     { id: "data",  label: "Reports & Insights", icon: BarChart3, desc: "Your numbers, AI tools & importing", settings: ["reports", "aicuthelper", "import"] },
   ];
   // Safety net: any card not placed above still appears (appended to Reports & Insights) so nothing is ever lost.
+  // RETIRED cards are intentionally left out of the list (their function moved elsewhere).
+  const RETIRED = new Set(["staffselection"]); // bookable-online now lives inside each staff member
   const placed = new Set(CATS.flatMap((c) => c.settings));
-  const orphans = cards.filter((c) => !placed.has(c.id)).map((c) => c.id);
+  const orphans = cards.filter((c) => !placed.has(c.id) && !RETIRED.has(c.id)).map((c) => c.id);
   if (orphans.length) CATS[CATS.length - 1].settings.push(...orphans);
 
 
@@ -8440,7 +8439,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             {CATS.map((cat) => {
               const Icon = cat.icon || Settings;
               return (
-                <button key={cat.id} onClick={() => setOpenCat(cat.id)} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", border: "none" }}>
+                <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", border: "none" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
                     <div style={{ width: 38, height: 38, borderRadius: 11, background: cat.smart ? "color-mix(in srgb, var(--gold) 20%, transparent)" : "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={17} style={{ color: "var(--gold)" }} /></div>
                     <div style={{ minWidth: 0, flex: 1 }}>
