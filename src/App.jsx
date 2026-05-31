@@ -863,7 +863,7 @@ export default function App() {
       {view === "privacy" && <PrivacyPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("landing")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={() => setView("landing")} />}
-      {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} onExit={() => { setView("landing"); }} />}
+      {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} recoveryCode={SHOP_PASSWORD} onExit={() => { setView("landing"); }} />}
     </div>
   );
 }
@@ -5169,7 +5169,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
 // ============================================================
 // SHOP DASHBOARD — adds Menu editor + Settings
 // ============================================================
-function ShopDashboard({ business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, onExit }) {
+function ShopDashboard({ business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, recoveryCode, onExit }) {
   const [tab, setTab] = useState("pulse");
   const [activeClient, setActiveClient] = useState(null);
   const [pulseDetail, setPulseDetail] = useState(null); // null | "revenue" — drill-in from Pulse
@@ -5211,6 +5211,20 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   const [pinFor, setPinFor] = useState(null);   // provider id awaiting PIN
   const [pinEntry, setPinEntry] = useState("");
   const [pinErr, setPinErr] = useState(false);
+
+  // ENTRY LOCK — once any staff member has a PIN set, the dashboard can't be opened without one.
+  // No PINs anywhere = no lock (so you can never lock yourself out before setting one up).
+  const needsLock = realProviders.some((p) => !!p.pin);
+  const [authed, setAuthed] = useState(!needsLock);
+  const [lockPin, setLockPin] = useState("");
+  const [lockErr, setLockErr] = useState(false);
+  const submitLock = () => {
+    const code = lockPin.trim();
+    const match = realProviders.find((p) => p.pin && p.pin === code);
+    if (match) { setSignedInAs(match.id); setAuthed(true); setLockPin(""); setLockErr(false); }
+    else if (recoveryCode && code === recoveryCode) { setAuthed(true); setLockPin(""); setLockErr(false); }
+    else setLockErr(true);
+  };
   // First-load: if no provider has ever been "signed in" before, prompt the user
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -5237,6 +5251,22 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
     setTab("messages");
   };
 
+  // Gate: if a PIN is required and we're not yet authenticated, show the lock instead of the dashboard.
+  if (needsLock && !authed) {
+    return (
+      <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 22px", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY }}>
+        <div style={{ width: "100%", maxWidth: 340, textAlign: "center" }}>
+          <div style={{ width: 28, height: 1.5, background: "var(--gold)", margin: "0 auto 16px" }} />
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8 }}>{business?.name || "Vero"}</div>
+          <p style={{ color: "var(--sub)", fontSize: 14.5, marginBottom: 22 }}>Enter your PIN to open the dashboard.</p>
+          <input autoFocus type="password" inputMode="numeric" value={lockPin} onChange={(e) => { setLockPin(e.target.value.replace(/\D/g, "").slice(0, 8)); setLockErr(false); }} onKeyDown={(e) => { if (e.key === "Enter") submitLock(); }} placeholder="••••" style={{ width: "100%", boxSizing: "border-box", textAlign: "center", letterSpacing: 10, background: "var(--panel2)", border: `1px solid ${lockErr ? "#c0392b" : "var(--border)"}`, borderRadius: 14, padding: "16px", color: "var(--text)", fontSize: 24, fontFamily: FONT_BODY, marginBottom: lockErr ? 8 : 18 }} />
+          {lockErr && <div style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>That PIN didn't match. Try again.</div>}
+          <button onClick={submitLock} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 16, fontSize: 13.5, letterSpacing: 2, fontWeight: 600, borderRadius: 12, cursor: "pointer" }}>UNLOCK</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ position: "relative", minHeight: "100dvh" }}>
       <div style={{ borderBottom: "1px solid var(--line)", padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
@@ -5251,18 +5281,18 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} />}
-        {tab === "clients" && !activeClient && <ClientList clients={clients} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} me={me} isOwner={isOwner} />}
+        {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
-        {tab === "messages" && <MessagesView clients={clients} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
+        {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} />}
-        {tab === "settings" && <SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} showToast={showToast} />}
+        {tab === "settings" && isOwner && <SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} showToast={showToast} />}
       </div>
 
       {/* fixed bottom tab bar — anchors to viewport bottom. transform:translateZ(0) puts it on its own GPU layer so iOS Safari doesn't let it drift during scroll/overscroll. */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "color-mix(in srgb, var(--bg) 82%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderTop: "1px solid var(--line)", boxShadow: "0 -8px 30px -12px var(--shadow)", display: "flex", justifyContent: "space-around", alignItems: "stretch", padding: "10px 4px calc(10px + env(safe-area-inset-bottom))", zIndex: 20, transform: "translateZ(0)", WebkitTransform: "translateZ(0)", willChange: "transform" }}>
-        {[["pulse", "Pulse", TrendingUp], ["calendar", "Calendar", Calendar], ["clients", "Clients", User], ["messages", "Messages", MessageSquare], ["settings", "Settings", Settings]].map(([id, label, Icon]) => (
+        {[["pulse", "Pulse", TrendingUp], ["calendar", "Calendar", Calendar], ["clients", "Clients", User], ["messages", "Messages", MessageSquare], ...(isOwner ? [["settings", "Settings", Settings]] : [])].map(([id, label, Icon]) => (
           <button key={id} onClick={() => { setTab(id); setActiveClient(null); setPulseDetail(null); }} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
             <div style={{ position: "relative" }}>
               <Icon size={21} />
@@ -7141,6 +7171,8 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             })}
           </div>
         </div>
+
+        <button onClick={() => { showToast && showToast("Saved."); setSection(null); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 13.5, letterSpacing: 2, fontWeight: 600, borderRadius: 12, cursor: "pointer", marginTop: 4 }}>SAVE</button>
       </div>
     );
   }
@@ -8462,7 +8494,7 @@ function DatePickerSheet({ selectedDate, onPick, onClose }) {
   );
 }
 
-function CalendarView({ appts, setAppts, clients, setClients, providers, services, business, theme, showToast, waitlist = [], setWaitlist }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, services, business, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true }) {
   const sizeId = business?.calendarRowSize || "L";
   const [showWaitlistPanel, setShowWaitlistPanel] = useState(false);
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
@@ -8894,7 +8926,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   };
 
   const allStaff = providers.filter((p) => p.id !== "anyone");
-  const [hidden, setHidden] = useState([]); // provider ids hidden from view
+  // A barber lands on just their own chair; they can flip the others on via calendar options ("see both").
+  const [hidden, setHidden] = useState(() => (isOwner || !me) ? [] : allStaff.filter((p) => p.id !== me.id).map((p) => p.id));
   const staff = allStaff.filter((p) => !hidden.includes(p.id));
   const toggleStaff = (id) => setHidden((h) => h.includes(id) ? h.filter((x) => x !== id) : (allStaff.length - h.length > 1 ? [...h, id] : h));
 
