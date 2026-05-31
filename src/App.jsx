@@ -8780,6 +8780,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         const first = conflictModal.conflicts[0];
         const more = conflictModal.conflicts.length - 1;
         const nextSlotTxt = conflictModal.nextSlot != null ? fmtTime(conflictModal.nextSlot) : null;
+        // Which barber are we double-booking? Pull from the booking (create) or the moving appt (move).
+        const provId = conflictModal.mode === "create" ? conflictModal.bookData.providerId : conflictModal.moveData.appt.providerId;
+        const provObj = providers.find((p) => p.id === provId);
+        const barberName = provObj ? (provObj.name || "").split(" ")[0] : "This barber";
         const onMove = () => {
           if (conflictModal.mode === "create") {
             commitAppt(conflictModal.bookData, conflictModal.nextSlot);
@@ -8798,14 +8802,14 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         return createPortal((
           <div className="fade-in" onClick={() => setConflictModal(null)} style={{ position: "fixed", inset: 0, zIndex: 900, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, marginBottom: 8 }}>This overlaps an appointment</div>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, marginBottom: 8 }}>Already booked at this time</div>
               <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 18 }}>
-                {first.name} is booked {fmtTime(first.start)} – {fmtTime(first.end)}{more > 0 ? ` (and ${more} more)` : ""}.{nextSlotTxt ? ` The next open slot is ${nextSlotTxt}.` : ""}
+                {barberName} already has {first.name} at {fmtTime(first.start)}{more > 0 ? ` (and ${more} more)` : ""}.{nextSlotTxt ? ` Next open slot is ${nextSlotTxt}.` : ""} Book anyway?
               </div>
               {nextSlotTxt && (
                 <button className="lift" onClick={onMove} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", letterSpacing: 0.5, marginBottom: 9 }}>Move to {nextSlotTxt}</button>
               )}
-              <button onClick={onKeepBoth} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, fontWeight: 500, borderRadius: 12 }}>Keep both</button>
+              <button onClick={onKeepBoth} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, fontWeight: 500, borderRadius: 12 }}>Book anyway</button>
             </div>
           </div>
         ), document.body);
