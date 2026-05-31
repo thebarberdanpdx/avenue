@@ -612,7 +612,7 @@ function TimeScrollPicker({ value, onChange, step = 15, minMin = 0, maxMin = 24 
             {options.map((t) => {
               const on = t === value;
               return (
-                <button key={t} data-current={on ? "1" : undefined} onClick={() => { onChange(t); setOpen(false); }} style={{ width: "100%", textAlign: "center", padding: "13px 0", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--text)", fontSize: 16, fontWeight: on ? 700 : 500, fontFamily: FONT_BODY, cursor: "pointer" }}>{fmtTime(t)}</button>
+                <button key={t} data-current={on ? "1" : undefined} onClick={() => { onChange(t); setOpen(false); }} style={{ width: "100%", textAlign: "center", padding: "13px 0", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--text)", fontSize: 16, fontWeight: on ? 700 : 500, fontFamily: FONT_BODY, cursor: "pointer" }}>{fmtTime(t)}</button>
               );
             })}
           </div>
@@ -907,7 +907,7 @@ export default function App() {
         html { overscroll-behavior: none; }
         html, body { overscroll-behavior-y: contain; -webkit-overflow-scrolling: auto; }
         body { position: relative; min-height: 100dvh; }
-        .appt-screen { animation: slideInRight .3s var(--ease) both; }
+        .appt-screen { animation: slideInRight .3s var(--ease) both; max-width: 680px; margin-left: auto; margin-right: auto; }
         @keyframes fadeInFixed { from { opacity:0; } to { opacity:1; } }
         .appt-screen-fixed { animation: fadeInFixed .25s var(--ease) both; }
         /* Success bloom — used on the "You're in" check circle */
@@ -2375,7 +2375,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                               setNotSureLoading(false);
                             }
                           }}
-                          style={{ width: "100%", background: (notSureText.trim() && !notSureLoading) ? "var(--gold)" : "var(--border)", color: (notSureText.trim() && !notSureLoading) ? "var(--on-gold)" : "var(--faint)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 16 }}
+                          style={{ width: "100%", background: (notSureText.trim() && !notSureLoading) ? "var(--gold)" : "var(--border2)", color: (notSureText.trim() && !notSureLoading) ? "var(--on-gold)" : "var(--faint)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 16 }}
                         >
                           {notSureLoading ? "One sec…" : "Find my match"}
                         </button>
@@ -2788,7 +2788,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               {[selfPerson, ...(matched.family || []).map((m) => ({ id: m.id, name: m.name, note: m.note, isMember: true }))].map((person) => {
                 const key = person.id || "self"; const on = isSel(key);
                 return (
-                  <button key={key} className="lift" onClick={() => toggle(person)} style={{ width: "100%", background: on ? "color-mix(in srgb, var(--gold) 14%, var(--panel))" : "var(--panel)", color: "var(--text)", padding: "18px", fontSize: 16, borderRadius: 14, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, marginBottom: 11, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                  <button key={key} className="lift" onClick={() => toggle(person)} style={{ width: "100%", background: on ? "color-mix(in srgb, var(--gold) 14%, var(--panel))" : "var(--panel)", color: "var(--text)", padding: "18px", fontSize: 16, borderRadius: 14, border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, marginBottom: 11, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                       <span style={{ fontSize: 17 }}>{person.id ? person.name : "Myself"}</span>
                       <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>{person.id ? (person.note || "") : matched.name}</span>
@@ -2800,7 +2800,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <button className="lift" onClick={() => { setNewMemberName(""); setNewMemberNote(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", color: "var(--gold)", padding: "18px", fontSize: 16, borderRadius: 14, border: "1px dashed var(--border2)", textAlign: "left", display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
                 <Plus size={18} /> <span>Someone new</span>
               </button>
-              <button className="lift" disabled={groupPeople.length === 0} onClick={continueGroup} style={{ width: "100%", background: groupPeople.length ? "var(--gold)" : "var(--border)", color: groupPeople.length ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 10 }}>
+              <button className="lift" disabled={groupPeople.length === 0} onClick={continueGroup} style={{ width: "100%", background: groupPeople.length ? "var(--gold)" : "var(--border2)", color: groupPeople.length ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 10 }}>
                 {groupPeople.length > 1 ? `CONTINUE — ${groupPeople.length} PEOPLE →` : "CONTINUE →"}
               </button>
             </div>
@@ -2823,7 +2823,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               setMatched({ ...matched, family: [...(matched.family || []), member] });
               setGroupPeople((cur) => [...cur, { id: member.id, name: member.name, note: member.note, isMember: true }]);
               setAddingMember(false); // back to the multi-select, now with this person added & selected
-            }} style={{ width: "100%", background: newMemberName.trim() ? "var(--gold)" : "var(--border)", color: newMemberName.trim() ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, border: "none" }}>ADD &amp; CONTINUE →</button>
+            }} style={{ width: "100%", background: newMemberName.trim() ? "var(--gold)" : "var(--border2)", color: newMemberName.trim() ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, border: "none" }}>ADD &amp; CONTINUE →</button>
           </div>
         )}
 
@@ -2954,7 +2954,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               const isFirstToday = firstOpen.toDateString() === new Date().toDateString();
               const already = selectedDate && firstOpen.toDateString() === selectedDate.toDateString();
               return (
-                <button className="lift" onClick={() => { setSelectedDate(firstOpen); setSlot(null); }} style={{ width: "100%", textAlign: "left", background: already ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1.5px solid ${already ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: "15px 17px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <button className="lift" onClick={() => { setSelectedDate(firstOpen); setSlot(null); }} style={{ width: "100%", textAlign: "left", background: already ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1.5px solid ${already ? "var(--gold)" : "var(--border2)"}`, borderRadius: 14, padding: "15px 17px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                   <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     <span style={{ fontSize: 11.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600 }}>SOONEST OPENING</span>
                     <span style={{ fontSize: 16.5, fontWeight: 500 }}>{DAYS[firstOpen.getDay()]}, {MONTHS[firstOpen.getMonth()]} {firstOpen.getDate()}</span>
@@ -2970,7 +2970,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                 const on = selectedDate && d.toDateString() === selectedDate.toDateString();
                 const isToday = d.toDateString() === new Date().toDateString();
                 return (
-                  <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); }} style={{ flexShrink: 0, width: 60, padding: "10px 0", borderRadius: 12, background: on ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: on ? "var(--gold)" : (isToday ? "var(--gold)" : "var(--border)"), color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+                  <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); }} style={{ flexShrink: 0, width: 60, padding: "10px 0", borderRadius: 12, background: on ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: on ? "var(--gold)" : (isToday ? "var(--gold)" : "var(--border2)"), color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
                     <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{DAYS[d.getDay()].slice(0, 3).toUpperCase()}</div>
                     {isToday
                       ? <div style={{ fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 600, color: on ? "var(--on-gold)" : "var(--gold)", lineHeight: "24px" }}>Today</div>
@@ -2985,7 +2985,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
               <div style={{ fontSize: 13.5, color: "var(--gold)", fontWeight: 500, marginBottom: 14 }}>{daysFromNow(selectedDate)}</div>
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{openSlots.map((t) => (<button key={t} className="lift" onClick={() => setSlot(t)} style={{ background: slot === t ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: slot === t ? "var(--gold)" : "var(--border)", borderRadius: 10, padding: "13px 4px", color: slot === t ? "var(--on-gold)" : "var(--text)", fontSize: 14 }}>{fmtTime(t)}</button>))}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{openSlots.map((t) => (<button key={t} className="lift" onClick={() => setSlot(t)} style={{ background: slot === t ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: slot === t ? "var(--gold)" : "var(--border2)", borderRadius: 10, padding: "13px 4px", color: slot === t ? "var(--on-gold)" : "var(--text)", fontSize: 14 }}>{fmtTime(t)}</button>))}</div>
               {slot != null && <button className="lift" onClick={() => setStep(7)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 24 }}>Continue →</button>}
             </>)}
 
@@ -3012,7 +3012,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Preferred days <span style={{ color: "var(--sub)", fontWeight: 400 }}>(tap any that work)</span></label>
                     <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 16 }}>
                       {dateOptions.slice(0, 10).map((d, i) => { const lbl = relativeDate(d).includes(",") ? relativeDate(d) : `${relativeDate(d)}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; const on = wlDays.includes(lbl); return (
-                        <button key={i} onClick={() => setWlDays((prev) => prev.includes(lbl) ? prev.filter((x) => x !== lbl) : [...prev, lbl])} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+                        <button key={i} onClick={() => setWlDays((prev) => prev.includes(lbl) ? prev.filter((x) => x !== lbl) : [...prev, lbl])} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
                           <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
                           <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18 }}>{d.getDate()}</div>
                         </button>
@@ -3029,7 +3029,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                         const avail = windows.filter(([id, label, sub, end]) => !isToday || nowMin < end);
                         if (avail.length === 0) return <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>Today's about wrapped up — try picking another day above.</div>;
                         return avail.map(([id, label, sub]) => { const on = wlWhen === id; return (
-                          <button key={id} onClick={() => setWlWhen(id)} style={{ flex: 1, padding: "12px 6px", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: "var(--text)" }}>
+                          <button key={id} onClick={() => setWlWhen(id)} style={{ flex: 1, padding: "12px 6px", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: "var(--text)" }}>
                             <div style={{ fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</div>
                             <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>{sub}</div>
                           </button>
@@ -3050,8 +3050,8 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                       <>
                         <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>If a spot opens with another barber, want it?</label>
                         <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-                          <button onClick={() => setWlAnyProvider(false)} style={{ flex: 1, padding: "13px 8px", borderRadius: 10, border: `1.5px solid ${!wlAnyProvider ? "var(--gold)" : "var(--border)"}`, background: !wlAnyProvider ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "transparent", color: "var(--text)", fontSize: 14, fontWeight: !wlAnyProvider ? 600 : 400 }}>Only {provider.name}</button>
-                          <button onClick={() => setWlAnyProvider(true)} style={{ flex: 1, padding: "13px 8px", borderRadius: 10, border: `1.5px solid ${wlAnyProvider ? "var(--gold)" : "var(--border)"}`, background: wlAnyProvider ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "transparent", color: "var(--text)", fontSize: 14, fontWeight: wlAnyProvider ? 600 : 400 }}>Anyone available</button>
+                          <button onClick={() => setWlAnyProvider(false)} style={{ flex: 1, padding: "13px 8px", borderRadius: 10, border: `1.5px solid ${!wlAnyProvider ? "var(--gold)" : "var(--border2)"}`, background: !wlAnyProvider ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "transparent", color: "var(--text)", fontSize: 14, fontWeight: !wlAnyProvider ? 600 : 400 }}>Only {provider.name}</button>
+                          <button onClick={() => setWlAnyProvider(true)} style={{ flex: 1, padding: "13px 8px", borderRadius: 10, border: `1.5px solid ${wlAnyProvider ? "var(--gold)" : "var(--border2)"}`, background: wlAnyProvider ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "transparent", color: "var(--text)", fontSize: 14, fontWeight: wlAnyProvider ? 600 : 400 }}>Anyone available</button>
                         </div>
                       </>
                     )}
@@ -3070,7 +3070,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                       if (!ready) return;
                       setWaitlist([...waitlist, { name: wlName, phone, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", when: wlWhen, service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() }]);
                       setWaitlistDone(true); setShowWaitlist(false);
-                    }} style={{ width: "100%", background: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--gold)" : "var(--border)", color: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
+                    }} style={{ width: "100%", background: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--gold)" : "var(--border2)", color: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
                   </div>
                 )}
               </div>
@@ -3144,11 +3144,11 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55 }}>{business.policy}</p>
             </div>
             <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", color: "var(--text)", marginBottom: 16, fontSize: 14.5, padding: "4px 2px", width: "100%", textAlign: "left" }}>
-              <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+              <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
               <span>I agree to the cancellation policy</span>
             </button>
             <button onClick={() => setWantEarlier(!wantEarlier)} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", color: "var(--text)", marginBottom: 26, fontSize: 14.5, padding: "4px 2px", width: "100%", textAlign: "left" }}>
-              <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+              <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
               <span>Notify me if an earlier spot opens up</span>
             </button>
 
@@ -3163,7 +3163,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                 return;
               }
               commitBooking(phone, newEmail);
-            }} style={{ width: "100%", background: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--gold)" : "var(--border)", color: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--on-gold)" : "var(--faint)", padding: 17, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--shadow-md)" : "none" }}>LOCK IT IN</button>
+            }} style={{ width: "100%", background: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--gold)" : "var(--border2)", color: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--on-gold)" : "var(--faint)", padding: 17, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--shadow-md)" : "none" }}>LOCK IT IN</button>
 
             {/* Contact-info conflict — only opens when matched and the user changed an existing phone or email. */}
             <Sheet open={!!contactConfirm && !!matched} onClose={() => setContactConfirm(null)} align="top" maxWidth={460}>
@@ -3184,7 +3184,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                       ].map((opt) => {
                         const on = keepPhone === opt.id;
                         return (
-                          <button key={opt.id} onClick={() => setKeepPhone(opt.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer", width: "100%" }}>
+                          <button key={opt.id} onClick={() => setKeepPhone(opt.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer", width: "100%" }}>
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <div style={{ fontSize: 11, letterSpacing: 1.5, color: opt.topColor, fontWeight: 600, marginBottom: 4 }}>{opt.topLabel}</div>
                               <div style={{ fontSize: 16 }}>{opt.value}</div>
@@ -3207,7 +3207,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                       ].map((opt) => {
                         const on = keepEmail === opt.id;
                         return (
-                          <button key={opt.id} onClick={() => setKeepEmail(opt.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer", width: "100%" }}>
+                          <button key={opt.id} onClick={() => setKeepEmail(opt.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer", width: "100%" }}>
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <div style={{ fontSize: 11, letterSpacing: 1.5, color: opt.topColor, fontWeight: 600, marginBottom: 4 }}>{opt.topLabel}</div>
                               <div style={{ fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.value}</div>
@@ -3491,7 +3491,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
                   <div style={{ fontSize: 15, color: "var(--faint)", letterSpacing: 1, marginBottom: 8 }}>Pick a new day</div>
                   <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 14 }}>
                     {dateOptions.slice(0, 10).map((d, i) => { const on = newDate && d.toDateString() === newDate.toDateString(); return (
-                      <button key={i} onClick={() => { setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+                      <button key={i} onClick={() => { setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
                         <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
                         <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18 }}>{d.getDate()}</div>
                       </button>
@@ -3500,7 +3500,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
                   {newDate && (<>
                     <div style={{ fontSize: 15, color: "var(--faint)", letterSpacing: 1, marginBottom: 8 }}>Pick a time</div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-                      {slots.map((t) => { const on = newSlot === t; return (<button key={t} onClick={() => setNewSlot(t)} style={{ padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", fontSize: 15 }}>{fmtTime(t)}</button>); })}
+                      {slots.map((t) => { const on = newSlot === t; return (<button key={t} onClick={() => setNewSlot(t)} style={{ padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", fontSize: 15 }}>{fmtTime(t)}</button>); })}
                     </div>
                   </>)}
                   {a.rebookDiscount > 0 && (
@@ -3511,7 +3511,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
                   )}
                   <div style={{ display: "flex", gap: 10 }}>
                     <button onClick={() => { setReschedId(null); setNewDate(null); setNewSlot(null); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 15, letterSpacing: 1, borderRadius: 8 }}>BACK</button>
-                    <button className="lift" disabled={newDate == null || newSlot == null} onClick={() => doReschedule(a)} style={{ flex: 1, background: (newDate != null && newSlot != null) ? "var(--gold)" : "var(--border)", color: (newDate != null && newSlot != null) ? "var(--on-gold)" : "var(--faint)", padding: 13, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 8 }}>Confirm new time</button>
+                    <button className="lift" disabled={newDate == null || newSlot == null} onClick={() => doReschedule(a)} style={{ flex: 1, background: (newDate != null && newSlot != null) ? "var(--gold)" : "var(--border2)", color: (newDate != null && newSlot != null) ? "var(--on-gold)" : "var(--faint)", padding: 13, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 8 }}>Confirm new time</button>
                   </div>
                 </div>
               ) : cancelId === a.id ? (
@@ -4287,7 +4287,7 @@ function RevenueView({ appts, clients, services, providers, onBack }) {
         {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
           const on = period === id;
           return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
           );
         })}
       </div>
@@ -4506,7 +4506,7 @@ function AppointmentsView({ appts, providers, services, onBack }) {
         {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
           const on = period === id;
           return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
           );
         })}
       </div>
@@ -4775,7 +4775,7 @@ function ClientsReportView({ appts, clients, services, providers, onBack, onOpen
         {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
           const on = period === id;
           return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
           );
         })}
       </div>
@@ -5029,7 +5029,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
         {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
           const on = period === id;
           return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
           );
         })}
       </div>
@@ -5084,7 +5084,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
               {[["revenue", "Revenue"], ["visits", "Visits"], ["perhour", "$ per hour"]].map(([id, label]) => {
                 const on = sortBy === id;
                 return (
-                  <button key={id} onClick={() => setSortBy(id)} style={{ flex: 1, padding: "9px 10px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 12.5, fontWeight: on ? 600 : 400, letterSpacing: 0.3, cursor: "pointer" }}>{label}</button>
+                  <button key={id} onClick={() => setSortBy(id)} style={{ flex: 1, padding: "9px 10px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 12.5, fontWeight: on ? 600 : 400, letterSpacing: 0.3, cursor: "pointer" }}>{label}</button>
                 );
               })}
             </div>
@@ -5299,7 +5299,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
         {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
           const on = period === id;
           return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
           );
         })}
       </div>
@@ -5544,7 +5544,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
                 <p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5, marginBottom: 20 }}>Tap your name. This device remembers, so you only see this once.</p>
                 <div style={{ display: "grid", gap: 8 }}>
                   {realProviders.map((p) => (
-                    <button key={p.id} onClick={() => { if (p.pin) { setPinFor(p.id); setPinEntry(""); setPinErr(false); } else { setSignedInAs(p.id); setShowSignInPicker(false); } }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: signedInAs === p.id ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1px solid ${signedInAs === p.id ? "var(--gold)" : "var(--border)"}`, color: "var(--text)", borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
+                    <button key={p.id} onClick={() => { if (p.pin) { setPinFor(p.id); setPinEntry(""); setPinErr(false); } else { setSignedInAs(p.id); setShowSignInPicker(false); } }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: signedInAs === p.id ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1px solid ${signedInAs === p.id ? "var(--gold)" : "var(--border2)"}`, color: "var(--text)", borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
                       <Avatar size={36} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 15.5, fontWeight: 500 }}>{p.name}</div>
@@ -5642,7 +5642,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>CATEGORY</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {cats.map((c) => { const on = (form.category || cats[0]) === c; return (
-              <button key={c} onClick={() => setForm({ ...form, category: c })} style={{ background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, color: on ? "var(--gold)" : "var(--text)", padding: "8px 14px", borderRadius: 20, fontSize: 14, fontWeight: on ? 600 : 400 }}>{c}</button>
+              <button key={c} onClick={() => setForm({ ...form, category: c })} style={{ background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: on ? "var(--gold)" : "var(--text)", padding: "8px 14px", borderRadius: 20, fontSize: 14, fontWeight: on ? 600 : 400 }}>{c}</button>
             ); })}
           </div>
         </div>
@@ -5855,7 +5855,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>DAYS <span style={{ color: "var(--faint)", letterSpacing: 0, fontWeight: 400, textTransform: "none" }}>(none = every day)</span></div>
             <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
               {DOW.map((d, i) => { const on = r.days.includes(i); return (
-                <button key={i} onClick={() => toggleDay(r.id, i)} style={{ flex: 1, height: 38, borderRadius: 9, fontSize: 13.5, fontWeight: on ? 700 : 400, background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--sub)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}` }}>{d}</button>
+                <button key={i} onClick={() => toggleDay(r.id, i)} style={{ flex: 1, height: 38, borderRadius: 9, fontSize: 13.5, fontWeight: on ? 700 : 400, background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--sub)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}` }}>{d}</button>
               ); })}
             </div>
             <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
@@ -6183,8 +6183,8 @@ function HourMinutePicker({ totalMin, onChange, maxHours = 72 }) {
 
 function Toggle({ on, onClick }) {
   return (
-    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, border: "none" }}>
-      <span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} />
+    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}>
+      <span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
     </button>
   );
 }
@@ -6271,7 +6271,7 @@ function NotificationsEditor({ n, onChange }) {
                   {grp.channels.map((ch) => {
                     const active = !!eff[ch];
                     return (
-                      <button key={ch} onClick={() => setEvent(ev.k, { [ch]: !active })} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, fontSize: 13.5, fontWeight: active ? 600 : 400, background: active ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "var(--panel2)", border: `1px solid ${active ? "var(--gold)" : "var(--border)"}`, color: active ? "var(--text)" : "var(--sub)" }}>
+                      <button key={ch} onClick={() => setEvent(ev.k, { [ch]: !active })} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, fontSize: 13.5, fontWeight: active ? 600 : 400, background: active ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "var(--panel2)", border: `1px solid ${active ? "var(--gold)" : "var(--border2)"}`, color: active ? "var(--text)" : "var(--sub)" }}>
                         {CHANNEL_LABEL[ch]}{ch === "sms" ? " *" : ""}
                       </button>
                     );
@@ -6389,7 +6389,7 @@ function LocationsEditor({ business, setForm }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: business.multiLocation ? 18 : 0 }}>
         <div style={{ paddingRight: 16 }}><div style={{ fontSize: 15 }}>Multiple locations</div><div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.5 }}>Turn on if you run more than one shop. Each location can have its own address, hours, and staff.</div></div>
-        <button onClick={() => setForm({ ...business, multiLocation: !business.multiLocation })} style={{ width: 44, height: 26, borderRadius: 13, background: business.multiLocation ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: business.multiLocation ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+        <button onClick={() => setForm({ ...business, multiLocation: !business.multiLocation })} style={{ width: 44, height: 26, borderRadius: 13, background: business.multiLocation ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: business.multiLocation ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
       </div>
 
       {business.multiLocation && (
@@ -6462,14 +6462,14 @@ function MessagesEditor({ messages, onChange, business }) {
                   <div style={{ fontSize: 15, fontWeight: 500 }}>{m.label}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{channelBadge(m.channel)}<span style={{ fontSize: 12.5, color: "var(--sub)" }}>{m.timing}</span></div>
                 </button>
-                <button onClick={() => update(m.id, { enabled: !m.enabled })} style={{ width: 44, height: 26, borderRadius: 13, background: m.enabled ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, marginLeft: 12 }}><span style={{ position: "absolute", top: 3, left: m.enabled ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+                <button onClick={() => update(m.id, { enabled: !m.enabled })} style={{ width: 44, height: 26, borderRadius: 13, background: m.enabled ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, marginLeft: 12 }}><span style={{ position: "absolute", top: 3, left: m.enabled ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
               </div>
               {expanded && (
                 <div style={{ padding: "4px 16px 18px", borderTop: "1px solid var(--line)" }}>
                   <label style={{ fontSize: 13, color: "var(--faint)", display: "block", margin: "14px 0 8px" }}>Send as</label>
                   <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                     {[["text", "Text"], ["email", "Email"], ["both", "Both"]].map(([id, label]) => { const on = m.channel === id; return (
-                      <button key={id} onClick={() => update(m.id, { channel: id })} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
+                      <button key={id} onClick={() => update(m.id, { channel: id })} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
                     ); })}
                   </div>
 
@@ -6502,7 +6502,7 @@ function TippingEditor({ t, onChange }) {
   const setPreset = (i, val) => { const presets = [...t.presets]; presets[i] = Math.max(0, Math.min(100, parseInt(val) || 0)); onChange({ ...t, presets }); };
   const sampleTotal = 50; // preview on a $50 ticket
   const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
   );
   return (
     <div>
@@ -6525,7 +6525,7 @@ function TippingEditor({ t, onChange }) {
         <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>Pre-highlighted suggestion</label>
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           {t.presets.map((p, i) => { const on = t.smartDefault === p; return (
-            <button key={i} onClick={() => set({ smartDefault: p })} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{p}%</button>
+            <button key={i} onClick={() => set({ smartDefault: p })} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{p}%</button>
           ); })}
         </div>
 
@@ -6543,7 +6543,7 @@ function TippingEditor({ t, onChange }) {
         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: 16 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: t.allowNoTip || t.allowCustom ? 10 : 0 }}>
             {t.presets.map((p, i) => { const on = t.smartDefault === p; return (
-              <div key={i} style={{ flex: 1, textAlign: "center", padding: "10px 4px", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)" }}>
+              <div key={i} style={{ flex: 1, textAlign: "center", padding: "10px 4px", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)" }}>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{p}%</div>
                 <div style={{ fontSize: 12, opacity: 0.8 }}>${(sampleTotal * p / 100).toFixed(0)}</div>
               </div>
@@ -6563,7 +6563,7 @@ function TippingEditor({ t, onChange }) {
 function WaitlistRulesEditor({ w, onChange }) {
   const set = (patch) => onChange({ ...w, ...patch });
   const Opt = ({ active, title, sub, onClick }) => (
-    <button onClick={onClick} style={{ width: "100%", textAlign: "left", background: active ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", border: `1px solid ${active ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: 16, marginBottom: 10, display: "flex", alignItems: "flex-start", gap: 12 }}>
+    <button onClick={onClick} style={{ width: "100%", textAlign: "left", background: active ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", border: `1px solid ${active ? "var(--gold)" : "var(--border2)"}`, borderRadius: 14, padding: 16, marginBottom: 10, display: "flex", alignItems: "flex-start", gap: 12 }}>
       <span style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${active ? "var(--gold)" : "var(--border2)"}`, flexShrink: 0, marginTop: 2, display: "flex", alignItems: "center", justifyContent: "center" }}>{active && <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--gold)" }} />}</span>
       <span><span style={{ fontSize: 15.5, fontWeight: 600, color: "var(--text)", display: "block" }}>{title}</span><span style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>{sub}</span></span>
     </button>
@@ -6586,7 +6586,7 @@ function WaitlistRulesEditor({ w, onChange }) {
           <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WAIT BEFORE OFFERING TO THE NEXT PERSON</div>
           <div style={{ display: "flex", gap: 8 }}>
             {delays.map((d) => { const on = (w.delayMin || 30) === d; return (
-              <button key={d} onClick={() => set({ delayMin: d })} style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{d} min</button>
+              <button key={d} onClick={() => set({ delayMin: d })} style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{d} min</button>
             ); })}
           </div>
           <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Each client gets {w.delayMin || 30} minutes to claim the slot before it's offered to the next person in line.</p>
@@ -6606,7 +6606,7 @@ function BusinessHoursEditor({ hours, onChange }) {
   const h = hours || {};
   const setDay = (d, patch) => onChange({ ...h, [d]: { ...(h[d] || { on: false, start: 540, end: 1020 }), ...patch } });
   const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
   );
   // time options every 30 min from 6:00 to 22:00
   const opts = []; for (let t = 360; t <= 1320; t += 30) opts.push(t);
@@ -6662,7 +6662,7 @@ function AvoidGapsEditor({ b, onChange }) {
             <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Pack the day</div>
             <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>Clients only see times that fill your day end-to-end. Empty days show a few smart anchor times so your calendar fills from multiple points at once.</div>
           </div>
-          <span style={{ width: 44, height: 26, borderRadius: 13, background: enabled ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, marginLeft: 14 }}><span style={{ position: "absolute", top: 3, left: enabled ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+          <span style={{ width: 44, height: 26, borderRadius: 13, background: enabled ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, marginLeft: 14 }}><span style={{ position: "absolute", top: 3, left: enabled ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
         </button>
       </div>
 
@@ -6772,7 +6772,7 @@ function StaffSelectionEditor({ providers, setProviders }) {
             <Avatar size={40} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color} />
             <div><div style={{ fontSize: 15.5, fontWeight: 500 }}>{p.name}</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>{p.role}</div></div>
           </div>
-          <button onClick={() => toggle(p.id)} style={{ width: 44, height: 26, borderRadius: 13, background: p.onlineBooking ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: p.onlineBooking ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+          <button onClick={() => toggle(p.id)} style={{ width: 44, height: 26, borderRadius: 13, background: p.onlineBooking ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: p.onlineBooking ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
         </div>
       ))}
     </div>
@@ -6787,7 +6787,7 @@ function CheckoutSettingsEditor({ c, onChange }) {
   const addMethod = () => set({ customMethods: [...methods, ""] });
   const removeMethod = (i) => set({ customMethods: methods.filter((_, j) => j !== i) });
   const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
   );
   const Card = ({ title, desc, children }) => (
     <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
@@ -6823,7 +6823,7 @@ function CheckoutSettingsEditor({ c, onChange }) {
       <Card title="Signature required" desc="When to ask the client for a signature at checkout.">
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {sigOpts.map(([v, label]) => { const on = c.requireSignature === v; return (
-            <button key={v} onClick={() => set({ requireSignature: v })} style={{ flex: "1 1 30%", padding: "11px 8px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
+            <button key={v} onClick={() => set({ requireSignature: v })} style={{ flex: "1 1 30%", padding: "11px 8px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
           ); })}
         </div>
         {c.requireSignature === "over" && (
@@ -6841,7 +6841,7 @@ function CheckoutSettingsEditor({ c, onChange }) {
       <Card title="Default receipt" desc="What happens with the receipt after a sale.">
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {rcptOpts.map(([v, label]) => { const on = c.receiptDefault === v; return (
-            <button key={v} onClick={() => set({ receiptDefault: v })} style={{ flex: "1 1 30%", padding: "11px 8px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{label}</button>
+            <button key={v} onClick={() => set({ receiptDefault: v })} style={{ flex: "1 1 30%", padding: "11px 8px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{label}</button>
           ); })}
         </div>
         <div style={{ fontSize: 13.5, color: "var(--sub)", margin: "14px 0 8px" }}>Receipt footer message</div>
@@ -6855,7 +6855,7 @@ function CheckoutSettingsEditor({ c, onChange }) {
 function WaitingRoomEditor({ w, onChange }) {
   const set = (patch) => onChange({ ...w, ...patch });
   const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
   );
   const RowToggle = ({ title, desc, on, onClick, soon }) => (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14, opacity: soon ? 0.7 : 1 }}>
@@ -6894,7 +6894,7 @@ function RunningLateEditor({ r, onChange }) {
   const addRange = () => set({ ranges: [...ranges, ""] });
   const removeRange = (i) => set({ ranges: ranges.filter((_, j) => j !== i) });
   const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
   );
   return (
     <div>
@@ -6937,7 +6937,7 @@ function RunningLateEditor({ r, onChange }) {
 function OverdueBufferEditor({ b, onChange }) {
   const set = (patch) => onChange({ ...b, ...patch });
   const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
   );
   return (
     <div>
@@ -6962,8 +6962,8 @@ function OverdueBufferEditor({ b, onChange }) {
         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
           <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 10 }}>How to handle it</div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => set({ charge: false })} style={{ flex: 1, padding: "12px 8px", borderRadius: 10, border: `1px solid ${!b.charge ? "var(--gold)" : "var(--border)"}`, background: !b.charge ? "rgba(176,141,87,0.12)" : "transparent", color: !b.charge ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: !b.charge ? 600 : 400 }}>Free bonus</button>
-            <button onClick={() => set({ charge: true })} style={{ flex: 1, padding: "12px 8px", borderRadius: 10, border: `1px solid ${b.charge ? "var(--gold)" : "var(--border)"}`, background: b.charge ? "rgba(176,141,87,0.12)" : "transparent", color: b.charge ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: b.charge ? 600 : 400 }}>Charge for it</button>
+            <button onClick={() => set({ charge: false })} style={{ flex: 1, padding: "12px 8px", borderRadius: 10, border: `1px solid ${!b.charge ? "var(--gold)" : "var(--border2)"}`, background: !b.charge ? "rgba(176,141,87,0.12)" : "transparent", color: !b.charge ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: !b.charge ? 600 : 400 }}>Free bonus</button>
+            <button onClick={() => set({ charge: true })} style={{ flex: 1, padding: "12px 8px", borderRadius: 10, border: `1px solid ${b.charge ? "var(--gold)" : "var(--border2)"}`, background: b.charge ? "rgba(176,141,87,0.12)" : "transparent", color: b.charge ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: b.charge ? 600 : 400 }}>Charge for it</button>
           </div>
           {b.charge && (
             <div style={{ marginTop: 14 }}>
@@ -7009,10 +7009,10 @@ function ImportDataEditor({ showToast }) {
         <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WHERE ARE YOU COMING FROM?</div>
         <div style={{ display: "grid", gap: 8 }}>
           {SYSTEMS.map((s) => { const on = system === s; return (
-            <button key={s} onClick={() => setSystem(s)} style={{ textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, display: "flex", justifyContent: "space-between", alignItems: "center" }}>{s}{on && <Check size={17} style={{ color: "var(--gold)" }} />}</button>
+            <button key={s} onClick={() => setSystem(s)} style={{ textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, display: "flex", justifyContent: "space-between", alignItems: "center" }}>{s}{on && <Check size={17} style={{ color: "var(--gold)" }} />}</button>
           ); })}
         </div>
-        <button className="lift" disabled={!system} onClick={() => setStage("upload")} style={{ width: "100%", marginTop: 16, background: system ? "var(--gold)" : "var(--border)", color: system ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none" }}>Continue</button>
+        <button className="lift" disabled={!system} onClick={() => setStage("upload")} style={{ width: "100%", marginTop: 16, background: system ? "var(--gold)" : "var(--border2)", color: system ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none" }}>Continue</button>
       </>)}
 
       {stage === "upload" && (<>
@@ -7196,7 +7196,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
               <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Phone</div><input value={person.phone || ""} onChange={(e) => patch(person.id, { phone: e.target.value })} style={inputStyle} /></div>
               <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>User type</div>
                 <div style={{ display: "flex", gap: 8 }}>{["Admin", "Staff", "Front Desk"].map((t) => (
-                  <button key={t} onClick={() => patch(person.id, { userType: t })} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${ut === t ? "var(--gold)" : "var(--border)"}`, background: ut === t ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel2)", color: ut === t ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: ut === t ? 600 : 400 }}>{t}</button>
+                  <button key={t} onClick={() => patch(person.id, { userType: t })} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${ut === t ? "var(--gold)" : "var(--border2)"}`, background: ut === t ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel2)", color: ut === t ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: ut === t ? 600 : 400 }}>{t}</button>
                 ))}</div>
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ fontSize: 15 }}>Is service provider</span><Toggle on={person.isProvider !== false} onClick={() => patch(person.id, { isProvider: !(person.isProvider !== false) })} /></div>
@@ -7373,7 +7373,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                     {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((dn, di) => {
                       const on = picked.has(di);
                       return (
-                        <button key={di} onClick={() => toggle(di)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>
+                        <button key={di} onClick={() => toggle(di)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>
                           {dn}{di === repeatFor.dow && <span style={{ fontSize: 12, color: "var(--sub)" }}>(this day)</span>}
                           <span style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
                         </button>
@@ -7422,7 +7422,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             {[["barber", "Barber"], ["owner", "Owner"]].map(([id, label]) => {
               const on = (person.pulseRole || "barber") === id;
               return (
-                <button key={id} onClick={() => patch(person.id, { pulseRole: id })} style={{ flex: 1, padding: "11px 12px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{label}</button>
+                <button key={id} onClick={() => patch(person.id, { pulseRole: id })} style={{ flex: 1, padding: "11px 12px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{label}</button>
               );
             })}
           </div>
@@ -7807,8 +7807,8 @@ function RebookCheckoutEditor({ r, onChange }) {
             <div style={{ marginTop: 16 }}>
               <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 10 }}>Discount</div>
               <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-                <button onClick={() => set({ discountType: "amount" })} style={{ flex: 1, padding: "12px", borderRadius: 12, border: `1.5px solid ${r.discountType !== "percent" ? "var(--gold)" : "var(--border)"}`, background: r.discountType !== "percent" ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel2)", color: "var(--text)", fontSize: 15, fontWeight: 500 }}>Dollar ($)</button>
-                <button onClick={() => set({ discountType: "percent" })} style={{ flex: 1, padding: "12px", borderRadius: 12, border: `1.5px solid ${r.discountType === "percent" ? "var(--gold)" : "var(--border)"}`, background: r.discountType === "percent" ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel2)", color: "var(--text)", fontSize: 15, fontWeight: 500 }}>Percent (%)</button>
+                <button onClick={() => set({ discountType: "amount" })} style={{ flex: 1, padding: "12px", borderRadius: 12, border: `1.5px solid ${r.discountType !== "percent" ? "var(--gold)" : "var(--border2)"}`, background: r.discountType !== "percent" ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel2)", color: "var(--text)", fontSize: 15, fontWeight: 500 }}>Dollar ($)</button>
+                <button onClick={() => set({ discountType: "percent" })} style={{ flex: 1, padding: "12px", borderRadius: 12, border: `1.5px solid ${r.discountType === "percent" ? "var(--gold)" : "var(--border2)"}`, background: r.discountType === "percent" ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel2)", color: "var(--text)", fontSize: 15, fontWeight: 500 }}>Percent (%)</button>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px" }}>
                 <span style={{ fontSize: 18, color: "var(--sub)" }}>{r.discountType === "percent" ? "%" : "$"}</span>
@@ -7825,14 +7825,14 @@ function RebookCheckoutEditor({ r, onChange }) {
 
 function ToggleSetting({ label, desc, on, onToggle }) {
   return (
-    <div style={{ padding: "4px 2px" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 5 }}>{label}</div>
-          <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>{desc}</div>
+    <div style={{ padding: "6px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 500, marginBottom: desc ? 5 : 0 }}>{label}</div>
+          {desc && <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55 }}>{desc}</div>}
         </div>
-        <button onClick={() => onToggle(!on)} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: on ? "var(--gold)" : "var(--border2)", position: "relative", transition: "background .2s", marginTop: 2 }}>
-          <span style={{ position: "absolute", top: 3, left: on ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+        <button onClick={() => onToggle(!on)} aria-label={on ? "On" : "Off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: on ? "var(--gold)" : "var(--border2)", position: "relative", transition: "background .2s", cursor: "pointer" }}>
+          <span style={{ position: "absolute", top: 3, left: on ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
         </button>
       </div>
     </div>
@@ -7844,7 +7844,7 @@ function PhotoModeSetting({ mode, onChange }) {
   return (
     <div style={{ display: "grid", gap: 10 }}>
       {opts.map(([val, label, desc]) => { const on = mode === val; return (
-        <button key={val} onClick={() => onChange(val)} style={{ width: "100%", textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <button key={val} onClick={() => onChange(val)} style={{ width: "100%", textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <span><span style={{ fontSize: 15.5, fontWeight: 500, display: "block" }}>{label}</span><span style={{ fontSize: 13.5, color: "var(--sub)" }}>{desc}</span></span>
           <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} />}</span>
         </button>
@@ -8043,7 +8043,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <>
         <button onClick={() => setForm({ ...form, aiCutHelper: !form.aiCutHelper })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, color: "var(--text)", marginBottom: 14 }}>
           <div style={{ textAlign: "left" }}><div style={{ fontSize: 15, marginBottom: 2 }}>Photo + description matching</div><div style={{ fontSize: 14, color: "var(--sub)", fontWeight: 300, lineHeight: 1.4 }}>Lets new clients upload a photo or describe what they want — we suggest a matching cut from your menu.</div></div>
-          <span style={{ width: 44, height: 26, borderRadius: 13, background: form.aiCutHelper ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: form.aiCutHelper ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+          <span style={{ width: 44, height: 26, borderRadius: 13, background: form.aiCutHelper ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: form.aiCutHelper ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
         </button>
         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "var(--sub)", lineHeight: 1.5 }}>For best results, upload 3 reference photos per cut showing what each style looks like at your shop. The matcher uses these to learn your work. <em>Reference photo upload is coming soon.</em></div>
         </>
@@ -8068,13 +8068,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>The first day shown on your calendar's week strip.</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 22 }}>
           {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((day, i) => { const on = (form.weekStartsOn ?? 0) === i; return (
-            <button key={i} onClick={() => setForm({ ...form, weekStartsOn: i })} style={{ flex: "1 1 30%", padding: "11px 4px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{day}</button>
+            <button key={i} onClick={() => setForm({ ...form, weekStartsOn: i })} style={{ flex: "1 1 30%", padding: "11px 4px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{day}</button>
           ); })}
         </div>
 
         <button onClick={() => setForm({ ...form, showAddonPhotos: !form.showAddonPhotos })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, color: "var(--text)" }}>
           <div style={{ textAlign: "left" }}><div style={{ fontSize: 15, marginBottom: 2 }}>Show photos on add-ons</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>Display images next to add-on options for clients.</div></div>
-          <span style={{ width: 44, height: 26, borderRadius: 13, background: form.showAddonPhotos ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: form.showAddonPhotos ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+          <span style={{ width: 44, height: 26, borderRadius: 13, background: form.showAddonPhotos ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: form.showAddonPhotos ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
         </button>
         </>
       ),
@@ -8188,11 +8188,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: (
         <>
           <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>How brand-new clients pick their cut. Returning clients always skip straight to "the usual."</p>
-          <button onClick={() => setForm({ ...form, booking: { ...form.booking, guidedConsult: true } })} style={{ width: "100%", textAlign: "left", background: (form.booking?.guidedConsult !== false) ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1.5px solid ${(form.booking?.guidedConsult !== false) ? "var(--gold)" : "var(--border)"}`, borderRadius: 16, padding: "18px 20px", marginBottom: 12, color: "var(--text)" }}>
+          <button onClick={() => setForm({ ...form, booking: { ...form.booking, guidedConsult: true } })} style={{ width: "100%", textAlign: "left", background: (form.booking?.guidedConsult !== false) ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1.5px solid ${(form.booking?.guidedConsult !== false) ? "var(--gold)" : "var(--border2)"}`, borderRadius: 16, padding: "18px 20px", marginBottom: 12, color: "var(--text)" }}>
             <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 500, marginBottom: 4 }}>Guided consultation</div>
             <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45 }}>A few simple questions walk them to the right cut. Feels personal, teaches them, prevents wrong picks.</div>
           </button>
-          <button onClick={() => setForm({ ...form, booking: { ...form.booking, guidedConsult: false } })} style={{ width: "100%", textAlign: "left", background: (form.booking?.guidedConsult === false) ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1.5px solid ${(form.booking?.guidedConsult === false) ? "var(--gold)" : "var(--border)"}`, borderRadius: 16, padding: "18px 20px", color: "var(--text)" }}>
+          <button onClick={() => setForm({ ...form, booking: { ...form.booking, guidedConsult: false } })} style={{ width: "100%", textAlign: "left", background: (form.booking?.guidedConsult === false) ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1.5px solid ${(form.booking?.guidedConsult === false) ? "var(--gold)" : "var(--border2)"}`, borderRadius: 16, padding: "18px 20px", color: "var(--text)" }}>
             <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 500, marginBottom: 4 }}>Simple list</div>
             <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45 }}>Show all the cuts in a clean list. Fastest for clients who already know what they want.</div>
           </button>
@@ -8287,7 +8287,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   if (active) {
     const Icon = active.icon;
     return (
-      <div className="appt-screen" style={{ maxWidth: 640, margin: "0 auto", padding: "12px 4px 40px" }}>
+      <div className="appt-screen" style={{ maxWidth: 720, margin: "0 auto", padding: "12px 16px 40px" }}>
         <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
         <div style={{ marginBottom: 26 }}>
           <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
@@ -8299,7 +8299,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           {active.status && <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.4, marginTop: 6 }}>{active.status}</div>}
         </div>
 
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "20px 18px", boxShadow: "var(--shadow-sm)" }}>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "24px 24px", boxShadow: "var(--shadow-sm)" }}>
           {active.editor}
         </div>
 
@@ -8311,7 +8311,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   }
 
   return (
-    <div className="fade-up" style={{ maxWidth: 720, margin: "0 auto", padding: "12px 4px" }}>
+    <div className="fade-up" style={{ maxWidth: 720, margin: "0 auto", padding: "12px 16px" }}>
       {/* Masthead — the search is the hero */}
       <div style={{ marginBottom: 18 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
@@ -8653,7 +8653,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
             return offering.length > 1 && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "22px 0 0" }}>
               {offering.map((p) => { const on = p.id === provId; return (
-                <button key={p.id} onClick={() => setProvId(p.id)} style={{ display: "flex", alignItems: "center", gap: 7, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, color: "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14.5, fontWeight: on ? 600 : 400 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color || "var(--gold)" }} />{p.name}</button>
+                <button key={p.id} onClick={() => setProvId(p.id)} style={{ display: "flex", alignItems: "center", gap: 7, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14.5, fontWeight: on ? 600 : 400 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color || "var(--gold)" }} />{p.name}</button>
               ); })}
             </div>
             );
@@ -8739,7 +8739,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
             {openSvc && (
               <div style={{ display: "grid", gap: 8, paddingBottom: 22 }}>
                 {services.map((s) => { const on = service && service.id === s.id; return (
-                  <button key={s.id} onClick={() => { setService(s); setOpenSvc(false); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left" }}>
+                  <button key={s.id} onClick={() => { setService(s); setOpenSvc(false); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <span style={{ width: 10, height: 10, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />
                       <div><div style={{ fontSize: 15.5, fontWeight: on ? 600 : 500 }}>{s.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>${getPrice(s, provId)} · {getDuration(client, s, provId)} min</div></div>
@@ -8781,7 +8781,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
           <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 40px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxWidth: 460, margin: "0 auto" }}>
               {timeOptions.map((m) => { const on = m === startMin; return (
-                <button key={m} onClick={() => { setStartMin(m); setShowTimePick(false); }} style={{ padding: "14px 0", borderRadius: 10, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{fmtHM(m)}</button>
+                <button key={m} onClick={() => { setStartMin(m); setShowTimePick(false); }} style={{ padding: "14px 0", borderRadius: 10, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{fmtHM(m)}</button>
               ); })}
             </div>
           </div>
@@ -9904,15 +9904,15 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
       <p style={{ color: "var(--sub)", fontSize: 15, textAlign: "center", marginBottom: 24, fontWeight: 300 }}>{service?.name || appt.title} · {money(base)}</p>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         {tipCfg.presets.map((p) => { const on = customTip == null && tipPct === p; return (
-          <button key={p} onClick={() => { setCustomTip(null); setTipPct(p); }} style={{ flex: 1, padding: "18px 4px", borderRadius: 16, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+          <button key={p} onClick={() => { setCustomTip(null); setTipPct(p); }} style={{ flex: 1, padding: "18px 4px", borderRadius: 16, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
             <div style={{ fontSize: 20, fontWeight: 700 }}>{p}%</div>
             <div style={{ fontSize: 13, color: on ? "var(--on-gold)" : "var(--sub)", marginTop: 3 }}>{money(+(base * p / 100).toFixed(2))}</div>
           </button>
         ); })}
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        {tipCfg.allowCustom && <button onClick={() => { const v = prompt("Custom tip amount ($)"); if (v != null) setCustomTip(Math.max(0, parseFloat(v) || 0)); }} style={{ flex: 1, padding: "13px 4px", borderRadius: 12, border: `1px solid ${customTip != null && customTip !== 0 ? "var(--gold)" : "var(--border)"}`, background: customTip != null && customTip !== 0 ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel)", color: customTip != null && customTip !== 0 ? "var(--gold)" : "var(--text)", fontSize: 14 }}>{customTip != null && customTip !== 0 ? `Custom · ${money(customTip)}` : "Custom"}</button>}
-        {tipCfg.allowNoTip && <button onClick={() => setCustomTip(0)} style={{ flex: 1, padding: "13px 4px", borderRadius: 12, border: `1px solid ${customTip === 0 ? "var(--gold)" : "var(--border)"}`, background: customTip === 0 ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel)", color: customTip === 0 ? "var(--gold)" : "var(--sub)", fontSize: 14 }}>No tip</button>}
+        {tipCfg.allowCustom && <button onClick={() => { const v = prompt("Custom tip amount ($)"); if (v != null) setCustomTip(Math.max(0, parseFloat(v) || 0)); }} style={{ flex: 1, padding: "13px 4px", borderRadius: 12, border: `1px solid ${customTip != null && customTip !== 0 ? "var(--gold)" : "var(--border2)"}`, background: customTip != null && customTip !== 0 ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel)", color: customTip != null && customTip !== 0 ? "var(--gold)" : "var(--text)", fontSize: 14 }}>{customTip != null && customTip !== 0 ? `Custom · ${money(customTip)}` : "Custom"}</button>}
+        {tipCfg.allowNoTip && <button onClick={() => setCustomTip(0)} style={{ flex: 1, padding: "13px 4px", borderRadius: 12, border: `1px solid ${customTip === 0 ? "var(--gold)" : "var(--border2)"}`, background: customTip === 0 ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel)", color: customTip === 0 ? "var(--gold)" : "var(--sub)", fontSize: 14 }}>No tip</button>}
       </div>
       <button className="lift" onClick={confirmTip} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: "var(--shadow-md)" }}>{tipAmt > 0 ? `TIP ${money(tipAmt)} · TOTAL ${money(total)}` : `CONTINUE · ${money(total)}`}</button>
     </div>
@@ -9963,14 +9963,14 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
       <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WHEN?</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 12 }}>
         {rebookCfg.weeks.map((w) => { const on = rebookWeeks === w && !customDate; const isRhythm = w === rhythmWeek; return (
-          <button key={w} onClick={() => { setRebookWeeks(w); setCustomDate(null); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "var(--panel)", color: "var(--text)", textAlign: "left" }}>
+          <button key={w} onClick={() => { setRebookWeeks(w); setCustomDate(null); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "var(--panel)", color: "var(--text)", textAlign: "left" }}>
             <div><div style={{ fontSize: 16, fontWeight: 600 }}>{w} weeks</div><div style={{ fontSize: 13, color: isRhythm ? "var(--gold)" : "var(--sub)", marginTop: 2 }}>{isRhythm ? `${appt.name ? appt.name.split(" ")[0] + "'s" : "their"} usual rhythm` : fmtRebook(w)}</div></div>
             {on && <Check size={18} style={{ color: "var(--gold)" }} />}
           </button>
         ); })}
       </div>
       {/* custom date — opens the device calendar/date picker */}
-      <label style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${customDate ? "var(--gold)" : "var(--border)"}`, background: customDate ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "var(--panel)", color: "var(--text)", marginBottom: 22, cursor: "pointer" }}>
+      <label style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${customDate ? "var(--gold)" : "var(--border2)"}`, background: customDate ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "var(--panel)", color: "var(--text)", marginBottom: 22, cursor: "pointer" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Calendar size={19} style={{ color: "var(--gold)" }} />
           <div>
@@ -10013,7 +10013,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
                 <button key={s.start} onClick={() => setChosenStart(s.start)} style={{ position: "relative", padding: "13px 0", borderRadius: 11, fontSize: 14.5, fontWeight: sel || s.best ? 600 : 400,
                   background: sel ? "var(--gold)" : s.best ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "var(--panel)",
                   color: sel ? "var(--on-gold)" : "var(--text)",
-                  border: `1px solid ${sel ? "var(--gold)" : s.best ? "var(--gold)" : "var(--border)"}` }}>
+                  border: `1px solid ${sel ? "var(--gold)" : s.best ? "var(--gold)" : "var(--border2)"}` }}>
                   {fmtTime(s.start)}
                 </button>
               );
@@ -10507,7 +10507,7 @@ function ReportsView({ appts, clients, providers, services, business }) {
       {/* range toggle */}
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
         {[["today", "Today"], ["week", "This week"], ["month", "This month"]].map(([v, label]) => { const on = range === v; return (
-          <button key={v} onClick={() => setRange(v)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
+          <button key={v} onClick={() => setRange(v)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
         ); })}
       </div>
 
@@ -10668,7 +10668,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
           <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PREFERRED BARBER</label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
             {staff.map((p) => { const on = draft.provider === p.id; return (
-              <button key={p.id} onClick={() => setDraft({ ...draft, provider: p.id })} style={{ padding: "10px 16px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{p.name}</button>
+              <button key={p.id} onClick={() => setDraft({ ...draft, provider: p.id })} style={{ padding: "10px 16px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{p.name}</button>
             ); })}
           </div>
 
@@ -11031,7 +11031,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         {/* filter chips */}
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
           {[["all","All"],["appointments","Appointments"],["notes","Notes"]].map(([id, label]) => { const on = tlFilter === id; return (
-            <button key={id} onClick={() => setTlFilter(id)} style={{ background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "transparent", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, color: on ? "var(--gold)" : "var(--sub)", padding: "6px 14px", borderRadius: 20, fontSize: 13, fontWeight: on ? 600 : 400 }}>{label}</button>
+            <button key={id} onClick={() => setTlFilter(id)} style={{ background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "transparent", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: on ? "var(--gold)" : "var(--sub)", padding: "6px 14px", borderRadius: 20, fontSize: 13, fontWeight: on ? 600 : 400 }}>{label}</button>
           ); })}
         </div>
         {/* feed */}
