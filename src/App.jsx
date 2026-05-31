@@ -1217,6 +1217,12 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     const dow = d.getDay();
     const h = prov.hours?.[dow];
     if (!h || !h.on) return [];
+    // Daily caps (online clients are hard-blocked once a day is full; the barber can still override in-app).
+    const realCount = (filterFn) => (appts || []).filter((a) => a.status !== "cancelled" && a.status !== "block" && a.bookedFor && dayKey(new Date(a.bookedFor)) === dayKey(d) && filterFn(a)).length;
+    const provCap = Math.max(0, Number(prov.maxPerDay) || 0);
+    const shopCap = Math.max(0, Number(business?.booking?.dailyCap) || 0);
+    if (provCap > 0 && realCount((a) => a.providerId === prov.id) >= provCap) return [];
+    if (shopCap > 0 && realCount(() => true) >= shopCap) return [];
     const busy = apptsOnDate(prov.id, d).slice().sort((a, b) => a[0] - b[0]); // [[start,end], ...] sorted
     const isToday = d.toDateString() === new Date().toDateString();
     const bk = business?.booking || {};
@@ -2876,7 +2882,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <span>I agree to the cancellation policy</span>
             </button>
 
-            <button className="lift" disabled={!agreed || !newFirst.trim() || !newLast.trim() || !newEmail.trim() || phone.replace(/\D/g, "").length < 10} onClick={() => {
+            <button className="lift" onMouseDown={(e) => e.preventDefault()} disabled={!agreed || !newFirst.trim() || !newLast.trim() || !newEmail.trim() || phone.replace(/\D/g, "").length < 10} onClick={() => {
               const digits = (s) => (s || "").replace(/\D/g, "");
               // Conflict only if matched and they CHANGED an existing value (not just adding a missing email).
               const phoneChanged = !!matched && digits(phone) !== digits(matched.phone);
@@ -2944,7 +2950,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                   </div>
                 )}
 
-                <button className="lift" onClick={() => {
+                <button className="lift" onMouseDown={(e) => e.preventDefault()} onClick={() => {
                   const finalPhone = (contactConfirm?.phone && keepPhone === "file") ? matched.phone : phone;
                   const finalEmail = (contactConfirm?.email && keepEmail === "file") ? matched.email : newEmail.trim();
                   setContactConfirm(null);
@@ -5874,8 +5880,12 @@ function BookingRulesEditor({ b, onChange }) {
           </div>
         )}
 
+        <Row title="Max appointments per day (whole shop)" desc="Cap total bookings across all barbers in a day. Clients can't book online past this; you can still add one manually. 0 = no limit.">
+          <Stepper value={b.dailyCap || 0} onChange={(v) => set({ dailyCap: v })} min={0} max={200} step={1} />
+        </Row>
+
         <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginTop: 18, fontStyle: "italic" }}>
-          Buffer, minimum notice, and booking window live in Settings → Scheduling Options.
+          Buffer, minimum notice, and booking window live in Settings → Scheduling Options. Per-barber daily caps live under each staff member's Work Hours.
         </p>
       </div>
 
@@ -6862,6 +6872,15 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           ); })}
         </div>
         <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>The − / + buttons nudge each shift's start (top row) and end (bottom row) by 15 minutes. These hours drive the calendar and online booking availability.</p>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginTop: 16 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Max appointments per day</div>
+          <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Once {person.name.split(" ")[0]} hits this many in a day, online clients can't book more — you can still add one manually. Leave at 0 for no limit.</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button onClick={() => patch(person.id, { maxPerDay: Math.max(0, (Number(person.maxPerDay) || 0) - 1) })} style={{ width: 44, height: 44, borderRadius: 12, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 20 }}>−</button>
+            <div style={{ flex: 1, textAlign: "center", fontSize: 22, fontWeight: 600 }}>{(Number(person.maxPerDay) || 0) === 0 ? "No limit" : (Number(person.maxPerDay) || 0)}</div>
+            <button onClick={() => patch(person.id, { maxPerDay: (Number(person.maxPerDay) || 0) + 1 })} style={{ width: 44, height: 44, borderRadius: 12, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 20 }}>+</button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -8029,7 +8048,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
       {/* sticky footer — Cancel (left) and Book (right) pinned to the viewport bottom; safe-area padding keeps the iOS Safari toolbar from covering it */}
       <div style={{ flexShrink: 0, padding: "12px 18px max(18px, env(safe-area-inset-bottom))", background: "var(--bg)", borderTop: "1px solid var(--line)", display: "flex", gap: 10, boxSizing: "border-box" }}>
         <button onClick={onClose} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 15, letterSpacing: 1, borderRadius: 12 }}>CANCEL</button>
-        <button className="lift" onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note })} disabled={!canBook} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 12, border: "none", opacity: canBook ? 1 : 0.45 }}>BOOK</button>
+        <button className="lift" onMouseDown={(e) => e.preventDefault()} onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note })} disabled={!canBook} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 12, border: "none", opacity: canBook ? 1 : 0.45 }}>BOOK</button>
       </div>
 
       {/* time picker — fills the form from the top, always in view */}
@@ -8189,6 +8208,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   // Eye-level popup that fires when the provider tries to book/move an appointment on top of another.
   // Shape: { mode: "create"|"move", bookData?, moveData?, conflicts:[...], nextSlot:number|null, dur:number }
   const [conflictModal, setConflictModal] = useState(null);
+  const [capWarn, setCapWarn] = useState(null); // { bookData, who, limit, scope } — booking would exceed a daily cap
   // parse the "at" timestamp so we can order by who's waited longest
   const waitedSince = (w) => { const t = Date.parse(w.at); return isNaN(t) ? 0 : t; };
   const findWaitlistMatches = (freed) => {
@@ -8492,6 +8512,17 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
     showToast(`${newAppt.name} booked at ${fmtTime(useStart)}.`);
   };
 
+  // Daily cap: count real appointments (not blocks/cancellations) for the viewed day.
+  const dayCount = (filterFn) => (appts || []).filter((a) => a.status !== "cancelled" && a.status !== "block" && a.bookedFor && sameDay(a.bookedFor, selectedDate) && filterFn(a)).length;
+  const capCheck = (providerId) => {
+    const prov = providers.find((p) => p.id === providerId);
+    const provCap = Math.max(0, Number(prov?.maxPerDay) || 0);
+    const shopCap = Math.max(0, Number(business?.booking?.dailyCap) || 0);
+    if (provCap > 0 && dayCount((a) => a.providerId === providerId) >= provCap) return { who: prov?.name || "This barber", limit: provCap, scope: "provider" };
+    if (shopCap > 0 && dayCount(() => true) >= shopCap) return { who: "the shop", limit: shopCap, scope: "shop" };
+    return null;
+  };
+
   // commit a fully-formed appointment from the booking form — checks for conflict first
   const bookAppt = (data) => {
     let dur = getDuration(data.client, data.service, data.providerId);
@@ -8503,6 +8534,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       setConflictModal({ mode: "create", bookData: data, conflicts, nextSlot, dur });
       return;
     }
+    const cap = capCheck(data.providerId);
+    if (cap) { setCapWarn({ bookData: data, ...cap }); return; }
     commitAppt(data);
   };
 
@@ -8877,6 +8910,19 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           </div>
         ), document.body);
       })()}
+
+      {capWarn && createPortal((
+        <div className="fade-in" onClick={() => setCapWarn(null)} style={{ position: "fixed", inset: 0, zIndex: 900, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, marginBottom: 8 }}>Daily limit reached</div>
+            <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 18 }}>
+              {capWarn.scope === "shop" ? "The shop is" : `${capWarn.who} is`} already at {capWarn.limit} appointment{capWarn.limit === 1 ? "" : "s"} that day — the max you set. Clients can't book online past this, but you can squeeze one in.
+            </div>
+            <button className="lift" onClick={() => { const d = capWarn.bookData; setCapWarn(null); commitAppt(d); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", letterSpacing: 0.5, marginBottom: 9 }}>Book anyway</button>
+            <button onClick={() => setCapWarn(null)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, fontWeight: 500, borderRadius: 12 }}>Cancel</button>
+          </div>
+        </div>
+      ), document.body)}
 
       {/* tap-to-create: menu anchored right under the tapped time/spot */}
       {createSlot && (() => {
