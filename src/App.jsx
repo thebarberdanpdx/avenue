@@ -5491,7 +5491,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, letterSpacing: 1.5, fontWeight: 500 }}>{business.name}</div>
         <div style={{ width: 50 }} />
       </div>
-      <div style={{ width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
+      <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
         {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
@@ -8368,7 +8368,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   if (active) {
     const Icon = active.icon;
     return (
-      <div className="appt-screen" style={{ width: "100%", padding: "12px 16px 40px" }}>
+      <div className="appt-screen" style={{ width: "100%", padding: "12px 6px 40px" }}>
         <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
         <div style={{ marginBottom: 22 }}>
           <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
@@ -8382,7 +8382,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
         {active.fullBleed
           ? <div>{active.editor}</div>
-          : <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "24px 24px", boxShadow: "var(--shadow-sm)" }}>{active.editor}</div>}
+          : <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "20px 14px", boxShadow: "var(--shadow-sm)" }}>{active.editor}</div>}
 
         {hasChanges && (
           <button className="lift" onClick={() => save(`${active.title} saved.`)} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 13.5, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: "var(--shadow-md)" }}>SAVE CHANGES</button>
@@ -8392,7 +8392,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   }
 
   return (
-    <div className="fade-up" style={{ width: "100%", padding: "12px 16px" }}>
+    <div className="fade-up" style={{ width: "100%", padding: "12px 6px" }}>
       {/* Masthead — the search is the hero */}
       <div style={{ marginBottom: 18 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
@@ -8463,8 +8463,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                     <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</span>
                         <Explain title={c.title}>{explainText}</Explain>
+                        <span style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</span>
                         {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
                       </div>
                       <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>
@@ -8500,8 +8500,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                       <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</span>
                           <Explain title={c.title}>{explainText}</Explain>
+                          <span style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</span>
                           {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
                         </div>
                         <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>
