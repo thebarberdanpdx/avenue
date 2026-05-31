@@ -1384,6 +1384,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [selectedDate, setSelectedDate] = useState(null);
   const [slot, setSlot] = useState(null);
   const [agreed, setAgreed] = useState(false);
+  const [cardOnFile, setCardOnFile] = useState(false); // simulated card-on-file for no-show protection
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [waitlistDone, setWaitlistDone] = useState(false);
   const [photos, setPhotos] = useState(0);       // 0–3 uploaded at booking
@@ -3147,14 +3148,49 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
               <span>I agree to the cancellation policy</span>
             </button>
+
+            {/* Card on file + deposit (simulated until a live processor is connected) */}
+            {(() => {
+              const bk = business.booking || {};
+              const dep = bk.deposit || { mode: "none", amount: 0 };
+              const needsCard = !!bk.requireCard || (dep.mode && dep.mode !== "none");
+              if (!needsCard) return null;
+              const depositAmt = dep.mode === "fixed" ? Number(dep.amount || 0) : dep.mode === "percent" ? Math.round(cartAdjTotal * (Number(dep.amount || 0) / 100)) : 0;
+              return (
+                <div style={{ background: "var(--panel)", border: `1px solid ${cardOnFile ? "color-mix(in srgb, var(--gold) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>{depositAmt > 0 ? "DEPOSIT TO RESERVE" : "CARD TO RESERVE"}</div>
+                  <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>
+                    {depositAmt > 0
+                      ? <>A <b style={{ color: "var(--text)" }}>${depositAmt}</b> deposit holds your spot and goes toward your total. The rest (${Math.max(0, cartAdjTotal - depositAmt)}) is due at your visit.</>
+                      : <>We keep a card on file to hold your spot. You won't be charged unless you no-show or cancel late, per the policy above.</>}
+                  </p>
+                  {cardOnFile ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px" }}>
+                      <Check size={18} style={{ color: "var(--gold)" }} />
+                      <span style={{ fontSize: 14.5, color: "var(--text)" }}>Card added · •••• 4242</span>
+                      <button onClick={() => setCardOnFile(false)} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Change</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setCardOnFile(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}><CreditCard size={17} style={{ color: "var(--gold)" }} /> Add a card</button>
+                  )}
+                  <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Secure card entry. {depositAmt > 0 ? "Deposit is" : "Charges are"} processed when card payments go live for this shop.</p>
+                </div>
+              );
+            })()}
             <button onClick={() => setWantEarlier(!wantEarlier)} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", color: "var(--text)", marginBottom: 26, fontSize: 14.5, padding: "4px 2px", width: "100%", textAlign: "left" }}>
               <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
               <span>Notify me if an earlier spot opens up</span>
             </button>
 
-            <button className="lift" onMouseDown={(e) => e.preventDefault()} disabled={!agreed || !newFirst.trim() || !newLast.trim() || !newEmail.trim() || phone.replace(/\D/g, "").length < 10} onClick={() => {
+            {(() => {
+              const bk = business.booking || {};
+              const dep = bk.deposit || { mode: "none", amount: 0 };
+              const needsCard = !!bk.requireCard || (dep.mode && dep.mode !== "none");
+              const baseOk = agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10;
+              const canLock = baseOk && (!needsCard || cardOnFile);
+              return (
+            <button className="lift" onMouseDown={(e) => e.preventDefault()} disabled={!canLock} onClick={() => {
               const digits = (s) => (s || "").replace(/\D/g, "");
-              // Conflict only if matched and they CHANGED an existing value (not just adding a missing email).
               const phoneChanged = !!matched && digits(phone) !== digits(matched.phone);
               const emailChanged = !!matched && !!(matched.email && matched.email.trim()) && newEmail.trim() !== matched.email.trim();
               if (phoneChanged || emailChanged) {
@@ -3163,7 +3199,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                 return;
               }
               commitBooking(phone, newEmail);
-            }} style={{ width: "100%", background: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--gold)" : "var(--border2)", color: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--on-gold)" : "var(--faint)", padding: 17, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: (agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10) ? "var(--shadow-md)" : "none" }}>LOCK IT IN</button>
+            }} style={{ width: "100%", background: canLock ? "var(--gold)" : "var(--border2)", color: canLock ? "var(--on-gold)" : "var(--faint)", padding: 17, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: canLock ? "var(--shadow-md)" : "none" }}>{needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : "LOCK IT IN"}</button>
+              );
+            })()}
 
             {/* Contact-info conflict — only opens when matched and the user changed an existing phone or email. */}
             <Sheet open={!!contactConfirm && !!matched} onClose={() => setContactConfirm(null)} align="top" maxWidth={460}>
@@ -7895,6 +7933,89 @@ function Explain({ title, children }) {
   );
 }
 
+// No-show protection: card-on-file, deposit (none/fixed/percent), notice window, and policy text.
+// Writes to business.booking (requireCard, deposit{mode,amount}, leadTimeMin) + business.policy.
+// The actual charge is simulated until a live payment processor is connected.
+function NoShowEditor({ b, policy, onBooking, onPolicy }) {
+  const dep = b.deposit || { mode: "none", amount: 0 };
+  const setDep = (patch) => onBooking({ deposit: { ...dep, ...patch } });
+  const noticeOpts = [
+    { v: 0, label: "No minimum" }, { v: 60, label: "1 hour" }, { v: 120, label: "2 hours" },
+    { v: 240, label: "4 hours" }, { v: 720, label: "12 hours" }, { v: 1440, label: "24 hours" }, { v: 2880, label: "48 hours" },
+  ];
+  const lead = b.leadTimeMin || 0;
+  const Toggle = ({ on, onClick }) => (
+    <button onClick={onClick} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
+  );
+  return (
+    <div style={{ display: "grid", gap: 0 }}>
+      {/* Preview-mode notice */}
+      <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel2))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 18, fontSize: 13, color: "var(--text2)", lineHeight: 1.5 }}>
+        <b style={{ color: "var(--gold)" }}>Preview mode.</b> Clients enter a card and agree to your terms, but no money moves until your payment processor is connected. Everything below is ready for that day.
+      </div>
+
+      {/* Require a card to book */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "6px 0 18px" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Require a card to book</div>
+          <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>Clients put a card on file to reserve a time. Nothing is charged unless they no-show or cancel late.</div>
+        </div>
+        <Toggle on={!!b.requireCard} onClick={() => onBooking({ requireCard: !b.requireCard })} />
+      </div>
+
+      {/* Deposit */}
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18, marginBottom: 4 }}>
+        <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Take a deposit at booking</div>
+        <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Charge part (or all) of the price up front. It goes toward their total at checkout.</div>
+        <div style={{ display: "grid", gap: 8, marginBottom: dep.mode !== "none" ? 14 : 0 }}>
+          {[["none", "No deposit", "Just hold the card"], ["fixed", "Fixed amount", "A set dollar amount per booking"], ["percent", "Percent of price", "A share of the service price"]].map(([val, lbl, desc]) => {
+            const on = (dep.mode || "none") === val;
+            return (
+              <button key={val} onClick={() => setDep({ mode: val })} style={{ width: "100%", textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "13px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
+                <span><span style={{ fontSize: 15.5, fontWeight: 500, display: "block", color: "var(--text)" }}>{lbl}</span><span style={{ fontSize: 13, color: "var(--sub)" }}>{desc}</span></span>
+                <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
+              </button>
+            );
+          })}
+        </div>
+        {dep.mode === "fixed" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 15px" }}>
+            <span style={{ fontSize: 16, color: "var(--gold)", fontWeight: 700 }}>$</span>
+            <input type="number" value={dep.amount || ""} onChange={(e) => setDep({ amount: e.target.value === "" ? 0 : Number(e.target.value) })} placeholder="20" style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 16, fontWeight: 600, fontFamily: FONT_BODY }} />
+            <span style={{ fontSize: 14, color: "var(--faint)" }}>per booking</span>
+          </div>
+        )}
+        {dep.mode === "percent" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 15px" }}>
+            <input type="number" value={dep.amount || ""} onChange={(e) => setDep({ amount: e.target.value === "" ? 0 : Math.min(100, Number(e.target.value)) })} placeholder="50" style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 16, fontWeight: 600, fontFamily: FONT_BODY }} />
+            <span style={{ fontSize: 16, color: "var(--gold)", fontWeight: 700 }}>%</span>
+            <span style={{ fontSize: 14, color: "var(--faint)" }}>of price</span>
+          </div>
+        )}
+      </div>
+
+      {/* Notice window */}
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18, marginTop: 18 }}>
+        <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>How much notice to cancel or reschedule</div>
+        <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Cancel later than this and it counts as a late cancellation under your policy.</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {noticeOpts.map((o) => {
+            const on = lead === o.v;
+            return <button key={o.v} onClick={() => onBooking({ leadTimeMin: o.v })} style={{ padding: "10px 15px", borderRadius: 10, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{o.label}</button>;
+          })}
+        </div>
+      </div>
+
+      {/* Policy text */}
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18, marginTop: 18 }}>
+        <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>POLICY CLIENTS AGREE TO</div>
+        <textarea value={policy} onChange={(e) => onPolicy(e.target.value)} rows={5} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
+        <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 8 }}>Shown on the booking screen for clients to agree to. Write it to match your own rules and your state's regulations.</p>
+      </div>
+    </div>
+  );
+}
+
 function ToggleSetting({ label, desc, on, onToggle }) {
   return (
     <div style={{ padding: "6px 0" }}>
@@ -8185,13 +8306,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <OverdueBufferEditor b={form.overdueBuffer || {}} onChange={(ob) => setForm({ ...form, overdueBuffer: { ...(form.overdueBuffer || {}), ...ob } })} />,
     },
     {
-      id: "policy", title: "No-show Protection", subtitle: "Cancellation & reschedule policy", icon: AlertCircle, category: "Calendar & Appointments",
-      explain: <>This is how you protect your time and money from no-shows and last-minute cancellations. You write the rules clients agree to when they book — how much notice you need, and what happens if they miss. Down the line, once card payments are live, this is also where you'll be able to hold a card or take a deposit so a no-show actually costs them, not you.</>,
-      status: form.policy ? "Set" : "Not set", keywords: "cancellation no-show no show policy refund rules deposit charge fee reschedule late cancel card on file protect revenue window cutoff",
-      editor: (<>
-        {field("CANCELLATION / NO-SHOW POLICY", "policy", true)}
-        <p style={{ fontSize: 14, color: "var(--faint)", lineHeight: 1.5 }}>Write this to match your own rules and your state's regulations. Shows on the booking screen.</p>
-      </>),
+      id: "policy", title: "No-show Protection", subtitle: "Cancellation, deposits & card-on-file", icon: AlertCircle, category: "Calendar & Appointments",
+      explain: <>This is how you protect your time and money from no-shows and last-minute cancellations — the same tools Booksy, GlossGenius and Square charge for. Require a card to book, take a deposit, and set how much notice a client must give. You write the rules they agree to when they book. <b>Heads up:</b> the card and deposit steps run in preview mode until your payment processor (Helcim) is approved — clients see and agree to everything, but no money moves until you flip it live.</>,
+      status: (() => { const bk = form.booking || {}; const bits = []; if (bk.requireCard) bits.push("Card required"); if (bk.deposit?.mode && bk.deposit.mode !== "none") bits.push("Deposit on"); bits.push(`${Math.round((bk.leadTimeMin || 0) / 60)}h notice`); return bits.join(" · "); })(),
+      keywords: "cancellation no-show no show policy refund rules deposit charge fee reschedule late cancel card on file protect revenue window cutoff notice hold helcim payment",
+      editor: <NoShowEditor b={form.booking || {}} policy={form.policy} onBooking={(patch) => setForm({ ...form, booking: { ...(form.booking || {}), ...patch } })} onPolicy={(v) => setForm({ ...form, policy: v })} />,
     },
     {
       id: "waitlist", title: "Waitlist", icon: Clock, category: "Calendar & Appointments",
