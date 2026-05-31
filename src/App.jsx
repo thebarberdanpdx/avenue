@@ -6,7 +6,7 @@ import {
   Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock,
   Settings, Image as ImageIcon, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
-  BarChart3, TrendingUp, Palette
+  BarChart3, TrendingUp, Palette, Globe
 } from "lucide-react";
 
 // ============================================================
@@ -100,6 +100,17 @@ const DEFAULT_BUSINESS = {
   showAddonPhotos: true, // owner preference toggle
   aiCutHelper: false, // when ON, shows "Show us a photo" + "I'm not sure" on Pick Your Cut (needs reference photos uploaded first)
   weekStartsOn: 0, // 0=Sunday … 6=Saturday — first day of the calendar week
+  // ---- Branded storefront website (one-page scroll served at the shop's public link) ----
+  website: {
+    enabled: false,           // off by default — the branded storefront is an opt-in option in settings
+    tagline: "True to the craft.", // short line under the name
+    intro: "",                // optional longer welcome paragraph
+    instagram: "",            // handle without the @ (blank = hide the button)
+    showServices: true,       // show the services menu section
+    showHours: true,          // show the hours section
+    showTeam: true,           // show the barbers/team section
+    customDomain: "",         // a business's own domain (wired but off until DNS/hosting is set up)
+  },
   // Shop open hours per weekday (0=Sun … 6=Sat), times in minutes from midnight
   hours: { 0: { on: true, start: 600, end: 900 }, 1: { on: true, start: 540, end: 1020 }, 2: { on: false, start: 540, end: 1020 }, 3: { on: false, start: 540, end: 1020 }, 4: { on: true, start: 540, end: 1020 }, 5: { on: true, start: 540, end: 1020 }, 6: { on: true, start: 540, end: 1020 } },
   // Waitlist auto-notify behavior when a slot frees up
@@ -845,7 +856,9 @@ export default function App() {
         * { -webkit-tap-highlight-color: transparent; }
       `}</style>
 
-      {view === "landing" && <Landing business={business} onPick={goView} />}
+      {view === "landing" && (business.website?.enabled === true
+        ? <Storefront business={business} services={services} providers={providers} categories={categories} onPick={goView} />
+        : <Landing business={business} onPick={goView} />)}
 
       {shopPwPrompt && (
         <div onClick={() => { setShopPwPrompt(false); setPwEntry(""); setPwError(false); }} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
@@ -955,6 +968,129 @@ function TermsPage({ onExit }) {
         <H>Contact</H>
         <P>Questions about these terms? Reach us at sanctuarybarberco@gmail.com.</P>
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// BRANDED STOREFRONT — the shop's public one-page website.
+// Themed by the shop's chosen theme. Reuses real business data
+// (name, services, hours, team) + a few website fields. "Book"
+// flows into the existing ClientFlow. Minimal by design.
+// ============================================================
+function minLabel(min) {
+  if (min == null) return "";
+  let h = Math.floor(min / 60), m = min % 60;
+  const ap = h >= 12 ? "pm" : "am";
+  h = h % 12; if (h === 0) h = 12;
+  return m === 0 ? `${h}${ap}` : `${h}:${String(m).padStart(2, "0")}${ap}`;
+}
+
+function Storefront({ business, services = [], providers = [], categories = [], onPick }) {
+  const w = business.website || {};
+  const logo = business.logoText || business.name;
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const hours = business.hours || {};
+  const realProviders = providers.filter((p) => p.id !== "anyone" && !p.archived);
+  const onlineServices = services.filter((s) => !s.archived);
+  const ig = (w.instagram || "").replace(/^@/, "").trim();
+  const addr = [business.address, business.cityZip].filter(Boolean).join(", ");
+
+  const section = { maxWidth: 620, margin: "0 auto", padding: "0 24px" };
+
+  return (
+    <div style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY, paddingBottom: 60 }}>
+      {/* HERO */}
+      <div className="fade-up" style={{ ...section, paddingTop: "clamp(56px, 16vw, 110px)", paddingBottom: 40, textAlign: "center" }}>
+        <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: "clamp(42px, 14vw, 68px)", fontWeight: 500, lineHeight: 0.98, letterSpacing: 1 }}>{logo}</h1>
+        <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "20px auto" }} />
+        {w.tagline && <p style={{ fontSize: 17, color: "var(--sub)", fontWeight: 300, fontStyle: "italic", marginBottom: 8 }}>{w.tagline}</p>}
+        {addr && <p style={{ fontSize: 13.5, color: "var(--faint)", letterSpacing: 0.5 }}>{addr}</p>}
+        <button className="lift" onClick={() => onPick("client")} style={{ marginTop: 30, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 14, padding: "17px 44px", fontSize: 14, letterSpacing: 2.5, fontWeight: 600, boxShadow: "var(--shadow-md)" }}>BOOK AN APPOINTMENT</button>
+        {ig && (
+          <div style={{ marginTop: 18 }}>
+            <a href={`https://instagram.com/${ig}`} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "var(--text)", textDecoration: "none", fontSize: 14.5, border: "1px solid var(--border)", borderRadius: 12, padding: "11px 20px" }}>
+              <Camera size={16} style={{ color: "var(--gold)" }} /> See our work — @{ig}
+            </a>
+          </div>
+        )}
+      </div>
+
+      {w.intro && (
+        <div style={{ ...section, paddingBottom: 44 }}>
+          <p style={{ fontSize: 16.5, lineHeight: 1.7, color: "var(--text2)", textAlign: "center", fontWeight: 300, maxWidth: 520, margin: "0 auto" }}>{w.intro}</p>
+        </div>
+      )}
+
+      {/* SERVICES */}
+      {w.showServices !== false && onlineServices.length > 0 && (
+        <div style={{ ...section, paddingBottom: 44 }}>
+          <SfHeading label="Services" />
+          <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}>
+            {onlineServices.map((s) => (
+              <div key={s.id} style={{ background: "var(--panel)", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, padding: "16px 18px" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 500 }}>{s.name}</div>
+                  {s.duration ? <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{s.duration} min</div> : null}
+                </div>
+                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, color: "var(--gold)", whiteSpace: "nowrap" }}>{s.price != null ? `$${s.price}` : ""}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TEAM */}
+      {w.showTeam !== false && realProviders.length > 0 && (
+        <div style={{ ...section, paddingBottom: 44 }}>
+          <SfHeading label="Our team" />
+          <div style={{ display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap" }}>
+            {realProviders.map((p) => (
+              <div key={p.id} style={{ textAlign: "center", width: 96 }}>
+                <Avatar size={72} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
+                <div style={{ fontSize: 14.5, fontWeight: 500, marginTop: 8 }}>{p.name}</div>
+                {p.role && <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{p.role}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* HOURS */}
+      {w.showHours !== false && (
+        <div style={{ ...section, paddingBottom: 44 }}>
+          <SfHeading label="Hours" />
+          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "8px 18px" }}>
+            {dayNames.map((dn, i) => {
+              const h = hours[i];
+              return (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "11px 0", borderBottom: i < 6 ? "1px solid var(--line)" : "none", fontSize: 15 }}>
+                  <span style={{ color: "var(--text2)" }}>{dn}</span>
+                  <span style={{ color: h?.on ? "var(--text)" : "var(--faint)" }}>{h?.on ? `${minLabel(h.start)} – ${minLabel(h.end)}` : "Closed"}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* BOOK CTA (bottom) */}
+      <div style={{ ...section, paddingTop: 12, textAlign: "center" }}>
+        <button className="lift" onClick={() => onPick("client")} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 14, padding: "17px 44px", fontSize: 14, letterSpacing: 2.5, fontWeight: 600, boxShadow: "var(--shadow-md)" }}>BOOK AN APPOINTMENT</button>
+        <div style={{ marginTop: 22, display: "flex", gap: 18, justifyContent: "center" }}>
+          <button onClick={() => onPick("manage")} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 3 }}>Manage my appointment</button>
+        </div>
+        <div style={{ marginTop: 34, fontSize: 11.5, color: "var(--faint)", letterSpacing: 1 }}>Powered by Vero</div>
+      </div>
+    </div>
+  );
+}
+
+function SfHeading({ label }) {
+  return (
+    <div style={{ textAlign: "center", marginBottom: 18 }}>
+      <div style={{ width: 24, height: 1.5, background: "var(--gold)", margin: "0 auto 10px" }} />
+      <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600 }}>{label.toUpperCase()}</div>
     </div>
   );
 }
@@ -7597,6 +7733,76 @@ function PhotoModeSetting({ mode, onChange }) {
   );
 }
 
+// ---- Your Website: branded storefront controls + custom-domain (wired, off until hosting set up) ----
+function WebsiteEditor({ w, onChange, business }) {
+  const set = (k, v) => onChange({ [k]: v });
+  const ig = (w.instagram || "").replace(/^@/, "");
+  const slug = (business?.name || "yourshop").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const veroUrl = `gotvero.com/${slug}`;
+  const fieldLabel = { fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 8 };
+  const input = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+
+  return (
+    <div style={{ display: "grid", gap: 22 }}>
+      <ToggleSetting label="Show my branded website" desc="Visitors to your booking link land on a clean, branded page — your name, services, hours, team, and a Book button — styled to your theme." on={w.enabled === true} onToggle={(v) => set("enabled", v)} />
+
+      {w.enabled === true && (<>
+        {/* Live address */}
+        <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel2))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "14px 16px" }}>
+          <div style={{ fontSize: 12.5, color: "var(--sub)", marginBottom: 4 }}>Your website is live at</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: "var(--gold)", wordBreak: "break-all" }}>{w.customDomain ? w.customDomain : veroUrl}</div>
+        </div>
+
+        <div>
+          <div style={fieldLabel}>TAGLINE</div>
+          <input value={w.tagline || ""} onChange={(e) => set("tagline", e.target.value)} placeholder="e.g. True to the craft." style={input} />
+          <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 7, lineHeight: 1.5 }}>A short line under your name. Leave blank to hide.</p>
+        </div>
+
+        <div>
+          <div style={fieldLabel}>WELCOME TEXT (OPTIONAL)</div>
+          <textarea value={w.intro || ""} onChange={(e) => set("intro", e.target.value)} rows={4} placeholder="A sentence or two about your shop — what makes it yours." style={{ ...input, resize: "vertical", lineHeight: 1.6 }} />
+        </div>
+
+        <div>
+          <div style={fieldLabel}>INSTAGRAM</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 0, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+            <span style={{ padding: "13px 4px 13px 15px", color: "var(--sub)", fontSize: 15.5 }}>@</span>
+            <input value={ig} onChange={(e) => set("instagram", e.target.value.replace(/[^a-zA-Z0-9._]/g, ""))} placeholder="yourshop" style={{ ...input, border: "none", background: "transparent", paddingLeft: 2 }} />
+          </div>
+          <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 7, lineHeight: 1.5 }}>Adds a "See our work" button linking to your Instagram, so your feed is your photo gallery. Leave blank to hide.</p>
+        </div>
+
+        {/* Section toggles */}
+        <div>
+          <div style={fieldLabel}>SHOW ON THE PAGE</div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {[["showServices", "Services & prices"], ["showTeam", "Your team"], ["showHours", "Hours"]].map(([k, lbl]) => {
+              const on = w[k] !== false;
+              return (
+                <button key={k} onClick={() => set(k, !on)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 16px", color: "var(--text)" }}>
+                  <span style={{ fontSize: 15 }}>{lbl}</span>
+                  <span style={{ width: 46, height: 27, borderRadius: 27, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 22 : 3, width: 21, height: 21, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} /></span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Custom domain — wired, but off until hosting/DNS is configured */}
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <div style={{ fontSize: 16, fontWeight: 500 }}>Use your own domain</div>
+            <span style={{ fontSize: 9.5, letterSpacing: 1, fontWeight: 700, color: "var(--sub)", border: "1px solid var(--border2)", borderRadius: 5, padding: "2px 6px" }}>COMING SOON</span>
+          </div>
+          <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 12 }}>Point your own web address (like yourshop.com) at your Vero site. We'll give you the exact records to add with your domain provider. This switches on once domain hosting is set up.</p>
+          <input value={w.customDomain || ""} onChange={(e) => set("customDomain", e.target.value.trim().toLowerCase())} placeholder="yourshop.com" style={{ ...input, opacity: 0.85 }} />
+        </div>
+      </>)}
+    </div>
+  );
+}
+
 function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, showToast }) {
   const [form, setForm] = useState(business);
   const [openCard, setOpenCard] = useState(null);
@@ -7852,6 +8058,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <MessagesEditor messages={form.messages || []} onChange={(msgs) => setForm({ ...form, messages: msgs })} business={form} />,
     },
     {
+      id: "website", title: "Your Website", subtitle: "Your branded booking page", icon: Globe, category: "Your Website",
+      status: (form.website?.enabled === true) ? ((form.website?.customDomain) ? form.website.customDomain : "On · Vero-hosted page") : "Off",
+      keywords: "website web site storefront landing page online presence branded booking link domain custom url instagram social about tagline intro public page",
+      editor: <WebsiteEditor w={form.website || {}} onChange={(wx) => setForm({ ...form, website: { ...(form.website || {}), ...wx } })} business={form} />,
+    },
+    {
       id: "reports", title: "Reports & Insights", icon: BarChart3, category: "Reporting",
       status: "Revenue, staff, retention",
       keywords: "reports reporting analytics revenue sales staff performance retention average ticket dashboard insights numbers trends",
@@ -7871,6 +8083,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     { id: "pay",   label: "Checkout & Money", icon: CreditCard, desc: "Tipping, payments, rebooking & no-show protection", settings: ["tipping", "checkout", "rebookco", "policy"] },
     { id: "msg",   label: "Messages clients get", icon: Bell, desc: "Every automatic text & email, in your words", settings: ["notifications", "messages"] },
     { id: "menu",  label: "Services & Menu", icon: ImageIcon, desc: "Your services, add-ons, photos & pricing", settings: ["servicesmenu"] },
+    { id: "web",   label: "Your Website", icon: Globe, desc: "Your branded booking page & online presence", settings: ["website"] },
     { id: "data",  label: "Reports & Insights", icon: BarChart3, desc: "Your numbers, AI tools & importing", settings: ["reports", "aicuthelper", "import"] },
   ];
   // Safety net: any card not placed above still appears (appended to Reports & Insights) so nothing is ever lost.
