@@ -7884,12 +7884,31 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
 
           {/* CLIENT */}
           {client ? (
-            <div style={{ ...fieldWrap, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-                <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 17 }}>{client.name.charAt(0)}</div>
-                <div><div style={{ fontSize: 17, fontWeight: 500 }}>{client.name}</div><div style={{ fontSize: 14, color: "var(--sub)" }}>{client.phone || `${client.visits} visits`}</div></div>
+            <div style={{ ...fieldWrap }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 17 }}>{client.name.charAt(0)}</div>
+                  <div><div style={{ fontSize: 17, fontWeight: 500 }}>{client.name}</div><div style={{ fontSize: 14, color: "var(--sub)" }}>{client.phone || `${client.visits} visits`}</div></div>
+                </div>
+                <button onClick={() => setClient(null)} style={{ background: "none", color: "var(--gold)", fontSize: 14.5 }}>Change</button>
               </div>
-              <button onClick={() => setClient(null)} style={{ background: "none", color: "var(--gold)", fontSize: 14.5 }}>Change</button>
+              {(() => {
+                // Show the client's rhythm the moment they're picked, so you can drop them on the right day.
+                const daysSince = client.lastVisit ? Math.round((Date.now() - new Date(client.lastVisit)) / 86400000) : null;
+                const sinceTxt = daysSince == null ? null : daysSince < 14 ? `${daysSince} day${daysSince === 1 ? "" : "s"} ago` : `${Math.round(daysSince / 7)} weeks ago`;
+                const usualTxt = client.cadenceDays ? (client.cadenceDays < 14 ? `every ${client.cadenceDays} days` : `every ${Math.round(client.cadenceDays / 7)} weeks`) : null;
+                if (!sinceTxt && !usualTxt) return null;
+                return (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 13, background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 22%, transparent)", borderRadius: 11, padding: "9px 13px" }}>
+                    <Clock size={14} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.4 }}>
+                      {sinceTxt && <>Last in <strong style={{ color: "var(--text)", fontWeight: 600 }}>{sinceTxt}</strong></>}
+                      {sinceTxt && usualTxt && " · "}
+                      {usualTxt && <>usually <strong style={{ color: "var(--text)", fontWeight: 600 }}>{usualTxt}</strong></>}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           ) : walkIn ? (
             <div style={fieldWrap}>
@@ -9045,6 +9064,24 @@ function Checkout({ appt, service, provider, business, clients, setClients, show
         <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, lineHeight: 1.15 }}>{discountOn ? `Save ${discLabel} by rebooking now?` : "Book the next visit?"}</h2>
         <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300 }}>{discountOn ? `Lock in ${appt.name ? appt.name.split(" ")[0] : "the next visit"}'s next ${service?.name || "appointment"} and take ${discLabel} off.` : `Lock in ${appt.name ? appt.name.split(" ")[0] : "the next visit"}'s next ${service?.name || "appointment"} before they head out.`}</p>
       </div>
+      {(() => {
+        // Rhythm read-out: how long since the last visit + their usual cadence. Helps the barber pick instantly.
+        const lv = liveClient?.lastVisit;
+        const daysSince = lv ? Math.round((Date.now() - new Date(lv)) / 86400000) : null;
+        const sinceTxt = daysSince == null ? null : daysSince < 14 ? `${daysSince} day${daysSince === 1 ? "" : "s"} ago` : `${Math.round(daysSince / 7)} weeks ago`;
+        const usualTxt = cadenceDays ? (cadenceDays < 14 ? `every ${cadenceDays} days` : `every ${Math.round(cadenceDays / 7)} weeks`) : null;
+        if (!sinceTxt && !usualTxt) return null;
+        return (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap", background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 22%, transparent)", borderRadius: 12, padding: "11px 14px", marginBottom: 18 }}>
+            <Clock size={15} style={{ color: "var(--gold)", flexShrink: 0 }} />
+            <span style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.4, textAlign: "center" }}>
+              {sinceTxt && <>Last visit <strong style={{ color: "var(--text)", fontWeight: 600 }}>{sinceTxt}</strong></>}
+              {sinceTxt && usualTxt && " · "}
+              {usualTxt && <>usually <strong style={{ color: "var(--text)", fontWeight: 600 }}>{usualTxt}</strong></>}
+            </span>
+          </div>
+        );
+      })()}
       <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WHEN?</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 12 }}>
         {rebookCfg.weeks.map((w) => { const on = rebookWeeks === w && !customDate; const isRhythm = w === rhythmWeek; return (
