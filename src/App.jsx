@@ -7880,8 +7880,8 @@ function Explain({ title, children }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 3, background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 500, padding: 0, cursor: "pointer", verticalAlign: "middle" }}>
-        <span style={{ width: 15, height: 15, borderRadius: "50%", border: "1px solid var(--gold)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, lineHeight: 1 }}>?</span> Explain
+      <button onClick={() => setOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "color-mix(in srgb, var(--gold) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, padding: "8px 13px", borderRadius: 10, cursor: "pointer", verticalAlign: "middle" }}>
+        <span style={{ width: 17, height: 17, borderRadius: "50%", border: "1.5px solid var(--gold)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, lineHeight: 1 }}>?</span> What is this?
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} align="center" maxWidth={400}>
         <div style={{ padding: "4px 2px 6px" }}>
@@ -8372,15 +8372,17 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     return (
       <div className="appt-screen" style={{ maxWidth: 860, margin: "0 auto", padding: "12px 18px 40px" }}>
         <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
-        <div style={{ marginBottom: 26 }}>
+        <div style={{ marginBottom: 22 }}>
           <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.4px" }}>{active.title}</h2>
             {active.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "3px 7px" }}>SMART</span>}
-            {active.explain && <Explain title={active.title}>{active.explain}</Explain>}
           </div>
           {active.subtitle && <div style={{ fontSize: 15, color: "var(--gold)", marginTop: 6, fontWeight: 500 }}>{active.subtitle}</div>}
           {active.status && <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.4, marginTop: 6 }}>{active.status}</div>}
+          <div style={{ marginTop: 12 }}>
+            <Explain title={active.title}>{active.explain || <>This is the “{active.title}” setting. Adjust the options below — your changes save when you tap Save Changes. If you're not sure, the defaults here are sensible to leave as they are.</>}</Explain>
+          </div>
         </div>
 
         {active.fullBleed
