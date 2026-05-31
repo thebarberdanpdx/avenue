@@ -5207,6 +5207,10 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   useEffect(() => { setPulseView("me"); }, [signedInAs]);
   // Modal picker for switching the signed-in barber (shown via Pulse owner menu)
   const [showSignInPicker, setShowSignInPicker] = useState(false);
+  // PIN step: when a provider has a PIN set, tapping their name asks for it before signing in.
+  const [pinFor, setPinFor] = useState(null);   // provider id awaiting PIN
+  const [pinEntry, setPinEntry] = useState("");
+  const [pinErr, setPinErr] = useState(false);
   // First-load: if no provider has ever been "signed in" before, prompt the user
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -5271,23 +5275,40 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
 
       {/* SIGN-IN PICKER — appears on first load (if multiple providers), or when user picks "Sign in as someone else" from Pulse menu. Pre-auth honor-system version. */}
       {showSignInPicker && (
-        <div onClick={() => signedInAs && setShowSignInPicker(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100 }}>
+        <div onClick={() => signedInAs && !pinFor && setShowSignInPicker(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "26px 22px", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
             <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 6 }}>Who's at the chair?</h2>
-            <p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5, marginBottom: 20 }}>Tap your name. This device remembers, so you only see this once.</p>
-            <div style={{ display: "grid", gap: 8 }}>
-              {realProviders.map((p) => (
-                <button key={p.id} onClick={() => { setSignedInAs(p.id); setShowSignInPicker(false); }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: signedInAs === p.id ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1px solid ${signedInAs === p.id ? "var(--gold)" : "var(--border)"}`, color: "var(--text)", borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
-                  <Avatar size={36} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15.5, fontWeight: 500 }}>{p.name}</div>
-                    <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{p.role}{p.pulseRole === "owner" ? " · Owner" : ""}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-            {signedInAs && <button onClick={() => setShowSignInPicker(false)} style={{ width: "100%", marginTop: 16, background: "none", color: "var(--sub)", border: "none", padding: 10, fontSize: 14 }}>Cancel</button>}
+            {pinFor ? (() => {
+              const p = realProviders.find((x) => x.id === pinFor);
+              const submit = () => { if (pinEntry === (p.pin || "")) { setSignedInAs(p.id); setShowSignInPicker(false); setPinFor(null); setPinEntry(""); setPinErr(false); } else { setPinErr(true); } };
+              return (
+                <>
+                  <button onClick={() => { setPinFor(null); setPinEntry(""); setPinErr(false); }} style={{ background: "none", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, padding: 0, marginBottom: 14 }}><ArrowLeft size={16} /> Back</button>
+                  <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 6 }}>{p.name}'s PIN</h2>
+                  <p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5, marginBottom: 18 }}>Enter your PIN to sign in.</p>
+                  <input autoFocus type="password" inputMode="numeric" value={pinEntry} onChange={(e) => { setPinEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setPinErr(false); }} onKeyDown={(e) => { if (e.key === "Enter") submit(); }} placeholder="••••" style={{ width: "100%", boxSizing: "border-box", textAlign: "center", letterSpacing: 8, background: "var(--panel2)", border: `1px solid ${pinErr ? "#c0392b" : "var(--border)"}`, borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 22, fontFamily: FONT_BODY, marginBottom: pinErr ? 8 : 16 }} />
+                  {pinErr && <div style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>That PIN didn't match. Try again.</div>}
+                  <button onClick={submit} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 13.5, letterSpacing: 2, fontWeight: 600, borderRadius: 12 }}>SIGN IN</button>
+                </>
+              );
+            })() : (
+              <>
+                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 6 }}>Who's at the chair?</h2>
+                <p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5, marginBottom: 20 }}>Tap your name. This device remembers, so you only see this once.</p>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {realProviders.map((p) => (
+                    <button key={p.id} onClick={() => { if (p.pin) { setPinFor(p.id); setPinEntry(""); setPinErr(false); } else { setSignedInAs(p.id); setShowSignInPicker(false); } }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: signedInAs === p.id ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1px solid ${signedInAs === p.id ? "var(--gold)" : "var(--border)"}`, color: "var(--text)", borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
+                      <Avatar size={36} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 15.5, fontWeight: 500 }}>{p.name}</div>
+                        <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{p.role}{p.pulseRole === "owner" ? " · Owner" : ""}{p.pin ? " · PIN" : ""}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {signedInAs && <button onClick={() => setShowSignInPicker(false)} style={{ width: "100%", marginTop: 16, background: "none", color: "var(--sub)", border: "none", padding: 10, fontSize: 14 }}>Cancel</button>}
+              </>
+            )}
           </div>
         </div>
       )}
@@ -7094,6 +7115,36 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
     );
   }
 
+  // ---------- SIGN-IN & ACCESS ----------
+  if (section === "access") {
+    return (
+      <div className="appt-screen" style={{ paddingBottom: 40 }}>
+        <SecHeader title="Sign-in & access" onBack={() => setSection(null)} />
+
+        {/* Sign-in PIN — what this person enters to sign in as themselves on the dashboard. */}
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: FONT_DISPLAY, marginBottom: 4 }}>Sign-in PIN</div>
+          <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, marginBottom: 14 }}>{person.name} enters this to sign in as themselves. Leave blank for no PIN (open sign-in).</div>
+          <input value={person.pin || ""} onChange={(e) => patch(person.id, { pin: e.target.value.replace(/\D/g, "").slice(0, 6) })} inputMode="numeric" placeholder="e.g. 1234" style={{ width: 150, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 18, letterSpacing: 4, fontFamily: FONT_BODY }} />
+        </div>
+
+        {/* Role — Owner sees all barbers + shop totals; Barber sees only their own chair. */}
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: FONT_DISPLAY, marginBottom: 4 }}>Role</div>
+          <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, marginBottom: 14 }}>Owners see every barber's numbers and shop totals. Barbers see only their own chair.</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[["barber", "Barber"], ["owner", "Owner"]].map(([id, label]) => {
+              const on = (person.pulseRole || "barber") === id;
+              return (
+                <button key={id} onClick={() => patch(person.id, { pulseRole: id })} style={{ flex: 1, padding: "11px 12px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{label}</button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ---------- COMPENSATION ----------
   if (section === "comp") {
     const comp = { ...defaultComp(), ...(person.comp || {}) };
@@ -7113,20 +7164,6 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
     return (
       <div className="appt-screen" style={{ paddingBottom: 40 }}>
         <SecHeader title="Compensation" onBack={() => setSection(null)} />
-
-        {/* Pulse access — Owner sees all barbers + shop totals; Barber sees only their own chair. */}
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: FONT_DISPLAY, marginBottom: 4 }}>Pulse access</div>
-          <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, marginBottom: 14 }}>Owners see every barber's numbers and shop totals. Barbers see only their own chair on Pulse.</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            {[["barber", "Barber"], ["owner", "Owner"]].map(([id, label]) => {
-              const on = (person.pulseRole || "barber") === id;
-              return (
-                <button key={id} onClick={() => patch(person.id, { pulseRole: id })} style={{ flex: 1, padding: "11px 12px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{label}</button>
-              );
-            })}
-          </div>
-        </div>
 
         {/* Earnings goals — drive the Pulse goal ring + weekly bar. Personal to this barber. */}
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
@@ -7258,6 +7295,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   // ---------- MEMBER HUB ----------
   const hubRows = [
     { id: "details", label: "Details" },
+    { id: "access", label: "Sign-in & access" },
     { id: "notifications", label: "Notifications" },
     { id: "services", label: "Services" },
     { id: "hours", label: "Work Hours" },
