@@ -1105,6 +1105,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [pendingMatch, setPendingMatch] = useState(null); // the client we found, awaiting code verify
   const [blockedNotice, setBlockedNotice] = useState(false); // shown when a blocked client tries to book
   const [dupWarn, setDupWarn] = useState(null); // { existing, phone, email } — client already has an appt within 10 days
+  const [wantEarlier, setWantEarlier] = useState(false); // client opts in to be told if an earlier slot opens
   const [clientTypeBlock, setClientTypeBlock] = useState(null); // "returning_only" | "new_only" | null — set when shop's online booking is restricted to one type and this client is the other
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberNote, setNewMemberNote] = useState("");
@@ -1482,6 +1483,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         bigChange: (simpleChange === "fresh" && people.length === 1) ? true : undefined,
         phone: finalPhone,
         groupId: isMultiPerson ? baseId : null,
+        wantsEarlier: wantEarlier,
       });
       if (!isSame) cursor += person.durMin;
     });
@@ -2877,9 +2879,13 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>CANCELLATION POLICY</div>
               <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55 }}>{business.policy}</p>
             </div>
-            <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", color: "var(--text)", marginBottom: 26, fontSize: 14.5, padding: "4px 2px", width: "100%", textAlign: "left" }}>
+            <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", color: "var(--text)", marginBottom: 16, fontSize: 14.5, padding: "4px 2px", width: "100%", textAlign: "left" }}>
               <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
               <span>I agree to the cancellation policy</span>
+            </button>
+            <button onClick={() => setWantEarlier(!wantEarlier)} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", color: "var(--text)", marginBottom: 26, fontSize: 14.5, padding: "4px 2px", width: "100%", textAlign: "left" }}>
+              <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+              <span>Notify me if an earlier spot opens up</span>
             </button>
 
             <button className="lift" onMouseDown={(e) => e.preventDefault()} disabled={!agreed || !newFirst.trim() || !newLast.trim() || !newEmail.trim() || phone.replace(/\D/g, "").length < 10} onClick={() => {
@@ -8242,9 +8248,26 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
     }
     setWaitlistMatch(null);
   };
+  // Earlier-slot alerts: booked clients who opted into "tell me if something opens sooner."
+  // Match the freed slot to confirmed appointments (same barber) that sit LATER than the freed time.
+  const findEarlierAlerts = (freed) => {
+    if (!freed || !freed.bookedFor) return [];
+    const freedAt = new Date(freed.bookedFor);
+    if (isNaN(freedAt)) return [];
+    return (appts || []).filter((a) =>
+      a.wantsEarlier === true
+      && a.status === "confirmed"
+      && a.id !== freed.id
+      && a.providerId === freed.providerId
+      && a.bookedFor && new Date(a.bookedFor) > freedAt        // their appointment is later than the slot that just opened
+    ).map((a) => {
+      const prov = providers.find((p) => p.id === a.providerId);
+      return { id: "ea-" + a.id, name: a.name || "Client", service: a.title || "appointment", provider: prov?.name, earlierApptId: a.id };
+    });
+  };
   const handleFreedSlot = (freed) => {
     if (!freed || freed.status === "done" || freed.status === "block") return;
-    const matches = findWaitlistMatches(freed);
+    const matches = [...findWaitlistMatches(freed), ...findEarlierAlerts(freed)];
     if (!matches.length) return;
     if (wlRules.mode === "silent") sendWaitlistNotices(matches, freed); // auto-send, no prompt
     else setWaitlistMatch({ freed, matches }); // ask first
