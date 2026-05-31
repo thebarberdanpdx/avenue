@@ -734,6 +734,16 @@ export default function App() {
   useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
   useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('providers', providers); }, 800); return () => clearTimeout(t); }, [providers]);
 
+  // Mirror the theme class onto <html> so CSS variables (--gold, --bg, --text, etc.) cascade
+  // to portaled content too (booking form, conflict popup, etc. — these render under document.body,
+  // outside the React tree's #app-root, so without this mirror they'd lose the theme.)
+  useEffect(() => {
+    const el = document.documentElement;
+    const stale = Array.from(el.classList).filter((c) => c.startsWith("theme-"));
+    stale.forEach((c) => el.classList.remove(c));
+    el.classList.add(`theme-${theme}`);
+  }, [theme]);
+
   return (
     <div id="app-root" className={`theme-${theme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
       <style>{`
@@ -8946,7 +8956,7 @@ function Checkout({ appt, service, provider, business, clients, setClients, show
   const hasSelection = rebookWeeks != null || customDate != null;
   const selectionLabel = customDate ? fmtCustom(customDate) : (rebookWeeks != null ? fmtRebook(rebookWeeks) : "");
 
-  const sheet = (inner, dismissable, top = true) => (
+  const sheet = (inner, dismissable, top = true) => createPortal((
     <div className="fade-in" onClick={dismissable ? onClose : undefined} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", alignItems: top ? "flex-start" : "flex-end", justifyContent: "center" }}>
       <div onClick={(e) => e.stopPropagation()} className={top ? "appt-drop" : ""} style={{ background: "var(--bg)", borderBottomLeftRadius: 24, borderBottomRightRadius: 24, borderTopLeftRadius: top ? 0 : 24, borderTopRightRadius: top ? 0 : 24, width: "100%", maxWidth: 480, maxHeight: "92vh", overflowY: "auto", boxShadow: top ? "0 20px 60px var(--shadow)" : "0 -20px 60px var(--shadow)" }}>
         {!top && <div style={{ display: "flex", justifyContent: "center", paddingTop: 10 }}><div style={{ width: 38, height: 4, borderRadius: 4, background: "var(--border2)" }} /></div>}
@@ -8954,7 +8964,7 @@ function Checkout({ appt, service, provider, business, clients, setClients, show
         {top && <div style={{ display: "flex", justifyContent: "center", paddingBottom: 10 }}><div style={{ width: 38, height: 4, borderRadius: 4, background: "var(--border2)" }} /></div>}
       </div>
     </div>
-  );
+  ), document.body);
 
   if (stage === "review") return sheet(
     <div style={{ padding: "20px 24px 32px" }}>
