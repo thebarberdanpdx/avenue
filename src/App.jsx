@@ -8374,7 +8374,6 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.4px" }}>{active.title}</h2>
-            <Explain title={active.title}>{active.explain || <>This is the “{active.title}” setting. Adjust the options below — your changes save when you tap Save Changes. If you're not sure, the defaults here are sensible to leave as they are.</>}</Explain>
             {active.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "3px 7px" }}>SMART</span>}
           </div>
           {active.subtitle && <div style={{ fontSize: 15, color: "var(--gold)", marginTop: 6, fontWeight: 500 }}>{active.subtitle}</div>}
@@ -8458,20 +8457,20 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
               {filtered.map((c) => {
                 const Icon = c.icon;
+                const explainText = c.explain || <>This is the “{c.title}” setting. Open it to adjust the options. If you're not sure, the defaults are sensible to leave as they are.</>;
                 return (
-                  <button key={c.id} onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", border: "none" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</span>
-                          {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
-                        </div>
-                        <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>
+                  <div key={c.id} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", display: "flex", alignItems: "center", gap: 10, padding: "16px 18px" }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</span>
+                        <Explain title={c.title}>{explainText}</Explain>
+                        {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
                       </div>
+                      <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>
                     </div>
-                    <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
-                  </button>
+                    <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ background: "none", border: "none", color: "var(--faint)", flexShrink: 0, cursor: "pointer", padding: 6, display: "flex", alignItems: "center" }}><ChevronRight size={18} /></button>
+                  </div>
                 );
               })}
             </div>
@@ -8495,20 +8494,20 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
               <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
                 {catCards.map((c) => {
                   const Icon = c.icon;
+                  const explainText = c.explain || <>This is the “{c.title}” setting. Open it to adjust the options. If you're not sure, the defaults are sensible to leave as they are.</>;
                   return (
-                    <button key={c.id} onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", border: "none" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</span>
-                            {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
-                          </div>
-                          <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>
+                    <div key={c.id} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", display: "flex", alignItems: "center", gap: 10, padding: "16px 18px" }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</span>
+                          <Explain title={c.title}>{explainText}</Explain>
+                          {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
                         </div>
+                        <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>
                       </div>
-                      <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
-                    </button>
+                      <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ background: "none", border: "none", color: "var(--faint)", flexShrink: 0, cursor: "pointer", padding: 6, display: "flex", alignItems: "center" }}><ChevronRight size={18} /></button>
+                    </div>
                   );
                 })}
               </div>
