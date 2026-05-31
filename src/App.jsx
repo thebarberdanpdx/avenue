@@ -7103,6 +7103,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   const [editingDetails, setEditingDetails] = useState(false);
   const [workWeekRef, setWorkWeekRef] = useState(new Date());
   const [repeatFor, setRepeatFor] = useState(null); // { dow, h } when the "repeat on days" popup is open
+  const [dayEdit, setDayEdit] = useState(null); // { dow } when editing one day's shift in a focused sheet
 
   const staff = providers.filter((p) => p.id !== "anyone");
   const active = staff.filter((p) => !p.archived);
@@ -7324,28 +7325,65 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             <button onClick={() => shift(1)} style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid var(--border)", background: "var(--panel)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronRight size={18} /></button>
           </div>
         </div>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "8px 14px" }}>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "10px 16px" }}>
           {days.map((d, i) => { const dow = d.getDay(); const h = person.hours[dow] || { on: false, start: 540, end: 1020 }; return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "15px 4px", borderTop: i ? "1px solid var(--line)" : "none" }}>
-              <button onClick={() => patchDay(person.id, dow, { on: !h.on })} aria-label={h.on ? "Turn day off" : "Turn day on"} style={{ width: 46, height: 27, borderRadius: 27, border: "none", flexShrink: 0, background: h.on ? "var(--gold)" : "var(--border2)", position: "relative", cursor: "pointer", transition: "background .2s" }}>
-                <span style={{ position: "absolute", top: 3, left: h.on ? 22 : 3, width: 21, height: 21, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 2px rgba(0,0,0,0.25)" }} />
-              </button>
-              <div style={{ width: 38, flexShrink: 0 }}>
-                <div style={{ fontSize: 14.5, fontWeight: 600, color: h.on ? "var(--text)" : "var(--faint)" }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</div>
-                <div style={{ fontSize: 11, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div>
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
+              <div style={{ width: 46, flexShrink: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: h.on ? "var(--text)" : "var(--faint)" }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</div>
+                <div style={{ fontSize: 12, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div>
               </div>
-              {h.on
-                ? <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-                    <div style={{ flex: 1 }}><TimeScrollPicker value={h.start} onChange={(v) => patchDay(person.id, dow, { start: v, end: Math.max(v + 15, h.end) })} label={`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} start`} compact full /></div>
-                    <span style={{ color: "var(--faint)", fontSize: 13, flexShrink: 0 }}>–</span>
-                    <div style={{ flex: 1 }}><TimeScrollPicker value={h.end} onChange={(v) => patchDay(person.id, dow, { end: v })} minMin={h.start + 15} label={`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} end`} compact full /></div>
-                    <button onClick={() => setRepeatFor({ dow, h })} aria-label="Repeat these hours on other days" title="Repeat on other days" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 9, background: "transparent", border: "1px solid var(--border)", color: "var(--gold)", flexShrink: 0, cursor: "pointer" }}><Repeat size={15} /></button>
-                  </div>
-                : <span style={{ flex: 1, textAlign: "right", fontSize: 14.5, color: "var(--faint)" }}>Off</span>}
+              <button onClick={() => setDayEdit({ dow })} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: h.on ? "color-mix(in srgb, var(--gold) 9%, var(--panel2))" : "var(--panel2)", border: `1px solid ${h.on ? "color-mix(in srgb, var(--gold) 30%, var(--border))" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
+                <span style={{ fontSize: 15.5, fontWeight: h.on ? 600 : 400, color: h.on ? "var(--text)" : "var(--faint)", fontStyle: h.on ? "normal" : "italic" }}>{h.on ? `${fmtTime(h.start)} – ${fmtTime(h.end)}` : "No shifts"}</span>
+                <Edit2 size={15} style={{ color: "var(--sub)", flexShrink: 0 }} />
+              </button>
             </div>
           ); })}
         </div>
-        <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Tap a time to set it in 15-minute steps. Tap the repeat icon to copy a day's hours to other days.</p>
+        <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Tap any day to set its hours.</p>
+
+        {/* Per-day edit sheet — focused, roomy: on/off, start, end, and repeat all live here */}
+        {dayEdit && (() => {
+          const dow = dayEdit.dow;
+          const h = person.hours[dow] || { on: false, start: 540, end: 1020 };
+          const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dow];
+          return (
+            <Sheet open={true} onClose={() => setDayEdit(null)} align="bottom" maxWidth={460}>
+              <div style={{ padding: "6px 2px 8px" }}>
+                <div style={{ textAlign: "center", marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>WORK HOURS</div>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginTop: 6 }}>{dayName}</div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
+                  <span style={{ fontSize: 16, fontWeight: 500 }}>{h.on ? "Working this day" : "Day off"}</span>
+                  <button onClick={() => patchDay(person.id, dow, { on: !h.on })} aria-label={h.on ? "Working" : "Day off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: h.on ? "var(--gold)" : "var(--border2)", position: "relative", cursor: "pointer", transition: "background .2s" }}>
+                    <span style={{ position: "absolute", top: 3, left: h.on ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
+                  </button>
+                </div>
+
+                {h.on && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>START</div>
+                      <TimeScrollPicker value={h.start} onChange={(v) => patchDay(person.id, dow, { start: v, end: Math.max(v + 15, h.end) })} label={`${dayName} start`} full />
+                    </div>
+                    <span style={{ color: "var(--faint)", fontSize: 15, marginTop: 22 }}>–</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>END</div>
+                      <TimeScrollPicker value={h.end} onChange={(v) => patchDay(person.id, dow, { end: v })} minMin={h.start + 15} label={`${dayName} end`} full />
+                    </div>
+                  </div>
+                )}
+
+                {h.on && (
+                  <button onClick={() => { setRepeatFor({ dow, h }); setDayEdit(null); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--gold)", fontSize: 14.5, fontWeight: 500, marginBottom: 12, cursor: "pointer" }}><Repeat size={16} /> Repeat these hours on other days</button>
+                )}
+
+                <button onClick={() => setDayEdit(null)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 13.5, letterSpacing: 2, fontWeight: 600, borderRadius: 12, cursor: "pointer" }}>DONE</button>
+              </div>
+            </Sheet>
+          );
+        })()}
 
         {/* Repeat-on-days popup */}
         {repeatFor && (() => {
