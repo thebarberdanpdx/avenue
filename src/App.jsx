@@ -8236,16 +8236,41 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   // one person; the rest are queued, each offered after delayMin if unclaimed.
   const sendWaitlistNotices = (matches, freed) => {
     if (!matches.length) return;
+    const notified = wlRules.order === "longest" ? matches.slice(0, 1) : matches;
+    let msg;
     if (wlRules.order === "longest") {
       const first = matches[0];
       const rest = matches.length - 1;
-      showToast(rest > 0
+      msg = rest > 0
         ? `Sent ${first.name.split(" ")[0]} a booking link. ${rest} other${rest > 1 ? "s" : ""} queued — each offered after ${wlRules.delayMin || 30} min if unclaimed.`
-        : `Sent ${first.name.split(" ")[0]} an in-app notification with a booking link.`);
+        : `Sent ${first.name.split(" ")[0]} an in-app notification with a booking link.`;
     } else {
       const names = matches.map((m) => (m.name || "client").split(" ")[0]).join(", ");
-      showToast(`Sent ${matches.length} in-app notification${matches.length > 1 ? "s" : ""} with a booking link: ${names}.`);
+      msg = `Sent ${matches.length} in-app notification${matches.length > 1 ? "s" : ""} with a booking link: ${names}.`;
     }
+    // Addressed-from-waitlist cleanup: drop the notified people from the waitlist (all their days).
+    // Skip earlier-alert pseudo-entries (id "ea-…") — those are booked clients, not waitlist rows.
+    const keyOf = (x) => ((x.phone || "").replace(/\D/g, "")) || (x.name || "").trim().toLowerCase();
+    const realNotified = notified.filter((m) => !(m.id && String(m.id).startsWith("ea-")));
+    if (realNotified.length && setWaitlist) {
+      const removeKeys = new Set(realNotified.map(keyOf));
+      setWaitlist((cur) => (cur || []).filter((w) => !removeKeys.has(keyOf(w))));
+    }
+    // Flag the owner if any addressed client already has an upcoming appointment within a week.
+    const now0 = new Date(); now0.setHours(0, 0, 0, 0);
+    const clash = realNotified.filter((m) => {
+      const k = keyOf(m);
+      return (appts || []).some((a) => {
+        if (a.status !== "confirmed") return false;
+        const ak = (a.phone || "").replace(/\D/g, "") || (a.name || "").trim().toLowerCase();
+        if (ak !== k) return false;
+        const d = new Date(a.bookedFor); if (isNaN(d)) return false;
+        const days = (d - now0) / 86400000;
+        return days >= 0 && days <= 7;
+      });
+    }).map((m) => (m.name || "client").split(" ")[0]);
+    if (clash.length) msg += ` ${clash.join(", ")} already ha${clash.length > 1 ? "ve" : "s"} an appointment within a week — we asked ${clash.length > 1 ? "them" : "them"} to drop the older one when they take the new slot.`;
+    showToast(msg);
     setWaitlistMatch(null);
   };
   // Earlier-slot alerts: booked clients who opted into "tell me if something opens sooner."
