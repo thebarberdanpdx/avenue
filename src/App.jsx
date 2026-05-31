@@ -1383,6 +1383,17 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     if (!selectedDate || !isMultiPerson) return null;
     return findGroupSlots(people.map((p) => ({ prov: p.prov, durMin: p.durMin })), selectedDate);
   }, [selectedDate, isMultiPerson, people, appts]);
+  // A slot is blocked if any service in the cart has a "Blocked" time rule covering this barber/day/time.
+  const slotBlockedByRules = (provId, dayDate, slotMin) => {
+    const dow = dayDate.getDay();
+    const svcs = (cart || []).map((c) => c.service).filter(Boolean);
+    return svcs.some((svc) => (svc.timeRules || []).some((r) => {
+      if (!r.block) return false;
+      if (r.scope && r.scope !== "all" && r.scope !== provId) return false;
+      if (r.days && r.days.length && !r.days.includes(dow)) return false;
+      return slotMin >= r.start && slotMin < r.end;
+    }));
+  };
   const openSlots = useMemo(() => {
     if (!selectedDate) return [];
     if (isMultiPerson && groupSlots) {
@@ -1391,8 +1402,8 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
       return groupSlots.sequential.map((s) => s.start);
     }
     const prov = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]);
-    return freeSlotsFor(prov, selectedDate, effMin || 30, 15);
-  }, [selectedDate, provider, providers, cartMin, appts, isMultiPerson, groupSlots]);
+    return freeSlotsFor(prov, selectedDate, effMin || 30, 15).filter((t) => !slotBlockedByRules(prov.id, selectedDate, t));
+  }, [selectedDate, provider, providers, cartMin, appts, isMultiPerson, groupSlots, cart]);
   const slotIsSameTime = isMultiPerson && groupSlots && slot != null && groupSlots.sameTime.includes(slot);
   const dateIsFull = selectedDate && openSlots.length === 0;
 
@@ -5511,6 +5522,72 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     </>
   );
 
+  // ---- HOURS & PRICING RULES section ----
+  // Each rule: who it applies to (all barbers or one), which days + time window, and the effect
+  // (block the slot, or charge more/less). Availability is enforced for online clients; the price
+  // adjustments are stored here and applied at booking in the next step.
+  const tr = form.timeRules || [];
+  const DOW = ["S", "M", "T", "W", "T", "F", "S"];
+  const newRule = () => ({ id: "tr" + Date.now() + Math.floor(Math.random() * 1000), scope: "all", days: [], start: 9 * 60, end: 17 * 60, block: false, priceMode: "none", amount: 0, amountType: "amount" });
+  const setRule = (id, patch) => setForm((f) => ({ ...f, timeRules: (f.timeRules || []).map((r) => r.id === id ? { ...r, ...patch } : r) }));
+  const addRule = () => setForm((f) => ({ ...f, timeRules: [...(f.timeRules || []), newRule()] }));
+  const removeRule = (id) => setForm((f) => ({ ...f, timeRules: (f.timeRules || []).filter((r) => r.id !== id) }));
+  const toggleDay = (id, dow) => setForm((f) => ({ ...f, timeRules: (f.timeRules || []).map((r) => { if (r.id !== id) return r; const days = r.days.includes(dow) ? r.days.filter((d) => d !== dow) : [...r.days, dow]; return { ...r, days }; }) }));
+  const stepBtn = { width: 30, height: 28, borderRadius: 7, background: "var(--panel2)", border: "1px solid var(--border)", fontSize: 15, color: "var(--text)" };
+  const timeRulesSection = (
+    <>
+      <SectionHeader title="Hours & Pricing" />
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18 }}>Add a rule for any window where this service should behave differently — block it off, or charge more at peak times and less when it's slow. Leave days unselected to mean every day. No rules = offered normally whenever the barber works.</p>
+      <div style={{ display: "grid", gap: 14 }}>
+        {tr.map((r) => (
+          <div key={r.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>APPLIES TO</span>
+              <button onClick={() => removeRule(r.id)} style={{ background: "none", color: "var(--sub)", display: "flex" }}><Trash2 size={16} /></button>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <Segmented options={[{ value: "all", label: "All barbers" }, ...staffList.map((p) => ({ value: p.id, label: p.name.split(" ")[0] }))]} value={r.scope} onChange={(v) => setRule(r.id, { scope: v })} />
+            </div>
+            <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>DAYS <span style={{ color: "var(--faint)", letterSpacing: 0, fontWeight: 400, textTransform: "none" }}>(none = every day)</span></div>
+            <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+              {DOW.map((d, i) => { const on = r.days.includes(i); return (
+                <button key={i} onClick={() => toggleDay(r.id, i)} style={{ flex: 1, height: 38, borderRadius: 9, fontSize: 13.5, fontWeight: on ? 700 : 400, background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--sub)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}` }}>{d}</button>
+              ); })}
+            </div>
+            <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+              {[["From", "start"], ["To", "end"]].map(([lbl, key]) => (
+                <div key={key} style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>{lbl}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button onClick={() => setRule(r.id, { [key]: Math.max(0, r[key] - 15) })} style={stepBtn}>−</button>
+                    <span style={{ flex: 1, textAlign: "center", fontSize: 15, fontWeight: 600 }}>{fmtTime(r[key])}</span>
+                    <button onClick={() => setRule(r.id, { [key]: Math.min(24 * 60, r[key] + 15) })} style={stepBtn}>+</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>IN THIS WINDOW</div>
+            <Segmented options={[{ value: "open", label: "Available" }, { value: "block", label: "Blocked" }]} value={r.block ? "block" : "open"} onChange={(v) => setRule(r.id, { block: v === "block" })} />
+            {!r.block && (
+              <div style={{ marginTop: 14 }}>
+                <Segmented options={[{ value: "none", label: "Normal price" }, { value: "more", label: "Charge more" }, { value: "less", label: "Charge less" }]} value={r.priceMode} onChange={(v) => setRule(r.id, { priceMode: v })} />
+                {r.priceMode !== "none" && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
+                    <span style={{ fontSize: 14.5, color: "var(--sub)" }}>{r.priceMode === "more" ? "Add" : "Take off"}</span>
+                    <input type="number" value={r.amount || ""} onChange={(e) => setRule(r.id, { amount: e.target.value === "" ? 0 : Number(e.target.value) })} style={{ width: 80, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
+                    <Segmented options={[{ value: "amount", label: "$" }, { value: "percent", label: "%" }]} value={r.amountType} onChange={(v) => setRule(r.id, { amountType: v })} />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+        <button onClick={addRule} style={{ width: "100%", background: "transparent", color: "var(--gold)", padding: 16, fontSize: 15, fontWeight: 500, borderRadius: 14, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={18} /> Add a rule</button>
+      </div>
+      <SaveBar />
+    </>
+  );
+
   // ---- REFERENCE PHOTOS section (AI training) ----
   // Picker for which target gets the next picked photo: { kind: 'service' } or { kind: 'cutType', id }
   const [refPickTarget, setRefPickTarget] = useState(null);
@@ -5613,6 +5690,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     { id: "customizations", label: "Add-ons & Customizations", sub: `${form.addonGroups.length} option group${form.addonGroups.length !== 1 ? "s" : ""}` },
     { id: "refphotos", label: "Reference Photos for AI", sub: refPhotoCount === 0 ? "None yet" : `${refPhotoCount} photo${refPhotoCount === 1 ? "" : "s"}` },
     { id: "booking", label: "Online Booking", sub: b.available ? "Available" : "Off" },
+    { id: "timerules", label: "Hours & Pricing", sub: (form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Always available" },
   ];
 
   // ---- full-page service editor ----
@@ -5629,6 +5707,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           : section === "customizations" ? customizationsSection
           : section === "refphotos" ? referencePhotosSection
           : section === "booking" ? bookingSection
+          : section === "timerules" ? timeRulesSection
           : (
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
