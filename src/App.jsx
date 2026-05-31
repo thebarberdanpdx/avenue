@@ -8074,28 +8074,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           );
         })()
       ) : (
-        // EMPTY STATE — quiet helpers under the hero: common picks + browse-by-area
+        // EMPTY STATE — the nine sections, right under the hero search
         <div>
-          <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, margin: "0 2px 12px" }}>JUMP TO</div>
-          <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
-            {["tipping", "hours", "notifications", "booking", "staff"].map((id) => cards.find((c) => c.id === id)).filter(Boolean).map((c) => {
-              const Icon = c.icon;
-              return (
-                <button key={c.id} onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", border: "none" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</div>
-                      <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
-                </button>
-              );
-            })}
-          </div>
-
-          <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" }}>OR BROWSE BY AREA</div>
           <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
             {CATS.map((cat) => {
               const Icon = cat.icon || Settings;
