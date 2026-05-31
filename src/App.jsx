@@ -5491,7 +5491,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, letterSpacing: 1.5, fontWeight: 500 }}>{business.name}</div>
         <div style={{ width: 50 }} />
       </div>
-      <div style={{ maxWidth: 900, width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
+      <div style={{ width: "100%", margin: "0 auto", padding: "24px 20px 120px" }}>
         {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
@@ -7880,9 +7880,7 @@ function Explain({ title, children }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "color-mix(in srgb, var(--gold) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, padding: "8px 13px", borderRadius: 10, cursor: "pointer", verticalAlign: "middle" }}>
-        <span style={{ width: 17, height: 17, borderRadius: "50%", border: "1.5px solid var(--gold)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, lineHeight: 1 }}>?</span> What is this?
-      </button>
+      <button onClick={() => setOpen(true)} aria-label="What is this?" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", border: "none", fontSize: 13, fontWeight: 700, fontStyle: "italic", fontFamily: "Georgia, serif", lineHeight: 1, cursor: "pointer", flexShrink: 0, verticalAlign: "middle" }}>i</button>
       <Sheet open={open} onClose={() => setOpen(false)} align="center" maxWidth={400}>
         <div style={{ padding: "4px 2px 6px" }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
@@ -8370,19 +8368,17 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   if (active) {
     const Icon = active.icon;
     return (
-      <div className="appt-screen" style={{ maxWidth: 860, margin: "0 auto", padding: "12px 18px 40px" }}>
+      <div className="appt-screen" style={{ width: "100%", padding: "12px 16px 40px" }}>
         <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
         <div style={{ marginBottom: 22 }}>
           <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.4px" }}>{active.title}</h2>
+            <Explain title={active.title}>{active.explain || <>This is the “{active.title}” setting. Adjust the options below — your changes save when you tap Save Changes. If you're not sure, the defaults here are sensible to leave as they are.</>}</Explain>
             {active.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "3px 7px" }}>SMART</span>}
           </div>
           {active.subtitle && <div style={{ fontSize: 15, color: "var(--gold)", marginTop: 6, fontWeight: 500 }}>{active.subtitle}</div>}
           {active.status && <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.4, marginTop: 6 }}>{active.status}</div>}
-          <div style={{ marginTop: 12 }}>
-            <Explain title={active.title}>{active.explain || <>This is the “{active.title}” setting. Adjust the options below — your changes save when you tap Save Changes. If you're not sure, the defaults here are sensible to leave as they are.</>}</Explain>
-          </div>
         </div>
 
         {active.fullBleed
@@ -8397,7 +8393,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   }
 
   return (
-    <div className="fade-up" style={{ maxWidth: 860, margin: "0 auto", padding: "12px 18px" }}>
+    <div className="fade-up" style={{ width: "100%", padding: "12px 16px" }}>
       {/* Masthead — the search is the hero */}
       <div style={{ marginBottom: 18 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
