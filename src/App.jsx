@@ -587,7 +587,7 @@ const fmtTime = (mins) => { const h = Math.floor(mins / 60), m = mins % 60; cons
 // Reusable tap-to-scroll time picker. Shows the current time as a tappable chip;
 // tapping opens a sheet with a scrollable list of times in `step`-minute increments.
 // Replaces +/- steppers everywhere. value/onChange are minutes-from-midnight.
-function TimeScrollPicker({ value, onChange, step = 15, minMin = 0, maxMin = 24 * 60 - step, label, compact }) {
+function TimeScrollPicker({ value, onChange, step = 15, minMin = 0, maxMin = 24 * 60 - step, label, compact, full }) {
   const [open, setOpen] = useState(false);
   const listRef = useRef(null);
   const options = [];
@@ -600,7 +600,7 @@ function TimeScrollPicker({ value, onChange, step = 15, minMin = 0, maxMin = 24 
   }, [open]);
   return (
     <>
-      <button onClick={() => setOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: compact ? "8px 11px" : "11px 15px", color: "var(--text)", fontSize: compact ? 14 : 15.5, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" }}>
+      <button onClick={() => setOpen(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: full ? "100%" : "auto", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: compact ? "9px 10px" : "11px 15px", color: "var(--text)", fontSize: compact ? 14 : 15.5, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" }}>
         {!compact && <Clock size={15} style={{ color: "var(--gold)" }} />} {fmtTime(value)}
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} align="center" maxWidth={300}>
@@ -7119,7 +7119,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
     const colors = ["#C2703D", "#5E8C72", "#8064B5", "#3D9BE9", "#B14A5E"];
     const id = "s" + Date.now();
     setProviders([...providers, { id, name: "New Staff Member", role: "Stylist", color: colors[providers.length % colors.length], photo: STAFF_PORTRAITS[providers.length % STAFF_PORTRAITS.length], hours: { ...DEFAULT_HOURS }, email: "", phone: "", userType: "Staff", isProvider: true, onlineBooking: true, archived: false, notifications: defaultStaffNotifications(), comp: defaultComp(), permissions: defaultPermissions("Staff") }]);
-    setOpenId(id); setSection(null); showToast("Staff member added.");
+    setOpenId(id); setSection("details"); setEditingDetails(true); showToast("New staff member — add their details.");
   };
   const archive = (pid) => { patch(pid, { archived: true }); setOpenId(null); showToast("Staff member archived."); };
   const restore = (pid) => { patch(pid, { archived: false }); showToast("Staff member restored."); };
@@ -7142,10 +7142,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   if (!person) {
     return (
       <div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300, margin: 0, flex: 1 }}>Manage your team — details, notifications, services, hours, and compensation.</p>
-          <button onClick={addStaff} className="lift" style={{ background: "var(--gold)", color: "var(--on-gold)", width: 38, height: 38, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 12 }}><Plus size={20} /></button>
-        </div>
+        <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300, margin: "0 0 16px" }}>Your team. Tap anyone to edit their photo, title, hours, access, and pay.</p>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
           {active.map((p, i) => (
             <button key={p.id} onClick={() => { setOpenId(p.id); setSection(null); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
@@ -7155,6 +7152,8 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             </button>
           ))}
         </div>
+
+        <button onClick={addStaff} className="lift" style={{ width: "100%", marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 14, padding: 16, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, boxShadow: "var(--shadow-sm)" }}><Plus size={18} /> ADD A STAFF MEMBER</button>
 
         {archived.length > 0 && (
           <button onClick={() => setShowArchived(!showArchived)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", color: "var(--text)" }}>
@@ -7327,20 +7326,20 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         </div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "8px 14px" }}>
           {days.map((d, i) => { const dow = d.getDay(); const h = person.hours[dow] || { on: false, start: 540, end: 1020 }; return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 2px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "15px 4px", borderTop: i ? "1px solid var(--line)" : "none" }}>
               <button onClick={() => patchDay(person.id, dow, { on: !h.on })} aria-label={h.on ? "Turn day off" : "Turn day on"} style={{ width: 46, height: 27, borderRadius: 27, border: "none", flexShrink: 0, background: h.on ? "var(--gold)" : "var(--border2)", position: "relative", cursor: "pointer", transition: "background .2s" }}>
                 <span style={{ position: "absolute", top: 3, left: h.on ? 22 : 3, width: 21, height: 21, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 2px rgba(0,0,0,0.25)" }} />
               </button>
-              <div style={{ width: 42, flexShrink: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, color: h.on ? "var(--text)" : "var(--faint)" }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</div>
-                <div style={{ fontSize: 11.5, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div>
+              <div style={{ width: 38, flexShrink: 0 }}>
+                <div style={{ fontSize: 14.5, fontWeight: 600, color: h.on ? "var(--text)" : "var(--faint)" }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</div>
+                <div style={{ fontSize: 11, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div>
               </div>
               {h.on
-                ? <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, minWidth: 0 }}>
-                    <TimeScrollPicker value={h.start} onChange={(v) => patchDay(person.id, dow, { start: v, end: Math.max(v + 15, h.end) })} label={`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} start`} compact />
+                ? <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                    <div style={{ flex: 1 }}><TimeScrollPicker value={h.start} onChange={(v) => patchDay(person.id, dow, { start: v, end: Math.max(v + 15, h.end) })} label={`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} start`} compact full /></div>
                     <span style={{ color: "var(--faint)", fontSize: 13, flexShrink: 0 }}>–</span>
-                    <TimeScrollPicker value={h.end} onChange={(v) => patchDay(person.id, dow, { end: v })} minMin={h.start + 15} label={`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} end`} compact />
-                    <button onClick={() => setRepeatFor({ dow, h })} aria-label="Repeat these hours on other days" title="Repeat on other days" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 9, background: "transparent", border: "1px solid var(--border)", color: "var(--gold)", flexShrink: 0, cursor: "pointer" }}><Repeat size={15} /></button>
+                    <div style={{ flex: 1 }}><TimeScrollPicker value={h.end} onChange={(v) => patchDay(person.id, dow, { end: v })} minMin={h.start + 15} label={`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} end`} compact full /></div>
+                    <button onClick={() => setRepeatFor({ dow, h })} aria-label="Repeat these hours on other days" title="Repeat on other days" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 9, background: "transparent", border: "1px solid var(--border)", color: "var(--gold)", flexShrink: 0, cursor: "pointer" }}><Repeat size={15} /></button>
                   </div>
                 : <span style={{ flex: 1, textAlign: "right", fontSize: 14.5, color: "var(--faint)" }}>Off</span>}
             </div>
@@ -8009,7 +8008,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <ImportDataEditor showToast={showToast} />,
     },
     {
-      id: "staff", title: "Staff Members", icon: Users, category: "Business Setup",
+      id: "staff", fullBleed: true, title: "Staff Members", icon: Users, category: "Business Setup",
       status: `${providers.filter((p) => p.id !== "anyone").length} staff`, keywords: "staff team employees hours days off schedule availability who works barber stylist",
       editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} showToast={showToast} />),
     },
@@ -8156,7 +8155,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <CheckoutSettingsEditor c={form.checkout || {}} onChange={(ck) => setForm({ ...form, checkout: { ...(form.checkout || {}), ...ck } })} />,
     },
     {
-      id: "servicesmenu", title: "Services & Menu", icon: ImageIcon, category: "Services & Menu",
+      id: "servicesmenu", fullBleed: true, title: "Services & Menu", icon: ImageIcon, category: "Services & Menu",
       status: `${(services || []).length} services`,
       keywords: "menu services service list edit add price duration photo category haircut beard add-ons addons cut types",
       editor: <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} />,
@@ -8202,13 +8201,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <MessagesEditor messages={form.messages || []} onChange={(msgs) => setForm({ ...form, messages: msgs })} business={form} />,
     },
     {
-      id: "website", title: "Your Website", subtitle: "Your branded booking page", icon: Globe, category: "Your Website",
+      id: "website", fullBleed: true, title: "Your Website", subtitle: "Your branded booking page", icon: Globe, category: "Your Website",
       status: (form.website?.enabled === true) ? ((form.website?.customDomain) ? form.website.customDomain : "On · Vero-hosted page") : "Off",
       keywords: "website web site storefront landing page online presence branded booking link domain custom url instagram social about tagline intro public page",
       editor: <WebsiteEditor w={form.website || {}} onChange={(wx) => setForm({ ...form, website: { ...(form.website || {}), ...wx } })} business={form} theme={(form?.theme && THEME_IDS.includes(form.theme)) ? form.theme : theme} setTheme={(id) => setForm({ ...form, theme: id })} />,
     },
     {
-      id: "reports", title: "Reports & Insights", icon: BarChart3, category: "Reporting",
+      id: "reports", fullBleed: true, title: "Reports & Insights", icon: BarChart3, category: "Reporting",
       status: "Revenue, staff, retention",
       keywords: "reports reporting analytics revenue sales staff performance retention average ticket dashboard insights numbers trends",
       editor: <ReportsView appts={appts} clients={clients} providers={providers} services={services} business={form} />,
@@ -8298,9 +8297,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           {active.status && <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.4, marginTop: 6 }}>{active.status}</div>}
         </div>
 
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "24px 24px", boxShadow: "var(--shadow-sm)" }}>
-          {active.editor}
-        </div>
+        {active.fullBleed
+          ? <div>{active.editor}</div>
+          : <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "24px 24px", boxShadow: "var(--shadow-sm)" }}>{active.editor}</div>}
 
         {hasChanges && (
           <button className="lift" onClick={() => save(`${active.title} saved.`)} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 13.5, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: "var(--shadow-md)" }}>SAVE CHANGES</button>
