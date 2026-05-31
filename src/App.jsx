@@ -7772,6 +7772,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
   const [openCat, setOpenCat] = useState(null);
   const [cockpitHidden, setCockpitHidden] = useState(false);
+  const [cockpitOpen, setCockpitOpen] = useState(false);
 
   // ---- Go-live cockpit: live setup checklist. Shows only while there are open items;
   // once everything's done (incl. payments + texts), it has nothing to show and disappears.
@@ -7815,41 +7816,48 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
   return (
     <div className="fade-up" style={{ maxWidth: 720, margin: "0 auto", padding: "12px 4px" }}>
-      {/* Masthead */}
-      <div style={{ marginBottom: 26 }}>
+      {/* Masthead — the search is the hero */}
+      <div style={{ marginBottom: 18 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>SETTINGS</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, lineHeight: 0.95, letterSpacing: "-0.6px", marginBottom: 12 }}>How the shop runs</h2>
-        <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.5, maxWidth: 460 }}>Everything that shapes how Vero looks, behaves, and speaks to clients.</p>
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 10, fontWeight: 600 }}>SETTINGS</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 38, fontWeight: 500, lineHeight: 0.98, letterSpacing: "-0.6px" }}>What do you want to change?</h2>
       </div>
 
-      {/* GO-LIVE COCKPIT — only while there's setup left; disappears once you're fully live */}
-      {showCockpit && !openCat && (
-        <div style={{ background: "var(--panel)", border: "1px solid var(--gold-line, color-mix(in srgb, var(--gold) 35%, transparent))", borderRadius: 18, padding: "18px 18px 8px", marginBottom: 24, boxShadow: "var(--shadow-sm)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-              <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700 }}>FINISH SETUP</span>
-              <span style={{ fontSize: 12, color: "var(--faint)", fontWeight: 500 }}>{setupLeft.length} left</span>
+      {/* HERO SEARCH */}
+      <div style={{ position: "relative", marginBottom: 12 }}>
+        <input value={query} onChange={(e) => { setQuery(e.target.value); setOpenCat(null); }} placeholder="Try “tipping”, “hours”, “remind clients”…" style={{ width: "100%", background: "var(--panel)", border: "1.5px solid var(--border)", borderRadius: 16, padding: "19px 18px 19px 52px", color: "var(--text)", fontSize: 17, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+        <Settings size={20} style={{ position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)", color: "var(--gold)", pointerEvents: "none" }} />
+      </div>
+
+      {/* SLIM COCKPIT — a quiet line under search; expands on tap; gone once setup's done */}
+      {showCockpit && !openCat && !q && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => setCockpitOpen((v) => !v)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, transparent)", borderRadius: 12, padding: "12px 14px", color: "var(--text)" }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
+              <span style={{ flex: 1, textAlign: "left", fontSize: 14, fontWeight: 500 }}>Finish setting up your shop</span>
+              <span style={{ fontSize: 12.5, color: "var(--gold)", fontWeight: 600 }}>{setupLeft.length} left</span>
+              <ChevronDown size={16} style={{ color: "var(--faint)", transform: cockpitOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .2s" }} />
+            </button>
+            <button onClick={() => setCockpitHidden(true)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 6, display: "flex" }}><X size={16} /></button>
+          </div>
+          {cockpitOpen && (
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, marginTop: 6, padding: "2px 14px" }}>
+              {[...setupItems].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1)).map((s, i) => (
+                <button key={s.k} onClick={() => setOpenCard(s.card)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 0", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left" }}>
+                  <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: s.done ? "var(--gold)" : "transparent", border: s.done ? "none" : "1.5px solid var(--border2)" }}>{s.done && <Check size={12} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
+                  <span style={{ flex: 1, fontSize: 14.5, color: s.done ? "var(--faint)" : "var(--text)", textDecoration: s.done ? "line-through" : "none" }}>{s.label}</span>
+                  {!s.done && <ChevronRight size={16} style={{ color: "var(--faint)" }} />}
+                </button>
+              ))}
             </div>
-            <button onClick={() => setCockpitHidden(true)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 4, display: "flex" }}><X size={16} /></button>
-          </div>
-          <div>
-            {[...setupItems].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1)).map((s, i) => (
-              <button key={s.k} onClick={() => setOpenCard(s.card)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 0", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left" }}>
-                <span style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: s.done ? "var(--gold)" : "transparent", border: s.done ? "none" : "1.5px solid var(--border2)" }}>{s.done && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
-                <span style={{ flex: 1, fontSize: 15, color: s.done ? "var(--faint)" : "var(--text)", textDecoration: s.done ? "line-through" : "none" }}>{s.label}</span>
-                {!s.done && <ChevronRight size={17} style={{ color: "var(--faint)" }} />}
-              </button>
-            ))}
-          </div>
+          )}
         </div>
       )}
 
-      {/* Search */}
-      <div style={{ position: "relative", marginBottom: 24 }}>
-        <input value={query} onChange={(e) => { setQuery(e.target.value); setOpenCat(null); }} placeholder="Search settings — tipping, hours, reminders…" style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 16px 13px 44px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
-        <Settings size={17} style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
-      </div>
+      {!showCockpit && !openCat && !q && (
+        <p style={{ fontSize: 12.5, color: "var(--faint)", margin: "0 4px 24px", lineHeight: 1.5 }}>Type what you're after in plain words — or jump to a common one below.</p>
+      )}
 
       {q ? (
         // SEARCHING — flat list of matching settings
@@ -7909,23 +7917,36 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           );
         })()
       ) : (
-        // CATEGORY GRID — the calm browse layer
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 13 }}>
-          {CATS.map((cat, i) => {
-            const Icon = cat.icon;
-            const count = cat.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean).length;
-            const wide = i === CATS.length - 1 && CATS.length % 2 === 1; // last tile spans full width if odd count
-            return (
-              <button key={cat.id} onClick={() => setOpenCat(cat.id)} className="lift" style={{ gridColumn: wide ? "1 / -1" : "auto", position: "relative", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: wide ? "16px 18px" : "18px 16px 16px", textAlign: "left", color: "var(--text)", overflow: "hidden", display: wide ? "flex" : "block", alignItems: "center", gap: 16 }}>
-                <span style={{ position: wide ? "static" : "absolute", top: 18, right: 18, fontSize: 12, color: "var(--faint)", fontWeight: 500, order: wide ? 3 : 0 }}>{count}</span>
-                <div style={{ width: 42, height: 42, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: wide ? 0 : 30, flexShrink: 0 }}><Icon size={20} style={{ color: "var(--gold)" }} /></div>
-                <div style={{ flex: wide ? 1 : "none" }}>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, letterSpacing: "-0.2px", marginBottom: 4 }}>{cat.label}</div>
-                  <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.4, fontWeight: 300 }}>{cat.desc}</div>
-                </div>
+        // EMPTY STATE — quiet helpers under the hero: common picks + browse-by-area
+        <div>
+          <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, margin: "0 2px 12px" }}>JUMP TO</div>
+          <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
+            {["tipping", "hours", "notifications", "booking", "staff"].map((id) => cards.find((c) => c.id === id)).filter(Boolean).map((c) => {
+              const Icon = c.icon;
+              return (
+                <button key={c.id} onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", border: "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</div>
+                      <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</div>
+                    </div>
+                  </div>
+                  <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" }}>OR BROWSE BY AREA</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 9 }}>
+            {CATS.map((cat) => (
+              <button key={cat.id} onClick={() => setOpenCat(cat.id)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px", borderRadius: 12, background: "var(--panel)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 14 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--gold)" }} />
+                {cat.label}
               </button>
-            );
-          })}
+            ))}
+          </div>
         </div>
       )}
     </div>
