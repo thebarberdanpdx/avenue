@@ -1223,6 +1223,14 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   };
   const provider = cart[0]?.provider || providers[0];
 
+  // Time-of-day pricing adjustment for the cart at the chosen slot — surfaced on the review step
+  // so an online client sees a peak surcharge or off-peak discount before they confirm.
+  const bookingProvId = provider ? (provider.id === "anyone" ? "dan" : provider.id) : "dan";
+  const cartTimeDelta = (slot != null && selectedDate)
+    ? cart.reduce((sum, e) => sum + (priceWithTimeRules(e.service, bookingProvId, selectedDate, slot) - getPrice(e.service, bookingProvId)), 0)
+    : 0;
+  const cartAdjTotal = cartPrice + cartTimeDelta;
+
   // ---------- REAL AVAILABILITY ENGINE ----------
   // For a barber on a given date, return free start-times that fit `durMin`,
   // based on their working hours minus appointments already booked that day.
@@ -2879,9 +2887,15 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                     <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.4 }}>{describeEntry(e)}</div>
                   </div>
                 ))}
+                {cartTimeDelta !== 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+                    <span style={{ fontSize: 14, color: "var(--sub)" }}>{cartTimeDelta > 0 ? "Peak time" : "Off-peak discount"}</span>
+                    <span style={{ fontSize: 14.5, color: cartTimeDelta > 0 ? "var(--text)" : "var(--gold)", fontWeight: 500 }}>{cartTimeDelta > 0 ? "+" : "−"}${Math.abs(cartTimeDelta)}</span>
+                  </div>
+                )}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
                   <span style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 500 }}>TOTAL</span>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)", fontWeight: 500 }}>${cartPrice}</span>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)", fontWeight: 500 }}>${cartAdjTotal}</span>
                 </div>
               </div>
             </div>
@@ -3001,7 +3015,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           </div>
         )}
 
-        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartPrice} provider={provider} selectedDate={selectedDate} slot={slot} photos={photos} onManage={() => setStep(9)} onExit={onExit} />}
+        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} provider={provider} selectedDate={selectedDate} slot={slot} photos={photos} onManage={() => setStep(9)} onExit={onExit} />}
 
         {step === 9 && <ManageAppointment business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} initialPhone={phone} dateOptions={dateOptions} onExit={onExit} showToast={(m) => {}} />}
         </div>
@@ -7796,8 +7810,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const [cockpitHidden, setCockpitHidden] = useState(false);
   const [cockpitOpen, setCockpitOpen] = useState(false);
 
-  // ---- Go-live cockpit: live setup checklist. Shows only while there are open items;
-  // once everything's done (incl. payments + texts), it has nothing to show and disappears.
+  // ---- Go-live cockpit: live setup checklist (auto-detected) + a manual "test before launch"
+  // checklist you tick off as you verify each flow. Both feed one "get ready to launch" panel
+  // that disappears once everything's done.
   const setupItems = [
     { k: "name",     label: "Add your business name", done: !!(form.name && form.name.trim()), card: "business" },
     { k: "hours",    label: "Set your hours",          done: !!(form.hours && Object.values(form.hours).some((h) => h && h.on)), card: "hours" },
@@ -7807,7 +7822,22 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     { k: "sms",      label: "Turn on text messaging",  done: !!form.smsApproved, card: "notifications" },
   ];
   const setupLeft = setupItems.filter((s) => !s.done);
-  const showCockpit = setupLeft.length > 0 && !cockpitHidden && !query.trim();
+
+  // Manual checks — you tick these off after trying each flow yourself. Saved to your shop.
+  const launchTests = business.launchTests || {};
+  const toggleTest = (k) => setBusiness({ ...business, launchTests: { ...(business.launchTests || {}), [k]: !launchTests[k] } });
+  const testItems = [
+    { k: "book",       label: "Book a test appointment from your calendar" },
+    { k: "online",     label: "Book a test appointment from your online link" },
+    { k: "checkout",   label: "Run a full checkout — tip and payment (simulated until Helcim is live)" },
+    { k: "reschedule", label: "Drag an appointment to a new time" },
+    { k: "cancel",     label: "Cancel an appointment" },
+    { k: "walkin",     label: "Add a walk-in" },
+    { k: "menu",       label: "Open your booking link on your phone — check services, prices & hours look right" },
+  ].map((t) => ({ ...t, done: !!launchTests[t.k] }));
+  const testLeft = testItems.filter((t) => !t.done);
+
+  const showCockpit = (setupLeft.length + testLeft.length) > 0 && !cockpitHidden && !query.trim();
 
   const q = query.trim().toLowerCase();
   const filtered = q ? cards.filter((c) => (c.title + " " + c.keywords).toLowerCase().includes(q)) : cards;
@@ -7851,25 +7881,37 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <Settings size={20} style={{ position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)", color: "var(--gold)", pointerEvents: "none" }} />
       </div>
 
-      {/* SLIM COCKPIT — a quiet line under search; expands on tap; gone once setup's done */}
+      {/* SLIM COCKPIT — quiet line under search; expands to a launch checklist; gone once done */}
       {showCockpit && !openCat && !q && (
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button onClick={() => setCockpitOpen((v) => !v)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, transparent)", borderRadius: 12, padding: "12px 14px", color: "var(--text)" }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
-              <span style={{ flex: 1, textAlign: "left", fontSize: 14, fontWeight: 500 }}>Finish setting up your shop</span>
-              <span style={{ fontSize: 12.5, color: "var(--gold)", fontWeight: 600 }}>{setupLeft.length} left</span>
+              <span style={{ flex: 1, textAlign: "left", fontSize: 14, fontWeight: 500 }}>Get ready to launch</span>
+              <span style={{ fontSize: 12.5, color: "var(--gold)", fontWeight: 600 }}>{setupLeft.length + testLeft.length} left</span>
               <ChevronDown size={16} style={{ color: "var(--faint)", transform: cockpitOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .2s" }} />
             </button>
             <button onClick={() => setCockpitHidden(true)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 6, display: "flex" }}><X size={16} /></button>
           </div>
           {cockpitOpen && (
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, marginTop: 6, padding: "2px 14px" }}>
-              {[...setupItems].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1)).map((s, i) => (
-                <button key={s.k} onClick={() => setOpenCard(s.card)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 0", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left" }}>
-                  <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: s.done ? "var(--gold)" : "transparent", border: s.done ? "none" : "1.5px solid var(--border2)" }}>{s.done && <Check size={12} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
-                  <span style={{ flex: 1, fontSize: 14.5, color: s.done ? "var(--faint)" : "var(--text)", textDecoration: s.done ? "line-through" : "none" }}>{s.label}</span>
-                  {!s.done && <ChevronRight size={16} style={{ color: "var(--faint)" }} />}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, marginTop: 6, padding: "12px 14px" }}>
+              {setupLeft.length > 0 && (
+                <>
+                  <div style={{ fontSize: 10.5, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 700, marginBottom: 2 }}>FINISH SETUP</div>
+                  {[...setupItems].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1)).map((s, i) => (
+                    <button key={s.k} onClick={() => setOpenCard(s.card)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 0", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left" }}>
+                      <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: s.done ? "var(--gold)" : "transparent", border: s.done ? "none" : "1.5px solid var(--border2)" }}>{s.done && <Check size={12} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
+                      <span style={{ flex: 1, fontSize: 14.5, color: s.done ? "var(--faint)" : "var(--text)", textDecoration: s.done ? "line-through" : "none" }}>{s.label}</span>
+                      {!s.done && <ChevronRight size={16} style={{ color: "var(--faint)" }} />}
+                    </button>
+                  ))}
+                </>
+              )}
+              <div style={{ fontSize: 10.5, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 700, margin: `${setupLeft.length > 0 ? 14 : 0}px 0 2px` }}>TEST BEFORE LAUNCH</div>
+              {[...testItems].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1)).map((t, i) => (
+                <button key={t.k} onClick={() => toggleTest(t.k)} style={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 12, padding: "11px 0", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left" }}>
+                  <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", background: t.done ? "var(--gold)" : "transparent", border: t.done ? "none" : "1.5px solid var(--border2)" }}>{t.done && <Check size={12} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
+                  <span style={{ flex: 1, fontSize: 14.5, lineHeight: 1.4, color: t.done ? "var(--faint)" : "var(--text)", textDecoration: t.done ? "line-through" : "none" }}>{t.label}</span>
                 </button>
               ))}
             </div>
