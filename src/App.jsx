@@ -103,6 +103,7 @@ const DEFAULT_BUSINESS = {
   // ---- Branded storefront website (one-page scroll served at the shop's public link) ----
   website: {
     enabled: false,           // off by default — the branded storefront is an opt-in option in settings
+    logo: "",                 // optional logo image (photo id / url); blank = show the business name as text
     tagline: "True to the craft.", // short line under the name
     intro: "",                // optional longer welcome paragraph
     instagram: "",            // handle without the @ (blank = hide the button)
@@ -650,6 +651,10 @@ export default function App() {
     } else if (h === "#book" || h === "#client") {
       setView("client");
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    } else if (h === "#preview") {
+      // Always show the branded storefront (even if it's toggled off) so the owner can preview it.
+      setView("preview");
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
   }, []);
   const goView = (v) => {
@@ -856,6 +861,7 @@ export default function App() {
         * { -webkit-tap-highlight-color: transparent; }
       `}</style>
 
+      {view === "preview" && <Storefront business={business} services={services} providers={providers} categories={categories} onPick={goView} />}
       {view === "landing" && (business.website?.enabled === true
         ? <Storefront business={business} services={services} providers={providers} categories={categories} onPick={goView} />
         : <Landing business={business} onPick={goView} />)}
@@ -1002,7 +1008,9 @@ function Storefront({ business, services = [], providers = [], categories = [], 
     <div style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY, paddingBottom: 60 }}>
       {/* HERO */}
       <div className="fade-up" style={{ ...section, paddingTop: "clamp(56px, 16vw, 110px)", paddingBottom: 40, textAlign: "center" }}>
-        <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: "clamp(42px, 14vw, 68px)", fontWeight: 500, lineHeight: 0.98, letterSpacing: 1 }}>{logo}</h1>
+        {w.logo
+          ? <img src={imgUrl(w.logo, 600)} alt={logo} style={{ maxWidth: "min(320px, 80%)", maxHeight: 140, objectFit: "contain", display: "block", margin: "0 auto" }} />
+          : <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: "clamp(42px, 14vw, 68px)", fontWeight: 500, lineHeight: 0.98, letterSpacing: 1 }}>{logo}</h1>}
         <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "20px auto" }} />
         {w.tagline && <p style={{ fontSize: 17, color: "var(--sub)", fontWeight: 300, fontStyle: "italic", marginBottom: 8 }}>{w.tagline}</p>}
         {addr && <p style={{ fontSize: 13.5, color: "var(--faint)", letterSpacing: 0.5 }}>{addr}</p>}
@@ -7734,23 +7742,50 @@ function PhotoModeSetting({ mode, onChange }) {
 }
 
 // ---- Your Website: branded storefront controls + custom-domain (wired, off until hosting set up) ----
-function WebsiteEditor({ w, onChange, business }) {
+function WebsiteEditor({ w, onChange, business, theme, setTheme }) {
   const set = (k, v) => onChange({ [k]: v });
+  const [logoPicker, setLogoPicker] = useState(false);
   const ig = (w.instagram || "").replace(/^@/, "");
   const slug = (business?.name || "yourshop").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const veroUrl = `gotvero.com/${slug}`;
   const fieldLabel = { fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 8 };
   const input = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+  const openPreview = () => { if (typeof window !== "undefined") window.open(window.location.origin + window.location.pathname + "#preview", "_blank"); };
 
   return (
     <div style={{ display: "grid", gap: 22 }}>
+      {logoPicker && <PhotoPicker onClose={() => setLogoPicker(false)} onPick={(id) => set("logo", id)} />}
       <ToggleSetting label="Show my branded website" desc="Visitors to your booking link land on a clean, branded page — your name, services, hours, team, and a Book button — styled to your theme." on={w.enabled === true} onToggle={(v) => set("enabled", v)} />
 
       {w.enabled === true && (<>
-        {/* Live address */}
+        {/* Live address + preview */}
         <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel2))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "14px 16px" }}>
           <div style={{ fontSize: 12.5, color: "var(--sub)", marginBottom: 4 }}>Your website is live at</div>
-          <div style={{ fontSize: 16, fontWeight: 500, color: "var(--gold)", wordBreak: "break-all" }}>{w.customDomain ? w.customDomain : veroUrl}</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: "var(--gold)", wordBreak: "break-all", marginBottom: 12 }}>{w.customDomain ? w.customDomain : veroUrl}</div>
+          <button onClick={openPreview} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 16px", color: "var(--text)", fontSize: 14, fontWeight: 500 }}><Globe size={15} style={{ color: "var(--gold)" }} /> Preview my website</button>
+          <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 9, lineHeight: 1.5 }}>Opens your real site in a new tab. Save first to preview your latest changes.</p>
+        </div>
+
+        {/* Logo */}
+        <div>
+          <div style={fieldLabel}>LOGO</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 72, height: 72, borderRadius: 14, background: "var(--panel2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+              {w.logo ? <img src={imgUrl(w.logo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <ImageIcon size={22} style={{ color: "var(--faint)" }} />}
+            </div>
+            <div style={{ flex: 1 }}>
+              <button onClick={() => setLogoPicker(true)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 16px", color: "var(--text)", fontSize: 14, fontWeight: 500 }}>{w.logo ? "Change logo" : "Add a logo"}</button>
+              {w.logo && <button onClick={() => set("logo", "")} style={{ marginLeft: 10, background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 3 }}>Remove</button>}
+            </div>
+          </div>
+          <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 9, lineHeight: 1.5 }}>Shown at the top of your website. Leave blank to use your business name in text.</p>
+        </div>
+
+        {/* Theme — same dial as the app, surfaced here for convenience */}
+        <div>
+          <div style={fieldLabel}>THEME</div>
+          <p style={{ fontSize: 13, color: "var(--sub)", marginTop: -2, marginBottom: 12, lineHeight: 1.5 }}>Your website and your dashboard share one look. Pick a theme here or under Your Shop — it's the same setting.</p>
+          <AppearancePicker theme={theme} setTheme={setTheme} />
         </div>
 
         <div>
@@ -8061,7 +8096,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "website", title: "Your Website", subtitle: "Your branded booking page", icon: Globe, category: "Your Website",
       status: (form.website?.enabled === true) ? ((form.website?.customDomain) ? form.website.customDomain : "On · Vero-hosted page") : "Off",
       keywords: "website web site storefront landing page online presence branded booking link domain custom url instagram social about tagline intro public page",
-      editor: <WebsiteEditor w={form.website || {}} onChange={(wx) => setForm({ ...form, website: { ...(form.website || {}), ...wx } })} business={form} />,
+      editor: <WebsiteEditor w={form.website || {}} onChange={(wx) => setForm({ ...form, website: { ...(form.website || {}), ...wx } })} business={form} theme={(form?.theme && THEME_IDS.includes(form.theme)) ? form.theme : theme} setTheme={(id) => setForm({ ...form, theme: id })} />,
     },
     {
       id: "reports", title: "Reports & Insights", icon: BarChart3, category: "Reporting",
