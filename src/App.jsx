@@ -591,6 +591,27 @@ const getPrice = (service, providerId) => {
   if (se && se.price != null) return se.price;
   return service.price;
 };
+// Time-of-day pricing: apply the first matching priced rule for a service at a given
+// provider / day-of-week / start-minute. Falls back to the normal price when nothing matches.
+const priceWithTimeRules = (service, providerId, dateObj, startMin) => {
+  const base = getPrice(service, providerId);
+  if (!service || !Array.isArray(service.timeRules) || !dateObj || startMin == null) return base;
+  const dow = (dateObj instanceof Date ? dateObj : new Date(dateObj)).getDay();
+  const rule = service.timeRules.find((r) =>
+    r && !r.block && r.priceMode && r.priceMode !== "none" &&
+    (!r.scope || r.scope === "all" || r.scope === providerId) &&
+    (!r.days || r.days.length === 0 || r.days.includes(dow)) &&
+    startMin >= r.start && startMin < r.end
+  );
+  if (!rule) return base;
+  const amt = Number(rule.amount) || 0;
+  let p = base;
+  if (rule.priceMode === "more") p = rule.amountType === "percent" ? base * (1 + amt / 100) : base + amt;
+  else if (rule.priceMode === "less") p = rule.amountType === "percent" ? base * (1 - amt / 100) : base - amt;
+  return Math.max(0, Math.round(p));
+};
+// The price locked onto an appointment at booking. Existing appts without one fall back to normal pricing.
+const apptPrice = (appt, service) => (appt && appt.price != null) ? appt.price : (service ? getPrice(service, appt && appt.providerId) : 0);
 const inputStyle = { width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY };
 
 // ============================================================
@@ -1482,6 +1503,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         familyMemberId: person.key === "self" ? null : person.key,
         bookedByName: person.key === "self" ? null : (matched?.name || newName.trim()),
         serviceId: person.items[0].service.id,
+        price: priceWithTimeRules(person.items[0].service, prov.id === "anyone" ? "dan" : prov.id, selectedDate, startMin),
         lineItems: person.items.map((e) => ({ serviceId: e.service.id, cutType: e.cutType || null, beardType: e.beardType || null, addons: e.addons || {} })),
         start: startMin,
         end: startMin + person.durMin,
@@ -3329,11 +3351,11 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
     if (a.lineItems && a.lineItems.length) {
       return a.lineItems.reduce((sum, li) => {
         const s = services.find((x) => x.id === li.serviceId);
-        return sum + (s ? getPrice(s, a.providerId) : 0);
+        return sum + (s ? apptPrice(a, s) : 0);
       }, 0);
     }
     const s = services.find((x) => x.id === a.serviceId);
-    return s ? getPrice(s, a.providerId) : 0;
+    return s ? apptPrice(a, s) : 0;
   };
 
   const isBlock = (a) => a.status === "block";
@@ -3887,11 +3909,11 @@ function RevenueView({ appts, clients, services, providers, onBack }) {
     if (a.lineItems && a.lineItems.length) {
       return a.lineItems.reduce((sum, li) => {
         const s = services.find((x) => x.id === li.serviceId);
-        return sum + (s ? getPrice(s, a.providerId) : 0);
+        return sum + (s ? apptPrice(a, s) : 0);
       }, 0);
     }
     const s = services.find((x) => x.id === a.serviceId);
-    return s ? getPrice(s, a.providerId) : 0;
+    return s ? apptPrice(a, s) : 0;
   };
 
   const inRange = (a, start, end) => {
@@ -4385,11 +4407,11 @@ function ClientsReportView({ appts, clients, services, providers, onBack, onOpen
     if (a.lineItems && a.lineItems.length) {
       return a.lineItems.reduce((sum, li) => {
         const s = services.find((x) => x.id === li.serviceId);
-        return sum + (s ? getPrice(s, a.providerId) : 0);
+        return sum + (s ? apptPrice(a, s) : 0);
       }, 0);
     }
     const s = services.find((x) => x.id === a.serviceId);
-    return s ? getPrice(s, a.providerId) : 0;
+    return s ? apptPrice(a, s) : 0;
   };
 
   // --- Period boundaries (this + prior) ---
@@ -4676,11 +4698,11 @@ function ServiceMixView({ appts, services, providers, onBack }) {
     if (a.lineItems && a.lineItems.length) {
       return a.lineItems.reduce((sum, li) => {
         const s = services.find((x) => x.id === li.serviceId);
-        return sum + (s ? getPrice(s, a.providerId) : 0);
+        return sum + (s ? apptPrice(a, s) : 0);
       }, 0);
     }
     const s = services.find((x) => x.id === a.serviceId);
-    return s ? getPrice(s, a.providerId) : 0;
+    return s ? apptPrice(a, s) : 0;
   };
 
   let periodStart, periodEnd;
@@ -4711,7 +4733,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
       if (!it.sid) return;
       const svc = services.find((s) => s.id === it.sid);
       if (!svc) return;
-      const r = getPrice(svc, a.providerId) || 0;
+      const r = apptPrice(a, svc) || 0;
       const m = it.mins || svc.duration || 0;
       agg[it.sid] = agg[it.sid] || { svc, visits: 0, revenue: 0, minutes: 0 };
       agg[it.sid].visits += 1;
@@ -4910,11 +4932,11 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
     if (a.lineItems && a.lineItems.length) {
       return a.lineItems.reduce((sum, li) => {
         const s = services.find((x) => x.id === li.serviceId);
-        return sum + (s ? getPrice(s, a.providerId) : 0);
+        return sum + (s ? apptPrice(a, s) : 0);
       }, 0);
     }
     const s = services.find((x) => x.id === a.serviceId);
-    return s ? getPrice(s, a.providerId) : 0;
+    return s ? apptPrice(a, s) : 0;
   };
 
   let periodStart, periodEnd;
@@ -8092,7 +8114,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
   }, [service]);
   const fmtHM = (m) => fmtTime(m);
   const dur = service ? getDuration(client, service, provId) : 0;
-  const price = service ? getPrice(service, provId) : 0;
+  const price = service ? priceWithTimeRules(service, provId, new Date(), startMin) : 0;
   const canBook = service && (client || (walkIn && walkInFirst.trim() && walkInLast.trim() && walkInPhone.replace(/\D/g, "").length >= 10));
   const dateLabel = (() => { const d = new Date(); return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })();
   const stepTime = (delta) => setStartMin((m) => Math.max(6 * 60, Math.min(21 * 60, m + delta)));
@@ -8739,7 +8761,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
     const useStart = overrideStart != null ? overrideStart : start;
     const id = "a" + Date.now() + Math.floor(Math.random() * 1000); // collision-proof string id
     const dur = getDuration(client, service, providerId);
-    const price = getPrice(service, providerId);
+    const price = priceWithTimeRules(service, providerId, selectedDate, useStart);
     // Stamp the appointment with the day currently shown on the calendar, or it can't be placed on any date.
     const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(useStart / 60), useStart % 60, 0, 0);
 
@@ -9296,7 +9318,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
   // Rhythm intelligence: the client's real cadence → recommended rebook week (nearest offered option).
   const cadenceDays = liveClient?.cadenceDays || null;
   const rhythmWeek = cadenceDays ? rebookCfg.weeks.reduce((best, w) => Math.abs(w * 7 - cadenceDays) < Math.abs(best * 7 - cadenceDays) ? w : best, rebookCfg.weeks[0]) : null;
-  const base = service?.price || appt.price || 0;
+  const base = apptPrice(appt, service);
   const [stage, setStage] = useState("review"); // review → reader → tip → approving → approved → rebook → done
   const [tipPct, setTipPct] = useState(tipCfg.smartDefault ?? tipCfg.presets[0]);
   const [customTip, setCustomTip] = useState(null);
