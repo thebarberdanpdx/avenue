@@ -5806,6 +5806,24 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         <div><div style={{ fontSize: 15.5, color: "var(--text)" }}>Available in online booking</div><div style={{ fontSize: 13, color: "var(--faint)", marginTop: 3 }}>Clients can book this service themselves.</div></div>
         <Toggle on={!!b.available} onClick={() => setBooking({ available: !b.available })} />
       </div>
+
+      {b.available && (
+        <div style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+          <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4 }}>WHO CAN BOOK THIS ONLINE</div>
+          <div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 12, lineHeight: 1.5 }}>Limit a service to people who've been in before — handy for complex work you'd rather not give to a first-timer online.</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {[["all", "Everyone", "Any client can book this online"], ["returning", "Returning clients only", "New clients are asked to call instead"]].map(([val, lbl, desc]) => {
+              const on = (b.whoCanBook || "all") === val;
+              return (
+                <button key={val} onClick={() => setBooking({ whoCanBook: val })} style={{ width: "100%", textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "13px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
+                  <span><span style={{ fontSize: 15.5, fontWeight: 500, display: "block", color: "var(--text)" }}>{lbl}</span><span style={{ fontSize: 13, color: "var(--sub)" }}>{desc}</span></span>
+                  <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
         <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 6 }}>DIRECT LINK</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", borderRadius: 10, padding: "11px 13px" }}>
@@ -5989,7 +6007,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     { id: "staff", label: "Staff", sub: `${staffList.filter((p) => form.staff[p.id]?.on !== false).length} of ${staffList.length} offering` },
     { id: "customizations", label: "Add-ons & Customizations", sub: `${form.addonGroups.length} option group${form.addonGroups.length !== 1 ? "s" : ""}` },
     { id: "refphotos", label: "Reference Photos for AI", sub: refPhotoCount === 0 ? "None yet" : `${refPhotoCount} photo${refPhotoCount === 1 ? "" : "s"}` },
-    { id: "booking", label: "Online Booking", sub: b.available ? "Available" : "Off" },
+    { id: "booking", label: "Online Booking", sub: !b.available ? "Off" : ((b.whoCanBook === "returning") ? "Returning clients only" : "Available to everyone") },
     { id: "timerules", label: "Hours & Pricing", sub: (form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Always available" },
   ];
 
@@ -6115,12 +6133,11 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <div style={{ display: "grid", gap: 10 }}>
               {inCat.length === 0 && <div style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "6px 2px" }}>No services in this category yet.</div>}
               {inCat.map((s, si) => (
-                <div key={s.id} draggable onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} className="card" style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 12 }}>
+                <div key={s.id} draggable onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} className="card" style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "14px 14px" }}>
                   <GripVertical size={18} style={{ color: "var(--border2)", cursor: "grab", flexShrink: 0 }} />
-                  <div style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", background: "var(--panel2)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.photo ? <img src={imgUrl(s.photo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={18} style={{ color: "var(--faint)" }} />}</div>
-                  <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--text)" }}>
-                    <div style={{ fontSize: 16, display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />{s.name}</div>
-                    <div style={{ fontSize: 14, color: "var(--sub)" }}>${s.price} · {s.duration} min · {s.addonGroups.length} add-on{s.addonGroups.length !== 1 ? "s" : ""}</div>
+                  <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--text)", minWidth: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 9, height: 9, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />{s.name}</div>
+                    <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>${s.price} · {s.duration} min{s.addonGroups.length ? ` · ${s.addonGroups.length} add-on${s.addonGroups.length !== 1 ? "s" : ""}` : ""}</div>
                   </button>
                   {/* up/down reorder (mobile-safe) */}
                   <div style={{ display: "flex", flexDirection: "column" }}>
@@ -7857,6 +7874,29 @@ function RebookCheckoutEditor({ r, onChange }) {
   );
 }
 
+// Tiny "Explain" link → opens a small plain-English popover (what it is / why you'd use it),
+// X to close. Invisible weight for pros, a lifeline for first-timers. Drop next to any setting title.
+function Explain({ title, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => setOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 3, background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 500, padding: 0, cursor: "pointer", verticalAlign: "middle" }}>
+        <span style={{ width: 15, height: 15, borderRadius: "50%", border: "1px solid var(--gold)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, lineHeight: 1 }}>?</span> Explain
+      </button>
+      <Sheet open={open} onClose={() => setOpen(false)} align="center" maxWidth={400}>
+        <div style={{ padding: "4px 2px 6px" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{title}</h3>
+            <button onClick={() => setOpen(false)} aria-label="Close" style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)", flexShrink: 0, cursor: "pointer" }}><X size={16} /></button>
+          </div>
+          <div style={{ fontSize: 15, color: "var(--text2)", lineHeight: 1.6 }}>{children}</div>
+          <button onClick={() => setOpen(false)} style={{ width: "100%", marginTop: 18, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 13, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 11, cursor: "pointer" }}>GOT IT</button>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
 function ToggleSetting({ label, desc, on, onToggle }) {
   return (
     <div style={{ padding: "6px 0" }}>
@@ -8121,6 +8161,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "avoidgaps", title: "Avoid Gaps Between Appointments", icon: Clock, category: "Calendar & Appointments",
+      explain: <>Left alone, online booking can scatter appointments across your day with dead time between them — a cut at 9, nothing till noon, another at 2. This makes Vero offer clients times that sit snug against your existing bookings instead, so your day fills tight with fewer empty holes. More chair time, less standing around.</>,
       status: (() => { const bk = form.booking || {}; if (bk.avoidGaps === false) return "Off"; const bits = ["On"]; if (bk.maxGapMin > 0) bits.push(`max ${bk.maxGapMin}m`); if (bk.minGapMin > 0) bits.push(`min ${bk.minGapMin}m`); if (bk.emptyDayMode === "anchored") bits.push("empty: first only"); return bits.join(" · "); })(),
       keywords: "avoid gaps back to back fill no dead time tight schedule revenue optimize cluster anchor max min empty day first last",
       editor: <AvoidGapsEditor b={form.booking || defaultBooking()} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
@@ -8133,18 +8174,21 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "runninglate", title: "Running Late Alerts", smart: true, icon: Clock, category: "Calendar & Appointments",
+      explain: <>When an appointment runs long and you're about to fall behind, Vero gives you a heads-up so the rest of your day doesn't quietly slip. It's the kind of thing other apps don't do — a small nudge that keeps you on track without you watching the clock.</>,
       status: form.runningLate?.enabled === false ? "Off" : `On · ${form.runningLate?.thresholdMin || 5} min warning`,
       keywords: "running late behind next client wrapping up notify prompt delay minutes message schedule overrun",
       editor: <RunningLateEditor r={form.runningLate || {}} onChange={(rl) => setForm({ ...form, runningLate: { ...(form.runningLate || {}), ...rl } })} />,
     },
     {
       id: "overduebuffer", title: "It's Been a While", smart: true, icon: Clock, category: "Calendar & Appointments",
+      explain: <>When a regular hasn't been in for a long stretch, there's usually more to do — more hair to cut, more cleanup. This quietly adds a little extra time to their appointment when they've been away past a point you set, so you're not scrambling to finish on time. It happens automatically; the client just sees their normal booking.</>,
       status: form.overdueBuffer?.enabled === false ? "Off" : `+${form.overdueBuffer?.addMinutes || 10} min after ${form.overdueBuffer?.thresholdWeeks || 8} wks`,
       keywords: "overdue buffer been a while extra time add minutes long time since last visit haircut more to cut charge free bonus perceived value lapsed returning",
       editor: <OverdueBufferEditor b={form.overdueBuffer || {}} onChange={(ob) => setForm({ ...form, overdueBuffer: { ...(form.overdueBuffer || {}), ...ob } })} />,
     },
     {
       id: "policy", title: "No-show Protection", subtitle: "Cancellation & reschedule policy", icon: AlertCircle, category: "Calendar & Appointments",
+      explain: <>This is how you protect your time and money from no-shows and last-minute cancellations. You write the rules clients agree to when they book — how much notice you need, and what happens if they miss. Down the line, once card payments are live, this is also where you'll be able to hold a card or take a deposit so a no-show actually costs them, not you.</>,
       status: form.policy ? "Set" : "Not set", keywords: "cancellation no-show no show policy refund rules deposit charge fee reschedule late cancel card on file protect revenue window cutoff",
       editor: (<>
         {field("CANCELLATION / NO-SHOW POLICY", "policy", true)}
@@ -8159,6 +8203,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "autotiming", title: "Smart Timing", smart: true, icon: Clock, category: "Calendar & Appointments",
+      explain: <>Most booking apps make you guess how long a service takes, then lock that guess in forever. Smart Timing watches how long each service <em>actually</em> takes you and quietly tightens future bookings to match. The payoff: your day packs efficiently — no wasted gaps, no rushing — so you can fit more clients or give each one the full time they need. Turn it on and forget it; it learns in the background.</>,
       status: (form.autoTiming?.enabled === false) ? "Off" : "On — learns each service's real time",
       keywords: "auto timing smart duration clock service time measure suggest save remembered learn how long takes efficient fit more clients accurate",
       editor: <ToggleSetting label="Suggest saving service times" desc="After checkout, offer to save how long the service actually took as that client's time, so future bookings get more accurate." on={form.autoTiming?.enabled !== false} onToggle={(v) => setForm({ ...form, autoTiming: { ...(form.autoTiming || {}), enabled: v } })} />,
@@ -8206,6 +8251,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "booking", title: "Online Booking", subtitle: "What clients see when booking", icon: Calendar, category: "Online Booking",
+      explain: <>This is the heart of how clients book themselves online — the rules behind your booking link. How far ahead they can book, how much notice you need, whether a card's required, and the times they're offered. Set it once and clients can book around the clock without calling you.</>,
       status: bookingStatus(form.booking), keywords: "online booking link card required deposit lead time buffer cap gaps rebook setup how early advance days ahead far minimum notice times slots increments what clients see",
       editor: <BookingRulesEditor b={form.booking} onChange={(bk) => setForm({ ...form, booking: bk })} />,
     },
@@ -8240,6 +8286,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "website", fullBleed: true, title: "Your Website", subtitle: "Your branded booking page", icon: Globe, category: "Your Website",
+      explain: <>Turn this on and your booking link becomes a clean, branded web page — your name, logo, services, hours, and a Book button — styled to your theme. It's a simple website for your shop without building one. Off by default; flip it on when you're ready and preview it before it goes live.</>,
       status: (form.website?.enabled === true) ? ((form.website?.customDomain) ? form.website.customDomain : "On · Vero-hosted page") : "Off",
       keywords: "website web site storefront landing page online presence branded booking link domain custom url instagram social about tagline intro public page",
       editor: <WebsiteEditor w={form.website || {}} onChange={(wx) => setForm({ ...form, website: { ...(form.website || {}), ...wx } })} business={form} theme={(form?.theme && THEME_IDS.includes(form.theme)) ? form.theme : theme} setTheme={(id) => setForm({ ...form, theme: id })} />,
@@ -8330,6 +8377,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.4px" }}>{active.title}</h2>
             {active.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "3px 7px" }}>SMART</span>}
+            {active.explain && <Explain title={active.title}>{active.explain}</Explain>}
           </div>
           {active.subtitle && <div style={{ fontSize: 15, color: "var(--gold)", marginTop: 6, fontWeight: 500 }}>{active.subtitle}</div>}
           {active.status && <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.4, marginTop: 6 }}>{active.status}</div>}
