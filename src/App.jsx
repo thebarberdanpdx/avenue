@@ -7680,7 +7680,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     {
       id: "theme", title: "Theme", icon: (THEMES.find((x) => x.id === theme)?.dark) ? Moon : Sun, category: "Business Setup",
       status: THEMES.find((x) => x.id === theme)?.name || "Theme", keywords: "theme appearance light dark mode color display look style vibe palette font accent barbershop tattoo spa salon",
-      editor: (<AppearancePicker theme={theme} setTheme={setTheme} />),
+      editor: (<AppearancePicker theme={(form?.theme && THEME_IDS.includes(form.theme)) ? form.theme : theme} setTheme={(id) => setForm({ ...form, theme: id })} />),
     },
     {
       id: "aicuthelper", title: "AI Cut Helper", icon: Sparkles, category: "Client Experience",
