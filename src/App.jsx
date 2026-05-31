@@ -8276,15 +8276,18 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   // ---- Conflict detection: find appointments that overlap a proposed time block on a given provider/day ----
   // excludeId lets us ignore the appointment being moved (so it doesn't conflict with itself).
   const findConflicts = (providerId, startMin, endMin, excludeId = null) => {
-    return appts.filter((a) =>
-      a.providerId === providerId
-      && sameDay(a.bookedFor, selectedDate)
-      && a.status !== "cancelled"
-      && a.status !== "done"
-      && a.id !== excludeId
-      && startMin < a.end
-      && endMin > a.start
-    );
+    const lo = Math.min(startMin, endMin);
+    const hi = Math.max(startMin, endMin);
+    return appts.filter((a) => {
+      if (!a) return false;
+      if (a.id === excludeId) return false;
+      if (a.status === "cancelled" || a.status === "done") return false;
+      if (a.providerId !== providerId) return false;
+      if (!sameDay(a.bookedFor, selectedDate)) return false;
+      const aLo = Math.min(a.start, a.end);
+      const aHi = Math.max(a.start, a.end);
+      return lo < aHi && hi > aLo;          // any time overlap
+    });
   };
   // Earliest open slot of the given duration at or after `fromMin`, scanning past any conflicts on that provider.
   const findNextFreeSlot = (providerId, fromMin, durMin, excludeId = null) => {
@@ -8432,7 +8435,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
 
   // commit a fully-formed appointment from the booking form — checks for conflict first
   const bookAppt = (data) => {
-    const dur = getDuration(data.client, data.service, data.providerId);
+    let dur = getDuration(data.client, data.service, data.providerId);
+    if (!dur || isNaN(dur) || dur <= 0) dur = 30;     // bad/missing duration must never skip the check
     const end = data.start + dur;
     const conflicts = findConflicts(data.providerId, data.start, end);
     if (conflicts.length > 0) {
