@@ -8132,7 +8132,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         if (src) {
           const nd = summary.rebookDate ? new Date(summary.rebookDate + "T00:00:00") : (() => { const d = new Date(); d.setDate(d.getDate() + summary.rebookWeeks * 7); return d; })();
           const dur = src.end - src.start;
-          const newAppt = { ...src, id: "rb" + Date.now() + Math.floor(Math.random() * 1000), status: "confirmed", paid: null, prepaid: false, rebookDiscount: (business?.rebook?.discountEnabled !== false ? (business?.rebook?.discount || 0) : 0), rebookDiscountType: business?.rebook?.discountType || "amount", bookedFor: nd.toISOString(), start: src.start, end: src.start + dur, photos: 0, hasPhotos: false, hasNote: false };
+          const startMin = (summary.rebookStart != null) ? summary.rebookStart : src.start;
+          const newAppt = { ...src, id: "rb" + Date.now() + Math.floor(Math.random() * 1000), status: "confirmed", paid: null, prepaid: false, rebookDiscount: (business?.rebook?.discountEnabled !== false ? (business?.rebook?.discount || 0) : 0), rebookDiscountType: business?.rebook?.discountType || "amount", bookedFor: nd.toISOString(), start: startMin, end: startMin + dur, photos: 0, hasPhotos: false, hasNote: false };
           done.push(newAppt);
         }
       }
@@ -8909,6 +8910,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           provider={providers.find((p) => p.id === checkout.providerId)}
           business={business}
           clients={clients}
+          appts={appts}
           setClients={setClients}
           showToast={showToast}
           onClose={() => setCheckout(null)}
@@ -8936,7 +8938,7 @@ const APPT_STATUSES = [
 // ============================================================
 // CHECKOUT — staged card-reader flow: charge → tap → tip → approved → rebook
 // ============================================================
-function Checkout({ appt, service, provider, business, clients, setClients, showToast, onClose, onDone }) {
+function Checkout({ appt, service, provider, business, clients, appts, setClients, showToast, onClose, onDone }) {
   // ---- auto-timing: measure actual service time, round UP to next 5 ----
   const measuredMin = appt.serviceStartedAt ? Math.round((Date.now() - appt.serviceStartedAt) / 60000) : null;
   const roundUp5 = (m) => Math.max(5, Math.ceil(m / 5) * 5);
@@ -8963,6 +8965,7 @@ function Checkout({ appt, service, provider, business, clients, setClients, show
   const [customTip, setCustomTip] = useState(null);
   const [rebookWeeks, setRebookWeeks] = useState(null);
   const [customDate, setCustomDate] = useState(null); // ISO date string when picked manually
+  const [chosenStart, setChosenStart] = useState(null); // minutes-of-day the barber picked for the rebook
   const tipAmt = customTip != null ? customTip : +(base * tipPct / 100).toFixed(2);
   const total = +(base + tipAmt).toFixed(2);
   const money = (n) => `$${n.toFixed(2)}`;
@@ -8974,7 +8977,7 @@ function Checkout({ appt, service, provider, business, clients, setClients, show
   useEffect(() => {
     if (stage === "approved") { const t = setTimeout(() => setStage(rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
     if (stage === "rebook" && rhythmWeek != null && rebookWeeks == null && !customDate) { setRebookWeeks(rhythmWeek); }
-    if (stage === "done") { const t = setTimeout(() => onDone(appt.id, { total, totalLabel: money(total), tip: tipAmt, rebookWeeks, rebookDate: customDate, rebookLabel: hasSelection ? selectionLabel : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null }), 1200); return () => clearTimeout(t); }
+    if (stage === "done") { const t = setTimeout(() => onDone(appt.id, { total, totalLabel: money(total), tip: tipAmt, rebookWeeks, rebookDate: customDate, rebookStart: chosenStart, rebookLabel: hasSelection ? selectionLabel : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null }), 1200); return () => clearTimeout(t); }
   }, [stage]);
 
   const rebookDate = (weeks) => { const d = new Date(); d.setDate(d.getDate() + weeks * 7); return d; };
@@ -8982,6 +8985,34 @@ function Checkout({ appt, service, provider, business, clients, setClients, show
   const fmtCustom = (iso) => { const d = new Date(iso + "T00:00:00"); return `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
   const hasSelection = rebookWeeks != null || customDate != null;
   const selectionLabel = customDate ? fmtCustom(customDate) : (rebookWeeks != null ? fmtRebook(rebookWeeks) : "");
+
+  // The day we're rebooking onto (from the chosen cadence or custom date).
+  const targetDate = customDate ? new Date(customDate + "T00:00:00") : (rebookWeeks != null ? rebookDate(rebookWeeks) : null);
+  const targetLabel = targetDate ? `${DAYS_SHORT[targetDate.getDay()]}, ${MONTHS[targetDate.getMonth()]} ${targetDate.getDate()}` : "";
+  const apptDur = Math.max(15, (appt.end - appt.start) || service?.duration || 30);
+  const sameDayLocal = (iso, ref) => { if (!iso || !ref) return false; const a = new Date(iso); return a.getFullYear() === ref.getFullYear() && a.getMonth() === ref.getMonth() && a.getDate() === ref.getDate(); };
+  // Build the slot list for the target day: every open 15-min start where the appt fits,
+  // flagged "best" when it sits back-to-back with an existing appointment (no gap left behind).
+  const daySlots = (() => {
+    if (!targetDate || !provider) return { off: false, slots: [] };
+    const dow = targetDate.getDay();
+    const h = (provider.hours && provider.hours[dow]) || { on: true, start: 9 * 60, end: 19 * 60 };
+    if (!h.on) return { off: true, slots: [] };
+    const dayAppts = (appts || [])
+      .filter((a) => a.providerId === provider.id && sameDayLocal(a.bookedFor, targetDate) && a.status !== "cancelled" && a.status !== "done")
+      .map((a) => ({ start: a.start, end: a.end }))
+      .sort((a, b) => a.start - b.start);
+    const out = [];
+    for (let t = h.start; t + apptDur <= h.end; t += 15) {
+      const end = t + apptDur;
+      const conflict = dayAppts.some((a) => t < a.end && end > a.start);
+      if (conflict) continue;
+      const backToBack = dayAppts.some((a) => a.end === t || a.start === end);
+      out.push({ start: t, best: backToBack });
+    }
+    return { off: false, slots: out };
+  })();
+  const hasBest = daySlots.slots.some((s) => s.best);
 
   const sheet = (inner, dismissable, top = true) => createPortal((
     <div className="fade-in" onClick={dismissable ? onClose : undefined} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", alignItems: top ? "flex-start" : "flex-end", justifyContent: "center" }}>
@@ -9103,9 +9134,47 @@ function Checkout({ appt, service, provider, business, clients, setClients, show
         {customDate ? <Check size={18} style={{ color: "var(--gold)" }} /> : <ChevronRight size={18} style={{ color: "var(--faint)" }} />}
         <input type="date" value={customDate || ""} min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)} onChange={(e) => { if (e.target.value) { setCustomDate(e.target.value); setRebookWeeks(null); } }} style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
       </label>
-      <button className="lift" disabled={!hasSelection} onClick={() => setStage("done")} style={{ width: "100%", background: !hasSelection ? "var(--panel2)" : "var(--gold)", color: !hasSelection ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: !hasSelection ? "none" : "var(--shadow-md)" }}>{!hasSelection ? "PICK A TIME" : (discountOn ? `BOOK ${selectionLabel} · SAVE ${discLabel}` : `BOOK ${selectionLabel}`)}</button>
+      <button className="lift" disabled={!hasSelection} onClick={() => { setChosenStart(null); setStage("pickTime"); }} style={{ width: "100%", background: !hasSelection ? "var(--panel2)" : "var(--gold)", color: !hasSelection ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: !hasSelection ? "none" : "var(--shadow-md)" }}>{!hasSelection ? "PICK A DAY FIRST" : `PICK A TIME · ${selectionLabel}`}</button>
       {hasSelection && <p style={{ color: "var(--faint)", fontSize: 12.5, lineHeight: 1.5, textAlign: "center", marginTop: 10 }}>{discountOn ? `Nothing is charged today — the ${discLabel} is taken off when they come in. ` : "Nothing is charged today. "}We'll send the confirmation and reminders automatically.</p>}
-      <button onClick={() => { setRebookWeeks(null); setCustomDate(null); setStage("done"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 4 }}>NO THANKS</button>
+      <button onClick={() => { setRebookWeeks(null); setCustomDate(null); setChosenStart(null); setStage("done"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 4 }}>NO THANKS</button>
+    </div>
+  );
+
+  if (stage === "pickTime") return sheet(
+    <div style={{ padding: "24px 22px 30px" }}>
+      <button onClick={() => setStage("rebook")} style={{ background: "none", color: "var(--sub)", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 16 }}><ArrowLeft size={16} /> Back</button>
+      <div style={{ textAlign: "center", marginBottom: 20 }}>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 25, fontWeight: 500, letterSpacing: -0.3, marginBottom: 6 }}>Pick a time</h2>
+        <p style={{ color: "var(--sub)", fontSize: 14.5, fontWeight: 300 }}>{targetLabel}{provider?.name ? ` · ${provider.name}` : ""}</p>
+      </div>
+      {daySlots.off ? (
+        <div style={{ textAlign: "center", padding: "24px 0", color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5 }}>{provider?.name || "This barber"} isn't working that day.<br />Go back and pick a different day.</div>
+      ) : daySlots.slots.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "24px 0", color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5 }}>That day is fully booked.<br />Go back and try another day.</div>
+      ) : (
+        <>
+          {hasBest && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text2)", marginBottom: 12, lineHeight: 1.4 }}>
+              <span style={{ width: 12, height: 12, borderRadius: 4, background: "var(--gold)", flexShrink: 0 }} />
+              Gold times sit right against another appointment — no gaps in {provider?.name ? provider.name.split(" ")[0] + "'s" : "the"} day.
+            </div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+            {daySlots.slots.map((s) => {
+              const sel = chosenStart === s.start;
+              return (
+                <button key={s.start} onClick={() => setChosenStart(s.start)} style={{ position: "relative", padding: "13px 0", borderRadius: 11, fontSize: 14.5, fontWeight: sel || s.best ? 600 : 400,
+                  background: sel ? "var(--gold)" : s.best ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "var(--panel)",
+                  color: sel ? "var(--on-gold)" : "var(--text)",
+                  border: `1px solid ${sel ? "var(--gold)" : s.best ? "var(--gold)" : "var(--border)"}` }}>
+                  {fmtTime(s.start)}
+                </button>
+              );
+            })}
+          </div>
+          <button className="lift" disabled={chosenStart == null} onClick={() => setStage("done")} style={{ width: "100%", marginTop: 20, background: chosenStart == null ? "var(--panel2)" : "var(--gold)", color: chosenStart == null ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: chosenStart == null ? "none" : "var(--shadow-md)" }}>{chosenStart == null ? "TAP A TIME ABOVE" : (discountOn ? `BOOK ${fmtTime(chosenStart)} · SAVE ${discLabel}` : `BOOK ${fmtTime(chosenStart)}`)}</button>
+        </>
+      )}
     </div>
   );
 
