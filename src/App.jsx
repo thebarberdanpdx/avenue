@@ -907,7 +907,7 @@ export default function App() {
         html { overscroll-behavior: none; }
         html, body { overscroll-behavior-y: contain; -webkit-overflow-scrolling: auto; }
         body { position: relative; min-height: 100dvh; }
-        .appt-screen { animation: slideInRight .3s var(--ease) both; max-width: 680px; margin-left: auto; margin-right: auto; }
+        .appt-screen { animation: slideInRight .3s var(--ease) both; }
         @keyframes fadeInFixed { from { opacity:0; } to { opacity:1; } }
         .appt-screen-fixed { animation: fadeInFixed .25s var(--ease) both; }
         /* Success bloom — used on the "You're in" check circle */
@@ -8323,7 +8323,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   if (active) {
     const Icon = active.icon;
     return (
-      <div className="appt-screen" style={{ maxWidth: 720, margin: "0 auto", padding: "12px 16px 40px" }}>
+      <div className="appt-screen" style={{ maxWidth: 860, margin: "0 auto", padding: "12px 18px 40px" }}>
         <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
         <div style={{ marginBottom: 26 }}>
           <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
@@ -8347,7 +8347,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   }
 
   return (
-    <div className="fade-up" style={{ maxWidth: 720, margin: "0 auto", padding: "12px 16px" }}>
+    <div className="fade-up" style={{ maxWidth: 860, margin: "0 auto", padding: "12px 18px" }}>
       {/* Masthead — the search is the hero */}
       <div style={{ marginBottom: 18 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
