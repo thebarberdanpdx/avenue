@@ -583,6 +583,45 @@ function EmailLink({ email, style }) {
 }
 
 const fmtTime = (mins) => { const h = Math.floor(mins / 60), m = mins % 60; const ampm = h >= 12 ? "PM" : "AM"; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`; };
+
+// Reusable tap-to-scroll time picker. Shows the current time as a tappable chip;
+// tapping opens a sheet with a scrollable list of times in `step`-minute increments.
+// Replaces +/- steppers everywhere. value/onChange are minutes-from-midnight.
+function TimeScrollPicker({ value, onChange, step = 15, minMin = 0, maxMin = 24 * 60 - step, label, compact }) {
+  const [open, setOpen] = useState(false);
+  const listRef = useRef(null);
+  const options = [];
+  for (let t = minMin; t <= maxMin; t += step) options.push(t);
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    // center the current value when the sheet opens
+    const el = listRef.current.querySelector('[data-current="1"]');
+    if (el) el.scrollIntoView({ block: "center" });
+  }, [open]);
+  return (
+    <>
+      <button onClick={() => setOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: compact ? "8px 12px" : "11px 15px", color: "var(--text)", fontSize: compact ? 14.5 : 15.5, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" }}>
+        <Clock size={compact ? 14 : 15} style={{ color: "var(--gold)" }} /> {fmtTime(value)}
+      </button>
+      <Sheet open={open} onClose={() => setOpen(false)} align="center" maxWidth={300}>
+        <div style={{ padding: "4px 0 6px" }}>
+          <div style={{ textAlign: "center", marginBottom: 14 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>{(label || "Select time").toUpperCase()}</div>
+          </div>
+          <div ref={listRef} style={{ maxHeight: "52vh", overflowY: "auto", WebkitOverflowScrolling: "touch", display: "grid", gap: 5 }}>
+            {options.map((t) => {
+              const on = t === value;
+              return (
+                <button key={t} data-current={on ? "1" : undefined} onClick={() => { onChange(t); setOpen(false); }} style={{ width: "100%", textAlign: "center", padding: "13px 0", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--text)", fontSize: 16, fontWeight: on ? 700 : 500, fontFamily: FONT_BODY, cursor: "pointer" }}>{fmtTime(t)}</button>
+              );
+            })}
+          </div>
+          <button onClick={() => setOpen(false)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "14px 0 4px" }}>Cancel</button>
+        </div>
+      </Sheet>
+    </>
+  );
+}
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const relativeDate = (date) => { const today = new Date(); today.setHours(0,0,0,0); const d = new Date(date); d.setHours(0,0,0,0); const diff = Math.round((d - today) / 86400000); if (diff === 0) return "Today"; if (diff === 1) return "Tomorrow"; if (diff > 1 && diff < 7) return DAYS[d.getDay()]; return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
@@ -694,7 +733,41 @@ export default function App() {
   //   3. savingRef serializes saves per table — if a save is in flight when another fires,
   //      we just store the latest items and re-run after; older writes can't land on top
   //      of newer ones.
-  const SHOP_ID = 'sanctuary';
+  // ---- Which shop are we? ----
+  // Multi-tenant resolver: a shop is identified from the web address, so each business loads
+  // only its own data. Resolution order:
+  //   1. ?shop=slug query param (explicit, used for testing)
+  //   2. subdomain  → sanctuary.gotvero.com  → "sanctuary"
+  //   3. first path segment → gotvero.com/sanctuary → "sanctuary"
+  //   4. fallback → "sanctuary" (the current shop), so nothing changes if no shop is in the URL.
+  // The fallback is deliberate and conservative: until other shops are onboarded, every
+  // address still lands on Sanctuary exactly as before.
+  const resolveShopId = () => {
+    const FALLBACK = 'sanctuary';
+    if (typeof window === 'undefined') return FALLBACK;
+    try {
+      const url = new URL(window.location.href);
+      const q = url.searchParams.get('shop');
+      if (q) return q.toLowerCase().replace(/[^a-z0-9-]/g, '');
+      const host = url.hostname;
+      // subdomain: anything before the root domain that isn't www/app/gotvero
+      const parts = host.split('.');
+      if (parts.length > 2) {
+        const sub = parts[0].toLowerCase();
+        if (sub && !['www', 'app', 'gotvero', 'localhost'].includes(sub)) return sub.replace(/[^a-z0-9-]/g, '');
+      }
+      // first path segment, ignoring known app routes
+      const seg = url.pathname.split('/').filter(Boolean)[0];
+      if (seg) {
+        const s = seg.toLowerCase();
+        if (!['book', 'client', 'staff', 'manage', 'terms', 'privacy', 'preview', 'index.html'].includes(s)) {
+          return s.replace(/[^a-z0-9-]/g, '') || FALLBACK;
+        }
+      }
+    } catch (e) { /* fall through to fallback */ }
+    return FALLBACK;
+  };
+  const SHOP_ID = resolveShopId();
   const loadedRef = useRef(false); // blocks saves until the first load finishes (so seed data can't overwrite real data)
   const savingRef = useRef({});    // per-table { running, queued } — guarantees in-order saves
 
@@ -764,7 +837,7 @@ export default function App() {
     })();
   }, []);
 
-  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || 'Sanctuary Barber Co', settings: business }).then(({ error }) => { if (error) console.error('[vero] save shops failed:', error); }); }, 800); return () => clearTimeout(t); }, [business]);
+  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: business }).then(({ error }) => { if (error) console.error('[vero] save shops failed:', error); }); }, 800); return () => clearTimeout(t); }, [business]);
   useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
   useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
@@ -5789,11 +5862,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               {[["From", "start"], ["To", "end"]].map(([lbl, key]) => (
                 <div key={key} style={{ flex: 1 }}>
                   <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>{lbl}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <button onClick={() => setRule(r.id, { [key]: Math.max(0, r[key] - 15) })} style={stepBtn}>−</button>
-                    <span style={{ flex: 1, textAlign: "center", fontSize: 15, fontWeight: 600 }}>{fmtTime(r[key])}</span>
-                    <button onClick={() => setRule(r.id, { [key]: Math.min(24 * 60, r[key] + 15) })} style={stepBtn}>+</button>
-                  </div>
+                  <TimeScrollPicker value={r[key]} onChange={(v) => setRule(r.id, { [key]: v })} label={lbl === "From" ? "Window start" : "Window end"} compact />
                 </div>
               ))}
             </div>
@@ -6559,9 +6628,9 @@ function BusinessHoursEditor({ hours, onChange }) {
             </div>
             {day.on ? (
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                <TimeSel value={day.start} onPick={(t) => setDay(d, { start: t })} />
+                <TimeScrollPicker value={day.start} onChange={(t) => setDay(d, { start: t, end: Math.max(t + 15, day.end) })} label={`${name} open`} compact />
                 <span style={{ color: "var(--faint)", fontSize: 14 }}>–</span>
-                <TimeSel value={day.end} onPick={(t) => setDay(d, { end: t })} />
+                <TimeScrollPicker value={day.end} onChange={(t) => setDay(d, { end: t })} minMin={day.start + 15} label={`${name} close`} compact />
               </div>
             ) : <span style={{ fontSize: 14.5, color: "var(--faint)" }}>Closed</span>}
           </div>
@@ -7033,6 +7102,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   const [picker, setPicker] = useState(false);  // photo picker open
   const [editingDetails, setEditingDetails] = useState(false);
   const [workWeekRef, setWorkWeekRef] = useState(new Date());
+  const [repeatFor, setRepeatFor] = useState(null); // { dow, h } when the "repeat on days" popup is open
 
   const staff = providers.filter((p) => p.id !== "anyone");
   const active = staff.filter((p) => !p.archived);
@@ -7257,25 +7327,67 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         </div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "8px 14px" }}>
           {days.map((d, i) => { const dow = d.getDay(); const h = person.hours[dow] || { on: false, start: 540, end: 1020 }; return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 4px", borderTop: i ? "1px solid var(--line)" : "none" }}>
-              <div style={{ width: 52, flexShrink: 0 }}><div style={{ fontSize: 14.5, fontWeight: 700 }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</div><div style={{ fontSize: 12.5, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div></div>
-              <button onClick={() => patchDay(person.id, dow, { on: !h.on })} style={{ flex: 1, textAlign: "left", background: h.on ? "color-mix(in srgb, var(--gold) 8%, var(--panel2))" : "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: h.on ? "var(--text)" : "var(--faint)", fontSize: 15, fontStyle: h.on ? "normal" : "italic" }}>{h.on ? fmtRange(h) : "No shifts"}</button>
+            <div key={i} style={{ padding: "14px 4px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 52, flexShrink: 0 }}><div style={{ fontSize: 14.5, fontWeight: 700 }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</div><div style={{ fontSize: 12.5, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div></div>
+                <button onClick={() => patchDay(person.id, dow, { on: !h.on })} aria-label={h.on ? "Turn day off" : "Turn day on"} style={{ width: 50, height: 29, borderRadius: 29, border: "none", flexShrink: 0, background: h.on ? "var(--gold)" : "var(--border2)", position: "relative", cursor: "pointer" }}>
+                  <span style={{ position: "absolute", top: 3, left: h.on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
+                </button>
+                {h.on
+                  ? <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                      <TimeScrollPicker value={h.start} onChange={(v) => patchDay(person.id, dow, { start: v, end: Math.max(v + 15, h.end) })} label={`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} start`} compact />
+                      <span style={{ color: "var(--faint)", fontSize: 14 }}>–</span>
+                      <TimeScrollPicker value={h.end} onChange={(v) => patchDay(person.id, dow, { end: v })} minMin={h.start + 15} label={`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} end`} compact />
+                    </div>
+                  : <span style={{ flex: 1, textAlign: "right", fontSize: 14.5, color: "var(--faint)", fontStyle: "italic" }}>No shifts</span>}
+              </div>
               {h.on && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <button onClick={() => patchDay(person.id, dow, { start: Math.max(0, h.start - 15) })} style={{ width: 26, height: 24, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", fontSize: 13, color: "var(--text)" }}>−</button>
-                    <button onClick={() => patchDay(person.id, dow, { start: h.start + 15 })} style={{ width: 26, height: 24, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", fontSize: 13, color: "var(--text)" }}>+</button>
-                  </div>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <button onClick={() => patchDay(person.id, dow, { end: Math.max(h.start + 15, h.end - 15) })} style={{ width: 26, height: 24, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", fontSize: 13, color: "var(--text)" }}>−</button>
-                    <button onClick={() => patchDay(person.id, dow, { end: h.end + 15 })} style={{ width: 26, height: 24, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", fontSize: 13, color: "var(--text)" }}>+</button>
-                  </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                  <button onClick={() => setRepeatFor({ dow, h })} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}><Repeat size={13} /> Repeat these hours…</button>
                 </div>
               )}
             </div>
           ); })}
         </div>
-        <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>The − / + buttons nudge each shift's start (top row) and end (bottom row) by 15 minutes. These hours drive the calendar and online booking availability.</p>
+        <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Tap a time to scroll and pick it in 15-minute steps. Use "Repeat these hours" to copy a day's shift to other days at once. These hours drive the calendar and online booking availability.</p>
+
+        {/* Repeat-on-days popup */}
+        {repeatFor && (() => {
+          const RepeatPopup = () => {
+            const [picked, setPicked] = useState(() => new Set([repeatFor.dow]));
+            const toggle = (d) => setPicked((s) => { const n = new Set(s); n.has(d) ? n.delete(d) : n.add(d); return n; });
+            const apply = () => {
+              picked.forEach((d) => patchDay(person.id, d, { on: true, start: repeatFor.h.start, end: repeatFor.h.end }));
+              showToast && showToast(`Hours copied to ${picked.size} day${picked.size === 1 ? "" : "s"}.`);
+              setRepeatFor(null);
+            };
+            return (
+              <Sheet open={true} onClose={() => setRepeatFor(null)} align="center" maxWidth={360}>
+                <div style={{ padding: "4px 0 6px" }}>
+                  <div style={{ textAlign: "center", marginBottom: 6 }}>
+                    <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>REPEAT THESE HOURS</div>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginTop: 6 }}>{fmtTime(repeatFor.h.start)} – {fmtTime(repeatFor.h.end)}</div>
+                  </div>
+                  <p style={{ fontSize: 13.5, color: "var(--sub)", textAlign: "center", lineHeight: 1.5, marginBottom: 16 }}>Pick the days to copy this shift to.</p>
+                  <div style={{ display: "grid", gap: 7, marginBottom: 16 }}>
+                    {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((dn, di) => {
+                      const on = picked.has(di);
+                      return (
+                        <button key={di} onClick={() => toggle(di)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>
+                          {dn}{di === repeatFor.dow && <span style={{ fontSize: 12, color: "var(--sub)" }}>(this day)</span>}
+                          <span style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button onClick={apply} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 13.5, letterSpacing: 2, fontWeight: 600, borderRadius: 12, cursor: "pointer" }}>COPY TO {picked.size} DAY{picked.size === 1 ? "" : "S"}</button>
+                  <button onClick={() => setRepeatFor(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px" }}>Cancel</button>
+                </div>
+              </Sheet>
+            );
+          };
+          return <RepeatPopup />;
+        })()}
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginTop: 16 }}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Max appointments per day</div>
           <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Once {person.name.split(" ")[0]} hits this many in a day, online clients can't book more — you can still add one manually. Leave at 0 for no limit.</p>
