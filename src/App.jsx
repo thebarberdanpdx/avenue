@@ -7675,55 +7675,37 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   ];
   const CATEGORY_ORDER = ["Business Setup", "Services & Menu", "Calendar & Appointments", "Payments & Checkout", "Online Booking", "Automated Messages", "Reporting"];
 
-  // ---- New editorial settings landing ----
-  // Five focused, intent-driven sections. Each shows its current status inline so
-  // you don't drill in just to check what's set. Order = how often a typical shop
-  // owner touches each one.
-  const SECTIONS = [
-    {
-      id: "setup",
-      title: "Setup",
-      desc: "Set these once and forget. Your shop's identity, your team, your menu.",
-      defaultOpen: true,
-      settings: ["business", "hours", "staff", "servicesmenu", "appearance", "theme", "phones", "locations"],
-    },
-    {
-      id: "booking",
-      title: "Online booking",
-      desc: "What clients see and how they book — rules, who can book, the new-client flow.",
-      defaultOpen: false,
-      settings: ["booking", "policy", "staffselection", "newclient", "family"],
-    },
-    {
-      id: "calendar",
-      title: "Your calendar",
-      desc: "How the day behaves — buffers, gap-filling, smart timing, waitlist, alerts.",
-      defaultOpen: false,
-      settings: ["scheduling", "avoidgaps", "autotiming", "waitlist", "waitingroom", "runninglate", "overduebuffer", "photos"],
-    },
-    {
-      id: "money",
-      title: "Payments & messages",
-      desc: "Tipping, checkout, rebooking prompts, and the messages clients receive.",
-      defaultOpen: false,
-      settings: ["tipping", "checkout", "rebookco", "messages"],
-    },
-    {
-      id: "smart",
-      title: "Smart & data",
-      desc: "AI helpers, analytics, and getting your existing client list in.",
-      defaultOpen: false,
-      settings: ["aicuthelper", "reports", "import"],
-    },
+  // ---- Category grid: concrete, plain-named buckets. Every setting lives in exactly one,
+  // so nothing falls through to search-only. Tap a tile → that category's list. ----
+  const CATS = [
+    { id: "shop",  label: "Your Shop", icon: User,       desc: "Identity, team, hours, branding", settings: ["business", "hours", "staff", "locations", "phones", "appearance", "theme"] },
+    { id: "book",  label: "Booking",   icon: Calendar,   desc: "How clients book themselves",     settings: ["booking", "staffselection", "newclient", "family", "policy", "rebook_usual"] },
+    { id: "cal",   label: "Calendar",  icon: Clock,      desc: "How the day behaves",             settings: ["scheduling", "avoidgaps", "autotiming", "waitlist", "waitingroom", "runninglate", "overduebuffer", "photos"] },
+    { id: "pay",   label: "Checkout",  icon: CreditCard, desc: "Tipping, payments, rebooking",    settings: ["tipping", "checkout", "rebookco"] },
+    { id: "msg",   label: "Messages",  icon: Bell,       desc: "What goes out, and how",          settings: ["notifications", "messages"] },
+    { id: "menu",  label: "Services & Menu", icon: ImageIcon, desc: "Your service list & pricing", settings: ["servicesmenu"] },
+    { id: "data",  label: "Insights & Data", icon: BarChart3, desc: "Reports, AI, importing",     settings: ["reports", "aicuthelper", "import"] },
   ];
+  // Safety net: any card not placed above still appears (appended to Insights & Data) so nothing is ever lost.
+  const placed = new Set(CATS.flatMap((c) => c.settings));
+  const orphans = cards.filter((c) => !placed.has(c.id)).map((c) => c.id);
+  if (orphans.length) CATS[CATS.length - 1].settings.push(...orphans);
 
-  // Track which sections are expanded. Initialize from each section's defaultOpen.
-  const [openSections, setOpenSections] = useState(() => {
-    const init = {};
-    SECTIONS.forEach((s) => { init[s.id] = s.defaultOpen; });
-    return init;
-  });
-  const toggleSection = (sid) => setOpenSections((cur) => ({ ...cur, [sid]: !cur[sid] }));
+  const [openCat, setOpenCat] = useState(null);
+  const [cockpitHidden, setCockpitHidden] = useState(false);
+
+  // ---- Go-live cockpit: live setup checklist. Shows only while there are open items;
+  // once everything's done (incl. payments + texts), it has nothing to show and disappears.
+  const setupItems = [
+    { k: "name",     label: "Add your business name", done: !!(form.name && form.name.trim()), card: "business" },
+    { k: "hours",    label: "Set your hours",          done: !!(form.hours && Object.values(form.hours).some((h) => h && h.on)), card: "hours" },
+    { k: "staff",    label: "Add your team",           done: providers.filter((p) => p.id !== "anyone").length > 0, card: "staff" },
+    { k: "services", label: "Build your menu",         done: (services || []).length > 0, card: "servicesmenu" },
+    { k: "pay",      label: "Connect payments",        done: !!form.paymentsConnected, card: "checkout" },
+    { k: "sms",      label: "Turn on text messaging",  done: !!form.smsApproved, card: "notifications" },
+  ];
+  const setupLeft = setupItems.filter((s) => !s.done);
+  const showCockpit = setupLeft.length > 0 && !cockpitHidden && !query.trim();
 
   const q = query.trim().toLowerCase();
   const filtered = q ? cards.filter((c) => (c.title + " " + c.keywords).toLowerCase().includes(q)) : cards;
@@ -7754,22 +7736,44 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
   return (
     <div className="fade-up" style={{ maxWidth: 720, margin: "0 auto", padding: "12px 4px" }}>
-      {/* Masthead — matches the editorial language of Pulse and Client profile */}
-      <div style={{ marginBottom: 28 }}>
+      {/* Masthead */}
+      <div style={{ marginBottom: 26 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>SETTINGS</div>
         <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, lineHeight: 0.95, letterSpacing: "-0.6px", marginBottom: 12 }}>How the shop runs</h2>
         <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.5, maxWidth: 460 }}>Everything that shapes how Vero looks, behaves, and speaks to clients.</p>
       </div>
 
-      {/* Search — works the same as before, but stays out of the way when not used */}
+      {/* GO-LIVE COCKPIT — only while there's setup left; disappears once you're fully live */}
+      {showCockpit && !openCat && (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--gold-line, color-mix(in srgb, var(--gold) 35%, transparent))", borderRadius: 18, padding: "18px 18px 8px", marginBottom: 24, boxShadow: "var(--shadow-sm)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+              <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700 }}>FINISH SETUP</span>
+              <span style={{ fontSize: 12, color: "var(--faint)", fontWeight: 500 }}>{setupLeft.length} left</span>
+            </div>
+            <button onClick={() => setCockpitHidden(true)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 4, display: "flex" }}><X size={16} /></button>
+          </div>
+          <div>
+            {[...setupItems].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1)).map((s, i) => (
+              <button key={s.k} onClick={() => setOpenCard(s.card)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 0", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left" }}>
+                <span style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: s.done ? "var(--gold)" : "transparent", border: s.done ? "none" : "1.5px solid var(--border2)" }}>{s.done && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
+                <span style={{ flex: 1, fontSize: 15, color: s.done ? "var(--faint)" : "var(--text)", textDecoration: s.done ? "line-through" : "none" }}>{s.label}</span>
+                {!s.done && <ChevronRight size={17} style={{ color: "var(--faint)" }} />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Search */}
       <div style={{ position: "relative", marginBottom: 24 }}>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search settings" style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 16px 13px 44px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+        <input value={query} onChange={(e) => { setQuery(e.target.value); setOpenCat(null); }} placeholder="Search settings — tipping, hours, reminders…" style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 16px 13px 44px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
         <Settings size={17} style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
       </div>
 
-      {/* SEARCHING — flat list of matching settings */}
       {q ? (
+        // SEARCHING — flat list of matching settings
         <div>
           {filtered.length === 0 ? (
             <p style={{ color: "var(--faint)", fontSize: 15, textAlign: "center", padding: "40px 0", fontStyle: "italic" }}>No settings match "{query}".</p>
@@ -7793,48 +7797,54 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             </div>
           )}
         </div>
-      ) : (
-        // NOT SEARCHING — three editorial sections, each collapsible
-        <div style={{ display: "grid", gap: 24 }}>
-          {SECTIONS.map((section) => {
-            const sectionCards = section.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
-            if (sectionCards.length === 0) return null;
-            const isOpen = openSections[section.id];
-            return (
-              <div key={section.id}>
-                {/* Section header — tap to collapse/expand */}
-                <button onClick={() => toggleSection(section.id)} style={{ width: "100%", background: "none", border: "none", textAlign: "left", padding: "0 0 14px", color: "var(--text)", cursor: "pointer" }}>
-                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 14, marginBottom: 4 }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-                      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, letterSpacing: -0.3 }}>{section.title}</div>
-                      <div style={{ fontSize: 12, color: "var(--faint)", fontWeight: 500 }}>{sectionCards.length}</div>
-                    </div>
-                    <ChevronDown size={18} style={{ color: "var(--faint)", transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .2s ease" }} />
-                  </div>
-                  <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45, fontWeight: 300 }}>{section.desc}</div>
-                </button>
-
-                {/* Settings rows — only render when expanded */}
-                {isOpen && (
-                  <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)", marginTop: 4 }}>
-                    {sectionCards.map((c) => {
-                      const Icon = c.icon;
-                      return (
-                        <button key={c.id} onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", border: "none" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
-                            <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</div>
-                              <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</div>
-                            </div>
-                          </div>
-                          <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+      ) : openCat ? (
+        // CATEGORY DETAIL — one category's settings, each showing its current value
+        (() => {
+          const cat = CATS.find((c) => c.id === openCat);
+          const catCards = cat.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
+          return (
+            <div className="screen-swap">
+              <button onClick={() => setOpenCat(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14.5, marginBottom: 20, padding: 0, border: "none" }}><ArrowLeft size={16} /> All settings</button>
+              <div style={{ marginBottom: 22 }}>
+                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, letterSpacing: "-0.4px", marginBottom: 6 }}>{cat.label}</h2>
+                <p style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300, lineHeight: 1.45 }}>{cat.desc}</p>
               </div>
+              <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
+                {catCards.map((c) => {
+                  const Icon = c.icon;
+                  return (
+                    <button key={c.id} onClick={() => setOpenCard(c.id)} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", border: "none" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</div>
+                          <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</div>
+                        </div>
+                      </div>
+                      <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()
+      ) : (
+        // CATEGORY GRID — the calm browse layer
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 13 }}>
+          {CATS.map((cat, i) => {
+            const Icon = cat.icon;
+            const count = cat.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean).length;
+            const wide = i === CATS.length - 1 && CATS.length % 2 === 1; // last tile spans full width if odd count
+            return (
+              <button key={cat.id} onClick={() => setOpenCat(cat.id)} className="lift" style={{ gridColumn: wide ? "1 / -1" : "auto", position: "relative", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: wide ? "16px 18px" : "18px 16px 16px", textAlign: "left", color: "var(--text)", overflow: "hidden", display: wide ? "flex" : "block", alignItems: "center", gap: 16 }}>
+                <span style={{ position: wide ? "static" : "absolute", top: 18, right: 18, fontSize: 12, color: "var(--faint)", fontWeight: 500, order: wide ? 3 : 0 }}>{count}</span>
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: wide ? 0 : 30, flexShrink: 0 }}><Icon size={20} style={{ color: "var(--gold)" }} /></div>
+                <div style={{ flex: wide ? 1 : "none" }}>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, letterSpacing: "-0.2px", marginBottom: 4 }}>{cat.label}</div>
+                  <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.4, fontWeight: 300 }}>{cat.desc}</div>
+                </div>
+              </button>
             );
           })}
         </div>
