@@ -5820,6 +5820,94 @@ function Stepper({ value, onChange, min = 0, max = 999, step = 1, suffix }) {
   );
 }
 
+// Notification matrix metadata. Each audience lists the events it can receive, with the channels
+// that make sense for it and a sensible default on/off + default channels. The editor reads from this,
+// so anything the owner hasn't touched falls back to these defaults.
+const NOTIF_AUDIENCES = [
+  {
+    key: "client", label: "Clients",
+    desc: "What your clients receive. A booking confirmation always goes out — the rest is up to you.",
+    channels: ["sms", "email"],
+    events: [
+      { k: "created", label: "Booking confirmation", locked: true, def: { sms: true, email: true } },
+      { k: "canceled", label: "Cancellation notice", def: { on: true, sms: true, email: true } },
+      { k: "rescheduled", label: "Reschedule notice", def: { on: true, sms: true, email: true } },
+      { k: "reminder24", label: "Reminder — 24 hours before", def: { on: true, sms: true, email: false } },
+      { k: "reminder2", label: "Reminder — 2 hours before", def: { on: true, sms: true, email: false } },
+      { k: "waitlistOpen", label: "Waitlist slot opened (booking link)", def: { on: true, sms: true, email: false } },
+      { k: "earlierSlot", label: "Earlier spot opened (opted-in clients)", def: { on: true, sms: true, email: false } },
+      { k: "lapsed", label: "We-miss-you nudge (overdue for a visit)", def: { on: false, sms: true, email: false } },
+      { k: "birthday", label: "Birthday message", def: { on: false, sms: true, email: false } },
+    ],
+  },
+  {
+    key: "provider", label: "Providers",
+    desc: "What each barber gets about their own chair.",
+    channels: ["push", "sms", "email"],
+    events: [
+      { k: "created", label: "New appointment booked", def: { on: true, push: true } },
+      { k: "canceled", label: "Appointment canceled", def: { on: true, push: true } },
+      { k: "rescheduled", label: "Appointment rescheduled", def: { on: true, push: true } },
+      { k: "firstTime", label: "First-time client booked with them", def: { on: true, push: true } },
+      { k: "endOfDay", label: "End-of-day summary (their numbers)", def: { on: false, push: true } },
+    ],
+  },
+  {
+    key: "shop", label: "Shop",
+    desc: "What you get across the whole shop.",
+    channels: ["push", "sms", "email"],
+    events: [
+      { k: "created", label: "New appointment (any barber)", def: { on: false, push: true } },
+      { k: "canceled", label: "Appointment canceled (any barber)", def: { on: true, push: true } },
+      { k: "rescheduled", label: "Appointment rescheduled (any barber)", def: { on: false, push: true } },
+      { k: "firstTime", label: "First-time client booked", def: { on: true, push: true } },
+      { k: "endOfDay", label: "End-of-day summary (shop totals)", def: { on: true, push: true } },
+      { k: "waitlistOpen", label: "Waitlist slot opened", def: { on: true, push: true } },
+    ],
+  },
+];
+const CHANNEL_LABEL = { sms: "Text", email: "Email", push: "Push" };
+
+function NotificationsEditor({ n, onChange }) {
+  const [aud, setAud] = useState("client");
+  const grp = NOTIF_AUDIENCES.find((a) => a.key === aud);
+  const data = (n && n[aud]) || {};
+  const setEvent = (k, patch) => onChange({ ...(n || {}), [aud]: { ...data, [k]: { ...(data[k] || {}), ...patch } } });
+  return (
+    <div>
+      <Segmented options={NOTIF_AUDIENCES.map((a) => ({ value: a.key, label: a.label }))} value={aud} onChange={setAud} />
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>{grp.desc}</p>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 12px" }}>
+        {grp.events.map((ev, i) => {
+          const eff = { ...ev.def, ...(data[ev.k] || {}) };
+          const on = ev.locked ? true : eff.on !== false;
+          return (
+            <div key={ev.k} style={{ padding: "14px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <span style={{ fontSize: 15.5, lineHeight: 1.4 }}>{ev.label}{ev.locked && <span style={{ fontSize: 12, color: "var(--faint)", marginLeft: 8 }}>Always on</span>}</span>
+                <Toggle on={on} onClick={() => { if (!ev.locked) setEvent(ev.k, { on: !on }); }} />
+              </div>
+              {on && (
+                <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                  {grp.channels.map((ch) => {
+                    const active = !!eff[ch];
+                    return (
+                      <button key={ch} onClick={() => setEvent(ev.k, { [ch]: !active })} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, fontSize: 13.5, fontWeight: active ? 600 : 400, background: active ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "var(--panel2)", border: `1px solid ${active ? "var(--gold)" : "var(--border)"}`, color: active ? "var(--text)" : "var(--sub)" }}>
+                        {CHANNEL_LABEL[ch]}{ch === "sms" ? " *" : ""}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 14 }}>* Text messages start sending once your A2P carrier registration clears. Email and in-app push are active now.</p>
+    </div>
+  );
+}
+
 function Segmented({ options, value, onChange }) {
   return (
     <div style={{ display: "flex", background: "var(--panel2)", borderRadius: 6, padding: 3, gap: 2 }}>
@@ -7389,6 +7477,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "staff", title: "Staff Members", icon: Users, category: "Business Setup",
       status: `${providers.filter((p) => p.id !== "anyone").length} staff`, keywords: "staff team employees hours days off schedule availability who works barber stylist",
       editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} showToast={showToast} />),
+    },
+    {
+      id: "notifications", title: "Notifications", icon: Bell, category: "Business Setup",
+      status: "Clients, providers & shop",
+      keywords: "notifications alerts sms text email push reminders confirmation canceled rescheduled waitlist birthday end of day summary lapsed first time client who gets notified",
+      editor: <NotificationsEditor n={form.notifications} onChange={(nx) => setForm({ ...form, notifications: nx })} />,
     },
     {
       id: "appearance", title: "Logo & Branding", icon: ImageIcon, category: "Business Setup",
