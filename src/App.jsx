@@ -132,6 +132,13 @@ const DEFAULT_BUSINESS = {
     bufferAfter: 5,          // minutes pad after each appt
     dailyCap: 0,             // 0 = unlimited online bookings per day
     fillGapsFirst: true,     // Boulevard-style: offer gap-filling slots first
+    // ---- How clients get offered times (booking-times engine) ----
+    // "grid"  → clean clock every gridMin minutes
+    // "smart" → by service length, anchored to fit the day tightly (Smart Timing)
+    // "pack"  → only times flush against existing appointments (no gaps)
+    // "all"   → every possible opening (max choice)
+    timeMode: "smart",
+    gridMin: 30,             // increment for "grid" mode
     rebookNudgeWeeks: 4,     // suggest rebooking after N weeks (0 = off)
     guidedConsult: true,     // new-client guided consultation (true) vs. simple cut list (false)
     // Gap avoidance — strict back-to-back booking to eliminate dead time
@@ -1481,7 +1488,10 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     const bufBefore = Math.max(0, Number(bk.bufferBefore) || 0);
     const bufAfter = Math.max(0, Number(bk.bufferAfter) || 0);
 
-    const packTheDay = bk.avoidGaps !== false; // default ON
+    // ---- Booking-times engine: which times we offer ----
+    // Back-compat: an old shop with avoidGaps:false and no timeMode behaves like "all".
+    const timeMode = bk.timeMode || (bk.avoidGaps === false ? "all" : "smart");
+    const gridMin = Math.max(5, Number(bk.gridMin) || 30);
     // Per-barber: allow ending after closing time (up to N minutes), only if it fits flush
     const overrunMin = Math.max(0, Number(prov.overrunMin) || 0);
     const dayEnd = h.end + overrunMin;
@@ -1491,11 +1501,14 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
 
     let candidates = new Set();
 
-    if (!packTheDay) {
-      // Loose: every 15-min increment from start to end of day
-      for (let t = h.start; t + durMin <= dayEnd; t += 15) candidates.add(t);
+    if (timeMode === "grid" || timeMode === "all") {
+      // Grid: clean clock at gridMin steps. All: every 15 min (max choice).
+      const step = timeMode === "grid" ? gridMin : 15;
+      // align grid to the hour so times read clean (9:00, 9:30…)
+      const startT = timeMode === "grid" ? Math.ceil(h.start / step) * step : h.start;
+      for (let t = startT; t + durMin <= dayEnd; t += step) candidates.add(t);
     } else {
-      // Pack-the-day mode. Build a list of open runs (continuous blocks between busy appts).
+      // smart / pack — build open runs (continuous blocks between busy appts).
       const runs = []; // each: [runStart, runEnd]
       let cursor = h.start;
       busy.forEach(([bs, be]) => {
@@ -1510,14 +1523,10 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         // Always anchor the first slot at the start of the run (flush with whatever came before)
         candidates.add(rs);
         // If this run sits at the end of the day, also offer the last possible slot
-        // (so the day fills from both ends on empty days)
         const lastFit = re - durMin;
-        if (lastFit > rs && Math.abs(re - dayEnd) < 1) {
-          candidates.add(lastFit);
-        }
-        // Smart middle anchor: only if the open run is at least 3× the service length.
-        // Snap to the nearest 30-min mark so the time looks clean (e.g. 1:00, 1:30, not 1:13).
-        if (runLen >= durMin * 3) {
+        if (lastFit > rs && Math.abs(re - dayEnd) < 1) candidates.add(lastFit);
+        // "smart" adds a clean middle anchor on long open runs; "pack" stays strictly flush.
+        if (timeMode === "smart" && runLen >= durMin * 3) {
           let mid = rs + Math.floor(runLen / 2);
           mid = Math.round(mid / 30) * 30;
           if (mid >= rs && mid + durMin <= re && noClash(mid)) candidates.add(mid);
@@ -8016,6 +8025,47 @@ function NoShowEditor({ b, policy, onBooking, onPolicy }) {
   );
 }
 
+// Booking-times engine UI: one mode the shop picks for how clients are offered times.
+// Writes business.booking.timeMode (grid|smart|pack|all) + gridMin.
+function BookingTimesEditor({ b, onChange }) {
+  const mode = b.timeMode || (b.avoidGaps === false ? "all" : "smart");
+  const gridMin = b.gridMin || 30;
+  const modes = [
+    { v: "smart", label: "Smart Timing", smart: true, desc: "Times are shaped around how long each service actually takes, so your day fits together tightly. Best for most shops." },
+    { v: "pack", label: "Packed tight", desc: "Only offer times flush against your existing appointments — no gaps between clients." },
+    { v: "grid", label: "Clean grid", desc: "Offer times on a simple clock (every 15, 30, or 60 minutes). Predictable and familiar." },
+    { v: "all", label: "Show all times", desc: "Offer every possible opening. Maximum choice for the client, looser for your day." },
+  ];
+  return (
+    <div>
+      <div style={{ display: "grid", gap: 9 }}>
+        {modes.map((m) => {
+          const on = mode === m.v;
+          return (
+            <button key={m.v} onClick={() => onChange({ timeMode: m.v, avoidGaps: m.v !== "all" })} style={{ width: "100%", textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: "15px 16px", cursor: "pointer" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{m.label}</span>
+                  {m.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
+                </div>
+                <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
+              </div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 5 }}>{m.desc}</div>
+              {on && m.v === "grid" && (
+                <div style={{ display: "flex", gap: 8, marginTop: 14 }} onClick={(e) => e.stopPropagation()}>
+                  {[15, 30, 60].map((g) => (
+                    <button key={g} onClick={(e) => { e.stopPropagation(); onChange({ gridMin: g }); }} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: `1.5px solid ${gridMin === g ? "var(--gold)" : "var(--border)"}`, background: gridMin === g ? "color-mix(in srgb, var(--gold) 14%, var(--panel))" : "var(--panel)", color: gridMin === g ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: gridMin === g ? 600 : 400, cursor: "pointer" }}>{g === 60 ? "1 hour" : `${g} min`}</button>
+                  ))}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ToggleSetting({ label, desc, on, onToggle }) {
   return (
     <div style={{ padding: "6px 0" }}>
@@ -8279,11 +8329,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <SchedulingOptionsEditor b={form.booking || defaultBooking()} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
     },
     {
-      id: "avoidgaps", title: "Avoid Gaps Between Appointments", icon: Clock, category: "Calendar & Appointments",
-      explain: <>Left alone, online booking can scatter appointments across your day with dead time between them — a cut at 9, nothing till noon, another at 2. This makes Vero offer clients times that sit snug against your existing bookings instead, so your day fills tight with fewer empty holes. More chair time, less standing around.</>,
-      status: (() => { const bk = form.booking || {}; if (bk.avoidGaps === false) return "Off"; const bits = ["On"]; if (bk.maxGapMin > 0) bits.push(`max ${bk.maxGapMin}m`); if (bk.minGapMin > 0) bits.push(`min ${bk.minGapMin}m`); if (bk.emptyDayMode === "anchored") bits.push("empty: first only"); return bits.join(" · "); })(),
-      keywords: "avoid gaps back to back fill no dead time tight schedule revenue optimize cluster anchor max min empty day first last",
-      editor: <AvoidGapsEditor b={form.booking || defaultBooking()} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
+      id: "avoidgaps", title: "Booking Times", smart: true, subtitle: "How clients get offered times", icon: Clock, category: "Online Booking",
+      explain: <>This is the brain behind which times a client sees when they book online. Pick one way of working and Vero handles the rest: a clean clock grid, times shaped around how long each service actually takes (Smart Timing), times packed tight against your existing appointments so you have no dead gaps, or every possible opening for maximum choice. Most shops want Smart Timing — it quietly keeps your day full without you thinking about it.</>,
+      status: (() => { const bk = form.booking || {}; const m = bk.timeMode || (bk.avoidGaps === false ? "all" : "smart"); return { grid: `Clean grid · every ${bk.gridMin || 30}m`, smart: "Smart Timing", pack: "Packed tight", all: "Show all times" }[m] || "Smart Timing"; })(),
+      keywords: "booking times slots offered grid increment smart timing pack tight avoid gaps back to back fill dead time show all choice availability how clients book engine mode",
+      editor: <BookingTimesEditor b={form.booking || defaultBooking()} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
     },
     {
       id: "waitingroom", title: "Waiting Room", icon: Users, category: "Calendar & Appointments",
