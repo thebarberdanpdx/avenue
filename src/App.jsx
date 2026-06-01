@@ -89,8 +89,8 @@ const hexById = (id) => (SERVICE_PALETTE.find((c) => c.id === id) || SERVICE_PAL
 // DEFAULT BUSINESS CONFIG — fully editable in Settings
 // ============================================================
 const DEFAULT_BUSINESS = {
-  name: "MERIDIAN",
-  legalName: "Meridian Studio",
+  name: "",
+  legalName: "",
   address: "2077 NE Town Center Dr",
   address2: "Suite 120",
   cityZip: "Beaverton, OR 97006",
@@ -776,6 +776,7 @@ export default function App() {
   };
   const SHOP_ID = resolveShopId();
   const loadedRef = useRef(false); // blocks saves until the first load finishes (so seed data can't overwrite real data)
+  const [dataLoaded, setDataLoaded] = useState(false); // true once the first load finishes — used to avoid flashing placeholder names
   const savingRef = useRef({});    // per-table { running, queued } — guarantees in-order saves
 
   // Save a whole in-memory list to its shop-scoped table.
@@ -841,6 +842,7 @@ export default function App() {
       // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
       if (allLoaded) loadedRef.current = true;
       else console.error('[vero] one or more loads failed — saves are blocked until the next page reload to protect existing data');
+      setDataLoaded(true);
     })();
   }, []);
 
