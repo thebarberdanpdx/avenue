@@ -8040,10 +8040,18 @@ function BookingTimesEditor({ b, onChange }) {
   const mode = b.timeMode || (b.avoidGaps === false ? "all" : "smart");
   const gridMin = b.gridMin || 30;
   const modes = [
-    { v: "smart", label: "Smart Timing", smart: true, desc: "Times are shaped around how long each service actually takes, so your day fits together tightly. Best for most shops." },
-    { v: "pack", label: "Packed tight", desc: "Only offer times flush against your existing appointments — no gaps between clients." },
-    { v: "grid", label: "Clean grid", desc: "Offer times on a simple clock (every 15, 30, or 60 minutes). Predictable and familiar." },
-    { v: "all", label: "Show all times", desc: "Offer every possible opening. Maximum choice for the client, looser for your day." },
+    { v: "smart", label: "Smart Timing", smart: true,
+      desc: "Times are shaped around how long each service actually takes, so your day fits together tightly. Best for most shops.",
+      example: "Say you've got a cut booked 11:00–11:30. A client booking a 30-min cut is offered 9:00, right after at 11:30, and a clean mid-day option — not a scatter of odd times. Your chair stays busy without you arranging it." },
+    { v: "pack", label: "Packed tight",
+      desc: "Only offer times flush against your existing appointments — no gaps between clients.",
+      example: "With that same 11:00–11:30 cut booked, a client is only offered times that butt right up against it — 9:00, or 11:30 the moment it ends. No 20-minute dead spots between clients, ever. Great when you want zero downtime." },
+    { v: "grid", label: "Clean grid",
+      desc: "Offer times on a simple clock (every 15, 30, or 60 minutes). Predictable and familiar.",
+      example: "Clients see round times like 9:00, 9:30, 10:00 — whatever's open on the clock. Simple and familiar, like most booking sites, but it can leave small gaps between appointments." },
+    { v: "all", label: "Show all times",
+      desc: "Offer every possible opening. Maximum choice for the client, looser for your day.",
+      example: "Clients see every open slot, every 15 minutes — 9:00, 9:15, 9:30, and on. Most freedom for them to pick, but your day can end up with awkward gaps you'd otherwise fill." },
   ];
   return (
     <div>
@@ -8060,8 +8068,14 @@ function BookingTimesEditor({ b, onChange }) {
                 <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
               </div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 5 }}>{m.desc}</div>
+              {on && (
+                <div style={{ marginTop: 12, background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
+                  <div style={{ fontSize: 10.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, marginBottom: 5 }}>FOR EXAMPLE</div>
+                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55 }}>{m.example}</div>
+                </div>
+              )}
               {on && m.v === "grid" && (
-                <div style={{ display: "flex", gap: 8, marginTop: 14 }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
                   {[15, 30, 60].map((g) => (
                     <button key={g} onClick={(e) => { e.stopPropagation(); onChange({ gridMin: g }); }} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: `1.5px solid ${gridMin === g ? "var(--gold)" : "var(--border)"}`, background: gridMin === g ? "color-mix(in srgb, var(--gold) 14%, var(--panel))" : "var(--panel)", color: gridMin === g ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: gridMin === g ? 600 : 400, cursor: "pointer" }}>{g === 60 ? "1 hour" : `${g} min`}</button>
                   ))}
