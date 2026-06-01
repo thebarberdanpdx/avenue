@@ -943,7 +943,7 @@ export default function App() {
         * { -webkit-tap-highlight-color: transparent; }
       `}</style>
 
-      {view === "preview" && <Storefront business={business} services={services} providers={providers} categories={categories} onPick={goView} />}
+      {view === "preview" && <Storefront business={business} services={services} providers={providers} categories={categories} onPick={goView} preview onExitPreview={() => goView("shop")} />}
       {view === "landing" && (business.website?.enabled === true
         ? <Storefront business={business} services={services} providers={providers} categories={categories} onPick={goView} />
         : <Landing business={business} onPick={goView} />)}
@@ -1074,7 +1074,7 @@ function minLabel(min) {
   return m === 0 ? `${h}${ap}` : `${h}:${String(m).padStart(2, "0")}${ap}`;
 }
 
-function Storefront({ business, services = [], providers = [], categories = [], onPick }) {
+function Storefront({ business, services = [], providers = [], categories = [], onPick, preview, onExitPreview }) {
   const w = business.website || {};
   const logo = business.logoText || business.name;
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -1088,6 +1088,13 @@ function Storefront({ business, services = [], providers = [], categories = [], 
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY, paddingBottom: 60 }}>
+      {/* Preview-only bar: gives the owner a clear way back out of the preview */}
+      {preview && (
+        <div style={{ position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 18px", background: "color-mix(in srgb, var(--bg) 88%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderBottom: "1px solid var(--line)" }}>
+          <button onClick={() => (onExitPreview ? onExitPreview() : window.history.back())} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "none", border: "none", color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}><ArrowLeft size={17} /> Back to settings</button>
+          <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600 }}>PREVIEW</span>
+        </div>
+      )}
       {/* HERO */}
       <div className="fade-up" style={{ ...section, paddingTop: "clamp(56px, 16vw, 110px)", paddingBottom: 40, textAlign: "center" }}>
         {w.logo
@@ -1765,7 +1772,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
       <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          {(step > 0 || simpleStep) ? <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button> : <div style={{ width: 50 }} />}
+          <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button>
           <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
           <div style={{ width: 50 }} />
         </div>
