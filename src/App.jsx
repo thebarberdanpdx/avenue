@@ -217,6 +217,10 @@ const DEFAULT_BUSINESS = {
       body: "Updated! Your {service} with {provider} is now {date} at {time}. See you then, {client}." },
     { id: "waitlist", label: "Waitlist — Slot Opened", channel: "text", timing: "When a slot opens", enabled: true,
       body: "Good news {client} — a spot opened for your {service} with {provider} on {date} at {time}. Reply YES to grab it before someone else does!" },
+    { id: "deposit", label: "Deposit Received", channel: "both", timing: "When a deposit is taken", enabled: true,
+      body: "Thanks {client}! We've received your deposit for your {service} with {provider} on {date} at {time}. It goes toward your total — see you at {business}." },
+    { id: "noshow", label: "Missed / Late Cancellation", channel: "both", timing: "On a no-show or late cancel", enabled: false,
+      body: "Hi {client}, we missed you for your {service} on {date}. Per our policy, a fee may apply. Questions? Just reply and we'll help. — {business}" },
   ],
   // ---- Locations: off by default; turns on for multi-location businesses ----
   multiLocation: false,
@@ -6524,18 +6528,21 @@ function MessagesEditor({ messages, onChange, business }) {
   };
   return (
     <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300, marginBottom: 16 }}>Edit exactly what each automated message says. Tap a tag like {"{client}"} to drop in info the system fills automatically.</p>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300, marginBottom: 14 }}>Edit exactly what each automated message says. Tap a tag like {"{client}"} to drop in info the system fills automatically.</p>
+      <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel2))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "11px 14px", marginBottom: 18, fontSize: 13, color: "var(--text2)", lineHeight: 1.5 }}>
+        <b style={{ color: "var(--gold)" }}>Preview mode.</b> Texts start sending once your texting service is connected; emails send now. You can write and tweak everything here in the meantime.
+      </div>
       <div style={{ display: "grid", gap: 10 }}>
         {messages.map((m) => {
           const expanded = openId === m.id;
           return (
-            <div key={m.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden", opacity: m.enabled ? 1 : 0.6 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px" }}>
+            <div key={m.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", opacity: m.enabled ? 1 : 0.6 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px" }}>
                 <button onClick={() => setOpenId(expanded ? null : m.id)} style={{ background: "none", color: "var(--text)", textAlign: "left", flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>{m.label}</div>
+                  <div style={{ fontSize: 15.5, fontWeight: 500 }}>{m.label}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{channelBadge(m.channel)}<span style={{ fontSize: 12.5, color: "var(--sub)" }}>{m.timing}</span></div>
                 </button>
-                <button onClick={() => update(m.id, { enabled: !m.enabled })} style={{ width: 44, height: 26, borderRadius: 13, background: m.enabled ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, marginLeft: 12 }}><span style={{ position: "absolute", top: 3, left: m.enabled ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
+                <button onClick={() => update(m.id, { enabled: !m.enabled })} aria-label={m.enabled ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: m.enabled ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, marginLeft: 12, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: m.enabled ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
               </div>
               {expanded && (
                 <div style={{ padding: "4px 16px 18px", borderTop: "1px solid var(--line)" }}>
@@ -8471,7 +8478,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "messages", title: "Automated Messages", icon: MessageSquare, category: "Automated Messages",
-      status: `${(form.messages || []).filter((m) => m.enabled).length} active`, keywords: "automated messages reminders texts email confirmation check-in waitlist booked canceled rescheduled wording edit",
+      explain: <>Every automatic text and email your clients get — booking confirmation, reminders, "we're ready for you," cancellations, deposit receipts — laid out so you can read the exact words and change any of them. Tap a message to edit it, pick whether it goes by text, email, or both, and use tags like {"{client}"} that fill in automatically. Turn off any you don't want sent.</>,
+      status: `${(form.messages || []).filter((m) => m.enabled).length} active`, keywords: "automated messages reminders texts email confirmation check-in waitlist booked canceled rescheduled wording edit deposit no-show",
       editor: <MessagesEditor messages={form.messages || []} onChange={(msgs) => setForm({ ...form, messages: msgs })} business={form} />,
     },
     {
