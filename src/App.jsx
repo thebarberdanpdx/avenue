@@ -8472,9 +8472,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const CATS = [
     { id: "shop",  label: "Your Shop", icon: User,       desc: "Your name, hours, branding & logo", settings: ["business", "hours", "appearance", "theme", "locations", "phones"] },
     { id: "staff", label: "Staff",      icon: Users,      desc: "Add or edit staff — hours, access, pay & booking", settings: ["staff"] },
-    { id: "book",  label: "Online Booking", tag: "What clients see when booking", icon: Calendar, desc: "How clients book you online", settings: ["booking", "newclient", "family", "refphotos", "waitlist", "rebook_usual"] },
+    { id: "book",  label: "Online Booking", tag: "What clients see when booking", icon: Calendar, desc: "How clients book you online", settings: ["booking", "avoidgaps", "newclient", "family", "refphotos", "waitlist", "rebook_usual"] },
     { id: "smart", label: "Smart Timing", smart: true, icon: Sparkles, desc: "The scheduling smarts that save you time", settings: ["autotiming", "overduebuffer", "runninglate"] },
-    { id: "dayof", label: "Day-of Tools", icon: Clock,    desc: "Managing the day as it happens", settings: ["scheduling", "avoidgaps", "waitingroom", "photos"] },
+    { id: "dayof", label: "Day-of Tools", icon: Clock,    desc: "Managing the day as it happens", settings: ["scheduling", "waitingroom", "photos"] },
     { id: "pay",   label: "Checkout & Money", icon: CreditCard, desc: "Tipping, payments, rebooking & no-show protection", settings: ["tipping", "checkout", "rebookco", "policy"] },
     { id: "msg",   label: "Messages clients get", icon: Bell, desc: "Every automatic text & email, in your words", settings: ["notifications", "messages"] },
     { id: "menu",  label: "Services & Menu", icon: ImageIcon, desc: "Your services, add-ons, photos & pricing", settings: ["servicesmenu"] },
