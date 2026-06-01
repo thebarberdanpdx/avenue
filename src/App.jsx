@@ -8583,6 +8583,26 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     );
   }
 
+  // One clean, roomy settings row — name + info-i, a one-line status, an arrow. No per-row icon clutter.
+  const SettingRow = ({ c, first }) => {
+    const explainText = c.explain || <>This is the “{c.title}” setting. Open it to adjust the options. If you're not sure, the defaults are sensible to leave as they are.</>;
+    return (
+      <div style={{ position: "relative", background: "var(--panel)", borderTop: first ? "none" : "1px solid var(--line)" }}>
+        <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 12, padding: "18px 18px", textAlign: "left", cursor: "pointer" }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 16, fontWeight: 500 }}>{c.title}</span>
+              {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
+            </div>
+            {(c.subtitle || c.status) && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>}
+          </div>
+          <span onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, display: "flex", alignItems: "center" }}><Explain title={c.title}>{explainText}</Explain></span>
+          <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className="fade-up" style={{ width: "100%", padding: "12px 6px" }}>
       {/* Masthead — the search is the hero */}
@@ -8646,32 +8666,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           {filtered.length === 0 ? (
             <p style={{ color: "var(--faint)", fontSize: 15, textAlign: "center", padding: "40px 0", fontStyle: "italic" }}>No settings match "{query}".</p>
           ) : (
-            <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
-              {filtered.map((c) => {
-                const Icon = c.icon;
-                const explainText = c.explain || <>This is the “{c.title}” setting. Open it to adjust the options. If you're not sure, the defaults are sensible to leave as they are.</>;
-                return (
-                  <div key={c.id} style={{ position: "relative", width: "100%", background: "var(--panel)" }}>
-                    <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 10, padding: "16px 18px", textAlign: "left", cursor: "pointer" }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          {/* spacer so title clears the absolutely-positioned info button */}
-                          <span style={{ width: 22, flexShrink: 0 }} />
-                          <span style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</span>
-                          {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
-                        </div>
-                        <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingLeft: 30 }}>{c.subtitle || c.status}</div>
-                      </div>
-                      <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
-                    </button>
-                    {/* info-i overlaid so it doesn't open the setting */}
-                    <div style={{ position: "absolute", left: 64, top: 16 }} onClick={(e) => e.stopPropagation()}>
-                      <Explain title={c.title}>{explainText}</Explain>
-                    </div>
-                  </div>
-                );
-              })}
+            <div style={{ background: "var(--panel)", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}>
+              {filtered.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} />)}
             </div>
           )}
         </div>
@@ -8690,30 +8686,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                 </div>
                 <p style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300, lineHeight: 1.45 }}>{cat.desc}</p>
               </div>
-              <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
-                {catCards.map((c) => {
-                  const Icon = c.icon;
-                  const explainText = c.explain || <>This is the “{c.title}” setting. Open it to adjust the options. If you're not sure, the defaults are sensible to leave as they are.</>;
-                  return (
-                    <div key={c.id} style={{ position: "relative", width: "100%", background: "var(--panel)" }}>
-                      <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 10, padding: "16px 18px", textAlign: "left", cursor: "pointer" }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={16} style={{ color: "var(--gold)" }} /></div>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ width: 22, flexShrink: 0 }} />
-                            <span style={{ fontSize: 15.5, fontWeight: 500 }}>{c.title}</span>
-                            {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
-                          </div>
-                          <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingLeft: 30 }}>{c.subtitle || c.status}</div>
-                        </div>
-                        <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
-                      </button>
-                      <div style={{ position: "absolute", left: 64, top: 16 }} onClick={(e) => e.stopPropagation()}>
-                        <Explain title={c.title}>{explainText}</Explain>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div style={{ background: "var(--panel)", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}>
+                {catCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} />)}
               </div>
             </div>
           );
@@ -8721,22 +8695,18 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       ) : (
         // EMPTY STATE — the nine sections, right under the hero search
         <div>
-          <div style={{ display: "grid", gap: 1, background: "var(--line)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)" }}>
-            {CATS.map((cat) => {
-              const Icon = cat.icon || Settings;
+          <div style={{ background: "var(--panel)", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}>
+            {CATS.map((cat, i) => {
               return (
-                <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", border: "none" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 11, background: cat.smart ? "color-mix(in srgb, var(--gold) 20%, transparent)" : "color-mix(in srgb, var(--gold) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={17} style={{ color: "var(--gold)" }} /></div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 15.5, fontWeight: 500 }}>{cat.label}</span>
-                        {cat.smart && <span style={{ fontSize: 9.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 6px" }}>SMART</span>}
-                      </div>
-                      <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.tag || cat.desc}</div>
+                <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "18px 18px", border: "none", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 16, fontWeight: 500 }}>{cat.label}</span>
+                      {cat.smart && <span style={{ fontSize: 9.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 6px" }}>SMART</span>}
                     </div>
+                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.tag || cat.desc}</div>
                   </div>
-                  <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                  <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
                 </button>
               );
             })}
