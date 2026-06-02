@@ -10613,6 +10613,45 @@ function CardOnFileSheet({ open, onClose, client, onSaved, showToast }) {
   );
 }
 
+// Charge a saved card (no-show fee). Reuses the card-on-file; nothing new to enter.
+function ChargeCardSheet({ open, onClose, client, defaultAmount, showToast }) {
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => { if (open) { setAmount(defaultAmount ? String(defaultAmount) : ""); setErr(""); setBusy(false); } }, [open, defaultAmount]);
+  const card = client && client.card;
+  const charge = async () => {
+    const n = parseFloat(String(amount).replace(/[^0-9.]/g, ""));
+    if (isNaN(n) || n <= 0) { setErr("Enter a valid amount."); return; }
+    if (!card || !card.paymentMethodId || !card.stripeCustomerId) { setErr("No card on file for this client."); return; }
+    setBusy(true); setErr("");
+    try {
+      const res = await stripeApi({ action: "charge", customerId: card.stripeCustomerId, paymentMethodId: card.paymentMethodId, amount: n, description: `No-show fee — ${client.name}` });
+      if (res.status === "succeeded") { showToast(`Charged $${Math.round(n * 100) / 100} to ${client.name}.`); onClose(); }
+      else { setErr(`Stripe returned "${res.status}". The client may need to approve it in person.`); }
+    } catch (e) { setErr(e.message || "Charge failed."); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Sheet open={open} onClose={onClose} align="bottom" maxWidth={420}>
+      <div style={{ padding: "6px 4px 8px" }}>
+        <div style={{ textAlign: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CHARGE NO-SHOW FEE</div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
+          {card && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 4 }}>{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : "Card"} ···· {card.last4}</div>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 12 }}>
+          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 28, color: "var(--sub)" }}>$</span>
+          <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: FONT_DISPLAY, fontSize: 28, color: "var(--text)", width: "100%", padding: 0 }} />
+        </div>
+        {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
+        <button onClick={charge} disabled={busy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: busy ? 0.6 : 1 }}><DollarSign size={16} /> {busy ? "CHARGING…" : "CHARGE CARD"}</button>
+        <button onClick={onClose} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 6 }}>Cancel</button>
+      </div>
+    </Sheet>
+  );
+}
+
 function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
@@ -10684,6 +10723,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const canEditPrice = me ? (me.pulseRole === "owner" || me.userType !== "Staff") : true;
   // ---- card on file (admin) ----
   const [cardOpen, setCardOpen] = useState(false);
+  const [chargeOpen, setChargeOpen] = useState(false);
   const savedCard = (client && client.card && client.card.last4) ? client.card : null;
   const saveCardToClient = (info) => {
     if (!client || !setClients) { showToast("Couldn't attach the card to this client."); return; }
@@ -10949,6 +10989,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div className="fade-in" style={{ position: "absolute", top: 56, right: 14, width: 250, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,0.28)", zIndex: 9, overflow: "hidden", padding: "6px 0" }}>
                   <MenuItem T={T} danger icon={<Trash2 size={17} />} label="Cancel / Delete" onClick={() => onDelete(appt.id)} />
                   <MenuItem T={T} icon={<DollarSign size={17} />} label="Checkout" onClick={() => { setMenuOpen(false); showToast("Checkout — coming in the Payments build."); }} />
+                  {canEditPrice && savedCard && <MenuItem T={T} icon={<CreditCard size={17} />} label="Charge no-show fee" onClick={() => { setMenuOpen(false); setChargeOpen(true); }} />}
                   <Divider T={T} />
                   <MenuItem T={T} icon={<Repeat size={17} />} label="Make Repeating" onClick={() => { setMenuOpen(false); showToast("Repeating appointment set up."); }} />
                   <MenuItem T={T} icon={<Copy size={17} />} label="Duplicate / Rebook" onClick={() => { setMenuOpen(false); showToast("Rebooked — duplicate created."); }} />
@@ -11094,6 +11135,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
       </Sheet>
 
       <CardOnFileSheet open={cardOpen} onClose={() => setCardOpen(false)} client={client} onSaved={saveCardToClient} showToast={showToast} />
+      <ChargeCardSheet open={chargeOpen} onClose={() => setChargeOpen(false)} client={client} defaultAmount={price} showToast={showToast} />
       </div>
     </div>
     </Portal>
