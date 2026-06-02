@@ -10161,6 +10161,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           clients={clients}
           services={services}
           business={business}
+          isOwner={isOwner}
           onClose={() => setOpen(null)}
           appts={appts}
           onSetStatus={setStatus}
@@ -10482,7 +10483,7 @@ function CheckoutRow({ label, val, bold }) {
   );
 }
 
-function AppointmentSheet({ appt, appts, providers, clients, services, business, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
+function AppointmentSheet({ appt, appts, providers, clients, services, business, isOwner, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
   const scrollTopRef = useRef(null);
@@ -10533,6 +10534,22 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
   const [draftNote, setDraftNote] = useState(appt.note || "");
   const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setMode("edit"); setMenuOpen(false); };
   const saveEdit = () => { onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote }); showToast("Appointment updated."); setMode("detail"); };
+
+  // ---- price (admin-editable; per-appointment override stored on appt.price) ----
+  const price = lockedApptPrice(appt, service);
+  const defaultPrice = service ? getPrice(service, appt.providerId) : 0;
+  const [priceOpen, setPriceOpen] = useState(false);
+  const [priceDraft, setPriceDraft] = useState("");
+  const openPriceEditor = () => { setPriceDraft(price != null ? String(price) : ""); setPriceOpen(true); };
+  const savePrice = () => {
+    const n = parseFloat(String(priceDraft).replace(/[^0-9.]/g, ""));
+    if (isNaN(n) || n < 0) { showToast("Enter a valid price."); return; }
+    const v = Math.round(n * 100) / 100;
+    onUpdate(appt.id, { price: v });
+    setPriceOpen(false);
+    showToast(`Price set to $${v}.`);
+  };
+  const resetPrice = () => { onUpdate(appt.id, { price: null }); setPriceOpen(false); showToast("Price reset to the service default."); };
 
   const staff = providers.filter((p) => p.id !== "anyone");
 
@@ -10736,7 +10753,11 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                 <div style={{ display: "flex", alignItems: "baseline", marginBottom: 14, paddingBottom: 16, borderBottom: `1px solid ${T.line}` }}>
                   <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: T.text }}>{service?.name || appt.title}</span>
                   <span style={{ flex: 1, margin: "0 12px", borderBottom: `2px dotted ${T.faint}`, transform: "translateY(-5px)" }} />
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: T.text }}>${service?.price ?? "—"}</span>
+                  {isOwner ? (
+                    <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontFamily: FONT_DISPLAY, fontSize: 24, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }}>${price}<Edit2 size={14} style={{ color: T.faint }} /></button>
+                  ) : (
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: T.text }}>${price}</span>
+                  )}
                 </div>
                 {appt.detail && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
@@ -10888,6 +10909,12 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                   <span style={{ fontSize: 15, color: T.sub }}>Duration</span>
                   <EditStepperRow T={T} value={`${draftDur} min`} onDec={() => setDraftDur((v) => Math.max(5, v - 5))} onInc={() => setDraftDur((v) => Math.min(240, v + 5))} />
                 </div>
+                {isOwner && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20 }}>
+                    <span style={{ fontSize: 15, color: T.sub }}>Price</span>
+                    <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontFamily: FONT_DISPLAY, fontSize: 21, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }}>${price}<Edit2 size={14} style={{ color: T.faint }} /></button>
+                  </div>
+                )}
               </div>
 
               {/* NOTE */}
@@ -10898,6 +10925,25 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
             </div>
           </>
         )}
+
+      {/* admin price editor — reachable from the detail or edit screen, in any status */}
+      <Sheet open={priceOpen} onClose={() => setPriceOpen(false)} align="bottom" maxWidth={420}>
+        <div style={{ padding: "6px 4px 8px" }}>
+          <div style={{ textAlign: "center", marginBottom: 18 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>EDIT PRICE</div>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{service?.name || appt.title}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 12 }}>
+            <span style={{ fontFamily: FONT_DISPLAY, fontSize: 28, color: "var(--sub)" }}>$</span>
+            <input type="text" inputMode="decimal" value={priceDraft} onChange={(e) => setPriceDraft(e.target.value)} placeholder={String(price)} autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: FONT_DISPLAY, fontSize: 28, color: "var(--text)", width: "100%", padding: 0 }} />
+          </div>
+          <button onClick={savePrice} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", marginBottom: 10 }}><Check size={17} /> SAVE PRICE</button>
+          {appt.price != null && (
+            <button onClick={resetPrice} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: 14, fontSize: 13.5, fontWeight: 600, letterSpacing: 1, borderRadius: 14 }}><RefreshCw size={15} /> RESET TO ${defaultPrice}</button>
+          )}
+          <button onClick={() => setPriceOpen(false)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 4 }}>Cancel</button>
+        </div>
+      </Sheet>
       </div>
     </div>
     </Portal>
