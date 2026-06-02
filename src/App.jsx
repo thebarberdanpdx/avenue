@@ -1660,8 +1660,8 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   };
   const cartPrice = cart.reduce((s, e) => s + lineTotal(e).price, 0);
   const cartMin = cart.reduce((s, e) => s + lineTotal(e).min, 0);
-  // Effective duration for slot-finding: a "going a lot shorter" first-timer gets +15 min of chair time reserved (no charge).
-  const effMin = cartMin + (simpleChange === "fresh" ? 15 : 0);
+  // Effective duration for slot-finding: a "going a lot shorter" first-timer gets +10 min of chair time reserved (no charge).
+  const effMin = cartMin + (simpleChange === "fresh" ? 10 : 0);
   const describeEntry = (entry) => {
     // First-time intake answers (if present) read as the meaningful description
     if (entry.intakeAnswers && entry.service.intake) {
@@ -1868,8 +1868,8 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
       groups[key].durMin += dur;
       groups[key].items.push(e);
     });
-    // First-timer going a lot shorter → reserve +15 min on the (single) appointment so the chair isn't rushed.
-    if (simpleChange === "fresh") { const vals = Object.values(groups); if (vals.length === 1) vals[0].durMin += 15; }
+    // First-timer going a lot shorter → reserve +10 min on the (single) appointment so the chair isn't rushed.
+    if (simpleChange === "fresh") { const vals = Object.values(groups); if (vals.length === 1) vals[0].durMin += 10; }
     return Object.values(groups);
   }, [cart, providers, simpleChange]);
   const isMultiPerson = people.length > 1;
@@ -2139,14 +2139,23 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
           return (
             <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column" }}>
               <div style={{ width: 38, height: 3, background: "var(--gold)", marginBottom: 20, borderRadius: 2 }} />
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 33, fontWeight: 600, marginBottom: 14, lineHeight: 1.06, letterSpacing: "-0.4px" }}>Are you going a lot shorter today?</h2>
-              <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 400, lineHeight: 1.55 }}>If so, we'll set aside a few extra minutes for your appointment — so we never have to rush you.</p>
-              <div style={{ display: "grid", gap: 12, marginTop: "auto", paddingTop: 28 }}>
-                <button className="lift" onClick={() => { setSimpleChange("trim"); proceedAfterChange(); }} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 15, padding: 19, color: "var(--text)", fontSize: 17, fontWeight: 500, textAlign: "center" }}>No, about the same</button>
-                <button className="lift" onClick={() => { setSimpleChange("fresh"); proceedAfterChange(); }} style={{ width: "100%", background: "var(--gold)", border: "none", borderRadius: 15, padding: "16px 19px", color: "var(--on-gold)", textAlign: "center", lineHeight: 1.2 }}>
-                  <span style={{ display: "block", fontSize: 17, fontWeight: 600 }}>Yes, going shorter</span>
-                  <span style={{ display: "block", fontSize: 12.5, fontWeight: 500, opacity: 0.8, marginTop: 3 }}>(no extra charge)</span>
-                </button>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 33, fontWeight: 600, marginBottom: 12, lineHeight: 1.06, letterSpacing: "-0.4px" }}>How much are we taking off today?</h2>
+              <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 400, lineHeight: 1.55, marginBottom: 4 }}>This just tells your barber how much time to set aside — pick honestly and you'll never feel rushed.</p>
+              <p style={{ color: "var(--faint)", fontSize: 13, fontWeight: 400, lineHeight: 1.5 }}>Same price either way — no charge for the extra time.</p>
+              <div style={{ display: "grid", gap: 12, marginTop: "auto", paddingTop: 24 }}>
+                {[
+                  { label: "Just a tidy-up", sub: "About the same length — cleaning it up.", change: "trim" },
+                  { label: "Going shorter than usual", sub: "A noticeable change from how it looks now.", change: "fresh" },
+                  { label: "It's grown out — been a while", sub: "Lots to work through.", change: "fresh" },
+                ].map((o) => (
+                  <button key={o.label} className="lift" onClick={() => { setSimpleChange(o.change); proceedAfterChange(); }} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", boxShadow: "var(--shadow-sm)" }}>
+                    <span>
+                      <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 500, lineHeight: 1.12 }}>{o.label}</span>
+                      <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{o.sub}</span>
+                    </span>
+                    <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                  </button>
+                ))}
               </div>
             </div>
           );
@@ -4164,6 +4173,85 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         </div>
       </div>
 
+      {/* OWNER-ONLY REPORTS — hidden for barbers */}
+      {isOwner && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />
+          {onOpenRevenue && (
+            <button onClick={onOpenRevenue} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <TrendingUp size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>View revenue trend</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Week, month, year — top services and clients</div>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          )}
+          {onOpenPayments && (
+            <button onClick={onOpenPayments} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <CreditCard size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>Payments</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Every charge — open one to refund or discount</div>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          )}
+          {onOpenAppointments && (
+            <button onClick={onOpenAppointments} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <BarChart3 size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>View appointments</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Counts, no-shows, busiest day &amp; hour</div>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          )}
+          {onOpenClients && (
+            <button onClick={onOpenClients} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Users size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>View clients</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>New vs returning, retention, top clients</div>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          )}
+          {onOpenServices && (
+            <button onClick={onOpenServices} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Sparkles size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>View service mix</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>What drives revenue · $ per hour</div>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          )}
+          {onOpenBarbers && realProviders.length > 1 && (
+            <button onClick={onOpenBarbers} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: overdueCount > 0 ? 14 : 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Users size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>View per barber</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Each barber's revenue, occupancy &amp; retention</div>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          )}
+        </>
+      )}
+
       {/* RIGHT NOW — what's happening on the chair */}
       <div style={{ marginBottom: 26, background: "color-mix(in srgb, var(--gold) 13%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 16, padding: "17px 19px" }}>
         <div style={{ fontSize: 10.5, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 9, fontWeight: 600 }}>RIGHT NOW</div>
@@ -4355,84 +4443,6 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         )}
       </div>
 
-      {/* OWNER-ONLY REPORTS — hidden for barbers */}
-      {isOwner && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />
-          {onOpenRevenue && (
-            <button onClick={onOpenRevenue} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <TrendingUp size={17} style={{ color: "var(--gold)" }} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>View revenue trend</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Week, month, year — top services and clients</div>
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-            </button>
-          )}
-          {onOpenPayments && (
-            <button onClick={onOpenPayments} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <CreditCard size={17} style={{ color: "var(--gold)" }} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>Payments</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Every charge — open one to refund or discount</div>
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-            </button>
-          )}
-          {onOpenAppointments && (
-            <button onClick={onOpenAppointments} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <BarChart3 size={17} style={{ color: "var(--gold)" }} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>View appointments</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Counts, no-shows, busiest day &amp; hour</div>
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-            </button>
-          )}
-          {onOpenClients && (
-            <button onClick={onOpenClients} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Users size={17} style={{ color: "var(--gold)" }} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>View clients</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>New vs returning, retention, top clients</div>
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-            </button>
-          )}
-          {onOpenServices && (
-            <button onClick={onOpenServices} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Sparkles size={17} style={{ color: "var(--gold)" }} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>View service mix</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>What drives revenue · $ per hour</div>
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-            </button>
-          )}
-          {onOpenBarbers && realProviders.length > 1 && (
-            <button onClick={onOpenBarbers} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: overdueCount > 0 ? 14 : 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Users size={17} style={{ color: "var(--gold)" }} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>View per barber</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Each barber's revenue, occupancy &amp; retention</div>
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-            </button>
-          )}
-        </>
-      )}
 
       {/* OVERDUE CTA — shown to everyone in their scope */}
       {overdueCount > 0 && (
@@ -4525,7 +4535,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
 // REVENUE — first Pulse drill-in. Period toggle (week/month/year),
 // editorial bar chart, top services + top clients for the period.
 // ============================================================
-function RevenueView({ appts, clients, services, providers, onBack }) {
+function RevenueView({ appts, clients, services, providers, business, onBack }) {
   const [period, setPeriod] = useState("month"); // "week" | "month" | "year" | "custom"
   const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().slice(0, 10); });
   const [customTo, setCustomTo] = useState(() => new Date().toISOString().slice(0, 10));
@@ -4602,6 +4612,22 @@ function RevenueView({ appts, clients, services, providers, onBack }) {
   const periodVisits = appts.filter((a) => !isBlock(a) && isRevenue(a) && inRange(a, periodStart, periodEnd));
   const visitCount = periodVisits.length;
   const avgTicket = visitCount > 0 ? Math.round(periodTotal / visitCount) : 0;
+
+  // --- add-ons: earned per chair-hour + money mix ---
+  const realProvs = providers.filter((p) => p.id !== "anyone");
+  let availMins = 0;
+  const _capEnd = Math.min(periodEnd.getTime(), now.getTime() + 86400000);
+  for (let cur = new Date(periodStart); cur.getTime() < _capEnd; cur.setDate(cur.getDate() + 1)) {
+    const dow = cur.getDay();
+    realProvs.forEach((p) => { const h = (p.hours || {})[dow]; if (h && h.on) availMins += Math.max(0, h.end - h.start); });
+  }
+  const chairHours = availMins / 60;
+  const revPerChairHr = chairHours > 0 ? periodTotal / chairHours : 0;
+  const tipsTotal = periodVisits.reduce((s, a) => s + ((a.paid && a.paid.tip) || 0), 0);
+  const posTotal = (business && business.sales ? business.sales : []).reduce((s, x) => { const t = +new Date(x.ts || 0); return (t >= periodStart.getTime() && t < periodEnd.getTime()) ? s + ((x.amount || 0) - (x.refunded || 0)) : s; }, 0);
+  const serviceRev = periodTotal;
+  const mixTotal = serviceRev + posTotal + tipsTotal;
+  const mixPct = (n) => (mixTotal > 0 ? Math.round((n / mixTotal) * 100) : 0);
 
   // --- Bucket the chart depending on period ---
   const buckets = (() => {
@@ -4788,6 +4814,40 @@ function RevenueView({ appts, clients, services, providers, onBack }) {
         </div>
       )}
 
+      {/* Earned per chair-hour */}
+      {chairHours > 0 && visitCount > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 14, fontWeight: 600 }}>EARNED PER CHAIR-HOUR</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -1.2, color: "var(--gold)" }}>{fmtMoney(revPerChairHr)}</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>per open chair-hour · {Math.round(chairHours)}h of chair time so far</div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Where it comes from */}
+      {mixTotal > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 14, fontWeight: 600 }}>WHERE IT COMES FROM</div>
+            <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: "var(--panel2)", marginBottom: 16 }}>
+              <div style={{ width: mixPct(serviceRev) + "%", background: "var(--gold)" }} />
+              <div style={{ width: mixPct(posTotal) + "%", background: "color-mix(in srgb, var(--gold) 55%, var(--panel2))" }} />
+              <div style={{ width: mixPct(tipsTotal) + "%", background: "color-mix(in srgb, var(--gold) 28%, var(--panel2))" }} />
+            </div>
+            <div style={{ display: "grid", gap: 11 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 14.5 }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: "var(--gold)", marginRight: 9 }} />Services</span><span style={{ fontSize: 14.5, fontWeight: 500 }}>{fmtMoney(serviceRev)} <span style={{ color: "var(--faint)", fontWeight: 400 }}>{mixPct(serviceRev)}%</span></span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 14.5 }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: "color-mix(in srgb, var(--gold) 55%, var(--panel2))", marginRight: 9 }} />Products / POS</span><span style={{ fontSize: 14.5, fontWeight: 500 }}>{fmtMoney(posTotal)} <span style={{ color: "var(--faint)", fontWeight: 400 }}>{mixPct(posTotal)}%</span></span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 14.5 }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: "color-mix(in srgb, var(--gold) 28%, var(--panel2))", marginRight: 9 }} />Tips</span><span style={{ fontSize: 14.5, fontWeight: 500 }}>{fmtMoney(tipsTotal)} <span style={{ color: "var(--faint)", fontWeight: 400 }}>{mixPct(tipsTotal)}%</span></span></div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* By service */}
       {topServices.length > 0 && (
         <>
@@ -4845,238 +4905,169 @@ function RevenueView({ appts, clients, services, providers, onBack }) {
 // rates, and a heatmap of which day×hour combos are most booked.
 // ============================================================
 function AppointmentsView({ appts, providers, services, onBack }) {
-  const [period, setPeriod] = useState("month"); // "week" | "month" | "year"
+  const [period, setPeriod] = useState("month");
   const now = new Date();
 
-  // --- Date helpers (kept local for self-containment, same as Pulse/Revenue) ---
   const sod = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-  const sow = (d) => {
-    const x = sod(d);
-    const day = x.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    x.setDate(x.getDate() + diff);
-    return x;
-  };
+  const sow = (d) => { const x = sod(d); const day = x.getDay(); const diff = day === 0 ? -6 : 1 - day; x.setDate(x.getDate() + diff); return x; };
   const som = (d) => { const x = sod(d); x.setDate(1); return x; };
 
-  // --- Period boundaries ---
   let periodStart, periodEnd;
-  if (period === "week") {
-    periodStart = sow(now);
-    periodEnd = new Date(periodStart); periodEnd.setDate(periodEnd.getDate() + 7);
-  } else if (period === "month") {
-    periodStart = som(now);
-    periodEnd = new Date(periodStart); periodEnd.setMonth(periodEnd.getMonth() + 1);
-  } else {
-    periodStart = new Date(now.getFullYear(), 0, 1);
-    periodEnd = new Date(now.getFullYear() + 1, 0, 1);
-  }
+  if (period === "week") { periodStart = sow(now); periodEnd = new Date(periodStart); periodEnd.setDate(periodEnd.getDate() + 7); }
+  else if (period === "month") { periodStart = som(now); periodEnd = new Date(periodStart); periodEnd.setMonth(periodEnd.getMonth() + 1); }
+  else { periodStart = new Date(now.getFullYear(), 0, 1); periodEnd = new Date(now.getFullYear() + 1, 0, 1); }
 
-  const inRange = (a, start, end) => {
-    if (!a.bookedFor) return false;
-    const t = new Date(a.bookedFor).getTime();
-    return t >= start.getTime() && t < end.getTime();
-  };
-  const isBlock = (a) => a.status === "block";
+  const inRange = (a, start, end) => { if (!a.bookedFor) return false; const t = new Date(a.bookedFor).getTime(); return t >= start.getTime() && t < end.getTime(); };
+  const periodAppts = appts.filter((a) => a.status !== "block" && inRange(a, periodStart, periodEnd));
 
-  // --- Filter: all real appointments in range (excludes blocks) ---
-  const periodAppts = appts.filter((a) => !isBlock(a) && inRange(a, periodStart, periodEnd));
+  const svcById = {}; services.forEach((s) => { svcById[s.id] = s; });
+  const apptPrice = (a) => { if (typeof a.price === "number") return a.price; if (typeof a.total === "number") return a.total; const s = svcById[a.serviceId]; return s ? (s.price || 0) : 0; };
+  const apptMins = (a) => { if (typeof a.start === "number" && typeof a.end === "number" && a.end > a.start) return a.end - a.start; const s = svcById[a.serviceId]; return s && s.duration ? s.duration : 45; };
 
-  // --- Counts by status ---
-  // Booked = everything that wasn't blocked and wasn't cancelled (so: done, no-show, confirmed, checked-in, in-service all count)
-  const booked = periodAppts.filter((a) => a.status !== "cancelled").length;
+  const live = periodAppts.filter((a) => a.status !== "cancelled");
+  const booked = live.length;
   const done = periodAppts.filter((a) => a.status === "done").length;
   const cancelled = periodAppts.filter((a) => a.status === "cancelled").length;
   const noShow = periodAppts.filter((a) => a.status === "no-show").length;
-  // Pending = future-dated, not cancelled, not yet completed
-  const pending = periodAppts.filter((a) => {
-    if (a.status === "cancelled" || a.status === "done" || a.status === "no-show") return false;
-    return new Date(a.bookedFor).getTime() >= now.getTime();
-  }).length;
-
-  // --- Rates (% of finished bookings) ---
+  const pending = periodAppts.filter((a) => { if (a.status === "cancelled" || a.status === "done" || a.status === "no-show") return false; return new Date(a.bookedFor).getTime() >= now.getTime(); }).length;
   const finished = done + noShow + cancelled;
   const noShowRate = finished > 0 ? Math.round((noShow / finished) * 100) : 0;
   const cancelRate = finished > 0 ? Math.round((cancelled / finished) * 100) : 0;
 
-  // --- Day × hour heatmap (7 rows × N hours). Only counts non-cancelled bookings. ---
-  // Determine the hour range from the providers' schedules so the heatmap is right-sized for this shop.
+  // capacity: booked chair-hours vs available chair-hours
+  const realProvs = providers.filter((p) => p.id !== "anyone");
+  const bookedMins = live.reduce((s, a) => s + apptMins(a), 0);
+  let availMins = 0;
+  const cur = new Date(periodStart);
+  while (cur.getTime() < periodEnd.getTime()) {
+    const dow = cur.getDay();
+    realProvs.forEach((p) => { const h = (p.hours || {})[dow]; if (h && h.on) availMins += Math.max(0, h.end - h.start); });
+    cur.setDate(cur.getDate() + 1);
+  }
+  const occupancy = availMins > 0 ? Math.round((bookedMins / availMins) * 100) : 0;
+  const bookedHrs = Math.round(bookedMins / 60);
+  const availHrs = Math.round(availMins / 60);
+  const openHrs = Math.max(0, availHrs - bookedHrs);
+
+  const doneAppts = periodAppts.filter((a) => a.status === "done");
+  const avgTicket = doneAppts.length ? doneAppts.reduce((s, a) => s + apptPrice(a), 0) / doneAppts.length : 0;
+  const lost = Math.round((noShow + cancelled) * avgTicket);
+
+  // busiest day/time heatmap
   let minHour = 24, maxHour = 0;
-  providers.forEach((p) => {
-    if (p.id === "anyone") return;
-    Object.values(p.hours || {}).forEach((h) => {
-      if (!h?.on) return;
-      const startH = Math.floor(h.start / 60);
-      const endH = Math.ceil(h.end / 60);
-      if (startH < minHour) minHour = startH;
-      if (endH > maxHour) maxHour = endH;
-    });
-  });
-  if (minHour === 24) { minHour = 9; maxHour = 19; } // fallback
-  const hourLabels = [];
-  for (let h = minHour; h < maxHour; h++) hourLabels.push(h);
-  // grid[dow][hourIdx] = count
+  realProvs.forEach((p) => { Object.values(p.hours || {}).forEach((h) => { if (!h || !h.on) return; const sH = Math.floor(h.start / 60); const eH = Math.ceil(h.end / 60); if (sH < minHour) minHour = sH; if (eH > maxHour) maxHour = eH; }); });
+  if (minHour === 24) { minHour = 9; maxHour = 19; }
+  const hourLabels = []; for (let h = minHour; h < maxHour; h++) hourLabels.push(h);
   const grid = Array.from({ length: 7 }, () => Array(hourLabels.length).fill(0));
-  periodAppts.filter((a) => a.status !== "cancelled" && a.bookedFor).forEach((a) => {
-    const d = new Date(a.bookedFor);
-    const dow = d.getDay();
-    const hr = d.getHours();
-    const hourIdx = hourLabels.indexOf(hr);
-    if (hourIdx >= 0) grid[dow][hourIdx] += 1;
-  });
-  // Re-order so Monday is first column on the chart (matches "business week")
+  live.filter((a) => a.bookedFor).forEach((a) => { const d = new Date(a.bookedFor); const hi = hourLabels.indexOf(d.getHours()); if (hi >= 0) grid[d.getDay()][hi] += 1; });
   const dowOrder = [1, 2, 3, 4, 5, 6, 0];
   const dowLabels = ["M", "T", "W", "T", "F", "S", "S"];
   const orderedGrid = dowOrder.map((d) => grid[d]);
   const maxCell = Math.max(1, ...orderedGrid.flat());
-
-  // --- Busiest day & hour pulled straight from the grid ---
-  const dayTotals = orderedGrid.map((row, i) => ({ dow: dowOrder[i], label: dowLabels[i], total: row.reduce((a, b) => a + b, 0) }));
-  const busiestDay = dayTotals.slice().sort((a, b) => b.total - a.total)[0];
   const dayFull = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const dayTotals = orderedGrid.map((row, i) => ({ dow: dowOrder[i], total: row.reduce((a, b) => a + b, 0) }));
+  const busiestDay = dayTotals.slice().sort((a, b) => b.total - a.total)[0];
   const hourTotals = hourLabels.map((h, i) => ({ hour: h, total: orderedGrid.reduce((sum, row) => sum + row[i], 0) }));
   const busiestHour = hourTotals.slice().sort((a, b) => b.total - a.total)[0];
-  const fmtHour = (h) => { const ap = h >= 12 ? "PM" : "AM"; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12} ${ap}`; };
+  const fmtHour = (h) => { const ap = h >= 12 ? "PM" : "AM"; const h12 = h % 12 === 0 ? 12 : h % 12; return h12 + " " + ap; };
+  const heatmapHasData = orderedGrid.flat().some((v) => v > 0);
 
-  // --- Heatmap geometry ---
-  const cellW = 28;
-  const cellH = 22;
-  const gap = 3;
-  const leftLabel = 36;
-  const topLabel = 22;
+  const cellW = 28, cellH = 22, gap = 3, leftLabel = 22, topLabel = 20;
   const gridW = leftLabel + hourLabels.length * (cellW + gap) - gap;
   const gridH = topLabel + 7 * (cellH + gap) - gap;
 
-  const heatmapHasData = orderedGrid.flat().some((v) => v > 0);
+  const periodLabel = period === "week" ? "This week" : period === "month" ? "This month" : "This year";
+  const Pill = ({ k, label }) => (
+    <button onClick={() => setPeriod(k)} style={{ flex: 1, padding: "10px 8px", borderRadius: 24, border: period === k ? "1px solid var(--gold)" : "1px solid var(--border2)", background: period === k ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: period === k ? "var(--gold)" : "var(--sub)", fontWeight: period === k ? 600 : 400, fontSize: 13.5, cursor: "pointer" }}>{label}</button>
+  );
 
   return (
     <div className="fade-up">
       <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> Back to Pulse</button>
 
-      {/* Masthead */}
-      <div style={{ marginBottom: 22 }}>
+      <div style={{ marginBottom: 18 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>APPOINTMENTS</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>APPOINTMENTS &middot; CAPACITY</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95, margin: 0 }}>{periodLabel}</h2>
+        <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10 }}><b style={{ color: "var(--text)", fontWeight: 600 }}>{booked}</b> booked &middot; <b style={{ color: "var(--text)", fontWeight: 600 }}>{occupancy}%</b> of chair time filled</div>
       </div>
 
-      {/* Period toggle */}
       <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
-        {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
-          const on = period === id;
-          return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
-          );
-        })}
+        <Pill k="week" label="Week" /><Pill k="month" label="Month" /><Pill k="year" label="Year" />
       </div>
 
-      {/* Hero number — total booked */}
+      {booked === 0 ? (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "26px 20px", textAlign: "center" }}>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 8 }}>No appointments yet</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55 }}>Once bookings flow through Vero, this shows how full your chairs are, where the open time is, and what no-shows are costing you.</div>
+        </div>
+      ) : (
+      <>
+      <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "20px 18px 18px", marginBottom: 30 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700, marginBottom: 10 }}>CHAIR OCCUPANCY</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 14 }}>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 52, fontWeight: 500, lineHeight: 1, letterSpacing: -1.5, color: "var(--gold)" }}>{occupancy}%</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>of your open chair time is booked</div>
+        </div>
+        <div style={{ height: 8, borderRadius: 4, background: "color-mix(in srgb, var(--gold) 18%, var(--panel2))", overflow: "hidden", marginBottom: 10 }}>
+          <div style={{ width: Math.min(100, occupancy) + "%", height: "100%", background: "var(--gold)" }} />
+        </div>
+        <div style={{ fontSize: 12.5, color: "var(--sub)" }}><b style={{ color: "var(--text)" }}>{bookedHrs}h</b> booked &middot; <b style={{ color: "var(--text)" }}>{openHrs}h</b> still open of {availHrs}h</div>
+      </div>
+
+      <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
       <div style={{ marginBottom: 28 }}>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
-          {booked}
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 14 }}>SCHEDULE HEALTH</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 14px" }}>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, lineHeight: 1, color: "var(--text)" }}>{noShowRate}%</div>
+            <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 6 }}>no-show rate &middot; {noShow}</div>
+          </div>
+          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 14px" }}>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, lineHeight: 1, color: "var(--text)" }}>{cancelRate}%</div>
+            <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 6 }}>cancel rate &middot; {cancelled}</div>
+          </div>
         </div>
-        <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
-          {booked === 0 ? "No appointments this period." : <>{booked === 1 ? "appointment booked" : "appointments booked"}{pending > 0 && <> · <span style={{ fontWeight: 600 }}>{pending}</span> still upcoming</>}</>}
-        </div>
+        {lost > 0 && (
+          <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>Roughly <b style={{ color: "var(--text)" }}>{fmtMoney(lost)}</b> in lost bookings from no-shows &amp; cancels <span style={{ color: "var(--faint)" }}>(est.)</span>. A card on file cuts this.</div>
+        )}
       </div>
 
-      {/* Breakdown — quick row of counts */}
-      {periodAppts.length > 0 && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-          <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>BREAKDOWN</div>
-            <div style={{ display: "grid", gap: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Completed</div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{done}</span>
-                </div>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Cancelled</div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{cancelled}</span>
-                  {cancelRate > 0 && <span style={{ fontSize: 12.5, color: "var(--faint)" }}>{cancelRate}% of finished</span>}
-                </div>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>No-shows</div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, color: noShow > 0 ? "var(--gold)" : "var(--text)" }}>{noShow}</span>
-                  {noShowRate > 0 && <span style={{ fontSize: 12.5, color: noShow > 0 ? "var(--gold)" : "var(--faint)", fontWeight: noShow > 0 ? 600 : 400 }}>{noShowRate}% of finished</span>}
-                </div>
-              </div>
-              {pending > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Upcoming</div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{pending}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* When */}
-      {heatmapHasData && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-          <div style={{ marginBottom: 26 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>WHEN</div>
-            <div style={{ fontSize: 14, color: "var(--text2)", marginBottom: 18, lineHeight: 1.5 }}>
-              Busiest is <span style={{ fontWeight: 600 }}>{dayFull[busiestDay.dow]}</span>
-              {busiestHour && busiestHour.total > 0 && <> around <span style={{ fontWeight: 600 }}>{fmtHour(busiestHour.hour)}</span></>}.
-            </div>
-
-            {/* Heatmap */}
-            <div style={{ overflowX: "auto", paddingBottom: 6 }}>
-              <svg viewBox={`0 0 ${gridW} ${gridH}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto", maxHeight: 240, display: "block", minWidth: 320 }}>
-                {/* Hour labels along the top */}
-                {hourLabels.map((h, i) => (
-                  <text key={`h-${i}`} x={leftLabel + i * (cellW + gap) + cellW / 2} y={topLabel - 8} textAnchor="middle" fontSize="9" fill="var(--faint)">{h % 12 === 0 ? 12 : h % 12}{h >= 12 ? "p" : "a"}</text>
-                ))}
-                {/* Day labels along the left */}
-                {dowLabels.map((lbl, i) => (
-                  <text key={`d-${i}`} x={leftLabel - 10} y={topLabel + i * (cellH + gap) + cellH / 2 + 3} textAnchor="end" fontSize="11" fill="var(--faint)">{lbl}</text>
-                ))}
-                {/* Cells */}
-                {orderedGrid.map((row, di) => row.map((v, hi) => {
-                  const x = leftLabel + hi * (cellW + gap);
-                  const y = topLabel + di * (cellH + gap);
-                  // Color ramp: empty cells barely visible, busiest cells full gold.
-                  const intensity = v === 0 ? 0 : Math.max(0.15, v / maxCell);
-                  const fill = v === 0 ? "var(--panel2)" : `color-mix(in srgb, var(--gold) ${Math.round(intensity * 100)}%, var(--panel2))`;
-                  return (
-                    <g key={`c-${di}-${hi}`}>
-                      <rect x={x} y={y} width={cellW} height={cellH} rx="3" fill={fill} />
-                      {v > 0 && <text x={x + cellW / 2} y={y + cellH / 2 + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill={intensity > 0.55 ? "var(--on-gold)" : "var(--text)"}>{v}</text>}
-                    </g>
-                  );
-                }))}
-              </svg>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Empty period state */}
-      {periodAppts.length === 0 && (
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "28px 22px", textAlign: "center", marginTop: 10 }}>
-          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto" }}>Once you have appointments in this period, breakdowns and the busiest-times heatmap show up here.</p>
+      {heatmapHasData && (<>
+      <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>BUSIEST TIMES</div>
+        {busiestDay && busiestHour && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 16 }}>Your busiest stretch is <b style={{ color: "var(--text)" }}>{dayFull[busiestDay.dow]}s around {fmtHour(busiestHour.hour)}</b>.</div>)}
+        <div style={{ overflowX: "auto", paddingBottom: 4 }}>
+          <svg width={gridW} height={gridH} style={{ display: "block" }}>
+            {hourLabels.map((h, i) => (i % 2 === 0 ? (<text key={"h" + h} x={leftLabel + i * (cellW + gap) + cellW / 2} y={12} textAnchor="middle" style={{ fontSize: 9, fill: "var(--faint)" }}>{fmtHour(h).replace(" ", "")}</text>) : null))}
+            {orderedGrid.map((row, r) => (
+              <g key={"r" + r}>
+                <text x={0} y={topLabel + r * (cellH + gap) + cellH / 2 + 3} style={{ fontSize: 10, fill: "var(--faint)" }}>{dowLabels[r]}</text>
+                {row.map((v, c) => { const t = v / maxCell; const bg = v === 0 ? "var(--panel2)" : "color-mix(in srgb, var(--gold) " + Math.round(20 + t * 70) + "%, var(--panel))"; return (<rect key={"c" + c} x={leftLabel + c * (cellW + gap)} y={topLabel + r * (cellH + gap)} width={cellW} height={cellH} rx={4} fill={bg} />); })}
+              </g>
+            ))}
+          </svg>
         </div>
+      </div>
+      </>)}
+
+      <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+      <div style={{ marginBottom: 6 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 14 }}>BREAKDOWN</div>
+        {[["Completed", done], ["Upcoming", pending], ["No-shows", noShow], ["Cancelled", cancelled]].map(([lbl, n]) => (
+          <div key={lbl} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 2px", borderTop: "1px solid var(--line)" }}>
+            <span style={{ fontSize: 14.5 }}>{lbl}</span>
+            <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500 }}>{n}</span>
+          </div>
+        ))}
+      </div>
+      </>
       )}
     </div>
   );
 }
 
-// ============================================================
-// CLIENTS REPORT — third Pulse drill-in. Health metrics for the
-// client base: new vs returning, retention, top by visits + revenue,
-// lapsed list (with a direct path to the nudge folder).
-// ============================================================
 function ClientsReportView({ appts, clients, services, providers, pulseView, me, onBack, onOpenNudge, onOpenClient }) {
   const [period, setPeriod] = useState("month"); // "week" | "month" | "year"
   const now = new Date();
@@ -5404,6 +5395,32 @@ function ServiceMixView({ appts, services, providers, onBack }) {
   const totalMinutes = activeRows.reduce((sum, r) => sum + r.minutes, 0);
   const avgPerHour = totalMinutes > 0 ? (totalRevenue / totalMinutes) * 60 : 0;
 
+  // --- add-on attach (over completed visits in period) ---
+  const addonsOf = (a) => {
+    const out = [];
+    const lis = (a.lineItems && a.lineItems.length) ? a.lineItems : [{ serviceId: a.serviceId, addons: a.addons || {} }];
+    lis.forEach((li) => {
+      const svc = services.find((s) => s.id === li.serviceId);
+      const map = li.addons || {};
+      Object.keys(map).forEach((k) => {
+        if (!map[k]) return;
+        const g = svc && (svc.addonGroups || []).find((gr) => gr.id === k);
+        const item = g && g.item;
+        out.push({ name: item ? item.name : "Add-on", price: item ? (item.price || 0) : 0 });
+      });
+    });
+    return out;
+  };
+  const doneInPeriod = appts.filter((a) => isRevenue(a) && inRange(a, periodStart, periodEnd));
+  let attachVisits = 0; const addonTally = {}; let addonRevenue = 0;
+  doneInPeriod.forEach((a) => {
+    const ad = addonsOf(a);
+    if (ad.length) attachVisits += 1;
+    ad.forEach((x) => { addonTally[x.name] = addonTally[x.name] || { name: x.name, count: 0, revenue: 0 }; addonTally[x.name].count += 1; addonTally[x.name].revenue += x.price; addonRevenue += x.price; });
+  });
+  const attachRate = doneInPeriod.length > 0 ? Math.round((attachVisits / doneInPeriod.length) * 100) : 0;
+  const topAddons = Object.values(addonTally).sort((a, b) => b.count - a.count).slice(0, 4);
+
   // Sort according to current toggle
   const sortedActive = activeRows.slice().sort((a, b) => {
     if (sortBy === "visits") return b.visits - a.visits;
@@ -5483,6 +5500,27 @@ function ServiceMixView({ appts, services, providers, onBack }) {
                 </div>
               )}
             </div>
+          </div>
+        </>
+      )}
+
+      {/* ADD-ON ATTACH */}
+      {doneInPeriod.length > 0 && (
+        <>
+          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 14, fontWeight: 600 }}>ADD-ON ATTACH</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: topAddons.length ? 18 : 0 }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -1.2, color: "var(--gold)" }}>{attachRate}%</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>of visits added an add-on{addonRevenue > 0 && <> &middot; <span style={{ fontWeight: 600, color: "var(--text)" }}>{fmtMoney(addonRevenue)}</span> extra</>}</div>
+            </div>
+            {topAddons.map((x) => (
+              <div key={x.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "11px 2px", borderTop: "1px solid var(--line)" }}>
+                <span style={{ fontSize: 14.5 }}>{x.name}</span>
+                <span style={{ fontSize: 13.5, color: "var(--sub)" }}>{x.count}&times; &middot; {fmtMoney(x.revenue)}</span>
+              </div>
+            ))}
+            {topAddons.length === 0 && (<div style={{ fontSize: 13.5, color: "var(--sub)" }}>No add-ons attached yet — a prompt at checkout lifts this.</div>)}
           </div>
         </>
       )}
@@ -5672,10 +5710,29 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
     });
     const retentionPct = cohortSize > 0 ? Math.round((cohortReturned / cohortSize) * 100) : null;
 
+    // avg ticket + tips (this barber, completed in period)
+    const tips = done.reduce((s, a) => s + ((a.paid && a.paid.tip) || 0), 0);
+    const avgTicket = done.length > 0 ? revenue / done.length : 0;
+    // rebooking: of this barber's clients seen in last 90d, how many have a future visit booked with them
+    const ninety = 90 * 24 * 60 * 60 * 1000;
+    let recentN = 0, rebookedN = 0;
+    Object.keys(apptsByClient).forEach((cid) => {
+      const list = apptsByClient[cid];
+      const seenRecently = list.some((a) => a.status === "done" && (now.getTime() - new Date(a.bookedFor).getTime()) <= ninety && new Date(a.bookedFor).getTime() <= now.getTime());
+      if (!seenRecently) return;
+      recentN += 1;
+      const hasFuture = list.some((a) => a.status !== "cancelled" && new Date(a.bookedFor).getTime() > now.getTime());
+      if (hasFuture) rebookedN += 1;
+    });
+    const rebookPct = recentN > 0 ? Math.round((rebookedN / recentN) * 100) : null;
+
     return {
       prov,
       visits: done.length,
       revenue,
+      avgTicket,
+      tips,
+      rebookPct,
       occupancyPct,
       noShow,
       noShowRate,
@@ -5758,6 +5815,22 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
 
                 {/* Stats grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 18px" }}>
+                  <div>
+                    <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>AVG TICKET</div>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500 }}>{r.visits > 0 ? fmtMoney(r.avgTicket) : "—"}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>TIPS</div>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500 }}>{r.tips > 0 ? fmtMoney(r.tips) : "—"}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>REBOOKING</div>
+                    {r.rebookPct !== null ? (
+                      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, color: r.rebookPct >= 50 ? "var(--gold)" : "var(--text)" }}>{r.rebookPct}%</div>
+                    ) : (
+                      <div style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic" }}>—</div>
+                    )}
+                  </div>
                   <div>
                     <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>OCCUPANCY</div>
                     <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500 }}>{r.occupancyPct}%</div>
@@ -5928,8 +6001,8 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
         {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenPayments={() => setPulseDetail("payments")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} showToast={showToast} />}
-        {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "pulse" && pulseDetail === "payments" && <PaymentsView clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={() => setPulseDetail(null)} showToast={showToast} />}
+        {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} business={business} onBack={() => setPulseDetail(null)} />}
+        {tab === "pulse" && pulseDetail === "payments" && <PaymentsView appts={appts} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={() => setPulseDetail(null)} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} onOpenClient={(c) => { setPulseDetail(null); setActiveClient(c); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
@@ -11207,9 +11280,10 @@ function RefundSheet({ open, onClose, client, payment, onApply, showToast }) {
   );
 }
 
-function PaymentsView({ clients, setClients, business, setBusiness, providers, onBack, showToast }) {
+function PaymentsView({ appts, clients, setClients, business, setBusiness, providers, onBack, showToast }) {
   const [openId, setOpenId] = useState(null);
   const [refundFor, setRefundFor] = useState(null);
+  const [period, setPeriod] = useState("month");
   const [noteDraft, setNoteDraft] = useState("");
 
   const rows = [];
@@ -11223,6 +11297,31 @@ function PaymentsView({ clients, setClients, business, setBusiness, providers, o
 
   const totalNet = rows.reduce((s, r) => s + (r.amount || 0) - (r.refunded || 0), 0);
   const totalRefunded = rows.reduce((s, r) => s + (r.refunded || 0), 0);
+
+  // --- money-flow summary (period-scoped) ---
+  const _now = new Date();
+  const _sod = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const _sow = (d) => { const x = _sod(d); const day = x.getDay(); x.setDate(x.getDate() + (day === 0 ? -6 : 1 - day)); return x; };
+  const _som = (d) => { const x = _sod(d); x.setDate(1); return x; };
+  let _ps, _pe;
+  if (period === "week") { _ps = _sow(_now); _pe = new Date(_ps); _pe.setDate(_pe.getDate() + 7); }
+  else if (period === "month") { _ps = _som(_now); _pe = new Date(_ps); _pe.setMonth(_pe.getMonth() + 1); }
+  else { _ps = new Date(_now.getFullYear(), 0, 1); _pe = new Date(_now.getFullYear() + 1, 0, 1); }
+  const inPeriod = (ts) => { const t = +new Date(ts || 0); return t >= +_ps && t < +_pe; };
+  const periodRows = rows.filter((r) => inPeriod(r.ts));
+  const grossIn = periodRows.reduce((s, r) => s + (r.amount || 0), 0);
+  const refundsOut = periodRows.reduce((s, r) => s + (r.refunded || 0), 0);
+  const netIn = grossIn - refundsOut;
+  const cashIn = periodRows.filter((r) => r.method === "cash").reduce((s, r) => s + (r.amount || 0), 0);
+  const cardIn = grossIn - cashIn;
+  const noShowFees = periodRows.filter((r) => r.type === "no-show").reduce((s, r) => s + (r.amount || 0), 0);
+  const tipsIn = (appts || []).reduce((s, a) => (a.paid && inPeriod(a.bookedFor) ? s + (a.paid.tip || 0) : s), 0) + periodRows.reduce((s, r) => s + (r.tip || 0), 0);
+  const cashPct = grossIn > 0 ? Math.round((cashIn / grossIn) * 100) : 0;
+  const fmtMoney0 = (n) => "$" + Math.round(n || 0).toLocaleString();
+  const periodLabel = period === "week" ? "This week" : period === "month" ? "This month" : "This year";
+  const Pill = ({ k, label }) => (
+    <button onClick={() => setPeriod(k)} style={{ flex: 1, padding: "9px 8px", borderRadius: 24, border: period === k ? "1px solid var(--gold)" : "1px solid var(--border2)", background: period === k ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: period === k ? "var(--gold)" : "var(--sub)", fontWeight: period === k ? 600 : 400, fontSize: 13.5, cursor: "pointer" }}>{label}</button>
+  );
 
   const openRow = rows.find((r) => r.id === openId) || null;
   const openClient = openRow && openRow.clientId ? clients.find((c) => c.id === openRow.clientId) : null;
@@ -11255,30 +11354,68 @@ function PaymentsView({ clients, setClients, business, setBusiness, providers, o
 
   return (
     <div className="fade-in" style={{ padding: "8px 0 40px" }}>
-      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 14 }}><ArrowLeft size={16} /> Pulse</button>
-      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 4 }}>Payments</div>
-      <div style={{ fontSize: 14, color: "var(--sub)", marginBottom: 18 }}>Every charge taken in Vero.</div>
+      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 14 }}><ArrowLeft size={16} /> Back to Pulse</button>
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>PAYMENTS &middot; MONEY FLOW</div>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{periodLabel}</div>
+        <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10 }}><b style={{ color: "var(--text)", fontWeight: 600 }}>{fmtMoney0(netIn)}</b> net &middot; {periodRows.length} charge{periodRows.length === 1 ? "" : "s"}</div>
+      </div>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-        <div style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px" }}>
-          <div style={{ fontSize: 12, letterSpacing: 1, color: "var(--sub)", marginBottom: 4 }}>NET COLLECTED</div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500 }}>{fmtMoney(totalNet)}</div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 26 }}>
+        <Pill k="week" label="Week" /><Pill k="month" label="Month" /><Pill k="year" label="Year" />
+      </div>
+
+      <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "20px 18px", marginBottom: 16 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700, marginBottom: 8 }}>MONEY IN</div>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, lineHeight: 1, letterSpacing: -1.3 }}>{fmtMoney0(grossIn)}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, paddingTop: 14, borderTop: "1px solid color-mix(in srgb, var(--gold) 18%, var(--border))" }}>
+          <span style={{ fontSize: 13.5, color: "var(--sub)" }}>&minus; Refunds</span>
+          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500, color: refundsOut > 0 ? "var(--text)" : "var(--faint)" }}>{fmtMoney0(refundsOut)}</span>
         </div>
-        <div style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px" }}>
-          <div style={{ fontSize: 12, letterSpacing: 1, color: "var(--sub)", marginBottom: 4 }}>REFUNDED</div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500 }}>{fmtMoney(totalRefunded)}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+          <span style={{ fontSize: 14, color: "var(--text)", fontWeight: 600 }}>Net in your pocket</span>
+          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 600, color: "var(--gold)" }}>{fmtMoney0(netIn)}</span>
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px" }}>
+          <div style={{ fontSize: 11, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600, marginBottom: 6 }}>TIPS</div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{fmtMoney0(tipsIn)}</div>
+        </div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px" }}>
+          <div style={{ fontSize: 11, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600, marginBottom: 6 }}>NO-SHOW FEES</div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{fmtMoney0(noShowFees)}</div>
+        </div>
+      </div>
+
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+          <span style={{ fontSize: 11, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600 }}>CASH vs CARD</span>
+          <span style={{ fontSize: 12.5, color: "var(--faint)" }}>{cashPct}% cash</span>
+        </div>
+        <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", background: "var(--panel2)", marginBottom: 10 }}>
+          <div style={{ width: cashPct + "%", background: "var(--gold)" }} />
+          <div style={{ width: (100 - cashPct) + "%", background: "color-mix(in srgb, var(--gold) 35%, var(--panel2))" }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5 }}>
+          <span style={{ color: "var(--sub)" }}>Cash <b style={{ color: "var(--text)" }}>{fmtMoney0(cashIn)}</b></span>
+          <span style={{ color: "var(--sub)" }}>Card <b style={{ color: "var(--text)" }}>{fmtMoney0(cardIn)}</b></span>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 14 }}>CHARGES &middot; {periodLabel.toUpperCase()}</div>
+
+      {periodRows.length === 0 ? (
         <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--sub)" }}>
           <CreditCard size={28} style={{ color: "var(--faint)", marginBottom: 12 }} />
-          <div style={{ fontSize: 15 }}>No charges yet.</div>
+          <div style={{ fontSize: 15 }}>No charges this period.</div>
           <div style={{ fontSize: 13.5, marginTop: 4 }}>No-show fees and sales will show up here.</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {rows.map((r) => (
+          {periodRows.map((r) => (
             <button key={r.id} onClick={() => { setOpenId(r.id); setNoteDraft(r.note || ""); }} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", color: "var(--text)", textAlign: "left" }}>
               <div>
                 <div style={{ fontSize: 15.5, fontWeight: 500 }}>{r.clientName || "Client"}</div>
