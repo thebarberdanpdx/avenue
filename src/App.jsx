@@ -3733,7 +3733,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 // Owners get a "viewing as" picker to flip between barbers or shop totals.
 // Barbers only see their own chair, period.
 // ============================================================
-function PulseView({ business, appts, setAppts, clients, setClients, services, providers, setProviders, me, isOwner, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onOpenClient, onSignOut, showToast }) {
+function PulseView({ business, appts, setAppts, clients, setClients, services, providers, setProviders, me, isOwner, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenPayments, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onOpenClient, onSignOut, showToast }) {
   const now = new Date();
   const realProviders = providers.filter((p) => p.id !== "anyone");
 
@@ -4219,6 +4219,18 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: 15, fontWeight: 500 }}>View revenue trend</div>
                   <div style={{ fontSize: 13, color: "var(--sub)" }}>Week, month, year — top services and clients</div>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </button>
+          )}
+          {onOpenPayments && (
+            <button onClick={onOpenPayments} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <CreditCard size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>Payments</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Every charge — open one to refund or discount</div>
                 </div>
               </div>
               <ChevronRight size={18} style={{ color: "var(--faint)" }} />
@@ -5748,8 +5760,9 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         <div style={{ width: 50 }} />
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
-        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} showToast={showToast} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenPayments={() => setPulseDetail("payments")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
+        {tab === "pulse" && pulseDetail === "payments" && <PaymentsView clients={clients} setClients={setClients} providers={providers} onBack={() => setPulseDetail(null)} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
@@ -10613,12 +10626,187 @@ function CardOnFileSheet({ open, onClose, client, onSaved, showToast }) {
   );
 }
 
-// Charge a saved card (no-show fee). Reuses the card-on-file; nothing new to enter.
-function ChargeCardSheet({ open, onClose, client, defaultAmount, showToast }) {
+// ---- Payments ledger -------------------------------------------------------
+// Each client carries a `payments` array. This view flattens them into one
+// running record you can open and refund. A partial refund is also how you
+// give a discount on something already paid.
+function PayRow({ label, value, last }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: last ? "none" : "1px solid var(--border)" }}>
+      <span style={{ fontSize: 12.5, letterSpacing: 0.8, color: "var(--sub)", textTransform: "uppercase" }}>{label}</span>
+      <span style={{ fontSize: 14.5, fontWeight: 500, color: "var(--text)", textAlign: "right" }}>{value}</span>
+    </div>
+  );
+}
+
+function RefundSheet({ open, onClose, client, payment, setClients, showToast }) {
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  useEffect(() => { if (open) { setAmount(defaultAmount ? String(defaultAmount) : ""); setErr(""); setBusy(false); } }, [open, defaultAmount]);
+  const [done, setDone] = useState(null);
+  const maxRefund = payment ? Math.round((payment.amount - (payment.refunded || 0)) * 100) / 100 : 0;
+  useEffect(() => { if (open) { setAmount(maxRefund ? String(maxRefund) : ""); setErr(""); setBusy(false); setDone(null); } }, [open, payment]);
+  const refund = async () => {
+    const n = parseFloat(String(amount).replace(/[^0-9.]/g, ""));
+    if (isNaN(n) || n <= 0) { setErr("Enter a valid amount."); return; }
+    if (n > maxRefund + 0.001) { setErr(`You can refund at most $${maxRefund.toFixed(2)}.`); return; }
+    if (!payment.paymentIntentId) { setErr("This payment can't be refunded automatically."); return; }
+    setBusy(true); setErr("");
+    try {
+      const res = await stripeApi({ action: "refund", paymentIntentId: payment.paymentIntentId, amount: n });
+      if (res.status === "succeeded" || res.status === "pending") {
+        const amt = Math.round(n * 100) / 100;
+        const newRefunded = Math.round(((payment.refunded || 0) + amt) * 100) / 100;
+        const newStatus = newRefunded >= payment.amount - 0.001 ? "refunded" : "partial";
+        setClients((prev) => prev.map((c) => c.id === client.id ? { ...c, payments: (c.payments || []).map((p) => p.id === payment.id ? { ...p, refunded: newRefunded, status: newStatus } : p) } : c));
+        setDone(amt); showToast(`Refunded $${amt} to ${client.name}.`);
+      } else { setErr(`Stripe returned "${res.status}".`); }
+    } catch (e) { setErr(e.message || "Refund failed."); }
+    finally { setBusy(false); }
+  };
+  if (!payment) return null;
+  return (
+    <Sheet open={open} onClose={onClose} align="center" maxWidth={420}>
+      <div style={{ padding: "6px 4px 8px" }}>
+        {done != null ? (
+          <div style={{ textAlign: "center", padding: "14px 0 6px" }}>
+            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><CheckCircle2 size={34} color="var(--on-gold)" /></div>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 4 }}>Refunded ${done}</div>
+            <div style={{ fontSize: 14.5, color: "var(--sub)" }}>{client?.name}</div>
+            <button onClick={onClose} style={{ marginTop: 22, width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none" }}>DONE</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ textAlign: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>REFUND OR DISCOUNT</div>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 4 }}>Up to ${maxRefund.toFixed(2)} refundable</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 12 }}>
+              <span style={{ fontFamily: FONT_DISPLAY, fontSize: 28, color: "var(--sub)" }}>$</span>
+              <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: FONT_DISPLAY, fontSize: 28, color: "var(--text)", width: "100%", padding: 0 }} />
+            </div>
+            {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
+            <button onClick={refund} disabled={busy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: busy ? 0.6 : 1 }}><RefreshCw size={16} /> {busy ? "REFUNDING…" : "ISSUE REFUND"}</button>
+            <button onClick={onClose} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 6 }}>Cancel</button>
+          </>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
+function PaymentsView({ clients, setClients, providers, onBack, showToast }) {
+  const [openId, setOpenId] = useState(null);
+  const [refundFor, setRefundFor] = useState(null);
+  const [noteDraft, setNoteDraft] = useState("");
+
+  const rows = [];
+  clients.forEach((c) => (c.payments || []).forEach((p) => rows.push({ ...p, clientId: c.id, clientName: c.name })));
+  rows.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+  const fmtMoney = (n) => "$" + (Math.round((n || 0) * 100) / 100).toFixed(2);
+  const fmtDay = (ts) => { try { return new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); } catch { return ""; } };
+  const fmtTime = (ts) => { try { return new Date(ts).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }); } catch { return ""; } };
+
+  const totalNet = rows.reduce((s, r) => s + (r.amount || 0) - (r.refunded || 0), 0);
+  const totalRefunded = rows.reduce((s, r) => s + (r.refunded || 0), 0);
+
+  const openRow = rows.find((r) => r.id === openId) || null;
+  const openClient = openRow ? clients.find((c) => c.id === openRow.clientId) : null;
+
+  const statusPill = (st) => {
+    const map = { paid: ["Paid", "var(--gold)"], refunded: ["Refunded", "var(--sub)"], partial: ["Partial refund", "#C8923F"] };
+    const [label, col] = map[st] || ["Paid", "var(--gold)"];
+    return <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.5, color: col }}>{label}</span>;
+  };
+
+  const saveNote = () => {
+    if (!openRow) return;
+    setClients((prev) => prev.map((c) => c.id === openRow.clientId ? { ...c, payments: (c.payments || []).map((p) => p.id === openRow.id ? { ...p, note: noteDraft } : p) } : c));
+  };
+
+  return (
+    <div className="fade-in" style={{ padding: "8px 0 40px" }}>
+      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 14 }}><ArrowLeft size={16} /> Pulse</button>
+      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 4 }}>Payments</div>
+      <div style={{ fontSize: 14, color: "var(--sub)", marginBottom: 18 }}>Every charge taken in Vero.</div>
+
+      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+        <div style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px" }}>
+          <div style={{ fontSize: 12, letterSpacing: 1, color: "var(--sub)", marginBottom: 4 }}>NET COLLECTED</div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500 }}>{fmtMoney(totalNet)}</div>
+        </div>
+        <div style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px" }}>
+          <div style={{ fontSize: 12, letterSpacing: 1, color: "var(--sub)", marginBottom: 4 }}>REFUNDED</div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500 }}>{fmtMoney(totalRefunded)}</div>
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--sub)" }}>
+          <CreditCard size={28} style={{ color: "var(--faint)", marginBottom: 12 }} />
+          <div style={{ fontSize: 15 }}>No charges yet.</div>
+          <div style={{ fontSize: 13.5, marginTop: 4 }}>No-show fees and sales will show up here.</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {rows.map((r) => (
+            <button key={r.id} onClick={() => { setOpenId(r.id); setNoteDraft(r.note || ""); }} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", color: "var(--text)", textAlign: "left" }}>
+              <div>
+                <div style={{ fontSize: 15.5, fontWeight: 500 }}>{r.clientName || "Client"}</div>
+                <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{r.note || (r.type === "no-show" ? "No-show fee" : "Sale")} · {fmtDay(r.ts)}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, textDecoration: r.status === "refunded" ? "line-through" : "none", color: r.status === "refunded" ? "var(--faint)" : "var(--text)" }}>{fmtMoney(r.amount)}</div>
+                <div style={{ marginTop: 2 }}>{statusPill(r.status)}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <Sheet open={!!openRow} onClose={() => setOpenId(null)} align="center" maxWidth={440}>
+        {openRow && (
+          <div style={{ padding: "6px 4px 8px" }}>
+            <div style={{ textAlign: "center", marginBottom: 18 }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500 }}>{fmtMoney(openRow.amount)}</div>
+              <div style={{ marginTop: 4 }}>{statusPill(openRow.status)}</div>
+              {openRow.refunded > 0 && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 4 }}>{fmtMoney(openRow.refunded)} refunded</div>}
+            </div>
+            <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "4px 16px", marginBottom: 16 }}>
+              <PayRow label="Client" value={openRow.clientName} />
+              <PayRow label="When" value={`${fmtDay(openRow.ts)} · ${fmtTime(openRow.ts)}`} />
+              <PayRow label="Type" value={openRow.type === "no-show" ? "No-show fee" : "Sale"} last={!openRow.last4} />
+              {openRow.last4 && <PayRow label="Card" value={`${openRow.brand ? openRow.brand.charAt(0).toUpperCase() + openRow.brand.slice(1) : "Card"} ···· ${openRow.last4}`} last />}
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, letterSpacing: 1, color: "var(--sub)", marginBottom: 6 }}>NOTE</div>
+              <textarea value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onBlur={saveNote} placeholder="Add a note about this charge…" rows={2} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", fontSize: 14.5, color: "var(--text)", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
+            </div>
+            {openRow.status !== "refunded" && openRow.paymentIntentId && (
+              <button onClick={() => setRefundFor(openRow)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--panel)", color: "var(--text)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, border: "1px solid var(--border2)" }}><RefreshCw size={16} /> Refund or discount</button>
+            )}
+            {openRow.status !== "refunded" && !openRow.paymentIntentId && (
+              <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", padding: "4px 8px" }}>This was a manual record — refund it in person.</div>
+            )}
+            <button onClick={() => setOpenId(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "14px 0 4px" }}>Close</button>
+          </div>
+        )}
+      </Sheet>
+
+      <RefundSheet open={!!refundFor} onClose={() => { setRefundFor(null); setOpenId(null); }} client={openClient} payment={refundFor} setClients={setClients} showToast={showToast} />
+    </div>
+  );
+}
+
+// Charge a saved card (no-show fee). Reuses the card-on-file; nothing new to enter.
+function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, showToast }) {
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(null);
+  useEffect(() => { if (open) { setAmount(defaultAmount ? String(defaultAmount) : ""); setErr(""); setBusy(false); setDone(null); } }, [open, defaultAmount]);
   const card = client && client.card;
   const charge = async () => {
     const n = parseFloat(String(amount).replace(/[^0-9.]/g, ""));
@@ -10627,14 +10815,24 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, showToast }) {
     setBusy(true); setErr("");
     try {
       const res = await stripeApi({ action: "charge", customerId: card.stripeCustomerId, paymentMethodId: card.paymentMethodId, amount: n, description: `No-show fee — ${client.name}` });
-      if (res.status === "succeeded") { showToast(`Charged $${Math.round(n * 100) / 100} to ${client.name}.`); onClose(); }
+      if (res.status === "succeeded") { const amt = Math.round(n * 100) / 100; setDone(amt); if (onCharged) onCharged({ id: "pay_" + Date.now().toString(36), ts: Date.now(), amount: amt, type: "no-show", status: "paid", paymentIntentId: res.id || null, brand: card.brand || null, last4: card.last4 || null, note: "No-show fee", refunded: 0 }); showToast(`Charged $${amt} to ${client.name}.`); }
       else { setErr(`Stripe returned "${res.status}". The client may need to approve it in person.`); }
     } catch (e) { setErr(e.message || "Charge failed."); }
     finally { setBusy(false); }
   };
   return (
-    <Sheet open={open} onClose={onClose} align="bottom" maxWidth={420}>
+    <Sheet open={open} onClose={onClose} align="center" maxWidth={420}>
       <div style={{ padding: "6px 4px 8px" }}>
+        {done != null ? (
+          <div style={{ textAlign: "center", padding: "14px 0 6px" }}>
+            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><CheckCircle2 size={34} color="var(--on-gold)" /></div>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 4 }}>Charged ${done}</div>
+            <div style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 2 }}>{client?.name}</div>
+            {card && <div style={{ fontSize: 13.5, color: "var(--faint)" }}>{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : "Card"} ···· {card.last4}</div>}
+            <button onClick={onClose} style={{ marginTop: 22, width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none" }}>DONE</button>
+          </div>
+        ) : (
+          <>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CHARGE NO-SHOW FEE</div>
           <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
@@ -10647,6 +10845,8 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, showToast }) {
         {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
         <button onClick={charge} disabled={busy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: busy ? 0.6 : 1 }}><DollarSign size={16} /> {busy ? "CHARGING…" : "CHARGE CARD"}</button>
         <button onClick={onClose} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 6 }}>Cancel</button>
+          </>
+        )}
       </div>
     </Sheet>
   );
@@ -10728,6 +10928,10 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const saveCardToClient = (info) => {
     if (!client || !setClients) { showToast("Couldn't attach the card to this client."); return; }
     setClients((prev) => prev.map((c) => c.id === client.id ? { ...c, card: info } : c));
+  };
+  const recordPayment = (rec) => {
+    if (!client || !setClients) return;
+    setClients((prev) => prev.map((c) => c.id === client.id ? { ...c, payments: [...(c.payments || []), rec] } : c));
   };
 
   const staff = providers.filter((p) => p.id !== "anyone");
@@ -11135,7 +11339,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
       </Sheet>
 
       <CardOnFileSheet open={cardOpen} onClose={() => setCardOpen(false)} client={client} onSaved={saveCardToClient} showToast={showToast} />
-      <ChargeCardSheet open={chargeOpen} onClose={() => setChargeOpen(false)} client={client} defaultAmount={price} showToast={showToast} />
+      <ChargeCardSheet open={chargeOpen} onClose={() => setChargeOpen(false)} client={client} defaultAmount={price} onCharged={recordPayment} showToast={showToast} />
       </div>
     </div>
     </Portal>

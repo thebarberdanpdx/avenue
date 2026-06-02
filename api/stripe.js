@@ -61,6 +61,20 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: pi.status, id: pi.id });
     }
 
+    // --- Refund a charge ----------------------------------------------------
+    // Full refund if `amount` is omitted; partial refund (also used to give a
+    // discount after the fact) when `amount` (in dollars) is provided.
+    if (action === "refund") {
+      const { paymentIntentId, amount } = body;
+      if (!paymentIntentId) {
+        return res.status(400).json({ error: "Missing paymentIntentId." });
+      }
+      const params = { payment_intent: paymentIntentId };
+      if (amount) params.amount = Math.round(Number(amount) * 100);
+      const r = await stripe.refunds.create(params);
+      return res.status(200).json({ status: r.status, id: r.id, amount: (r.amount || 0) / 100 });
+    }
+
     return res.status(400).json({ error: "Unknown action." });
   } catch (err) {
     // Card declined, expired, needs authentication, etc. all surface here.
