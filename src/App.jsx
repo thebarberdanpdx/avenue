@@ -8685,6 +8685,7 @@ This help center lives right inside the app. Search the box up top, or browse by
 
   { id: "signing-in", category: "Getting Started", title: "Signing in to your dashboard", keywords: "login log in magic link email password access staff sign in",
     related: ["add-staff", "staff-pin"],
+    illustration: "signing-in",
     body: `Vero uses a one-tap sign-in link instead of a password.
 
 ## To sign in
@@ -8712,6 +8713,7 @@ Use each person's real email — it's how the app signs them in as themselves au
   // ---------- BOOKING & CALENDAR ----------
   { id: "how-clients-book", category: "Booking & Calendar", title: "How clients book with you", keywords: "online booking link website appointment schedule client book",
     related: ["waitlist", "card-on-file"],
+    illustration: "how-clients-book",
     body: `Clients book through your booking link or your Vero website — no app or login required.
 
 ## What they do
@@ -8733,6 +8735,7 @@ Settings → Online Booking controls what clients see and how they book.` },
   // ---------- PAYMENTS ----------
   { id: "card-on-file", category: "Payments & Checkout", title: "Card on file & no-show protection", keywords: "card on file no show deposit cancellation fee charge protect stripe payment",
     related: ["checkout", "how-clients-book"],
+    illustration: "card-on-file",
     body: `Protect your time by saving a client's card and charging for late cancellations or no-shows.
 
 ## Setting it up
@@ -8792,6 +8795,74 @@ Client lists import cleanly. Full appointment history, notes, and photos depend 
 Leave it off — your email sign-in already handles access.` },
 ];
 
+// In-article illustrations — simple monoline drawings in the brand's sage + porcelain look.
+// To add one to an article, set `illustration: "<key>"` on it. Keys: "how-clients-book",
+// "signing-in", "card-on-file". They render right under the article title. Ask Claude for more.
+function ArticleIllustration({ id }) {
+  const G = "var(--gold)", T = "var(--text)", LINE = "var(--line)", PANEL = "var(--panel)", ON = "var(--on-gold)";
+  const wrap = (svg) => (
+    <div style={{ background: "var(--panel2)", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 16px", margin: "4px 0 22px", display: "flex", justifyContent: "center" }}>{svg}</div>
+  );
+
+  if (id === "how-clients-book") {
+    return wrap(
+      <svg width="100%" viewBox="0 0 360 150" style={{ maxWidth: 360 }} role="img" aria-label="Pick a service, choose a time, you're booked">
+        <text x="60" y="22" textAnchor="middle" fill={G} style={{ fontFamily: FONT_DISPLAY, fontSize: 13, letterSpacing: 1.5, opacity: 0.85 }}>01</text>
+        <text x="180" y="22" textAnchor="middle" fill={G} style={{ fontFamily: FONT_DISPLAY, fontSize: 13, letterSpacing: 1.5, opacity: 0.85 }}>02</text>
+        <text x="300" y="22" textAnchor="middle" fill={G} style={{ fontFamily: FONT_DISPLAY, fontSize: 13, letterSpacing: 1.5, opacity: 0.85 }}>03</text>
+        <line x1="90" y1="70" x2="148" y2="70" stroke={G} strokeWidth="1.5" strokeDasharray="1 6" strokeLinecap="round" />
+        <path d="M150 66 L155 70 L150 74" fill="none" stroke={G} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="210" y1="70" x2="268" y2="70" stroke={G} strokeWidth="1.5" strokeDasharray="1 6" strokeLinecap="round" />
+        <path d="M270 66 L275 70 L270 74" fill="none" stroke={G} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="60" cy="70" r="28" fill={PANEL} stroke={LINE} strokeWidth="1" />
+        <rect x="46" y="56" width="28" height="28" rx="5" fill="none" stroke={G} strokeWidth="1.8" />
+        <line x1="51" y1="63" x2="69" y2="63" stroke={G} strokeWidth="1.6" strokeLinecap="round" />
+        <rect x="50" y="68" width="20" height="4.5" rx="2.25" fill={G} />
+        <line x1="51" y1="78" x2="64" y2="78" stroke={G} strokeWidth="1.6" strokeLinecap="round" />
+        <circle cx="180" cy="70" r="28" fill={PANEL} stroke={LINE} strokeWidth="1" />
+        <circle cx="180" cy="70" r="14" fill="none" stroke={G} strokeWidth="1.8" />
+        <line x1="180" y1="70" x2="180" y2="60" stroke={G} strokeWidth="1.8" strokeLinecap="round" />
+        <line x1="180" y1="70" x2="188" y2="74" stroke={G} strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="180" cy="70" r="1.6" fill={G} />
+        <circle cx="300" cy="70" r="28" fill={G} />
+        <path d="M288 70 L297 79 L313 60" fill="none" stroke={ON} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+        <text x="60" y="124" textAnchor="middle" fill={T} style={{ fontFamily: FONT_DISPLAY, fontSize: 12.5, fontWeight: 500 }}>Pick a service</text>
+        <text x="180" y="124" textAnchor="middle" fill={T} style={{ fontFamily: FONT_DISPLAY, fontSize: 12.5, fontWeight: 500 }}>Choose a time</text>
+        <text x="300" y="124" textAnchor="middle" fill={T} style={{ fontFamily: FONT_DISPLAY, fontSize: 12.5, fontWeight: 500 }}>You're booked</text>
+      </svg>
+    );
+  }
+
+  if (id === "signing-in") {
+    return wrap(
+      <svg width="100%" viewBox="0 0 360 150" style={{ maxWidth: 360 }} role="img" aria-label="Tap the link in your email and you're signed in">
+        <rect x="44" y="48" width="92" height="60" rx="9" fill={PANEL} stroke={G} strokeWidth="2" />
+        <path d="M44 56 L90 86 L136 56" fill="none" stroke={G} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="150" y1="78" x2="252" y2="78" stroke={G} strokeWidth="1.6" strokeDasharray="1 6" strokeLinecap="round" />
+        <path d="M254 73 L260 78 L254 83" fill="none" stroke={G} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="300" cy="78" r="30" fill={G} />
+        <path d="M287 78 L296 88 L314 67" fill="none" stroke={ON} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (id === "card-on-file") {
+    return wrap(
+      <svg width="100%" viewBox="0 0 360 160" style={{ maxWidth: 360 }} role="img" aria-label="A saved card, protected">
+        <rect x="78" y="50" width="174" height="104" rx="14" fill={PANEL} stroke={G} strokeWidth="2" />
+        <rect x="78" y="72" width="174" height="13" fill={G} opacity="0.18" />
+        <rect x="98" y="98" width="26" height="19" rx="3" fill="none" stroke={G} strokeWidth="1.6" />
+        <line x1="98" y1="134" x2="128" y2="134" stroke="var(--sub)" strokeWidth="2" strokeLinecap="round" />
+        <line x1="138" y1="134" x2="168" y2="134" stroke="var(--sub)" strokeWidth="2" strokeLinecap="round" />
+        <line x1="178" y1="134" x2="208" y2="134" stroke="var(--sub)" strokeWidth="2" strokeLinecap="round" />
+        <path d="M252 34 L274 42 L274 58 Q274 72 252 80 Q230 72 230 58 L230 42 Z" fill={G} stroke={PANEL} strokeWidth="3" />
+        <path d="M243 56 L250 63 L263 47" fill="none" stroke={ON} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  return null;
+}
+
 function HelpCenter({ business, onBack }) {
   const [query, setQuery] = useState("");
   const [openArticle, setOpenArticle] = useState(null);
@@ -8838,6 +8909,7 @@ function HelpCenter({ business, onBack }) {
         <button onClick={() => setOpenArticle(null)} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "4px 0 18px", cursor: "pointer" }}><ArrowLeft size={17} /> All articles</button>
         <div style={{ fontSize: 11.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 8 }}>{a.category}</div>
         <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 600, lineHeight: 1.1, margin: "0 0 16px", color: "var(--text)" }}>{a.title}</h1>
+        {a.illustration && <ArticleIllustration id={a.illustration} />}
         <div>{renderBody(a.body)}</div>
 
         {Array.isArray(a.related) && a.related.filter((rid) => HELP_ARTICLES.some((x) => x.id === rid)).length > 0 && (
