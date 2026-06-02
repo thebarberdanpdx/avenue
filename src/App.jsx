@@ -3806,16 +3806,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
     return (days - c.cadenceDays) > 0;
   }).length;
 
-  // --- Recent cuts that still need a note or photo (this provider ONLY — never shown in shop view) ---
-  const needNotes = (!isShopView && viewedProvider) ? (appts || []).filter((a) => {
-    if (a.status !== "done") return false;
-    if (a.providerId !== viewedProvider.id) return false;
-    if (a.hasNote || a.hasPhotos || a.noteLogged) return false;
-    if (!clients.some((c) => c.id === a.clientId)) return false; // need a real profile to add to
-    if (a.bookedFor) { const days = Math.round((Date.now() - new Date(a.bookedFor).getTime()) / 86400000); if (days < 0 || days > 7) return false; }
-    return true;
-  }) : [];
-  const needNotesCount = needNotes.length;
+  // --- Formatters ---
   const fmtMoney = (n) => `$${Math.round(n).toLocaleString()}`;
   const todayLabel = `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
 
@@ -3838,6 +3829,9 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   // --- Inline goal editor: tap the ring (daily) or the week number (weekly) to set goals in place ---
   const [goalEditor, setGoalEditor] = useState(null); // null | "daily" | "weekly"
   const [goalInput, setGoalInput] = useState("");
+  const [noteFor, setNoteFor] = useState(null);   // wrap-up: appt we're adding a note to (inline)
+  const [noteDraft, setNoteDraft] = useState("");
+  const [photoFor, setPhotoFor] = useState(null); // wrap-up: appt we're adding a timeline photo to
   const openGoalEditor = (which) => {
     if (isShopView || !viewedProvider) return; // goals are personal; not editable in shop view
     setGoalInput(String(which === "daily" ? (rawDailyGoal || "") : (rawWeeklyGoal || "")));
@@ -3974,46 +3968,77 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         </div>
       )}
 
-      {/* VERIFY TIME — duration suggestions land here after a checkout (instead of popping up in front of the client at checkout).
-          Only shown in personal or per-provider view, never shop-wide, because the action is "save this person's custom time". */}
+      {/* WRAP-UP — after a checkout, each finished cut lands here so nothing slips: verify the time if it ran long/short,
+          and add a note (→ profile notes) or a photo (→ their timeline). Personal / per-provider view only. */}
       {viewedProvider && (() => {
-        const pendingDuration = appts.filter((a) => a.providerId === viewedProvider.id && a.status === "done" && a.pendingDurationSave);
-        if (pendingDuration.length === 0) return null;
+        const isRecent = (a) => { if (!a.bookedFor) return true; const days = Math.round((Date.now() - new Date(a.bookedFor).getTime()) / 86400000); return days >= 0 && days <= 7; };
+        const wrapUp = appts.filter((a) => a.providerId === viewedProvider.id && a.status === "done" && (
+          a.pendingDurationSave || (!a.hasNote && !a.hasPhotos && !a.noteLogged && clients.some((c) => c.id === a.clientId) && isRecent(a))
+        ));
+        if (wrapUp.length === 0) return null;
         return (
           <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>VERIFY TIME</div>
-            {pendingDuration.map((a) => {
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>WRAP-UP</div>
+            {wrapUp.map((a) => {
               const d = a.pendingDurationSave;
+              const client = clients.find((c) => c.id === a.clientId);
               const onSave = () => {
                 setClients((cur) => cur.map((c) => c.id === d.clientId ? { ...c, customDurations: { ...(c.customDurations || {}), [d.serviceId]: d.suggestedMin } } : c));
                 setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, pendingDurationSave: null } : x));
                 if (showToast) showToast(`Saved — ${d.serviceName} books at ${d.suggestedMin} min for ${(d.clientName || "").split(" ")[0]}.`);
               };
-              const onDismiss = () => {
-                setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, pendingDurationSave: null } : x));
-              };
+              const onDismiss = () => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, pendingDurationSave: null } : x)); };
+              const editing = noteFor && noteFor.id === a.id;
               return (
                 <div key={a.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", marginBottom: 8 }}>
-                  <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 12 }}>
-                    <strong>{d.clientName}</strong>'s {d.serviceName} took <strong style={{ color: "var(--gold)" }}>{d.measuredMin} min</strong>{d.currentDur != null ? ` (was scheduled for ${d.currentDur} min)` : ""}. Save {d.suggestedMin} min as their new time?
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button className="lift" onClick={onSave} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: "10px 14px", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", letterSpacing: 0.5 }}>SAVE {d.suggestedMin} MIN</button>
-                    <button onClick={onDismiss} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: "10px 14px", borderRadius: 10, fontSize: 14 }}>Discard</button>
-                  </div>
-                  <button onClick={() => { const client = clients.find((c) => c.id === d.clientId); setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, noteLogged: true } : x)); if (client && onOpenClient) onOpenClient(client); else if (onNavigate) onNavigate("clients"); }} className="lift" style={{ width: "100%", marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "color-mix(in srgb, var(--gold) 13%, var(--panel2))", border: "1.5px solid color-mix(in srgb, var(--gold) 38%, var(--border))", borderRadius: 12, padding: "13px 15px", cursor: "pointer", color: "var(--text)" }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <Camera size={18} style={{ color: "var(--gold)" }} />
-                      <span style={{ fontSize: 14.5, fontWeight: 600 }}>Add a note or photo</span>
-                    </span>
-                    <ChevronRight size={17} style={{ color: "var(--gold)" }} />
-                  </button>
+                  {d ? (
+                    <>
+                      <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 12 }}>
+                        <strong>{d.clientName}</strong>'s {d.serviceName} took <strong style={{ color: "var(--gold)" }}>{d.measuredMin} min</strong>{d.currentDur != null ? ` (was scheduled for ${d.currentDur} min)` : ""}. Save {d.suggestedMin} min as their new time?
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button className="lift" onClick={onSave} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: "10px 14px", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", letterSpacing: 0.5 }}>SAVE {d.suggestedMin} MIN</button>
+                        <button onClick={onDismiss} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: "10px 14px", borderRadius: 10, fontSize: 14 }}>Discard</button>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 12 }}>
+                      <strong>{client?.name || a.name || "This client"}</strong>'s cut is done — add a note or photo to their profile.
+                    </div>
+                  )}
+                  {client && (editing ? (
+                    <div style={{ marginTop: d ? 10 : 0 }}>
+                      <textarea autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Formula, what you did, preferences — anything to remember." rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, resize: "vertical", lineHeight: 1.5, outline: "none" }} />
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <button className="lift" onClick={() => {
+                          const text = noteDraft.trim();
+                          if (text) setClients((cur) => cur.map((c) => c.id === a.clientId ? { ...c, notes: (c.notes ? c.notes + "\n" : "") + text } : c));
+                          setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, hasNote: true } : x));
+                          setNoteFor(null); setNoteDraft("");
+                          if (showToast && text) showToast("Note added to their profile.");
+                        }} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: "10px 14px", borderRadius: 10, fontSize: 14, fontWeight: 600 }}>Save note</button>
+                        <button onClick={() => { setNoteFor(null); setNoteDraft(""); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: "10px 14px", borderRadius: 10, fontSize: 14 }}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", gap: 8, marginTop: d ? 10 : 0 }}>
+                      <button className="lift" onClick={() => { setNoteFor(a); setNoteDraft(""); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 12%, var(--panel2))", border: "1.5px solid color-mix(in srgb, var(--gold) 36%, var(--border))", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontWeight: 600 }}><Edit2 size={16} style={{ color: "var(--gold)" }} /> Note</button>
+                      <button className="lift" onClick={() => setPhotoFor(a)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 12%, var(--panel2))", border: "1.5px solid color-mix(in srgb, var(--gold) 36%, var(--border))", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontWeight: 600 }}><Camera size={16} style={{ color: "var(--gold)" }} /> Photo</button>
+                    </div>
+                  ))}
                 </div>
               );
             })}
           </div>
         );
       })()}
+
+      {photoFor && <PhotoPicker onClose={() => setPhotoFor(null)} onPick={(id) => {
+        const a = photoFor;
+        setClients((cur) => cur.map((c) => c.id === a.clientId ? { ...c, gallery: [...(c.gallery || []), { id: "g" + Date.now(), photo: id, note: "", date: new Date().toISOString() }] } : c));
+        setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, hasPhotos: true, photos: (x.photos || 0) + 1 } : x));
+        if (showToast) showToast("Photo added to their timeline.");
+      }} />}
 
       {/* DAY TIMELINE — horizontal bar showing today's bookings */}
       {todayApptsAll.length > 0 && (
@@ -4162,25 +4187,6 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             <div style={{ textAlign: "left" }}>
               <div style={{ fontSize: 15, fontWeight: 500 }}>{overdueCount} client{overdueCount > 1 ? "s" : ""} overdue to rebook</div>
               <div style={{ fontSize: 13, color: "var(--sub)" }}>Open the nudge folder</div>
-            </div>
-          </div>
-          <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-        </button>
-      )}
-
-      {needNotesCount > 0 && (
-        <button onClick={() => {
-          const target = [...needNotes].sort((a, b) => ((Date.parse(b.bookedFor) || Date.now()) - (Date.parse(a.bookedFor) || Date.now())))[0];
-          if (!target) return;
-          const client = clients.find((c) => c.id === target.clientId);
-          setAppts((cur) => cur.map((a) => a.id === target.id ? { ...a, noteLogged: true } : a));
-          if (client && onOpenClient) onOpenClient(client); else if (onNavigate) onNavigate("clients");
-        }} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginTop: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Camera size={17} style={{ color: "var(--gold)" }} />
-            <div style={{ textAlign: "left" }}>
-              <div style={{ fontSize: 15, fontWeight: 500 }}>{needNotesCount} cut{needNotesCount > 1 ? "s" : ""} {needNotesCount > 1 ? "need" : "needs"} a note or photo</div>
-              <div style={{ fontSize: 13, color: "var(--sub)" }}>Tap to add to their profile</div>
             </div>
           </div>
           <ChevronRight size={18} style={{ color: "var(--faint)" }} />
