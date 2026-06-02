@@ -10631,6 +10631,19 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                 </div>
               )}
 
+              {/* FLEXIBILITY — barber can flag any upcoming appointment into the earlier-slot engine */}
+              {appt.status === "confirmed" && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15.5, fontWeight: 600, color: T.text }}>Notify if an earlier slot opens</div>
+                    <div style={{ fontSize: 13.5, color: T.sub, marginTop: 3, lineHeight: 1.4 }}>If a sooner spot frees up with {provider.name}, {((appt.name || "they").split(" ")[0])} gets first dibs.</div>
+                  </div>
+                  <button onClick={() => onUpdate(appt.id, { wantsEarlier: !appt.wantsEarlier })} aria-label={appt.wantsEarlier ? "On" : "Off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: appt.wantsEarlier ? T.accent : T.line, position: "relative", cursor: "pointer", transition: "background .2s" }}>
+                    <span style={{ position: "absolute", top: 3, left: appt.wantsEarlier ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
+                  </button>
+                </div>
+              )}
+
               {/* CHAIR-SIDE BRIEFING — full client story on check-in/in-service */}
               {(appt.status === "checked-in" || appt.status === "in-service") && client && (() => {
                 const g = (client.gallery || []);
