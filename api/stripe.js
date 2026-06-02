@@ -61,6 +61,23 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: pi.status, id: pi.id });
     }
 
+    // --- One-time sale (register) -------------------------------------------
+    // Charges a card that's entered right now — no saved customer needed.
+    // Returns a clientSecret the app confirms with the card field.
+    if (action === "sale_intent") {
+      const { amount, description } = body;
+      if (!amount) {
+        return res.status(400).json({ error: "Missing amount." });
+      }
+      const pi = await stripe.paymentIntents.create({
+        amount: Math.round(Number(amount) * 100),
+        currency: "usd",
+        payment_method_types: ["card"],
+        description: description || "Vero — sale",
+      });
+      return res.status(200).json({ clientSecret: pi.client_secret, id: pi.id });
+    }
+
     // --- Refund a charge ----------------------------------------------------
     // Full refund if `amount` is omitted; partial refund (also used to give a
     // discount after the fact) when `amount` (in dollars) is provided.

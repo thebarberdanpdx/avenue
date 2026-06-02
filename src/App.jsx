@@ -5762,12 +5762,12 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
         {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenPayments={() => setPulseDetail("payments")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "pulse" && pulseDetail === "payments" && <PaymentsView clients={clients} setClients={setClients} providers={providers} onBack={() => setPulseDetail(null)} showToast={showToast} />}
+        {tab === "pulse" && pulseDetail === "payments" && <PaymentsView clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={() => setPulseDetail(null)} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} me={me} isOwner={isOwner} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} me={me} isOwner={isOwner} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
@@ -9359,7 +9359,7 @@ function DatePickerSheet({ selectedDate, onPick, onClose }) {
   );
 }
 
-function CalendarView({ appts, setAppts, clients, setClients, providers, services, business, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, services, business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true }) {
   const sizeId = business?.calendarRowSize || "L";
   const [showWaitlistPanel, setShowWaitlistPanel] = useState(false);
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
@@ -9372,6 +9372,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   const [pressInd, setPressInd] = useState(null); // { providerId, start, y } live indicator while holding
   const [checkout, setCheckout] = useState(null); // appt being checked out
   const [showDatePicker, setShowDatePicker] = useState(false); // month-grid date jumper triggered by tapping the date header
+  const [registerOpen, setRegisterOpen] = useState(false); // walk-in register / point-of-sale overlay
   const dragRef = useRef(null);                // mutable: { id, startY, origStart, dur, moved }
   const holdTimerRef = useRef(null);           // press-and-hold timer for drag-to-reschedule
   const pressRef = useRef(null);               // mutable: long-press timer + start info
@@ -9912,21 +9913,23 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           }}
         />
       </Sheet>
-      {/* Editorial calendar header — two lines, no cramping. The date cluster is tappable to open the month picker. */}
-      <div style={{ marginTop: 8, marginBottom: 26 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 18 }} />
-        <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, margin: 0, textAlign: "left", color: "inherit", cursor: "pointer", display: "block", width: "auto" }}>
-          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{`${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`.toUpperCase()}</div>
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, letterSpacing: -0.7, lineHeight: 0.95, marginBottom: 16, display: "flex", alignItems: "baseline", gap: 10 }}>
+      <RegisterView open={registerOpen} onClose={() => setRegisterOpen(false)} services={services} business={business} setBusiness={setBusiness} clients={clients} setClients={setClients} providers={providers} me={me} showToast={showToast} />
+      {/* Calendar header — date headline gets room to breathe, then a tidy action row that wraps instead of bunching. */}
+      <div style={{ marginTop: 12, marginBottom: 28 }}>
+        <div style={{ width: 28, height: 2, background: "var(--gold)", marginBottom: 22 }} />
+        <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, margin: "0 0 24px", textAlign: "left", color: "inherit", cursor: "pointer", display: "block", width: "auto" }}>
+          <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", marginBottom: 12, fontWeight: 600 }}>{`${DAYS[selectedDate.getDay()]} · ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`.toUpperCase()}</div>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.5, lineHeight: 1, margin: 0, display: "flex", alignItems: "center", gap: 12 }}>
             <span>{relativeDate(selectedDate)}</span>
-            <ChevronDown size={22} style={{ color: "var(--faint)", flexShrink: 0, alignSelf: "center", marginTop: 6 }} />
+            <ChevronDown size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
           </h2>
         </button>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button onClick={() => setShowCalendarOptions(true)} title="Calendar view" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 40, height: 40, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center" }}><Settings size={15} /></button>
-          <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 18px", height: 40, borderRadius: 11, fontSize: 13.5, fontWeight: 600, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)" }}><Plus size={15} strokeWidth={2.5} /> NEW</button>
-          <div style={{ flex: 1 }} />
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, rowGap: 10, alignItems: "center" }}>
+          <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 16px", height: 40, borderRadius: 11, fontSize: 13, fontWeight: 600, letterSpacing: 1.2, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)" }}><Plus size={15} strokeWidth={2.5} /> NEW</button>
+          <button className="lift" onClick={() => setRegisterOpen(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border2)", padding: "0 16px", height: 40, borderRadius: 11, fontSize: 13, fontWeight: 600, letterSpacing: 1.2, display: "flex", alignItems: "center", gap: 7 }}><DollarSign size={15} style={{ color: "var(--gold)" }} /> SALE</button>
+          <div style={{ flex: 1, minWidth: 8 }} />
           <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 40, borderRadius: 11, fontSize: 13.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 7, position: "relative", letterSpacing: 0.3 }}><Clock size={14} style={{ color: "var(--gold)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
+          <button onClick={() => setShowCalendarOptions(true)} title="Calendar view" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 40, height: 40, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center" }}><Settings size={15} /></button>
         </div>
       </div>
 
@@ -10639,7 +10642,7 @@ function PayRow({ label, value, last }) {
   );
 }
 
-function RefundSheet({ open, onClose, client, payment, setClients, showToast }) {
+function RefundSheet({ open, onClose, client, payment, onApply, showToast }) {
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -10656,10 +10659,8 @@ function RefundSheet({ open, onClose, client, payment, setClients, showToast }) 
       const res = await stripeApi({ action: "refund", paymentIntentId: payment.paymentIntentId, amount: n });
       if (res.status === "succeeded" || res.status === "pending") {
         const amt = Math.round(n * 100) / 100;
-        const newRefunded = Math.round(((payment.refunded || 0) + amt) * 100) / 100;
-        const newStatus = newRefunded >= payment.amount - 0.001 ? "refunded" : "partial";
-        setClients((prev) => prev.map((c) => c.id === client.id ? { ...c, payments: (c.payments || []).map((p) => p.id === payment.id ? { ...p, refunded: newRefunded, status: newStatus } : p) } : c));
-        setDone(amt); showToast(`Refunded $${amt} to ${client.name}.`);
+        if (onApply) onApply(amt);
+        setDone(amt); showToast(`Refunded $${amt} to ${client?.name || payment?.clientName || "client"}.`);
       } else { setErr(`Stripe returned "${res.status}".`); }
     } catch (e) { setErr(e.message || "Refund failed."); }
     finally { setBusy(false); }
@@ -10696,13 +10697,14 @@ function RefundSheet({ open, onClose, client, payment, setClients, showToast }) 
   );
 }
 
-function PaymentsView({ clients, setClients, providers, onBack, showToast }) {
+function PaymentsView({ clients, setClients, business, setBusiness, providers, onBack, showToast }) {
   const [openId, setOpenId] = useState(null);
   const [refundFor, setRefundFor] = useState(null);
   const [noteDraft, setNoteDraft] = useState("");
 
   const rows = [];
-  clients.forEach((c) => (c.payments || []).forEach((p) => rows.push({ ...p, clientId: c.id, clientName: c.name })));
+  clients.forEach((c) => (c.payments || []).forEach((p) => rows.push({ ...p, source: "client", clientId: c.id, clientName: c.name })));
+  ((business && business.sales) || []).forEach((s) => rows.push({ ...s, source: "sale", clientName: s.clientName || "Walk-in" }));
   rows.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
   const fmtMoney = (n) => "$" + (Math.round((n || 0) * 100) / 100).toFixed(2);
@@ -10713,7 +10715,7 @@ function PaymentsView({ clients, setClients, providers, onBack, showToast }) {
   const totalRefunded = rows.reduce((s, r) => s + (r.refunded || 0), 0);
 
   const openRow = rows.find((r) => r.id === openId) || null;
-  const openClient = openRow ? clients.find((c) => c.id === openRow.clientId) : null;
+  const openClient = openRow && openRow.clientId ? clients.find((c) => c.id === openRow.clientId) : null;
 
   const statusPill = (st) => {
     const map = { paid: ["Paid", "var(--gold)"], refunded: ["Refunded", "var(--sub)"], partial: ["Partial refund", "#C8923F"] };
@@ -10721,9 +10723,24 @@ function PaymentsView({ clients, setClients, providers, onBack, showToast }) {
     return <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.5, color: col }}>{label}</span>;
   };
 
+  // Write a field change back to whichever store the row came from.
+  const patchRow = (row, patch) => {
+    if (row.source === "sale") {
+      setBusiness((b) => ({ ...b, sales: (b.sales || []).map((s) => s.id === row.id ? { ...s, ...patch } : s) }));
+    } else {
+      setClients((prev) => prev.map((c) => c.id === row.clientId ? { ...c, payments: (c.payments || []).map((p) => p.id === row.id ? { ...p, ...patch } : p) } : c));
+    }
+  };
+
   const saveNote = () => {
     if (!openRow) return;
-    setClients((prev) => prev.map((c) => c.id === openRow.clientId ? { ...c, payments: (c.payments || []).map((p) => p.id === openRow.id ? { ...p, note: noteDraft } : p) } : c));
+    patchRow(openRow, { note: noteDraft });
+  };
+
+  const applyRefund = (row, amt) => {
+    const newRefunded = Math.round(((row.refunded || 0) + amt) * 100) / 100;
+    const newStatus = newRefunded >= row.amount - 0.001 ? "refunded" : "partial";
+    patchRow(row, { refunded: newRefunded, status: newStatus });
   };
 
   return (
@@ -10777,7 +10794,8 @@ function PaymentsView({ clients, setClients, providers, onBack, showToast }) {
             <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "4px 16px", marginBottom: 16 }}>
               <PayRow label="Client" value={openRow.clientName} />
               <PayRow label="When" value={`${fmtDay(openRow.ts)} · ${fmtTime(openRow.ts)}`} />
-              <PayRow label="Type" value={openRow.type === "no-show" ? "No-show fee" : "Sale"} last={!openRow.last4} />
+              <PayRow label="Type" value={openRow.type === "no-show" ? "No-show fee" : "Sale"} last={!openRow.method && !openRow.last4} />
+              {openRow.method && <PayRow label="Paid with" value={openRow.method === "cash" ? "Cash" : "Card"} last={!openRow.last4} />}
               {openRow.last4 && <PayRow label="Card" value={`${openRow.brand ? openRow.brand.charAt(0).toUpperCase() + openRow.brand.slice(1) : "Card"} ···· ${openRow.last4}`} last />}
             </div>
             <div style={{ marginBottom: 16 }}>
@@ -10795,8 +10813,240 @@ function PaymentsView({ clients, setClients, providers, onBack, showToast }) {
         )}
       </Sheet>
 
-      <RefundSheet open={!!refundFor} onClose={() => { setRefundFor(null); setOpenId(null); }} client={openClient} payment={refundFor} setClients={setClients} showToast={showToast} />
+      <RefundSheet open={!!refundFor} onClose={() => { setRefundFor(null); setOpenId(null); }} client={openClient} payment={refundFor} onApply={(amt) => refundFor && applyRefund(refundFor, amt)} showToast={showToast} />
     </div>
+  );
+}
+
+// One-time card sale for the register — enters a card now, charges it once.
+function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast }) {
+  const cardBox = useRef(null);
+  const stripeRef = useRef(null);
+  const elRef = useRef(null);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    if (!open) return;
+    let dead = false;
+    setReady(false); setErr(""); setBusy(false);
+    getStripe().then((stripe) => {
+      if (dead) return;
+      if (!stripe) { setErr("Couldn't load Stripe — check your connection and try again."); return; }
+      stripeRef.current = stripe;
+      const elements = stripe.elements();
+      const card = elements.create("card", { style: { base: { fontSize: "16px", color: "#232221", fontFamily: "inherit", "::placeholder": { color: "#A39C8A" } } } });
+      elRef.current = card;
+      requestAnimationFrame(() => { if (!dead && cardBox.current) { try { card.mount(cardBox.current); setReady(true); } catch (e) { setErr("Couldn't open the card field."); } } });
+    });
+    return () => { dead = true; try { elRef.current && elRef.current.unmount(); } catch (e) {} elRef.current = null; stripeRef.current = null; };
+  }, [open]);
+  const pay = async () => {
+    const stripe = stripeRef.current, card = elRef.current;
+    if (!stripe || !card) return;
+    setBusy(true); setErr("");
+    try {
+      const pm = await stripe.createPaymentMethod({ type: "card", card });
+      if (pm.error) throw new Error(pm.error.message);
+      const intent = await stripeApi({ action: "sale_intent", amount, description: description || "Vero — sale" });
+      if (!intent.clientSecret) throw new Error(intent.error || "Couldn't start the charge.");
+      const conf = await stripe.confirmCardPayment(intent.clientSecret, { payment_method: pm.paymentMethod.id });
+      if (conf.error) throw new Error(conf.error.message);
+      if (conf.paymentIntent && conf.paymentIntent.status === "succeeded") {
+        onPaid({ paymentIntentId: intent.id, brand: pm.paymentMethod.card.brand, last4: pm.paymentMethod.card.last4 });
+      } else { throw new Error("The payment didn't complete."); }
+    } catch (e) { setErr(e.message || "Couldn't take the payment."); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Sheet open={open} onClose={onClose} align="center" maxWidth={420}>
+      <div style={{ padding: "6px 4px 8px" }}>
+        <div style={{ textAlign: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD PAYMENT</div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500 }}>${(Math.round((amount || 0) * 100) / 100).toFixed(2)}</div>
+        </div>
+        <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
+        {!ready && !err && <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", marginBottom: 12 }}>Loading secure card field…</div>}
+        {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
+        <button onClick={pay} disabled={busy || !ready} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: (busy || !ready) ? 0.55 : 1 }}><CreditCard size={16} /> {busy ? "CHARGING…" : "CHARGE CARD"}</button>
+        <button onClick={onClose} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 6 }}>Cancel</button>
+      </div>
+    </Sheet>
+  );
+}
+
+// The register — ring up a walk-in sale (no client needed). Records into the
+// Payments ledger via business.sales.
+function RegisterView({ open, onClose, services, business, setBusiness, clients, setClients, providers, me, showToast }) {
+  const [items, setItems] = useState([]);
+  const [discount, setDiscount] = useState("");
+  const [customOpen, setCustomOpen] = useState(false);
+  const [cName, setCName] = useState("");
+  const [cPrice, setCPrice] = useState("");
+  const [payMode, setPayMode] = useState(null); // null | "cash" | "card"
+  const [tendered, setTendered] = useState("");
+  const [client, setClient] = useState(null);
+  const [clientPick, setClientPick] = useState(false);
+  const [clientQuery, setClientQuery] = useState("");
+  const [done, setDone] = useState(null); // { amount, method, change }
+
+  useEffect(() => { if (open) { setItems([]); setDiscount(""); setCustomOpen(false); setCName(""); setCPrice(""); setPayMode(null); setTendered(""); setClient(null); setClientPick(false); setClientQuery(""); setDone(null); } }, [open]);
+
+  const fm = (n) => "$" + (Math.round((n || 0) * 100) / 100).toFixed(2);
+  const addItem = (name, price) => setItems((it) => [...it, { id: "li_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, price: Number(price) || 0, qty: 1 }]);
+  const setQty = (id, d) => setItems((it) => it.map((x) => x.id === id ? { ...x, qty: Math.max(1, x.qty + d) } : x));
+  const removeItem = (id) => setItems((it) => it.filter((x) => x.id !== id));
+
+  const gross = items.reduce((s, x) => s + x.price * x.qty, 0);
+  const disc = Math.min(gross, Math.max(0, parseFloat(String(discount).replace(/[^0-9.]/g, "")) || 0));
+  const total = Math.round((gross - disc) * 100) / 100;
+  const changeDue = Math.max(0, Math.round(((parseFloat(String(tendered).replace(/[^0-9.]/g, "")) || 0) - total) * 100) / 100);
+
+  const recordSale = (extra) => {
+    const sale = {
+      id: "sale_" + Date.now().toString(36), ts: Date.now(), amount: total, gross, discount: disc,
+      items: items.map((x) => ({ name: x.name, price: x.price, qty: x.qty })),
+      status: "paid", refunded: 0, type: "sale",
+      clientId: client?.id || null, clientName: client?.name || "Walk-in",
+      barberId: me?.id || null, barberName: me?.name || null,
+      note: items.map((x) => (x.qty > 1 ? `${x.qty}× ` : "") + x.name).join(", "),
+      ...extra,
+    };
+    setBusiness((b) => ({ ...b, sales: [...(b.sales || []), sale] }));
+  };
+
+  const completeCash = () => {
+    recordSale({ method: "cash" });
+    setDone({ amount: total, method: "cash", change: changeDue });
+    showToast(`Sale recorded — ${fm(total)} cash.`);
+  };
+
+  const matches = clientQuery.trim()
+    ? clients.filter((c) => (c.name || "").toLowerCase().includes(clientQuery.trim().toLowerCase())).slice(0, 6)
+    : clients.slice(0, 6);
+
+  return (
+    <Sheet open={open} onClose={onClose} align="top" maxWidth={520}>
+      {done ? (
+        <div style={{ padding: "40px 8px", textAlign: "center" }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}><CheckCircle2 size={38} color="var(--on-gold)" /></div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Paid {fm(done.amount)}</div>
+          <div style={{ fontSize: 14.5, color: "var(--sub)" }}>{done.method === "cash" ? "Cash" : "Card"}{client ? ` · ${client.name}` : ""}</div>
+          {done.method === "cash" && done.change > 0 && <div style={{ fontSize: 18, color: "var(--text)", marginTop: 14, fontWeight: 600 }}>Change due: {fm(done.change)}</div>}
+          <div style={{ display: "flex", gap: 10, marginTop: 28 }}>
+            <button onClick={() => { setItems([]); setDiscount(""); setPayMode(null); setTendered(""); setClient(null); setDone(null); }} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border2)", color: "var(--text)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14 }}>NEW SALE</button>
+            <button onClick={onClose} style={{ flex: 1, background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, border: "none" }}>DONE</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ padding: "2px 2px 12px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500 }}>New sale</div>
+            <button onClick={onClose} style={{ background: "var(--panel2)", border: "1px solid var(--border)", width: 38, height: 38, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={18} /></button>
+          </div>
+
+          {/* quick add */}
+          <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>QUICK ADD</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+            {services.slice(0, 8).map((s) => (
+              <button key={s.id} onClick={() => addItem(s.name, s.price)} style={{ background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 11, padding: "9px 13px", fontSize: 13.5, color: "var(--text)", display: "flex", alignItems: "center", gap: 7 }}>
+                <Plus size={13} strokeWidth={2.5} style={{ color: "var(--gold)" }} /> {s.name} <span style={{ color: "var(--sub)" }}>{fm(s.price)}</span>
+              </button>
+            ))}
+            <button onClick={() => setCustomOpen((v) => !v)} style={{ background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 11, padding: "9px 13px", fontSize: 13.5, color: "var(--text)" }}>+ Custom item</button>
+          </div>
+
+          {customOpen && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              <input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Item name" style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "11px 13px", fontSize: 14.5, color: "var(--text)" }} />
+              <input value={cPrice} onChange={(e) => setCPrice(e.target.value)} inputMode="decimal" placeholder="$" style={{ width: 80, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "11px 13px", fontSize: 14.5, color: "var(--text)" }} />
+              <button onClick={() => { if (cName.trim() && parseFloat(cPrice) > 0) { addItem(cName.trim(), parseFloat(cPrice)); setCName(""); setCPrice(""); setCustomOpen(false); } }} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "0 16px", fontSize: 14, fontWeight: 600 }}>Add</button>
+            </div>
+          )}
+
+          {/* cart */}
+          {items.length === 0 ? (
+            <div style={{ textAlign: "center", color: "var(--sub)", padding: "26px 10px", fontSize: 14.5, background: "var(--panel2)", borderRadius: 14, marginBottom: 16 }}>Tap an item above to start the sale.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+              {items.map((x) => (
+                <div key={x.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14.5, fontWeight: 500 }}>{x.name}</div>
+                    <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{fm(x.price)} each</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <button onClick={() => setQty(x.id, -1)} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--text)", fontSize: 16, lineHeight: 1 }}>–</button>
+                    <span style={{ minWidth: 18, textAlign: "center", fontSize: 14.5, fontWeight: 600 }}>{x.qty}</span>
+                    <button onClick={() => setQty(x.id, 1)} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--text)", fontSize: 16, lineHeight: 1 }}>+</button>
+                  </div>
+                  <div style={{ minWidth: 56, textAlign: "right", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 500 }}>{fm(x.price * x.qty)}</div>
+                  <button onClick={() => removeItem(x.id)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 2 }}><Trash2 size={15} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {items.length > 0 && (
+            <>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 2px", marginBottom: 6 }}>
+                <span style={{ fontSize: 14, color: "var(--sub)" }}>Discount</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ color: "var(--sub)" }}>$</span>
+                  <input value={discount} onChange={(e) => setDiscount(e.target.value)} inputMode="decimal" placeholder="0" style={{ width: 70, textAlign: "right", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 10px", fontSize: 14.5, color: "var(--text)" }} />
+                </div>
+              </div>
+              <button onClick={() => setClientPick(true)} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "6px 2px", color: client ? "var(--text)" : "var(--sub)", fontSize: 14, display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <User size={15} style={{ color: "var(--gold)" }} /> {client ? client.name : "Attach a client (optional)"}{client && <span onClick={(e) => { e.stopPropagation(); setClient(null); }} style={{ marginLeft: "auto", color: "var(--faint)" }}><X size={15} /></span>}
+              </button>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--border)", paddingTop: 14, marginBottom: 16 }}>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>Total</span>
+                <span style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500 }}>{fm(total)}</span>
+              </div>
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => { setTendered(String(total)); setPayMode("cash"); }} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border2)", color: "var(--text)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><DollarSign size={16} style={{ color: "var(--gold)" }} /> CASH</button>
+                <button onClick={() => setPayMode("card")} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><CreditCard size={16} /> CARD</button>
+              </div>
+            </>
+          )}
+
+          {/* cash sheet */}
+          <Sheet open={payMode === "cash"} onClose={() => setPayMode(null)} align="center" maxWidth={380}>
+            <div style={{ padding: "6px 4px 8px", textAlign: "center" }}>
+              <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CASH</div>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 16 }}>{fm(total)}</div>
+              <div style={{ textAlign: "left", fontSize: 12, letterSpacing: 1, color: "var(--sub)", marginBottom: 6 }}>AMOUNT TENDERED</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "12px 16px", marginBottom: 12 }}>
+                <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--sub)" }}>$</span>
+                <input value={tendered} onChange={(e) => setTendered(e.target.value)} inputMode="decimal" autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--text)", width: "100%" }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, marginBottom: 18 }}><span style={{ color: "var(--sub)" }}>Change due</span><span style={{ fontWeight: 600 }}>{fm(changeDue)}</span></div>
+              <button onClick={() => { setPayMode(null); completeCash(); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none" }}>COMPLETE SALE</button>
+              <button onClick={() => setPayMode(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px" }}>Back</button>
+            </div>
+          </Sheet>
+
+          {/* card sheet */}
+          <CardSaleSheet open={payMode === "card"} onClose={() => setPayMode(null)} amount={total} description={`Vero sale — ${client?.name || "walk-in"}`} onPaid={(info) => { recordSale({ method: "card", ...info }); setPayMode(null); setDone({ amount: total, method: "card", change: 0 }); showToast(`Charged ${fm(total)} to card.`); }} showToast={showToast} />
+
+          {/* client picker */}
+          <Sheet open={clientPick} onClose={() => setClientPick(false)} align="top" maxWidth={420}>
+            <div style={{ padding: "4px 2px 10px" }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 12 }}>Attach a client</div>
+              <input value={clientQuery} onChange={(e) => setClientQuery(e.target.value)} placeholder="Search clients…" autoFocus style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", fontSize: 15, color: "var(--text)", marginBottom: 12, boxSizing: "border-box" }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: "50vh", overflowY: "auto" }}>
+                {matches.map((c) => (
+                  <button key={c.id} onClick={() => { setClient(c); setClientPick(false); setClientQuery(""); }} style={{ textAlign: "left", background: "none", border: "none", padding: "12px 8px", borderBottom: "1px solid var(--border)", color: "var(--text)", fontSize: 15.5 }}>{c.name}</button>
+                ))}
+                {matches.length === 0 && <div style={{ color: "var(--sub)", fontSize: 14, padding: "12px 8px" }}>No matches.</div>}
+              </div>
+            </div>
+          </Sheet>
+        </div>
+      )}
+    </Sheet>
   );
 }
 
