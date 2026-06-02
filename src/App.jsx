@@ -439,7 +439,7 @@ const FONT_BODY = "var(--font-body, 'Inter', -apple-system, sans-serif)";
 // ============================================================
 const THEMES = [
   // ===== VERO (house brand) =====
-  { id: "vero", name: "Vero", tagline: "True to the craft — porcelain & sage", cat: "Vero", dark: false,
+  { id: "vero", name: "Vero Theme", tagline: "Default · porcelain & sage", cat: "Vero", dark: false,
     disp: "'Fraunces', serif", body: "'Hanken Grotesk', sans-serif",
     t: { bg:"#FAF8F3", panel:"#FFFFFF", panel2:"#F4EFE4", line:"#ECE4D5", border:"#E0D8C7", border2:"#CFC6B7", text:"#232221", text2:"#3A382F", sub:"#6F685D", faint:"#A39C8A", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(60,55,45,.07)", overlay:"rgba(35,34,33,0.34)" } },
 
@@ -5599,7 +5599,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
 
   return (
     <div style={{ position: "relative", minHeight: "100dvh" }}>
-      <div style={{ borderBottom: "1px solid var(--line)", padding: "15px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
         <button onClick={() => { if (pulseDetail) { setPulseDetail(null); return; } if (tab === "pulse" && !activeClient) { onExit(); return; } setActiveClient(null); setTab("pulse"); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> {pulseDetail ? "Pulse" : (tab === "pulse" && !activeClient ? "Home" : "Pulse")}</button>
         <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, letterSpacing: 1.5, fontWeight: 500 }}>{business.name}</div>
         <div style={{ width: 50 }} />
@@ -9203,14 +9203,17 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   const pressRef = useRef(null);               // mutable: long-press timer + start info
   const blockScrollRef = useRef((e) => { if (e.cancelable) e.preventDefault(); });
   const dayStripRef = useRef(null);            // ref on the horizontal day strip — used to scroll "today" into view on first mount
-  // On first render, position the day strip so today's button is the leftmost visible one.
-  // Without this, adding past-day buttons would leave the strip parked 14 days in the past on open.
+  // On first render, center the selected/today button in the day strip so it sits in the middle
+  // (not jammed against the left edge); past days are still reachable by scrolling left.
   // useLayoutEffect runs after DOM commit but before paint, so the user never sees the strip jump.
   useLayoutEffect(() => {
     const strip = dayStripRef.current;
     if (!strip) return;
     const todayBtn = strip.querySelector('[data-today="1"]');
-    if (todayBtn) strip.scrollLeft = todayBtn.offsetLeft - strip.offsetLeft;
+    if (todayBtn) {
+      const centered = todayBtn.offsetLeft - strip.offsetLeft - (strip.clientWidth / 2) + (todayBtn.offsetWidth / 2);
+      strip.scrollLeft = Math.max(0, centered);
+    }
   }, []);
 
   const setStatus = (id, status, msg) => { const freed = appts.find((a) => a.id === id); setAppts(appts.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) setTimeout(() => handleFreedSlot(freed), 350); };
@@ -9724,8 +9727,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         />
       </Sheet>
       {/* Editorial calendar header — two lines, no cramping. The date cluster is tappable to open the month picker. */}
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+      <div style={{ marginTop: 8, marginBottom: 26 }}>
+        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 18 }} />
         <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, margin: 0, textAlign: "left", color: "inherit", cursor: "pointer", display: "block", width: "auto" }}>
           <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{`${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`.toUpperCase()}</div>
           <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, letterSpacing: -0.7, lineHeight: 0.95, marginBottom: 16, display: "flex", alignItems: "baseline", gap: 10 }}>
