@@ -5077,156 +5077,112 @@ function AppointmentsView({ appts, providers, services, onBack }) {
 // client base: new vs returning, retention, top by visits + revenue,
 // lapsed list (with a direct path to the nudge folder).
 // ============================================================
-function ClientsReportView({ appts, clients, services, providers, onBack, onOpenNudge }) {
+function ClientsReportView({ appts, clients, services, providers, pulseView, me, onBack, onOpenNudge, onOpenClient }) {
   const [period, setPeriod] = useState("month"); // "week" | "month" | "year"
   const now = new Date();
 
-  // --- Same date helpers as the other reports ---
-  const sod = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-  const sow = (d) => {
-    const x = sod(d);
-    const day = x.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    x.setDate(x.getDate() + diff);
-    return x;
-  };
-  const som = (d) => { const x = sod(d); x.setDate(1); return x; };
+  // --- Scope: owner can view the whole shop or one barber; a barber sees only their own book. ---
+  const filterProv = (pulseView === "shop") ? null : (pulseView === "me" ? (me?.id || null) : pulseView);
+  const clientsF = filterProv ? clients.filter((c) => c.provider === filterProv) : clients;
+  const apptsF = filterProv ? appts.filter((a) => a.providerId === filterProv) : appts;
 
-  // --- Price-per-appt for revenue rankings ---
+  // --- Helpers ---
+  const sod = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const sow = (d) => { const x = sod(d); const day = x.getDay(); x.setDate(x.getDate() + (day === 0 ? -6 : 1 - day)); return x; };
+  const som = (d) => { const x = sod(d); x.setDate(1); return x; };
+  const fmtMoney = (n) => `$${Math.round(n).toLocaleString()}`;
+  const daysSince = (d) => Math.round((Date.now() - new Date(d)) / 86400000);
+  const provName = (c) => providers.find((p) => p.id === c.provider)?.name;
+
   const apptPrice = (a) => {
     if (a.lineItems && a.lineItems.length) {
-      return a.lineItems.reduce((sum, li) => {
-        const s = services.find((x) => x.id === li.serviceId);
-        return sum + (s ? getPrice(s, a.providerId) : 0);
-      }, 0);
+      return a.lineItems.reduce((sum, li) => { const s = services.find((x) => x.id === li.serviceId); return sum + (s ? getPrice(s, a.providerId) : 0); }, 0);
     }
     const s = services.find((x) => x.id === a.serviceId);
     return s ? getPrice(s, a.providerId) : 0;
   };
 
-  // --- Period boundaries (this + prior) ---
-  let periodStart, periodEnd, priorStart, priorEnd;
-  if (period === "week") {
-    periodStart = sow(now);
-    periodEnd = new Date(periodStart); periodEnd.setDate(periodEnd.getDate() + 7);
-    priorStart = new Date(periodStart); priorStart.setDate(priorStart.getDate() - 7);
-    priorEnd = new Date(periodStart);
-  } else if (period === "month") {
-    periodStart = som(now);
-    periodEnd = new Date(periodStart); periodEnd.setMonth(periodEnd.getMonth() + 1);
-    priorStart = new Date(periodStart); priorStart.setMonth(priorStart.getMonth() - 1);
-    priorEnd = new Date(periodStart);
-  } else {
-    periodStart = new Date(now.getFullYear(), 0, 1);
-    periodEnd = new Date(now.getFullYear() + 1, 0, 1);
-    priorStart = new Date(now.getFullYear() - 1, 0, 1);
-    priorEnd = new Date(now.getFullYear(), 0, 1);
-  }
-
-  const inRange = (a, start, end) => {
-    if (!a.bookedFor) return false;
-    const t = new Date(a.bookedFor).getTime();
-    return t >= start.getTime() && t < end.getTime();
-  };
+  // --- Period boundaries ---
+  let periodStart, periodEnd;
+  if (period === "week") { periodStart = sow(now); periodEnd = new Date(periodStart); periodEnd.setDate(periodEnd.getDate() + 7); }
+  else if (period === "month") { periodStart = som(now); periodEnd = new Date(periodStart); periodEnd.setMonth(periodEnd.getMonth() + 1); }
+  else { periodStart = new Date(now.getFullYear(), 0, 1); periodEnd = new Date(now.getFullYear() + 1, 0, 1); }
+  const inRange = (a, s, e) => { if (!a.bookedFor) return false; const t = new Date(a.bookedFor).getTime(); return t >= s.getTime() && t < e.getTime(); };
   const isCountable = (a) => a.status !== "block" && a.status !== "cancelled" && a.status !== "no-show";
 
-  // --- Appointments grouped by client across all history (needed for "first visit ever" + retention) ---
+  // --- Appointment history grouped by client (for first-visit, retention, lifetime value) ---
   const apptsByClient = {};
-  appts.forEach((a) => {
-    if (a.status === "block" || !a.clientId || a.clientId === "guest") return;
-    apptsByClient[a.clientId] = apptsByClient[a.clientId] || [];
-    apptsByClient[a.clientId].push(a);
-  });
-  Object.keys(apptsByClient).forEach((cid) => {
-    apptsByClient[cid].sort((a, b) => new Date(a.bookedFor) - new Date(b.bookedFor));
-  });
+  apptsF.forEach((a) => { if (a.status === "block" || !a.clientId || a.clientId === "guest") return; (apptsByClient[a.clientId] = apptsByClient[a.clientId] || []).push(a); });
+  Object.keys(apptsByClient).forEach((cid) => apptsByClient[cid].sort((a, b) => new Date(a.bookedFor) - new Date(b.bookedFor)));
 
-  // --- New vs returning for this period ---
-  // A client is "new this period" if their FIRST appointment ever falls within this period.
-  // Otherwise they're "returning" (had any prior appointment before the period).
-  const periodAppts = appts.filter((a) => isCountable(a) && inRange(a, periodStart, periodEnd) && a.clientId && a.clientId !== "guest");
-  const seenClientsThisPeriod = new Set(periodAppts.map((a) => a.clientId));
-  let newThisPeriod = 0;
-  let returningThisPeriod = 0;
-  seenClientsThisPeriod.forEach((cid) => {
-    const list = apptsByClient[cid] || [];
-    const first = list[0];
-    if (!first) return;
-    const firstTime = new Date(first.bookedFor).getTime();
-    if (firstTime >= periodStart.getTime() && firstTime < periodEnd.getTime()) {
-      newThisPeriod += 1;
-    } else {
-      returningThisPeriod += 1;
-    }
-  });
+  // --- New vs returning this period (a client is "new" if their first-ever visit lands in the period) ---
+  const periodAppts = apptsF.filter((a) => isCountable(a) && inRange(a, periodStart, periodEnd) && a.clientId && a.clientId !== "guest");
+  const seen = new Set(periodAppts.map((a) => a.clientId));
+  let newThisPeriod = 0, returningThisPeriod = 0;
+  seen.forEach((cid) => { const f = (apptsByClient[cid] || [])[0]; if (!f) return; const ft = new Date(f.bookedFor).getTime(); (ft >= periodStart.getTime() && ft < periodEnd.getTime()) ? newThisPeriod++ : returningThisPeriod++; });
   const totalActive = newThisPeriod + returningThisPeriod;
+  const totalClients = clientsF.filter((c) => !c.blocked).length;
 
-  // --- 60-day retention: of clients whose first-ever visit was 60-180 days ago,
-  //     what % came back within 60 days of that first visit? Window is rolling. ---
-  const sixtyDays = 60 * 24 * 60 * 60 * 1000;
-  const cohortEnd = new Date(now.getTime() - sixtyDays); // first visit must be at least 60d ago
-  const cohortStart = new Date(now.getTime() - 3 * sixtyDays); // and not older than 180d (so the metric stays current)
-  let cohortSize = 0;
-  let cohortReturned = 0;
+  // --- 60-day retention: of clients whose first visit was 60–180 days ago, how many came back within 60 days ---
+  const sixty = 60 * 86400000;
+  const cohortEnd = new Date(Date.now() - sixty), cohortStart = new Date(Date.now() - 3 * sixty);
+  let cohortSize = 0, cohortReturned = 0;
   Object.keys(apptsByClient).forEach((cid) => {
-    const list = apptsByClient[cid];
-    if (!list.length) return;
+    const list = apptsByClient[cid]; if (!list.length) return;
     const first = new Date(list[0].bookedFor).getTime();
     if (first < cohortStart.getTime() || first >= cohortEnd.getTime()) return;
-    cohortSize += 1;
-    // Did they have any other appt within 60 days of the first?
-    const within = list.slice(1).some((a) => {
-      const t = new Date(a.bookedFor).getTime();
-      return t > first && (t - first) <= sixtyDays;
-    });
-    if (within) cohortReturned += 1;
+    cohortSize++;
+    if (list.slice(1).some((a) => { const t = new Date(a.bookedFor).getTime(); return t > first && (t - first) <= sixty; })) cohortReturned++;
   });
   const retentionPct = cohortSize > 0 ? Math.round((cohortReturned / cohortSize) * 100) : null;
 
-  // --- Total clients on file (excludes blocked) ---
-  const totalClients = clients.filter((c) => !c.blocked).length;
+  // --- Average ticket (used to estimate dollars-at-risk where exact spend is thin) ---
+  const doneAll = apptsF.filter((a) => a.status === "done");
+  const shopAvgTicket = doneAll.length ? doneAll.reduce((s, a) => s + apptPrice(a), 0) / doneAll.length : 0;
+  const ticketFor = (c) => { const ds = (apptsByClient[c.id] || []).filter((a) => a.status === "done"); if (!ds.length) return shopAvgTicket; return ds.reduce((s, a) => s + apptPrice(a), 0) / ds.length; };
 
-  // --- Top by visits (lifetime) and by revenue this period ---
-  const visitCounts = {};
-  Object.keys(apptsByClient).forEach((cid) => {
-    visitCounts[cid] = apptsByClient[cid].filter((a) => a.status === "done").length;
-  });
-  const topByVisits = Object.entries(visitCounts)
-    .map(([cid, count]) => ({ client: clients.find((c) => c.id === cid), count }))
-    .filter((x) => x.client && x.count > 0)
-    .sort((a, b) => b.count - a.count)
+  // --- Rebooking %: of clients seen in the last 90 days, how many already have their next visit booked ---
+  const future = new Set(apptsF.filter((a) => isCountable(a) && a.bookedFor && new Date(a.bookedFor).getTime() > Date.now()).map((a) => a.clientId));
+  const recent = clientsF.filter((c) => !c.blocked && c.lastVisit && daysSince(c.lastVisit) <= 90);
+  const rebooked = recent.filter((c) => future.has(c.id)).length;
+  const rebookPct = recent.length ? Math.round((rebooked / recent.length) * 100) : null;
+
+  // --- Lapsed (overdue to rebook) + dollars at risk, and clients coming due in the next 7 days ---
+  const lapsed = clientsF
+    .filter((c) => { if (c.blocked || !c.cadenceDays || !c.lastVisit) return false; if (c.nudgeDismissedAt && new Date(c.nudgeDismissedAt) > new Date(c.lastVisit)) return false; if (future.has(c.id)) return false; return (daysSince(c.lastVisit) - c.cadenceDays) > 0; })
+    .map((c) => ({ c, over: daysSince(c.lastVisit) - c.cadenceDays, since: daysSince(c.lastVisit) }))
+    .sort((a, b) => b.over - a.over);
+  const atRisk = lapsed.reduce((s, x) => s + ticketFor(x.c), 0);
+  const comingDue = clientsF
+    .filter((c) => { if (c.blocked || !c.cadenceDays || !c.lastVisit) return false; if (future.has(c.id)) return false; const left = c.cadenceDays - daysSince(c.lastVisit); return left >= 0 && left <= 7; })
+    .map((c) => ({ c, left: c.cadenceDays - daysSince(c.lastVisit) }))
+    .sort((a, b) => a.left - b.left);
+
+  // --- Top clients by lifetime value (visits + spend) ---
+  const top = clientsF.filter((c) => !c.blocked)
+    .map((c) => { const list = apptsByClient[c.id] || []; const dn = list.filter((a) => a.status === "done"); const v = dn.length || c.visits || 0; const spend = dn.reduce((s, a) => s + apptPrice(a), 0); return { c, v, spend }; })
+    .filter((x) => x.v > 0)
+    .sort((a, b) => (b.spend - a.spend) || (b.v - a.v))
     .slice(0, 6);
 
-  const revByClient = {};
-  periodAppts.filter((a) => a.status === "done").forEach((a) => {
-    revByClient[a.clientId] = (revByClient[a.clientId] || 0) + apptPrice(a);
-  });
-  const topByRevenue = Object.entries(revByClient)
-    .map(([cid, revenue]) => ({ client: clients.find((c) => c.id === cid), revenue }))
-    .filter((x) => x.client && x.revenue > 0)
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 6);
-
-  // --- Lapsed (overdue-to-rebook) — same logic as the nudge folder for consistency ---
-  const lapsed = clients.filter((c) => {
-    if (c.blocked) return false;
-    if (!c.cadenceDays || !c.lastVisit) return false;
-    if (c.nudgeDismissedAt && new Date(c.nudgeDismissedAt) > new Date(c.lastVisit)) return false;
-    const days = Math.round((Date.now() - new Date(c.lastVisit)) / 86400000);
-    return (days - c.cadenceDays) > 0;
-  });
-
-  const fmtMoney = (n) => `$${Math.round(n).toLocaleString()}`;
+  const periodLabel = period === "week" ? "This week" : period === "month" ? "This month" : "This year";
+  const open = (c) => onOpenClient && onOpenClient(c);
+  const Eyebrow = ({ children }) => <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>{children}</div>;
+  const Rule = () => <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />;
+  const isEmpty = totalActive === 0 && lapsed.length === 0 && comingDue.length === 0 && top.length === 0;
 
   return (
     <div className="fade-up">
       <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> Back to Pulse</button>
 
       {/* Masthead */}
-      <div style={{ marginBottom: 22 }}>
+      <div style={{ marginBottom: 20 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>CLIENTS</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
+        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>CLIENTS · RETENTION</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{periodLabel}</h2>
+        <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10, lineHeight: 1.5 }}>
+          <span style={{ fontWeight: 600, color: "var(--text)" }}>{totalClients}</span> active{rebookPct !== null ? <> · <span style={{ fontWeight: 600, color: "var(--text)" }}>{rebookPct}%</span> rebooked</> : null}
+        </div>
       </div>
 
       {/* Period toggle */}
@@ -5239,59 +5195,92 @@ function ClientsReportView({ appts, clients, services, providers, onBack, onOpen
         })}
       </div>
 
-      {/* Hero — clients seen this period */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
-          {totalActive}
+      {/* WIN BACK — the hero action: lapsed clients + dollars at risk */}
+      {lapsed.length > 0 && (
+        <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "18px 16px 12px", marginBottom: 30 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700 }}>WIN BACK</div>
+            <div style={{ fontSize: 12.5, color: "var(--sub)" }}>~{fmtMoney(atRisk)} at risk <span style={{ color: "var(--faint)" }}>(est.)</span></div>
+          </div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, letterSpacing: -0.5, color: "var(--text)", marginBottom: 14 }}>{lapsed.length} overdue to rebook</div>
+          <div style={{ display: "grid", gap: 2 }}>
+            {lapsed.slice(0, 5).map(({ c, over, since }) => (
+              <button key={c.id} onClick={() => open(c)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "none", border: "none", borderTop: "1px solid color-mix(in srgb, var(--gold) 16%, var(--border))", padding: "12px 2px", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ display: "block", fontSize: 15.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                  <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 1 }}>Last seen {since}d ago{!filterProv && provName(c) ? ` · ${provName(c)}` : ""}</span>
+                </span>
+                <span style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 600, color: "var(--gold)" }}>{over}d over</span>
+              </button>
+            ))}
+          </div>
+          <button onClick={onOpenNudge} className="lift" style={{ width: "100%", marginTop: 12, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: "13px 16px", fontSize: 14, fontWeight: 600, letterSpacing: 0.5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Bell size={16} /> Reach out to all {lapsed.length}</button>
         </div>
-        <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
-          {totalActive === 0 ? "No client visits this period yet." : <>{totalActive === 1 ? "client seen" : "clients seen"} · <span style={{ fontWeight: 600 }}>{totalClients}</span> total on file</>}
-        </div>
-      </div>
+      )}
 
-      {/* NEW vs RETURNING bar */}
+      {/* REBOOKING % — the number that predicts next month */}
+      {rebookPct !== null && (
+        <>
+          <Rule />
+          <div style={{ marginBottom: 30 }}>
+            <Eyebrow>REBOOKING RATE</Eyebrow>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 8 }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 48, fontWeight: 500, lineHeight: 1, letterSpacing: -1.2, color: rebookPct >= 60 ? "var(--gold)" : "var(--text)" }}>{rebookPct}%</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>of recent clients already have their next visit booked</div>
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--faint)" }}>{rebooked} of {recent.length} seen in the last 90 days.</div>
+          </div>
+        </>
+      )}
+
+      {/* NEW vs RETURNING */}
       {totalActive > 0 && (
         <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <Rule />
           <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>NEW vs RETURNING</div>
-            {/* Visual split bar */}
+            <Eyebrow>NEW vs RETURNING</Eyebrow>
             <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", background: "var(--panel2)", marginBottom: 16 }}>
               {newThisPeriod > 0 && <div style={{ flex: newThisPeriod, background: "var(--gold)" }} />}
               {returningThisPeriod > 0 && <div style={{ flex: returningThisPeriod, background: "color-mix(in srgb, var(--gold) 35%, var(--panel2))" }} />}
             </div>
             <div style={{ display: "grid", gap: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--gold)" }} />
-                  <span style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>New</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{newThisPeriod}</span>
-                  <span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((newThisPeriod / totalActive) * 100)}%</span>
-                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--gold)" }} /><span style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>New</span></div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{newThisPeriod}</span><span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((newThisPeriod / totalActive) * 100)}%</span></div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: "color-mix(in srgb, var(--gold) 35%, var(--panel2))" }} />
-                  <span style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Returning</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{returningThisPeriod}</span>
-                  <span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((returningThisPeriod / totalActive) * 100)}%</span>
-                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "color-mix(in srgb, var(--gold) 35%, var(--panel2))" }} /><span style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Returning</span></div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{returningThisPeriod}</span><span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((returningThisPeriod / totalActive) * 100)}%</span></div>
               </div>
             </div>
           </div>
         </>
       )}
 
-      {/* RETENTION */}
+      {/* COMING DUE — rebook before they lapse */}
+      {comingDue.length > 0 && (
+        <>
+          <Rule />
+          <div style={{ marginBottom: 30 }}>
+            <Eyebrow>COMING DUE · NEXT 7 DAYS</Eyebrow>
+            <div style={{ display: "grid", gap: 2 }}>
+              {comingDue.slice(0, 6).map(({ c, left }) => (
+                <button key={c.id} onClick={() => open(c)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "none", border: "none", borderTop: "1px solid var(--line)", padding: "12px 2px", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
+                  <span style={{ minWidth: 0, flex: 1, fontSize: 15.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}{!filterProv && provName(c) ? <span style={{ fontWeight: 400, color: "var(--faint)" }}> · {provName(c)}</span> : null}</span>
+                  <span style={{ flexShrink: 0, fontSize: 13, color: "var(--sub)" }}>{left === 0 ? "due today" : `due in ${left}d`}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* RETENTION (60-day cohort) */}
       {retentionPct !== null && (
         <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <Rule />
           <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>RETENTION</div>
+            <Eyebrow>FIRST-VISIT RETENTION</Eyebrow>
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 8 }}>
               <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, lineHeight: 1, letterSpacing: -1, color: retentionPct >= 60 ? "var(--gold)" : "var(--text)" }}>{retentionPct}%</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>of first-timers came back within 60 days</div>
@@ -5301,53 +5290,18 @@ function ClientsReportView({ appts, clients, services, providers, onBack, onOpen
         </>
       )}
 
-      {/* LAPSED CTA */}
-      {lapsed.length > 0 && (
+      {/* TOP CLIENTS by lifetime value */}
+      {top.length > 0 && (
         <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />
-          <button onClick={onOpenNudge} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 30 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Bell size={17} style={{ color: "var(--gold)" }} />
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: 15, fontWeight: 500 }}>{lapsed.length} client{lapsed.length > 1 ? "s" : ""} overdue to rebook</div>
-                <div style={{ fontSize: 13, color: "var(--sub)" }}>Open the nudge folder</div>
-              </div>
-            </div>
-            <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-          </button>
-        </>
-      )}
-
-      {/* TOP BY VISITS */}
-      {topByVisits.length > 0 && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
+          <Rule />
           <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>MOST VISITS (LIFETIME)</div>
-            <div style={{ display: "grid", gap: 10 }}>
-              {topByVisits.map((row) => (
-                <div key={row.client.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
-                  <div style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{row.client.name}</div>
-                  <div style={{ fontSize: 15, fontWeight: 500, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{row.count} {row.count === 1 ? "visit" : "visits"}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* TOP BY REVENUE */}
-      {topByRevenue.length > 0 && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-          <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>HIGHEST SPEND ({period === "week" ? "THIS WEEK" : period === "month" ? "THIS MONTH" : "THIS YEAR"})</div>
-            <div style={{ display: "grid", gap: 10 }}>
-              {topByRevenue.map((row) => (
-                <div key={row.client.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
-                  <div style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{row.client.name}</div>
-                  <div style={{ fontSize: 15, fontWeight: 500, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{fmtMoney(row.revenue)}</div>
-                </div>
+            <Eyebrow>TOP CLIENTS · LIFETIME</Eyebrow>
+            <div style={{ display: "grid", gap: 2 }}>
+              {top.map(({ c, v, spend }) => (
+                <button key={c.id} onClick={() => open(c)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14, background: "none", border: "none", borderTop: "1px solid var(--line)", padding: "12px 2px", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
+                  <span style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{c.name}</span>
+                  <span style={{ flexShrink: 0, fontSize: 14.5, fontWeight: 500, fontVariantNumeric: "tabular-nums", color: "var(--sub)" }}>{v} {v === 1 ? "visit" : "visits"}{spend > 0 ? ` · ${fmtMoney(spend)}` : ""}</span>
+                </button>
               ))}
             </div>
           </div>
@@ -5355,9 +5309,9 @@ function ClientsReportView({ appts, clients, services, providers, onBack, onOpen
       )}
 
       {/* Empty state */}
-      {totalActive === 0 && lapsed.length === 0 && topByVisits.length === 0 && (
+      {isEmpty && (
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "28px 22px", textAlign: "center", marginTop: 10 }}>
-          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto" }}>Once clients book and visit, you'll see new vs returning split, retention rate, and your top clients here.</p>
+          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto" }}>Once clients book and visit, this is where you'll spot who to win back, your rebooking rate, and your most valuable regulars.</p>
         </div>
       )}
     </div>
@@ -5977,7 +5931,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "payments" && <PaymentsView clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={() => setPulseDetail(null)} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
-        {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
+        {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} onOpenClient={(c) => { setPulseDetail(null); setActiveClient(c); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} me={me} isOwner={isOwner} />}
