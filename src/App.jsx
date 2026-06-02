@@ -523,7 +523,10 @@ const buildThemeCSS = () => THEMES.map((th) => {
 // The overlay wrapper itself carries NO transform (so it anchors to the viewport,
 // not a transformed ancestor); inner content keeps the drop animation.
 function Portal({ children }) {
-  return <>{children}</>;
+  // Render into <body> so a transformed / backdrop-filtered ancestor (the dashboard
+  // header) can't trap our position:fixed overlay and squeeze it below the app chrome.
+  if (typeof document === "undefined") return null;
+  return createPortal(children, document.body);
 }
 
 // Sheet: a popup that opens centered in the viewport, never off-screen.
@@ -563,19 +566,28 @@ function Sheet({ open, onClose, children, align = "top", maxWidth = 520 }) {
 
 // Tap-to-call / Tap-to-text: render a phone number as a subtle button that opens a Sheet with Call + Text options.
 // Both buttons use native `tel:` and `sms:` URIs so mobile opens the dialer / Messages directly.
+// Format a US phone for display: 5038402389 -> (503) 840-2389. Leaves non-standard numbers as-is.
+function fmtPhone(number) {
+  if (!number) return "";
+  const d = String(number).replace(/\D/g, "");
+  if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  if (d.length === 11 && d[0] === "1") return `(${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7)}`;
+  return String(number);
+}
 function PhoneLink({ number, style }) {
   const [open, setOpen] = useState(false);
   if (!number) return null;
   const clean = String(number);
   const digits = clean.replace(/\D/g, "");
+  const disp = fmtPhone(clean);
   return (
     <>
-      <button onClick={(e) => { e.stopPropagation(); setOpen(true); }} style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", ...style }}>{clean}</button>
+      <button onClick={(e) => { e.stopPropagation(); setOpen(true); }} style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", ...style }}>{disp}</button>
       <Sheet open={open} onClose={() => setOpen(false)} align="bottom" maxWidth={420}>
         <div style={{ padding: "6px 4px 8px" }}>
           <div style={{ textAlign: "center", marginBottom: 18 }}>
             <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CONTACT</div>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{clean}</div>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{disp}</div>
           </div>
           <a href={`tel:${digits}`} onClick={() => setOpen(false)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, textDecoration: "none", marginBottom: 10 }}>
             <Phone size={17} /> CALL
@@ -10571,17 +10583,17 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
 
   // small building blocks
   const TopBar = ({ left, title, right }) => (
-    <div style={{ background: T.topbar, borderBottom: `1px solid ${T.line}`, padding: "16px 18px calc(16px)", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 5 }}>
-      <div style={{ minWidth: 70 }}>{left}</div>
-      <div style={{ fontSize: 17, fontWeight: 600, color: T.text }}>{title}</div>
-      <div style={{ minWidth: 70, display: "flex", justifyContent: "flex-end", gap: 14, alignItems: "center" }}>{right}</div>
+    <div style={{ background: T.panel, borderBottom: `1px solid var(--border)`, padding: "calc(env(safe-area-inset-top, 0px) + 16px) 16px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 5, boxShadow: "0 6px 20px -16px rgba(0,0,0,0.35)" }}>
+      <div style={{ minWidth: 64 }}>{left}</div>
+      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: T.text, letterSpacing: "-0.2px" }}>{title}</div>
+      <div style={{ minWidth: 64, display: "flex", justifyContent: "flex-end", gap: 14, alignItems: "center" }}>{right}</div>
     </div>
   );
 
   const Cell = ({ label, value }) => (
     <div style={{ flex: 1, padding: "16px 18px" }}>
-      <span style={{ fontSize: 14, color: T.sub, fontStyle: "italic", marginRight: 8 }}>{label}</span>
-      <span style={{ fontSize: 17, color: T.text, fontWeight: 500 }}>{value}</span>
+      <div style={{ fontSize: 11, letterSpacing: 1.8, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 18, color: T.text, fontWeight: 600 }}>{value}</div>
     </div>
   );
 
@@ -10604,9 +10616,9 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
             <div ref={scrollTopRef} style={{ overflowY: "auto", flex: 1 }}>
               {/* status + check-in */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px", borderBottom: `1px solid ${T.line}` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ width: 13, height: 13, borderRadius: "50%", background: status.dot }} />
-                  <span style={{ fontSize: 18, fontWeight: 600 }}>{status.label}</span>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 9, background: T.chip, border: `1px solid ${T.line}`, padding: "8px 14px", borderRadius: 30 }}>
+                  <span style={{ width: 11, height: 11, borderRadius: "50%", background: status.dot }} />
+                  <span style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: 0.2 }}>{status.label}</span>
                 </div>
                 {appt.status === "confirmed" && <button className="lift" onClick={() => onSetStatus(appt.id, "checked-in", `${appt.name} checked in.`)} style={{ border: `1.5px solid ${T.line}`, color: T.text, background: "none", padding: "11px 22px", borderRadius: 30, fontSize: 15, letterSpacing: 1, fontWeight: 600 }}>CHECK-IN</button>}
                 {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} is ready for you and will meet you in front."; const msg = wr.autoReadyMessage === false ? `${appt.name} marked in service.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`; onSetStatus(appt.id, "in-service", msg); }} style={{ background: T.accent, color: T.accentText, padding: "11px 18px", borderRadius: 30, fontSize: 15, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>NOTIFY · READY</button>}
@@ -10696,41 +10708,41 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                   <div style={{ width: 54, height: 54, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, flexShrink: 0 }}>{initials}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, lineHeight: 1.1 }}>{appt.name} {appt.vip && <span style={{ color: status.dot }}>★</span>}</div>
-                    <div style={{ fontSize: 15, color: T.sub }}>{client ? `${client.visits} visits` : "New client"}</div>
+                    <div style={{ fontSize: 15, color: T.sub }}>{client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client"}</div>
                   </div>
                   <button onClick={() => showToast("Opening message thread…")} style={{ width: 44, height: 44, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center" }}><MessageSquare size={18} /></button>
                 </div>
-                {/* client's global note shows prominently when viewing an appointment */}
-                {client && client.notes && (
-                  <div style={{ marginTop: 14, background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "12px 14px", display: "flex", gap: 10 }}>
-                    <AlertCircle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
-                    <div style={{ fontSize: 14, color: T.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{client.notes}</div>
-                  </div>
-                )}
-                <div style={{ marginTop: 16, display: "grid", gap: 9 }}>
+                <div style={{ marginTop: 18, display: "grid", gap: 11 }}>
                   <DetailRow T={T} label="Phone" value={client?.phone ? <PhoneLink number={client.phone} /> : "—"} accent />
                   <DetailRow T={T} label="Email" value={client?.email ? <EmailLink email={client.email} /> : "—"} />
                   <DetailRow T={T} label="Credit" value="Visa  ···7815   Exp 9/30" icon={<CreditCard size={13} style={{ color: T.faint }} />} />
                 </div>
+                {/* client's standing note — after contact so the name → contact read isn't interrupted */}
+                {client && client.notes && (
+                  <div style={{ marginTop: 18, background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 14, padding: "13px 15px", display: "flex", gap: 11 }}>
+                    <AlertCircle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+                    <div style={{ fontSize: 14.5, color: T.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{client.notes}</div>
+                  </div>
+                )}
               </div>
 
               {/* service block */}
               <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22 }}>{service?.name || appt.title}</span>
-                  <span style={{ fontSize: 20, fontWeight: 600 }}>${service?.price ?? "—"}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14, paddingBottom: 14, borderBottom: `1px solid ${T.line}` }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24 }}>{service?.name || appt.title}</span>
+                  <span style={{ fontSize: 22, fontWeight: 600 }}>${service?.price ?? "—"}</span>
                 </div>
                 {appt.detail && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
                     {appt.detail.split(",").map((d, i) => (
                       <span key={i} style={{ background: T.chip, color: T.text, padding: "8px 14px", borderRadius: 8, fontSize: 15 }}>{d.trim()}</span>
                     ))}
                   </div>
                 )}
-                <div style={{ fontSize: 15, color: T.sub, lineHeight: 1.9 }}>
-                  <span style={{ fontStyle: "italic" }}>with </span><span style={{ color: T.text, fontWeight: 500 }}>{provider.name}</span>
-                  <span style={{ fontStyle: "italic" }}>   ·   at </span><span style={{ color: T.text, fontWeight: 500 }}>{fmtTime(appt.start)}</span>
-                  <span style={{ fontStyle: "italic" }}>   for </span><span style={{ color: T.text, fontWeight: 500 }}>{dur} min</span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 22px", fontSize: 15 }}>
+                  <span><span style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginRight: 8 }}>With</span><span style={{ color: T.text, fontWeight: 600 }}>{provider.name}</span></span>
+                  <span><span style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginRight: 8 }}>At</span><span style={{ color: T.text, fontWeight: 600 }}>{fmtTime(appt.start)}</span></span>
+                  <span><span style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginRight: 8 }}>For</span><span style={{ color: T.text, fontWeight: 600 }}>{dur} min</span></span>
                 </div>
               </div>
 
@@ -10891,9 +10903,9 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
 
 function DetailRow({ T, label, value, accent, icon }) {
   return (
-    <div style={{ display: "flex", gap: 14, fontSize: 15 }}>
-      <span style={{ color: T.sub, fontStyle: "italic", minWidth: 58 }}>{label}</span>
-      <span style={{ color: accent ? (T.text) : T.text, display: "flex", alignItems: "center", gap: 7, fontWeight: accent ? 500 : 400 }}>{icon}{value}</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 15.5 }}>
+      <span style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 600, minWidth: 62 }}>{label}</span>
+      <span style={{ color: T.text, display: "flex", alignItems: "center", gap: 7, fontWeight: 500 }}>{icon}{value}</span>
     </div>
   );
 }
