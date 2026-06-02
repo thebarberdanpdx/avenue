@@ -799,6 +799,7 @@ export default function App() {
   const loadedRef = useRef(false); // blocks saves until the first load finishes (so seed data can't overwrite real data)
   const [dataLoaded, setDataLoaded] = useState(false); // true once the first load finishes — used to avoid flashing placeholder names
   const savingRef = useRef({});    // per-table { running, queued } — guarantees in-order saves
+  const [saveFailed, setSaveFailed] = useState(false); // drives a banner if a save to the server errors out
 
   // Save a whole in-memory list to its shop-scoped table.
   // Strategy: upsert current items first (never destroys data), then delete rows that aren't in the list.
@@ -816,17 +817,24 @@ export default function App() {
         const { error: upErr } = await supabase.from(table).upsert(rows);
         if (upErr) throw upErr;
       }
-      // 2. Find any server rows we no longer have in memory and delete only those.
+      // 2. Delete ONLY rows this device knew about and has since removed. A server row we
+      //    don't have but never knew about is a NEW row from another device (e.g. Heather just
+      //    booked someone) — deleting it would be the two-device clobber, so we leave it.
       const keepIds = new Set(rows.map((r) => r.id));
+      const prevKnown = new Set((lastRemoteRef.current[table] || []).map((it) => String(it && it.id)));
       const { data: existing, error: selErr } = await supabase.from(table).select('id').eq('shop_id', SHOP_ID);
       if (selErr) throw selErr;
-      const toDelete = (existing || []).filter((r) => !keepIds.has(r.id)).map((r) => r.id);
+      const toDelete = (existing || []).filter((r) => !keepIds.has(r.id) && prevKnown.has(r.id)).map((r) => r.id);
       if (toDelete.length) {
         const { error: delErr } = await supabase.from(table).delete().eq('shop_id', SHOP_ID).in('id', toDelete);
         if (delErr) throw delErr;
       }
+      // Success: this list is now exactly what's on the server, so it becomes our known baseline.
+      lastRemoteRef.current[table] = list;
+      setSaveFailed(false);
     } catch (err) {
       console.error(`[vero] save '${table}' failed (data on server unchanged):`, err);
+      setSaveFailed(true);
     } finally {
       // Drain the queue: if more changes arrived while we were saving, run once more with the latest.
       const next = savingRef.current[table].queued;
@@ -877,6 +885,14 @@ export default function App() {
       const pr = await loadList('providers');    if (pr && pr.length) setProviders(pr);
       const sv = await loadList('services');     if (sv && sv.length) setServices(sv);
 
+      // Record the loaded baseline so the safe-delete reconciliation knows which rows this device
+      // already knew about (so it never deletes a row another device adds later).
+      if (cl !== null) lastRemoteRef.current.clients = cl;
+      if (ap !== null) lastRemoteRef.current.appointments = ap;
+      if (wl !== null) lastRemoteRef.current.waitlist = wl;
+      if (pr && pr.length) lastRemoteRef.current.providers = pr;
+      if (sv && sv.length) lastRemoteRef.current.services = sv;
+
       // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
       if (allLoaded) loadedRef.current = true;
       else console.error('[vero] one or more loads failed — saves are blocked until the next page reload to protect existing data');
@@ -884,12 +900,24 @@ export default function App() {
     })();
   }, []);
 
-  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: business }).then(({ error }) => { if (error) console.error('[vero] save shops failed:', error); }); }, 800); return () => clearTimeout(t); }, [business]);
+  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: business }).then(({ error }) => { if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false); }); }, 800); return () => clearTimeout(t); }, [business]);
   useEffect(() => { if (!loadedRef.current) return; if (clients === lastRemoteRef.current.clients) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
   useEffect(() => { if (!loadedRef.current) return; if (appts === lastRemoteRef.current.appointments) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current) return; if (waitlist === lastRemoteRef.current.waitlist) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
   useEffect(() => { if (!loadedRef.current) return; if (services === lastRemoteRef.current.services) return; const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
   useEffect(() => { if (!loadedRef.current) return; if (providers === lastRemoteRef.current.providers) return; const t = setTimeout(() => { syncList('providers', providers); }, 800); return () => clearTimeout(t); }, [providers]);
+
+  // Retry: re-push everything currently in memory (used by the failed-save banner's Retry button).
+  const resaveAll = () => {
+    if (!loadedRef.current) return;
+    setSaveFailed(false);
+    syncList('clients', clients);
+    syncList('appointments', appts);
+    syncList('waitlist', waitlist);
+    syncList('services', services);
+    syncList('providers', providers);
+    supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: business }).then(({ error }) => { if (error) setSaveFailed(true); });
+  };
 
   // ---- LIVE SYNC ----
   // Keep every device in step. When another device (e.g. Heather's phone) adds, edits, or
@@ -1001,6 +1029,13 @@ export default function App() {
         ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 8px; } ::-webkit-scrollbar-track { background: transparent; }
         * { -webkit-tap-highlight-color: transparent; }
       `}</style>
+
+      {saveFailed && (
+        <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#C2563F", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
+          <span>Couldn't save your last change to the server. It's still safe on this device — check your connection.</span>
+          <button onClick={resaveAll} style={{ flexShrink: 0, background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600, letterSpacing: 0.5 }}>Retry</button>
+        </div>
+      )}
 
       {view === "preview" && <Storefront business={business} services={services} providers={providers} categories={categories} onPick={goView} preview onExitPreview={() => goView("shop")} />}
       {view === "landing" && (business.website?.enabled === true
