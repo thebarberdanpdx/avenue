@@ -4120,7 +4120,10 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         if (wrapUp.length === 0) return null;
         return (
           <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>WRAP-UP</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <span style={{ width: 28, height: 1.5, background: "var(--gold)" }} />
+              <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, margin: 0, lineHeight: 1, color: "var(--text)" }}>Wrap Up</h3>
+            </div>
             {wrapUp.map((a) => {
               const d = a.pendingDurationSave;
               const client = clients.find((c) => c.id === a.clientId);
@@ -4163,10 +4166,13 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                       </div>
                     </div>
                   ) : (
+                    <>
                     <div style={{ display: "flex", gap: 8, marginTop: d ? 10 : 0 }}>
                       <button className="lift" onClick={() => { setNoteFor(a); setNoteDraft(""); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 12%, var(--panel2))", border: "1.5px solid color-mix(in srgb, var(--gold) 36%, var(--border))", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontWeight: 600 }}><Edit2 size={16} style={{ color: "var(--gold)" }} /> Note</button>
                       <button className="lift" onClick={() => { photoTargetRef.current = a; if (photoInputRef.current) photoInputRef.current.click(); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 12%, var(--panel2))", border: "1.5px solid color-mix(in srgb, var(--gold) 36%, var(--border))", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontWeight: 600 }}><Camera size={16} style={{ color: "var(--gold)" }} /> Photo</button>
                     </div>
+                    {!d && <button onClick={() => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, noteLogged: true } : x)); if (showToast) showToast("Cleared from wrap-up."); }} style={{ width: "100%", background: "transparent", border: "none", color: "var(--faint)", fontSize: 13, padding: "10px 0 2px", marginTop: 6 }}>Nothing to add — clear this</button>}
+                    </>
                   ))}
                 </div>
               );
@@ -4420,7 +4426,9 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
 // editorial bar chart, top services + top clients for the period.
 // ============================================================
 function RevenueView({ appts, clients, services, providers, onBack }) {
-  const [period, setPeriod] = useState("month"); // "week" | "month" | "year"
+  const [period, setPeriod] = useState("month"); // "week" | "month" | "year" | "custom"
+  const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().slice(0, 10); });
+  const [customTo, setCustomTo] = useState(() => new Date().toISOString().slice(0, 10));
   const now = new Date();
 
   // --- Same date helpers as PulseView (kept local for self-containment) ---
@@ -4473,12 +4481,20 @@ function RevenueView({ appts, clients, services, providers, onBack }) {
     priorStart = new Date(periodStart); priorStart.setMonth(priorStart.getMonth() - 1);
     priorEnd = new Date(periodStart);
     priorLabel = "last month";
-  } else {
+  } else if (period === "year") {
     periodStart = new Date(now.getFullYear(), 0, 1);
     periodEnd = new Date(now.getFullYear() + 1, 0, 1);
     priorStart = new Date(now.getFullYear() - 1, 0, 1);
     priorEnd = new Date(now.getFullYear(), 0, 1);
     priorLabel = "last year";
+  } else {
+    periodStart = sod(new Date(customFrom + "T00:00:00"));
+    periodEnd = sod(new Date(customTo + "T00:00:00")); periodEnd.setDate(periodEnd.getDate() + 1);
+    if (periodEnd <= periodStart) { periodEnd = new Date(periodStart); periodEnd.setDate(periodEnd.getDate() + 1); }
+    const lenMs = periodEnd.getTime() - periodStart.getTime();
+    priorEnd = new Date(periodStart);
+    priorStart = new Date(periodStart.getTime() - lenMs);
+    priorLabel = "prior period";
   }
 
   const periodTotal = sumRevenue(periodStart, periodEnd);
@@ -4489,6 +4505,24 @@ function RevenueView({ appts, clients, services, providers, onBack }) {
 
   // --- Bucket the chart depending on period ---
   const buckets = (() => {
+    if (period === "custom") {
+      const dayCount = Math.max(1, Math.round((periodEnd.getTime() - periodStart.getTime()) / 86400000));
+      if (dayCount <= 31) {
+        return Array.from({ length: dayCount }, (_, i) => {
+          const d = new Date(periodStart); d.setDate(d.getDate() + i);
+          const nd = new Date(d); nd.setDate(nd.getDate() + 1);
+          return { start: d, end: nd, label: String(d.getDate()), isCurrent: d.toDateString() === now.toDateString() };
+        });
+      }
+      const out = []; let cursor = new Date(periodStart); let wk = 1;
+      while (cursor < periodEnd) {
+        const wkEnd = new Date(cursor); wkEnd.setDate(wkEnd.getDate() + 7);
+        const realEnd = wkEnd > periodEnd ? new Date(periodEnd) : wkEnd;
+        out.push({ start: new Date(cursor), end: realEnd, label: `W${wk}`, isCurrent: now >= cursor && now < realEnd });
+        cursor = realEnd; wk++;
+      }
+      return out;
+    }
     if (period === "week") {
       const start = sow(now);
       return Array.from({ length: 7 }, (_, i) => {
@@ -4560,6 +4594,17 @@ function RevenueView({ appts, clients, services, providers, onBack }) {
 
   const fmtMoney = (n) => `$${Math.round(n).toLocaleString()}`;
 
+  const isoDay = (d) => d.toISOString().slice(0, 10);
+  const applyQuickRange = (kind) => {
+    const today = new Date();
+    let from = new Date(today);
+    if (kind === "7") from.setDate(today.getDate() - 6);
+    else if (kind === "30") from.setDate(today.getDate() - 29);
+    else if (kind === "qtd") from = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1);
+    else if (kind === "ytd") from = new Date(today.getFullYear(), 0, 1);
+    setCustomFrom(isoDay(from)); setCustomTo(isoDay(today));
+  };
+
   // --- Bar chart geometry ---
   const barWidth = period === "year" ? 18 : period === "month" ? 28 : 24;
   const gap = period === "year" ? 8 : period === "month" ? 14 : 14;
@@ -4578,18 +4623,33 @@ function RevenueView({ appts, clients, services, providers, onBack }) {
       <div style={{ marginBottom: 22 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>REVENUE</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{period === "week" ? "This week" : period === "month" ? "This month" : period === "year" ? "This year" : "Custom range"}</h2>
       </div>
 
       {/* Period toggle */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
-        {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
+      <div style={{ display: "flex", gap: 6, marginBottom: period === "custom" ? 14 : 28 }}>
+        {[["week", "Week"], ["month", "Month"], ["year", "Year"], ["custom", "Custom"]].map(([id, label]) => {
           const on = period === id;
           return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 6px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13, fontWeight: on ? 600 : 400, letterSpacing: 0.3, cursor: "pointer" }}>{label}</button>
           );
         })}
       </div>
+      {period === "custom" && (<>
+        <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+          <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, fontSize: 11, letterSpacing: 1, color: "var(--faint)", fontWeight: 600 }}>FROM
+            <input type="date" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "11px 12px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
+          </label>
+          <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, fontSize: 11, letterSpacing: 1, color: "var(--faint)", fontWeight: 600 }}>TO
+            <input type="date" value={customTo} min={customFrom} onChange={(e) => setCustomTo(e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "11px 12px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
+          </label>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 28 }}>
+          {[["7", "Last 7 days"], ["30", "Last 30"], ["qtd", "This quarter"], ["ytd", "Year to date"]].map(([k, lbl]) => (
+            <button key={k} onClick={() => applyQuickRange(k)} style={{ padding: "8px 14px", borderRadius: 20, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--sub)", fontSize: 12.5, fontWeight: 500, cursor: "pointer" }}>{lbl}</button>
+          ))}
+        </div>
+      </>)}
 
       {/* Hero number */}
       <div style={{ marginBottom: 28 }}>
@@ -4597,8 +4657,8 @@ function RevenueView({ appts, clients, services, providers, onBack }) {
           {fmtMoney(periodTotal)}
         </div>
         {delta && (
-          <div style={{ fontSize: 13.5, color: delta.up !== undefined ? (delta.up ? "var(--gold)" : "var(--sub)") : "var(--sub)", lineHeight: 1.5, marginBottom: 6 }}>
-            {delta.pct !== undefined ? <>{delta.up ? "+" : "−"}{delta.pct}% vs {fmtMoney(delta.prior)} {priorLabel}</> : delta.label}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: delta.pct !== undefined ? (delta.up ? "var(--gold)" : "var(--sub)") : "var(--sub)", background: delta.pct !== undefined && delta.up ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel2)", border: `1px solid ${delta.pct !== undefined && delta.up ? "color-mix(in srgb, var(--gold) 30%, transparent)" : "var(--border)"}`, borderRadius: 20, padding: "5px 12px", marginBottom: 10 }}>
+            {delta.pct !== undefined ? <>{delta.up ? "↑" : "↓"} {delta.pct}% vs {fmtMoney(delta.prior)} {priorLabel}</> : delta.label}
           </div>
         )}
         <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
