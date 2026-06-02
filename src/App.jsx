@@ -782,7 +782,19 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => { if (mounted) { setSession(data.session || null); setAuthReady(true); } });
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setSession(data.session || null);
+      setAuthReady(true);
+      // If the user asked for staff (via #staff) and is already signed in, go straight to the
+      // dashboard instead of the public landing page. Intent is cleared once consumed.
+      try {
+        if (localStorage.getItem("vero_login_intent") === "staff") {
+          if (data.session) { localStorage.removeItem("vero_login_intent"); setView("shop"); }
+          else { setView("shop"); } // not signed in yet -> the gate shows the login screen
+        }
+      } catch (e) {}
+    });
     const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
       setSession(sess || null);
       // Only a FRESH magic-link sign-in carries the "staff" intent flag we set when sending it,
@@ -801,7 +813,9 @@ export default function App() {
     if (typeof window === "undefined") return;
     const h = window.location.hash.toLowerCase();
     if (h === "#staff") {
-      // No password until we go live — opens dashboard directly. (Re-enable the prompt before launch.)
+      // Remember the staff intent durably: the magic-link round-trip replaces the URL hash
+      // (wiping #staff), so a flag is what survives to land us on the dashboard after auth.
+      try { localStorage.setItem("vero_login_intent", "staff"); } catch (e) {}
       setShopUnlocked(true);
       setView("shop");
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -1160,7 +1174,7 @@ export default function App() {
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={() => setView("landing")} />}
       {view === "shop" && (session
         ? <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("landing"); }} onExit={() => { setView("landing"); }} />
-        : <StaffLogin authReady={authReady} onBack={() => setView("landing")} />)}
+        : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} setView("landing"); }} />)}
     </div>
   );
 }
