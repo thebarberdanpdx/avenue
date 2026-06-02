@@ -1173,7 +1173,7 @@ export default function App() {
       {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("landing")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={() => setView("landing")} />}
       {view === "shop" && (session
-        ? <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("landing"); }} onExit={() => { setView("landing"); }} />
+        ? <ShopDashboard authEmail={session?.user?.email || null} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("landing"); }} onExit={() => { setView("landing"); }} />
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} setView("landing"); }} />)}
     </div>
   );
@@ -5827,7 +5827,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
 // ============================================================
 // SHOP DASHBOARD — adds Menu editor + Settings
 // ============================================================
-function ShopDashboard({ business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onExit }) {
+function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit }) {
   const [tab, setTab] = useState("pulse");
   const [activeClient, setActiveClient] = useState(null);
   const [pulseDetail, setPulseDetail] = useState(null); // null | "revenue" — drill-in from Pulse
@@ -5849,14 +5849,23 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   useEffect(() => {
     if (typeof window !== "undefined" && signedInAs) {
       window.localStorage.setItem("vero_signed_in_as", signedInAs);
-    }
-  }, [signedInAs]);
+    }  }, [signedInAs]);
   // If the currently-signed-in provider gets deleted, fall back gracefully
   useEffect(() => {
     if (signedInAs && !providers.some((p) => p.id === signedInAs)) {
       setSignedInAs(realProviders[0]?.id || null);
     }
   }, [providers, signedInAs]);
+  // Identify the person from their LOGIN email: if a staff member's email matches the
+  // signed-in account, act as that person — so Dan logs in and the register knows it's Dan,
+  // no PIN or manual pick. Runs when the email or staff list loads. Only overrides when a
+  // confident match exists; otherwise the device's last identity stands.
+  useEffect(() => {
+    if (!authEmail) return;
+    const norm = (e) => (e || "").trim().toLowerCase();
+    const match = realProviders.find((p) => norm(p.email) && norm(p.email) === norm(authEmail));
+    if (match && match.id !== signedInAs) setSignedInAs(match.id);
+  }, [authEmail, providers]);
   const me = providers.find((p) => p.id === signedInAs);
   const isOwner = me?.pulseRole === "owner";
   // Pulse 2.0: owners can also "view as" another barber or "shop" totals. Barbers can't.
