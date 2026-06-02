@@ -11006,8 +11006,8 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
               </div>
 
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => { setTendered(String(total)); setPayMode("cash"); }} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border2)", color: "var(--text)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><DollarSign size={16} style={{ color: "var(--gold)" }} /> CASH</button>
-                <button onClick={() => setPayMode("card")} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><CreditCard size={16} /> CARD</button>
+                <button onClick={() => { setTendered(String(total)); setPayMode("cash"); }} disabled={total <= 0} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border2)", color: "var(--text)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: total <= 0 ? 0.5 : 1 }}><DollarSign size={16} style={{ color: "var(--gold)" }} /> CASH</button>
+                <button onClick={() => setPayMode("card")} disabled={total <= 0} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: total <= 0 ? 0.5 : 1 }}><CreditCard size={16} /> CARD</button>
               </div>
             </>
           )}
@@ -11442,7 +11442,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div onClick={() => setMenuOpen(false)} style={{ position: "absolute", inset: 0, zIndex: 8 }} />
                 <div className="fade-in" style={{ position: "absolute", top: 56, right: 14, width: 250, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,0.28)", zIndex: 9, overflow: "hidden", padding: "6px 0" }}>
                   <MenuItem T={T} danger icon={<Trash2 size={17} />} label="Cancel / Delete" onClick={() => onDelete(appt.id)} />
-                  <MenuItem T={T} icon={<DollarSign size={17} />} label="Checkout" onClick={() => { setMenuOpen(false); showToast("Checkout — coming in the Payments build."); }} />
+                  <MenuItem T={T} icon={<DollarSign size={17} />} label="Checkout" onClick={() => { setMenuOpen(false); onCheckout(appt); }} />
                   {canEditPrice && savedCard && <MenuItem T={T} icon={<CreditCard size={17} />} label="Charge no-show fee" onClick={() => { setMenuOpen(false); setChargeOpen(true); }} />}
                   <Divider T={T} />
                   <MenuItem T={T} icon={<Repeat size={17} />} label="Make Repeating" onClick={() => { setMenuOpen(false); showToast("Repeating appointment set up."); }} />
