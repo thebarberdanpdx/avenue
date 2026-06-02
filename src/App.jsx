@@ -10527,14 +10527,15 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
   // ---- "running late" prompt ----
   // The next client for this provider: the soonest later appointment that's
   // still upcoming (confirmed) or already waiting (checked-in).
-  const nextClient = (appts || [])
+  const laterClients = (appts || [])
     .filter((a) => a.providerId === appt.providerId && a.id !== appt.id && a.start >= appt.start && (a.status === "confirmed" || a.status === "checked-in") && a.status !== "block")
-    .sort((a, b) => a.start - b.start)[0];
+    .sort((a, b) => a.start - b.start);
+  const nextClient = laterClients[0];
   const nextIsWaiting = nextClient && nextClient.status === "checked-in";
   const [lateOpen, setLateOpen] = useState(false);
+  const [lateCascade, setLateCascade] = useState(null); // { ci, idx } — asking about laterClients[idx] with band ranges[ci-idx]
   const sendRunningLate = (range) => {
     if (nextClient) onUpdate(nextClient.id, { lateNotified: range });
-    setLateOpen(false);
     const rl = (business && business.runningLate) || {};
     if (rl.message && nextClient) {
       const filled = rl.message
@@ -10546,6 +10547,26 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
     } else {
       showToast(nextClient ? `In-app notice sent to ${nextClient.name}: running ${range} min behind.` : `Running-late notice sent.`);
     }
+    // Cascade: offer to warn the client after next, with a lighter band as you catch up — asked one at a time.
+    const ranges = (rl.ranges) || ["5–10", "10–15"];
+    const ci = ranges.indexOf(range);
+    if (laterClients.length > 1 && ci - 1 >= 0) setLateCascade({ ci, idx: 1 });
+    else setLateOpen(false);
+  };
+  const cascadeYes = () => {
+    if (!lateCascade) return;
+    const ranges = (business?.runningLate?.ranges) || ["5–10", "10–15"];
+    const { ci, idx } = lateCascade;
+    const target = laterClients[idx];
+    const band = ranges[ci - idx];
+    if (target && band != null) {
+      onUpdate(target.id, { lateNotified: band });
+      if (showToast) showToast(`Also let ${(target.name || "").split(" ")[0]} know — running ${band} min behind.`);
+    }
+    // Offer the next one down too, if there is one and you haven't caught up yet.
+    const nextIdx = idx + 1;
+    if (laterClients[nextIdx] && (ci - nextIdx) >= 0) setLateCascade({ ci, idx: nextIdx });
+    else { setLateCascade(null); setLateOpen(false); }
   };
 
   // small building blocks
@@ -10747,8 +10768,10 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
 
             {lateOpen && (
               <>
-                <div onClick={() => setLateOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 20px 20px", boxSizing: "border-box" }}>
+                <div onClick={() => { setLateOpen(false); setLateCascade(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 20px 20px", boxSizing: "border-box" }}>
                   <div className="fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 811, padding: 24 }}>
+                  {!lateCascade ? (
+                  <>
                   <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, marginBottom: 4 }}>How far behind?</div>
                   <div style={{ fontSize: 14, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>We'll send {nextClient ? nextClient.name : "your next client"} an in-app notification — no text message.</div>
                   <div style={{ display: "flex", gap: 10 }}>
@@ -10757,6 +10780,26 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                     ))}
                   </div>
                   <button onClick={() => setLateOpen(false)} style={{ width: "100%", marginTop: 12, background: "none", border: "none", color: T.sub, fontSize: 14.5, padding: 8 }}>Cancel</button>
+                  </>
+                  ) : (() => {
+                  const ranges = (business?.runningLate?.ranges) || ["5–10", "10–15"];
+                  const target = laterClients[lateCascade.idx];
+                  const band = ranges[lateCascade.ci - lateCascade.idx];
+                  if (!target) return null;
+                  const tFirst = (target.name || "").split(" ")[0];
+                  return (
+                  <>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, marginBottom: 4 }}>{lateCascade.idx === 1 ? "Let the client after next know too?" : "And the next one in line?"}</div>
+                  <div style={{ fontSize: 14, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>{target.name} is up at {fmtTime(target.start)}. As you catch up, they'd get a lighter heads-up.</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
+                    <span style={{ fontSize: 15, fontWeight: 500 }}>{target.name}</span>
+                    <span style={{ fontSize: 14, color: T.accent, fontWeight: 600 }}>{band} min behind</span>
+                  </div>
+                  <button className="lift" onClick={cascadeYes} style={{ width: "100%", background: T.accent, color: T.accentText, border: "none", padding: "15px 0", borderRadius: 14, fontSize: 15.5, fontWeight: 600 }}>Yes, let {tFirst} know</button>
+                  <button onClick={() => { setLateCascade(null); setLateOpen(false); }} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: T.sub, fontSize: 14.5, padding: 8 }}>No, that's all</button>
+                  </>
+                  );
+                  })()}
                   </div>
                 </div>
               </>
