@@ -3658,7 +3658,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 // Owners get a "viewing as" picker to flip between barbers or shop totals.
 // Barbers only see their own chair, period.
 // ============================================================
-function PulseView({ business, appts, setAppts, clients, setClients, services, providers, setProviders, me, isOwner, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onSignOut, showToast }) {
+function PulseView({ business, appts, setAppts, clients, setClients, services, providers, setProviders, me, isOwner, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onOpenClient, onSignOut, showToast }) {
   const now = new Date();
   const realProviders = providers.filter((p) => p.id !== "anyone");
 
@@ -3806,7 +3806,16 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
     return (days - c.cadenceDays) > 0;
   }).length;
 
-  // --- Formatters ---
+  // --- Recent cuts that still need a note or photo (this provider ONLY — never shown in shop view) ---
+  const needNotes = (!isShopView && viewedProvider) ? (appts || []).filter((a) => {
+    if (a.status !== "done") return false;
+    if (a.providerId !== viewedProvider.id) return false;
+    if (a.hasNote || a.hasPhotos || a.noteLogged) return false;
+    if (!clients.some((c) => c.id === a.clientId)) return false; // need a real profile to add to
+    if (a.bookedFor) { const days = Math.round((Date.now() - new Date(a.bookedFor).getTime()) / 86400000); if (days < 0 || days > 7) return false; }
+    return true;
+  }) : [];
+  const needNotesCount = needNotes.length;
   const fmtMoney = (n) => `$${Math.round(n).toLocaleString()}`;
   const todayLabel = `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
 
@@ -4146,6 +4155,25 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             <div style={{ textAlign: "left" }}>
               <div style={{ fontSize: 15, fontWeight: 500 }}>{overdueCount} client{overdueCount > 1 ? "s" : ""} overdue to rebook</div>
               <div style={{ fontSize: 13, color: "var(--sub)" }}>Open the nudge folder</div>
+            </div>
+          </div>
+          <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+        </button>
+      )}
+
+      {needNotesCount > 0 && (
+        <button onClick={() => {
+          const target = [...needNotes].sort((a, b) => ((Date.parse(b.bookedFor) || Date.now()) - (Date.parse(a.bookedFor) || Date.now())))[0];
+          if (!target) return;
+          const client = clients.find((c) => c.id === target.clientId);
+          setAppts((cur) => cur.map((a) => a.id === target.id ? { ...a, noteLogged: true } : a));
+          if (client && onOpenClient) onOpenClient(client); else if (onNavigate) onNavigate("clients");
+        }} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginTop: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Camera size={17} style={{ color: "var(--gold)" }} />
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 15, fontWeight: 500 }}>{needNotesCount} cut{needNotesCount > 1 ? "s" : ""} need a note or photo</div>
+              <div style={{ fontSize: 13, color: "var(--sub)" }}>Tap to add to their profile</div>
             </div>
           </div>
           <ChevronRight size={18} style={{ color: "var(--faint)" }} />
@@ -5611,7 +5639,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         <div style={{ width: 50 }} />
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
-        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} showToast={showToast} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
@@ -9244,7 +9272,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         if (src) {
           const nd = summary.rebookDate ? new Date(summary.rebookDate + "T00:00:00") : (() => { const d = new Date(); d.setDate(d.getDate() + summary.rebookWeeks * 7); return d; })();
           const dur = src.end - src.start;
-          const startMin = (summary.rebookStart != null) ? summary.rebookStart : src.start;
+          const startMin = (summary.rebookStart != null) ? summary.rebookStart : earliestOpenSlot(src.providerId, nd, dur);
           const newAppt = { ...src, id: "rb" + Date.now() + Math.floor(Math.random() * 1000), status: "confirmed", paid: null, prepaid: false, rebookDiscount: (business?.rebook?.discountEnabled !== false ? (business?.rebook?.discount || 0) : 0), rebookDiscountType: business?.rebook?.discountType || "amount", bookedFor: nd.toISOString(), start: startMin, end: startMin + dur, photos: 0, hasPhotos: false, hasNote: false };
           done.push(newAppt);
         }
@@ -9654,16 +9682,28 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   const selectedDate = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(0, 0, 0, 0); return d; }, [dayOffset]);
   const sameDay = (iso, refDate) => { if (!iso) return false; const a = new Date(iso); return a.getFullYear() === refDate.getFullYear() && a.getMonth() === refDate.getMonth() && a.getDate() === refDate.getDate(); };
 
-  // find the first open 15-min slot for a provider today (falls back to DAY_START)
-  const nextFreeSlot = (providerId) => {
-    const booked = appts.filter((a) => a.providerId === providerId && a.status !== "done").sort((a, b) => a.start - b.start);
-    let t = DAY_START;
-    for (const a of booked) {
-      if (a.start >= t + 15) break;     // found a gap before this appt
-      if (a.end > t) t = a.end;          // push past this appt
+  // Earliest open slot for a provider on a given date, respecting that day's working hours and
+  // existing bookings. durMin = the appointment length to fit. + NEW and rebook default to this,
+  // so a new booking lands at the earliest fair time — the barber can still drag it anywhere.
+  const earliestOpenSlot = (providerId, date, durMin = 30) => {
+    const prov = providers.find((p) => p.id === providerId) || providers[0];
+    const dur = Math.max(15, Number(durMin) || 30);
+    const h = prov && prov.hours && prov.hours[date.getDay()];
+    const open = (h && h.on) ? h.start : DAY_START;
+    const close = (h && h.on) ? h.end : DAY_END;
+    const busy = (appts || [])
+      .filter((a) => a.providerId === providerId && sameDay(a.bookedFor, date) && a.status !== "cancelled" && a.status !== "done")
+      .map((a) => [a.start, a.end])
+      .sort((x, y) => x[0] - y[0]);
+    let t = open;
+    for (const [bs, be] of busy) {
+      if (t + dur <= bs) break;   // fits in the gap before this booking
+      if (be > t) t = be;          // otherwise jump past it
     }
-    return Math.min(t, DAY_END - 15);
+    return Math.min(t, Math.max(open, close - dur));
   };
+  // + NEW quick-add defaults to the earliest open slot on the day in view.
+  const nextFreeSlot = (providerId) => earliestOpenSlot(providerId, selectedDate, 30);
 
   return (
     <div className="fade-up">
