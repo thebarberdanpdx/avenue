@@ -824,6 +824,23 @@ export default function App() {
     }
   };
 
+  // ---- LIVE SYNC HELPERS ----
+  // Re-pull one list table from the server and apply it locally. We remember the exact array
+  // we applied (lastRemoteRef) so the matching save effect can tell "this is a remote update,
+  // don't bounce it back as my own save" with a simple reference check — which also prevents
+  // any save loop between two devices.
+  const lastRemoteRef = useRef({});
+  const tableSetters = { clients: setClients, appointments: setAppts, waitlist: setWaitlist, services: setServices, providers: setProviders };
+  const refetchTable = async (table) => {
+    try {
+      const { data, error } = await supabase.from(table).select('data').eq('shop_id', SHOP_ID);
+      if (error) { console.error(`[vero] live-sync refetch '${table}' failed:`, error); return; }
+      const list = data ? data.map((r) => r.data) : [];
+      lastRemoteRef.current[table] = list;
+      const set = tableSetters[table]; if (set) set(list);
+    } catch (e) { console.error('[vero] live-sync refetch error:', e); }
+  };
+
   useEffect(() => {
     (async () => {
       let allLoaded = true; // flipped to false on ANY real error — blocks saves so seeds can't overwrite real data
@@ -856,11 +873,32 @@ export default function App() {
   }, []);
 
   useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: business }).then(({ error }) => { if (error) console.error('[vero] save shops failed:', error); }); }, 800); return () => clearTimeout(t); }, [business]);
-  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
-  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
-  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
-  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
-  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { syncList('providers', providers); }, 800); return () => clearTimeout(t); }, [providers]);
+  useEffect(() => { if (!loadedRef.current) return; if (clients === lastRemoteRef.current.clients) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
+  useEffect(() => { if (!loadedRef.current) return; if (appts === lastRemoteRef.current.appointments) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
+  useEffect(() => { if (!loadedRef.current) return; if (waitlist === lastRemoteRef.current.waitlist) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
+  useEffect(() => { if (!loadedRef.current) return; if (services === lastRemoteRef.current.services) return; const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
+  useEffect(() => { if (!loadedRef.current) return; if (providers === lastRemoteRef.current.providers) return; const t = setTimeout(() => { syncList('providers', providers); }, 800); return () => clearTimeout(t); }, [providers]);
+
+  // ---- LIVE SYNC ----
+  // Keep every device in step. When another device (e.g. Heather's phone) adds, edits, or
+  // removes a booking/client, Supabase Realtime tells us instantly and we re-pull that table —
+  // so this device always has the full picture and its next save can never delete a row it
+  // simply hadn't loaded yet. Purely additive: if Realtime is off/unavailable, the app behaves
+  // exactly as before (saves & loads unchanged); it just won't auto-refresh between devices.
+  // NOTE: enable Realtime for these tables in Supabase for this to fire.
+  useEffect(() => {
+    if (!dataLoaded) return;
+    const tables = ['clients', 'appointments', 'waitlist', 'services', 'providers'];
+    let channel;
+    try {
+      channel = supabase.channel(`vero-sync-${SHOP_ID}`);
+      tables.forEach((table) => {
+        channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `shop_id=eq.${SHOP_ID}` }, () => { refetchTable(table); });
+      });
+      channel.subscribe();
+    } catch (e) { console.error('[vero] live-sync subscribe failed:', e); }
+    return () => { try { if (channel) supabase.removeChannel(channel); } catch (e) { /* ignore */ } };
+  }, [dataLoaded, SHOP_ID]);
 
   // Mirror the theme class onto <html> so CSS variables (--gold, --bg, --text, etc.) cascade
   // to portaled content too (booking form, conflict popup, etc. — these render under document.body,
