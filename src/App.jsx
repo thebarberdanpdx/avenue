@@ -5732,7 +5732,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} />}
-        {tab === "settings" && isOwner && <SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} showToast={showToast} />}
+        {tab === "settings" && isOwner && <SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} />}
       </div>
 
       {/* fixed bottom tab bar — anchors to viewport bottom. transform:translateZ(0) puts it on its own GPU layer so iOS Safari doesn't let it drift during scroll/overscroll. */}
@@ -8401,7 +8401,7 @@ function WebsiteEditor({ w, onChange, business, theme, setTheme }) {
   );
 }
 
-function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, showToast }) {
+function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast }) {
   const [form, setForm] = useState(business);
   const [openCard, setOpenCard] = useState(null);
   const [query, setQuery] = useState("");
@@ -8797,6 +8797,14 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 10, fontWeight: 600 }}>SETTINGS</div>
         <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 38, fontWeight: 500, lineHeight: 0.98, letterSpacing: "-0.6px" }}>What do you want to change?</h2>
       </div>
+
+      {/* Signed in as — so you and Heather always know whose account is driving */}
+      {me && (
+        <div style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "9px 12px", marginBottom: 16, width: "fit-content" }}>
+          <Avatar size={24} initial={me.name?.charAt(0)} color={me.color} photo={me.photo} />
+          <span style={{ fontSize: 13.5, color: "var(--sub)" }}>Signed in as <span style={{ color: "var(--text)", fontWeight: 600 }}>{me.name}</span>{me.pulseRole === "owner" ? " · Owner" : ""}</span>
+        </div>
+      )}
 
       {/* HERO SEARCH */}
       <div style={{ position: "relative", marginBottom: 12 }}>
