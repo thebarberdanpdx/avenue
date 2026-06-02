@@ -9040,14 +9040,6 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 38, fontWeight: 500, lineHeight: 0.98, letterSpacing: "-0.6px" }}>What do you want to change?</h2>
       </div>
 
-      {/* Signed in as — so you and Heather always know whose account is driving */}
-      {me && (
-        <div style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "9px 12px", marginBottom: 16, width: "fit-content" }}>
-          <Avatar size={24} initial={me.name?.charAt(0)} color={me.color} photo={me.photo} />
-          <span style={{ fontSize: 13.5, color: "var(--sub)" }}>Signed in as <span style={{ color: "var(--text)", fontWeight: 600 }}>{me.name}</span>{me.pulseRole === "owner" ? " · Owner" : ""}</span>
-        </div>
-      )}
-
       {/* HERO SEARCH */}
       <div style={{ position: "relative", marginBottom: 12 }}>
         <input value={query} onChange={(e) => { setQuery(e.target.value); setOpenCat(null); }} placeholder="Try “tipping”, “hours”, “remind clients”…" style={{ width: "100%", background: "var(--panel)", border: "1.5px solid var(--border)", borderRadius: 16, padding: "19px 18px 19px 52px", color: "var(--text)", fontSize: 17, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
