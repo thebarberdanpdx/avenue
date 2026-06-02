@@ -722,12 +722,78 @@ const lockedApptPrice = (appt, service) => (appt && appt.price != null) ? appt.p
 const inputStyle = { width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY };
 
 // ============================================================
+// ============================================================================
+// STAFF LOGIN — magic-link sign-in for the dashboard ONLY. Clients never see this.
+// Enter email -> Supabase emails a one-tap sign-in link -> you're in and stay in.
+// ============================================================================
+function StaffLogin({ authReady, onBack }) {
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const send = async () => {
+    const clean = email.trim().toLowerCase();
+    if (!clean || !clean.includes("@")) { setErr("Enter a valid email."); return; }
+    setBusy(true); setErr("");
+    try {
+      try { localStorage.setItem("vero_login_intent", "staff"); } catch (e) {}
+      const { error } = await supabase.auth.signInWithOtp({ email: clean, options: { emailRedirectTo: window.location.origin } });
+      if (error) { setErr(error.message || "Couldn't send the link. Try again."); setBusy(false); return; }
+      setSent(true); setBusy(false);
+    } catch (e) { setErr("Couldn't send the link. Try again."); setBusy(false); }
+  };
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "var(--bg, #f6f3ec)" }}>
+      <div className="fade-up" style={{ width: "100%", maxWidth: 380 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+          <span style={{ width: 28, height: 1.5, background: "var(--gold)" }} />
+          <span style={{ fontSize: 12, letterSpacing: 3, color: "var(--faint)", textTransform: "uppercase" }}>Staff sign-in</span>
+        </div>
+        {!sent ? (
+          <>
+            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.5px", margin: "0 0 10px" }}>Welcome back</h1>
+            <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.5, margin: "0 0 26px" }}>Enter your email and we'll send a one-tap sign-in link. No password to remember.</p>
+            <input type="email" value={email} autoFocus inputMode="email" autoCapitalize="none" placeholder="you@email.com" onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, padding: "16px 16px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, marginBottom: 12, boxSizing: "border-box" }} />
+            {err && <p style={{ color: "#c0392b", fontSize: 13.5, margin: "0 0 12px" }}>{err}</p>}
+            <button className="lift" disabled={busy || !authReady} onClick={send} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "17px 20px", fontSize: 16, fontWeight: 500, borderRadius: 16, border: "none", boxShadow: "var(--shadow-md)", opacity: busy || !authReady ? 0.6 : 1, cursor: busy ? "default" : "pointer" }}>{busy ? "Sending…" : "Send sign-in link"}</button>
+          </>
+        ) : (
+          <>
+            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.5px", margin: "0 0 12px" }}>Check your email</h1>
+            <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.55, margin: "0 0 8px" }}>We sent a sign-in link to <strong style={{ color: "var(--text)", fontWeight: 500 }}>{email.trim().toLowerCase()}</strong>. Tap it on this device and you're in.</p>
+            <p style={{ color: "var(--faint)", fontSize: 13, fontWeight: 300, lineHeight: 1.5, margin: "0 0 24px" }}>Didn't get it? Check spam, or send it again.</p>
+            <button onClick={() => { setSent(false); setBusy(false); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "15px 20px", fontSize: 15, borderRadius: 14, border: "1px solid var(--border2)", cursor: "pointer" }}>Use a different email</button>
+          </>
+        )}
+        <button onClick={onBack} style={{ width: "100%", background: "transparent", color: "var(--faint)", fontSize: 13.5, padding: "16px 0 2px", border: "none", marginTop: 8, cursor: "pointer" }}>← Back to site</button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [view, setView] = useState("landing");
   const [shopUnlocked, setShopUnlocked] = useState(true);
   const [shopPwPrompt, setShopPwPrompt] = useState(false);
   const [pwEntry, setPwEntry] = useState("");
   const [pwError, setPwError] = useState(false);
+  // ---- AUTH: magic-link login, STAFF DASHBOARD ONLY (booking side is never gated) ----
+  const [session, setSession] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => { if (mounted) { setSession(data.session || null); setAuthReady(true); } });
+    const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
+      setSession(sess || null);
+      // Only a FRESH magic-link sign-in carries the "staff" intent flag we set when sending it,
+      // so we drop the owner straight on the dashboard. A normal returning visitor has no flag,
+      // so the public booking link is never hijacked to the dashboard.
+      if (event === "SIGNED_IN") {
+        try { if (localStorage.getItem("vero_login_intent") === "staff") { localStorage.removeItem("vero_login_intent"); setView("shop"); } } catch (e) {}
+      }
+    });
+    return () => { mounted = false; try { sub.subscription.unsubscribe(); } catch (e) {} };
+  }, []);
   const SHOP_PASSWORD = "avenue2026"; // change this to whatever you want
   // Staff reach the dashboard via a hidden URL: add #staff to the web address.
   // Clients never see anything about staff — the app opens straight into booking.
@@ -1092,7 +1158,9 @@ export default function App() {
       {view === "privacy" && <PrivacyPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("landing")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={() => setView("landing")} />}
-      {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} onExit={() => { setView("landing"); }} />}
+      {view === "shop" && (session
+        ? <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("landing"); }} onExit={() => { setView("landing"); }} />
+        : <StaffLogin authReady={authReady} onBack={() => setView("landing")} />)}
     </div>
   );
 }
