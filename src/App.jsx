@@ -4001,6 +4001,13 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                     <button className="lift" onClick={onSave} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: "10px 14px", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", letterSpacing: 0.5 }}>SAVE {d.suggestedMin} MIN</button>
                     <button onClick={onDismiss} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: "10px 14px", borderRadius: 10, fontSize: 14 }}>Discard</button>
                   </div>
+                  <button onClick={() => { const client = clients.find((c) => c.id === d.clientId); setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, noteLogged: true } : x)); if (client && onOpenClient) onOpenClient(client); else if (onNavigate) onNavigate("clients"); }} className="lift" style={{ width: "100%", marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "color-mix(in srgb, var(--gold) 13%, var(--panel2))", border: "1.5px solid color-mix(in srgb, var(--gold) 38%, var(--border))", borderRadius: 12, padding: "13px 15px", cursor: "pointer", color: "var(--text)" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <Camera size={18} style={{ color: "var(--gold)" }} />
+                      <span style={{ fontSize: 14.5, fontWeight: 600 }}>Add a note or photo</span>
+                    </span>
+                    <ChevronRight size={17} style={{ color: "var(--gold)" }} />
+                  </button>
                 </div>
               );
             })}
@@ -4172,7 +4179,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Camera size={17} style={{ color: "var(--gold)" }} />
             <div style={{ textAlign: "left" }}>
-              <div style={{ fontSize: 15, fontWeight: 500 }}>{needNotesCount} cut{needNotesCount > 1 ? "s" : ""} need a note or photo</div>
+              <div style={{ fontSize: 15, fontWeight: 500 }}>{needNotesCount} cut{needNotesCount > 1 ? "s" : ""} {needNotesCount > 1 ? "need" : "needs"} a note or photo</div>
               <div style={{ fontSize: 13, color: "var(--sub)" }}>Tap to add to their profile</div>
             </div>
           </div>
