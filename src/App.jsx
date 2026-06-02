@@ -1056,6 +1056,12 @@ export default function App() {
         .card { box-shadow: var(--shadow-sm); }
         ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 8px; } ::-webkit-scrollbar-track { background: transparent; }
         * { -webkit-tap-highlight-color: transparent; }
+        ::selection { background: color-mix(in srgb, var(--gold) 26%, transparent); }
+        #app-root h1, #app-root h2, #app-root h3 { text-wrap: balance; }
+        #app-root p { text-wrap: pretty; }
+        #app-root button:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 38%, transparent); }
+        @keyframes shimmer { 0% { background-position: -480px 0; } 100% { background-position: 480px 0; } }
+        .skeleton { background: linear-gradient(90deg, var(--panel2) 25%, color-mix(in srgb, var(--panel2) 55%, var(--panel)) 50%, var(--panel2) 75%); background-size: 960px 100%; animation: shimmer 1.4s linear infinite; border-radius: 10px; }
       `}</style>
 
       {saveFailed && (
@@ -1521,6 +1527,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [keepEmail, setKeepEmail] = useState("new"); // "file" | "new"
   const [selectedDate, setSelectedDate] = useState(null);
   const [slot, setSlot] = useState(null);
+  const [slotsReady, setSlotsReady] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [cardOnFile, setCardOnFile] = useState(false); // simulated card-on-file for no-show protection
   const [showWaitlist, setShowWaitlist] = useState(false);
@@ -1799,6 +1806,12 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   }, [selectedDate, provider, providers, cartMin, appts, isMultiPerson, groupSlots, cart]);
   const slotIsSameTime = isMultiPerson && groupSlots && slot != null && groupSlots.sameTime.includes(slot);
   const dateIsFull = selectedDate && openSlots.length === 0;
+  useEffect(() => {
+    if (!selectedDate) { setSlotsReady(false); return; }
+    setSlotsReady(false);
+    const id = setTimeout(() => setSlotsReady(true), 320);
+    return () => clearTimeout(id);
+  }, [selectedDate]);
 
   const back = () => { setShowWaitlist(false); if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "change") { setSimpleStep((draft && draft.cutTypes && draft.cutTypes.length) ? "cut" : "what"); return; } if (simpleStep === "finish") { setSimpleStep("change"); return; } if (simpleStep === "who") { const hasFinish = draft && (draft.addonGroups || []).some((g) => g.type === "addon"); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(6); return; } setStep(step - 1); };
 
@@ -1911,17 +1924,26 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         <div key={screenKey} className="screen-swap">
         {/* STEP 0 — WELCOME / front door */}
         {step === 0 && !simpleStep && (
-          <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center", padding: "10px 4px 0" }}>
-            <div style={{ fontSize: 13, letterSpacing: 3, color: "var(--faint)", marginBottom: 14 }}>WELCOME TO</div>
-            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, lineHeight: 1.05, margin: "0 0 14px" }}>{business.name}</h1>
-            <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, margin: "0 auto 38px", maxWidth: 280 }}>Glad you're here. Let's find you a time.</p>
-            <button className="lift" onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "20px 18px", fontSize: 16, fontWeight: 500, borderRadius: 14, border: "none", marginBottom: 13, textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
-              <span style={{ fontSize: 17 }}>I've been here before</span>
-              <span style={{ fontSize: 13, opacity: 0.8, fontWeight: 300 }}>We'll pull up your details</span>
+          <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "10px 4px 0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+              <span style={{ width: 28, height: 1.5, background: "var(--gold)" }} />
+              <span style={{ fontSize: 12, letterSpacing: 3, color: "var(--faint)", textTransform: "uppercase" }}>Welcome to</span>
+            </div>
+            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 48, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.5px", margin: "0 0 14px" }}>{business.name}</h1>
+            <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300, lineHeight: 1.5, margin: "0 0 34px", maxWidth: 300 }}>Glad you're here. Let's find you a time.</p>
+            <button className="lift" onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "19px 20px", fontSize: 16, fontWeight: 500, borderRadius: 16, border: "none", marginBottom: 12, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "var(--shadow-md)" }}>
+              <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <span style={{ fontSize: 17 }}>I've been here before</span>
+                <span style={{ fontSize: 13, opacity: 0.82, fontWeight: 300 }}>We'll pull up your details</span>
+              </span>
+              <ChevronRight size={20} style={{ opacity: 0.9, flexShrink: 0 }} />
             </button>
-            <button className="lift" onClick={() => { setBookingFor(null); setMatched(null); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleStep("what"); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", textAlign: "left", display: "flex", flexDirection: "column", gap: 3 }}>
-              <span style={{ fontSize: 17 }}>It's my first time</span>
-              <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>Welcome — let's take a look</span>
+            <button className="lift" onClick={() => { setBookingFor(null); setMatched(null); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleStep("what"); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "19px 20px", fontSize: 16, borderRadius: 16, border: "1px solid var(--border)", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "var(--shadow-sm)" }}>
+              <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <span style={{ fontSize: 17 }}>It's my first time</span>
+                <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>Welcome — let's take a look</span>
+              </span>
+              <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
             </button>
           </div>
         )}
@@ -3132,7 +3154,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
               <div style={{ fontSize: 13.5, color: "var(--gold)", fontWeight: 500, marginBottom: 14 }}>{daysFromNow(selectedDate)}</div>
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{openSlots.map((t) => (<button key={t} className="lift" onClick={() => setSlot(t)} style={{ background: slot === t ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: slot === t ? "var(--gold)" : "var(--border2)", borderRadius: 10, padding: "13px 4px", color: slot === t ? "var(--on-gold)" : "var(--text)", fontSize: 14 }}>{fmtTime(t)}</button>))}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{slotsReady ? openSlots.map((t) => (<button key={t} className="lift" onClick={() => setSlot(t)} style={{ background: slot === t ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: slot === t ? "var(--gold)" : "var(--border2)", borderRadius: 10, padding: "13px 4px", color: slot === t ? "var(--on-gold)" : "var(--text)", fontSize: 14 }}>{fmtTime(t)}</button>)) : [0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 10 }} />))}</div>
               {slot != null && <button className="lift" onClick={() => setStep(7)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 24 }}>Continue →</button>}
             </>)}
 
@@ -3733,7 +3755,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 // Owners get a "viewing as" picker to flip between barbers or shop totals.
 // Barbers only see their own chair, period.
 // ============================================================
-function PulseView({ business, appts, setAppts, clients, setClients, services, providers, setProviders, me, isOwner, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenPayments, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onOpenClient, onSignOut, showToast }) {
+function PulseView({ business, appts, setAppts, clients, setClients, services, providers, setProviders, me, isOwner, dataLoaded, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenPayments, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onOpenClient, onSignOut, showToast }) {
   const now = new Date();
   const realProviders = providers.filter((p) => p.id !== "anyone");
 
@@ -3944,6 +3966,25 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
     setProviders(providers.map((p) => p.id === viewedProvider.id ? { ...p, [field]: val } : p));
     setGoalEditor(null);
   };
+
+  if (!dataLoaded) return (
+    <div className="fade-up">
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 18 }} />
+        <div className="skeleton" style={{ width: 96, height: 12, marginBottom: 12 }} />
+        <div className="skeleton" style={{ width: "68%", height: 38, borderRadius: 12 }} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 22 }}>
+        <div className="skeleton" style={{ height: 96, borderRadius: 16 }} />
+        <div className="skeleton" style={{ height: 96, borderRadius: 16 }} />
+      </div>
+      <div className="skeleton" style={{ height: 120, borderRadius: 16, marginBottom: 24 }} />
+      <div className="skeleton" style={{ width: 140, height: 14, marginBottom: 14 }} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {[0, 1, 2, 3].map((i) => (<div key={"pk" + i} className="skeleton" style={{ height: 64, borderRadius: 14 }} />))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="fade-up">
@@ -5760,7 +5801,7 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
         <div style={{ width: 50 }} />
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
-        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenPayments={() => setPulseDetail("payments")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} showToast={showToast} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenPayments={() => setPulseDetail("payments")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "payments" && <PaymentsView clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={() => setPulseDetail(null)} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
