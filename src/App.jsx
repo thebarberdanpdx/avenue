@@ -1092,7 +1092,7 @@ export default function App() {
       {view === "privacy" && <PrivacyPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("landing")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={() => setView("landing")} />}
-      {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} recoveryCode={SHOP_PASSWORD} onExit={() => { setView("landing"); }} />}
+      {view === "shop" && <ShopDashboard business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} onExit={() => { setView("landing"); }} />}
     </div>
   );
 }
@@ -5685,7 +5685,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
 // ============================================================
 // SHOP DASHBOARD — adds Menu editor + Settings
 // ============================================================
-function ShopDashboard({ business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, recoveryCode, onExit }) {
+function ShopDashboard({ business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onExit }) {
   const [tab, setTab] = useState("pulse");
   const [activeClient, setActiveClient] = useState(null);
   const [pulseDetail, setPulseDetail] = useState(null); // null | "revenue" — drill-in from Pulse
