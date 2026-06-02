@@ -574,6 +574,34 @@ function fmtPhone(number) {
   if (d.length === 11 && d[0] === "1") return `(${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7)}`;
   return String(number);
 }
+// ---- Stripe (client side) ----
+// The publishable key is meant to be public and safe to ship in the app bundle.
+// The SECRET key lives only in Vercel (env var) and is used by /api/stripe — never here.
+const STRIPE_PUBLISHABLE_KEY = "pk_test_51TdVev0XV9TtWHCq8s4dGMpa6zLDn4otUSTcFNtlrRIPJGedN9dEKPeSQMZxFxJgEXW4cW2n1JjAT7p6MPS5Rdxe00bogFrsmR";
+let _stripePromise = null;
+function getStripe() {
+  if (_stripePromise) return _stripePromise;
+  _stripePromise = new Promise((resolve) => {
+    if (typeof window === "undefined") { resolve(null); return; }
+    if (window.Stripe) { resolve(window.Stripe(STRIPE_PUBLISHABLE_KEY)); return; }
+    const el = document.createElement("script");
+    el.src = "https://js.stripe.com/v3/";
+    el.async = true;
+    el.onload = () => resolve(window.Stripe ? window.Stripe(STRIPE_PUBLISHABLE_KEY) : null);
+    el.onerror = () => resolve(null);
+    document.head.appendChild(el);
+  });
+  return _stripePromise;
+}
+// Call our serverless Stripe function. Throws with a readable message on failure.
+async function stripeApi(payload) {
+  const r = await fetch("/api/stripe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  let data = {};
+  try { data = await r.json(); } catch (e) {}
+  if (!r.ok || data.error) throw new Error(data.error || `Request failed (${r.status})`);
+  return data;
+}
+
 function PhoneLink({ number, style }) {
   const [open, setOpen] = useState(false);
   if (!number) return null;
@@ -10202,6 +10230,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           appt={open}
           providers={providers}
           clients={clients}
+          setClients={setClients}
           services={services}
           business={business}
           isOwner={isOwner}
@@ -10527,7 +10556,64 @@ function CheckoutRow({ label, val, bold }) {
   );
 }
 
-function AppointmentSheet({ appt, appts, providers, clients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
+// Secure card-on-file capture. The card field is a Stripe Element — raw card numbers
+// go straight from the phone to Stripe and never touch our code or server.
+function CardOnFileSheet({ open, onClose, client, onSaved, showToast }) {
+  const cardBox = useRef(null);
+  const stripeRef = useRef(null);
+  const elRef = useRef(null);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    if (!open) return;
+    let dead = false;
+    setReady(false); setErr("");
+    getStripe().then((stripe) => {
+      if (dead) return;
+      if (!stripe) { setErr("Couldn't load Stripe — check your connection and try again."); return; }
+      stripeRef.current = stripe;
+      const elements = stripe.elements();
+      const card = elements.create("card", { style: { base: { fontSize: "16px", color: "#232221", fontFamily: "inherit", "::placeholder": { color: "#A39C8A" } } } });
+      elRef.current = card;
+      requestAnimationFrame(() => { if (!dead && cardBox.current) { try { card.mount(cardBox.current); setReady(true); } catch (e) { setErr("Couldn't open the card field."); } } });
+    });
+    return () => { dead = true; try { elRef.current && elRef.current.unmount(); } catch (e) {} elRef.current = null; stripeRef.current = null; };
+  }, [open]);
+  const save = async () => {
+    const stripe = stripeRef.current, card = elRef.current;
+    if (!stripe || !card) return;
+    setBusy(true); setErr("");
+    try {
+      const pm = await stripe.createPaymentMethod({ type: "card", card });
+      if (pm.error) throw new Error(pm.error.message);
+      const setup = await stripeApi({ action: "setup", customerId: client?.card?.stripeCustomerId || null, name: client?.name, email: client?.email, phone: client?.phone });
+      const conf = await stripe.confirmCardSetup(setup.clientSecret, { payment_method: pm.paymentMethod.id });
+      if (conf.error) throw new Error(conf.error.message);
+      onSaved({ stripeCustomerId: setup.customerId, paymentMethodId: pm.paymentMethod.id, brand: pm.paymentMethod.card.brand, last4: pm.paymentMethod.card.last4 });
+      showToast("Card saved on file.");
+      onClose();
+    } catch (e) { setErr(e.message || "Couldn't save the card."); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Sheet open={open} onClose={onClose} align="bottom" maxWidth={420}>
+      <div style={{ padding: "6px 4px 8px" }}>
+        <div style={{ textAlign: "center", marginBottom: 18 }}>
+          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD ON FILE</div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
+        </div>
+        <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
+        {!ready && !err && <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", marginBottom: 12 }}>Loading secure card field…</div>}
+        {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
+        <button onClick={save} disabled={busy || !ready} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: (busy || !ready) ? 0.55 : 1 }}><Check size={17} /> {busy ? "SAVING…" : "SAVE CARD"}</button>
+        <button onClick={onClose} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 6 }}>Cancel</button>
+      </div>
+    </Sheet>
+  );
+}
+
+function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
   const scrollTopRef = useRef(null);
@@ -10596,6 +10682,13 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
   const resetPrice = () => { onUpdate(appt.id, { price: null }); setPriceOpen(false); showToast("Price reset to the service default."); };
   // Who can edit price: owners and admins (you + Heather). Only an explicit regular "Staff" member is blocked.
   const canEditPrice = me ? (me.pulseRole === "owner" || me.userType !== "Staff") : true;
+  // ---- card on file (admin) ----
+  const [cardOpen, setCardOpen] = useState(false);
+  const savedCard = (client && client.card && client.card.last4) ? client.card : null;
+  const saveCardToClient = (info) => {
+    if (!client || !setClients) { showToast("Couldn't attach the card to this client."); return; }
+    setClients((prev) => prev.map((c) => c.id === client.id ? { ...c, card: info } : c));
+  };
 
   const staff = providers.filter((p) => p.id !== "anyone");
 
@@ -10783,7 +10876,14 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                 <div style={{ marginTop: 18, display: "grid", gap: 11 }}>
                   <DetailRow T={T} label="Phone" value={client?.phone ? <PhoneLink number={client.phone} /> : "—"} accent />
                   <DetailRow T={T} label="Email" value={client?.email ? <EmailLink email={client.email} /> : "—"} />
-                  <DetailRow T={T} label="Credit" value="Visa  ···7815   Exp 9/30" icon={<CreditCard size={13} style={{ color: T.faint }} />} />
+                  <DetailRow T={T} label="Credit" value={
+                    canEditPrice ? (
+                      <button onClick={() => setCardOpen(true)} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: savedCard ? T.text : "var(--gold)", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500 }}>
+                        {savedCard ? `${savedCard.brand ? savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1) : "Card"} ···· ${savedCard.last4}` : "Add card on file"}
+                        <Edit2 size={13} style={{ color: T.faint }} />
+                      </button>
+                    ) : (savedCard ? `${savedCard.brand || "Card"} ···· ${savedCard.last4}` : "No card on file")
+                  } icon={<CreditCard size={13} style={{ color: T.faint }} />} />
                 </div>
                 {/* client's standing note — after contact so the name → contact read isn't interrupted */}
                 {client && client.notes && (
@@ -10992,6 +11092,8 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
           <button onClick={() => setPriceOpen(false)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 4 }}>Cancel</button>
         </div>
       </Sheet>
+
+      <CardOnFileSheet open={cardOpen} onClose={() => setCardOpen(false)} client={client} onSaved={saveCardToClient} showToast={showToast} />
       </div>
     </div>
     </Portal>
