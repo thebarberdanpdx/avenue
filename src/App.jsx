@@ -32,7 +32,7 @@ const PHOTO_LIBRARY = {
     "photo-1512290923902-8a9f81dc236c", "photo-1519823551278-64ac92734fb1",
   ],
 };
-const imgUrl = (id, w = 400) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=70`;
+const imgUrl = (id, w = 400) => (typeof id === "string" && (id.startsWith("data:") || id.startsWith("http"))) ? id : `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=70`;
 // Portrait/headshot stand-ins for staff profile pictures.
 const STAFF_PORTRAITS = [
   "photo-1622286342621-4bd786c2447c", "photo-1595959183082-7b570b7e08e2",
@@ -3831,7 +3831,33 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   const [goalInput, setGoalInput] = useState("");
   const [noteFor, setNoteFor] = useState(null);   // wrap-up: appt we're adding a note to (inline)
   const [noteDraft, setNoteDraft] = useState("");
-  const [photoFor, setPhotoFor] = useState(null); // wrap-up: appt we're adding a timeline photo to
+  const photoInputRef = useRef(null);     // hidden file/camera input for wrap-up timeline photos
+  const photoTargetRef = useRef(null);    // which appt the captured photo belongs to
+  const addTimelinePhoto = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    const a = photoTargetRef.current;
+    if (!file || !a) return;
+    const fr = new FileReader();
+    fr.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 800; let w = img.width, h = img.height;
+        if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+        else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
+        setClients((cur) => cur.map((c) => c.id === a.clientId ? { ...c, gallery: [...(c.gallery || []), { id: "g" + Date.now(), photo: dataUrl, note: "", date: new Date().toISOString() }] } : c));
+        setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, hasPhotos: true, photos: (x.photos || 0) + 1 } : x));
+        if (showToast) showToast("Photo added to their timeline.");
+        photoTargetRef.current = null;
+      };
+      img.src = ev.target.result;
+    };
+    fr.readAsDataURL(file);
+  };
   const openGoalEditor = (which) => {
     if (isShopView || !viewedProvider) return; // goals are personal; not editable in shop view
     setGoalInput(String(which === "daily" ? (rawDailyGoal || "") : (rawWeeklyGoal || "")));
@@ -4023,7 +4049,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                   ) : (
                     <div style={{ display: "flex", gap: 8, marginTop: d ? 10 : 0 }}>
                       <button className="lift" onClick={() => { setNoteFor(a); setNoteDraft(""); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 12%, var(--panel2))", border: "1.5px solid color-mix(in srgb, var(--gold) 36%, var(--border))", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontWeight: 600 }}><Edit2 size={16} style={{ color: "var(--gold)" }} /> Note</button>
-                      <button className="lift" onClick={() => setPhotoFor(a)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 12%, var(--panel2))", border: "1.5px solid color-mix(in srgb, var(--gold) 36%, var(--border))", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontWeight: 600 }}><Camera size={16} style={{ color: "var(--gold)" }} /> Photo</button>
+                      <button className="lift" onClick={() => { photoTargetRef.current = a; if (photoInputRef.current) photoInputRef.current.click(); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 12%, var(--panel2))", border: "1.5px solid color-mix(in srgb, var(--gold) 36%, var(--border))", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontWeight: 600 }}><Camera size={16} style={{ color: "var(--gold)" }} /> Photo</button>
                     </div>
                   ))}
                 </div>
@@ -4033,12 +4059,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         );
       })()}
 
-      {photoFor && <PhotoPicker onClose={() => setPhotoFor(null)} onPick={(id) => {
-        const a = photoFor;
-        setClients((cur) => cur.map((c) => c.id === a.clientId ? { ...c, gallery: [...(c.gallery || []), { id: "g" + Date.now(), photo: id, note: "", date: new Date().toISOString() }] } : c));
-        setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, hasPhotos: true, photos: (x.photos || 0) + 1 } : x));
-        if (showToast) showToast("Photo added to their timeline.");
-      }} />}
+      <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={addTimelinePhoto} />
 
       {/* DAY TIMELINE — horizontal bar showing today's bookings */}
       {todayApptsAll.length > 0 && (
@@ -10979,11 +11000,34 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
     return over > 0 ? { c, days, over } : null;
   }).filter(Boolean).sort((a, b) => b.over - a.over);
   const [showNudgeFolder, setShowNudgeFolder] = useState(false);
+  const [nudgeConfirm, setNudgeConfirm] = useState(null); // { c, days, over } awaiting a send
+  const [nudgeChannel, setNudgeChannel] = useState("text"); // "text" | "email"
+  const [nudgeMsg, setNudgeMsg] = useState("");
   // Both Nudge and X mark the client as handled — they fall out of the list until their next visit.
   const markHandled = (clientId) => {
     setClients((cur) => cur.map((c) => c.id === clientId ? { ...c, nudgeDismissedAt: new Date().toISOString() } : c));
   };
-  const nudge = (o) => { if (showToast) showToast(`Nudge sent to ${o.c.name.split(" ")[0]} — "time for your next visit?" with a booking link.`); markHandled(o.c.id); };
+  // Tapping "Nudge" opens a confirm pop-up (channel + editable message) instead of firing silently.
+  const nudge = (o) => {
+    const first = (o.c.name || "").split(" ")[0];
+    const prov = providers.find((p) => p.id === o.c.provider);
+    const provName = prov ? prov.name : "us";
+    const hasPhone = !!(o.c.phone && o.c.phone.replace(/\D/g, "").length >= 10);
+    const hasEmail = !!(o.c.email && o.c.email.includes("@"));
+    setNudgeChannel(hasPhone ? "text" : (hasEmail ? "email" : "text"));
+    setNudgeMsg(`Hey ${first}, it's been a little while — ready for your next visit with ${provName}? Tap to grab a time: [your booking link]`);
+    setNudgeConfirm(o);
+  };
+  const sendNudge = () => {
+    if (!nudgeConfirm) return;
+    const o = nudgeConfirm;
+    const first = (o.c.name || "").split(" ")[0];
+    const via = nudgeChannel === "email" ? "email" : "text";
+    const to = via === "email" ? o.c.email : o.c.phone;
+    if (showToast) showToast(`Rebook ${via} sent to ${first}${to ? ` (${to})` : ""}.`);
+    markHandled(o.c.id);
+    setNudgeConfirm(null);
+  };
   const dismiss = (o) => { markHandled(o.c.id); };
 
   const saveClient = () => {
@@ -11100,6 +11144,36 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
         )}
       </div>
     </Sheet>
+
+    {nudgeConfirm && (() => {
+      const o = nudgeConfirm;
+      const hasPhone = !!(o.c.phone && o.c.phone.replace(/\D/g, "").length >= 10);
+      const hasEmail = !!(o.c.email && o.c.email.includes("@"));
+      return (
+        <div className="fade-in" onClick={() => setNudgeConfirm(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, maxHeight: "88vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24 }}>Send a rebook nudge</div>
+              <button onClick={() => setNudgeConfirm(null)} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
+            </div>
+            <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 18, lineHeight: 1.5 }}>To <strong style={{ color: "var(--text)" }}>{o.c.name}</strong> · {o.over}d overdue</p>
+
+            <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 8 }}>SEND BY</label>
+            <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+              <button onClick={() => hasPhone && setNudgeChannel("text")} disabled={!hasPhone} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: `1.5px solid ${nudgeChannel === "text" ? "var(--gold)" : "var(--border)"}`, background: nudgeChannel === "text" ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: hasPhone ? (nudgeChannel === "text" ? "var(--gold)" : "var(--text)") : "var(--faint)", fontSize: 14.5, fontWeight: nudgeChannel === "text" ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><MessageSquare size={16} /> Text{!hasPhone ? " (no #)" : ""}</button>
+              <button onClick={() => hasEmail && setNudgeChannel("email")} disabled={!hasEmail} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: `1.5px solid ${nudgeChannel === "email" ? "var(--gold)" : "var(--border)"}`, background: nudgeChannel === "email" ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: hasEmail ? (nudgeChannel === "email" ? "var(--gold)" : "var(--text)") : "var(--faint)", fontSize: 14.5, fontWeight: nudgeChannel === "email" ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Send size={15} /> Email{!hasEmail ? " (none)" : ""}</button>
+            </div>
+
+            <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 8 }}>MESSAGE</label>
+            <textarea value={nudgeMsg} onChange={(e) => setNudgeMsg(e.target.value)} rows={4} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, resize: "vertical", lineHeight: 1.5, outline: "none", marginBottom: 8 }} />
+            <p style={{ fontSize: 12.5, color: "var(--faint)", marginBottom: 18, lineHeight: 1.4 }}>Your booking link is added automatically when it sends.</p>
+
+            <button className="lift" onClick={sendNudge} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none" }}>Send {nudgeChannel === "email" ? "email" : "text"}</button>
+            <button onClick={() => setNudgeConfirm(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 2px" }}>Cancel</button>
+          </div>
+        </div>
+      );
+    })()}
     </>
   );
 }
