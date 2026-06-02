@@ -6,7 +6,7 @@ import {
   Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock,
   Settings, Image as ImageIcon, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
-  BarChart3, TrendingUp, Palette, Globe
+  BarChart3, TrendingUp, Palette, Globe, HelpCircle, BookOpen, Search, LifeBuoy
 } from "lucide-react";
 
 // ============================================================
@@ -8637,6 +8637,266 @@ function WebsiteEditor({ w, onChange, business, theme, setTheme }) {
   );
 }
 
+// ============================================================================
+// HELP CENTER  —  in-app support docs.
+//
+// 👉 TO ADD OR EDIT AN ARTICLE: just edit the HELP_ARTICLES array below.
+//    Each article = { id, category, title, keywords, body, related? }.
+//    - category: groups it on the home screen (add a new one and it appears automatically)
+//    - keywords: extra words people might search that aren't in the title
+//    - body: the article text. Use blank lines between paragraphs.
+//             Lines starting with "- " become bullets. Lines starting with "## " become subheadings.
+//    - LINK TO ANOTHER ARTICLE inside the text with [the words you click](go:that-articles-id)
+//             e.g.  Need to add your team first? [Adding staff members](go:add-staff)
+//    - related: (optional) a list of other article ids, e.g. related: ["signing-in", "add-staff"]
+//             They show as tappable "Related" links at the bottom of the article.
+//    Nothing else needs changing — search, categories, links, and layout update on their own.
+// ============================================================================
+const HELP_ARTICLES = [
+  // ---------- GETTING STARTED ----------
+  { id: "welcome", category: "Getting Started", title: "Welcome to Vero", keywords: "start begin overview new setup first",
+    related: ["signing-in", "add-staff", "how-clients-book"],
+    body: `Vero runs your whole shop — bookings, your calendar, clients, payments, and your booking website — in one place.
+
+This help center lives right inside the app. Search the box up top, or browse by topic. We add new articles as the app grows, so check back when something's new.
+
+## The basics
+- Your clients book through your booking link or website — they never need to log in.
+- You and your staff manage everything from the dashboard — [here's how to sign in](go:signing-in).
+- Everything syncs live across your devices automatically.` },
+
+  { id: "signing-in", category: "Getting Started", title: "Signing in to your dashboard", keywords: "login log in magic link email password access staff sign in",
+    related: ["add-staff", "staff-pin"],
+    body: `Vero uses a one-tap sign-in link instead of a password.
+
+## To sign in
+- Go to your dashboard link and enter your email.
+- We send you a sign-in link by email — tap it on that device.
+- You stay signed in on that device, so you only do this once in a while.
+
+## Good to know
+- Your clients never sign in — only you and your staff.
+- The app recognizes who you are from your email, so it signs you in as the right staff member automatically.
+- If the email doesn't arrive, check your spam folder, then try again.` },
+
+  { id: "add-staff", category: "Getting Started", title: "Adding staff members", keywords: "team barber stylist employee add staff hire email role owner",
+    related: ["signing-in", "staff-pin"],
+    body: `Add everyone who works in your shop so the calendar, register, and reports know who's who.
+
+## To add someone
+- Go to Settings → Staff.
+- Add a new member and fill in their name, email, and role.
+- Set their role to Owner (sees all numbers and shop totals) or Barber (sees only their own chair).
+
+## Tip
+Use each person's real email — it's how the app signs them in as themselves automatically.` },
+
+  // ---------- BOOKING & CALENDAR ----------
+  { id: "how-clients-book", category: "Booking & Calendar", title: "How clients book with you", keywords: "online booking link website appointment schedule client book",
+    related: ["waitlist", "card-on-file"],
+    body: `Clients book through your booking link or your Vero website — no app or login required.
+
+## What they do
+- Pick a service, choose a time, and confirm.
+- New clients can go through a quick guided consultation; returning clients can rebook their usual.
+- You can let clients book for family or several people in one visit.
+
+## Where to set it up
+Settings → Online Booking controls what clients see and how they book.` },
+
+  { id: "waitlist", category: "Booking & Calendar", title: "Using the waitlist", keywords: "waitlist waiting list opening cancellation fill gap notify",
+    body: `When you're booked up, clients can join a waitlist and you can fill openings fast.
+
+## How it works
+- A client joins the waitlist for a day or time range.
+- When a matching slot opens, you can offer it to them.
+- Turn it on under Settings → Online Booking → Waitlist.` },
+
+  // ---------- PAYMENTS ----------
+  { id: "card-on-file", category: "Payments & Checkout", title: "Card on file & no-show protection", keywords: "card on file no show deposit cancellation fee charge protect stripe payment",
+    related: ["checkout", "how-clients-book"],
+    body: `Protect your time by saving a client's card and charging for late cancellations or no-shows.
+
+## Setting it up
+- Go to Settings → Checkout & Money → Cancellation, deposits & card-on-file.
+- Choose whether to require a card to book and set your policy.
+
+## Charging a no-show
+From the appointment, you can apply your no-show fee to the saved card. The client agreed to the policy when they booked.` },
+
+  { id: "checkout", category: "Payments & Checkout", title: "Taking payment at checkout", keywords: "checkout register pay tip cash card sale refund payment",
+    related: ["card-on-file"],
+    body: `Ring up a sale right from the dashboard.
+
+## At checkout
+- Add services or products, take payment by card or cash, and add a tip.
+- Refunds (full or partial) are available on any charge.
+
+## Settings
+Tipping and checkout options live under Settings → Checkout & Money.` },
+
+  // ---------- YOUR SHOP ----------
+  { id: "hours-branding", category: "Your Shop", title: "Hours, branding & your logo", keywords: "hours branding logo theme colors name business details website appearance",
+    body: `Make Vero feel like your shop.
+
+## Where to look
+- Settings → Your Shop: your name, business hours, locations, and phone numbers.
+- Settings → Your Shop → Logo & Branding and Theme: your logo and color look.
+- Settings → Your Website: your branded booking page.` },
+
+  { id: "import", category: "Your Shop", title: "Bringing data from another app", keywords: "import migrate switch square booksy mangomint glossgenius vagaro boulevard csv clients history move transfer",
+    body: `Moving from another booking app? You can bring your clients over.
+
+## How
+- Go to Settings → Reports & Insights → Import Data.
+- Export your client list from your old app (usually a CSV), then import it here.
+
+## Note on history & photos
+Client lists import cleanly. Full appointment history, notes, and photos depend on what your old app lets you export — some don't release photos in bulk. If you're not sure, reach out and we'll help you figure out the best path.` },
+
+  // ---------- MESSAGES ----------
+  { id: "messages", category: "Messages & Reminders", title: "Automatic texts & emails", keywords: "reminder confirmation text email message automated notify client sms",
+    body: `Vero can automatically confirm bookings and remind clients, in your own words.
+
+## Where to edit
+- Settings → Messages clients get → Automated Messages.
+- Customize the timing and wording of confirmations, reminders, and more.` },
+
+  // ---------- ACCOUNT ----------
+  { id: "staff-pin", category: "Account & Security", title: "The staff PIN (optional)", keywords: "pin security shared computer front desk switch user who is working lock",
+    body: `Your sign-in already controls who gets into the shop. The staff PIN is an extra, optional step for shared computers.
+
+## When to turn it on
+- If several people share one front-desk device, turn on Settings → Staff → Require Staff PIN.
+- Each person then enters their PIN so the register knows who's working.
+
+## For most shops
+Leave it off — your email sign-in already handles access.` },
+];
+
+function HelpCenter({ business, onBack }) {
+  const [query, setQuery] = useState("");
+  const [openArticle, setOpenArticle] = useState(null);
+  const SUPPORT_EMAIL = "support@gotvero.com";
+  const supportHref = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Vero — help request")}`;
+  // Open another help article and jump to the top (used by in-body links & "Related").
+  const goArticle = (id) => { if (HELP_ARTICLES.some((x) => x.id === id)) { setOpenArticle(id); if (typeof window !== "undefined") window.scrollTo(0, 0); } };
+  const cats = [...new Set(HELP_ARTICLES.map((a) => a.category))];
+  const q = query.trim().toLowerCase();
+  const results = q
+    ? HELP_ARTICLES.filter((a) => (a.title + " " + a.keywords + " " + a.body + " " + a.category).toLowerCase().includes(q))
+    : null;
+
+  // Turn inline links [label](go:article-id) inside a line into tappable links to that article.
+  // Anything that isn't a link stays plain text.
+  const renderInline = (text) => {
+    const re = /\[([^\]]+)\]\(go:([a-z0-9-]+)\)/gi;
+    const out = []; let last = 0, m, k = 0;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) out.push(text.slice(last, m.index));
+      const id = m[2], label = m[1];
+      out.push(
+        <button key={`lnk${k++}`} onClick={() => goArticle(id)} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "var(--gold)", fontWeight: 600, textDecoration: "underline", textDecorationColor: "color-mix(in srgb, var(--gold) 45%, transparent)", textUnderlineOffset: 2, cursor: "pointer", display: "inline" }}>{label}</button>
+      );
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) out.push(text.slice(last));
+    return out.length ? out : text;
+  };
+
+  // Render an article body: paragraphs, "## " subheads, "- " bullets. Inline links work anywhere.
+  const renderBody = (body) => body.split("\n").map((line, i) => {
+    const t = line.trim();
+    if (!t) return <div key={i} style={{ height: 10 }} />;
+    if (t.startsWith("## ")) return <div key={i} style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 600, color: "var(--text)", margin: "14px 0 4px" }}>{renderInline(t.slice(3))}</div>;
+    if (t.startsWith("- ")) return <div key={i} style={{ display: "flex", gap: 9, margin: "4px 0", color: "var(--sub)", fontSize: 15, lineHeight: 1.55 }}><span style={{ color: "var(--gold)", flexShrink: 0 }}>•</span><span>{renderInline(t.slice(2))}</span></div>;
+    return <p key={i} style={{ color: "var(--sub)", fontSize: 15, lineHeight: 1.6, margin: "4px 0" }}>{renderInline(t)}</p>;
+  });
+
+  if (openArticle) {
+    const a = HELP_ARTICLES.find((x) => x.id === openArticle);
+    if (a) return (
+      <div className="appt-screen fade-up" style={{ paddingBottom: 48 }}>
+        <button onClick={() => setOpenArticle(null)} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "4px 0 18px", cursor: "pointer" }}><ArrowLeft size={17} /> All articles</button>
+        <div style={{ fontSize: 11.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 8 }}>{a.category}</div>
+        <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 600, lineHeight: 1.1, margin: "0 0 16px", color: "var(--text)" }}>{a.title}</h1>
+        <div>{renderBody(a.body)}</div>
+
+        {Array.isArray(a.related) && a.related.filter((rid) => HELP_ARTICLES.some((x) => x.id === rid)).length > 0 && (
+          <div style={{ marginTop: 30 }}>
+            <div style={{ fontSize: 11.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Related</div>
+            {a.related.map((rid) => { const r = HELP_ARTICLES.find((x) => x.id === rid); return r ? (
+              <button key={rid} onClick={() => goArticle(rid)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "13px 15px", marginBottom: 9, textAlign: "left", cursor: "pointer" }}>
+                <span style={{ fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{r.title}</span>
+                <ChevronRight size={17} style={{ color: "var(--gold)", flexShrink: 0 }} />
+              </button>
+            ) : null; })}
+          </div>
+        )}
+
+        <a href={supportHref} className="lift" style={{ display: "flex", alignItems: "center", gap: 13, textDecoration: "none", marginTop: 22, padding: 18, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16 }}>
+          <LifeBuoy size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>
+            <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Still need a hand?</span>
+            <span style={{ display: "block", fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginTop: 2 }}>Contact support and a real person will help.</span>
+          </span>
+          <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="appt-screen fade-up" style={{ paddingBottom: 48 }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "4px 0 16px", cursor: "pointer" }}><ArrowLeft size={17} /> Settings</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <span style={{ width: 28, height: 1.5, background: "var(--gold)" }} />
+        <span style={{ fontSize: 12, letterSpacing: 3, color: "var(--faint)", textTransform: "uppercase" }}>Help Center</span>
+      </div>
+      <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1.05, margin: "0 0 18px", color: "var(--text)" }}>How can we help?</h1>
+      <div style={{ position: "relative", marginBottom: 24 }}>
+        <Search size={19} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--gold)", pointerEvents: "none" }} />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search help articles…" style={{ width: "100%", background: "var(--panel)", border: "1.5px solid var(--border)", borderRadius: 16, padding: "16px 16px 16px 48px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+      </div>
+
+      {results ? (
+        <div>
+          <div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 12 }}>{results.length} result{results.length === 1 ? "" : "s"}</div>
+          {results.map((a) => (
+            <button key={a.id} onClick={() => setOpenArticle(a.id)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", marginBottom: 10, textAlign: "left", cursor: "pointer" }}>
+              <span><span style={{ display: "block", fontSize: 15.5, fontWeight: 600, color: "var(--text)" }}>{a.title}</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{a.category}</span></span>
+              <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
+            </button>
+          ))}
+          {results.length === 0 && <div style={{ color: "var(--sub)", fontSize: 15, lineHeight: 1.6, padding: "8px 0" }}>No articles matched that. Try different words, or <a href={supportHref} style={{ color: "var(--gold)", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 2 }}>contact support</a> and we'll help directly.</div>}
+        </div>
+      ) : (
+        <div>
+          {cats.map((cat) => (
+            <div key={cat} style={{ marginBottom: 26 }}>
+              <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>{cat}</div>
+              {HELP_ARTICLES.filter((a) => a.category === cat).map((a) => (
+                <button key={a.id} onClick={() => setOpenArticle(a.id)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", marginBottom: 9, textAlign: "left", cursor: "pointer" }}>
+                  <span style={{ fontSize: 15.5, fontWeight: 500, color: "var(--text)" }}>{a.title}</span>
+                  <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                </button>
+              ))}
+            </div>
+          ))}
+          <a href={supportHref} className="lift" style={{ marginTop: 8, padding: 20, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, display: "flex", alignItems: "flex-start", gap: 13, textDecoration: "none" }}>
+            <LifeBuoy size={22} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 15.5, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>Can't find an answer?</div>
+              <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>Contact support and a real person will help you out.</div>
+            </div>
+            <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast }) {
   const [form, setForm] = useState(business);
   const [openCard, setOpenCard] = useState(null);
@@ -8941,6 +9201,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
 
   const [openCat, setOpenCat] = useState(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [cockpitHidden, setCockpitHidden] = useState(false);
   const [cockpitOpen, setCockpitOpen] = useState(false);
 
@@ -9030,6 +9291,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       </div>
     );
   };
+
+  if (helpOpen) return <HelpCenter business={business} onBack={() => setHelpOpen(false)} />;
 
   return (
     <div className="fade-up" style={{ width: "100%", padding: "12px 6px" }}>
@@ -9141,6 +9404,16 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           </div>
         </div>
       )}
+
+      {/* Help & Support entry — pinned at the bottom of Settings */}
+      <button onClick={() => setHelpOpen(true)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, padding: "15px 16px", marginTop: 28, textAlign: "left", cursor: "pointer" }}>
+        <HelpCircle size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
+        <span style={{ flex: 1 }}>
+          <span style={{ display: "block", fontSize: 15.5, fontWeight: 600, color: "var(--text)" }}>Help & Support</span>
+          <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 1 }}>Guides, answers, and how-tos</span>
+        </span>
+        <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
+      </button>
     </div>
   );
 }
