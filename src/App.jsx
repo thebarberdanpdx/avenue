@@ -438,6 +438,11 @@ const FONT_BODY = "var(--font-body, 'Inter', -apple-system, sans-serif)";
 // and feel different, not just recolored.
 // ============================================================
 const THEMES = [
+  // ===== VERO (house brand) =====
+  { id: "vero", name: "Vero", tagline: "True to the craft — porcelain & sage", cat: "Vero", dark: false,
+    disp: "'Fraunces', serif", body: "'Hanken Grotesk', sans-serif",
+    t: { bg:"#FAF8F3", panel:"#FFFFFF", panel2:"#F4EFE4", line:"#ECE4D5", border:"#E0D8C7", border2:"#CFC6B7", text:"#232221", text2:"#3A382F", sub:"#6F685D", faint:"#A39C8A", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(60,55,45,.07)", overlay:"rgba(35,34,33,0.34)" } },
+
   // ===== BARBERSHOP =====
   { id: "fade", name: "Fade", tagline: "Graphite fading up to ash", cat: "Barbershop", dark: true,
     disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif",
@@ -506,7 +511,7 @@ const THEMES = [
     disp: "'Playfair Display', serif", body: "'Jost', sans-serif",
     t: { bg:"#160E13", panel:"#20151D", panel2:"#2A1D26", line:"#372733", border:"#463141", border2:"#634459", text:"#F4EAF0", text2:"#DAC4D2", sub:"#A88CA2", faint:"#6A4F62", gold:"#CE6F98", onGold:"#160E13", shadow:"rgba(0,0,0,.55)", overlay:"rgba(8,3,7,0.78)" } },
 ];
-const THEME_CATS = ["Barbershop", "Tattoo", "Spa", "Salon"];
+const THEME_CATS = ["Vero", "Barbershop", "Tattoo", "Spa", "Salon"];
 const THEME_IDS = THEMES.map((t) => t.id);
 const buildThemeCSS = () => THEMES.map((th) => {
   const v = th.t;
@@ -726,7 +731,7 @@ export default function App() {
   const [categories, setCategories] = useState(["Services"]); // ordered list of category names
   const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
   // Theme: stored on business.theme so it syncs across devices via Supabase. Falls back to "chrome" until loaded/set or if an old/unknown id is stored.
-  const theme = (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "chrome";
+  const theme = (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "vero";
   const setTheme = (newTheme) => setBusiness((b) => ({ ...(b || {}), theme: newTheme }));
 
   // ---- Supabase load + save (debounced) — shop-scoped tables (multi-tenant ready) ----
@@ -870,7 +875,7 @@ export default function App() {
   return (
     <div id="app-root" className={`theme-${theme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Oswald:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Oswald:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         #app-root { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; line-height: 1.5; letter-spacing: 0.1px; }
         #app-root h1, #app-root h2, #app-root h3 { letter-spacing: -0.2px; color: var(--text); }
@@ -5495,11 +5500,21 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   const [authed, setAuthed] = useState(!needsLock);
   const [lockPin, setLockPin] = useState("");
   const [lockErr, setLockErr] = useState(false);
+  // True only once the user has entered a correct PIN (or recovery code) this session.
+  const [manualAuth, setManualAuth] = useState(false);
+  // Re-evaluate the lock when provider data loads from Supabase.
+  // On first render the PINs haven't loaded yet, so `needsLock` is briefly false and the
+  // dashboard would otherwise stay open. The moment a PIN appears we re-lock — unless the
+  // user has already unlocked with a correct PIN this session. This closes the open-door bug.
+  useEffect(() => {
+    if (needsLock && !manualAuth) setAuthed(false);
+    if (!needsLock) setAuthed(true);
+  }, [needsLock, manualAuth]);
   const submitLock = () => {
     const code = lockPin.trim();
     const match = realProviders.find((p) => p.pin && p.pin === code);
-    if (match) { setSignedInAs(match.id); setAuthed(true); setLockPin(""); setLockErr(false); }
-    else if (recoveryCode && code === recoveryCode) { setAuthed(true); setLockPin(""); setLockErr(false); }
+    if (match) { setSignedInAs(match.id); setManualAuth(true); setAuthed(true); setLockPin(""); setLockErr(false); }
+    else if (recoveryCode && code === recoveryCode) { setManualAuth(true); setAuthed(true); setLockPin(""); setLockErr(false); }
     else setLockErr(true);
   };
   // First-load: if no provider has ever been "signed in" before, prompt the user
