@@ -5856,9 +5856,12 @@ function ShopDashboard({ business, setBusiness, services, setServices, categorie
   const [pinEntry, setPinEntry] = useState("");
   const [pinErr, setPinErr] = useState(false);
 
-  // ENTRY LOCK — once any staff member has a PIN set, the dashboard can't be opened without one.
-  // No PINs anywhere = no lock (so you can never lock yourself out before setting one up).
-  const needsLock = realProviders.some((p) => !!p.pin);
+  // ENTRY LOCK — gated by the shop setting "Require staff PIN". When OFF (the default), the
+  // dashboard never asks for a PIN even if staff have PINs saved — the magic-link login already
+  // controls access. When a shop turns it ON (e.g. a shared front-desk computer), any staff PIN
+  // re-arms the lock so each person identifies themselves. PINs are never deleted by this toggle.
+  const requirePin = business?.requireStaffPin === true;
+  const needsLock = requirePin && realProviders.some((p) => !!p.pin);
   const [authed, setAuthed] = useState(!needsLock);
   const [lockPin, setLockPin] = useState("");
   const [lockErr, setLockErr] = useState(false);
@@ -8800,6 +8803,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <ToggleSetting label="Offer 'the usual' to returning clients" desc="When a returning client books, show their last service for one-tap rebooking before the full menu." on={form.bookUsual?.enabled !== false} onToggle={(v) => setForm({ ...form, bookUsual: { ...(form.bookUsual || {}), enabled: v } })} />,
     },
     {
+      id: "staffpin", title: "Require Staff PIN", icon: Lock, category: "Business Setup",
+      status: (form.requireStaffPin === true) ? "On" : "Off",
+      keywords: "pin staff sign in lock shared computer front desk who is working register attribution switch user",
+      editor: <ToggleSetting label="Require a staff PIN to open the dashboard" desc="Off by default — your login already controls access. Turn this on for a shared front-desk computer so each person enters their PIN and the register knows who's working. Staff PINs are set per person under Staff." on={form.requireStaffPin === true} onToggle={(v) => setForm({ ...form, requireStaffPin: v })} />,
+    },
+    {
       id: "family", title: "Family & Group Booking", icon: User, category: "Online Booking",
       status: (form.familyBooking?.enabled === false) ? "Off" : "On",
       keywords: "family group multiple people kids children book for someone else who is this for partner",
@@ -8890,7 +8899,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   // so nothing falls through to search-only. Tap a tile → that category's list. ----
   const CATS = [
     { id: "shop",  label: "Your Shop", icon: User,       desc: "Your name, hours, branding & logo", settings: ["business", "hours", "appearance", "theme", "locations", "phones"] },
-    { id: "staff", label: "Staff",      icon: Users,      desc: "Add or edit staff — hours, access, pay & booking", settings: ["staff"] },
+    { id: "staff", label: "Staff",      icon: Users,      desc: "Add or edit staff — hours, access, pay & booking", settings: ["staff", "staffpin"] },
     { id: "book",  label: "Online Booking", tag: "What clients see when booking", icon: Calendar, desc: "How clients book you online", settings: ["booking", "avoidgaps", "newclient", "family", "refphotos", "waitlist", "rebook_usual"] },
     { id: "smart", label: "Smart Timing", smart: true, icon: Sparkles, desc: "The scheduling smarts that save you time", settings: ["autotiming", "overduebuffer", "runninglate"] },
     { id: "dayof", label: "Day-of Tools", icon: Clock,    desc: "Managing the day as it happens", settings: ["scheduling", "waitingroom", "photos"] },
