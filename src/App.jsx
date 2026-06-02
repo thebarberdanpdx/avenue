@@ -765,14 +765,23 @@ function StaffLogin({ authReady, onBack }) {
             <button onClick={() => { setSent(false); setBusy(false); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "15px 20px", fontSize: 15, borderRadius: 14, border: "1px solid var(--border2)", cursor: "pointer" }}>Use a different email</button>
           </>
         )}
-        <button onClick={onBack} style={{ width: "100%", background: "transparent", color: "var(--faint)", fontSize: 13.5, padding: "16px 0 2px", border: "none", marginTop: 8, cursor: "pointer" }}>← Back to site</button>
+        <button onClick={onBack} style={{ width: "100%", background: "transparent", color: "var(--sub)", fontSize: 13.5, padding: "16px 0 2px", border: "none", marginTop: 8, cursor: "pointer" }}>Are you a client? Book here →</button>
       </div>
     </div>
   );
 }
 
 export default function App() {
-  const [view, setView] = useState("landing");
+  // Two front doors: gotvero.com (root) is the BUSINESS dashboard; gotvero.com/book is the
+  // client booking link. Read the URL up front so a client never flashes the staff login.
+  const [view, setView] = useState(() => {
+    if (typeof window === "undefined") return "shop";
+    const path = window.location.pathname.toLowerCase().replace(/\/+$/, "");
+    const hash = window.location.hash.toLowerCase();
+    if (path === "/book" || path === "/client" || hash === "#book" || hash === "#client") return "client";
+    return "shop";
+  });
+  const [clientNonce, setClientNonce] = useState(0); // bump to restart the booking flow fresh
   const [shopUnlocked, setShopUnlocked] = useState(true);
   const [shopPwPrompt, setShopPwPrompt] = useState(false);
   const [pwEntry, setPwEntry] = useState("");
@@ -812,6 +821,16 @@ export default function App() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const h = window.location.hash.toLowerCase();
+    const path = window.location.pathname.toLowerCase().replace(/\/+$/, "");
+    const wantsBooking = path === "/book" || path === "/client" || h === "#book" || h === "#client";
+    if (wantsBooking) {
+      // Client booking link: clear any leftover staff-login intent so it can't pull the
+      // booking page into the dashboard, then show booking.
+      try { localStorage.removeItem("vero_login_intent"); } catch (e) {}
+      setView("client");
+      if (h) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      return;
+    }
     if (h === "#staff") {
       // Remember the staff intent durably: the magic-link round-trip replaces the URL hash
       // (wiping #staff), so a flag is what survives to land us on the dashboard after auth.
@@ -823,9 +842,6 @@ export default function App() {
       setView("terms");
     } else if (h === "#privacy") {
       setView("privacy");
-    } else if (h === "#book" || h === "#client") {
-      setView("client");
-      window.history.replaceState(null, "", window.location.pathname + window.location.search);
     } else if (h === "#preview") {
       // Always show the branded storefront (even if it's toggled off) so the owner can preview it.
       setView("preview");
@@ -840,6 +856,8 @@ export default function App() {
     if (pwEntry === SHOP_PASSWORD) { setShopUnlocked(true); setShopPwPrompt(false); setView("shop"); }
     else { setPwError(true); }
   };
+  // Send anyone into a fresh client booking flow (used by "Book here" on the login, and "book another").
+  const goBooking = () => { setClientNonce((n) => n + 1); setView("client"); };
   const [clients, setClients] = useState(CLIENTS);
   const [appts, setAppts] = useState(TODAY_APPTS);
   const [waitlist, setWaitlist] = useState([
@@ -1152,9 +1170,6 @@ export default function App() {
       )}
 
       {view === "preview" && <Storefront business={business} services={services} providers={providers} categories={categories} onPick={goView} preview onExitPreview={() => goView("shop")} />}
-      {view === "landing" && (business.website?.enabled === true
-        ? <Storefront business={business} services={services} providers={providers} categories={categories} onPick={goView} />
-        : <Landing business={business} onPick={goView} />)}
 
       {shopPwPrompt && (
         <div onClick={() => { setShopPwPrompt(false); setPwEntry(""); setPwError(false); }} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
@@ -1170,11 +1185,11 @@ export default function App() {
       )}
       {view === "terms" && <TermsPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "privacy" && <PrivacyPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
-      {view === "client" && <ClientFlow business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={() => setView("landing")} />}
-      {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={() => setView("landing")} />}
+      {view === "client" && <ClientFlow key={clientNonce} business={business} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} />}
+      {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={goBooking} />}
       {view === "shop" && (session
-        ? <ShopDashboard authEmail={session?.user?.email || null} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("landing"); }} onExit={() => { setView("landing"); }} />
-        : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} setView("landing"); }} />)}
+        ? <ShopDashboard authEmail={session?.user?.email || null} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} />
+        : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
 }
@@ -1527,7 +1542,7 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
 // ============================================================
 // CLIENT BOOKING FLOW
 // ============================================================
-function ClientFlow({ business, services, providers, clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit }) {
+function ClientFlow({ business, services, providers, clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit, onManage }) {
   const [step, setStep] = useState(0);
   const [bookingFor, setBookingFor] = useState(null); // null until chosen: "self" or "other"
   const [showWhoFor, setShowWhoFor] = useState(false); // who's-it-for screen for a matched returning client
@@ -2027,6 +2042,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               </span>
               <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
             </button>
+            {onManage && (
+              <button onClick={() => onManage()} style={{ width: "100%", background: "transparent", border: "none", color: "var(--sub)", fontSize: 13.5, textAlign: "center", padding: "20px 0 2px", marginTop: 4, cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 4 }}>Manage my appointment</button>
+            )}
           </div>
         )}
 
