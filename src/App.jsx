@@ -1631,6 +1631,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   const [waitlistDone, setWaitlistDone] = useState(false);
   const [photos, setPhotos] = useState(0);       // 0–3 uploaded at booking
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
+  const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
   // waitlist join form
   const [wlName, setWlName] = useState("");
   const [wlDays, setWlDays] = useState([]);        // preferred days (multi-select)
@@ -1959,6 +1960,23 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
   };
 
   const doCommitBooking = (finalPhone, finalEmail) => {
+    // Re-check the slot is still free before writing — guards against a double-booking if the
+    // chair got taken between showing times and tapping confirm.
+    {
+      const day0 = new Date(selectedDate); day0.setHours(0, 0, 0, 0);
+      const sameDay = (iso) => { const d = new Date(iso); return !isNaN(d) && d.getFullYear() === day0.getFullYear() && d.getMonth() === day0.getMonth() && d.getDate() === day0.getDate(); };
+      const occupies = (a) => a.status !== "cancelled" && a.status !== "no-show";
+      const isSameChk = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
+      let cursorChk = slot;
+      const clash = people.some((person) => {
+        const sMin = isMultiPerson ? (isSameChk ? slot : cursorChk) : slot;
+        const eMin = sMin + person.durMin;
+        if (!isSameChk) cursorChk += person.durMin;
+        const pid = person.prov.id === "anyone" ? "dan" : person.prov.id;
+        return appts.some((a) => occupies(a) && a.providerId === pid && a.bookedFor && sameDay(a.bookedFor) && typeof a.start === "number" && typeof a.end === "number" && sMin < a.end && eMin > a.start);
+      });
+      if (clash) { setSlot(null); setStep(6); setSlotConflict(true); return; }
+    }
     const baseId = Date.now();
     let clientId = matched?.id || null;
     if (!matched && !activeMember) {
@@ -1981,7 +1999,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
       newAppts.push({
         id: baseId + pi,
         providerId: prov.id === "anyone" ? "dan" : prov.id,
-        clientId: person.key === "self" ? (clientId || "guest") : (clientId || "guest"),
+        clientId: clientId || "guest",
         familyMemberId: person.key === "self" ? null : person.key,
         bookedByName: person.key === "self" ? null : (matched?.name || newName.trim()),
         serviceId: person.items[0].service.id,
@@ -2002,7 +2020,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
       });
       if (!isSame) cursor += person.durMin;
     });
-    setAppts([...appts, ...newAppts]);
+    setAppts((cur) => [...cur, ...newAppts]);
     setBookedId(baseId); setStep(8);
   };
 
@@ -3206,6 +3224,12 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
         {/* STEP 6 — date/time + waitlist */}
         {step === 6 && !showUsual && (
           <div className="fade-up">
+            {slotConflict && (
+              <div style={{ background: "rgba(176,141,87,0.10)", border: "1px solid rgba(176,141,87,0.30)", borderRadius: 12, padding: "13px 16px", marginBottom: 18, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <AlertCircle size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+                <div style={{ fontSize: 14, lineHeight: 1.5 }}>That time was just taken — pick another opening below.</div>
+              </div>
+            )}
             {matched && matched.lastVisit && business.overdueBuffer && business.overdueBuffer.enabled !== false && (() => {
               const ob = business.overdueBuffer;
               const weeksAgo = (Date.now() - new Date(matched.lastVisit)) / (7 * 86400000);
@@ -3232,7 +3256,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               const isFirstToday = firstOpen.toDateString() === new Date().toDateString();
               const already = selectedDate && firstOpen.toDateString() === selectedDate.toDateString();
               return (
-                <button className="lift" onClick={() => { setSelectedDate(firstOpen); setSlot(null); }} style={{ width: "100%", textAlign: "left", background: already ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1.5px solid ${already ? "var(--gold)" : "var(--border2)"}`, borderRadius: 14, padding: "15px 17px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <button className="lift" onClick={() => { setSelectedDate(firstOpen); setSlot(null); setSlotConflict(false); }} style={{ width: "100%", textAlign: "left", background: already ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1.5px solid ${already ? "var(--gold)" : "var(--border2)"}`, borderRadius: 14, padding: "15px 17px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                   <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     <span style={{ fontSize: 11.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600 }}>SOONEST OPENING</span>
                     <span style={{ fontSize: 16.5, fontWeight: 500 }}>{DAYS[firstOpen.getDay()]}, {MONTHS[firstOpen.getMonth()]} {firstOpen.getDate()}</span>
@@ -3248,7 +3272,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                 const on = selectedDate && d.toDateString() === selectedDate.toDateString();
                 const isToday = d.toDateString() === new Date().toDateString();
                 return (
-                  <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); }} style={{ flexShrink: 0, width: 60, padding: "10px 0", borderRadius: 12, background: on ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: on ? "var(--gold)" : (isToday ? "var(--gold)" : "var(--border2)"), color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+                  <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} style={{ flexShrink: 0, width: 60, padding: "10px 0", borderRadius: 12, background: on ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: on ? "var(--gold)" : (isToday ? "var(--gold)" : "var(--border2)"), color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
                     <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{DAYS[d.getDay()].slice(0, 3).toUpperCase()}</div>
                     {isToday
                       ? <div style={{ fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 600, color: on ? "var(--on-gold)" : "var(--gold)", lineHeight: "24px" }}>Today</div>
@@ -3263,7 +3287,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
               <div style={{ fontSize: 13.5, color: "var(--gold)", fontWeight: 500, marginBottom: 14 }}>{daysFromNow(selectedDate)}</div>
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{slotsReady ? openSlots.map((t) => (<button key={t} className="lift" onClick={() => setSlot(t)} style={{ background: slot === t ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: slot === t ? "var(--gold)" : "var(--border2)", borderRadius: 10, padding: "13px 4px", color: slot === t ? "var(--on-gold)" : "var(--text)", fontSize: 14 }}>{fmtTime(t)}</button>)) : [0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 10 }} />))}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{slotsReady ? openSlots.map((t) => (<button key={t} className="lift" onClick={() => { setSlot(t); setSlotConflict(false); }} style={{ background: slot === t ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: slot === t ? "var(--gold)" : "var(--border2)", borderRadius: 10, padding: "13px 4px", color: slot === t ? "var(--on-gold)" : "var(--text)", fontSize: 14 }}>{fmtTime(t)}</button>)) : [0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 10 }} />))}</div>
               {slot != null && <button className="lift" onClick={() => setStep(7)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 24 }}>Continue →</button>}
             </>)}
 
@@ -3346,7 +3370,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                     <button className="lift" disabled={!wlName || phone.replace(/\D/g, "").length < 10 || !wlWhen || wlDays.length === 0} onClick={() => {
                       const ready = wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0;
                       if (!ready) return;
-                      setWaitlist([...waitlist, { name: wlName, phone, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", when: wlWhen, service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() }]);
+                      setWaitlist((cur) => [...cur, { name: wlName, phone, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", when: wlWhen, service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() }]);
                       setWaitlistDone(true); setShowWaitlist(false);
                     }} style={{ width: "100%", background: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--gold)" : "var(--border2)", color: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
                   </div>
@@ -5970,7 +5994,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     if (!target) {
       const provId = (providers.find((p) => p.name === provider) || {}).id || "dan";
       target = { id: "wl-" + digits(phone), name: name || "Waitlist Client", phone, provider: provId, visits: 0, customDurations: {}, notes: "Added from the waitlist.", messages: [] };
-      setClients([...clients, target]);
+      setClients((cur) => [...cur, target]);
     }
     setMsgTarget({ clientId: target.id, draft });
     setTab("messages");
@@ -10314,7 +10338,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
     const id = "b" + Date.now() + Math.floor(Math.random() * 1000);
     const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(start / 60), start % 60, 0, 0);
     const newAppt = { id, providerId, clientId: null, serviceId: null, start, end: start + dur, bookedFor: bookedFor.toISOString(), status: "block", vip: false, name: "Time Block", title: "Blocked", detail: "" };
-    setAppts([...appts, newAppt]);
+    setAppts((cur) => [...cur, newAppt]);
     setCreateSlot(null);
     showToast(`Time block added at ${fmtTime(start)}.`);
   };
@@ -10344,7 +10368,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
     }
 
     const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: service.name, detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), hasPhotos: false, photos: 0 };
-    setAppts([...appts, newAppt]);
+    setAppts((cur) => [...cur, newAppt]);
     setNewApptSlot(null);
     setConflictModal(null);
     showToast(`${newAppt.name} booked at ${fmtTime(useStart)}.`);
@@ -10816,7 +10840,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           onBook={bookAppt}
           onBlock={({ providerId, start }) => {
             const id = Math.max(0, ...appts.map((a) => a.id)) + 1;
-            setAppts([...appts, { id, providerId, clientId: null, serviceId: null, start, end: start + 30, status: "block", vip: false, name: "Time Block", title: "Blocked", detail: "" }]);
+            setAppts((cur) => [...cur, { id, providerId, clientId: null, serviceId: null, start, end: start + 30, status: "block", vip: false, name: "Time Block", title: "Blocked", detail: "" }]);
             setNewApptSlot(null);
             showToast(`Time block added at ${fmtTime(start)}.`);
           }}
