@@ -1573,14 +1573,20 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
       });
       if (cursor < dayEnd) runs.push([cursor, dayEnd]);
 
+      // Earlier-start rule (default on): when a gap has room for only ONE appointment
+      // (less than two services fit), anchor that booking to the earliest fair time and don't
+      // also offer a later slot for the same gap. Gaps big enough for 2+ keep all 3 anchors.
+      const earlyStart = bk.earlyStart !== false;
       runs.forEach(([rs, re]) => {
         const runLen = re - rs;
         if (runLen < durMin) return; // service doesn't fit at all
+        const singleFit = runLen < durMin * 2; // only one appointment fits in this gap
         // Always anchor the first slot at the start of the run (flush with whatever came before)
         candidates.add(rs);
-        // If this run sits at the end of the day, also offer the last possible slot
+        // End-of-day run also offers the last possible slot — UNLESS the earlier-start rule
+        // applies to a single-fit gap, in which case we keep just the earliest.
         const lastFit = re - durMin;
-        if (lastFit > rs && Math.abs(re - dayEnd) < 1) candidates.add(lastFit);
+        if (lastFit > rs && Math.abs(re - dayEnd) < 1 && !(earlyStart && singleFit)) candidates.add(lastFit);
         // "smart" adds a clean middle anchor on long open runs; "pack" stays strictly flush.
         if (timeMode === "smart" && runLen >= durMin * 3) {
           let mid = rs + Math.floor(runLen / 2);
@@ -8145,6 +8151,16 @@ function BookingTimesEditor({ b, onChange }) {
           );
         })}
       </div>
+      {(mode === "smart" || mode === "pack") && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+          <ToggleSetting
+            label="Start single-fit gaps as early as possible"
+            desc="When a gap only has room for one appointment, offer just the earliest fair time (flush to the opening or the last client) instead of also adding a later option. Your bigger open stretches keep their full set of times."
+            on={b.earlyStart !== false}
+            onToggle={(v) => onChange({ earlyStart: v })}
+          />
+        </div>
+      )}
     </div>
   );
 }
