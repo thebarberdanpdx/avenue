@@ -10583,10 +10583,10 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
 
   // small building blocks
   const TopBar = ({ left, title, right }) => (
-    <div style={{ background: T.panel, borderBottom: `1px solid var(--border)`, padding: "calc(env(safe-area-inset-top, 0px) + 16px) 16px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 5, boxShadow: "0 6px 20px -16px rgba(0,0,0,0.35)" }}>
+    <div style={{ background: "var(--text)", borderBottom: "2px solid var(--gold)", padding: "calc(env(safe-area-inset-top, 0px) + 18px) 16px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 5 }}>
       <div style={{ minWidth: 64 }}>{left}</div>
-      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: T.text, letterSpacing: "-0.2px" }}>{title}</div>
-      <div style={{ minWidth: 64, display: "flex", justifyContent: "flex-end", gap: 14, alignItems: "center" }}>{right}</div>
+      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: "var(--bg)", letterSpacing: "0.2px" }}>{title}</div>
+      <div style={{ minWidth: 64, display: "flex", justifyContent: "flex-end", gap: 16, alignItems: "center" }}>{right}</div>
     </div>
   );
 
@@ -10605,11 +10605,11 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
         {mode === "detail" ? (
           <>
             <TopBar
-              left={<button onClick={onClose} style={{ background: "none", color: T.text, display: "flex", alignItems: "center", gap: 2, fontSize: 15 }}><ChevronLeft size={22} /></button>}
+              left={<button onClick={onClose} style={{ background: "none", color: "var(--bg)", display: "flex", alignItems: "center", gap: 2, fontSize: 15 }}><ChevronLeft size={22} /></button>}
               title="Appointment"
               right={<>
-                <button onClick={() => setMenuOpen((v) => !v)} style={{ background: "none", color: T.text }}><MoreHorizontal size={22} /></button>
-                <button onClick={startEdit} style={{ background: "none", color: T.sub, fontSize: 15, fontWeight: 600 }}>Edit</button>
+                <button onClick={() => setMenuOpen((v) => !v)} style={{ background: "none", color: "var(--bg)" }}><MoreHorizontal size={22} /></button>
+                <button onClick={startEdit} style={{ background: "none", color: "var(--bg)", fontSize: 15, fontWeight: 600 }}>Edit</button>
               </>}
             />
 
@@ -10695,11 +10695,16 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                 );
               })()}
 
-              {/* on / at */}
-              <div style={{ display: "flex", borderBottom: `1px solid ${T.line}` }}>
-                <Cell label="On" value={apptDateLabel()} />
-                <div style={{ width: 1, background: T.line }} />
-                <Cell label="At" value={fmtTime(appt.start)} />
+              {/* date + time — the ticket header */}
+              <div style={{ padding: "24px 18px 22px", borderBottom: `1px solid ${T.line}`, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 7 }}>Appointment</div>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 28, lineHeight: 1.05, color: T.text }}>{apptDateLabel()}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 7 }}>Time</div>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, lineHeight: 1.05, color: T.text }}>{fmtTime(appt.start)}</div>
+                </div>
               </div>
 
               {/* client card */}
@@ -10728,9 +10733,10 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
 
               {/* service block */}
               <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14, paddingBottom: 14, borderBottom: `1px solid ${T.line}` }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24 }}>{service?.name || appt.title}</span>
-                  <span style={{ fontSize: 22, fontWeight: 600 }}>${service?.price ?? "—"}</span>
+                <div style={{ display: "flex", alignItems: "baseline", marginBottom: 14, paddingBottom: 16, borderBottom: `1px solid ${T.line}` }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: T.text }}>{service?.name || appt.title}</span>
+                  <span style={{ flex: 1, margin: "0 12px", borderBottom: `2px dotted ${T.faint}`, transform: "translateY(-5px)" }} />
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: T.text }}>${service?.price ?? "—"}</span>
                 </div>
                 {appt.detail && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
@@ -10834,63 +10840,60 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
           /* ---------- EDIT MODE ---------- */
           <>
             <TopBar
-              left={<button onClick={() => setMode("detail")} style={{ background: "none", color: T.sub, fontSize: 15.5 }}>Cancel</button>}
+              left={<button onClick={() => setMode("detail")} style={{ background: "none", color: "rgba(250,248,243,0.72)", fontSize: 15.5 }}>Cancel</button>}
               title="Edit Appointment"
-              right={<button onClick={saveEdit} style={{ background: "none", color: T.text, fontSize: 15.5, fontWeight: 700 }}>Save</button>}
+              right={<button onClick={saveEdit} style={{ background: "none", color: "var(--gold)", fontSize: 15.5, fontWeight: 700 }}>Save</button>}
             />
             <div style={{ overflowY: "auto", flex: 1 }}>
-              {/* on / at editable */}
-              <div style={{ display: "flex", borderBottom: `1px solid ${T.line}` }}>
-                <Cell label="On" value={apptDateLabel()} />
-                <div style={{ width: 1, background: T.line }} />
-                <div style={{ flex: 1, padding: "12px 18px" }}>
-                  <div style={{ fontSize: 14, color: T.sub, fontStyle: "italic", marginBottom: 6 }}>At</div>
+              {/* WHEN */}
+              <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
+                <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 16 }}>When</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, color: T.text }}>{apptDateLabel()}</span>
+                  <span style={{ fontSize: 12.5, color: T.faint, fontStyle: "italic" }}>moved on the calendar</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 15, color: T.sub }}>Start time</span>
                   <EditStepperRow T={T} value={fmtTime(draftStart)} onDec={() => setDraftStart((v) => Math.max(DAY_START, v - 5))} onInc={() => setDraftStart((v) => Math.min(DAY_END - draftDur, v + 5))} />
                 </div>
               </div>
 
-              {/* client card with remove */}
+              {/* CLIENT */}
               <div style={{ padding: "20px 18px", borderBottom: `1px solid ${T.line}`, display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ width: 50, height: 50, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, fontWeight: 600 }}>{initials}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21 }}>{appt.name}</div>
-                  <div style={{ fontSize: 15, color: T.sub }}>{client?.phone || "New client"}</div>
+                <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 600, flexShrink: 0 }}>{initials}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, color: T.text }}>{appt.name}</div>
+                  <div style={{ fontSize: 14.5, color: T.sub }}>{client?.phone ? fmtPhone(client.phone) : "New client"}</div>
                 </div>
-                <button onClick={() => showToast("Remove client — would clear the booking.")} style={{ background: "none", color: T.faint }}><Trash2 size={19} /></button>
               </div>
 
-              {/* service editable */}
-              <div style={{ padding: "20px 18px", borderBottom: `1px solid ${T.line}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 21 }}>{service?.name || appt.title}</span>
-                  <button onClick={() => showToast("Remove service.")} style={{ background: "none", color: T.faint }}><Trash2 size={17} /></button>
-                </div>
+              {/* SERVICE */}
+              <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
+                <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 10 }}>Service</div>
+                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 23, color: T.text, marginBottom: 4 }}>{service?.name || appt.title}</div>
                 {appt.detail && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
                     {appt.detail.split(",").map((d, i) => (
-                      <span key={i} style={{ background: T.chip, color: T.text, padding: "8px 13px", borderRadius: 8, fontSize: 15, display: "flex", alignItems: "center", gap: 7 }}>{d.trim()} <X size={13} style={{ color: T.faint }} /></span>
+                      <span key={i} style={{ background: T.chip, color: T.text, padding: "7px 13px", borderRadius: 8, fontSize: 14.5 }}>{d.trim()}</span>
                     ))}
-                    <button onClick={() => showToast("Add an add-on to this service.")} style={{ background: "none", color: T.text, fontSize: 14, fontWeight: 600, padding: "8px 4px" }}>+ Add-on</button>
                   </div>
                 )}
-                {/* provider picker */}
-                <div style={{ fontSize: 15, color: T.sub, fontStyle: "italic", marginBottom: 8 }}>with</div>
-                <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+                <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, margin: "22px 0 10px" }}>With</div>
+                <div style={{ display: "flex", gap: 8 }}>
                   {staff.map((p) => (
-                    <button key={p.id} onClick={() => setDraftProvider(p.id)} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: `1.5px solid ${draftProvider === p.id ? T.accent : T.line}`, background: draftProvider === p.id ? T.accent : "none", color: draftProvider === p.id ? T.accentText : T.text, fontSize: 15, fontWeight: draftProvider === p.id ? 600 : 400 }}>{p.name}</button>
+                    <button key={p.id} onClick={() => setDraftProvider(p.id)} style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: `1.5px solid ${draftProvider === p.id ? T.accent : T.line}`, background: draftProvider === p.id ? T.accent : "none", color: draftProvider === p.id ? T.accentText : T.text, fontSize: 15, fontWeight: draftProvider === p.id ? 600 : 400 }}>{p.name}</button>
                   ))}
                 </div>
-                {/* duration */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 15, color: T.sub, fontStyle: "italic" }}>for</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 22 }}>
+                  <span style={{ fontSize: 15, color: T.sub }}>Duration</span>
                   <EditStepperRow T={T} value={`${draftDur} min`} onDec={() => setDraftDur((v) => Math.max(5, v - 5))} onInc={() => setDraftDur((v) => Math.min(240, v + 5))} />
                 </div>
               </div>
 
-              {/* add service + note */}
-              <button onClick={() => showToast("Add another service to this booking.")} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "20px", background: "none", color: T.sub, fontSize: 14, letterSpacing: 1, borderBottom: `1px solid ${T.line}` }}><Plus size={17} /> ADD SERVICE</button>
-              <div style={{ padding: "18px" }}>
-                <textarea value={draftNote} onChange={(e) => setDraftNote(e.target.value)} placeholder="Add a note" rows={3} style={{ width: "100%", background: "none", border: "none", color: T.text, fontSize: 16, fontFamily: FONT_BODY, resize: "vertical", outline: "none" }} />
+              {/* NOTE */}
+              <div style={{ padding: "22px 18px 30px" }}>
+                <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 12 }}>Note for this appointment</div>
+                <textarea value={draftNote} onChange={(e) => setDraftNote(e.target.value)} placeholder="Anything to remember for the chair…" rows={3} style={{ width: "100%", background: "var(--panel)", border: `1px solid ${T.line}`, borderRadius: 12, padding: "13px 14px", color: T.text, fontSize: 15.5, lineHeight: 1.5, fontFamily: FONT_BODY, resize: "vertical", outline: "none", minHeight: 92, boxSizing: "border-box" }} />
               </div>
             </div>
           </>
