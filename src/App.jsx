@@ -10162,6 +10162,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           services={services}
           business={business}
           isOwner={isOwner}
+          me={me}
           onClose={() => setOpen(null)}
           appts={appts}
           onSetStatus={setStatus}
@@ -10483,7 +10484,7 @@ function CheckoutRow({ label, val, bold }) {
   );
 }
 
-function AppointmentSheet({ appt, appts, providers, clients, services, business, isOwner, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
+function AppointmentSheet({ appt, appts, providers, clients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
   const scrollTopRef = useRef(null);
@@ -10550,6 +10551,8 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
     showToast(`Price set to $${v}.`);
   };
   const resetPrice = () => { onUpdate(appt.id, { price: null }); setPriceOpen(false); showToast("Price reset to the service default."); };
+  // Who can edit price: owners and admins (you + Heather). Only an explicit regular "Staff" member is blocked.
+  const canEditPrice = me ? (me.pulseRole === "owner" || me.userType !== "Staff") : true;
 
   const staff = providers.filter((p) => p.id !== "anyone");
 
@@ -10753,7 +10756,7 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                 <div style={{ display: "flex", alignItems: "baseline", marginBottom: 14, paddingBottom: 16, borderBottom: `1px solid ${T.line}` }}>
                   <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: T.text }}>{service?.name || appt.title}</span>
                   <span style={{ flex: 1, margin: "0 12px", borderBottom: `2px dotted ${T.faint}`, transform: "translateY(-5px)" }} />
-                  {isOwner ? (
+                  {canEditPrice ? (
                     <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontFamily: FONT_DISPLAY, fontSize: 24, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }}>${price}<Edit2 size={14} style={{ color: T.faint }} /></button>
                   ) : (
                     <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: T.text }}>${price}</span>
@@ -10899,17 +10902,19 @@ function AppointmentSheet({ appt, appts, providers, clients, services, business,
                     ))}
                   </div>
                 )}
-                <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, margin: "22px 0 10px" }}>With</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {staff.map((p) => (
-                    <button key={p.id} onClick={() => setDraftProvider(p.id)} style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: `1.5px solid ${draftProvider === p.id ? T.accent : T.line}`, background: draftProvider === p.id ? T.accent : "none", color: draftProvider === p.id ? T.accentText : T.text, fontSize: 15, fontWeight: draftProvider === p.id ? 600 : 400 }}>{p.name}</button>
-                  ))}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 22 }}>
+                  <span style={{ fontSize: 15, color: T.sub }}>With</span>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {staff.map((p) => (
+                      <button key={p.id} onClick={() => setDraftProvider(p.id)} style={{ padding: "7px 15px", borderRadius: 20, border: `1.5px solid ${draftProvider === p.id ? T.accent : T.line}`, background: draftProvider === p.id ? T.accent : "none", color: draftProvider === p.id ? T.accentText : T.sub, fontSize: 14, fontWeight: draftProvider === p.id ? 600 : 500 }}>{p.name}</button>
+                    ))}
+                  </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 22 }}>
                   <span style={{ fontSize: 15, color: T.sub }}>Duration</span>
                   <EditStepperRow T={T} value={`${draftDur} min`} onDec={() => setDraftDur((v) => Math.max(5, v - 5))} onInc={() => setDraftDur((v) => Math.min(240, v + 5))} />
                 </div>
-                {isOwner && (
+                {canEditPrice && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20 }}>
                     <span style={{ fontSize: 15, color: T.sub }}>Price</span>
                     <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontFamily: FONT_DISPLAY, fontSize: 21, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }}>${price}<Edit2 size={14} style={{ color: T.faint }} /></button>
