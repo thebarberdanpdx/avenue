@@ -2148,10 +2148,10 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
                       </span>
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, lineHeight: 1.1 }}>{niceName[ct.id] || ct.label}</span>
-                          {idx === 1 && <span style={{ fontSize: 10.5, color: "var(--sub)", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 20, padding: "2px 8px", fontWeight: 500 }}>most booked</span>}
+                          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, lineHeight: 1.1 }}>{ct.label || niceName[ct.id]}</span>
+                          {ct.popular && <span style={{ fontSize: 10.5, color: "var(--gold)", background: "color-mix(in srgb, var(--gold) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 32%, var(--border))", borderRadius: 20, padding: "2px 8px", fontWeight: 700 }}>Most common</span>}
                         </span>
-                        <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{friendly[ct.id] || ct.desc}</span>
+                        <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{ct.desc || friendly[ct.id]}</span>
                         <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, color: "var(--gold)", marginTop: 6 }}>${ct.price}</span>
                       </span>
                     </button>
@@ -3018,7 +3018,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
             <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             {/* SMS opt-in disclosure — required by carriers (A2P 10DLC) so Twilio's reviewer can verify on the public booking page. */}
             <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
-              By providing your number, you agree to receive booking confirmations and reminders from {business?.name || "this shop"}. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
+              By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
             </p>
             <p style={{ color: "var(--faint)", fontSize: 14, marginBottom: 22 }}>Try <span style={{ color: "var(--gold)", cursor: "pointer" }} onClick={() => setPhone("503-555-0142")}>503-555-0142</span> (returning client Marcus).</p>
             <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={() => { const digits = phone.replace(/\D/g, ""); const found = clients.find((c) => c.phone.replace(/\D/g, "") === digits) || null; if (found && found.blocked) { setBlockedNotice(true); return; } setPendingMatch(found); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "var(--border)" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Text me a code →</button>
@@ -3325,6 +3325,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
 
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Phone</label>
                     <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 16 }} />
+                    <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
+                      By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
+                    </p>
 
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Preferred days <span style={{ color: "var(--sub)", fontWeight: 400 }}>(tap any that work)</span></label>
                     <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 16 }}>
@@ -3442,6 +3445,9 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               </div>
               <input placeholder="Email" type="email" style={inputStyle} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
               <input placeholder="Phone number" type="tel" style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
+                By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
+              </p>
             </div>
 
             {/* photo upload — controlled by business.bookingPhotos.mode (off/optional/required) */}
@@ -3814,6 +3820,9 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
         <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Manage your appointment</h2>
         <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.5 }}>Enter the phone number you booked with. We'll text you a code — confirm it to see your appointments.</p>
         <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 14 }} />
+        <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
+          By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
+        </p>
         <button className="lift" disabled={digits(phone).length < 10} onClick={() => setConfirmed(true)} style={{ width: "100%", background: digits(phone).length < 10 ? "var(--border)" : "var(--gold)", color: digits(phone).length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 15, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>That's me →</button>
         <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>In the live product a 6-digit code is texted to verify it's really you. No password needed.</p>
       </div>
@@ -6169,6 +6178,34 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     </button>
   );
 
+  // ---- CUT TYPES section ----
+  const setCut = (i, patch) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c, idx) => idx === i ? { ...c, ...patch } : c) }));
+  const setPopularCut = (i) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c, idx) => ({ ...c, popular: idx === i ? !c.popular : false })) }));
+  const addCut = () => setForm((f) => ({ ...f, cutTypes: [...(f.cutTypes || []), { id: "ct" + Date.now(), label: "", desc: "", price: "" }] }));
+  const removeCut = (i) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).filter((_, idx) => idx !== i) }));
+  const cutTypesSection = (
+    <>
+      <SectionHeader title="Cut Types" />
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The cut options a client picks from when booking this service. Edit the name, description, and price for each. Mark one as most common to highlight it with a badge.</p>
+      {(form.cutTypes || []).map((ct, i) => (
+        <div key={ct.id || i} style={{ background: "var(--panel)", borderRadius: 16, padding: 16, marginBottom: 12, border: ct.popular ? "1.5px solid var(--gold)" : "1px solid var(--border)" }}>
+          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>NAME</div>
+          <input value={ct.label || ""} onChange={(e) => setCut(i, { label: e.target.value })} placeholder="e.g. Classic Cut/Fade" style={{ ...inputStyle, marginBottom: 12 }} />
+          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>DESCRIPTION</div>
+          <textarea value={ct.desc || ""} onChange={(e) => setCut(i, { desc: e.target.value })} placeholder="Shown to clients under the name" rows={2} style={{ ...inputStyle, padding: "10px 12px", resize: "vertical", marginBottom: 12, lineHeight: 1.4 }} />
+          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>PRICE ($)</div>
+          <input type="number" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setCut(i, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="35" style={{ ...inputStyle, marginBottom: 14 }} />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+            <span style={{ fontSize: 15 }}>Mark as most common<span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Shows a "Most common" badge to clients</span></span>
+            <Toggle on={!!ct.popular} onClick={() => setPopularCut(i)} />
+          </div>
+          <button onClick={() => removeCut(i)} style={{ background: "none", color: "#c0392b", fontSize: 13.5, marginTop: 12 }}>Remove this cut type</button>
+        </div>
+      ))}
+      <button onClick={addCut} style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", color: "var(--sub)", padding: 12, fontSize: 15, borderRadius: 12 }}>+ Cut type</button>
+      <SaveBar />
+    </>
+  );
   // ---- DETAILS section ----
   const detailsSection = (
     <>
@@ -6552,6 +6589,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   })();
   const hubRows = [
     { id: "details", label: "Details", sub: `$${form.price || "—"} · ${form.duration || "—"} min` },
+    { id: "cuttypes", label: "Cut Types", sub: (form.cutTypes && form.cutTypes.length) ? `${form.cutTypes.length} option${form.cutTypes.length === 1 ? "" : "s"}` : "None" },
     { id: "staff", label: "Staff", sub: `${staffList.filter((p) => form.staff[p.id]?.on !== false).length} of ${staffList.length} offering` },
     { id: "customizations", label: "Add-ons & Customizations", sub: `${form.addonGroups.length} option group${form.addonGroups.length !== 1 ? "s" : ""}` },
     { id: "refphotos", label: "Reference Photos for AI", sub: refPhotoCount === 0 ? "None yet" : `${refPhotoCount} photo${refPhotoCount === 1 ? "" : "s"}` },
@@ -6569,6 +6607,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         }} />}
         {refPickTarget && <PhotoPicker onClose={() => setRefPickTarget(null)} onPick={(id) => { addRefPhoto(refPickTarget, id); setRefPickTarget(null); }} />}
         {section === "details" ? detailsSection
+          : section === "cuttypes" ? cutTypesSection
           : section === "staff" ? staffSection
           : section === "customizations" ? customizationsSection
           : section === "refphotos" ? referencePhotosSection
