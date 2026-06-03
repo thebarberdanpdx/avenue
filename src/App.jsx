@@ -1926,7 +1926,7 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
     return () => clearTimeout(id);
   }, [selectedDate]);
 
-  const back = () => { setShowWaitlist(false); if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "change") { setSimpleStep((draft && draft.cutTypes && draft.cutTypes.length) ? "cut" : "what"); return; } if (simpleStep === "finish") { setSimpleStep("change"); return; } if (simpleStep === "who") { const hasFinish = draft && (draft.addonGroups || []).some((g) => g.type === "addon"); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(6); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "change") { setSimpleStep((draft && draft.cutTypes && draft.cutTypes.length) ? "cut" : "what"); return; } if (simpleStep === "finish") { setSimpleStep("change"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(6); return; } setStep(step - 1); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -2123,41 +2123,126 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
 
         {/* SIMPLE · CUT — the rich, slow centerpiece: pick the cut with photo + plain description + price */}
         {simpleStep === "cut" && draft && draft.cutTypes && (() => {
-          // Warm, client-friendly descriptions keyed off the cut id (falls back to the service desc).
           const friendly = {
             standard: "Sides blended or tapered, but never shaved to the skin — you keep a little length all the way down. The everyday classic.",
             skinfade: "Taken all the way down to bare skin at the bottom and blended up. Sharp, clean, and easy to keep up.",
             scissor: "Cut entirely with scissors, no clippers anywhere. The right call for longer hair and natural texture.",
           };
           const niceName = { standard: "Haircut", skinfade: "Skin Fade", scissor: "Scissor Only" };
+          const bs = (business && business.bookingStep) || {};
+          const T = {
+            greeting: bs.greeting || "First time? Welcome in",
+            head: bs.head || "What are we doing today?",
+            lead: bs.lead || "Just pick your style — we'll take care of the details in the chair.",
+            changeQ: bs.changeQ || "Just so we set aside the right amount of time…",
+            priceLine: bs.priceLine || "This won't change your price — we just want enough time so you're never rushed.",
+            opt1: bs.opt1 || "A little off", opt1sub: bs.opt1sub || "Cleaning it up, staying close to now",
+            opt2: bs.opt2 || "A lot off", opt2sub: bs.opt2sub || "Going noticeably shorter",
+          };
+          const showPrices = bs.showPrices === true;
+          const asksChange = draft.askChange !== false;
+          const addons = (draft.addonGroups || []).filter((g) => g.type === "addon");
+          const fin = addons.find((g) => g.featured) || addons[0];
+          const offerFinish = draft.offerFinish !== false && !!fin;
+          const finItem = fin ? (fin.item || {}) : {};
+          const picked = !!(cart[0] && cart[0].cutType);
+          const chosenCt = picked ? draft.cutTypes.find((c) => c.id === cart[0].cutType) : null;
+          const finOn = !!(cart[0] && cart[0].addons && fin && cart[0].addons[fin.id]);
+          const finAns = cart[0] && cart[0].finishAns;
+          const timeAnswered = !asksChange || !!simpleChange;
+          const showAddon = picked && offerFinish && timeAnswered;
+          const finDecided = !offerFinish || !!finAns;
+          const canContinue = picked && timeAnswered && finDecided;
+
+          const pickCut = (ct) => { setSimpleChange(null); setCart((c) => c.map((e, i) => i === 0 ? { ...e, cutType: ct.id, addons: {}, finishAns: undefined } : e)); };
+          const changeCut = () => { setSimpleChange(null); setCart((c) => c.map((e, i) => i === 0 ? { ...e, cutType: undefined, addons: {}, finishAns: undefined } : e)); };
+          const chooseTime = (val) => setSimpleChange(val);
+          const addYes = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: true }, finishAns: "yes" } : e));
+          const addNo = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: undefined }, finishAns: "no" } : e));
+
+          const renderCard = (ct, selected, hidden) => {
+            const img = ct.images && ct.images[0];
+            return (
+              <button key={ct.id} className="lift" onClick={() => { if (!selected) pickCut(ct); }} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: selected ? "2px solid var(--gold)" : "1px solid var(--border)", borderRadius: 16, padding: 13, display: hidden ? "none" : "flex", gap: 13, alignItems: "center", color: "var(--text)", boxShadow: "var(--shadow-sm)" }}>
+                <span style={{ width: 84, height: 84, borderRadius: 12, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {img ? <img src={imgUrl(img, 240)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <Camera size={22} style={{ color: "var(--faint)" }} />}
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, lineHeight: 1.1 }}>{ct.label || niceName[ct.id]}</span>
+                    {ct.popular && <span style={{ fontSize: 10.5, color: "var(--gold)", background: "color-mix(in srgb, var(--gold) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 32%, var(--border))", borderRadius: 20, padding: "2px 8px", fontWeight: 700 }}>Most common</span>}
+                  </span>
+                  <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{ct.desc || friendly[ct.id]}</span>
+                  {showPrices && <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, color: "var(--gold)", marginTop: 6 }}>${ct.price}</span>}
+                </span>
+              </button>
+            );
+          };
+
           return (
             <div className="fade-up">
-              <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 10, lineHeight: 1.07, letterSpacing: "-0.3px" }}>Pick the cut that fits you</h2>
-              <p style={{ color: "var(--text)", fontSize: 15.5, fontWeight: 400, lineHeight: 1.5, marginBottom: 22 }}>No pressure — this just helps us set aside the right amount of time for you.</p>
-              <div style={{ display: "grid", gap: 13 }}>
-                {draft.cutTypes.map((ct, idx) => {
-                  const img = ct.images && ct.images[0];
-                  return (
-                    <button key={ct.id} className="lift" onClick={() => {
-                      setCart((c) => c.map((e, i) => i === 0 ? { ...e, cutType: ct.id } : e));
-                      setSimpleStep("change");
-                    }} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 13, display: "flex", gap: 13, alignItems: "center", color: "var(--text)", boxShadow: "var(--shadow-sm)" }}>
-                      <span style={{ width: 84, height: 84, borderRadius: 12, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        {img ? <img src={imgUrl(img, 240)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <Camera size={22} style={{ color: "var(--faint)" }} />}
-                      </span>
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, lineHeight: 1.1 }}>{ct.label || niceName[ct.id]}</span>
-                          {ct.popular && <span style={{ fontSize: 10.5, color: "var(--gold)", background: "color-mix(in srgb, var(--gold) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 32%, var(--border))", borderRadius: 20, padding: "2px 8px", fontWeight: 700 }}>Most common</span>}
-                        </span>
-                        <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{ct.desc || friendly[ct.id]}</span>
-                        <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, color: "var(--gold)", marginTop: 6 }}>${ct.price}</span>
-                      </span>
-                    </button>
-                  );
-                })}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 10 }}>
+                <div style={{ width: 32, height: 3, background: "var(--gold)", borderRadius: 2 }} />
+                {!matched && <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "color-mix(in srgb, var(--gold) 11%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 600, color: "var(--gold)" }}>{T.greeting}</span>}
               </div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, marginBottom: 8, lineHeight: 1.07, letterSpacing: "-0.3px" }}>{T.head}</h2>
+              <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 400, lineHeight: 1.5, marginBottom: 20 }}>{T.lead}</p>
+
+              <div style={{ display: "grid", gap: picked ? 0 : 13 }}>
+                {draft.cutTypes.map((ct) => renderCard(ct, !!(chosenCt && ct.id === chosenCt.id), picked && (!chosenCt || ct.id !== chosenCt.id)))}
+              </div>
+              {picked && <button onClick={changeCut} style={{ marginTop: 11, background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}>← Change cut</button>}
+
+              {picked && (
+                <div style={{ marginTop: 20, paddingTop: 20, borderTop: "1px solid var(--line)" }}>
+                  {asksChange && (
+                    <div>
+                      <p style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, lineHeight: 1.2, margin: "0 0 5px" }}>{T.changeQ}</p>
+                      <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.45, margin: "0 0 13px" }}>{T.priceLine}</p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
+                        {[{ label: T.opt1, sub: T.opt1sub, val: "trim" }, { label: T.opt2, sub: T.opt2sub, val: "fresh" }].map((o) => {
+                          const on = simpleChange === o.val;
+                          return (
+                            <button key={o.val} onClick={() => chooseTime(o.val)} style={{ padding: "14px 12px", borderRadius: 14, border: on ? "1px solid var(--gold)" : "1px solid var(--border)", background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", lineHeight: 1.1, boxShadow: on ? "0 4px 14px rgba(110,139,116,0.22)" : "none" }}>
+                              <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 500 }}>{o.label}</span>
+                              <span style={{ display: "block", fontSize: 11.5, fontWeight: 400, marginTop: 3, color: on ? "rgba(255,255,255,0.88)" : "var(--sub)" }}>{o.sub}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {showAddon && (() => {
+                    const photo = fin.photo || finItem.photo;
+                    const addsMoney = finItem.addsPrice !== false && (Number(finItem.price) || 0) > 0;
+                    const name = finItem.name || "Finishing touch";
+                    const desc = finItem.desc || "";
+                    return (
+                      <div style={{ marginTop: 18, border: "1.5px solid color-mix(in srgb, var(--gold) 38%, var(--border))", borderRadius: 18, background: "linear-gradient(180deg, color-mix(in srgb, var(--gold) 7%, var(--panel)) 0%, var(--panel) 70%)", overflow: "hidden", boxShadow: "0 8px 22px rgba(110,139,116,0.12)" }}>
+                        <div style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 10.5, letterSpacing: 1.8, textTransform: "uppercase", fontWeight: 700, padding: "7px 16px" }}>Make it better</div>
+                        <div style={{ display: "flex", gap: 13, alignItems: "flex-start", padding: "14px 16px 0" }}>
+                          {photo ? <img src={imgUrl(photo, 200)} alt="" style={{ width: 48, height: 48, borderRadius: 12, objectFit: "cover", flexShrink: 0 }} /> : <span style={{ width: 48, height: 48, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", flexShrink: 0 }} />}
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                              <span style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 600, lineHeight: 1.1 }}>{name}</span>
+                              {showPrices && <span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 600, color: "var(--gold)", whiteSpace: "nowrap" }}>{addsMoney ? `+$${Number(finItem.price) || 0}` : "Free"}</span>}
+                            </span>
+                            {desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginTop: 3 }}>{desc}</span>}
+                          </span>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 10, padding: "12px 16px 16px" }}>
+                          <button onClick={addYes} style={{ padding: 14, borderRadius: 13, fontSize: 15, fontWeight: 700, border: "none", background: "var(--gold)", color: "var(--on-gold)", outline: finOn ? "2px solid var(--gold)" : "none", outlineOffset: 2, boxShadow: "0 6px 16px rgba(110,139,116,0.28)" }}>{finOn ? "Added" : "Add it"}</button>
+                          <button onClick={addNo} style={{ padding: 14, borderRadius: 13, fontSize: 15, fontWeight: 700, border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", outline: finAns === "no" ? "2px solid var(--gold)" : "none", outlineOffset: 2 }}>No thanks</button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <button className="lift" disabled={!canContinue} onClick={() => { if (canContinue) setSimpleStep("who"); }} style={{ width: "100%", marginTop: 18, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 16, padding: 17, fontSize: 16, fontWeight: 600, boxShadow: canContinue ? "0 8px 22px rgba(110,139,116,0.28)" : "none", opacity: canContinue ? 1 : 0.3 }}>Continue</button>
+                  {!canContinue && <p style={{ marginTop: 9, textAlign: "center", fontSize: 12.5, color: "var(--faint)" }}>{asksChange && !simpleChange ? "Pick how much we're taking off" : (showAddon && !finAns ? "Add the finishing touch, or tap No thanks" : "")}</p>}
+                </div>
+              )}
             </div>
           );
         })()}
