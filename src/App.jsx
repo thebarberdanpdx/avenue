@@ -729,6 +729,7 @@ const inputStyle = { width: "100%", background: "var(--panel2)", border: "1px so
 function StaffLogin({ authReady, onBack }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const send = async () => {
@@ -741,6 +742,17 @@ function StaffLogin({ authReady, onBack }) {
       if (error) { setErr(error.message || "Couldn't send the link. Try again."); setBusy(false); return; }
       setSent(true); setBusy(false);
     } catch (e) { setErr("Couldn't send the link. Try again."); setBusy(false); }
+  };
+  const verify = async () => {
+    const clean = email.trim().toLowerCase();
+    const token = code.trim();
+    if (token.length < 6) { setErr("Enter the 6-digit code from your email."); return; }
+    setBusy(true); setErr("");
+    try {
+      const { error } = await supabase.auth.verifyOtp({ email: clean, token, type: "email" });
+      if (error) { setErr(error.message || "That code didn't work — check it and try again."); setBusy(false); return; }
+      // success: onAuthStateChange sets the session and routes into the dashboard
+    } catch (e) { setErr("That code didn't work. Try again."); setBusy(false); }
   };
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "var(--bg, #f6f3ec)" }}>
@@ -760,9 +772,12 @@ function StaffLogin({ authReady, onBack }) {
         ) : (
           <>
             <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.5px", margin: "0 0 12px" }}>Check your email</h1>
-            <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.55, margin: "0 0 8px" }}>We sent a sign-in link to <strong style={{ color: "var(--text)", fontWeight: 500 }}>{email.trim().toLowerCase()}</strong>. Tap it on this device and you're in.</p>
-            <p style={{ color: "var(--faint)", fontSize: 13, fontWeight: 300, lineHeight: 1.5, margin: "0 0 24px" }}>Didn't get it? Check spam, or send it again.</p>
-            <button onClick={() => { setSent(false); setBusy(false); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "15px 20px", fontSize: 15, borderRadius: 14, border: "1px solid var(--border2)", cursor: "pointer" }}>Use a different email</button>
+            <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.55, margin: "0 0 16px" }}>We sent a 6-digit code and a sign-in link to <strong style={{ color: "var(--text)", fontWeight: 500 }}>{email.trim().toLowerCase()}</strong>. Enter the code below to sign in right here in the app.</p>
+            <input type="text" inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 8))} onKeyDown={(e) => { if (e.key === "Enter") verify(); }} placeholder="123456" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, padding: "16px 16px", color: "var(--text)", fontSize: 22, letterSpacing: 6, textAlign: "center", fontFamily: FONT_BODY, marginBottom: 12, boxSizing: "border-box" }} />
+            {err && <p style={{ color: "#c0392b", fontSize: 13.5, margin: "0 0 12px" }}>{err}</p>}
+            <button className="lift" disabled={busy} onClick={verify} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "17px 20px", fontSize: 16, fontWeight: 500, borderRadius: 16, border: "none", boxShadow: "var(--shadow-md)", opacity: busy ? 0.6 : 1, cursor: busy ? "default" : "pointer", marginBottom: 14 }}>{busy ? "Signing in…" : "Sign in"}</button>
+            <p style={{ color: "var(--faint)", fontSize: 13, fontWeight: 300, lineHeight: 1.5, margin: "0 0 16px" }}>On a computer you can also just tap the link in the email. Didn't get it? Check spam.</p>
+            <button onClick={() => { setSent(false); setBusy(false); setCode(""); setErr(""); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "15px 20px", fontSize: 15, borderRadius: 14, border: "1px solid var(--border2)", cursor: "pointer" }}>Use a different email</button>
           </>
         )}
         <button onClick={onBack} style={{ width: "100%", background: "transparent", color: "var(--sub)", fontSize: 13.5, padding: "16px 0 2px", border: "none", marginTop: 8, cursor: "pointer" }}>Are you a client? Book here →</button>
