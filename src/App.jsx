@@ -6832,6 +6832,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     { id: "timerules", label: "Hours & Pricing", sub: (form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Always available" },
   ];
 
+  // Reorder hooks must be declared before any early return (Rules of Hooks).
+  const rowRefs = useRef({});
+  const lpTimer = useRef(null);
+  const dropTimer = useRef(null);
+  const tStartY = useRef(0);
+  const dragRowH = useRef(64);
+  const [tDrag, setTDrag] = useState(null);
+  const tDragRef = useRef(null);
+
   // ---- full-page service editor ----
   if (editing) {
     return (
@@ -6889,31 +6898,53 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   };
   // Stamp each service with its position so the order is saved and survives reload.
   const commitOrder = (arr) => setServices(arr.map((x, i) => ({ ...x, order: i })));
-  // Long-press drag-to-reorder (touch). Arrows remain as a fallback.
-  const [tDragId, setTDragId] = useState(null);
-  const lpTimer = useRef(null);
-  const tStartY = useRef(0);
-  const touchStart = (id) => (e) => {
+  // ---- Premium long-press drag-to-reorder (touch): the held row tracks the finger 1:1, the
+  // others glide aside to open a gap, and the array is committed ONCE on release. ----
+  const ROW_GAP = 10;
+  const setDragState = (v) => { tDragRef.current = v; setTDrag(v); };
+  const beginDrag = (id, cat, ids) => {
+    const el = rowRefs.current[id];
+    dragRowH.current = el ? el.getBoundingClientRect().height + ROW_GAP : 64;
+    const fromIndex = ids.indexOf(id);
+    setDragState({ id, cat, ids, fromIndex, overIndex: fromIndex, dy: 0, dropping: false });
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e2) {} }
+  };
+  const touchStart = (id, cat, ids) => (e) => {
+    if (dropTimer.current) { clearTimeout(dropTimer.current); dropTimer.current = null; const pd = tDragRef.current; if (pd) { commitReorder(pd.cat, pd.ids, pd.fromIndex, pd.overIndex); setDragState(null); } }
     tStartY.current = e.touches && e.touches[0] ? e.touches[0].clientY : 0;
     if (lpTimer.current) clearTimeout(lpTimer.current);
-    lpTimer.current = setTimeout(() => { setTDragId(id); if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e2) {} } }, 320);
+    lpTimer.current = setTimeout(() => { lpTimer.current = null; beginDrag(id, cat, ids); }, 300);
   };
   const touchMove = (e) => {
     const t = e.touches && e.touches[0]; if (!t) return;
-    if (!tDragId) { if (Math.abs(t.clientY - tStartY.current) > 10 && lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } return; }
-    const el = document.elementFromPoint(t.clientX, t.clientY);
-    const row = el && el.closest ? el.closest("[data-sid]") : null;
-    const overId = row && row.getAttribute("data-sid");
-    if (!overId || overId === tDragId) return;
+    const d = tDragRef.current;
+    if (!d) { if (lpTimer.current && Math.abs(t.clientY - tStartY.current) > 8) { clearTimeout(lpTimer.current); lpTimer.current = null; } return; }
+    const dy = t.clientY - tStartY.current;
+    const slots = Math.round(dy / dragRowH.current);
+    const overIndex = Math.max(0, Math.min(d.ids.length - 1, d.fromIndex + slots));
+    if (dy !== d.dy || overIndex !== d.overIndex) setDragState({ ...d, dy, overIndex });
+  };
+  const touchEnd = () => {
+    if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; }
+    const d = tDragRef.current;
+    if (!d) return;
+    // Ease the held row into its target slot, then commit the new order once it lands.
+    const targetDy = (d.overIndex - d.fromIndex) * dragRowH.current;
+    setDragState({ ...d, dy: targetDy, dropping: true });
+    dropTimer.current = setTimeout(() => { commitReorder(d.cat, d.ids, d.fromIndex, d.overIndex); setDragState(null); dropTimer.current = null; }, 190);
+  };
+  // Reorder within a single category, refilling that category's existing slots in the new order.
+  const commitReorder = (cat, ids, fromIndex, overIndex) => {
+    if (fromIndex === overIndex) return;
+    const newIds = [...ids];
+    const [m] = newIds.splice(fromIndex, 1);
+    newIds.splice(overIndex, 0, m);
+    const positions = [];
+    services.forEach((s, i) => { if ((s.category || cats[0]) === cat) positions.push(i); });
     const arr = [...services];
-    const from = arr.findIndex((s) => s.id === tDragId);
-    const to = arr.findIndex((s) => s.id === overId);
-    if (from < 0 || to < 0) return;
-    if ((arr[from].category || cats[0]) !== (arr[to].category || cats[0])) return;
-    const [m] = arr.splice(from, 1); arr.splice(to, 0, m);
+    newIds.forEach((id, j) => { arr[positions[j]] = services.find((x) => x.id === id); });
     commitOrder(arr);
   };
-  const touchEnd = () => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } if (tDragId) setTDragId(null); };
   const moveCategory = (name, dir) => {
     const arr = [...cats]; const i = arr.indexOf(name); const j = i + dir;
     if (j < 0 || j >= arr.length) return;
@@ -6982,9 +7013,23 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             {/* services in this category */}
             <div style={{ display: "grid", gap: 10 }}>
               {inCat.length === 0 && <div style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "6px 2px" }}>No services in this category yet.</div>}
-              {inCat.map((s, si) => (
-                <div key={s.id} data-sid={s.id} draggable onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} className="card" style={{ position: "relative", zIndex: tDragId === s.id ? 5 : 1, display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: tDragId === s.id ? "1.5px solid var(--gold)" : "1px solid var(--border)", borderRadius: 16, padding: "15px 14px", boxShadow: tDragId === s.id ? "0 14px 30px rgba(60,50,30,0.20)" : "var(--shadow-sm)", opacity: tDragId && tDragId !== s.id ? 0.5 : 1, transform: tDragId === s.id ? "scale(1.015) translateY(-1px)" : "none", transition: "opacity .18s ease, transform .18s ease, box-shadow .18s ease, border-color .18s ease" }}>
-                  <span onTouchStart={touchStart(s.id)} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchEnd} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", flexShrink: 0, padding: "8px 4px", cursor: "grab" }}><GripVertical size={18} style={{ color: tDragId === s.id ? "var(--gold)" : "var(--faint)" }} /></span>
+              {inCat.map((s, si) => {
+                const dd = tDrag;
+                const act = dd && dd.cat === cat;
+                const held = act && dd.id === s.id;
+                let ty = 0, sc = 1, zz = 1, sh = "var(--shadow-sm)", bd = "1px solid var(--border)";
+                let tr = "scale .17s ease, box-shadow .2s ease, border-color .2s ease";
+                if (held) {
+                  ty = dd.dy; sc = 1.03; zz = 50; sh = "0 16px 34px rgba(60,50,30,0.22)"; bd = "1.5px solid var(--gold)";
+                  tr = dd.dropping ? "translate .19s cubic-bezier(.2,.85,.25,1), scale .17s ease, box-shadow .2s ease, border-color .2s ease" : "scale .16s ease, box-shadow .16s ease, border-color .16s ease";
+                } else if (act) {
+                  tr = "translate .22s cubic-bezier(.2,.85,.25,1), scale .17s ease, box-shadow .2s ease, border-color .2s ease";
+                  if (dd.overIndex > dd.fromIndex && si > dd.fromIndex && si <= dd.overIndex) ty = -dragRowH.current;
+                  else if (dd.overIndex < dd.fromIndex && si >= dd.overIndex && si < dd.fromIndex) ty = dragRowH.current;
+                }
+                return (
+                <div key={s.id} ref={(el) => { if (el) rowRefs.current[s.id] = el; }} data-sid={s.id} draggable onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} className="card" style={{ position: "relative", zIndex: zz, display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: bd, borderRadius: 16, padding: "15px 14px", boxShadow: sh, translate: `0px ${ty}px`, scale: String(sc), transition: tr, willChange: act ? "translate" : "auto" }}>
+                  <span onTouchStart={touchStart(s.id, cat, inCat.map((x) => x.id))} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchEnd} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", flexShrink: 0, padding: "8px 4px", cursor: held ? "grabbing" : "grab" }}><GripVertical size={18} style={{ color: held ? "var(--gold)" : "var(--faint)" }} /></span>
                   <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--text)", minWidth: 0 }}>
                     <div style={{ fontSize: 16, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 9, height: 9, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />{s.name}</div>
                     <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>${s.price} · {s.duration} min{s.addonGroups.length ? ` · ${s.addonGroups.length} add-on${s.addonGroups.length !== 1 ? "s" : ""}` : ""}</div>
@@ -6996,7 +7041,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   </div>
                   <button onClick={() => remove(s.id)} style={{ background: "none", color: "#C2703D", padding: 6, flexShrink: 0 }}><Trash2 size={16} /></button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         );
