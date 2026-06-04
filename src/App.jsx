@@ -1467,6 +1467,28 @@ function Landing({ business, onPick }) {
 function PhotoPicker({ onClose, onPick }) {
   const [cat, setCat] = useState("Haircuts");
   const [tab, setTab] = useState("library");
+  const fileRef = useRef(null);
+  const handleFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const fr = new FileReader();
+    fr.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 900; let w = img.width, h = img.height;
+        if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+        else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        onPick(canvas.toDataURL("image/jpeg", 0.72));
+        onClose();
+      };
+      img.src = ev.target.result;
+    };
+    fr.readAsDataURL(file);
+  };
   return (
     <Sheet open={true} onClose={onClose} maxWidth={560}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
@@ -1502,8 +1524,9 @@ function PhotoPicker({ onClose, onPick }) {
               <div style={{ fontSize: 15, marginBottom: 6 }}>Upload your own photo</div>
               <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300 }}>Your photos always take priority over the library.</p>
             </div>
-            <button className="lift" onClick={() => { onPick(ALL_LIBRARY[Math.floor(Math.random() * ALL_LIBRARY.length)].id); onClose(); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>CHOOSE FILE (SIMULATED)</button>
-            <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>Real uploads work in the live product. Here we'll drop in a sample so you can see the result.</p>
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
+            <button className="lift" onClick={() => fileRef.current && fileRef.current.click()} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>CHOOSE FILE</button>
+            <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>Photos are resized automatically so your booking page stays fast.</p>
           </div>
         )}
       </Sheet>
@@ -6311,6 +6334,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The cut options a client picks from when booking this service. Edit the name, description, and price for each. Mark one as most common to highlight it with a badge.</p>
       {(form.cutTypes || []).map((ct, i) => (
         <div key={ct.id || i} style={{ background: "var(--panel)", borderRadius: 16, padding: 16, marginBottom: 12, border: ct.popular ? "1.5px solid var(--gold)" : "1px solid var(--border)" }}>
+          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>PHOTO</div>
+          <button onClick={() => setPicker({ target: "cut", index: i })} className="lift" style={{ width: "100%", height: 120, borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 6, padding: 0, marginBottom: 12 }}>
+            {ct.images && ct.images[0] ? <img src={imgUrl(ct.images[0], 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={22} /><span style={{ fontSize: 13.5 }}>Add a photo (library or upload)</span></>}
+          </button>
           <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>NAME</div>
           <input value={ct.label || ""} onChange={(e) => setCut(i, { label: e.target.value })} placeholder="e.g. Classic Cut/Fade" style={{ ...inputStyle, marginBottom: 12 }} />
           <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>DESCRIPTION</div>
@@ -6725,6 +6752,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       <div className="appt-screen" style={{ paddingBottom: 40 }}>
         {picker && <PhotoPicker onClose={() => setPicker(null)} onPick={(id) => {
           if (picker.target === "service") setForm({ ...form, photo: id });
+          else if (picker.target === "cut") setCut(picker.index, { images: [id] });
           else setForm({ ...form, addonGroups: form.addonGroups.map((g, i) => i === picker.target ? { ...g, photo: id } : g) });
         }} />}
         {refPickTarget && <PhotoPicker onClose={() => setRefPickTarget(null)} onPick={(id) => { addRefPhoto(refPickTarget, id); setRefPickTarget(null); }} />}
