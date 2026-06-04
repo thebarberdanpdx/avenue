@@ -2193,7 +2193,6 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
                       {svc.photo ? <span style={{ width: 52, height: 52, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: "var(--panel2)" }}><img src={imgUrl(svc.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></span> : null}
                       <span style={{ minWidth: 0 }}>
                         <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{svc.name}</span>
-                        {svc.duration ? <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{svc.duration} min{svc.price ? (" · $" + svc.price) : ""}</span> : null}
                         {svc.comboOf && svc.comboOf.length > 0 ? (() => { const incl = svc.comboOf.map((id) => { const x = services.find((y) => y.id === id); return x && x.name; }).filter(Boolean); return incl.length ? <span style={{ display: "block", fontSize: 12.5, color: "var(--gold)", fontWeight: 600, marginTop: 3 }}>Includes {incl.join(" + ")}</span> : null; })() : null}
                       </span>
                     </span>
@@ -2218,8 +2217,8 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
             greeting: bs.greeting || "First time? Welcome in",
             head: bs.head || "What are we doing today?",
             lead: bs.lead || "Just pick your style — we'll take care of the details in the chair.",
-            changeQ: bs.changeQ || "Just so we set aside the right amount of time…",
-            priceLine: bs.priceLine || "If we need a little extra time, there's no extra charge — we just want enough set aside so you're never rushed.",
+            changeQ: bs.changeQ || "Same price either way — how much are we taking off?",
+            priceLine: bs.priceLine || "Helps us hold the right amount of time for you.",
             opt1: bs.opt1 || "A little off", opt1sub: bs.opt1sub || "Cleaning it up, staying close to now",
             opt2: bs.opt2 || "A lot off", opt2sub: bs.opt2sub || "Going noticeably shorter",
           };
@@ -2270,7 +2269,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
                 {!matched && <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "color-mix(in srgb, var(--gold) 11%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 600, color: "var(--gold)" }}>{T.greeting}</span>}
               </div>
               <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, marginBottom: 8, lineHeight: 1.07, letterSpacing: "-0.3px" }}>{T.head}</h2>
-              <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 400, lineHeight: 1.5, marginBottom: 20 }}>{T.lead}</p>
+              <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 400, lineHeight: 1.5, marginBottom: 26 }}>{T.lead}</p>
               {draft.comboOf && draft.comboOf.length > 0 && (() => {
                 const incl = draft.comboOf.map((id) => { const s = services.find((x) => x.id === id); return s && s.name; }).filter(Boolean);
                 return incl.length ? <p style={{ fontSize: 13.5, color: "var(--gold)", fontWeight: 600, margin: "-6px 0 20px" }}>Includes {incl.join(" + ")}</p> : null;
@@ -2280,19 +2279,36 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
                 <div style={{ display: "grid", gap: 13 }}>
                   {draft.cutTypes.map((ct) => renderCard(ct, false, false))}
                 </div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 13, background: "var(--panel)", border: "2px solid var(--gold)", borderRadius: 16, padding: "12px 14px", boxShadow: "var(--shadow-sm)" }}>
-                  <span style={{ width: 46, height: 46, borderRadius: 11, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {chosenCt && chosenCt.images && chosenCt.images[0] ? <img src={imgUrl(chosenCt.images[0], 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <Camera size={18} style={{ color: "var(--faint)" }} />}
-                  </span>
-                  <span style={{ flex: 1, minWidth: 0, fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600 }}>{(chosenCt && (chosenCt.label || niceName[chosenCt.id])) || "Your cut"}</span>
-                  <span style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>✓</span>
+              ) : (() => {
+                const cName = (chosenCt && (chosenCt.label || niceName[chosenCt.id])) || "Your cut";
+                const cDesc = chosenCt && (chosenCt.desc || friendly[chosenCt.id]);
+                const cPrice = chosenCt && (chosenCt.price != null && chosenCt.price !== "" ? chosenCt.price : draft.price);
+                const cDur = (chosenCt && chosenCt.duration) || draft.duration;
+                const cImg = chosenCt && chosenCt.images && chosenCt.images[0];
+                return (
+                <div style={{ background: "var(--panel)", border: "2px solid var(--gold)", borderRadius: 18, padding: "22px 20px", boxShadow: "0 6px 20px rgba(110,139,116,0.12)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, color: "var(--gold)", marginBottom: 14 }}>
+                    <span style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800 }}>✓</span>
+                    Your style
+                  </div>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 15 }}>
+                    <span style={{ width: 62, height: 62, borderRadius: 14, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {cImg ? <img src={imgUrl(cImg, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <Camera size={20} style={{ color: "var(--faint)" }} />}
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0, fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.08 }}>{cName}</span>
+                    {(cPrice != null && cPrice !== "") ? <span style={{ textAlign: "right", flexShrink: 0, paddingLeft: 10 }}>
+                      <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, color: "var(--text)" }}>${cPrice}</span>
+                      {cDur ? <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{cDur} min</span> : null}
+                    </span> : null}
+                  </div>
+                  {cDesc ? <div style={{ fontSize: 15.5, lineHeight: 1.6, color: "var(--text2)", marginTop: 16 }}>{cDesc}</div> : null}
+                  <button onClick={changeCut} style={{ marginTop: 18, background: "none", border: "none", color: "var(--gold)", fontSize: 14, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}>‹ Choose a different style</button>
                 </div>
-              )}
-              {picked && <button onClick={changeCut} style={{ marginTop: 14, background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}>← Change cut</button>}
+                );
+              })()}
 
               {picked && (
-                <div style={{ marginTop: 44, paddingTop: 32, borderTop: "1px solid var(--line)" }}>
+                <div style={{ marginTop: 52, paddingTop: 36, borderTop: "1px solid var(--line)" }}>
                   {asksChange && (
                     <div>
                       <p style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, lineHeight: 1.22, margin: "0 0 12px" }}>{T.changeQ}</p>
@@ -9459,8 +9475,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         {bword("HEADLINE", "head", "What are we doing today?")}
         {bword("SUB-LINE", "lead", "Just pick your style — we'll handle the details in the chair.")}
         <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, margin: "12px 0 8px" }}>TIME QUESTION</div>
-        {bword("HEADLINE", "changeQ", "Just so we set aside the right amount of time…")}
-        {bword("REASSURANCE", "priceLine", "If we need a little extra time, there's no extra charge — we just want enough set aside so you're never rushed.")}
+        {bword("HEADLINE", "changeQ", "Same price either way — how much are we taking off?")}
+        {bword("SMALL LINE", "priceLine", "Helps us hold the right amount of time for you.")}
       </>),
     },
     {
