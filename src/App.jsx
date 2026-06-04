@@ -6440,53 +6440,59 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const setPopularCut = (i) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c, idx) => ({ ...c, popular: idx === i ? !c.popular : false })) }));
   const addCut = () => setForm((f) => ({ ...f, cutTypes: [...(f.cutTypes || []), { id: "ct" + Date.now(), label: "", desc: "", price: "" }] }));
   const removeCut = (i) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).filter((_, idx) => idx !== i) }));
-  // ---- Step 5: keep a shared cut in sync across services. Non-destructive: copies name/desc/photo only, never price, never deletes. Matches by cut name. ----
+  // ---- cut styles: a service "offers" styles from the shared library; price & time stay per-service ----
   const cutNorm = (s) => (s || "").trim().toLowerCase();
-  const cutShareCount = (ct) => { const k = cutNorm(ct && ct.label); if (!k) return 0; return services.filter((s) => s.id !== editing && (s.cutTypes || []).some((c) => cutNorm(c.label) === k)).length; };
-  const applyCutEverywhere = (ct) => {
-    const k = cutNorm(ct && ct.label);
-    if (!k) { showToast("Give this cut a name first."); return; }
-    setServices(services.map((s) => {
-      if (s.id === editing) return s;
-      return { ...s, cutTypes: (s.cutTypes || []).map((c) => {
-        if (cutNorm(c.label) !== k) return c;
-        const patch = { label: ct.label, desc: ct.desc };
-        if (ct.images && ct.images.length) patch.images = ct.images;
-        return { ...c, ...patch };
-      }) };
-    }));
-    showToast("Updated this cut in your other services.");
-  };
+  const styleMatch = (c, entry) => (c.libId ? c.libId === entry.id : cutNorm(c.label) === cutNorm(entry.label));
+  const toggleStyle = (entry) => setForm((f) => {
+    const cts = f.cutTypes || [];
+    const i = cts.findIndex((c) => styleMatch(c, entry));
+    if (i >= 0) return { ...f, cutTypes: cts.filter((_, idx) => idx !== i) };
+    const basePrice = (f.price === "" || f.price === null || f.price === undefined) ? "" : Number(f.price);
+    return { ...f, cutTypes: [...cts, { id: "ct" + Date.now(), libId: entry.id, label: entry.label, desc: entry.desc || "", images: Array.isArray(entry.images) ? entry.images.slice() : [], price: basePrice, popular: false }] };
+  });
+  const setStyle = (entry, patch) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c) => (styleMatch(c, entry) ? { ...c, ...patch } : c)) }));
+  const setStylePopular = (entry) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c) => ({ ...c, popular: styleMatch(c, entry) ? !c.popular : false })) }));
   const cutTypesSection = (
     <>
       <SectionHeader title="Cut Types" />
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The cut options a client picks from when booking this service. Edit the name, description, and price for each. Mark one as most common to highlight it with a badge.</p>
-      {(form.cutTypes || []).map((ct, i) => (
-        <div key={ct.id || i} style={{ background: "var(--panel)", borderRadius: 16, padding: 20, marginBottom: 14, border: ct.popular ? "1.5px solid var(--gold)" : "1px solid var(--border)" }}>
-          <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>PHOTO</div>
-          <button onClick={() => setPicker({ target: "cut", index: i })} className="lift" style={{ width: "100%", height: 150, borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, padding: 0, marginBottom: 16 }}>
-            {ct.images && ct.images[0] ? <img src={imgUrl(ct.images[0], 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} /><span style={{ fontSize: 15 }}>Add a photo (library or upload)</span></>}
-          </button>
-          <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>NAME</div>
-          <input value={ct.label || ""} onChange={(e) => setCut(i, { label: e.target.value })} placeholder="e.g. Classic Cut/Fade" style={{ ...inputStyle, fontSize: 17, padding: "16px 16px", marginBottom: 16 }} />
-          <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>DESCRIPTION</div>
-          <textarea value={ct.desc || ""} onChange={(e) => setCut(i, { desc: e.target.value })} placeholder="Shown to clients under the name" rows={6} style={{ ...inputStyle, fontSize: 16, padding: "14px 16px", resize: "vertical", minHeight: 150, marginBottom: 16, lineHeight: 1.55 }} />
-          <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>PRICE ($)</div>
-          <input type="number" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setCut(i, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="35" style={{ ...inputStyle, fontSize: 17, padding: "16px 16px", marginBottom: 16 }} />
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 12 }}>
-            <span style={{ fontSize: 15 }}>Mark as most common<span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Shows a "Most common" badge to clients</span></span>
-            <Toggle on={!!ct.popular} onClick={() => setPopularCut(i)} />
-          </div>
-          {cutShareCount(ct) > 0 && (
-            <div style={{ marginTop: 12, padding: "11px 13px", background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))", borderRadius: 12, fontSize: 13, color: "var(--text2)", lineHeight: 1.5 }}>
-              This cut is also in <b>{cutShareCount(ct)}</b> other service{cutShareCount(ct) > 1 ? "s" : ""}.
-              <button onClick={() => applyCutEverywhere(ct)} style={{ display: "block", marginTop: 6, background: "none", border: "none", color: "var(--gold)", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 2, padding: 0, cursor: "pointer", fontSize: 13 }}>Copy this name, description &amp; photo to all of them →</button>
+      <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Tick the styles this service offers, then set this service's price and time for each. Edit a style's name, description and photo in Menu &rsaquo; Cut Styles.</p>
+      {(cutLibrary || []).length === 0 ? (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, color: "var(--sub)", fontSize: 15, lineHeight: 1.5, marginBottom: 14 }}>You don't have any cut styles yet. Tap "+ New style" below to create one.</div>
+      ) : (cutLibrary || []).map((entry) => {
+        const i = (form.cutTypes || []).findIndex((c) => styleMatch(c, entry));
+        const on = i >= 0;
+        const ct = on ? form.cutTypes[i] : null;
+        return (
+          <div key={entry.id} style={{ background: "var(--panel)", borderRadius: 16, padding: 18, marginBottom: 14, border: on ? (ct.popular ? "1.5px solid var(--gold)" : "1px solid var(--border2)") : "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <span style={{ width: 48, height: 48, borderRadius: 11, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{entry.images && entry.images[0] ? <img src={imgUrl(entry.images[0], 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={18} style={{ color: "var(--faint)" }} />}</span>
+              <span style={{ minWidth: 0, flex: 1 }}><span style={{ display: "block", fontSize: 17, fontWeight: 500 }}>{entry.label}</span><span style={{ display: "block", fontSize: 13, color: "var(--faint)", marginTop: 2 }}>{on ? "Offered here" : "Not offered"}</span></span>
+              <Toggle on={on} onClick={() => toggleStyle(entry)} />
             </div>
-          )}
-          <button onClick={() => removeCut(i)} style={{ background: "none", color: "#c0392b", fontSize: 13.5, marginTop: 12 }}>Remove this cut type</button>
-        </div>
-      ))}
-      <button onClick={addCut} style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", color: "var(--sub)", padding: 12, fontSize: 15, borderRadius: 12 }}>+ Cut type</button>
+            {on && (
+              <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13.5, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>PRICE ($)</div>
+                    <input type="number" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setStyle(entry, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="35" style={{ ...inputStyle, fontSize: 17, padding: "14px 16px" }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13.5, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>TIME (MIN)</div>
+                    <input type="number" value={ct.duration === undefined || ct.duration === null || ct.duration === "" ? "" : ct.duration} onChange={(e) => setStyle(entry, { duration: e.target.value === "" ? "" : Number(e.target.value) })} placeholder={String(form.duration || 45)} style={{ ...inputStyle, fontSize: 17, padding: "14px 16px" }} />
+                  </div>
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Leave time blank to use this service's default ({form.duration || 45} min).</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 14 }}>
+                  <span style={{ fontSize: 15 }}>Mark as most common<span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Shows a "Most common" badge to clients</span></span>
+                  <Toggle on={!!ct.popular} onClick={() => setStylePopular(entry)} />
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <button onClick={() => { setLibForm({ id: "lib_" + Date.now(), label: "", desc: "", images: [] }); setLibOpen(true); }} style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", color: "var(--sub)", padding: 12, fontSize: 15, borderRadius: 12 }}>+ New style</button>
+      <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>New styles open the Cut Styles editor. After you save one, come back here to tick it on.</p>
       <SaveBar />
     </>
   );
@@ -6929,7 +6935,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     const entry = { ...libForm, label: (libForm.label || "").trim(), desc: libForm.desc || "", images: Array.isArray(libForm.images) ? libForm.images.filter(Boolean) : [] };
     if (!entry.label) { showToast("Give this style a name first."); return; }
     const used = libUsedCount(entry);
-    setCutLibrary((lib) => (lib || []).map((e) => (e.id === entry.id ? entry : e)));
+    setCutLibrary((lib) => { const arr = lib || []; return arr.some((e) => e.id === entry.id) ? arr.map((e) => (e.id === entry.id ? entry : e)) : [...arr, entry]; });
     setServices(services.map((s) => ({ ...s, cutTypes: (s.cutTypes || []).map((c) => {
       const match = c.libId ? c.libId === entry.id : cutNorm(c.label) === cutNorm(entry.label);
       if (!match) return c;
