@@ -997,6 +997,7 @@ export default function App() {
       const { data, error } = await supabase.from(table).select('data').eq('shop_id', SHOP_ID);
       if (error) { console.error(`[vero] live-sync refetch '${table}' failed:`, error); return; }
       const list = data ? data.map((r) => r.data) : [];
+      if (table === 'services') list.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
       lastRemoteRef.current[table] = list;
       const set = tableSetters[table]; if (set) set(list);
     } catch (e) { console.error('[vero] live-sync refetch error:', e); }
