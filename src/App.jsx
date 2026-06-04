@@ -1066,12 +1066,38 @@ export default function App() {
       if (pr && pr.length) lastRemoteRef.current.providers = pr;
       if (sv && sv.length) lastRemoteRef.current.services = sv;
 
-      // Cut-style library: use the saved one if present, else seed it once from existing services
-      // (de-dupe by name). This only adds the shops.settings._cutLibrary key — services are untouched.
-      if (Array.isArray(savedCutLibrary) && savedCutLibrary.length) {
-        setCutLibrary(savedCutLibrary);
-      } else {
-        setCutLibrary(buildCutLibrary((sv && sv.length) ? sv : services));
+      // Cut-style library + linkage (Step 2a). Use the saved library if present, else seed it from
+      // existing services (de-dupe by name). Then give every service cut style a stable libId pointing
+      // at its library entry — matched by name, with the library extended for any style not yet in it.
+      // label/desc/images on each service are left as-is here, so booking looks identical (still invisible).
+      // Services are only re-saved if a libId actually changed (no churn once everything is linked).
+      {
+        const baseSvc = (sv && sv.length) ? sv : services;
+        const lib = (Array.isArray(savedCutLibrary) && savedCutLibrary.length) ? savedCutLibrary.slice() : buildCutLibrary(baseSvc);
+        const libByKey = new Map(lib.map((e) => [(e.label || "").trim().toLowerCase(), e]));
+        let extra = 0, linkChanged = false;
+        const linkedSvc = (baseSvc || []).map((s) => {
+          if (!s || !s.cutTypes || !s.cutTypes.length) return s;
+          let svcChanged = false;
+          const cts = s.cutTypes.map((ct) => {
+            const key = ((ct && ct.label) || "").trim().toLowerCase();
+            if (!key) return ct;
+            let entry = libByKey.get(key);
+            if (!entry) {
+              const baseId = key.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+              entry = { id: "lib_" + (baseId || ("x" + (++extra))), label: (ct.label || "").trim(), desc: ct.desc || "", images: Array.isArray(ct.images) ? ct.images.filter(Boolean) : [] };
+              lib.push(entry); libByKey.set(key, entry); linkChanged = true;
+            }
+            if (ct.libId !== entry.id) { svcChanged = true; return { ...ct, libId: entry.id }; }
+            return ct;
+          });
+          if (svcChanged) { linkChanged = true; return { ...s, cutTypes: cts }; }
+          return s;
+        });
+        setCutLibrary(lib);
+        // Persist linkage only when services were loaded AND something changed. We deliberately leave
+        // lastRemoteRef.services as the pre-link array so the save effect sees a diff and writes once.
+        if (linkChanged && sv && sv.length) setServices(linkedSvc);
       }
 
       // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
