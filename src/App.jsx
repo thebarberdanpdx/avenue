@@ -9238,6 +9238,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     </div>
   );
 
+  const bword = (label, key, placeholder) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>{label}</div>
+      <input value={(form.bookingStep && form.bookingStep[key]) || ""} placeholder={placeholder || ""} onChange={(e) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), [key]: e.target.value } })} style={inputStyle} />
+    </div>
+  );
+
   // Each card: status line (live) + the editor shown when expanded. Grouped by category.
   const cards = [
     {
@@ -9250,6 +9257,23 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         {field("ADDRESS LINE 2", "address2")}
         {field("CITY, STATE ZIP", "cityZip")}
         {field("CONTACT EMAIL", "email")}
+      </>),
+    },
+    {
+      id: "bookingwords", title: "Booking Wording", icon: MessageSquare, category: "Business Setup",
+      status: "Customize", keywords: "booking copy wording headlines titles category cut question text voice customize edit words",
+      editor: (<>
+        <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The words clients see while booking. Leave any field blank to use the default shown in grey.</div>
+        <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, margin: "2px 0 8px" }}>CATEGORY SCREEN</div>
+        {bword("HEADLINE", "catHead", "What are you here for today?")}
+        {bword("SUB-LINE", "catLead", "Tell us the vibe — we'll take it from there.")}
+        <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, margin: "12px 0 8px" }}>CUT SCREEN</div>
+        {bword("GREETING PILL", "greeting", "First time? Welcome in")}
+        {bword("HEADLINE", "head", "What are we doing today?")}
+        {bword("SUB-LINE", "lead", "Just pick your style — we'll handle the details in the chair.")}
+        <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, margin: "12px 0 8px" }}>TIME QUESTION</div>
+        {bword("HEADLINE", "changeQ", "Just so we set aside the right amount of time…")}
+        {bword("REASSURANCE", "priceLine", "This won't change your price — we just want enough time so you're never rushed.")}
       </>),
     },
     {
