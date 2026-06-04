@@ -2219,7 +2219,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
             head: bs.head || "What are we doing today?",
             lead: bs.lead || "Just pick your style — we'll take care of the details in the chair.",
             changeQ: bs.changeQ || "Just so we set aside the right amount of time…",
-            priceLine: bs.priceLine || "This won't change your price — we just want enough time so you're never rushed.",
+            priceLine: bs.priceLine || "If we need a little extra time, there's no extra charge — we just want enough set aside so you're never rushed.",
             opt1: bs.opt1 || "A little off", opt1sub: bs.opt1sub || "Cleaning it up, staying close to now",
             opt2: bs.opt2 || "A lot off", opt2sub: bs.opt2sub || "Going noticeably shorter",
           };
@@ -2292,18 +2292,18 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
               {picked && <button onClick={changeCut} style={{ marginTop: 14, background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}>← Change cut</button>}
 
               {picked && (
-                <div style={{ marginTop: 36, paddingTop: 24, borderTop: "1px solid var(--line)" }}>
+                <div style={{ marginTop: 44, paddingTop: 32, borderTop: "1px solid var(--line)" }}>
                   {asksChange && (
                     <div>
-                      <p style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, lineHeight: 1.2, margin: "0 0 5px" }}>{T.changeQ}</p>
-                      <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.45, margin: "0 0 13px" }}>{T.priceLine}</p>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
+                      <p style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, lineHeight: 1.22, margin: "0 0 12px" }}>{T.changeQ}</p>
+                      <p style={{ fontSize: 16, color: "var(--text2)", lineHeight: 1.55, margin: "0 0 26px", maxWidth: 380 }}>{T.priceLine}</p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                         {[{ label: T.opt1, sub: T.opt1sub, val: "trim" }, { label: T.opt2, sub: T.opt2sub, val: "fresh" }].map((o) => {
                           const on = simpleChange === o.val;
                           return (
-                            <button key={o.val} onClick={() => chooseTime(o.val)} style={{ padding: "14px 12px", borderRadius: 14, border: on ? "1px solid var(--gold)" : "1px solid var(--border)", background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", lineHeight: 1.1, boxShadow: on ? "0 4px 14px rgba(110,139,116,0.22)" : "none" }}>
-                              <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 500 }}>{o.label}</span>
-                              <span style={{ display: "block", fontSize: 11.5, fontWeight: 400, marginTop: 3, color: on ? "rgba(255,255,255,0.88)" : "var(--sub)" }}>{o.sub}</span>
+                            <button key={o.val} onClick={() => chooseTime(o.val)} style={{ padding: "24px 14px", borderRadius: 16, border: on ? "1px solid var(--gold)" : "1px solid var(--border)", background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", lineHeight: 1.15, boxShadow: on ? "0 4px 14px rgba(110,139,116,0.22)" : "var(--shadow-sm)" }}>
+                              <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500 }}>{o.label}</span>
+                              <span style={{ display: "block", fontSize: 13.5, fontWeight: 400, marginTop: 6, color: on ? "rgba(255,255,255,0.9)" : "var(--sub)", lineHeight: 1.35 }}>{o.sub}</span>
                             </button>
                           );
                         })}
@@ -3160,18 +3160,19 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
                     <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", color: "#fff", fontSize: 11, letterSpacing: 1.5, fontWeight: 600, padding: "5px 11px", borderRadius: 20 }}>YOUR LAST CUT</div>
                   </div>
                 )}
-                <div style={{ padding: "16px 20px" }}>
-                  <div style={{ fontSize: 11.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>YOUR USUAL</div>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{usualSvc.name}{usualProv && usualProv.id !== "anyone" ? ` with ${usualProv.name}` : ""}</div>
+                <div style={{ padding: "24px 20px", textAlign: "center" }}>
+                  <div style={{ fontSize: 11.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>YOUR USUAL</div>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, lineHeight: 1.08 }}>{usualSvc.name}</div>
+                  {usualProv && usualProv.id !== "anyone" ? <div style={{ fontSize: 15, color: "var(--sub)", marginTop: 7 }}>with {usualProv.name}</div> : null}
                 </div>
               </div>
 
               {/* Primary action — book the next available with their barber */}
               {nextAvail ? (
                 <button className="lift" onClick={() => { setCart([usualEntry]); setSelectedDate(nextAvail.date); setSlot(nextAvail.slot); setCameFromUsual(true); setShowUsual(false); setStep(7); }} style={{ width: "100%", textAlign: "left", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 16, padding: "16px 18px", marginBottom: 13, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    <span style={{ fontSize: 15.5, fontWeight: 600 }}>Book next available{usualProv && usualProv.id !== "anyone" ? ` with ${usualProv.name}` : ""}</span>
-                    <span style={{ fontSize: 13, opacity: 0.85 }}>{nextLabel}</span>
+                  <span style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.85, letterSpacing: 1, textTransform: "uppercase" }}>Book next available{usualProv && usualProv.id !== "anyone" ? ` with ${usualProv.name}` : ""}</span>
+                    <span style={{ fontSize: 21, fontWeight: 700, lineHeight: 1.15 }}>{nextLabel}</span>
                   </span>
                   <ChevronRight size={22} style={{ flexShrink: 0 }} />
                 </button>
@@ -3183,7 +3184,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
               <button className="lift" onClick={() => { setCart([usualEntry]); setCameFromUsual(true); setShowUsual(false); setStep(6); }} style={{ width: "100%", textAlign: "center", background: "transparent", border: "1px solid var(--border2)", color: "var(--text)", borderRadius: 16, padding: "15px", fontSize: 15, fontWeight: 500 }}>Pick a different time</button>
 
               {/* Quiet third option — browse the full menu (try something new) */}
-              <button onClick={() => { setShowUsual(false); setStep(1); }} style={{ width: "100%", textAlign: "center", background: "none", color: "var(--sub)", padding: "16px 0 4px", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3 }}>Book something different</button>
+              <button onClick={() => { setShowUsual(false); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} style={{ width: "100%", textAlign: "center", background: "none", color: "var(--sub)", padding: "16px 0 4px", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3 }}>Book something different</button>
             </div>
           );
         })()}
@@ -6982,8 +6983,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <div style={{ display: "grid", gap: 10 }}>
               {inCat.length === 0 && <div style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "6px 2px" }}>No services in this category yet.</div>}
               {inCat.map((s, si) => (
-                <div key={s.id} data-sid={s.id} draggable onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} className="card" style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: tDragId === s.id ? "1.5px solid var(--gold)" : "1px solid var(--border)", borderRadius: 16, padding: "14px 14px", boxShadow: tDragId === s.id ? "0 8px 22px rgba(60,50,30,0.15)" : "none", opacity: tDragId && tDragId !== s.id ? 0.55 : 1, transform: tDragId === s.id ? "scale(1.02)" : "none", transition: "opacity .12s, transform .12s" }}>
-                  <span onTouchStart={touchStart(s.id)} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchEnd} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", flexShrink: 0, padding: "6px 4px", cursor: "grab" }}><GripVertical size={18} style={{ color: tDragId === s.id ? "var(--gold)" : "var(--border2)" }} /></span>
+                <div key={s.id} data-sid={s.id} draggable onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} className="card" style={{ position: "relative", zIndex: tDragId === s.id ? 5 : 1, display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: tDragId === s.id ? "1.5px solid var(--gold)" : "1px solid var(--border)", borderRadius: 16, padding: "15px 14px", boxShadow: tDragId === s.id ? "0 14px 30px rgba(60,50,30,0.20)" : "var(--shadow-sm)", opacity: tDragId && tDragId !== s.id ? 0.5 : 1, transform: tDragId === s.id ? "scale(1.015) translateY(-1px)" : "none", transition: "opacity .18s ease, transform .18s ease, box-shadow .18s ease, border-color .18s ease" }}>
+                  <span onTouchStart={touchStart(s.id)} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchEnd} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", flexShrink: 0, padding: "8px 4px", cursor: "grab" }}><GripVertical size={18} style={{ color: tDragId === s.id ? "var(--gold)" : "var(--faint)" }} /></span>
                   <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--text)", minWidth: 0 }}>
                     <div style={{ fontSize: 16, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 9, height: 9, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />{s.name}</div>
                     <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>${s.price} · {s.duration} min{s.addonGroups.length ? ` · ${s.addonGroups.length} add-on${s.addonGroups.length !== 1 ? "s" : ""}` : ""}</div>
@@ -9413,7 +9414,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         {bword("SUB-LINE", "lead", "Just pick your style — we'll handle the details in the chair.")}
         <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, margin: "12px 0 8px" }}>TIME QUESTION</div>
         {bword("HEADLINE", "changeQ", "Just so we set aside the right amount of time…")}
-        {bword("REASSURANCE", "priceLine", "This won't change your price — we just want enough time so you're never rushed.")}
+        {bword("REASSURANCE", "priceLine", "If we need a little extra time, there's no extra charge — we just want enough set aside so you're never rushed.")}
       </>),
     },
     {
