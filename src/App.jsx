@@ -6317,8 +6317,8 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
-        {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} />}
-        {tab === "settings" && isOwner && <SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} />}
+        {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
+        {tab === "settings" && isOwner && <SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
       </div>
 
       {/* fixed bottom tab bar — anchors to viewport bottom. transform:translateZ(0) puts it on its own GPU layer so iOS Safari doesn't let it drift during scroll/overscroll. */}
@@ -6380,7 +6380,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
 }
 
 // ---------- MENU EDITOR (add/edit/remove + photos) ----------
-function MenuEditor({ services, setServices, categories, setCategories, providers, business, showToast }) {
+function MenuEditor({ services, setServices, categories, setCategories, providers, business, showToast, cutLibrary, setCutLibrary }) {
   const [editing, setEditing] = useState(null); // service id or "new"
   const [section, setSection] = useState(null); // null = hub, else "details"|"staff"|"customizations"|"booking"
   const [picker, setPicker] = useState(null); // {target}
@@ -6918,6 +6918,82 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [tDrag, setTDrag] = useState(null);
   const tDragRef = useRef(null);
 
+  // ---- Cut Styles library editor (2b-1): edit a style once; saving cascades its name/description/
+  //      photo into every service that uses it, matched by the stable libId set in 2a (falls back to
+  //      name for any style not yet linked). Each service keeps its OWN price and time. ----
+  const [libOpen, setLibOpen] = useState(false);     // the Cut Styles screen is open
+  const [libForm, setLibForm] = useState(null);      // the style being edited (null = show the list)
+  const [libPicker, setLibPicker] = useState(false); // photo picker for the style being edited
+  const libUsedCount = (entry) => services.filter((s) => (s.cutTypes || []).some((c) => (c.libId ? c.libId === entry.id : cutNorm(c.label) === cutNorm(entry.label)))).length;
+  const saveLibStyle = () => {
+    const entry = { ...libForm, label: (libForm.label || "").trim(), desc: libForm.desc || "", images: Array.isArray(libForm.images) ? libForm.images.filter(Boolean) : [] };
+    if (!entry.label) { showToast("Give this style a name first."); return; }
+    const used = libUsedCount(entry);
+    setCutLibrary((lib) => (lib || []).map((e) => (e.id === entry.id ? entry : e)));
+    setServices(services.map((s) => ({ ...s, cutTypes: (s.cutTypes || []).map((c) => {
+      const match = c.libId ? c.libId === entry.id : cutNorm(c.label) === cutNorm(entry.label);
+      if (!match) return c;
+      return { ...c, libId: entry.id, label: entry.label, desc: entry.desc, images: entry.images.slice() };
+    }) })));
+    setLibForm(null);
+    showToast(used > 0 ? "Updated everywhere this style is used." : "Style saved.");
+  };
+
+  // ---- full-page Cut Styles editor ----
+  if (libOpen) {
+    return (
+      <div className="appt-screen" style={{ paddingBottom: 40 }}>
+        {libPicker && <PhotoPicker onClose={() => setLibPicker(false)} onPick={(id) => { setLibForm((f) => ({ ...f, images: [id] })); setLibPicker(false); }} />}
+        {libForm ? (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <button onClick={() => setLibForm(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /> Cut Styles</button>
+            </div>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, paddingLeft: 4 }}>{libForm.label || "Edit style"}</h2>
+            <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20, paddingLeft: 4 }}>Edit this style once. When you save, the name, description and photo update on every service that uses it. Each service keeps its own price and time.</p>
+            <div style={{ background: "var(--panel)", borderRadius: 16, padding: 20, border: "1px solid var(--border)" }}>
+              <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>PHOTO</div>
+              <button onClick={() => setLibPicker(true)} className="lift" style={{ width: "100%", height: 150, borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, padding: 0, marginBottom: 8 }}>
+                {libForm.images && libForm.images[0] ? <img src={imgUrl(libForm.images[0], 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} /><span style={{ fontSize: 15 }}>Add a photo (library or upload)</span></>}
+              </button>
+              {libForm.images && libForm.images.length > 0 && <button onClick={() => setLibForm((f) => ({ ...f, images: [] }))} style={{ background: "none", color: "var(--gold)", fontSize: 14, marginBottom: 16 }}>Remove photo</button>}
+              <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8, marginTop: 8 }}>NAME</div>
+              <input value={libForm.label || ""} onChange={(e) => setLibForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Skin Fade" style={{ ...inputStyle, fontSize: 17, padding: "16px 16px", marginBottom: 16 }} />
+              <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>DESCRIPTION</div>
+              <textarea value={libForm.desc || ""} onChange={(e) => setLibForm((f) => ({ ...f, desc: e.target.value }))} placeholder="Shown to clients under the name" rows={6} style={{ ...inputStyle, fontSize: 16, padding: "14px 16px", resize: "vertical", minHeight: 150, lineHeight: 1.55 }} />
+            </div>
+            <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 14, lineHeight: 1.5 }}>{libUsedCount(libForm) > 0 ? `Used in ${libUsedCount(libForm)} service${libUsedCount(libForm) > 1 ? "s" : ""}. Saving updates all of them.` : "Not used by any service yet."}</p>
+            <button onClick={saveLibStyle} className="lift" style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 17, fontWeight: 600, borderRadius: 14, marginTop: 16, border: "none" }}>Save style</button>
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <button onClick={() => setLibOpen(false)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /> Menu</button>
+            </div>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 8, paddingLeft: 4 }}>Cut Styles</h2>
+            <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20, paddingLeft: 4 }}>Your styles in one place. Edit a style here and it updates on every service that offers it. Price and time stay set per service.</p>
+            {(cutLibrary || []).length === 0 ? (
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, color: "var(--sub)", fontSize: 15, lineHeight: 1.5 }}>No styles yet. They'll appear here once your services have cut styles.</div>
+            ) : (
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+                {(cutLibrary || []).map((entry, i) => (
+                  <button key={entry.id} onClick={() => setLibForm({ ...entry })} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                    <span style={{ width: 52, height: 52, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{entry.images && entry.images[0] ? <img src={imgUrl(entry.images[0], 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={20} style={{ color: "var(--faint)" }} />}</span>
+                    <span style={{ minWidth: 0, flex: 1 }}>
+                      <span style={{ display: "block", fontSize: 18, fontWeight: 500 }}>{entry.label}</span>
+                      <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{libUsedCount(entry) > 0 ? `Used in ${libUsedCount(entry)} service${libUsedCount(entry) > 1 ? "s" : ""}` : "Not used yet"}</span>
+                    </span>
+                    <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+
   // ---- full-page service editor ----
   if (editing) {
     return (
@@ -7071,6 +7147,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         <button className="lift" onClick={openNew} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "10px 16px", borderRadius: 12, fontSize: 15, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> Add service</button>
       </div>
       <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 20, fontWeight: 300 }}>Group services into categories. Press and hold the handle to drag, or use the arrows. Your order is saved automatically.</p>
+
+      <button className="lift" onClick={() => { setLibForm(null); setLibOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", textAlign: "left", marginBottom: 22 }}>
+        <span style={{ minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 17, fontWeight: 500 }}>Cut Styles</span>
+          <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>Edit each style once — it updates everywhere it's used</span>
+        </span>
+        <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+      </button>
 
       {cats.map((cat, ci) => {
         const inCat = services.filter((s) => (s.category || cats[0]) === cat);
@@ -9478,7 +9562,7 @@ function HelpCenter({ business, onBack }) {
   );
 }
 
-function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast }) {
+function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary }) {
   const [form, setForm] = useState(business);
   const [openCard, setOpenCard] = useState(null);
   const [query, setQuery] = useState("");
@@ -9723,7 +9807,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "servicesmenu", fullBleed: true, title: "Services & Menu", icon: ImageIcon, category: "Services & Menu",
       status: `${(services || []).length} services`,
       keywords: "menu services service list edit add price duration photo category haircut beard add-ons addons cut types",
-      editor: <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} />,
+      editor: <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />,
     },
     {
       id: "rebookco", title: "Rebooking at Checkout", icon: Repeat, category: "Payments & Checkout",
