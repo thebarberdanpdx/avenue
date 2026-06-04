@@ -4,7 +4,7 @@ import { supabase } from './supabaseClient'
 import {
   Calendar, Phone, Check, ChevronRight, ChevronLeft, ChevronDown, MessageSquare, Bell, User, Camera,
   Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock,
-  Settings, Image as ImageIcon, Trash2, Upload, GripVertical, DollarSign,
+  Settings, Image as ImageIcon, Lock, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
   BarChart3, TrendingUp, Palette, Globe, HelpCircle, BookOpen, Search, LifeBuoy
 } from "lucide-react";
