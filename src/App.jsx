@@ -2490,11 +2490,26 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
           const priceLabel = addsMoney ? `+$${Number(item.price) || 0}` : "Free";
           const name = item.name || "Finishing touch";
           const desc = item.desc || "";
+          // Running total: the chosen style's price plus any add-ons actually selected. Real items only.
+          // Shown only when the owner has turned prices on (business.bookingStep.showPrices).
+          const showPrices = ((business && business.bookingStep) || {}).showPrices === true;
+          const chosenCt = (cart[0] && cart[0].cutType) ? (draft.cutTypes || []).find((c) => c.id === cart[0].cutType) : null;
+          const stylePrice = Number((chosenCt && chosenCt.price != null && chosenCt.price !== "") ? chosenCt.price : draft.price) || 0;
+          const addonsTotal = addons.reduce((sum, g) => { const sel = cart[0] && cart[0].addons && cart[0].addons[g.id]; const it = g.item || {}; const adds = it.addsPrice !== false && (Number(it.price) || 0) > 0; return sum + ((sel && adds) ? (Number(it.price) || 0) : 0); }, 0);
+          const runningTotal = stylePrice + addonsTotal;
           return (
             <div className="fade-up">
               <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
               <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 10, lineHeight: 1.07, letterSpacing: "-0.3px" }}>Add the finishing touch?</h2>
               <p style={{ color: "var(--text)", fontSize: 15.5, fontWeight: 400, lineHeight: 1.5, marginBottom: 22 }}>Optional — the classic way to round out your visit.</p>
+              {showPrices && runningTotal > 0 && (
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
+                  <span style={{ display: "inline-flex", alignItems: "baseline", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "9px 15px" }}>
+                    <span style={{ fontSize: 11.5, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 700 }}>TOTAL</span>
+                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, color: "var(--gold)" }}>${runningTotal}</span>
+                  </span>
+                </div>
+              )}
               <button onClick={toggle} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: isOn ? "2px solid var(--gold)" : "1px solid var(--border)", borderRadius: 18, overflow: "hidden", color: "var(--text)", padding: 0, display: "block" }}>
                 <span style={{ display: "block", height: 130, background: "var(--panel2)", position: "relative" }}>
                   {photo ? <img src={imgUrl(photo, 700)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
@@ -9857,6 +9872,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <BookingRulesEditor b={form.booking} onChange={(bk) => setForm({ ...form, booking: bk })} />,
     },
     {
+      id: "showprices", title: "Show Prices While Booking", icon: DollarSign, category: "Online Booking",
+      status: ((form.bookingStep || {}).showPrices === true) ? "On — clients see prices" : "Off — prices hidden",
+      keywords: "price prices show display total cost amount add-on style money hide booking flow running total reveal",
+      editor: <ToggleSetting label="Show prices while booking" desc="When on, clients see each style and add-on's price, plus a running total as they choose add-ons. When off, no prices appear during booking (today's default)." on={(form.bookingStep || {}).showPrices === true} onToggle={(v) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), showPrices: v } })} />,
+    },
+    {
       id: "staffselection", title: "Staff Selection", icon: Users, category: "Online Booking",
       status: `${providers.filter((p) => p.id !== "anyone" && p.onlineBooking).length} bookable online`,
       keywords: "staff selection online booking bookable show hide who clients book provider barber availability public page",
@@ -9907,7 +9928,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const CATS = [
     { id: "shop",  label: "Your Shop", icon: User,       desc: "Your name, hours, branding & logo", settings: ["business", "hours", "appearance", "theme", "locations", "phones"] },
     { id: "staff", label: "Staff",      icon: Users,      desc: "Add or edit staff — hours, access, pay & booking", settings: ["staff", "staffpin"] },
-    { id: "book",  label: "Online Booking", tag: "What clients see when booking", icon: Calendar, desc: "How clients book you online", settings: ["booking", "avoidgaps", "newclient", "family", "refphotos", "waitlist", "rebook_usual"] },
+    { id: "book",  label: "Online Booking", tag: "What clients see when booking", icon: Calendar, desc: "How clients book you online", settings: ["booking", "showprices", "avoidgaps", "newclient", "family", "refphotos", "waitlist", "rebook_usual"] },
     { id: "smart", label: "Smart Timing", smart: true, icon: Sparkles, desc: "The scheduling smarts that save you time", settings: ["autotiming", "overduebuffer", "runninglate"] },
     { id: "dayof", label: "Day-of Tools", icon: Clock,    desc: "Managing the day as it happens", settings: ["scheduling", "waitingroom", "photos"] },
     { id: "pay",   label: "Checkout & Money", icon: CreditCard, desc: "Tipping, payments, rebooking & no-show protection", settings: ["tipping", "checkout", "rebookco", "policy"] },
