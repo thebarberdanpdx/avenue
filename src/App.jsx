@@ -2178,7 +2178,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
         familyMemberId: person.key === "self" ? null : person.key,
         bookedByName: person.key === "self" ? null : (matched?.name || newName.trim()),
         serviceId: person.items[0].service.id,
-        price: priceWithTimeRules(person.items[0].service, prov.id === "anyone" ? "dan" : prov.id, selectedDate, startMin),
+        price: person.items.reduce((s, e) => s + lineTotal(e).price, 0),
         lineItems: person.items.map((e) => ({ serviceId: e.service.id, cutType: e.cutType || null, beardType: e.beardType || null, addons: e.addons || {} })),
         start: startMin,
         end: startMin + person.durMin,
@@ -3321,7 +3321,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
               <button className="lift" onClick={() => { setCart([usualEntry]); setCameFromUsual(true); setShowUsual(false); setStep(6); }} style={{ width: "100%", textAlign: "center", background: "transparent", border: "1px solid var(--border2)", color: "var(--text)", borderRadius: 16, padding: "15px", fontSize: 15, fontWeight: 500 }}>Pick a different time</button>
 
               {/* Quiet third option — browse the full menu (try something new) */}
-              <button onClick={() => { setShowUsual(false); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} style={{ width: "100%", textAlign: "center", background: "none", color: "var(--sub)", padding: "16px 0 4px", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3 }}>Book something different</button>
+              <button onClick={() => { setShowUsual(false); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setGuidedCat(null); setSimpleStep(null); setStep(1); }} style={{ width: "100%", textAlign: "center", background: "none", color: "var(--sub)", padding: "16px 0 4px", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3 }}>Book something different</button>
             </div>
           );
         })()}
