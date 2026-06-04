@@ -7229,6 +7229,7 @@ function fmtDur(totalMin) {
 }
 
 function bookingStatus(b) {
+  b = b || {};
   if (!b.enabled) return "Turned off";
   const bits = [];
   bits.push(b.requireCard ? "Card required" : "No card");
@@ -9568,17 +9569,23 @@ function HelpCenter({ business, onBack }) {
   );
 }
 
+// Default online-booking settings, shared so SettingsView can fall back safely when a saved
+// shop has no `booking` block yet (MenuEditor has its own local defaultBooking()).
+const DEFAULT_BOOKING = { available: true, description: "", customPrice: false, promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false };
 function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary }) {
-  const [form, setForm] = useState(business);
+  // Fill in any missing top-level settings from the defaults so a sparse/older saved blob can't
+  // crash a card that reads a nested field (a single absent key used to white-screen the whole page).
+  const baseBiz = { ...DEFAULT_BUSINESS, ...(business || {}) };
+  const [form, setForm] = useState(baseBiz);
   const [openCard, setOpenCard] = useState(null);
   const [query, setQuery] = useState("");
 
   // When opening a setting card, reset the working form to the current saved business state
   // so previous unsaved edits don't carry over.
-  useEffect(() => { if (openCard) setForm(business); }, [openCard]);
+  useEffect(() => { if (openCard) setForm({ ...DEFAULT_BUSINESS, ...(business || {}) }); }, [openCard]);
 
   // Detect if the user has actually changed anything (so we only show DONE when needed)
-  const hasChanges = JSON.stringify(form) !== JSON.stringify(business);
+  const hasChanges = JSON.stringify(form) !== JSON.stringify(baseBiz);
 
   const save = (msg) => { setBusiness(form); showToast(msg || "Settings saved."); setOpenCard(null); };
   const cancel = () => { setForm(business); setOpenCard(null); };
@@ -9725,14 +9732,14 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "scheduling", title: "Scheduling Options", icon: Clock, category: "Calendar & Appointments",
       status: (() => { const bk = form.booking || {}; const parts = []; if (bk.bufferBefore || bk.bufferAfter) parts.push(`${bk.bufferBefore || 0}/${bk.bufferAfter || 0}m buffer`); const hd = bk.horizonDays; const winLabel = hd === 0 ? "no cutoff" : (hd >= 90 ? `${Math.round(hd / 30)}mo window` : `${hd || 60}d window`); parts.push(winLabel); return parts.join(" · "); })(),
       keywords: "scheduling buffer before after turnover cleanup gap minimum notice lead time booking window advance ahead days how far",
-      editor: <SchedulingOptionsEditor b={form.booking || defaultBooking()} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
+      editor: <SchedulingOptionsEditor b={form.booking || DEFAULT_BOOKING} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
     },
     {
       id: "avoidgaps", title: "Booking Times", smart: true, subtitle: "How clients get offered times", icon: Clock, category: "Online Booking",
       explain: <>This is the brain behind which times a client sees when they book online. Pick one way of working and Vero handles the rest: a clean clock grid, times shaped around how long each service actually takes (Smart Timing), times packed tight against your existing appointments so you have no dead gaps, or every possible opening for maximum choice. Most shops want Smart Timing — it quietly keeps your day full without you thinking about it.</>,
       status: (() => { const bk = form.booking || {}; const m = bk.timeMode || (bk.avoidGaps === false ? "all" : "smart"); return { grid: `Clean grid · every ${bk.gridMin || 30}m`, smart: "Smart Timing", pack: "Packed tight", all: "Show all times" }[m] || "Smart Timing"; })(),
       keywords: "booking times slots offered grid increment smart timing pack tight avoid gaps back to back fill dead time show all choice availability how clients book engine mode",
-      editor: <BookingTimesEditor b={form.booking || defaultBooking()} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
+      editor: <BookingTimesEditor b={form.booking || DEFAULT_BOOKING} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
     },
     {
       id: "waitingroom", title: "Waiting Room", icon: Users, category: "Calendar & Appointments",
