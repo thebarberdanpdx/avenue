@@ -2237,6 +2237,10 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
               </div>
               <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, marginBottom: 8, lineHeight: 1.07, letterSpacing: "-0.3px" }}>{T.head}</h2>
               <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 400, lineHeight: 1.5, marginBottom: 20 }}>{T.lead}</p>
+              {draft.comboOf && draft.comboOf.length > 0 && (() => {
+                const incl = draft.comboOf.map((id) => { const s = services.find((x) => x.id === id); return s && s.name; }).filter(Boolean);
+                return incl.length ? <p style={{ fontSize: 13.5, color: "var(--gold)", fontWeight: 600, margin: "-6px 0 20px" }}>Includes {incl.join(" + ")}</p> : null;
+              })()}
 
               {!picked ? (
                 <div style={{ display: "grid", gap: 13 }}>
@@ -6413,6 +6417,34 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         </div>
         <p style={{ fontSize: 14, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Shows on the calendar before a client checks in. Once they're checked in or in service, the block switches to the status color.</p>
       </div>
+      {(() => {
+        const isCombo = !!form.isCombo || (form.comboOf || []).length > 0;
+        return (
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 15 }}>This is a combo<span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Bundles other services, at the price &amp; duration you set above</span></span>
+              <Toggle on={isCombo} onClick={() => setForm({ ...form, isCombo: !isCombo, comboOf: isCombo ? [] : (form.comboOf || []) })} />
+            </div>
+            {isCombo && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>INCLUDES</div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {services.filter((s) => s.id !== editing && !((s.comboOf || []).length)).map((s) => {
+                    const on = (form.comboOf || []).includes(s.id);
+                    return (
+                      <button key={s.id} onClick={() => setForm({ ...form, comboOf: on ? (form.comboOf || []).filter((x) => x !== s.id) : [...(form.comboOf || []), s.id] })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: "1px solid " + (on ? "var(--gold)" : "var(--border)"), borderRadius: 12, padding: "12px 14px", color: "var(--text)" }}>
+                        <span style={{ fontSize: 15 }}>{s.name}</span>
+                        {on && <Check size={16} style={{ color: "var(--gold)", flexShrink: 0 }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Clients see "Includes …" and book at this combo's price. Add haircut styles in Cut Types if you want them to pick one.</p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
       <SaveBar />
     </>
   );
