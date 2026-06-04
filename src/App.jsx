@@ -1311,7 +1311,7 @@ export default function App() {
       )}
       {view === "terms" && <TermsPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "privacy" && <PrivacyPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
-      {view === "client" && <ClientFlow key={clientNonce} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} />}
+      {view === "client" && <ClientFlow key={clientNonce} shopId={SHOP_ID} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={goBooking} />}
       {view === "shop" && (session
         ? <ShopDashboard authEmail={session?.user?.email || null} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} />
@@ -1714,7 +1714,7 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
 // ============================================================
 // CLIENT BOOKING FLOW
 // ============================================================
-function ClientFlow({ business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit, onManage }) {
+function ClientFlow({ shopId, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit, onManage }) {
   const [step, setStep] = useState(0);
   const [bookingFor, setBookingFor] = useState(null); // null until chosen: "self" or "other"
   const [showWhoFor, setShowWhoFor] = useState(false); // who's-it-for screen for a matched returning client
@@ -1778,6 +1778,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
   // Derived full name — keeps older call sites that read `newName` working without rewrites.
   const newName = `${newFirst.trim()} ${newLast.trim()}`.trim();
   const [matched, setMatched] = useState(null);
+  const [myAppts, setMyAppts] = useState([]); // a verified returning client's OWN bookings (via get_client_appointments) — RLS-safe; replaces reading the full appts list
   useEffect(() => {
     if (!matched) return;
     // Prefer the stored firstName/lastName if present; otherwise split the legacy `name` field on whitespace.
@@ -2120,7 +2121,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
     if (matched) {
       const newDay = new Date(selectedDate); newDay.setHours(0, 0, 0, 0);
       const today0 = new Date(); today0.setHours(0, 0, 0, 0);
-      const existing = appts.find((a) => {
+      const existing = myAppts.find((a) => {
         if (a.clientId !== matched.id) return false;
         if (a.status !== "confirmed") return false;
         const d = new Date(a.bookedFor); if (isNaN(d)) return false;
@@ -2228,7 +2229,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
               </span>
               <ChevronRight size={20} style={{ opacity: 0.9, flexShrink: 0 }} />
             </button>
-            <button className="lift" onClick={() => { setBookingFor(null); setMatched(null); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "19px 20px", fontSize: 16, borderRadius: 16, border: "1px solid var(--border)", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "var(--shadow-sm)" }}>
+            <button className="lift" onClick={() => { setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "19px 20px", fontSize: 16, borderRadius: 16, border: "1px solid var(--border)", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "var(--shadow-sm)" }}>
               <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                 <span style={{ fontSize: 17 }}>It's my first time</span>
                 <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>Welcome — let's take a look</span>
@@ -3257,8 +3258,8 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
         {showUsual && matched && (() => {
           const who = activeMember || matched;
           const mine = activeMember
-            ? (appts || []).filter((a) => a.familyMemberId === activeMember.id && a.serviceId && a.status !== "block")
-            : (appts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block");
+            ? (myAppts || []).filter((a) => a.familyMemberId === activeMember.id && a.serviceId && a.status !== "block")
+            : (myAppts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block");
           const lastAppt = mine.length ? mine[mine.length - 1] : null;
           const usualSvc = lastAppt ? services.find((s) => s.id === lastAppt.serviceId) : null;
           const usualProv = providers.find((p) => p.id === (lastAppt?.providerId || who.provider)) || providers[1];
@@ -3362,7 +3363,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
                 <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 8 }}>You already have an appointment</h2>
                 <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>You're booked for <strong style={{ color: "var(--text)" }}>{dupWarn.existing.title || "an appointment"}</strong> on <strong style={{ color: "var(--text)" }}>{dayTxt}</strong> at <strong style={{ color: "var(--text)" }}>{timeTxt}</strong>{prov ? ` with ${prov.name}` : ""} — that's close to the one you're booking now. Want to keep both, or cancel the earlier one?</p>
                 <button className="lift" onClick={() => { const ph = dupWarn.phone, em = dupWarn.email; setDupWarn(null); doCommitBooking(ph, em); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>Keep both</button>
-                <button onClick={() => { const ex = dupWarn.existing, ph = dupWarn.phone, em = dupWarn.email; setAppts((cur) => cur.map((a) => a.id === ex.id ? { ...a, status: "cancelled" } : a)); setDupWarn(null); doCommitBooking(ph, em); }} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 14.5, fontWeight: 500, borderRadius: 12 }}>Cancel the {dayTxt} one</button>
+                <button onClick={() => { const ex = dupWarn.existing, ph = dupWarn.phone, em = dupWarn.email; try { supabase.rpc('cancel_my_appointment', { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(ex.id) }); } catch (e) {} setMyAppts((cur) => cur.map((a) => a.id === ex.id ? { ...a, status: "cancelled" } : a)); setDupWarn(null); doCommitBooking(ph, em); }} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 14.5, fontWeight: 500, borderRadius: 12 }}>Cancel the {dayTxt} one</button>
               </>
             );
           })()}
@@ -3382,7 +3383,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
             <p style={{ color: "var(--faint)", fontSize: 13, marginBottom: 24, fontWeight: 300, fontStyle: "italic" }}>Texting isn't live yet — enter any 6 digits to continue for now.</p>
             <input autoFocus inputMode="numeric" value={codeEntry} onChange={(e) => { setCodeEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(false); }} placeholder="• • • • • •" style={{ ...inputStyle, textAlign: "center", fontSize: 28, letterSpacing: 8, marginBottom: codeError ? 8 : 18 }} />
             {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Enter all 6 digits.</p>}
-            <button className="lift" onClick={() => { if (codeEntry.length < 6) { setCodeError(true); return; } const found = pendingMatch; const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = (appts || []).filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 12 }}>Verify →</button>
+            <button className="lift" onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } const found = pendingMatch; const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = list.filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 12 }}>Verify →</button>
             <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6 }}>Use a different number</button>
           </div>
         )}
@@ -3401,7 +3402,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
               const only = groupPeople[0];
               if (only.id) { setBookingFor("member"); setActiveMember(only.isMember ? (matched.family || []).find((m) => m.id === only.id) : null); }
               else { setBookingFor("self"); setActiveMember(null); }
-              const apptsFor = only.id ? (appts || []).filter((a) => a.familyMemberId === only.id && a.serviceId && a.status !== "block") : (appts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block");
+              const apptsFor = only.id ? (myAppts || []).filter((a) => a.familyMemberId === only.id && a.serviceId && a.status !== "block") : (myAppts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block");
               if (apptsFor.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1);
             } else {
               // multiple → ask together vs separate
@@ -3478,8 +3479,8 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
           const fm = person.id ? (matched.family || []).find((m) => m.id === person.id) : null;
           const who = person.id ? fm : matched;
           const theirAppts = person.id
-            ? (appts || []).filter((a) => a.familyMemberId === person.id && a.serviceId && a.status !== "block")
-            : (appts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block");
+            ? (myAppts || []).filter((a) => a.familyMemberId === person.id && a.serviceId && a.status !== "block")
+            : (myAppts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block");
           const lastAppt = theirAppts.length ? theirAppts[theirAppts.length - 1] : null;
           const usualSvc = lastAppt ? services.find((s) => s.id === lastAppt.serviceId) : null;
           const usualProv = lastAppt ? (providers.find((p) => p.id === lastAppt.providerId) || providers[1]) : (providers.find((p) => p.id === (who?.provider)) || providers[1]);
