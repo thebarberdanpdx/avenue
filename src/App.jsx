@@ -1072,8 +1072,9 @@ export default function App() {
         return data ? data.map((r) => r.data) : [];
       };
 
-      // Client data: use whatever's saved, including empty (fresh start = empty lists). Skip only on real error.
-      const cl = await loadList('clients');      if (cl !== null) setClients(cl);
+      // Clients are intentionally NOT loaded here. They hold private contact info, so they load only
+      // for signed-in staff via the session-keyed effect below — public booking visitors never receive
+      // the client list. (The in-code demo seed is also cleared for the public view by that effect.)
       const ap = await loadList('appointments'); if (ap !== null) setAppts(ap);
       const wl = await loadList('waitlist');     if (wl !== null) setWaitlist(wl);
       // Providers & services: keep the in-code defaults if nothing's saved yet (the app needs them to function).
@@ -1082,7 +1083,6 @@ export default function App() {
 
       // Record the loaded baseline so the safe-delete reconciliation knows which rows this device
       // already knew about (so it never deletes a row another device adds later).
-      if (cl !== null) lastRemoteRef.current.clients = cl;
       if (ap !== null) lastRemoteRef.current.appointments = ap;
       if (wl !== null) lastRemoteRef.current.waitlist = wl;
       if (pr && pr.length) lastRemoteRef.current.providers = pr;
@@ -1128,6 +1128,29 @@ export default function App() {
       setDataLoaded(true);
     })();
   }, []);
+
+  // Private client list: load it ONLY when signed-in staff are present, and never for public booking
+  // visitors. When there's no staff session we set an empty list (clearing the in-code demo seed) so the
+  // public view can never write seed data to the live database. Uses the same array reference for state
+  // and baseline so the save effect below sees no change and stays quiet.
+  useEffect(() => {
+    let alive = true;
+    if (!session) {
+      const empty = [];
+      lastRemoteRef.current.clients = empty;
+      setClients(empty);
+      return;
+    }
+    (async () => {
+      const { data, error } = await supabase.from('clients').select('data').eq('shop_id', SHOP_ID);
+      if (!alive) return;
+      if (error) { console.error('[vero] load clients failed:', error); return; }
+      const list = data ? data.map((r) => r.data) : [];
+      lastRemoteRef.current.clients = list;
+      setClients(list);
+    })();
+    return () => { alive = false; };
+  }, [session]);
 
   useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories, _cutLibrary: cutLibrary } }).then(({ error }) => { if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false); }); }, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
   useEffect(() => { if (!loadedRef.current) return; if (clients === lastRemoteRef.current.clients) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
@@ -3424,7 +3447,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
             <input value={newMemberNote} onChange={(e) => setNewMemberNote(e.target.value)} placeholder="e.g. son, age 8" style={{ ...inputStyle, marginBottom: 22 }} />
             <button className="lift" disabled={!newMemberName.trim()} onClick={() => {
               const member = { id: "fm" + Date.now(), name: newMemberName.trim(), note: newMemberNote.trim(), customDurations: {}, gallery: [], timeline: [] };
-              setClients(clients.map((c) => c.id === matched.id ? { ...c, family: [...(c.family || []), member] } : c));
+              supabase.rpc("append_family_member", { p_shop: SHOP_ID, p_client_id: matched.id, p_member: member }).then(({ error }) => { if (error) console.error('[vero] append_family_member failed:', error); }).catch(() => {});
               setMatched({ ...matched, family: [...(matched.family || []), member] });
               setGroupPeople((cur) => [...cur, { id: member.id, name: member.name, note: member.note, isMember: true }]);
               setAddingMember(false); // back to the multi-select, now with this person added & selected
