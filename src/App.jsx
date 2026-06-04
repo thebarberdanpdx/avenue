@@ -6328,6 +6328,23 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const setPopularCut = (i) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c, idx) => ({ ...c, popular: idx === i ? !c.popular : false })) }));
   const addCut = () => setForm((f) => ({ ...f, cutTypes: [...(f.cutTypes || []), { id: "ct" + Date.now(), label: "", desc: "", price: "" }] }));
   const removeCut = (i) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).filter((_, idx) => idx !== i) }));
+  // ---- Step 5: keep a shared cut in sync across services. Non-destructive: copies name/desc/photo only, never price, never deletes. Matches by cut name. ----
+  const cutNorm = (s) => (s || "").trim().toLowerCase();
+  const cutShareCount = (ct) => { const k = cutNorm(ct && ct.label); if (!k) return 0; return services.filter((s) => s.id !== editing && (s.cutTypes || []).some((c) => cutNorm(c.label) === k)).length; };
+  const applyCutEverywhere = (ct) => {
+    const k = cutNorm(ct && ct.label);
+    if (!k) { showToast("Give this cut a name first."); return; }
+    setServices(services.map((s) => {
+      if (s.id === editing) return s;
+      return { ...s, cutTypes: (s.cutTypes || []).map((c) => {
+        if (cutNorm(c.label) !== k) return c;
+        const patch = { label: ct.label, desc: ct.desc };
+        if (ct.images && ct.images.length) patch.images = ct.images;
+        return { ...c, ...patch };
+      }) };
+    }));
+    showToast("Updated this cut in your other services.");
+  };
   const cutTypesSection = (
     <>
       <SectionHeader title="Cut Types" />
@@ -6348,6 +6365,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <span style={{ fontSize: 15 }}>Mark as most common<span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Shows a "Most common" badge to clients</span></span>
             <Toggle on={!!ct.popular} onClick={() => setPopularCut(i)} />
           </div>
+          {cutShareCount(ct) > 0 && (
+            <div style={{ marginTop: 12, padding: "11px 13px", background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))", borderRadius: 12, fontSize: 13, color: "var(--text2)", lineHeight: 1.5 }}>
+              This cut is also in <b>{cutShareCount(ct)}</b> other service{cutShareCount(ct) > 1 ? "s" : ""}.
+              <button onClick={() => applyCutEverywhere(ct)} style={{ display: "block", marginTop: 6, background: "none", border: "none", color: "var(--gold)", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 2, padding: 0, cursor: "pointer", fontSize: 13 }}>Copy this name, description &amp; photo to all of them →</button>
+            </div>
+          )}
           <button onClick={() => removeCut(i)} style={{ background: "none", color: "#c0392b", fontSize: 13.5, marginTop: 12 }}>Remove this cut type</button>
         </div>
       ))}
