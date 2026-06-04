@@ -1028,7 +1028,7 @@ export default function App() {
       const wl = await loadList('waitlist');     if (wl !== null) setWaitlist(wl);
       // Providers & services: keep the in-code defaults if nothing's saved yet (the app needs them to function).
       const pr = await loadList('providers');    if (pr && pr.length) setProviders(pr);
-      const sv = await loadList('services');     if (sv && sv.length) setServices(sv);
+      const sv = await loadList('services');     if (sv) sv.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9)); if (sv && sv.length) setServices(sv);
 
       // Record the loaded baseline so the safe-delete reconciliation knows which rows this device
       // already knew about (so it never deletes a row another device adds later).
@@ -6883,8 +6883,35 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     if (!swapWith) return;
     const a = idx, b = swapWith.i;
     [arr[a], arr[b]] = [arr[b], arr[a]];
-    setServices(arr);
+    commitOrder(arr);
   };
+  // Stamp each service with its position so the order is saved and survives reload.
+  const commitOrder = (arr) => setServices(arr.map((x, i) => ({ ...x, order: i })));
+  // Long-press drag-to-reorder (touch). Arrows remain as a fallback.
+  const [tDragId, setTDragId] = useState(null);
+  const lpTimer = useRef(null);
+  const tStartY = useRef(0);
+  const touchStart = (id) => (e) => {
+    tStartY.current = e.touches && e.touches[0] ? e.touches[0].clientY : 0;
+    if (lpTimer.current) clearTimeout(lpTimer.current);
+    lpTimer.current = setTimeout(() => { setTDragId(id); if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e2) {} } }, 320);
+  };
+  const touchMove = (e) => {
+    const t = e.touches && e.touches[0]; if (!t) return;
+    if (!tDragId) { if (Math.abs(t.clientY - tStartY.current) > 10 && lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } return; }
+    const el = document.elementFromPoint(t.clientX, t.clientY);
+    const row = el && el.closest ? el.closest("[data-sid]") : null;
+    const overId = row && row.getAttribute("data-sid");
+    if (!overId || overId === tDragId) return;
+    const arr = [...services];
+    const from = arr.findIndex((s) => s.id === tDragId);
+    const to = arr.findIndex((s) => s.id === overId);
+    if (from < 0 || to < 0) return;
+    if ((arr[from].category || cats[0]) !== (arr[to].category || cats[0])) return;
+    const [m] = arr.splice(from, 1); arr.splice(to, 0, m);
+    commitOrder(arr);
+  };
+  const touchEnd = () => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } if (tDragId) setTDragId(null); };
   const moveCategory = (name, dir) => {
     const arr = [...cats]; const i = arr.indexOf(name); const j = i + dir;
     if (j < 0 || j >= arr.length) return;
@@ -6924,7 +6951,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     arr.splice(fi, 1);
     const ti = arr.findIndex((s) => s.id === targetId);
     arr.splice(ti < 0 ? arr.length : ti, 0, moved);
-    setServices(arr);
+    commitOrder(arr);
   };
 
   return (
@@ -6933,7 +6960,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500 }}>Menu</h2>
         <button className="lift" onClick={openNew} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "10px 16px", borderRadius: 12, fontSize: 15, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> Add service</button>
       </div>
-      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 20, fontWeight: 300 }}>Group services into categories, drag the handle (or use the arrows) to reorder. Changes show instantly on the client side.</p>
+      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 20, fontWeight: 300 }}>Group services into categories. Press and hold the handle to drag, or use the arrows. Your order is saved automatically.</p>
 
       {cats.map((cat, ci) => {
         const inCat = services.filter((s) => (s.category || cats[0]) === cat);
@@ -6954,8 +6981,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <div style={{ display: "grid", gap: 10 }}>
               {inCat.length === 0 && <div style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "6px 2px" }}>No services in this category yet.</div>}
               {inCat.map((s, si) => (
-                <div key={s.id} draggable onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} className="card" style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "14px 14px" }}>
-                  <GripVertical size={18} style={{ color: "var(--border2)", cursor: "grab", flexShrink: 0 }} />
+                <div key={s.id} data-sid={s.id} draggable onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} className="card" style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: tDragId === s.id ? "1.5px solid var(--gold)" : "1px solid var(--border)", borderRadius: 16, padding: "14px 14px", boxShadow: tDragId === s.id ? "0 8px 22px rgba(60,50,30,0.15)" : "none", opacity: tDragId && tDragId !== s.id ? 0.55 : 1, transform: tDragId === s.id ? "scale(1.02)" : "none", transition: "opacity .12s, transform .12s" }}>
+                  <span onTouchStart={touchStart(s.id)} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchEnd} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", flexShrink: 0, padding: "6px 4px", cursor: "grab" }}><GripVertical size={18} style={{ color: tDragId === s.id ? "var(--gold)" : "var(--border2)" }} /></span>
                   <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--text)", minWidth: 0 }}>
                     <div style={{ fontSize: 16, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 9, height: 9, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />{s.name}</div>
                     <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>${s.price} · {s.duration} min{s.addonGroups.length ? ` · ${s.addonGroups.length} add-on${s.addonGroups.length !== 1 ? "s" : ""}` : ""}</div>
