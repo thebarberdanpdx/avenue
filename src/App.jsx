@@ -3321,13 +3321,13 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
               <button className="lift" onClick={() => { setCart([usualEntry]); setCameFromUsual(true); setShowUsual(false); setStep(6); }} style={{ width: "100%", textAlign: "center", background: "transparent", border: "1px solid var(--border2)", color: "var(--text)", borderRadius: 16, padding: "15px", fontSize: 15, fontWeight: 500 }}>Pick a different time</button>
 
               {/* Quiet third option — browse the full menu (try something new) */}
-              <button onClick={() => { setShowUsual(false); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} style={{ width: "100%", textAlign: "center", background: "none", color: "var(--sub)", padding: "16px 0 4px", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3 }}>Book something different</button>
+              <button onClick={() => { setShowUsual(false); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setStep(0); setSimpleStep("what"); }} style={{ width: "100%", textAlign: "center", background: "none", color: "var(--sub)", padding: "16px 0 4px", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3 }}>Book something different</button>
             </div>
           );
         })()}
 
         {/* STEP 5 — phone */}
-        {step === 5 && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && (
+        {step === 5 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && (
           <div className="fade-up">
             <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Your number</h2>
