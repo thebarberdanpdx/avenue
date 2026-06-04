@@ -2188,13 +2188,23 @@ function ClientFlow({ business, services, providers, clients, setClients, appts,
               <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, marginBottom: 8, lineHeight: 1.07, letterSpacing: "-0.3px" }}>{T.head}</h2>
               <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 400, lineHeight: 1.5, marginBottom: 20 }}>{T.lead}</p>
 
-              <div style={{ display: "grid", gap: picked ? 0 : 13 }}>
-                {draft.cutTypes.map((ct) => renderCard(ct, !!(chosenCt && ct.id === chosenCt.id), picked && (!chosenCt || ct.id !== chosenCt.id)))}
-              </div>
-              {picked && <button onClick={changeCut} style={{ marginTop: 11, background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}>← Change cut</button>}
+              {!picked ? (
+                <div style={{ display: "grid", gap: 13 }}>
+                  {draft.cutTypes.map((ct) => renderCard(ct, false, false))}
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 13, background: "var(--panel)", border: "2px solid var(--gold)", borderRadius: 16, padding: "12px 14px", boxShadow: "var(--shadow-sm)" }}>
+                  <span style={{ width: 46, height: 46, borderRadius: 11, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {chosenCt && chosenCt.images && chosenCt.images[0] ? <img src={imgUrl(chosenCt.images[0], 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <Camera size={18} style={{ color: "var(--faint)" }} />}
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0, fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600 }}>{(chosenCt && (chosenCt.label || niceName[chosenCt.id])) || "Your cut"}</span>
+                  <span style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>✓</span>
+                </div>
+              )}
+              {picked && <button onClick={changeCut} style={{ marginTop: 14, background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}>← Change cut</button>}
 
               {picked && (
-                <div style={{ marginTop: 20, paddingTop: 20, borderTop: "1px solid var(--line)" }}>
+                <div style={{ marginTop: 36, paddingTop: 24, borderTop: "1px solid var(--line)" }}>
                   {asksChange && (
                     <div>
                       <p style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, lineHeight: 1.2, margin: "0 0 5px" }}>{T.changeQ}</p>
