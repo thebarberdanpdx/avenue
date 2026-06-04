@@ -1009,7 +1009,11 @@ export default function App() {
       // Settings (business) live on the shops row. maybeSingle returns null (not error) when no row exists yet.
       const { data: shopRow, error: shopErr } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle();
       if (shopErr) { allLoaded = false; console.error('[vero] load shops failed:', shopErr); }
-      else if (shopRow && shopRow.settings && Object.keys(shopRow.settings).length) setBusiness(shopRow.settings);
+      else if (shopRow && shopRow.settings && Object.keys(shopRow.settings).length) {
+        const { _categories, ...biz } = shopRow.settings;
+        setBusiness(biz);
+        if (Array.isArray(_categories) && _categories.length) setCategories(_categories);
+      }
 
       // Load a list table → array of stored item objects. Returns null ONLY on a real DB error (so we can skip and refuse saves).
       const loadList = async (table) => {
@@ -1041,7 +1045,7 @@ export default function App() {
     })();
   }, []);
 
-  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: business }).then(({ error }) => { if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false); }); }, 800); return () => clearTimeout(t); }, [business]);
+  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories } }).then(({ error }) => { if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false); }); }, 800); return () => clearTimeout(t); }, [business, categories]);
   useEffect(() => { if (!loadedRef.current) return; if (clients === lastRemoteRef.current.clients) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
   useEffect(() => { if (!loadedRef.current) return; if (appts === lastRemoteRef.current.appointments) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current) return; if (waitlist === lastRemoteRef.current.waitlist) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
@@ -1057,7 +1061,7 @@ export default function App() {
     syncList('waitlist', waitlist);
     syncList('services', services);
     syncList('providers', providers);
-    supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: business }).then(({ error }) => { if (error) setSaveFailed(true); });
+    supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories } }).then(({ error }) => { if (error) setSaveFailed(true); });
   };
 
   // ---- LIVE SYNC ----
@@ -1624,6 +1628,8 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
   const [simplePref, setSimplePref] = useState(null);  // chosen provider id, or "anyone"
   const [simpleChange, setSimpleChange] = useState(null); // "trim" | "fresh" — fresh look reserves extra chair time
   const [simpleCat, setSimpleCat] = useState(null); // chosen category name on the "what" screen (null = showing categories)
+  const [guidedCat, setGuidedCat] = useState(null); // chosen category on the guided (step 1) screen (null = showing categories)
+  useEffect(() => { if (step === 0) setGuidedCat(null); }, [step]);
 
   // ---- Guided consultation (auto-launches for brand-new clients) ----
   const [consult, setConsult] = useState(null); // null = off; otherwise { step, sides, bottom, condition } answers
@@ -1973,7 +1979,7 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
     return () => clearTimeout(id);
   }, [selectedDate]);
 
-  const back = () => { setShowWaitlist(false); if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "change") { setSimpleStep((draft && draft.cutTypes && draft.cutTypes.length) ? "cut" : "what"); return; } if (simpleStep === "finish") { setSimpleStep("change"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(6); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "change") { setSimpleStep((draft && draft.cutTypes && draft.cutTypes.length) ? "cut" : "what"); return; } if (simpleStep === "finish") { setSimpleStep("change"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(6); return; } setStep(step - 1); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -2452,56 +2458,52 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
         )}
 
         {/* STEP 1 — EDITORIAL CATEGORY SCREEN (new client) */}
-        {step === 1 && (
-          <div className="fade-up" style={{ margin: "0 -22px" }}>
-            {/* Editorial masthead — no photo, type carries the page */}
-            <div style={{ padding: "36px 24px 28px", textAlign: "center", marginBottom: 8 }}>
-              <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 22px" }} />
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 14 }}>Welcome in.</div>
-              <div style={{ fontSize: 17, color: "var(--text)", lineHeight: 1.5, fontWeight: 400, maxWidth: 320, margin: "0 auto" }}>Glad you're here. What are we doing today?</div>
+        {step === 1 && (() => {
+          const visible = (s) => !s.archived && !s.hidden;
+          const cats = (categories && categories.length) ? categories : ["Services"];
+          const inCat = (cat) => services.filter((s) => visible(s) && (s.category || cats[0]) === cat);
+          const liveCats = cats.filter((c) => inCat(c).length > 0);
+          const pickGuidedService = (svc) => {
+            if (!svc) return;
+            if (svc.firstTime && svc.intake) { setIntakeFor(svc); return; }
+            setDraft(svc); setDraftAddons({}); setCutType(null); setCutPhase("type");
+            const hasCutTypes = svc.cutTypes && svc.cutTypes.length > 0;
+            if (hasCutTypes && business?.booking?.guidedConsult !== false) {
+              setConsult({ step: "sides", sides: null, bottom: null, condition: null }); setConsultResult(null); setStep(2);
+            } else { setStep(2); }
+          };
+          const card = (key, photo, label, sub, onClick) => (
+            <button key={key} className="lift" onClick={onClick} style={{ position: "relative", height: 130, width: "100%", border: "none", borderRadius: 16, padding: 0, overflow: "hidden", color: "#fff", textAlign: "left", boxShadow: "var(--shadow-md)", background: "var(--panel2)" }}>
+              {photo ? <img src={imgUrl(photo, 700)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
+              <div style={{ position: "absolute", inset: 0, background: photo ? "linear-gradient(90deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.20) 100%)" : "linear-gradient(120deg, color-mix(in srgb, var(--gold) 78%, #000) 0%, var(--gold) 100%)" }} />
+              <div style={{ position: "absolute", left: 22, top: 0, bottom: 0, right: 56, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={{ width: 22, height: 1.5, background: "#fff", opacity: 0.9, marginBottom: 10 }} />
+                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.05 }}>{label}</div>
+                {sub ? <div style={{ fontSize: 11, color: "rgba(255,255,255,0.78)", letterSpacing: 1.8, marginTop: 6 }}>{sub}</div> : null}
+              </div>
+              <div style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.14)", backdropFilter: "blur(6px)", border: "0.5px solid rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <ChevronRight size={18} style={{ color: "#fff" }} />
+              </div>
+            </button>
+          );
+          const showCats = liveCats.length > 1 && !guidedCat;
+          const activeCat = guidedCat || (liveCats.length === 1 ? liveCats[0] : null);
+          const list = activeCat ? inCat(activeCat) : services.filter(visible);
+          return (
+            <div className="fade-up" style={{ margin: "0 -22px" }}>
+              <div style={{ padding: "36px 24px 28px", textAlign: "center", marginBottom: 8 }}>
+                <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 22px" }} />
+                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 14 }}>{guidedCat ? guidedCat : "Welcome in."}</div>
+                <div style={{ fontSize: 17, color: "var(--text)", lineHeight: 1.5, fontWeight: 400, maxWidth: 320, margin: "0 auto" }}>{showCats ? "Glad you're here. What are you here for today?" : (guidedCat ? "Pick your service." : "Glad you're here. What are we doing today?")}</div>
+              </div>
+              <div style={{ padding: "0 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+                {showCats
+                  ? liveCats.map((cat) => { const l = inCat(cat); const photo = (l.find((s) => s.photo) || {}).photo; return card(cat, photo, cat, l.length === 1 ? l[0].name : (l.length + " options"), () => { if (l.length === 1) pickGuidedService(l[0]); else setGuidedCat(cat); }); })
+                  : list.map((svc) => card(svc.id, svc.photo, svc.name, svc.duration ? (svc.duration + " min" + (svc.price ? " · $" + svc.price : "")) : null, () => pickGuidedService(svc)))}
+              </div>
             </div>
-            {/* Magazine-cover cards — tall photo with overlaid text */}
-            <div style={{ padding: "0 22px", display: "flex", flexDirection: "column", gap: 14 }}>
-              {[
-                { key: "hair", label: "Hair", sub: "JUST THE CUT", photo: "photo-1605497788044-5a32c7078486" },
-                { key: "hairBeard", label: "Hair + Beard", sub: "THE FULL RESET", photo: "photo-1621607512214-68297480165e" },
-                { key: "beard", label: "Beard", sub: "JUST A TIDY-UP", photo: "photo-1503951914875-452162b0f3f1" },
-              ].map((cat) => (
-                <button key={cat.key} className="lift" onClick={() => {
-                  setNewClientCategory(cat.key);
-                  const lower = (s) => (s.name || "").toLowerCase();
-                  let match = null;
-                  if (cat.key === "hairBeard") match = services.find((s) => /haircut.*beard|cut.*beard|beard.*cut/.test(lower(s)));
-                  if (cat.key === "beard" && !match) match = services.find((s) => lower(s).includes("beard") && !lower(s).includes("cut"));
-                  if (cat.key === "hair" && !match) match = services.find((s) => /haircut|cut/.test(lower(s)) && !lower(s).includes("beard"));
-                  if (!match) match = services[0];
-                  if (match.firstTime && match.intake) { setIntakeFor(match); return; }
-                  setDraft(match); setDraftAddons({}); setCutType(null); setCutPhase("type");
-                  // For hair-based services with cut types, launch the guided consultation.
-                  const hasCutTypes = match.cutTypes && match.cutTypes.length > 0;
-                  if ((cat.key === "hair" || cat.key === "hairBeard") && hasCutTypes && business?.booking?.guidedConsult !== false) {
-                    setConsult({ step: "sides", sides: null, bottom: null, condition: null });
-                    setConsultResult(null);
-                    setStep(2);
-                  } else {
-                    setStep(2);
-                  }
-                }} style={{ position: "relative", height: 130, width: "100%", border: "none", borderRadius: 16, padding: 0, overflow: "hidden", color: "#fff", textAlign: "left", boxShadow: "var(--shadow-md)", background: "var(--panel2)" }}>
-                  <img src={imgUrl(cat.photo, 700)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.20) 100%)" }} />
-                  <div style={{ position: "absolute", left: 22, top: 0, bottom: 0, right: 56, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                    <div style={{ width: 22, height: 1.5, background: "var(--gold)", marginBottom: 10 }} />
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.05 }}>{cat.label}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.78)", letterSpacing: 1.8, marginTop: 6 }}>{cat.sub}</div>
-                  </div>
-                  <div style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.14)", backdropFilter: "blur(6px)", border: "0.5px solid rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <ChevronRight size={18} style={{ color: "#fff" }} />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {intakeFor && (
           <FirstTimeIntake
@@ -6381,17 +6383,17 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       <SectionHeader title="Cut Types" />
       <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The cut options a client picks from when booking this service. Edit the name, description, and price for each. Mark one as most common to highlight it with a badge.</p>
       {(form.cutTypes || []).map((ct, i) => (
-        <div key={ct.id || i} style={{ background: "var(--panel)", borderRadius: 16, padding: 16, marginBottom: 12, border: ct.popular ? "1.5px solid var(--gold)" : "1px solid var(--border)" }}>
-          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>PHOTO</div>
-          <button onClick={() => setPicker({ target: "cut", index: i })} className="lift" style={{ width: "100%", height: 120, borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 6, padding: 0, marginBottom: 12 }}>
-            {ct.images && ct.images[0] ? <img src={imgUrl(ct.images[0], 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={22} /><span style={{ fontSize: 13.5 }}>Add a photo (library or upload)</span></>}
+        <div key={ct.id || i} style={{ background: "var(--panel)", borderRadius: 16, padding: 20, marginBottom: 14, border: ct.popular ? "1.5px solid var(--gold)" : "1px solid var(--border)" }}>
+          <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>PHOTO</div>
+          <button onClick={() => setPicker({ target: "cut", index: i })} className="lift" style={{ width: "100%", height: 150, borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, padding: 0, marginBottom: 16 }}>
+            {ct.images && ct.images[0] ? <img src={imgUrl(ct.images[0], 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} /><span style={{ fontSize: 15 }}>Add a photo (library or upload)</span></>}
           </button>
-          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>NAME</div>
-          <input value={ct.label || ""} onChange={(e) => setCut(i, { label: e.target.value })} placeholder="e.g. Classic Cut/Fade" style={{ ...inputStyle, marginBottom: 12 }} />
-          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>DESCRIPTION</div>
-          <textarea value={ct.desc || ""} onChange={(e) => setCut(i, { desc: e.target.value })} placeholder="Shown to clients under the name" rows={2} style={{ ...inputStyle, padding: "10px 12px", resize: "vertical", marginBottom: 12, lineHeight: 1.4 }} />
-          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>PRICE ($)</div>
-          <input type="number" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setCut(i, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="35" style={{ ...inputStyle, marginBottom: 14 }} />
+          <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>NAME</div>
+          <input value={ct.label || ""} onChange={(e) => setCut(i, { label: e.target.value })} placeholder="e.g. Classic Cut/Fade" style={{ ...inputStyle, fontSize: 17, padding: "16px 16px", marginBottom: 16 }} />
+          <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>DESCRIPTION</div>
+          <textarea value={ct.desc || ""} onChange={(e) => setCut(i, { desc: e.target.value })} placeholder="Shown to clients under the name" rows={6} style={{ ...inputStyle, fontSize: 16, padding: "14px 16px", resize: "vertical", minHeight: 150, marginBottom: 16, lineHeight: 1.55 }} />
+          <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>PRICE ($)</div>
+          <input type="number" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setCut(i, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="35" style={{ ...inputStyle, fontSize: 17, padding: "16px 16px", marginBottom: 16 }} />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 12 }}>
             <span style={{ fontSize: 15 }}>Mark as most common<span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Shows a "Most common" badge to clients</span></span>
             <Toggle on={!!ct.popular} onClick={() => setPopularCut(i)} />
