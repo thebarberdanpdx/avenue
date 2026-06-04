@@ -786,6 +786,28 @@ function StaffLogin({ authReady, onBack }) {
   );
 }
 
+// Catches render/runtime errors in a subtree and shows the message on-screen (instead of a blank
+// white page), keeping the rest of the app usable. Helps diagnose crashes without dev tools.
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err, info) { try { console.error("[vero] UI error:", err, info); } catch (e) {} }
+  render() {
+    if (this.state.err) {
+      const e = this.state.err;
+      return (
+        <div style={{ padding: 24, maxWidth: 680, margin: "0 auto" }}>
+          <div style={{ fontFamily: "var(--font-disp, Georgia, serif)", fontSize: 24, fontWeight: 600, marginBottom: 10, color: "var(--text, #232221)" }}>Something went wrong{this.props.label ? ` on ${this.props.label}` : ""}.</div>
+          <p style={{ fontSize: 15, color: "var(--sub, #6F685D)", lineHeight: 1.5, marginBottom: 16 }}>The rest of the app still works — head back and try again. If this keeps happening, send a screenshot of the text below:</p>
+          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", background: "var(--panel2, #F4EFE4)", border: "1px solid var(--border, #E0D8C7)", borderRadius: 12, padding: 14, fontSize: 12.5, color: "var(--text, #232221)" }}>{String((e && (e.stack || e.message)) || e)}</pre>
+          <button onClick={() => { try { window.location.reload(); } catch (x) {} }} style={{ marginTop: 16, background: "var(--gold, #6E8B74)", color: "var(--on-gold, #fff)", border: "none", borderRadius: 12, padding: "12px 18px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Reload</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   // Two front doors: gotvero.com (root) is the BUSINESS dashboard; gotvero.com/book is the
   // client booking link. Read the URL up front so a client never flashes the staff login.
@@ -6318,7 +6340,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
-        {tab === "settings" && isOwner && <SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
+        {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} /></ErrorBoundary>}
       </div>
 
       {/* fixed bottom tab bar — anchors to viewport bottom. transform:translateZ(0) puts it on its own GPU layer so iOS Safari doesn't let it drift during scroll/overscroll. */}
