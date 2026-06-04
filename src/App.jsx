@@ -882,6 +882,31 @@ export default function App() {
   const [business, setBusiness] = useState(DEFAULT_BUSINESS);
   const [services, setServices] = useState(DEFAULT_SERVICES);
   const [categories, setCategories] = useState(["Services"]); // ordered list of category names
+  // Cut-style library (Step 1 groundwork): the single canonical list of cut styles. Each entry
+  // { id, label, desc, images } holds what makes a style the same everywhere (name/description/
+  // photos). Per-service PRICE & TIME stay on each service's own cutTypes and remain fully editable.
+  // Persists in shops.settings._cutLibrary, mirroring _categories. Render is NOT wired to it yet.
+  const [cutLibrary, setCutLibrary] = useState([]);
+  // Build the canonical library from existing services by de-duping cut styles on name (first wins;
+  // backfill description/photos from any service that has them). Used once to seed if none is saved.
+  const buildCutLibrary = (svcList) => {
+    const byKey = new Map();
+    let n = 0;
+    (svcList || []).forEach((s) => (s && s.cutTypes ? s.cutTypes : []).forEach((ct) => {
+      const key = ((ct && ct.label) || "").trim().toLowerCase();
+      if (!key) return;
+      const imgs = Array.isArray(ct.images) ? ct.images.filter(Boolean) : [];
+      if (!byKey.has(key)) {
+        const base = key.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+        byKey.set(key, { id: "lib_" + (base || ++n), label: (ct.label || "").trim(), desc: ct.desc || "", images: imgs.slice() });
+      } else {
+        const e = byKey.get(key);
+        if (!e.desc && ct.desc) e.desc = ct.desc;
+        if ((!e.images || !e.images.length) && imgs.length) e.images = imgs.slice();
+      }
+    }));
+    return Array.from(byKey.values());
+  };
   const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
   // Theme: stored on business.theme so it syncs across devices via Supabase. Falls back to "chrome" until loaded/set or if an old/unknown id is stored.
   const theme = (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "vero";
@@ -1006,14 +1031,16 @@ export default function App() {
   useEffect(() => {
     (async () => {
       let allLoaded = true; // flipped to false on ANY real error — blocks saves so seeds can't overwrite real data
+      let savedCutLibrary = null; // captured from shops.settings below; if absent we seed it from services
 
       // Settings (business) live on the shops row. maybeSingle returns null (not error) when no row exists yet.
       const { data: shopRow, error: shopErr } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle();
       if (shopErr) { allLoaded = false; console.error('[vero] load shops failed:', shopErr); }
       else if (shopRow && shopRow.settings && Object.keys(shopRow.settings).length) {
-        const { _categories, ...biz } = shopRow.settings;
+        const { _categories, _cutLibrary, ...biz } = shopRow.settings;
         setBusiness(biz);
         if (Array.isArray(_categories) && _categories.length) setCategories(_categories);
+        if (Array.isArray(_cutLibrary)) savedCutLibrary = _cutLibrary;
       }
 
       // Load a list table → array of stored item objects. Returns null ONLY on a real DB error (so we can skip and refuse saves).
@@ -1039,6 +1066,14 @@ export default function App() {
       if (pr && pr.length) lastRemoteRef.current.providers = pr;
       if (sv && sv.length) lastRemoteRef.current.services = sv;
 
+      // Cut-style library: use the saved one if present, else seed it once from existing services
+      // (de-dupe by name). This only adds the shops.settings._cutLibrary key — services are untouched.
+      if (Array.isArray(savedCutLibrary) && savedCutLibrary.length) {
+        setCutLibrary(savedCutLibrary);
+      } else {
+        setCutLibrary(buildCutLibrary((sv && sv.length) ? sv : services));
+      }
+
       // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
       if (allLoaded) loadedRef.current = true;
       else console.error('[vero] one or more loads failed — saves are blocked until the next page reload to protect existing data');
@@ -1046,7 +1081,7 @@ export default function App() {
     })();
   }, []);
 
-  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories } }).then(({ error }) => { if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false); }); }, 800); return () => clearTimeout(t); }, [business, categories]);
+  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories, _cutLibrary: cutLibrary } }).then(({ error }) => { if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false); }); }, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
   useEffect(() => { if (!loadedRef.current) return; if (clients === lastRemoteRef.current.clients) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
   useEffect(() => { if (!loadedRef.current) return; if (appts === lastRemoteRef.current.appointments) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current) return; if (waitlist === lastRemoteRef.current.waitlist) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
@@ -1062,7 +1097,7 @@ export default function App() {
     syncList('waitlist', waitlist);
     syncList('services', services);
     syncList('providers', providers);
-    supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories } }).then(({ error }) => { if (error) setSaveFailed(true); });
+    supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories, _cutLibrary: cutLibrary } }).then(({ error }) => { if (error) setSaveFailed(true); });
   };
 
   // ---- LIVE SYNC ----
