@@ -1536,6 +1536,28 @@ function PhotoPicker({ onClose, onPick }) {
 // Profile-picture picker for staff members: portrait grid + simulated upload.
 function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
   const [tab, setTab] = useState("library");
+  const fileRef = useRef(null);
+  const handleFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const fr = new FileReader();
+    fr.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 500; let w = img.width, h = img.height;
+        if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+        else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        onPick(canvas.toDataURL("image/jpeg", 0.72));
+        onClose();
+      };
+      img.src = ev.target.result;
+    };
+    fr.readAsDataURL(file);
+  };
   return (
     <Sheet open={true} onClose={onClose} maxWidth={560}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
@@ -1566,8 +1588,9 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
             <div style={{ fontSize: 15, marginBottom: 6 }}>Upload a profile picture</div>
             <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300 }}>A clear, front-facing headshot works best.</p>
           </div>
-          <button className="lift" onClick={() => { onPick(STAFF_PORTRAITS[Math.floor(Math.random() * STAFF_PORTRAITS.length)]); onClose(); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>CHOOSE FILE (SIMULATED)</button>
-          <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>Real uploads work in the live product. Here we'll drop in a sample so you can see the result.</p>
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
+          <button className="lift" onClick={() => fileRef.current && fileRef.current.click()} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, letterSpacing: 1, fontWeight: 500, borderRadius: 10 }}>CHOOSE FILE</button>
+          <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>Photos are resized automatically.</p>
         </div>
       )}
       {hasPhoto && (
@@ -2159,9 +2182,13 @@ function ClientFlow({ business, services, providers, categories = [], clients, s
               <div style={{ display: "grid", gap: 12 }}>
                 {list.map((svc) => (
                   <button key={svc.id} className="lift" onClick={() => selectService(svc)} style={cardBtn}>
-                    <span>
-                      <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{svc.name}</span>
-                      {svc.duration ? <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{svc.duration} min{svc.price ? (" · $" + svc.price) : ""}</span> : null}
+                    <span style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+                      {svc.photo ? <span style={{ width: 52, height: 52, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: "var(--panel2)" }}><img src={imgUrl(svc.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></span> : null}
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{svc.name}</span>
+                        {svc.duration ? <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{svc.duration} min{svc.price ? (" · $" + svc.price) : ""}</span> : null}
+                        {svc.comboOf && svc.comboOf.length > 0 ? (() => { const incl = svc.comboOf.map((id) => { const x = services.find((y) => y.id === id); return x && x.name; }).filter(Boolean); return incl.length ? <span style={{ display: "block", fontSize: 12.5, color: "var(--gold)", fontWeight: 600, marginTop: 3 }}>Includes {incl.join(" + ")}</span> : null; })() : null}
+                      </span>
                     </span>
                     <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
                   </button>
