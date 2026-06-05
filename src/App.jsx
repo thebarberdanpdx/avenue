@@ -3431,26 +3431,26 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           };
           return (
             <div className="fade-up">
-              <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>HI {matched.name.split(" ")[0].toUpperCase()}</div>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Who are we taking care of?</h2>
-              <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>Pick one or more — tap everyone you're booking today.</p>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 14 }}>Hi {matched.name.split(" ")[0]}</div>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Who are we taking care of?</h2>
+              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 24px" }}>Pick one or more — tap everyone you're booking today.</p>
               {[selfPerson, ...(matched.family || []).map((m) => ({ id: m.id, name: m.name, note: m.note, isMember: true }))].map((person) => {
                 const key = person.id || "self"; const on = isSel(key);
                 return (
-                  <button key={key} className="lift" onClick={() => toggle(person)} style={{ width: "100%", background: on ? "color-mix(in srgb, var(--gold) 14%, var(--panel))" : "var(--panel)", color: "var(--text)", padding: "18px", fontSize: 16, borderRadius: 14, border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, marginBottom: 11, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                  <button key={key} onClick={() => toggle(person)} style={{ width: "100%", background: "transparent", color: "var(--text)", padding: "16px 16px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, marginBottom: 11, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer" }}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                      <span style={{ fontSize: 17 }}>{person.id ? person.name : "Myself"}</span>
-                      <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>{person.id ? (person.note || "") : matched.name}</span>
+                      <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500 }}>{person.id ? person.name : "Myself"}</span>
+                      <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", fontWeight: 400 }}>{person.id ? (person.note || "") : matched.name}</span>
                     </span>
-                    <span style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={14} style={{ color: "var(--on-gold)" }} />}</span>
+                    <span style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={14} style={{ color: "var(--on-gold)" }} />}</span>
                   </button>
                 );
               })}
-              <button className="lift" onClick={() => { setNewMemberName(""); setNewMemberNote(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", color: "var(--gold)", padding: "18px", fontSize: 16, borderRadius: 14, border: "1px dashed var(--border2)", textAlign: "left", display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
+              <button onClick={() => { setNewMemberName(""); setNewMemberNote(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", color: "var(--gold)", padding: "16px", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, borderRadius: 10, border: "1px dashed var(--border2)", textAlign: "left", display: "flex", alignItems: "center", gap: 10, marginBottom: 22, cursor: "pointer" }}>
                 <Plus size={18} /> <span>Someone new</span>
               </button>
-              <button className="lift" disabled={groupPeople.length === 0} onClick={continueGroup} style={{ width: "100%", background: groupPeople.length ? "var(--gold)" : "var(--border2)", color: groupPeople.length ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 10 }}>
-                {groupPeople.length > 1 ? `CONTINUE — ${groupPeople.length} PEOPLE →` : "CONTINUE →"}
+              <button disabled={groupPeople.length === 0} onClick={continueGroup} style={{ width: "100%", background: groupPeople.length ? "var(--gold)" : "transparent", color: groupPeople.length ? "var(--on-gold)" : "var(--faint)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: groupPeople.length ? "none" : "1px solid var(--border)", cursor: groupPeople.length ? "pointer" : "default" }}>
+                {groupPeople.length > 1 ? `Continue — ${groupPeople.length} people →` : "Continue →"}
               </button>
             </div>
           );
@@ -4032,31 +4032,29 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
   const relPlus = relDate.includes(",") ? relDate : `${relDate}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
   return (
     <div className="fade-up" style={{ paddingTop: 8 }}>
-      {/* Warm celebration moment — centered, big, no clinical icon */}
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <div className="success-bloom" style={{ width: 56, height: 56, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
-          <Check size={26} style={{ color: "var(--gold)" }} strokeWidth={2.5} />
+      <div style={{ textAlign: "center", marginBottom: 30 }}>
+        <div className="success-bloom" style={{ width: 52, height: 52, borderRadius: "50%", border: "1.5px solid var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+          <Check size={24} style={{ color: "var(--gold)" }} strokeWidth={2.5} />
         </div>
-        <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 14px" }} />
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 40, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 12 }}>You're in.</h2>
-        <p style={{ color: "var(--text)", fontSize: 16, lineHeight: 1.5, maxWidth: 340, margin: "0 auto", fontWeight: 400 }}>We'll text you a reminder closer to the day. See you soon.</p>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 10 }}>Booked</div>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, lineHeight: 1.1, letterSpacing: "-0.4px", marginBottom: 10, color: "var(--text)" }}>You're in.</h2>
+        <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto", fontWeight: 400 }}>We'll text you a reminder closer to the day. See you soon.</p>
       </div>
 
-      {/* The appointment card — editorial, with hierarchy */}
-      <div className="drift-in" style={{ background: "var(--panel)", border: "1.5px solid var(--gold)", borderRadius: 20, padding: "22px 24px", marginBottom: 18, boxShadow: "var(--shadow-md)" }}>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 12 }}>YOUR APPOINTMENT</div>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, lineHeight: 1.08, marginBottom: 4 }}>{relPlus}</div>
-        <div style={{ fontSize: 16, color: "var(--text)", marginBottom: 16 }}>{fmtTime(slot)} · with {provider.name}</div>
+      <div className="drift-in" style={{ border: "1px solid var(--line)", borderRadius: 12, padding: "20px 20px", marginBottom: 16 }}>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>Your appointment</div>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.15, marginBottom: 5, color: "var(--text)" }}>{relPlus}</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, color: "var(--sub)", marginBottom: 16 }}>{fmtTime(slot)} · with {provider.name}</div>
         <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
           {cart.map((e, i) => (
-            <div key={i} style={{ fontSize: 14.5, color: "var(--text)", marginBottom: i < cart.length - 1 ? 6 : 0, lineHeight: 1.4 }}>{describeEntry(e)}</div>
+            <div key={i} style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text)", marginBottom: i < cart.length - 1 ? 6 : 0, lineHeight: 1.4 }}>{describeEntry(e)}</div>
           ))}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
-            <span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 500 }}>TOTAL</span>
-            <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)", fontWeight: 500 }}>${cartPrice}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+            <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Total</span>
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: "var(--text)", fontWeight: 500 }}>${cartPrice}</span>
           </div>
           {photos > 0 && (
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)", fontSize: 13.5, color: "var(--sub)", display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", display: "flex", alignItems: "center", gap: 8 }}>
               <ImageIcon size={14} style={{ color: "var(--gold)" }} />
               <span>{photos} photo{photos > 1 ? "s" : ""} attached for your barber</span>
             </div>
@@ -4064,20 +4062,18 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
         </div>
       </div>
 
-      {/* What happens next — sets expectations warmly */}
-      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", marginBottom: 24 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>WHAT'S NEXT</div>
-        <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.55 }}>
+      <div style={{ border: "1px solid var(--line)", borderRadius: 12, padding: "16px 18px", marginBottom: 24 }}>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 8 }}>What's next</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text2)", lineHeight: 1.55 }}>
           A confirmation is on its way to your phone and email. We'll send a reminder the day before. If anything changes, you can always reschedule or cancel below.
         </div>
       </div>
 
-      <button className="lift" onClick={onManage} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 500, borderRadius: 14, marginBottom: 11 }}>Manage my appointment</button>
-      <button className="lift" onClick={onExit} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, marginBottom: 28, boxShadow: "var(--shadow-md)" }}>BOOK ANOTHER</button>
+      <button onClick={onManage} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 11, cursor: "pointer" }}>Manage my appointment</button>
+      <button onClick={onExit} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 28, border: "none", cursor: "pointer" }}>Book another</button>
 
-      {/* Shop footer — subtle, branded */}
-      <div style={{ textAlign: "center", color: "var(--faint)", fontSize: 13.5, lineHeight: 1.7, paddingBottom: 8 }}>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 16, color: "var(--sub)", marginBottom: 4, letterSpacing: 0.3 }}>{business.legalName}</div>
+      <div style={{ textAlign: "center", color: "var(--faint)", fontFamily: "'Jost', sans-serif", fontSize: 13, lineHeight: 1.7, paddingBottom: 8 }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: "var(--sub)", marginBottom: 4, letterSpacing: 0.3 }}>{business.legalName}</div>
         {business.address}{business.address2 ? `, ${business.address2}` : ""}<br />{business.cityZip}
       </div>
     </div>
