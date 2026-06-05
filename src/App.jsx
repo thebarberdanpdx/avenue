@@ -2304,8 +2304,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)", margin: 0 };
           const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
           const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, fontWeight: 400, lineHeight: 1.55, marginTop: 9 };
-          const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, textTransform: "uppercase", letterSpacing: 2, color: "var(--text)" };
-          const rowBtn = { width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "17px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" };
+          const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 22, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.2, lineHeight: 1.25, color: "var(--text)" };
+          const rowBtn = { width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "22px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" };
 
           if (showCats) {
             return (
@@ -2319,7 +2319,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     return (
                       <button key={cat} onClick={() => { if (list.length === 1) selectService(list[0]); else setSimpleCat(cat); }} style={rowBtn}>
                         <span style={NAME}>{cat}</span>
-                        <ChevronRight size={16} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                        <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
                       </button>
                     );
                   })}
@@ -2342,9 +2342,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <button key={svc.id} onClick={() => selectService(svc)} style={rowBtn}>
                     <span style={{ minWidth: 0 }}>
                       <span style={{ ...NAME, display: "block" }}>{svc.name}</span>
-                      {svc.comboOf && svc.comboOf.length > 0 ? (() => { const incl = svc.comboOf.map((id) => { const x = services.find((y) => y.id === id); return x && x.name; }).filter(Boolean); return incl.length ? <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 11.5, color: "var(--gold)", fontWeight: 500, marginTop: 5 }}>Includes {incl.join(" + ")}</span> : null; })() : null}
+                      {svc.comboOf && svc.comboOf.length > 0 ? (() => { const incl = svc.comboOf.map((id) => { const x = services.find((y) => y.id === id); return x && x.name; }).filter(Boolean); return incl.length ? <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--gold)", fontWeight: 500, marginTop: 8 }}>Includes {incl.join(" + ")}</span> : null; })() : null}
                     </span>
-                    <ChevronRight size={16} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                    <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
                   </button>
                 ))}
               </div>
@@ -6652,7 +6652,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                     return (
                       <button key={s.id} onClick={() => setForm({ ...form, comboOf: on ? (form.comboOf || []).filter((x) => x !== s.id) : [...(form.comboOf || []), s.id] })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: "1px solid " + (on ? "var(--gold)" : "var(--border)"), borderRadius: 12, padding: "12px 14px", color: "var(--text)" }}>
                         <span style={{ fontSize: 15 }}>{s.name}</span>
-                        {on && <Check size={16} style={{ color: "var(--gold)", flexShrink: 0 }} />}
+                        {on && <Check size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />}
                       </button>
                     );
                   })}
