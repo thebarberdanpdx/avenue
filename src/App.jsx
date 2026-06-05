@@ -6378,8 +6378,8 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   return (
     <div style={{ position: "relative", minHeight: "100dvh" }}>
       <div style={{ borderBottom: "1px solid var(--line)", padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
-        <button onClick={() => { if (pulseDetail) { setPulseDetail(null); return; } if (tab === "pulse" && !activeClient) { onExit(); return; } setActiveClient(null); setTab("pulse"); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> {pulseDetail ? "Pulse" : (tab === "pulse" && !activeClient ? "Home" : "Pulse")}</button>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, letterSpacing: 1.5, fontWeight: 500 }}>{business.name}</div>
+        <button onClick={() => { if (pulseDetail) { setPulseDetail(null); return; } if (tab === "pulse" && !activeClient) { onExit(); return; } setActiveClient(null); setTab("pulse"); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontFamily: "'Jost', sans-serif" }}><ArrowLeft size={16} /> {pulseDetail ? "Pulse" : (tab === "pulse" && !activeClient ? "Home" : "Pulse")}</button>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, letterSpacing: 0.3, fontWeight: 500, color: "var(--text)" }}>{business.name}</div>
         <div style={{ width: 50 }} />
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
@@ -6407,7 +6407,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
               <Icon size={21} />
               {id === "waitlist" && waitlist.length > 0 && <span style={{ position: "absolute", top: -5, right: -9, background: "var(--gold)", color: "var(--on-gold)", fontSize: 12, fontWeight: 600, borderRadius: 8, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{waitlist.length}</span>}
             </div>
-            <span style={{ fontSize: 14.5, letterSpacing: 0.3 }}>{label}</span>
+            <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 0.8, textTransform: "uppercase", fontWeight: 500 }}>{label}</span>
           </button>
         ))}
       </div>
