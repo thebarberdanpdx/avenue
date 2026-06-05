@@ -1041,6 +1041,13 @@ export default function App() {
   const tableSetters = { clients: setClients, appointments: setAppts, waitlist: setWaitlist, services: setServices, providers: setProviders };
   const refetchTable = async (table) => {
     try {
+      if (table === 'appointments' && !session) {
+        const { data } = await supabase.rpc('get_availability', { p_shop: SHOP_ID });
+        const list = Array.isArray(data) ? data : [];
+        lastRemoteRef.current.appointments = list;
+        setAppts(list);
+        return;
+      }
       const { data, error } = await supabase.from(table).select('data').eq('shop_id', SHOP_ID);
       if (error) { console.error(`[vero] live-sync refetch '${table}' failed:`, error); return; }
       const list = data ? data.map((r) => r.data) : [];
@@ -1075,7 +1082,8 @@ export default function App() {
       // Clients are intentionally NOT loaded here. They hold private contact info, so they load only
       // for signed-in staff via the session-keyed effect below — public booking visitors never receive
       // the client list. (The in-code demo seed is also cleared for the public view by that effect.)
-      const ap = await loadList('appointments'); if (ap !== null) setAppts(ap);
+      // Appointments load moved to the session-keyed effect below: the public reads TIMES ONLY via
+      // get_availability (no names/phones); signed-in staff load the full appointment rows.
       const wl = await loadList('waitlist');     if (wl !== null) setWaitlist(wl);
       // Providers & services: keep the in-code defaults if nothing's saved yet (the app needs them to function).
       const pr = await loadList('providers');    if (pr && pr.length) setProviders(pr);
@@ -1083,7 +1091,6 @@ export default function App() {
 
       // Record the loaded baseline so the safe-delete reconciliation knows which rows this device
       // already knew about (so it never deletes a row another device adds later).
-      if (ap !== null) lastRemoteRef.current.appointments = ap;
       if (wl !== null) lastRemoteRef.current.waitlist = wl;
       if (pr && pr.length) lastRemoteRef.current.providers = pr;
       if (sv && sv.length) lastRemoteRef.current.services = sv;
@@ -1152,6 +1159,31 @@ export default function App() {
     return () => { alive = false; };
   }, [session]);
 
+  // Appointments load, session-keyed. The public gets TIMES ONLY (open/busy slots) via get_availability —
+  // never names or phones; signed-in staff load the full appointment rows. Mirrors the clients effect above.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!session) {
+        try {
+          const { data } = await supabase.rpc('get_availability', { p_shop: SHOP_ID });
+          if (!alive) return;
+          const list = Array.isArray(data) ? data : [];
+          lastRemoteRef.current.appointments = list;
+          setAppts(list);
+        } catch (e) { console.error('[vero] availability load failed:', e); }
+        return;
+      }
+      const { data, error } = await supabase.from('appointments').select('data').eq('shop_id', SHOP_ID);
+      if (!alive) return;
+      if (error) { console.error('[vero] load appointments failed:', error); return; }
+      const list = data ? data.map((r) => r.data) : [];
+      lastRemoteRef.current.appointments = list;
+      setAppts(list);
+    })();
+    return () => { alive = false; };
+  }, [session]);
+
   useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories, _cutLibrary: cutLibrary } }).then(({ error }) => { if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false); }); }, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (clients === lastRemoteRef.current.clients) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (appts === lastRemoteRef.current.appointments) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
@@ -1180,7 +1212,7 @@ export default function App() {
   // NOTE: enable Realtime for these tables in Supabase for this to fire.
   useEffect(() => {
     if (!dataLoaded) return;
-    const tables = ['clients', 'appointments', 'waitlist', 'services', 'providers'];
+    const tables = session ? ['clients', 'appointments', 'waitlist', 'services', 'providers'] : ['appointments', 'services', 'providers'];
     let channel;
     try {
       channel = supabase.channel(`vero-sync-${SHOP_ID}`);
@@ -1190,7 +1222,7 @@ export default function App() {
       channel.subscribe();
     } catch (e) { console.error('[vero] live-sync subscribe failed:', e); }
     return () => { try { if (channel) supabase.removeChannel(channel); } catch (e) { /* ignore */ } };
-  }, [dataLoaded, SHOP_ID]);
+  }, [dataLoaded, SHOP_ID, session]);
 
   // Mirror the theme class onto <html> so CSS variables (--gold, --bg, --text, etc.) cascade
   // to portaled content too (booking form, conflict popup, etc. — these render under document.body,
