@@ -802,6 +802,18 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(err, info) { try { console.error("[vero] UI error:", err, info); } catch (e) {} }
   render() {
     if (this.state.err) {
+      if (this.props.minimal) {
+        // Client-facing root crash: calm, on-brand, no stack trace.
+        return (
+          <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", background: "var(--bg, #14110E)", color: "var(--text, #F2EBDD)" }}>
+            <div style={{ maxWidth: 360 }}>
+              <div style={{ fontFamily: "var(--font-disp, 'Fraunces', Georgia, serif)", fontSize: 28, fontWeight: 600, marginBottom: 12, lineHeight: 1.15 }}>Something went wrong</div>
+              <p style={{ fontSize: 15.5, lineHeight: 1.55, color: "var(--sub, #B7AD9B)", marginBottom: 24 }}>The app hit a snag. Reload to pick up right where you left off — nothing was lost.</p>
+              <button onClick={() => { try { window.location.reload(); } catch (x) {} }} style={{ background: "var(--gold, #C8A24A)", color: "var(--on-gold, #14110E)", border: "none", borderRadius: 12, padding: "13px 28px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}>Reload</button>
+            </div>
+          </div>
+        );
+      }
       const e = this.state.err;
       return (
         <div style={{ padding: 24, maxWidth: 680, margin: "0 auto" }}>
@@ -816,7 +828,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-export default function App() {
+function App() {
   // Two front doors: gotvero.com (root) is the BUSINESS dashboard; gotvero.com/book is the
   // client booking link. Read the URL up front so a client never flashes the staff login.
   const [view, setView] = useState(() => {
@@ -13889,3 +13901,7 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
     </div>
   );
 }
+
+// Default export wraps the app in the crash safety net.
+function AppWithSafetyNet() { return <ErrorBoundary minimal><App /></ErrorBoundary>; }
+export default AppWithSafetyNet;
