@@ -11096,7 +11096,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div>
                 <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 10 }} />
-                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1 }}>Waitlist</h2>
+                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>Waitlist</h2>
               </div>
               <button onClick={() => setShowWaitlistPanel(false)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: "50%", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={18} /></button>
             </div>
@@ -11110,14 +11110,14 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <div>
                 <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 10 }} />
-                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1 }}>Calendar view</h2>
+                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>Calendar view</h2>
               </div>
               <button onClick={() => setShowCalendarOptions(false)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: "50%", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={18} /></button>
             </div>
 
             {/* Row size */}
             <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>ROW HEIGHT</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>ROW HEIGHT</div>
               <div style={{ display: "flex", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 4, gap: 4 }}>
                 {ROW_SIZES.map((s) => { const on = sizeId === s.id; return (
                   <button key={s.id} onClick={() => setBusiness({ ...business, calendarRowSize: s.id })} style={{ flex: 1, padding: "11px 0", borderRadius: 8, fontSize: 14, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--sub)", fontWeight: on ? 700 : 500, letterSpacing: 0.5 }}>{s.label}</button>
@@ -11127,7 +11127,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
 
             {/* Staff filter */}
             <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>SHOWING</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>SHOWING</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {allStaff.map((p) => {
                   const on = !hidden.includes(p.id);
@@ -11142,7 +11142,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
 
             {/* Legend */}
             <div>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>STATUS COLORS</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>STATUS COLORS</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 9, fontSize: 14, color: "var(--text)" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: STATUS_COLORS["checked-in"] }} /> Checked in</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: STATUS_COLORS["in-service"] }} /> In service</span>
@@ -11170,14 +11170,14 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       <div style={{ marginTop: 12, marginBottom: 28 }}>
         <div style={{ width: 28, height: 2, background: "var(--gold)", marginBottom: 22 }} />
         <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, margin: "0 0 24px", textAlign: "left", color: "inherit", cursor: "pointer", display: "block", width: "auto" }}>
-          <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", marginBottom: 12, fontWeight: 600 }}>{`${DAYS[selectedDate.getDay()]} · ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`.toUpperCase()}</div>
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.5, lineHeight: 1, margin: 0, display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 12, fontWeight: 600 }}>{`${DAYS[selectedDate.getDay()]} · ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`.toUpperCase()}</div>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1, margin: 0, display: "flex", alignItems: "center", gap: 12 }}>
             <span>{relativeDate(selectedDate)}</span>
             <ChevronDown size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
           </h2>
         </button>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, rowGap: 10, alignItems: "center" }}>
-          <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 16px", height: 40, borderRadius: 11, fontSize: 13, fontWeight: 600, letterSpacing: 1.2, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)" }}><Plus size={15} strokeWidth={2.5} /> NEW</button>
+          <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 16px", height: 40, borderRadius: 11, fontSize: 13, fontWeight: 600, fontFamily: "'Jost', sans-serif", letterSpacing: 1.2, display: "flex", alignItems: "center", gap: 7 }}><Plus size={15} strokeWidth={2.5} /> NEW</button>
           <button className="lift" onClick={() => setRegisterOpen(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border2)", padding: "0 16px", height: 40, borderRadius: 11, fontSize: 13, fontWeight: 600, letterSpacing: 1.2, display: "flex", alignItems: "center", gap: 7 }}><DollarSign size={15} style={{ color: "var(--gold)" }} /> SALE</button>
           <div style={{ flex: 1, minWidth: 8 }} />
           <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 40, borderRadius: 11, fontSize: 13.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 7, position: "relative", letterSpacing: 0.3 }}><Clock size={14} style={{ color: "var(--gold)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
@@ -11194,8 +11194,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           const isToday = offset === 0;
           return (
             <button key={offset} data-today={isToday ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: "start", textAlign: "center", padding: "12px 4px 14px", borderRadius: 14, background: isSelected ? "var(--text)" : "transparent", color: isSelected ? "var(--bg)" : "var(--sub)", border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
-              <div style={{ fontSize: 10.5, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.8 : 0.55 }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, lineHeight: 1 }}>{d.getDate()}</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.8 : 0.55 }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1 }}>{d.getDate()}</div>
               {!isSelected && isToday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "var(--gold)" }} />}
             </button>
           );
@@ -11206,7 +11206,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       <div style={{ display: "flex", borderBottom: "1px solid var(--line)" }}>
         <div style={{ width: 56, flexShrink: 0 }} />
         {staff.map((p) => (
-          <div key={p.id} style={{ flex: 1, textAlign: "center", padding: "10px 0", fontSize: 15, color: p.color, fontFamily: FONT_DISPLAY, borderLeft: "1px solid var(--line)" }}>{p.name}</div>
+          <div key={p.id} style={{ flex: 1, textAlign: "center", padding: "10px 0", fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 0.5, fontWeight: 500, color: p.color, borderLeft: "1px solid var(--line)" }}>{p.name}</div>
         ))}
       </div>
 
