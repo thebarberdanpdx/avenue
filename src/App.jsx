@@ -10787,6 +10787,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         d.armed = true;
         setDrag({ id: a.id, deltaMin: 0, armed: true });
         if (navigator.vibrate) navigator.vibrate(12);
+        // freeze the page so the drag moves the block instead of scrolling (same lock the slot-scrub uses)
+        document.body.classList.add("scrub-lock");
+        document.addEventListener("touchmove", blockScrollRef.current, { passive: false });
       }
     }, 650);
   };
@@ -10836,6 +10839,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       setDrag({ id: d.id, deltaMin, armed: true });
     };
     const up = () => {
+      // release the scroll freeze that armed-drag turned on
+      document.body.classList.remove("scrub-lock");
+      document.removeEventListener("touchmove", blockScrollRef.current, { passive: false });
       if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
       const d = dragRef.current;
       setDrag(null);
@@ -10852,11 +10858,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
     window.addEventListener("mouseup", up);
     window.addEventListener("touchmove", move, { passive: false });
     window.addEventListener("touchend", up);
+    window.addEventListener("touchcancel", up);
     return () => {
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
       window.removeEventListener("touchmove", move);
       window.removeEventListener("touchend", up);
+      window.removeEventListener("touchcancel", up);
     };
   }, [drag, appts, PPM]);
 
