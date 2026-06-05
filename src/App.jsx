@@ -2586,39 +2586,37 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* SIMPLE · WHO — anyone, or a specific person? Defaults make this a one-tap step. */}
         {simpleStep === "who" && (
           <div className="fade-up">
-            <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Anyone in particular?</h2>
-            <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 400, lineHeight: 1.5, marginBottom: 24 }}>No wrong answer — if you're not sure, we'll match you with whoever's free soonest.</p>
-            <div style={{ display: "grid", gap: 10 }}>
-              {/* No preference — the easy default, listed first */}
-              <button className="lift" onClick={() => {
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Your barber</div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Anyone in particular?</h2>
+            <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 0" }}>No wrong answer — if you're not sure, we'll match you with whoever's free soonest.</p>
+            <div style={{ marginTop: 26, borderBottom: "1px solid var(--line)" }}>
+              <button onClick={() => {
                 const anyone = providers.find((p) => p.id === "anyone") || providers[0];
                 setSimplePref("anyone");
                 setCart((c) => c.map((e, i) => i === 0 ? { ...e, provider: anyone } : e));
                 setSelectedDate(null); setSlot(null);
                 setSimpleStep(null); setStep(6);
-              }} style={{ width: "100%", textAlign: "left", background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1.5px solid color-mix(in srgb, var(--gold) 40%, var(--border))", borderRadius: 14, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, color: "var(--text)" }}>
-                <span style={{ width: 46, height: 46, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 18%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Users size={20} style={{ color: "var(--gold)" }} /></span>
-                <span style={{ flex: 1 }}>
-                  <span style={{ display: "block", fontSize: 16.5, fontWeight: 500 }}>No preference</span>
-                  <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>First available — usually the soonest opening</span>
+              }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "16px 2px", display: "flex", alignItems: "center", gap: 14, color: "var(--text)", cursor: "pointer" }}>
+                <span style={{ width: 42, height: 42, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Users size={18} style={{ color: "var(--gold)" }} /></span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3 }}>No preference</span>
+                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 4 }}>First available — usually the soonest opening</span>
                 </span>
-                <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
               </button>
-              {/* Specific staff */}
               {providers.filter((p) => p.id !== "anyone" && p.isProvider !== false && !p.archived && p.onlineBooking !== false).map((p) => (
-                <button key={p.id} className="lift" onClick={() => {
+                <button key={p.id} onClick={() => {
                   setSimplePref(p.id);
                   setCart((c) => c.map((e, i) => i === 0 ? { ...e, provider: p } : e));
                   setSelectedDate(null); setSlot(null);
                   setSimpleStep(null); setStep(6);
-                }} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, color: "var(--text)" }}>
-                  <Avatar size={46} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
-                  <span style={{ flex: 1 }}>
-                    <span style={{ display: "block", fontSize: 16.5, fontWeight: 500 }}>{p.name}</span>
-                    <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{p.role}</span>
+                }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "16px 2px", display: "flex", alignItems: "center", gap: 14, color: "var(--text)", cursor: "pointer" }}>
+                  <Avatar size={42} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3 }}>{p.name}</span>
+                    <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 4 }}>{p.role}</span>
                   </span>
-                  <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                  <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
                 </button>
               ))}
             </div>
@@ -3315,43 +3313,39 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const nextLabel = nextAvail ? (() => { const d = nextAvail.date; const day = relativeDate(d); const lbl = day.includes(",") ? day : `${day}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; return `${lbl} · ${fmtTime(nextAvail.slot)}`; })() : null;
           return (
             <div className="fade-up">
-              <div style={{ fontSize: 12, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 12 }}>WELCOME BACK</div>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 8, lineHeight: 1.08 }}>Good to see you,<br/>{who.name.split(" ")[0]}.</h2>
-              <p style={{ color: "var(--sub)", fontSize: 15, marginBottom: 26, fontWeight: 300, lineHeight: 1.55 }}>{rhythmLine}</p>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.2, letterSpacing: "-0.2px", color: "var(--text)" }}>Good to see you, {who.name.split(" ")[0]}.</h2>
+              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 26px", fontWeight: 400, lineHeight: 1.55 }}>{rhythmLine}</p>
 
-              {/* Their usual (service + barber, no duration) with last-cut photo */}
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, overflow: "hidden", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
+              <div style={{ border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden", marginBottom: 18 }}>
                 {lastPhoto && (
                   <div style={{ width: "100%", height: 150, overflow: "hidden", position: "relative" }}>
                     <img src={imgUrl(lastPhoto, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                    <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", color: "#fff", fontSize: 11, letterSpacing: 1.5, fontWeight: 600, padding: "5px 11px", borderRadius: 20 }}>YOUR LAST CUT</div>
+                    <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", color: "#fff", fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 1.5, fontWeight: 600, padding: "5px 11px", borderRadius: 20 }}>YOUR LAST CUT</div>
                   </div>
                 )}
-                <div style={{ padding: "24px 20px", textAlign: "center" }}>
-                  <div style={{ fontSize: 11.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>YOUR USUAL</div>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, lineHeight: 1.08 }}>{usualSvc.name}</div>
-                  {usualProv && usualProv.id !== "anyone" ? <div style={{ fontSize: 15, color: "var(--sub)", marginTop: 7 }}>with {usualProv.name}</div> : null}
+                <div style={{ padding: "22px 20px", textAlign: "center" }}>
+                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your usual</div>
+                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.2, lineHeight: 1.2, color: "var(--text)" }}>{usualSvc.name}</div>
+                  {usualProv && usualProv.id !== "anyone" ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginTop: 8 }}>with {usualProv.name}</div> : null}
                 </div>
               </div>
 
-              {/* Primary action — book the next available with their barber */}
               {nextAvail ? (
-                <button className="lift" onClick={() => { setCart([usualEntry]); setSelectedDate(nextAvail.date); setSlot(nextAvail.slot); setCameFromUsual(true); setShowUsual(false); setStep(7); }} style={{ width: "100%", textAlign: "left", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 16, padding: "16px 18px", marginBottom: 13, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <button onClick={() => { setCart([usualEntry]); setSelectedDate(nextAvail.date); setSlot(nextAvail.slot); setCameFromUsual(true); setShowUsual(false); setStep(7); }} style={{ width: "100%", textAlign: "left", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "16px 18px", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
                   <span style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.85, letterSpacing: 1, textTransform: "uppercase" }}>Book next available{usualProv && usualProv.id !== "anyone" ? ` with ${usualProv.name}` : ""}</span>
-                    <span style={{ fontSize: 21, fontWeight: 700, lineHeight: 1.15 }}>{nextLabel}</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, fontWeight: 600, opacity: 0.85, letterSpacing: 1.5, textTransform: "uppercase" }}>Book next available{usualProv && usualProv.id !== "anyone" ? ` with ${usualProv.name}` : ""}</span>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, lineHeight: 1.2 }}>{nextLabel}</span>
                   </span>
-                  <ChevronRight size={22} style={{ flexShrink: 0 }} />
+                  <ChevronRight size={20} style={{ flexShrink: 0 }} />
                 </button>
               ) : (
-                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginBottom: 13, fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>No open times with {usualProv.name} in the next two weeks — pick a different time below.</div>
+                <div style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "16px 18px", marginBottom: 12, fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>No open times with {usualProv.name} in the next two weeks — pick a different time below.</div>
               )}
 
-              {/* Secondary action — open the calendar */}
-              <button className="lift" onClick={() => { setCart([usualEntry]); setCameFromUsual(true); setShowUsual(false); setStep(6); }} style={{ width: "100%", textAlign: "center", background: "transparent", border: "1px solid var(--border2)", color: "var(--text)", borderRadius: 16, padding: "15px", fontSize: 15, fontWeight: 500 }}>Pick a different time</button>
+              <button onClick={() => { setCart([usualEntry]); setCameFromUsual(true); setShowUsual(false); setStep(6); }} style={{ width: "100%", textAlign: "center", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 10, padding: "15px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>Pick a different time</button>
 
-              {/* Quiet third option — browse the full menu (try something new) */}
-              <button onClick={() => { setShowUsual(false); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setStep(0); setSimpleStep("what"); }} style={{ width: "100%", textAlign: "center", background: "none", color: "var(--sub)", padding: "16px 0 4px", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3 }}>Book something different</button>
+              <button onClick={() => { setShowUsual(false); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setStep(0); setSimpleStep("what"); }} style={{ width: "100%", textAlign: "center", background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", padding: "16px 0 4px", fontSize: 13, letterSpacing: 0.3, cursor: "pointer" }}>Book something different</button>
             </div>
           );
         })()}
@@ -3359,16 +3353,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* STEP 5 — phone */}
         {step === 5 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && (
           <div className="fade-up">
-            <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Your number</h2>
-            <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>We'll text you a quick code to confirm it's you.</p>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Your number</h2>
+            <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 24px", fontWeight: 400, lineHeight: 1.55 }}>We'll text you a quick code to confirm it's you.</p>
             <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             {/* SMS opt-in disclosure — required by carriers (A2P 10DLC) so Twilio's reviewer can verify on the public booking page. */}
             <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
               By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
             </p>
             <p style={{ color: "var(--faint)", fontSize: 14, marginBottom: 22 }}>Try <span style={{ color: "var(--gold)", cursor: "pointer" }} onClick={() => setPhone("503-555-0142")}>503-555-0142</span> (returning client Marcus).</p>
-            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={async () => { const digits = phone.replace(/\D/g, ""); let found = null; try { const { data, error } = await supabase.rpc("lookup_client_by_phone", { p_shop: SHOP_ID, p_phone: phone }); if (!error && data) found = data; } catch (e) {} if (!found) found = clients.find((c) => (c.phone || "").replace(/\D/g, "") === digits) || null; if (found && found.blocked) { setBlockedNotice(true); return; } setPendingMatch(found); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "var(--border)" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Text me a code →</button>
+            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={async () => { const digits = phone.replace(/\D/g, ""); let found = null; try { const { data, error } = await supabase.rpc("lookup_client_by_phone", { p_shop: SHOP_ID, p_phone: phone }); if (!error && data) found = data; } catch (e) {} if (!found) found = clients.find((c) => (c.phone || "").replace(/\D/g, "") === digits) || null; if (found && found.blocked) { setBlockedNotice(true); return; } setPendingMatch(found); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "transparent" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: phone.replace(/\D/g, "").length < 10 ? "1px solid var(--border)" : "none", cursor: "pointer" }}>Text me a code →</button>
           </div>
         )}
 
@@ -3406,13 +3400,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         </Sheet>
         {step === 5 && showCodeEntry && (
           <div className="fade-up">
-            <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Enter your code</h2>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Verify</div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 10px", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Enter your code</h2>
             <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 8, fontWeight: 400, lineHeight: 1.5 }}>We sent a 6-digit code to <strong>{phone}</strong>.</p>
             <p style={{ color: "var(--faint)", fontSize: 13, marginBottom: 24, fontWeight: 300, fontStyle: "italic" }}>Texting isn't live yet — enter any 6 digits to continue for now.</p>
             <input autoFocus inputMode="numeric" value={codeEntry} onChange={(e) => { setCodeEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(false); }} placeholder="• • • • • •" style={{ ...inputStyle, textAlign: "center", fontSize: 28, letterSpacing: 8, marginBottom: codeError ? 8 : 18 }} />
             {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Enter all 6 digits.</p>}
-            <button className="lift" onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } const found = pendingMatch; const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = list.filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 12 }}>Verify →</button>
+            <button className="lift" onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } const found = pendingMatch; const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = list.filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
             <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6 }}>Use a different number</button>
           </div>
         )}
