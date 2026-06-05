@@ -13772,26 +13772,26 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
       <div className="fade-up">
         <div style={{ marginBottom: 22 }}>
           <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{totalUnread > 0 ? `${totalUnread} UNREAD` : "ALL CAUGHT UP"}</div>
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95, marginBottom: 8 }}>Messages</h2>
-          <p style={{ color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.5 }}>Your studio line. Tap a client to open the conversation.</p>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 8, fontWeight: 600, textTransform: "uppercase" }}>{totalUnread > 0 ? `${totalUnread} UNREAD` : "ALL CAUGHT UP"}</div>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1, marginBottom: 8 }}>Messages</h2>
+          <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.5 }}>Your studio line. Tap a client to open the conversation.</p>
         </div>
-        <div style={{ display: "grid", gap: 2, border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           {clients.map((c) => {
             const msgs = c.messages || [];
             const last = msgs[msgs.length - 1];
             const unread = last && last.from === "client";
             return (
-              <button key={c.id} className="lift" onClick={() => setActiveId(c.id)} style={{ display: "flex", alignItems: "center", gap: 14, background: "var(--panel)", padding: "15px 16px", textAlign: "left", color: "var(--text)", borderBottom: "1px solid var(--line)" }}>
+              <button key={c.id} onClick={() => setActiveId(c.id)} style={{ display: "flex", alignItems: "center", gap: 14, background: "transparent", border: "none", padding: "14px 4px", textAlign: "left", color: "var(--text)", borderBottom: "1px solid var(--line)", cursor: "pointer" }}>
                 <div onClick={(e) => { e.stopPropagation(); if (onOpenClient) onOpenClient(c); }} style={{ flexShrink: 0, cursor: "pointer" }} aria-label={`Open ${c.name}'s profile`}>
                   <Avatar size={46} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provColor(c)} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                    <span style={{ fontSize: 15.5, fontWeight: unread ? 600 : 500 }}>{c.name}</span>
-                    {last && <span style={{ fontSize: 15.5, color: "var(--faint)", flexShrink: 0 }}>{last.time}</span>}
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: unread ? 600 : 500 }}>{c.name}</span>
+                    {last && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", flexShrink: 0 }}>{last.time}</span>}
                   </div>
-                  <div style={{ fontSize: 15, color: unread ? "var(--text2)" : "var(--sub)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: unread ? 500 : 300, marginTop: 2 }}>{last ? (last.from === "shop" ? "You: " : "") + last.text : "No messages yet"}</div>
+                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: unread ? "var(--text2)" : "var(--sub)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: unread ? 500 : 300, marginTop: 2 }}>{last ? (last.from === "shop" ? "You: " : "") + last.text : "No messages yet"}</div>
                 </div>
                 {unread && <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />}
               </button>
