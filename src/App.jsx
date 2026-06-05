@@ -2259,7 +2259,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {step === 0 && !simpleStep && (
           <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "10px 4px 0" }}>
             {/* booking-ui-rev5 */}
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", marginBottom: 14 }}>Welcome to</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", marginBottom: 14 }}>Welcome to</div>
             <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.08, letterSpacing: "-0.4px", margin: "0 0 12px", color: "var(--text)" }}>{business.name}</h1>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14, fontWeight: 400, lineHeight: 1.55, margin: "0 0 32px", maxWidth: 320 }}>Glad you're here. Let's find you a time.</p>
             <div style={{ display: "grid", gap: 12 }}>
@@ -2302,8 +2302,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const liveCats = cats.filter((c) => inCat(c).length > 0);
           const showCats = liveCats.length > 1 && !simpleCat;
           const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)", margin: 0 };
-          const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
-          const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, fontWeight: 400, lineHeight: 1.55, marginTop: 9 };
+          const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
+          const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, marginTop: 9 };
           const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" };
           const rowBtn = { width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "19px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" };
 
@@ -2391,7 +2391,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const addYes = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: true }, finishAns: "yes" } : e));
           const addNo = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: undefined }, finishAns: "no" } : e));
 
-          const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
+          const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
           const firstSentence = (s) => { if (!s) return s; const t = String(s).trim().replace(/\s+/g, " "); if (t.length <= 52) return t; const cut = t.slice(0, 52); const sp = cut.lastIndexOf(" "); return (sp > 24 ? cut.slice(0, sp) : cut).replace(/[\s—,.;:!?-]+$/, "") + "…"; };
           const renderCard = (ct, selected, hidden) => {
             const img = ct.images && ct.images[0];
@@ -2414,7 +2414,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div className="fade-up">
               <div style={EYE}>Choose your style</div>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>{T.head}</h2>
-              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, fontWeight: 400, lineHeight: 1.55, marginTop: 9 }}>{T.lead}</p>
+              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, marginTop: 9 }}>{T.lead}</p>
               {draft.comboOf && draft.comboOf.length > 0 && (() => {
                 const incl = draft.comboOf.map((id) => { const s = services.find((x) => x.id === id); return s && s.name; }).filter(Boolean);
                 return incl.length ? <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--gold)", fontWeight: 500, margin: "10px 0 0" }}>Includes {incl.join(" + ")}</p> : null;
@@ -2430,16 +2430,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 const cPrice = chosenCt && (chosenCt.price != null && chosenCt.price !== "" ? chosenCt.price : draft.price);
                 const cDur = (chosenCt && chosenCt.duration) || draft.duration;
                 return (
-                <div style={{ marginTop: 26, borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "20px 2px" }}>
-                  <div style={{ ...EYE, color: "var(--gold)", marginBottom: 12 }}>Your style</div>
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-                    <span style={{ flex: 1, minWidth: 0, fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{cName}</span>
-                    {(cPrice != null && cPrice !== "") ? <span style={{ textAlign: "right", flexShrink: 0, paddingLeft: 10 }}>
-                      <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 500, color: "var(--text)" }}>${cPrice}</span>
-                      {cDur ? <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 3 }}>{cDur} min</span> : null}
-                    </span> : null}
-                  </div>
-                  {cDesc ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, lineHeight: 1.6, color: "var(--text2)", marginTop: 12 }}>{cDesc}</div> : null}
+                <div style={{ marginTop: 28, paddingTop: 26, borderTop: "1px solid var(--line)", textAlign: "center" }}>
+                  <div style={{ ...EYE, color: "var(--gold)", marginBottom: 14, textAlign: "center" }}>Your style</div>
+                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 21, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.25, color: "var(--text)" }}>{cName}</div>
+                  {(cPrice != null && cPrice !== "") ? <div style={{ marginTop: 9, display: "flex", justifyContent: "center", alignItems: "baseline", gap: 9 }}>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: "var(--text)" }}>${cPrice}</span>
+                    {cDur ? <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}>· {cDur} min</span> : null}
+                  </div> : null}
+                  {cDesc ? <div style={{ background: "var(--text)", color: "var(--bg)", borderRadius: 12, padding: "16px 18px", marginTop: 18, fontFamily: "'Jost', sans-serif", fontSize: 14, lineHeight: 1.55, textAlign: "center" }}>{cDesc}</div> : null}
                   <button onClick={changeCut} style={{ marginTop: 16, background: "none", border: "none", color: "var(--gold)", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 600, letterSpacing: 0.3, padding: 0, cursor: "pointer" }}>‹ Choose a different style</button>
                 </div>
                 );
@@ -2508,9 +2506,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           };
           return (
             <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column" }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Your cut</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Your cut</div>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>How much are we taking off today?</h2>
-              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 4px" }}>This just tells your barber how much time to set aside — pick honestly and you'll never feel rushed.</p>
+              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 4px" }}>This just tells your barber how much time to set aside — pick honestly and you'll never feel rushed.</p>
               <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--faint)", fontSize: 12, fontWeight: 400, lineHeight: 1.5 }}>Same price either way — no charge for the extra time.</p>
               <div style={{ marginTop: "auto", paddingTop: 24, borderBottom: "1px solid var(--line)" }}>
                 {[
@@ -2554,12 +2552,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const runningTotal = stylePrice + addonsTotal;
           return (
             <div className="fade-up">
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>One more thing</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>One more thing</div>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Add the finishing touch?</h2>
-              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 22px" }}>Optional — the classic way to round out your visit.</p>
+              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 22px" }}>Optional — the classic way to round out your visit.</p>
               {showPrices && runningTotal > 0 && (
                 <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "baseline", gap: 9, marginBottom: 18 }}>
-                  <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Total</span>
+                  <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Total</span>
                   <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, color: "var(--text)" }}>${runningTotal}</span>
                 </div>
               )}
@@ -2585,9 +2583,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* SIMPLE · WHO — anyone, or a specific person? Defaults make this a one-tap step. */}
         {simpleStep === "who" && (
           <div className="fade-up">
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Your barber</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Your barber</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Anyone in particular?</h2>
-            <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 0" }}>No wrong answer — if you're not sure, we'll match you with whoever's free soonest.</p>
+            <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 0" }}>No wrong answer — if you're not sure, we'll match you with whoever's free soonest.</p>
             <div style={{ marginTop: 26, borderBottom: "1px solid var(--line)" }}>
               <button onClick={() => {
                 const anyone = providers.find((p) => p.id === "anyone") || providers[0];
@@ -3312,7 +3310,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const nextLabel = nextAvail ? (() => { const d = nextAvail.date; const day = relativeDate(d); const lbl = day.includes(",") ? day : `${day}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; return `${lbl} · ${fmtTime(nextAvail.slot)}`; })() : null;
           return (
             <div className="fade-up">
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.2, letterSpacing: "-0.2px", color: "var(--text)" }}>Good to see you, {who.name.split(" ")[0]}.</h2>
               <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 26px", fontWeight: 400, lineHeight: 1.55 }}>{rhythmLine}</p>
 
@@ -3324,7 +3322,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </div>
                 )}
                 <div style={{ padding: "22px 20px", textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your usual</div>
+                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your usual</div>
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.2, lineHeight: 1.2, color: "var(--text)" }}>{usualSvc.name}</div>
                   {usualProv && usualProv.id !== "anyone" ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginTop: 8 }}>with {usualProv.name}</div> : null}
                 </div>
@@ -3352,7 +3350,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* STEP 5 — phone */}
         {step === 5 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && (
           <div className="fade-up">
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Your number</h2>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 24px", fontWeight: 400, lineHeight: 1.55 }}>We'll text you a quick code to confirm it's you.</p>
             <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
@@ -3399,7 +3397,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         </Sheet>
         {step === 5 && showCodeEntry && (
           <div className="fade-up">
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Verify</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Verify</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 10px", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Enter your code</h2>
             <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 8, fontWeight: 400, lineHeight: 1.5 }}>We sent a 6-digit code to <strong>{phone}</strong>.</p>
             <p style={{ color: "var(--faint)", fontSize: 13, marginBottom: 24, fontWeight: 300, fontStyle: "italic" }}>Texting isn't live yet — enter any 6 digits to continue for now.</p>
@@ -3600,7 +3598,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               );
             })()}
             <div style={{ marginBottom: 24 }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Pick a time</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Pick a time</div>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>When works for you?</h2>
             </div>
             {/* soonest available shortcut */}
@@ -3620,7 +3618,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </button>
               );
             })()}
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 12 }}>Or pick another day</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 12 }}>Or pick another day</div>
             <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 22 }}>
               {dateOptions.map((d, i) => {
                 const on = selectedDate && d.toDateString() === selectedDate.toDateString();
@@ -3750,13 +3748,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* STEP 7 — contact + EDITABLE policy */}
         {step === 7 && !showUsual && (
           <div className="fade-up">
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Review</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Review</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>{matched ? "Almost there" : "Last thing — your details"}</h2>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 24px", fontWeight: 400, lineHeight: 1.55 }}>{matched ? "Quick check before we lock this in." : "We'll text you a reminder before your visit."}</p>
 
             {/* Editorial summary card with gold accent — the booking at a glance */}
             <div style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "18px 18px", marginBottom: 24 }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your appointment</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your appointment</div>
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.2, marginBottom: 5, color: "var(--text)" }}>{relativeDate(selectedDate)}{relativeDate(selectedDate).includes(",") ? "" : `, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", marginBottom: 14, lineHeight: 1.4 }}>{fmtTime(slot)} · with {provider.name}</div>
               <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
@@ -3772,13 +3770,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </div>
                 )}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
-                  <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Total</span>
+                  <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Total</span>
                   <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: "var(--text)", fontWeight: 500 }}>${cartAdjTotal}</span>
                 </div>
               </div>
             </div>
 
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>{matched ? "Confirm your info" : "Your details"}</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>{matched ? "Confirm your info" : "Your details"}</div>
             <div style={{ display: "grid", gap: 11, marginBottom: 20 }}>
               <div style={{ display: "flex", gap: 11 }}>
                 <input placeholder="First name" style={{ ...inputStyle, flex: 1 }} value={newFirst} onChange={(e) => setNewFirst(e.target.value)} />
@@ -8858,7 +8856,7 @@ function AppearancePicker({ theme, setTheme }) {
     const tint = (pct) => `color-mix(in srgb, ${acc} ${pct}%, ${v.panel})`;
     return (
       <div style={{ background: v.bg, padding: "20px 20px 22px", position: "relative", minHeight: 200 }}>
-        <div style={{ fontFamily: th.body, fontSize: 9.5, letterSpacing: 3, color: v.faint, marginBottom: 6, fontWeight: 600 }}>FRIDAY · TODAY</div>
+        <div style={{ fontFamily: th.body, fontSize: 12, letterSpacing: 2, color: v.faint, marginBottom: 6, fontWeight: 600 }}>FRIDAY · TODAY</div>
         <div style={{ fontFamily: th.disp, color: v.text, fontSize: 38, fontWeight: 500, letterSpacing: th.disp.includes("Oswald") ? 1 : -0.5, lineHeight: 0.95, marginBottom: 18 }}>Sanctuary</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 9, marginBottom: 18 }}>
           <div style={{ background: tint(12), borderLeft: `3px solid ${acc}`, border: `1px solid color-mix(in srgb, ${acc} 26%, ${v.border})`, borderRadius: 12, padding: "11px 13px" }}>
