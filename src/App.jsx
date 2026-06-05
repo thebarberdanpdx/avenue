@@ -1859,11 +1859,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
   const lineTotal = (entry) => {
     const dc = activeMember || matched; // duration/notes come from the person being booked for
-    let p = entry.service.price, m = getDuration(dc, entry.service);
+    const provId = entry.provider && entry.provider.id !== "anyone" ? entry.provider.id : "dan"; // barber decides the per-service length; "anyone" books as Dan (matches the commit)
+    let p = entry.service.price, m = getDuration(dc, entry.service, provId);
     // cut type overrides the base price/time when present
     if (entry.service.cutTypes && entry.cutType) {
       const ct = entry.service.cutTypes.find((c) => c.id === entry.cutType);
-      if (ct) { p = ct.price; m = getDuration(dc, entry.service) + (ct.min || 0); }
+      if (ct) { p = ct.price; m = getDuration(dc, entry.service, provId) + (ct.min || 0); }
     }
     if (entry.service.beardTypes && entry.beardType) {
       const bt = entry.service.beardTypes.find((b) => b.id === entry.beardType);
@@ -3163,10 +3164,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const who = activeMember || matched;
           const ct = cutType && draft.cutTypes ? draft.cutTypes.find((c) => c.id === cutType) : null;
           const bt = beardType && draft.beardTypes ? draft.beardTypes.find((b) => b.id === beardType) : null;
-          const draftDur = getDuration(who, draft) + (ct?.min || 0) + (bt?.min || 0);
+          const extraMin = (ct?.min || 0) + (bt?.min || 0);
+          const durFor = (pid) => getDuration(who, draft, pid) + extraMin; // each barber's own length for this service
           const realProviders = providers.filter((p) => p.id !== "anyone");
           // Compute each real barber's soonest opening
-          const cards = realProviders.map((p) => ({ p, next: findNextAvailable(p, draftDur) }));
+          const cards = realProviders.map((p) => ({ p, next: findNextAvailable(p, durFor(p.id)) }));
           // Soonest across all barbers (powers "Anyone")
           const anyoneNext = cards
             .filter((c) => c.next)
@@ -3289,7 +3291,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const usualSvc = lastAppt ? services.find((s) => s.id === lastAppt.serviceId) : null;
           const usualProv = providers.find((p) => p.id === (lastAppt?.providerId || who.provider)) || providers[1];
           if (!usualSvc) { setShowUsual(false); setStep(1); return null; }
-          const dur = getDuration(who, usualSvc);
+          const dur = getDuration(who, usualSvc, usualProv && usualProv.id !== "anyone" ? usualProv.id : "dan");
           const usualLine2 = lastAppt && lastAppt.lineItems && lastAppt.lineItems[0] ? lastAppt.lineItems[0] : null;
           const lastPhoto = (who.gallery && who.gallery.length) ? who.gallery[who.gallery.length - 1].photo : null;
           // Build the cart entry for their usual (used by both actions).
@@ -3543,7 +3545,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <button onClick={() => setExpandUsual(!expandUsual)} style={{ width: "100%", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", color: "var(--text)", padding: "16px 18px", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, border: "none" }}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                       <span style={{ fontSize: 17, fontWeight: 500 }}>{first}'s usual</span>
-                      <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300 }}>{usualSvc.name} · {getDuration(who, usualSvc)} min{usualProv && usualProv.id !== "anyone" ? ` · with ${usualProv.name}` : ""}</span>
+                      <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300 }}>{usualSvc.name} · {getDuration(who, usualSvc, usualProv && usualProv.id !== "anyone" ? usualProv.id : "dan")} min{usualProv && usualProv.id !== "anyone" ? ` · with ${usualProv.name}` : ""}</span>
                     </span>
                     <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0, transform: expandUsual ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
                   </button>
