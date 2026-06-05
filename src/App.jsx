@@ -443,6 +443,14 @@ const THEMES = [
     disp: "'Fraunces', serif", body: "'Hanken Grotesk', sans-serif",
     t: { bg:"#FAF8F3", panel:"#FFFFFF", panel2:"#F4EFE4", line:"#ECE4D5", border:"#E0D8C7", border2:"#CFC6B7", text:"#232221", text2:"#3A382F", sub:"#6F685D", faint:"#A39C8A", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(60,55,45,.07)", overlay:"rgba(35,34,33,0.34)" } },
 
+  // ===== MINIMAL (clean, professional — Mangomint / Boulevard feel) =====
+  { id: "studio", name: "Studio", tagline: "Pure white, black ink", cat: "Minimal", dark: false,
+    disp: "'Fraunces', serif", body: "'Jost', sans-serif",
+    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F4F4F4", line:"#ECECEC", border:"#DCDCDC", border2:"#C2C2C2", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#A6A6A6", gold:"#0A0A0A", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.05)", overlay:"rgba(0,0,0,0.3)" } },
+  { id: "noir", name: "Noir", tagline: "All black, white ink", cat: "Minimal", dark: true,
+    disp: "'Fraunces', serif", body: "'Jost', sans-serif",
+    t: { bg:"#0A0A0A", panel:"#141414", panel2:"#1C1C1C", line:"#242424", border:"#333333", border2:"#4A4A4A", text:"#FFFFFF", text2:"#D6D6D6", sub:"#9A9A9A", faint:"#5C5C5C", gold:"#FFFFFF", onGold:"#0A0A0A", shadow:"rgba(0,0,0,.6)", overlay:"rgba(0,0,0,0.85)" } },
+
   // ===== BARBERSHOP =====
   { id: "fade", name: "Fade", tagline: "Graphite fading up to ash", cat: "Barbershop", dark: true,
     disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif",
@@ -511,7 +519,7 @@ const THEMES = [
     disp: "'Playfair Display', serif", body: "'Jost', sans-serif",
     t: { bg:"#160E13", panel:"#20151D", panel2:"#2A1D26", line:"#372733", border:"#463141", border2:"#634459", text:"#F4EAF0", text2:"#DAC4D2", sub:"#A88CA2", faint:"#6A4F62", gold:"#CE6F98", onGold:"#160E13", shadow:"rgba(0,0,0,.55)", overlay:"rgba(8,3,7,0.78)" } },
 ];
-const THEME_CATS = ["Vero", "Barbershop", "Tattoo", "Spa", "Salon"];
+const THEME_CATS = ["Vero", "Minimal", "Barbershop", "Tattoo", "Spa", "Salon"];
 const THEME_IDS = THEMES.map((t) => t.id);
 const buildThemeCSS = () => THEMES.map((th) => {
   const v = th.t;
@@ -931,7 +939,7 @@ export default function App() {
   };
   const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
   // Theme: stored on business.theme so it syncs across devices via Supabase. Falls back to "chrome" until loaded/set or if an old/unknown id is stored.
-  const theme = (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "vero";
+  const theme = (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "noir";
   const setTheme = (newTheme) => setBusiness((b) => ({ ...(b || {}), theme: newTheme }));
 
   // ---- Supabase load + save (debounced) — shop-scoped tables (multi-tenant ready) ----
@@ -1041,6 +1049,13 @@ export default function App() {
   const tableSetters = { clients: setClients, appointments: setAppts, waitlist: setWaitlist, services: setServices, providers: setProviders };
   const refetchTable = async (table) => {
     try {
+      if (table === 'appointments' && !session) {
+        const { data } = await supabase.rpc('get_availability', { p_shop: SHOP_ID });
+        const list = Array.isArray(data) ? data : [];
+        lastRemoteRef.current.appointments = list;
+        setAppts(list);
+        return;
+      }
       const { data, error } = await supabase.from(table).select('data').eq('shop_id', SHOP_ID);
       if (error) { console.error(`[vero] live-sync refetch '${table}' failed:`, error); return; }
       const list = data ? data.map((r) => r.data) : [];
@@ -1075,7 +1090,8 @@ export default function App() {
       // Clients are intentionally NOT loaded here. They hold private contact info, so they load only
       // for signed-in staff via the session-keyed effect below — public booking visitors never receive
       // the client list. (The in-code demo seed is also cleared for the public view by that effect.)
-      const ap = await loadList('appointments'); if (ap !== null) setAppts(ap);
+      // Appointments load moved to the session-keyed effect below: the public reads TIMES ONLY via
+      // get_availability (no names/phones); signed-in staff load the full appointment rows.
       const wl = await loadList('waitlist');     if (wl !== null) setWaitlist(wl);
       // Providers & services: keep the in-code defaults if nothing's saved yet (the app needs them to function).
       const pr = await loadList('providers');    if (pr && pr.length) setProviders(pr);
@@ -1083,7 +1099,6 @@ export default function App() {
 
       // Record the loaded baseline so the safe-delete reconciliation knows which rows this device
       // already knew about (so it never deletes a row another device adds later).
-      if (ap !== null) lastRemoteRef.current.appointments = ap;
       if (wl !== null) lastRemoteRef.current.waitlist = wl;
       if (pr && pr.length) lastRemoteRef.current.providers = pr;
       if (sv && sv.length) lastRemoteRef.current.services = sv;
@@ -1152,10 +1167,35 @@ export default function App() {
     return () => { alive = false; };
   }, [session]);
 
+  // Appointments load, session-keyed. The public gets TIMES ONLY (open/busy slots) via get_availability —
+  // never names or phones; signed-in staff load the full appointment rows. Mirrors the clients effect above.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!session) {
+        try {
+          const { data } = await supabase.rpc('get_availability', { p_shop: SHOP_ID });
+          if (!alive) return;
+          const list = Array.isArray(data) ? data : [];
+          lastRemoteRef.current.appointments = list;
+          setAppts(list);
+        } catch (e) { console.error('[vero] availability load failed:', e); }
+        return;
+      }
+      const { data, error } = await supabase.from('appointments').select('data').eq('shop_id', SHOP_ID);
+      if (!alive) return;
+      if (error) { console.error('[vero] load appointments failed:', error); return; }
+      const list = data ? data.map((r) => r.data) : [];
+      lastRemoteRef.current.appointments = list;
+      setAppts(list);
+    })();
+    return () => { alive = false; };
+  }, [session]);
+
   useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories, _cutLibrary: cutLibrary } }).then(({ error }) => { if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false); }); }, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
-  useEffect(() => { if (!loadedRef.current) return; if (clients === lastRemoteRef.current.clients) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
-  useEffect(() => { if (!loadedRef.current) return; if (appts === lastRemoteRef.current.appointments) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
-  useEffect(() => { if (!loadedRef.current) return; if (waitlist === lastRemoteRef.current.waitlist) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (clients === lastRemoteRef.current.clients) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (appts === lastRemoteRef.current.appointments) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
   useEffect(() => { if (!loadedRef.current) return; if (services === lastRemoteRef.current.services) return; const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
   useEffect(() => { if (!loadedRef.current) return; if (providers === lastRemoteRef.current.providers) return; const t = setTimeout(() => { syncList('providers', providers); }, 800); return () => clearTimeout(t); }, [providers]);
 
@@ -1180,7 +1220,7 @@ export default function App() {
   // NOTE: enable Realtime for these tables in Supabase for this to fire.
   useEffect(() => {
     if (!dataLoaded) return;
-    const tables = ['clients', 'appointments', 'waitlist', 'services', 'providers'];
+    const tables = session ? ['clients', 'appointments', 'waitlist', 'services', 'providers'] : ['appointments', 'services', 'providers'];
     let channel;
     try {
       channel = supabase.channel(`vero-sync-${SHOP_ID}`);
@@ -1190,7 +1230,7 @@ export default function App() {
       channel.subscribe();
     } catch (e) { console.error('[vero] live-sync subscribe failed:', e); }
     return () => { try { if (channel) supabase.removeChannel(channel); } catch (e) { /* ignore */ } };
-  }, [dataLoaded, SHOP_ID]);
+  }, [dataLoaded, SHOP_ID, session]);
 
   // Mirror the theme class onto <html> so CSS variables (--gold, --bg, --text, etc.) cascade
   // to portaled content too (booking form, conflict popup, etc. — these render under document.body,
@@ -1311,7 +1351,7 @@ export default function App() {
       )}
       {view === "terms" && <TermsPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "privacy" && <PrivacyPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
-      {view === "client" && <ClientFlow key={clientNonce} shopId={SHOP_ID} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} />}
+      {view === "client" && <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={goBooking} />}
       {view === "shop" && (session
         ? <ShopDashboard authEmail={session?.user?.email || null} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} />
@@ -1714,7 +1754,7 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
 // ============================================================
 // CLIENT BOOKING FLOW
 // ============================================================
-function ClientFlow({ shopId, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit, onManage }) {
+function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit, onManage }) {
   const [step, setStep] = useState(0);
   const [bookingFor, setBookingFor] = useState(null); // null until chosen: "self" or "other"
   const [showWhoFor, setShowWhoFor] = useState(false); // who's-it-for screen for a matched returning client
@@ -2159,6 +2199,7 @@ function ClientFlow({ shopId, business, services, providers, categories = [], cl
       clientId = "c" + baseId + Math.floor(Math.random() * 1000);
       const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
       setClients((cur) => [newClient, ...cur]);
+      if (!isStaff) { try { supabase.from('clients').insert({ id: String(clientId), shop_id: shopId, data: newClient }); } catch (e) {} }
     } else if (matched) {
       // Returning client confirmed/updated their info — write the chosen values to their profile
       // so a barber-added record gets an email, a corrected name persists, etc.
@@ -2197,6 +2238,7 @@ function ClientFlow({ shopId, business, services, providers, categories = [], cl
       if (!isSame) cursor += person.durMin;
     });
     setAppts((cur) => [...cur, ...newAppts]);
+    if (!isStaff) { try { supabase.from('appointments').insert(newAppts.map((a) => ({ id: String(a.id), shop_id: shopId, data: a }))); } catch (e) {} }
     setBookedId(baseId); setStep(8);
   };
 
@@ -2259,24 +2301,25 @@ function ClientFlow({ shopId, business, services, providers, categories = [], cl
           };
           const liveCats = cats.filter((c) => inCat(c).length > 0);
           const showCats = liveCats.length > 1 && !simpleCat;
-          const cardBtn = { width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", boxShadow: "var(--shadow-sm)" };
+          const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)", margin: 0 };
+          const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
+          const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, fontWeight: 400, lineHeight: 1.55, marginTop: 9 };
+          const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, textTransform: "uppercase", letterSpacing: 2, color: "var(--text)" };
+          const rowBtn = { width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "17px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" };
 
           if (showCats) {
             return (
               <div className="fade-up">
-                <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
-                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{bs.catHead || "What are you here for today?"}</h2>
-                <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 400, lineHeight: 1.5, marginBottom: 26 }}>{bs.catLead || "Tell us the vibe — we'll take it from there."}</p>
-                <div style={{ display: "grid", gap: 12 }}>
+                <div style={EYE}>Book an appointment</div>
+                <h2 style={{ ...HEAD, marginTop: 11 }}>{bs.catHead || "What are you here for today?"}</h2>
+                <p style={LEAD}>{bs.catLead || "Tell us the vibe — we'll take it from there."}</p>
+                <div style={{ marginTop: 28, borderBottom: "1px solid var(--line)" }}>
                   {liveCats.map((cat) => {
                     const list = inCat(cat);
                     return (
-                      <button key={cat} className="lift" onClick={() => { if (list.length === 1) selectService(list[0]); else setSimpleCat(cat); }} style={cardBtn}>
-                        <span>
-                          <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{cat}</span>
-                          <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{list.length === 1 ? list[0].name : (list.length + " options")}</span>
-                        </span>
-                        <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                      <button key={cat} onClick={() => { if (list.length === 1) selectService(list[0]); else setSimpleCat(cat); }} style={rowBtn}>
+                        <span style={NAME}>{cat}</span>
+                        <ChevronRight size={16} style={{ color: "var(--gold)", flexShrink: 0 }} />
                       </button>
                     );
                   })}
@@ -2289,21 +2332,19 @@ function ClientFlow({ shopId, business, services, providers, categories = [], cl
           const list = activeCat ? inCat(activeCat) : services.filter(visible);
           return (
             <div className="fade-up">
-              <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
-              {simpleCat && <button onClick={() => setSimpleCat(null)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, fontWeight: 600, padding: 0, marginBottom: 12, cursor: "pointer" }}>‹ {simpleCat}</button>}
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{simpleCat ? "Pick your service" : (bs.whatHead || "Welcome in — what can we do for you?")}</h2>
-              <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 400, lineHeight: 1.5, marginBottom: 26 }}>{simpleCat ? ("Here's what we do in " + simpleCat + ".") : (bs.whatLead || "Start here. We'll walk you through the rest, nice and easy.")}</p>
-              <div style={{ display: "grid", gap: 12 }}>
+              {simpleCat
+                ? <button onClick={() => setSimpleCat(null)} style={{ background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 600, padding: 0, marginBottom: 14, cursor: "pointer", letterSpacing: 0.3 }}>‹ {simpleCat}</button>
+                : <div style={EYE}>Book an appointment</div>}
+              <h2 style={{ ...HEAD, marginTop: simpleCat ? 0 : 11 }}>{simpleCat ? "Pick your service" : (bs.whatHead || "What can we do for you?")}</h2>
+              <p style={LEAD}>{simpleCat ? ("Here's what we do in " + simpleCat + ".") : (bs.whatLead || "Start here — we'll walk you through the rest.")}</p>
+              <div style={{ marginTop: 28, borderBottom: "1px solid var(--line)" }}>
                 {list.map((svc) => (
-                  <button key={svc.id} className="lift" onClick={() => selectService(svc)} style={cardBtn}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-                      {svc.photo ? <span style={{ width: 52, height: 52, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: "var(--panel2)" }}><img src={imgUrl(svc.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></span> : null}
-                      <span style={{ minWidth: 0 }}>
-                        <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{svc.name}</span>
-                        {svc.comboOf && svc.comboOf.length > 0 ? (() => { const incl = svc.comboOf.map((id) => { const x = services.find((y) => y.id === id); return x && x.name; }).filter(Boolean); return incl.length ? <span style={{ display: "block", fontSize: 12.5, color: "var(--gold)", fontWeight: 600, marginTop: 3 }}>Includes {incl.join(" + ")}</span> : null; })() : null}
-                      </span>
+                  <button key={svc.id} onClick={() => selectService(svc)} style={rowBtn}>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ ...NAME, display: "block" }}>{svc.name}</span>
+                      {svc.comboOf && svc.comboOf.length > 0 ? (() => { const incl = svc.comboOf.map((id) => { const x = services.find((y) => y.id === id); return x && x.name; }).filter(Boolean); return incl.length ? <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 11.5, color: "var(--gold)", fontWeight: 500, marginTop: 5 }}>Includes {incl.join(" + ")}</span> : null; })() : null}
                     </span>
-                    <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                    <ChevronRight size={16} style={{ color: "var(--gold)", flexShrink: 0 }} />
                   </button>
                 ))}
               </div>
@@ -3706,7 +3747,9 @@ function ClientFlow({ shopId, business, services, providers, categories = [], cl
                     <button className="lift" disabled={!wlName || phone.replace(/\D/g, "").length < 10 || !wlWhen || wlDays.length === 0} onClick={() => {
                       const ready = wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0;
                       if (!ready) return;
-                      setWaitlist((cur) => [...cur, { name: wlName, phone, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", when: wlWhen, service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() }]);
+                      const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: wlName, phone, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", when: wlWhen, service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() };
+                      setWaitlist((cur) => [...cur, wlEntry]);
+                      if (!isStaff) { try { supabase.from('waitlist').insert({ id: wlEntry.id, shop_id: shopId, data: wlEntry }); } catch (e) {} }
                       setWaitlistDone(true); setShowWaitlist(false);
                     }} style={{ width: "100%", background: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--gold)" : "var(--border2)", color: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
                   </div>
