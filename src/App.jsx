@@ -2258,28 +2258,27 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* STEP 0 — WELCOME / front door */}
         {step === 0 && !simpleStep && (
           <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "10px 4px 0" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-              <span style={{ width: 28, height: 1.5, background: "var(--gold)" }} />
-              <span style={{ fontSize: 12, letterSpacing: 3, color: "var(--faint)", textTransform: "uppercase" }}>Welcome to</span>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", marginBottom: 14 }}>Welcome to</div>
+            <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.08, letterSpacing: "-0.4px", margin: "0 0 12px", color: "var(--text)" }}>{business.name}</h1>
+            <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14, fontWeight: 400, lineHeight: 1.55, margin: "0 0 32px", maxWidth: 320 }}>Glad you're here. Let's find you a time.</p>
+            <div style={{ borderBottom: "1px solid var(--line)" }}>
+              <button onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "20px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" }}>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" }}>I've been here before</span>
+                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", fontWeight: 400, marginTop: 5 }}>We'll pull up your details</span>
+                </span>
+                <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+              </button>
+              <button onClick={() => { setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "20px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" }}>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" }}>It's my first time</span>
+                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", fontWeight: 400, marginTop: 5 }}>Welcome — let's take a look</span>
+                </span>
+                <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+              </button>
             </div>
-            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 48, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.5px", margin: "0 0 14px" }}>{business.name}</h1>
-            <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300, lineHeight: 1.5, margin: "0 0 34px", maxWidth: 300 }}>Glad you're here. Let's find you a time.</p>
-            <button className="lift" onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "19px 20px", fontSize: 16, fontWeight: 500, borderRadius: 16, border: "none", marginBottom: 12, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "var(--shadow-md)" }}>
-              <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <span style={{ fontSize: 17 }}>I've been here before</span>
-                <span style={{ fontSize: 13, opacity: 0.82, fontWeight: 300 }}>We'll pull up your details</span>
-              </span>
-              <ChevronRight size={20} style={{ opacity: 0.9, flexShrink: 0 }} />
-            </button>
-            <button className="lift" onClick={() => { setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "19px 20px", fontSize: 16, borderRadius: 16, border: "1px solid var(--border)", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "var(--shadow-sm)" }}>
-              <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <span style={{ fontSize: 17 }}>It's my first time</span>
-                <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 300 }}>Welcome — let's take a look</span>
-              </span>
-              <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
-            </button>
             {onManage && (
-              <button onClick={() => onManage()} style={{ width: "100%", background: "transparent", border: "none", color: "var(--sub)", fontSize: 13.5, textAlign: "center", padding: "20px 0 2px", marginTop: 4, cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 4 }}>Manage my appointment</button>
+              <button onClick={() => onManage()} style={{ width: "100%", background: "transparent", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 0.3, textAlign: "center", padding: "22px 0 2px", marginTop: 6, cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 4 }}>Manage my appointment</button>
             )}
           </div>
         )}
@@ -2304,8 +2303,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)", margin: 0 };
           const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
           const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, fontWeight: 400, lineHeight: 1.55, marginTop: 9 };
-          const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 22, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.2, lineHeight: 1.25, color: "var(--text)" };
-          const rowBtn = { width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "22px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" };
+          const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" };
+          const rowBtn = { width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "19px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" };
 
           if (showCats) {
             return (
