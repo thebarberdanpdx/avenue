@@ -443,6 +443,14 @@ const THEMES = [
     disp: "'Fraunces', serif", body: "'Hanken Grotesk', sans-serif",
     t: { bg:"#FAF8F3", panel:"#FFFFFF", panel2:"#F4EFE4", line:"#ECE4D5", border:"#E0D8C7", border2:"#CFC6B7", text:"#232221", text2:"#3A382F", sub:"#6F685D", faint:"#A39C8A", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(60,55,45,.07)", overlay:"rgba(35,34,33,0.34)" } },
 
+  // ===== MINIMAL (clean, professional — Mangomint / Boulevard feel) =====
+  { id: "studio", name: "Studio", tagline: "Crisp white & calm mint", cat: "Minimal", dark: false,
+    disp: "'Jost', sans-serif", body: "'Inter', sans-serif",
+    t: { bg:"#FCFCFB", panel:"#FFFFFF", panel2:"#F2F4F3", line:"#E9EBEA", border:"#DEE1E0", border2:"#C5C9C7", text:"#1A1C1B", text2:"#3B3E3D", sub:"#6A6E6C", faint:"#A4A8A6", gold:"#1F8A75", onGold:"#FFFFFF", shadow:"rgba(20,30,28,.05)", overlay:"rgba(18,24,22,0.3)" } },
+  { id: "noir", name: "Noir", tagline: "Sleek monochrome — black & white", cat: "Minimal", dark: true,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif",
+    t: { bg:"#0C0C0D", panel:"#151517", panel2:"#1D1D20", line:"#292A2E", border:"#36373C", border2:"#4C4D55", text:"#F5F5F6", text2:"#C9CACE", sub:"#8D8E94", faint:"#565760", gold:"#F5F5F6", onGold:"#0C0C0D", shadow:"rgba(0,0,0,.6)", overlay:"rgba(0,0,0,0.82)" } },
+
   // ===== BARBERSHOP =====
   { id: "fade", name: "Fade", tagline: "Graphite fading up to ash", cat: "Barbershop", dark: true,
     disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif",
@@ -511,7 +519,7 @@ const THEMES = [
     disp: "'Playfair Display', serif", body: "'Jost', sans-serif",
     t: { bg:"#160E13", panel:"#20151D", panel2:"#2A1D26", line:"#372733", border:"#463141", border2:"#634459", text:"#F4EAF0", text2:"#DAC4D2", sub:"#A88CA2", faint:"#6A4F62", gold:"#CE6F98", onGold:"#160E13", shadow:"rgba(0,0,0,.55)", overlay:"rgba(8,3,7,0.78)" } },
 ];
-const THEME_CATS = ["Vero", "Barbershop", "Tattoo", "Spa", "Salon"];
+const THEME_CATS = ["Vero", "Minimal", "Barbershop", "Tattoo", "Spa", "Salon"];
 const THEME_IDS = THEMES.map((t) => t.id);
 const buildThemeCSS = () => THEMES.map((th) => {
   const v = th.t;
