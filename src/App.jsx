@@ -13129,15 +13129,15 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
       {/* Editorial masthead */}
       <div style={{ marginBottom: 22 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{clients.length} {clients.length === 1 ? "PERSON" : "PEOPLE"}</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 8, fontWeight: 600, textTransform: "uppercase" }}>{clients.length} {clients.length === 1 ? "PERSON" : "PEOPLE"}</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>Clients</h2>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1, color: "var(--text)" }}>Clients</h2>
           <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "stretch" }}>
             <button onClick={() => setShowNudgeFolder(true)} aria-label="Rebooking nudges" style={{ position: "relative", background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", height: 42, width: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
               <Bell size={17} style={{ color: overdue.length > 0 ? "var(--gold)" : "var(--sub)" }} />
               {overdue.length > 0 && <span style={{ position: "absolute", top: -5, right: -5, background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 10, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", lineHeight: 1 }}>{overdue.length}</span>}
             </button>
-            <button className="lift" onClick={() => { setDraft(blank); setAdding(true); }} aria-label="Add client" style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", height: 42, padding: "0 16px", borderRadius: 12, display: "flex", alignItems: "center", gap: 7, boxShadow: "var(--shadow-md)", fontSize: 13.5, fontWeight: 600, letterSpacing: 1.5 }}><Plus size={16} strokeWidth={2.5} /> ADD</button>
+            <button className="lift" onClick={() => { setDraft(blank); setAdding(true); }} aria-label="Add client" style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", height: 42, padding: "0 16px", borderRadius: 12, display: "flex", alignItems: "center", gap: 7, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 1.5 }}><Plus size={16} strokeWidth={2.5} /> ADD</button>
           </div>
         </div>
       </div>
@@ -13147,7 +13147,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
         <User size={17} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
       </div>
 
-      <div style={{ display: "grid", gap: 10 }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} className="lift card" onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", color: "var(--text)", textAlign: "left" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={42} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provider.color} /><div><div style={{ fontSize: 16 }}>{c.name}</div><div style={{ fontSize: 15, color: "var(--sub)" }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)" }} /></button>); })}</div>
+      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "14px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500 }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)" }} /></button>); })}</div>
       {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : "No clients yet — tap + to add your first one."}</p>}
     </div>
 
@@ -13155,7 +13155,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
       <div className="fade-in" onClick={() => setAdding(false)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
         <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, maxHeight: "88vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24 }}>New client</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, color: "var(--text)" }}>New client</div>
             <button onClick={() => setAdding(false)} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
           </div>
 
