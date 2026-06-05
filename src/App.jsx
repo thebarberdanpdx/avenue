@@ -2400,10 +2400,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 {img ? <span style={{ width: 60, height: 60, borderRadius: 8, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}><img src={imgUrl(img, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></span> : null}
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{ct.label || niceName[ct.id]}</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{ct.label || niceName[ct.id]}</span>
                     {ct.popular && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--gold)", fontWeight: 600 }}>Most common</span>}
                   </span>
-                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginTop: 6 }}>{firstSentence(ct.desc || friendly[ct.id])}</span>
                   {showPrices && <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, color: "var(--gold)", marginTop: 6 }}>${ct.price}</span>}
                 </span>
                 <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
