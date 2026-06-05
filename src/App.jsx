@@ -2390,40 +2390,37 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const addYes = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: true }, finishAns: "yes" } : e));
           const addNo = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: undefined }, finishAns: "no" } : e));
 
+          const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
           const renderCard = (ct, selected, hidden) => {
             const img = ct.images && ct.images[0];
             return (
-              <button key={ct.id} className="lift" onClick={() => { if (!selected) pickCut(ct); }} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: selected ? "2px solid var(--gold)" : "1px solid var(--border)", borderRadius: 16, padding: 13, display: hidden ? "none" : "flex", gap: 13, alignItems: "center", color: "var(--text)", boxShadow: "var(--shadow-sm)" }}>
-                <span style={{ width: 84, height: 84, borderRadius: 12, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {img ? <img src={imgUrl(img, 240)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <Camera size={22} style={{ color: "var(--faint)" }} />}
-                </span>
+              <button key={ct.id} onClick={() => { if (!selected) pickCut(ct); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "18px 2px", display: hidden ? "none" : "flex", gap: 15, alignItems: "center", color: "var(--text)", cursor: "pointer" }}>
+                {img ? <span style={{ width: 60, height: 60, borderRadius: 8, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}><img src={imgUrl(img, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></span> : null}
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, lineHeight: 1.1 }}>{ct.label || niceName[ct.id]}</span>
-                    {ct.popular && <span style={{ fontSize: 10.5, color: "var(--gold)", background: "color-mix(in srgb, var(--gold) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 32%, var(--border))", borderRadius: 20, padding: "2px 8px", fontWeight: 700 }}>Most common</span>}
+                  <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{ct.label || niceName[ct.id]}</span>
+                    {ct.popular && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--gold)", fontWeight: 600 }}>Most common</span>}
                   </span>
-                  <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{ct.desc || friendly[ct.id]}</span>
-                  {showPrices && <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, color: "var(--gold)", marginTop: 6 }}>${ct.price}</span>}
+                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 5 }}>{ct.desc || friendly[ct.id]}</span>
+                  {showPrices && <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, color: "var(--gold)", marginTop: 6 }}>${ct.price}</span>}
                 </span>
+                <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
               </button>
             );
           };
 
           return (
             <div className="fade-up">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 10 }}>
-                <div style={{ width: 32, height: 3, background: "var(--gold)", borderRadius: 2 }} />
-                {!matched && <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "color-mix(in srgb, var(--gold) 11%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 999, padding: "5px 12px", fontSize: 11.5, fontWeight: 600, color: "var(--gold)" }}>{T.greeting}</span>}
-              </div>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, marginBottom: 8, lineHeight: 1.07, letterSpacing: "-0.3px" }}>{T.head}</h2>
-              <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 400, lineHeight: 1.5, marginBottom: 26 }}>{T.lead}</p>
+              <div style={EYE}>Choose your style</div>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>{T.head}</h2>
+              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, fontWeight: 400, lineHeight: 1.55, marginTop: 9 }}>{T.lead}</p>
               {draft.comboOf && draft.comboOf.length > 0 && (() => {
                 const incl = draft.comboOf.map((id) => { const s = services.find((x) => x.id === id); return s && s.name; }).filter(Boolean);
-                return incl.length ? <p style={{ fontSize: 13.5, color: "var(--gold)", fontWeight: 600, margin: "-6px 0 20px" }}>Includes {incl.join(" + ")}</p> : null;
+                return incl.length ? <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--gold)", fontWeight: 500, margin: "10px 0 0" }}>Includes {incl.join(" + ")}</p> : null;
               })()}
 
               {!picked ? (
-                <div style={{ display: "grid", gap: 13 }}>
+                <div style={{ marginTop: 26, borderBottom: "1px solid var(--line)" }}>
                   {draft.cutTypes.map((ct) => renderCard(ct, false, false))}
                 </div>
               ) : (() => {
@@ -2431,42 +2428,35 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 const cDesc = chosenCt && (chosenCt.desc || friendly[chosenCt.id]);
                 const cPrice = chosenCt && (chosenCt.price != null && chosenCt.price !== "" ? chosenCt.price : draft.price);
                 const cDur = (chosenCt && chosenCt.duration) || draft.duration;
-                const cImg = chosenCt && chosenCt.images && chosenCt.images[0];
                 return (
-                <div style={{ background: "var(--panel)", border: "2px solid var(--gold)", borderRadius: 18, padding: "22px 20px", boxShadow: "0 6px 20px rgba(110,139,116,0.12)" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, color: "var(--gold)", marginBottom: 14 }}>
-                    <span style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800 }}>✓</span>
-                    Your style
-                  </div>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 15 }}>
-                    <span style={{ width: 62, height: 62, borderRadius: 14, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {cImg ? <img src={imgUrl(cImg, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <Camera size={20} style={{ color: "var(--faint)" }} />}
-                    </span>
-                    <span style={{ flex: 1, minWidth: 0, fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.08 }}>{cName}</span>
+                <div style={{ marginTop: 26, borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "20px 2px" }}>
+                  <div style={{ ...EYE, color: "var(--gold)", marginBottom: 12 }}>Your style</div>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                    <span style={{ flex: 1, minWidth: 0, fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{cName}</span>
                     {(cPrice != null && cPrice !== "") ? <span style={{ textAlign: "right", flexShrink: 0, paddingLeft: 10 }}>
-                      <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, color: "var(--text)" }}>${cPrice}</span>
-                      {cDur ? <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{cDur} min</span> : null}
+                      <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 500, color: "var(--text)" }}>${cPrice}</span>
+                      {cDur ? <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 3 }}>{cDur} min</span> : null}
                     </span> : null}
                   </div>
-                  {cDesc ? <div style={{ fontSize: 15.5, lineHeight: 1.6, color: "var(--text2)", marginTop: 16 }}>{cDesc}</div> : null}
-                  <button onClick={changeCut} style={{ marginTop: 18, background: "none", border: "none", color: "var(--gold)", fontSize: 14, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}>‹ Choose a different style</button>
+                  {cDesc ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, lineHeight: 1.6, color: "var(--text2)", marginTop: 12 }}>{cDesc}</div> : null}
+                  <button onClick={changeCut} style={{ marginTop: 16, background: "none", border: "none", color: "var(--gold)", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 600, letterSpacing: 0.3, padding: 0, cursor: "pointer" }}>‹ Choose a different style</button>
                 </div>
                 );
               })()}
 
               {picked && (
-                <div style={{ marginTop: 52, paddingTop: 36, borderTop: "1px solid var(--line)" }}>
+                <div style={{ marginTop: 40, paddingTop: 32, borderTop: "1px solid var(--line)" }}>
                   {asksChange && (
                     <div>
-                      <p style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, lineHeight: 1.22, margin: "0 0 12px" }}>{T.changeQ}</p>
-                      <p style={{ fontSize: 16, color: "var(--text2)", lineHeight: 1.55, margin: "0 0 26px", maxWidth: 380 }}>{T.priceLine}</p>
+                      <p style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 500, lineHeight: 1.25, margin: "0 0 10px", color: "var(--text)" }}>{T.changeQ}</p>
+                      <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 22px", maxWidth: 380 }}>{T.priceLine}</p>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                         {[{ label: T.opt1, sub: T.opt1sub, val: "trim" }, { label: T.opt2, sub: T.opt2sub, val: "fresh" }].map((o) => {
                           const on = simpleChange === o.val;
                           return (
-                            <button key={o.val} onClick={() => chooseTime(o.val)} style={{ padding: "24px 14px", borderRadius: 16, border: on ? "1px solid var(--gold)" : "1px solid var(--border)", background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", lineHeight: 1.15, boxShadow: on ? "0 4px 14px rgba(110,139,116,0.22)" : "var(--shadow-sm)" }}>
-                              <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500 }}>{o.label}</span>
-                              <span style={{ display: "block", fontSize: 13.5, fontWeight: 400, marginTop: 6, color: on ? "rgba(255,255,255,0.9)" : "var(--sub)", lineHeight: 1.35 }}>{o.sub}</span>
+                            <button key={o.val} onClick={() => chooseTime(o.val)} style={{ padding: "20px 14px", borderRadius: 10, border: on ? "1.5px solid var(--gold)" : "1px solid var(--border)", background: "transparent", color: on ? "var(--gold)" : "var(--text)", textAlign: "center", lineHeight: 1.2, cursor: "pointer" }}>
+                              <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1 }}>{o.label}</span>
+                              <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 400, marginTop: 6, color: on ? "var(--gold)" : "var(--sub)", lineHeight: 1.35 }}>{o.sub}</span>
                             </button>
                           );
                         })}
@@ -2480,28 +2470,28 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     const name = finItem.name || "Finishing touch";
                     const desc = finItem.desc || "";
                     return (
-                      <div style={{ marginTop: 18, border: "1.5px solid color-mix(in srgb, var(--gold) 38%, var(--border))", borderRadius: 18, background: "linear-gradient(180deg, color-mix(in srgb, var(--gold) 7%, var(--panel)) 0%, var(--panel) 70%)", overflow: "hidden", boxShadow: "0 8px 22px rgba(110,139,116,0.12)" }}>
-                        <div style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 10.5, letterSpacing: 1.8, textTransform: "uppercase", fontWeight: 700, padding: "7px 16px" }}>Make it better</div>
-                        <div style={{ display: "flex", gap: 13, alignItems: "flex-start", padding: "14px 16px 0" }}>
-                          {photo ? <img src={imgUrl(photo, 200)} alt="" style={{ width: 48, height: 48, borderRadius: 12, objectFit: "cover", flexShrink: 0 }} /> : <span style={{ width: 48, height: 48, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", flexShrink: 0 }} />}
+                      <div style={{ marginTop: 24, border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
+                        <div style={{ ...EYE, color: "var(--gold)", padding: "14px 16px 0" }}>Make it better</div>
+                        <div style={{ display: "flex", gap: 13, alignItems: "flex-start", padding: "10px 16px 0" }}>
+                          {photo ? <img src={imgUrl(photo, 200)} alt="" style={{ width: 48, height: 48, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} /> : null}
                           <span style={{ flex: 1, minWidth: 0 }}>
                             <span style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                              <span style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 600, lineHeight: 1.1 }}>{name}</span>
-                              {showPrices && <span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 600, color: "var(--gold)", whiteSpace: "nowrap" }}>{addsMoney ? `+$${Number(finItem.price) || 0}` : "Free"}</span>}
+                              <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1, lineHeight: 1.2 }}>{name}</span>
+                              {showPrices && <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 500, color: "var(--gold)", whiteSpace: "nowrap" }}>{addsMoney ? `+$${Number(finItem.price) || 0}` : "Free"}</span>}
                             </span>
-                            {desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginTop: 3 }}>{desc}</span>}
+                            {desc && <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{desc}</span>}
                           </span>
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 10, padding: "12px 16px 16px" }}>
-                          <button onClick={addYes} style={{ padding: 14, borderRadius: 13, fontSize: 15, fontWeight: 700, border: "none", background: "var(--gold)", color: "var(--on-gold)", outline: finOn ? "2px solid var(--gold)" : "none", outlineOffset: 2, boxShadow: "0 6px 16px rgba(110,139,116,0.28)" }}>{finOn ? "Added" : "Add it"}</button>
-                          <button onClick={addNo} style={{ padding: 14, borderRadius: 13, fontSize: 15, fontWeight: 700, border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", outline: finAns === "no" ? "2px solid var(--gold)" : "none", outlineOffset: 2 }}>No thanks</button>
+                        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 10, padding: "14px 16px 16px" }}>
+                          <button onClick={addYes} style={{ padding: 13, borderRadius: 8, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", border: "none", background: "var(--gold)", color: "var(--on-gold)" }}>{finOn ? "Added" : "Add it"}</button>
+                          <button onClick={addNo} style={{ padding: 13, borderRadius: 8, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", border: finAns === "no" ? "1.5px solid var(--gold)" : "1px solid var(--border)", background: "transparent", color: "var(--text)" }}>No thanks</button>
                         </div>
                       </div>
                     );
                   })()}
 
-                  <button className="lift" disabled={!canContinue} onClick={() => { if (canContinue) setSimpleStep("who"); }} style={{ width: "100%", marginTop: 18, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 16, padding: 17, fontSize: 16, fontWeight: 600, boxShadow: canContinue ? "0 8px 22px rgba(110,139,116,0.28)" : "none", opacity: canContinue ? 1 : 0.3 }}>Continue</button>
-                  {!canContinue && <p style={{ marginTop: 9, textAlign: "center", fontSize: 12.5, color: "var(--faint)" }}>{asksChange && !simpleChange ? "Pick how much we're taking off" : (showAddon && !finAns ? "Add the finishing touch, or tap No thanks" : "")}</p>}
+                  <button disabled={!canContinue} onClick={() => { if (canContinue) setSimpleStep("who"); }} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", cursor: canContinue ? "pointer" : "default", opacity: canContinue ? 1 : 0.3 }}>Continue</button>
+                  {!canContinue && <p style={{ marginTop: 10, textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--faint)" }}>{asksChange && !simpleChange ? "Pick how much we're taking off" : (showAddon && !finAns ? "Add the finishing touch, or tap No thanks" : "")}</p>}
                 </div>
               )}
             </div>
@@ -2517,22 +2507,22 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           };
           return (
             <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column" }}>
-              <div style={{ width: 38, height: 3, background: "var(--gold)", marginBottom: 20, borderRadius: 2 }} />
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 33, fontWeight: 600, marginBottom: 12, lineHeight: 1.06, letterSpacing: "-0.4px" }}>How much are we taking off today?</h2>
-              <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 400, lineHeight: 1.55, marginBottom: 4 }}>This just tells your barber how much time to set aside — pick honestly and you'll never feel rushed.</p>
-              <p style={{ color: "var(--faint)", fontSize: 13, fontWeight: 400, lineHeight: 1.5 }}>Same price either way — no charge for the extra time.</p>
-              <div style={{ display: "grid", gap: 12, marginTop: "auto", paddingTop: 24 }}>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Your cut</div>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>How much are we taking off today?</h2>
+              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 4px" }}>This just tells your barber how much time to set aside — pick honestly and you'll never feel rushed.</p>
+              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--faint)", fontSize: 12, fontWeight: 400, lineHeight: 1.5 }}>Same price either way — no charge for the extra time.</p>
+              <div style={{ marginTop: "auto", paddingTop: 24, borderBottom: "1px solid var(--line)" }}>
                 {[
                   { label: "Just a tidy-up", sub: "About the same length — cleaning it up.", change: "trim" },
                   { label: "Going shorter than usual", sub: "A noticeable change from how it looks now.", change: "fresh" },
                   { label: "It's grown out — been a while", sub: "Lots to work through.", change: "fresh" },
                 ].map((o) => (
-                  <button key={o.label} className="lift" onClick={() => { setSimpleChange(o.change); proceedAfterChange(); }} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", boxShadow: "var(--shadow-sm)" }}>
-                    <span>
-                      <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 500, lineHeight: 1.12 }}>{o.label}</span>
-                      <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{o.sub}</span>
+                  <button key={o.label} onClick={() => { setSimpleChange(o.change); proceedAfterChange(); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "18px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" }}>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{o.label}</span>
+                      <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 5 }}>{o.sub}</span>
                     </span>
-                    <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                    <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
                   </button>
                 ))}
               </div>
@@ -2563,33 +2553,30 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const runningTotal = stylePrice + addonsTotal;
           return (
             <div className="fade-up">
-              <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 10, lineHeight: 1.07, letterSpacing: "-0.3px" }}>Add the finishing touch?</h2>
-              <p style={{ color: "var(--text)", fontSize: 15.5, fontWeight: 400, lineHeight: 1.5, marginBottom: 22 }}>Optional — the classic way to round out your visit.</p>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>One more thing</div>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Add the finishing touch?</h2>
+              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 22px" }}>Optional — the classic way to round out your visit.</p>
               {showPrices && runningTotal > 0 && (
-                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
-                  <span style={{ display: "inline-flex", alignItems: "baseline", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "9px 15px" }}>
-                    <span style={{ fontSize: 11.5, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 700 }}>TOTAL</span>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, color: "var(--gold)" }}>${runningTotal}</span>
-                  </span>
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "baseline", gap: 9, marginBottom: 18 }}>
+                  <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Total</span>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, color: "var(--text)" }}>${runningTotal}</span>
                 </div>
               )}
-              <button onClick={toggle} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: isOn ? "2px solid var(--gold)" : "1px solid var(--border)", borderRadius: 18, overflow: "hidden", color: "var(--text)", padding: 0, display: "block" }}>
-                <span style={{ display: "block", height: 130, background: "var(--panel2)", position: "relative" }}>
-                  {photo ? <img src={imgUrl(photo, 700)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
-                  <span style={{ position: "absolute", top: 12, left: 14, fontSize: 10.5, letterSpacing: 1.5, color: "#fff", fontWeight: 600, textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>FINISHING TOUCH</span>
-                  {isOn && <span style={{ position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={16} style={{ color: "var(--on-gold)" }} strokeWidth={3} /></span>}
-                </span>
+              <button onClick={toggle} style={{ width: "100%", textAlign: "left", background: "transparent", border: isOn ? "1.5px solid var(--gold)" : "1px solid var(--line)", borderRadius: 10, overflow: "hidden", color: "var(--text)", padding: 0, display: "block", cursor: "pointer" }}>
+                {photo ? <span style={{ display: "block", height: 130, background: "var(--panel2)", position: "relative" }}>
+                  <img src={imgUrl(photo, 700)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  {isOn && <span style={{ position: "absolute", top: 10, right: 10, width: 26, height: 26, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={15} style={{ color: "var(--on-gold)" }} strokeWidth={3} /></span>}
+                </span> : null}
                 <span style={{ display: "block", padding: "15px 17px" }}>
                   <span style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 600, lineHeight: 1.1 }}>{name}</span>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, color: "var(--gold)", whiteSpace: "nowrap" }}>{priceLabel}</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.2, lineHeight: 1.2 }}>{name}</span>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, color: "var(--gold)", whiteSpace: "nowrap" }}>{priceLabel}</span>
                   </span>
-                  {desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginTop: 6 }}>{desc}</span>}
-                  <span style={{ display: "block", marginTop: 13, background: isOn ? "var(--gold)" : "var(--panel2)", color: isOn ? "var(--on-gold)" : "var(--text)", textAlign: "center", padding: 12, borderRadius: 11, fontSize: 13.5, fontWeight: 600, border: isOn ? "none" : "1px solid var(--border)" }}>{isOn ? "Added to your visit" : "Add it"}</span>
+                  {desc && <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 6 }}>{desc}</span>}
+                  <span style={{ display: "block", marginTop: 14, background: isOn ? "var(--gold)" : "transparent", color: isOn ? "var(--on-gold)" : "var(--text)", textAlign: "center", padding: 12, borderRadius: 8, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", border: isOn ? "none" : "1px solid var(--border)" }}>{isOn ? "Added to your visit" : "Add it"}</span>
                 </span>
               </button>
-              <button className="lift" onClick={() => setSimpleStep("who")} style={{ width: "100%", marginTop: 14, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "10px 0", textAlign: "center" }}>{isOn ? "Continue" : "No thanks, skip this"} →</button>
+              <button onClick={() => setSimpleStep("who")} style={{ width: "100%", marginTop: 16, background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 0.3, padding: "10px 0", textAlign: "center", cursor: "pointer" }}>{isOn ? "Continue" : "No thanks, skip this"} →</button>
             </div>
           );
         })()}
