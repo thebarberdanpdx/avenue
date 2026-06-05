@@ -4505,23 +4505,23 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             </div>
           )}
         </div>
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>{todayLabel.toUpperCase()}</div>
-        <h2 style={{ fontFamily: FONT_NUMERAL, fontSize: 40, fontWeight: 600, letterSpacing: -0.5, lineHeight: 0.98, color: "var(--text)" }}>{headerName}</h2>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 8, fontWeight: 600, textTransform: "uppercase" }}>{todayLabel.toUpperCase()}</div>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.3, lineHeight: 1.05, color: "var(--text)" }}>{headerName}</h2>
       </div>
 
       {/* TODAY — money + goal ring side by side (the cockpit hero) */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 24 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 5, fontWeight: 600 }}>{isShopView ? "TODAY · SHOP" : "TODAY · YOU"}</div>
-          <div style={{ fontFamily: FONT_NUMERAL, fontSize: 58, fontWeight: 600, color: "var(--text)", lineHeight: 0.92, letterSpacing: -1.5, marginBottom: 6 }}>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 5, fontWeight: 600, textTransform: "uppercase" }}>{isShopView ? "TODAY · SHOP" : "TODAY · YOU"}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 52, fontWeight: 500, color: "var(--text)", lineHeight: 0.95, letterSpacing: -1, marginBottom: 6 }}>
             {fmtMoney(todayMoney)}
           </div>
           {todayVsYesterday ? (
-            <div style={{ fontSize: 13, color: todayVsYesterday.up ? "var(--gold)" : "var(--sub)", lineHeight: 1.4 }}>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: todayVsYesterday.up ? "var(--gold)" : "var(--sub)", lineHeight: 1.4 }}>
               {todayVsYesterday.up ? "+" : "−"}{fmtMoney(todayVsYesterday.abs)} vs {fmtMoney(yesterdayMoney)} yesterday
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4 }}>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--sub)", lineHeight: 1.4 }}>
               {todayApptsAll.length === 0 ? "Nothing booked today yet." : `${todayApptsAll.length} ${todayApptsAll.length === 1 ? "visit" : "visits"} booked`}
             </div>
           )}
@@ -4532,7 +4532,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             <svg width="96" height="96" viewBox="0 0 96 96">
               <circle cx="48" cy="48" r="34" fill="none" stroke="var(--panel2)" strokeWidth="8" />
               <circle cx="48" cy="48" r="34" fill="none" stroke="var(--gold)" strokeWidth="8" strokeLinecap="round" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} transform="rotate(-90 48 48)" style={{ transition: "stroke-dashoffset .4s ease" }} />
-              <text x="48" y="53" textAnchor="middle" fill="var(--text)" fontSize="23" fontFamily={FONT_NUMERAL} fontWeight="600">{dailyPct}%</text>
+              <text x="48" y="53" textAnchor="middle" fill="var(--text)" fontSize="23" fontFamily="'Fraunces', serif" fontWeight="600">{dailyPct}%</text>
             </svg>
             <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 2 }}>{fmtMoney(todayMoney)} / {fmtMoney(dailyGoal)}</div>
             <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--gold)", marginTop: 2, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> {goalIsDefault ? "SET GOAL" : "EDIT GOAL"}</div>
@@ -4543,16 +4543,16 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       {/* STAT TILES — cuts, chair occupancy, avg ticket */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 9, marginBottom: 26 }}>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 10px", textAlign: "center" }}>
-          <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, color: "var(--text)", lineHeight: 1 }}>{cutsToday}</div>
-          <div style={{ fontSize: 10, letterSpacing: 1.3, color: "var(--sub)", marginTop: 5, fontWeight: 600 }}>CUTS</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{cutsToday}</div>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.3, color: "var(--sub)", marginTop: 5, fontWeight: 600 }}>CUTS</div>
         </div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 10px", textAlign: "center" }}>
-          <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, color: "var(--text)", lineHeight: 1 }}>{occupancyToday}%</div>
-          <div style={{ fontSize: 10, letterSpacing: 1.3, color: "var(--sub)", marginTop: 5, fontWeight: 600 }}>CHAIR FULL</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{occupancyToday}%</div>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.3, color: "var(--sub)", marginTop: 5, fontWeight: 600 }}>CHAIR FULL</div>
         </div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 10px", textAlign: "center" }}>
-          <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, color: "var(--text)", lineHeight: 1 }}>{fmtMoney(avgTicket)}</div>
-          <div style={{ fontSize: 10, letterSpacing: 1.3, color: "var(--sub)", marginTop: 5, fontWeight: 600 }}>AVG TICKET</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{fmtMoney(avgTicket)}</div>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.3, color: "var(--sub)", marginTop: 5, fontWeight: 600 }}>AVG TICKET</div>
         </div>
       </div>
 
@@ -4637,29 +4637,29 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
 
       {/* RIGHT NOW — what's happening on the chair */}
       <div style={{ marginBottom: 26, background: "color-mix(in srgb, var(--gold) 13%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 16, padding: "17px 19px" }}>
-        <div style={{ fontSize: 10.5, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 9, fontWeight: 600 }}>RIGHT NOW</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 9, fontWeight: 600 }}>RIGHT NOW</div>
         {inChair ? (
           <>
-            <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, marginBottom: 3, lineHeight: 1.1 }}>{inChair.name}</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 3, lineHeight: 1.15 }}>{inChair.name}</div>
             <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>
               {inChair.title} · <span style={{ color: "var(--gold)", fontWeight: 600 }}>{minutesLeft} min left</span> · started {minutesInChair} min ago
             </div>
           </>
         ) : nextAppt ? (
           <>
-            <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, marginBottom: 3, lineHeight: 1.1 }}>Up next: {nextAppt.name}</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 3, lineHeight: 1.15 }}>Up next: {nextAppt.name}</div>
             <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>
               {nextAppt.title} at {fmtTime(nextAppt.start)} · <span style={{ color: "var(--gold)", fontWeight: 600 }}>in {minutesUntil} min</span>
             </div>
           </>
         ) : todayApptsAll.length > 0 ? (
           <>
-            <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, marginBottom: 3, lineHeight: 1.1 }}>Day's done</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 3, lineHeight: 1.15 }}>Day's done</div>
             <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>No more bookings today. {fmtMoney(todayMoney)} in.</div>
           </>
         ) : (
           <>
-            <div style={{ fontFamily: FONT_NUMERAL, fontSize: 26, fontWeight: 600, marginBottom: 3, lineHeight: 1.1 }}>Open chair</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 3, lineHeight: 1.15 }}>Open chair</div>
             <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>No appointments booked today.</div>
           </>
         )}
@@ -4669,7 +4669,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           so the provider can text the next client without digging through the calendar. */}
       {inChair && nextAppt && minutesLeft != null && minutesLeft <= ((business?.runningLate?.thresholdMin) || 5) && (business?.runningLate?.enabled !== false) && !nextAppt.lateNotified && (
         <div style={{ marginBottom: 16, background: "color-mix(in srgb, var(--gold) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "14px 16px" }}>
-          <div style={{ fontSize: 10.5, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 6, fontWeight: 600 }}>RUNNING LATE?</div>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 6, fontWeight: 600 }}>RUNNING LATE?</div>
           <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 10 }}>
             {minutesLeft} min left with {inChair.name}. {(nextAppt.name || "").split(" ")[0]} is up next at {fmtTime(nextAppt.start)}. Want to give them a heads-up?
           </div>
@@ -4693,7 +4693,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
               <span style={{ width: 28, height: 1.5, background: "var(--gold)" }} />
-              <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, margin: 0, lineHeight: 1, color: "var(--text)" }}>Wrap Up</h3>
+              <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: 0, lineHeight: 1.1, color: "var(--text)" }}>Wrap Up</h3>
             </div>
             {wrapUp.map((a) => {
               const d = a.pendingDurationSave;
@@ -4758,7 +4758,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       {todayApptsAll.length > 0 && (
         <div style={{ marginBottom: 30 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600 }}>TODAY AT A GLANCE</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600 }}>TODAY AT A GLANCE</div>
             <div style={{ fontSize: 11, color: "var(--faint)" }}>{fmtTime(timelineStart)} → {fmtTime(timelineEnd)}</div>
           </div>
           <button onClick={() => onNavigate && onNavigate("calendar")} style={{ width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
@@ -4787,9 +4787,9 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
 
       {/* THIS WEEK */}
       <div style={{ marginBottom: 30 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>THIS WEEK</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>THIS WEEK</div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ fontFamily: FONT_NUMERAL, fontSize: 38, fontWeight: 600, color: "var(--text)", lineHeight: 1, letterSpacing: -0.8 }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -0.6 }}>
             {fmtMoney(thisWeekMoney)}
           </div>
           {!isShopView && (
