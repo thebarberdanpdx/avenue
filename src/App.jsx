@@ -2258,6 +2258,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* STEP 0 — WELCOME / front door */}
         {step === 0 && !simpleStep && (
           <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "10px 4px 0" }}>
+            {/* booking-ui-rev5 */}
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", marginBottom: 14 }}>Welcome to</div>
             <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.08, letterSpacing: "-0.4px", margin: "0 0 12px", color: "var(--text)" }}>{business.name}</h1>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14, fontWeight: 400, lineHeight: 1.55, margin: "0 0 32px", maxWidth: 320 }}>Glad you're here. Let's find you a time.</p>
@@ -2391,7 +2392,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const addNo = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: undefined }, finishAns: "no" } : e));
 
           const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
-          const firstSentence = (s) => { if (!s) return s; const m = String(s).match(/^.*?[.!?](\s|$)/); return m ? m[0].trim() : String(s); };
+          const firstSentence = (s) => { if (!s) return s; const t = String(s).trim().replace(/\s+/g, " "); if (t.length <= 52) return t; const cut = t.slice(0, 52); const sp = cut.lastIndexOf(" "); return (sp > 24 ? cut.slice(0, sp) : cut).replace(/[\s—,.;:!?-]+$/, "") + "…"; };
           const renderCard = (ct, selected, hidden) => {
             const img = ct.images && ct.images[0];
             return (
@@ -2399,7 +2400,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 {img ? <span style={{ width: 60, height: 60, borderRadius: 8, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}><img src={imgUrl(img, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></span> : null}
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{ct.label || niceName[ct.id]}</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{ct.label || niceName[ct.id]}</span>
                     {ct.popular && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--gold)", fontWeight: 600 }}>Most common</span>}
                   </span>
                   <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginTop: 6 }}>{firstSentence(ct.desc || friendly[ct.id])}</span>
