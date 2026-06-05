@@ -9670,7 +9670,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
   const field = (label, key, multiline) => (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>{label}</div>
       {multiline
         ? <textarea value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} rows={5} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
         : <input value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} style={inputStyle} />}
@@ -9679,7 +9679,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
   const bword = (label, key, placeholder) => (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>{label}</div>
       <input value={(form.bookingStep && form.bookingStep[key]) || ""} placeholder={placeholder || ""} onChange={(e) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), [key]: e.target.value } })} style={inputStyle} />
     </div>
   );
@@ -9783,7 +9783,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: (
         <>
         {/* Row size — pinned at top */}
-        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>CALENDAR ROW SIZE</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>CALENDAR ROW SIZE</div>
         <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>How tall each hour appears on your calendar. Larger rows give appointments room to breathe.</div>
         <div style={{ display: "flex", background: "var(--panel2)", borderRadius: 12, padding: 4, gap: 4, marginBottom: 22, border: "1px solid var(--border)" }}>
           {["S","M","L","XL"].map((s) => { const on = (form.calendarRowSize || "L") === s; return (
@@ -9791,7 +9791,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           ); })}
         </div>
 
-        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>WEEK STARTS ON</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>WEEK STARTS ON</div>
         <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>The first day shown on your calendar's week strip.</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 22 }}>
           {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((day, i) => { const on = (form.weekStartsOn ?? 0) === i; return (
@@ -9932,11 +9932,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <>
           <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>How brand-new clients pick their cut. Returning clients always skip straight to "the usual."</p>
           <button onClick={() => setForm({ ...form, booking: { ...form.booking, guidedConsult: true } })} style={{ width: "100%", textAlign: "left", background: (form.booking?.guidedConsult !== false) ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1.5px solid ${(form.booking?.guidedConsult !== false) ? "var(--gold)" : "var(--border2)"}`, borderRadius: 16, padding: "18px 20px", marginBottom: 12, color: "var(--text)" }}>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 500, marginBottom: 4 }}>Guided consultation</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, marginBottom: 4 }}>Guided consultation</div>
             <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45 }}>A few simple questions walk them to the right cut. Feels personal, teaches them, prevents wrong picks.</div>
           </button>
           <button onClick={() => setForm({ ...form, booking: { ...form.booking, guidedConsult: false } })} style={{ width: "100%", textAlign: "left", background: (form.booking?.guidedConsult === false) ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1.5px solid ${(form.booking?.guidedConsult === false) ? "var(--gold)" : "var(--border2)"}`, borderRadius: 16, padding: "18px 20px", color: "var(--text)" }}>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 500, marginBottom: 4 }}>Simple list</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, marginBottom: 4 }}>Simple list</div>
             <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45 }}>Show all the cuts in a clean list. Fastest for clients who already know what they want.</div>
           </button>
         </>
@@ -10036,11 +10036,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     const Icon = active.icon;
     return (
       <div className="appt-screen" style={{ width: "100%", padding: "12px 6px 40px" }}>
-        <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
+        <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontFamily: "'Jost', sans-serif", fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
         <div style={{ marginBottom: 22 }}>
           <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.4px" }}>{active.title}</h2>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.4px" }}>{active.title}</h2>
             {active.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "3px 7px" }}>SMART</span>}
           </div>
           {active.subtitle && <div style={{ fontSize: 15, color: "var(--gold)", marginTop: 6, fontWeight: 500 }}>{active.subtitle}</div>}
@@ -10052,7 +10052,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           : <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "20px 14px", boxShadow: "var(--shadow-sm)" }}>{active.editor}</div>}
 
         {hasChanges && (
-          <button className="lift" onClick={() => save(`${active.title} saved.`)} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 13.5, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: "var(--shadow-md)" }}>SAVE CHANGES</button>
+          <button className="lift" onClick={() => save(`${active.title} saved.`)} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>SAVE CHANGES</button>
         )}
       </div>
     );
@@ -10085,8 +10085,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       {/* Masthead — the search is the hero */}
       <div style={{ marginBottom: 18 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 10, fontWeight: 600 }}>SETTINGS</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 38, fontWeight: 500, lineHeight: 0.98, letterSpacing: "-0.6px" }}>What do you want to change?</h2>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 10, fontWeight: 600, textTransform: "uppercase" }}>SETTINGS</div>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, lineHeight: 0.98, letterSpacing: "-0.6px" }}>What do you want to change?</h2>
       </div>
 
       {/* HERO SEARCH */}
@@ -10111,7 +10111,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, marginTop: 6, padding: "12px 14px" }}>
               {setupLeft.length > 0 && (
                 <>
-                  <div style={{ fontSize: 10.5, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 700, marginBottom: 2 }}>FINISH SETUP</div>
+                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 2 }}>FINISH SETUP</div>
                   {[...setupItems].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1)).map((s, i) => (
                     <button key={s.k} onClick={() => setOpenCard(s.card)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 0", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left" }}>
                       <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: s.done ? "var(--gold)" : "transparent", border: s.done ? "none" : "1.5px solid var(--border2)" }}>{s.done && <Check size={12} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
@@ -10121,7 +10121,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                   ))}
                 </>
               )}
-              <div style={{ fontSize: 10.5, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 700, margin: `${setupLeft.length > 0 ? 14 : 0}px 0 2px` }}>TEST BEFORE LAUNCH</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, margin: `${setupLeft.length > 0 ? 14 : 0}px 0 2px` }}>TEST BEFORE LAUNCH</div>
               {[...testItems].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1)).map((t, i) => (
                 <button key={t.k} onClick={() => toggleTest(t.k)} style={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 12, padding: "11px 0", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left" }}>
                   <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", background: t.done ? "var(--gold)" : "transparent", border: t.done ? "none" : "1.5px solid var(--border2)" }}>{t.done && <Check size={12} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
@@ -10155,10 +10155,10 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           const catCards = cat.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
           return (
             <div className="screen-swap">
-              <button onClick={() => setOpenCat(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14.5, marginBottom: 20, padding: 0, border: "none" }}><ArrowLeft size={16} /> All settings</button>
+              <button onClick={() => setOpenCat(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontFamily: "'Jost', sans-serif", fontSize: 14.5, marginBottom: 20, padding: 0, border: "none" }}><ArrowLeft size={16} /> All settings</button>
               <div style={{ marginBottom: 22 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                  <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, letterSpacing: "-0.4px" }}>{cat.label}</h2>
+                  <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, letterSpacing: "-0.4px" }}>{cat.label}</h2>
                   {cat.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "3px 7px" }}>SMART</span>}
                 </div>
                 <p style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300, lineHeight: 1.45 }}>{cat.desc}</p>
