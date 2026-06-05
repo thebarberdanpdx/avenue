@@ -1849,6 +1849,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [photos, setPhotos] = useState(0);       // 0–3 uploaded at booking
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
+  const [booking, setBooking] = useState(false);   // true while the confirmed booking is being saved to the server
+  const [bookErr, setBookErr] = useState(false);   // true if that save failed — client is told to retry, nothing was held
   // waitlist join form
   const [wlName, setWlName] = useState("");
   const [wlDays, setWlDays] = useState([]);        // preferred days (multi-select)
@@ -2197,11 +2199,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     }
     const baseId = Date.now();
     let clientId = matched?.id || null;
+    let newClientRow = null;
     if (!matched && !activeMember) {
       clientId = "c" + baseId + Math.floor(Math.random() * 1000);
       const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
       setClients((cur) => [newClient, ...cur]);
-      if (!isStaff) { try { supabase.from('clients').insert({ id: String(clientId), shop_id: shopId, data: newClient }); } catch (e) {} }
+      if (!isStaff) newClientRow = { id: String(clientId), shop_id: shopId, data: newClient };
     } else if (matched) {
       // Returning client confirmed/updated their info — write the chosen values to their profile
       // so a barber-added record gets an email, a corrected name persists, etc.
@@ -2239,9 +2242,21 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       });
       if (!isSame) cursor += person.durMin;
     });
-    setAppts((cur) => [...cur, ...newAppts]);
-    if (!isStaff) { try { supabase.from('appointments').insert(newAppts.map((a) => ({ id: String(a.id), shop_id: shopId, data: a }))); } catch (e) {} }
-    setBookedId(baseId); setStep(8);
+    // Staff/preview bookings persist through the dashboard's own save path — show success immediately.
+    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); setBookedId(baseId); setStep(8); return; }
+    // Public booking: the slot is never held while saving, and the client is only told they're booked
+    // once the server actually has it — so a failed save can never become a ghost booking.
+    setBooking(true); setBookErr(false);
+    const apptRows = newAppts.map((a) => ({ id: String(a.id), shop_id: shopId, data: a }));
+    const writes = [];
+    if (newClientRow) writes.push(supabase.from('clients').insert(newClientRow));
+    writes.push(supabase.from('appointments').insert(apptRows));
+    Promise.all(writes).then((results) => {
+      setBooking(false);
+      if (results.some((r) => r && r.error)) { setBookErr(true); return; } // nothing was held, nothing lost — they can just tap again
+      setAppts((cur) => [...cur, ...newAppts]);
+      setBookedId(baseId); setStep(8);
+    }).catch(() => { setBooking(false); setBookErr(true); });
   };
 
   return (
@@ -3853,7 +3868,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const baseOk = agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10;
               const canLock = baseOk && (!needsCard || cardOnFile);
               return (
-            <button className="lift" onMouseDown={(e) => e.preventDefault()} disabled={!canLock} onClick={() => {
+            <>
+            <button className="lift" onMouseDown={(e) => e.preventDefault()} disabled={!canLock || booking} onClick={() => {
               const digits = (s) => (s || "").replace(/\D/g, "");
               const phoneChanged = !!matched && digits(phone) !== digits(matched.phone);
               const emailChanged = !!matched && !!(matched.email && matched.email.trim()) && newEmail.trim() !== matched.email.trim();
@@ -3863,7 +3879,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 return;
               }
               commitBooking(phone, newEmail);
-            }} style={{ width: "100%", background: canLock ? "var(--gold)" : "transparent", color: canLock ? "var(--on-gold)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : "LOCK IT IN"}</button>
+            }} style={{ width: "100%", background: canLock ? "var(--gold)" : "transparent", color: canLock ? "var(--on-gold)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : "LOCK IT IN")}</button>
+            {bookErr && <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "color-mix(in srgb, #c0392b 14%, var(--panel))", color: "var(--text)", fontSize: 13.5, lineHeight: 1.45, textAlign: "center" }}>Couldn't confirm your booking — check your connection and tap again. Your time wasn't held, so nothing's lost.</div>}
+            </>
               );
             })()}
 
