@@ -10780,6 +10780,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
     // Only arm a long-press. Do NOT capture the touch — scrolling stays completely normal.
     // Tapping is handled separately by onClick. Dragging only starts after a long hold.
     dragRef.current = { id: a.id, startY: y, startX: x, origStart: a.start, dur: a.end - a.start, didDrag: false, armed: false };
+    // Touching an appointment AT ALL freezes the page immediately — no scroll while a block is held.
+    document.body.classList.add("scrub-lock");
+    document.addEventListener("touchmove", blockScrollRef.current, { passive: false });
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
     holdTimerRef.current = setTimeout(() => {
       const d = dragRef.current;
@@ -10787,11 +10790,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         d.armed = true;
         setDrag({ id: a.id, deltaMin: 0, armed: true });
         if (navigator.vibrate) navigator.vibrate(12);
-        // freeze the page so the drag moves the block instead of scrolling (same lock the slot-scrub uses)
-        document.body.classList.add("scrub-lock");
-        document.addEventListener("touchmove", blockScrollRef.current, { passive: false });
       }
-    }, 650);
+    }, 220);
   };
 
   useEffect(() => {
@@ -10800,26 +10800,34 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       const d = dragRef.current; if (!d || d.armed) return;
       const y = e.touches ? e.touches[0].clientY : e.clientY;
       const x = e.touches ? e.touches[0].clientX : e.clientX;
-      if (Math.abs(y - d.startY) > 3 || Math.abs(x - (d.startX || 0)) > 3) {
-        d.scrolled = true;
+      // Page is already frozen from touchstart, so a deliberate move means "start dragging now."
+      if (Math.abs(y - d.startY) > 8 || Math.abs(x - (d.startX || 0)) > 8) {
         if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+        d.armed = true;
+        setDrag({ id: d.id, deltaMin: 0, armed: true });
+        if (navigator.vibrate) navigator.vibrate(12);
       }
     };
     const watchEnd = () => {
       const d = dragRef.current;
       if (d && !d.armed) {
         if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+        // released without dragging (a tap) — lift the freeze we set on touch
+        document.body.classList.remove("scrub-lock");
+        document.removeEventListener("touchmove", blockScrollRef.current, { passive: false });
         setTimeout(() => { if (dragRef.current && !dragRef.current.armed) dragRef.current = null; }, 300);
       }
     };
     window.addEventListener("touchmove", watchMove, { passive: true });
     window.addEventListener("mousemove", watchMove);
     window.addEventListener("touchend", watchEnd);
+    window.addEventListener("touchcancel", watchEnd);
     window.addEventListener("mouseup", watchEnd);
     return () => {
       window.removeEventListener("touchmove", watchMove);
       window.removeEventListener("mousemove", watchMove);
       window.removeEventListener("touchend", watchEnd);
+      window.removeEventListener("touchcancel", watchEnd);
       window.removeEventListener("mouseup", watchEnd);
     };
   }, []);
