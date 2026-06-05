@@ -54,7 +54,7 @@ function Avatar({ size = 42, photo = null, initial = "", color = "var(--gold)", 
   const fs = fontSize || Math.round(size * 0.44);
   const base = color || "var(--gold)";
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0, position: "relative", background: photo ? "var(--panel2)" : base, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontWeight: 500, fontSize: fs, ...style }}>
+    <div style={{ width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0, position: "relative", background: photo ? "var(--panel2)" : base, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: fs, ...style }}>
       {photo
         ? <img src={imgUrl(photo, Math.max(120, size * 3))} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         : (initial || null)}
@@ -623,7 +623,7 @@ function PhoneLink({ number, style }) {
         <div style={{ padding: "6px 4px 8px" }}>
           <div style={{ textAlign: "center", marginBottom: 18 }}>
             <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CONTACT</div>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{disp}</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{disp}</div>
           </div>
           <a href={`tel:${digits}`} onClick={() => setOpen(false)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, textDecoration: "none", marginBottom: 10 }}>
             <Phone size={17} /> CALL
@@ -771,7 +771,7 @@ function StaffLogin({ authReady, onBack }) {
         </div>
         {!sent ? (
           <>
-            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.5px", margin: "0 0 10px" }}>Welcome back</h1>
+            <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.5px", margin: "0 0 10px" }}>Welcome back</h1>
             <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.5, margin: "0 0 26px" }}>Enter your email and we'll send a one-tap sign-in link. No password to remember.</p>
             <input type="email" value={email} autoFocus inputMode="email" autoCapitalize="none" placeholder="you@email.com" onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, padding: "16px 16px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, marginBottom: 12, boxSizing: "border-box" }} />
             {err && <p style={{ color: "#c0392b", fontSize: 13.5, margin: "0 0 12px" }}>{err}</p>}
@@ -779,7 +779,7 @@ function StaffLogin({ authReady, onBack }) {
           </>
         ) : (
           <>
-            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.5px", margin: "0 0 12px" }}>Check your email</h1>
+            <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.5px", margin: "0 0 12px" }}>Check your email</h1>
             <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.55, margin: "0 0 16px" }}>We sent a 6-digit code and a sign-in link to <strong style={{ color: "var(--text)", fontWeight: 500 }}>{email.trim().toLowerCase()}</strong>. Enter the code below to sign in right here in the app.</p>
             <input type="text" inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 8))} onKeyDown={(e) => { if (e.key === "Enter") verify(); }} placeholder="123456" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, padding: "16px 16px", color: "var(--text)", fontSize: 22, letterSpacing: 6, textAlign: "center", fontFamily: FONT_BODY, marginBottom: 12, boxSizing: "border-box" }} />
             {err && <p style={{ color: "#c0392b", fontSize: 13.5, margin: "0 0 12px" }}>{err}</p>}
@@ -1340,7 +1340,7 @@ export default function App() {
       {shopPwPrompt && (
         <div onClick={() => { setShopPwPrompt(false); setPwEntry(""); setPwError(false); }} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 26, boxShadow: "0 24px 60px rgba(0,0,0,0.4)" }}>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Staff access</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Staff access</div>
             <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 18, fontWeight: 300, lineHeight: 1.5 }}>Enter the shop password to open the dashboard.</p>
             <input autoFocus type="password" value={pwEntry} onChange={(e) => { setPwEntry(e.target.value); setPwError(false); }} onKeyDown={(e) => { if (e.key === "Enter") tryUnlock(); }} placeholder="Password" style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: `1px solid ${pwError ? "#c0392b" : "var(--border)"}`, borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, marginBottom: pwError ? 8 : 16 }} />
             {pwError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Wrong password — try again.</p>}
@@ -1362,14 +1362,14 @@ export default function App() {
 
 function PrivacyPage({ onExit }) {
   const updated = "May 2026";
-  const H = ({ children }) => <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, margin: "26px 0 10px" }}>{children}</h2>;
+  const H = ({ children }) => <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "26px 0 10px" }}>{children}</h2>;
   const P = ({ children }) => <p style={{ fontSize: 15.5, color: "var(--text2)", lineHeight: 1.65, marginBottom: 12 }}>{children}</p>;
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY }}>
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "32px 22px 80px" }}>
         <button onClick={onExit} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 24 }}><ArrowLeft size={16} /> Back</button>
         <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>SANCTUARY BARBER CO</div>
-        <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.1, marginBottom: 8 }}>Privacy Policy</h1>
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.1, marginBottom: 8 }}>Privacy Policy</h1>
         <p style={{ fontSize: 14, color: "var(--sub)", marginBottom: 8 }}>Last updated: {updated}</p>
 
         <P>This policy explains what information Sanctuary Barber Co ("we," "us," "our") collects when you book an appointment with us, and how we use and protect it.</P>
@@ -1415,14 +1415,14 @@ function PrivacyPage({ onExit }) {
 
 function TermsPage({ onExit }) {
   const updated = "May 2026";
-  const H = ({ children }) => <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, margin: "26px 0 10px" }}>{children}</h2>;
+  const H = ({ children }) => <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "26px 0 10px" }}>{children}</h2>;
   const P = ({ children }) => <p style={{ fontSize: 15.5, color: "var(--text2)", lineHeight: 1.65, marginBottom: 12 }}>{children}</p>;
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY }}>
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "32px 22px 80px" }}>
         <button onClick={onExit} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 24 }}><ArrowLeft size={16} /> Back</button>
         <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>SANCTUARY BARBER CO</div>
-        <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, lineHeight: 1.1, marginBottom: 8 }}>Terms &amp; Conditions</h1>
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.1, marginBottom: 8 }}>Terms &amp; Conditions</h1>
         <p style={{ fontSize: 14, color: "var(--sub)", marginBottom: 8 }}>Last updated: {updated}</p>
 
         <P>These terms govern your use of the booking and messaging services provided by Sanctuary Barber Co ("we," "us," "our"). By booking an appointment or providing your phone number, you agree to these terms.</P>
@@ -1490,7 +1490,7 @@ function Storefront({ business, services = [], providers = [], categories = [], 
       <div className="fade-up" style={{ ...section, paddingTop: "clamp(56px, 16vw, 110px)", paddingBottom: 40, textAlign: "center" }}>
         {w.logo
           ? <img src={imgUrl(w.logo, 600)} alt={logo} style={{ maxWidth: "min(320px, 80%)", maxHeight: 140, objectFit: "contain", display: "block", margin: "0 auto" }} />
-          : <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: "clamp(42px, 14vw, 68px)", fontWeight: 500, lineHeight: 0.98, letterSpacing: 1 }}>{logo}</h1>}
+          : <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(42px, 14vw, 68px)", fontWeight: 500, lineHeight: 0.98, letterSpacing: 1 }}>{logo}</h1>}
         <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "20px auto" }} />
         {w.tagline && <p style={{ fontSize: 17, color: "var(--sub)", fontWeight: 300, fontStyle: "italic", marginBottom: 8 }}>{w.tagline}</p>}
         {addr && <p style={{ fontSize: 13.5, color: "var(--faint)", letterSpacing: 0.5 }}>{addr}</p>}
@@ -1521,7 +1521,7 @@ function Storefront({ business, services = [], providers = [], categories = [], 
                   <div style={{ fontSize: 16, fontWeight: 500 }}>{s.name}</div>
                   {s.duration ? <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{s.duration} min</div> : null}
                 </div>
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, color: "var(--gold)", whiteSpace: "nowrap" }}>{s.price != null ? `$${s.price}` : ""}</div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: "var(--gold)", whiteSpace: "nowrap" }}>{s.price != null ? `$${s.price}` : ""}</div>
               </div>
             ))}
           </div>
@@ -1593,14 +1593,14 @@ function Landing({ business, onPick }) {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 22px", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY }}>
       <div className="fade-up" style={{ width: "100%", maxWidth: 440 }}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: "clamp(40px, 13vw, 60px)", fontWeight: 500, lineHeight: 1, letterSpacing: 1 }}>{business.name}</h1>
+          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(40px, 13vw, 60px)", fontWeight: 500, lineHeight: 1, letterSpacing: 1 }}>{business.name}</h1>
           <div style={{ width: 34, height: 1, background: "var(--gold)", margin: "18px auto 0", opacity: 0.5 }} />
         </div>
         <div style={{ display: "grid", gap: 13 }}>
           {tiles.map((t) => (
             <button key={t.key} className="lift" onClick={() => onPick(t.key)} style={{ width: "100%", textAlign: "left", background: t.primary ? "var(--gold)" : "var(--panel)", color: t.primary ? "var(--on-gold)" : "var(--text)", border: t.primary ? "none" : "1px solid var(--border)", borderRadius: 18, padding: "22px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, boxShadow: t.primary ? "var(--shadow-md)" : "var(--shadow-sm)" }}>
               <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{t.label}</span>
+                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{t.label}</span>
                 <span style={{ fontSize: 14, opacity: t.primary ? 0.85 : 1, color: t.primary ? "inherit" : "var(--sub)", fontWeight: 300 }}>{t.desc}</span>
               </span>
               <ChevronRight size={22} style={{ flexShrink: 0, opacity: 0.7 }} />
@@ -1643,7 +1643,7 @@ function PhotoPicker({ onClose, onPick }) {
   return (
     <Sheet open={true} onClose={onClose} maxWidth={560}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24 }}>Choose a photo</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24 }}>Choose a photo</div>
           <button onClick={onClose} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
@@ -1712,7 +1712,7 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
   return (
     <Sheet open={true} onClose={onClose} maxWidth={560}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24 }}>Profile picture</div>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24 }}>Profile picture</div>
         <button onClick={onClose} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
@@ -2247,7 +2247,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
           <div style={{ width: 50 }} />
         </div>
         {step >= 3 && step <= 5 && <Stepper active={0} />}
@@ -2641,7 +2641,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <div style={{ position: "absolute", inset: 0, background: photo ? "linear-gradient(90deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.20) 100%)" : "linear-gradient(120deg, color-mix(in srgb, var(--gold) 78%, #000) 0%, var(--gold) 100%)" }} />
               <div style={{ position: "absolute", left: 22, top: 0, bottom: 0, right: 56, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                 <div style={{ width: 22, height: 1.5, background: "#fff", opacity: 0.9, marginBottom: 10 }} />
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.05 }}>{label}</div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1.05 }}>{label}</div>
                 {sub ? <div style={{ fontSize: 11, color: "rgba(255,255,255,0.78)", letterSpacing: 1.8, marginTop: 6 }}>{sub}</div> : null}
               </div>
               <div style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.14)", backdropFilter: "blur(6px)", border: "0.5px solid rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -2656,7 +2656,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div className="fade-up" style={{ margin: "0 -22px" }}>
               <div style={{ padding: "36px 24px 28px", textAlign: "center", marginBottom: 8 }}>
                 <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 22px" }} />
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 14 }}>{guidedCat ? guidedCat : "Welcome in."}</div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 42, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 14 }}>{guidedCat ? guidedCat : "Welcome in."}</div>
                 <div style={{ fontSize: 17, color: "var(--text)", lineHeight: 1.5, fontWeight: 400, maxWidth: 320, margin: "0 auto" }}>{showCats ? "Glad you're here. What are you here for today?" : (guidedCat ? "Pick your service." : "Glad you're here. What are we doing today?")}</div>
               </div>
               <div style={{ padding: "0 22px", display: "flex", flexDirection: "column", gap: 14 }}>
@@ -2692,7 +2692,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ padding: "8px 2px 30px" }}>
               <div style={{ width: 34, height: 1.5, background: "var(--gold)", marginBottom: 18 }} />
               <div style={{ fontSize: 12, letterSpacing: 3, color: "var(--gold)", fontWeight: 700, marginBottom: 18 }}>{s}</div>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 40, fontWeight: 500, color: "var(--text)", lineHeight: 1.04, letterSpacing: "-0.5px", marginBottom: sub ? 16 : 0 }}>{q}</h2>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 40, fontWeight: 500, color: "var(--text)", lineHeight: 1.04, letterSpacing: "-0.5px", marginBottom: sub ? 16 : 0 }}>{q}</h2>
               {sub && <p style={{ color: "var(--text)", fontSize: 18, lineHeight: 1.45, fontWeight: 400, opacity: 0.78 }}>{sub}</p>}
             </div>
           );
@@ -2702,7 +2702,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               {items.map((it, i) => (
                 <button key={i} className="lift-row" onClick={it.onTap} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, background: "none", border: "none", borderBottom: "1px solid var(--line)", padding: "22px 4px", textAlign: "left", color: "var(--text)" }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 25, fontWeight: 500, lineHeight: 1.1, marginBottom: it.sub ? 6 : 0, color: it.gold ? "var(--gold)" : "var(--text)" }}>{it.title}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, lineHeight: 1.1, marginBottom: it.sub ? 6 : 0, color: it.gold ? "var(--gold)" : "var(--text)" }}>{it.title}</div>
                     {it.sub && <div style={{ fontSize: 17, color: "var(--sub)", lineHeight: 1.45 }}>{it.sub}</div>}
                   </div>
                   <ChevronRight size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
@@ -2770,15 +2770,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   ) : (
                     // Fallback: layered warm gradient with a giant ghosted serif initial
                     <div style={{ position: "absolute", inset: 0, background: "linear-gradient(145deg, #1a1714 0%, #2a2420 55%, #0f0d0b 100%)" }}>
-                      <div style={{ position: "absolute", top: -40, right: -20, fontFamily: FONT_DISPLAY, fontSize: 320, lineHeight: 1, color: "color-mix(in srgb, var(--gold) 14%, transparent)", fontWeight: 500, userSelect: "none" }}>{ct?.label?.charAt(0)}</div>
+                      <div style={{ position: "absolute", top: -40, right: -20, fontFamily: "'Fraunces', serif", fontSize: 320, lineHeight: 1, color: "color-mix(in srgb, var(--gold) 14%, transparent)", fontWeight: 500, userSelect: "none" }}>{ct?.label?.charAt(0)}</div>
                       <div style={{ position: "absolute", top: 22, left: 24, width: 40, height: 1.5, background: "var(--gold)" }} />
                     </div>
                   )}
                   <div style={{ position: "absolute", left: 24, right: 24, bottom: 24, color: "#fff" }}>
                     <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 700, marginBottom: 10 }}>WE'D SET YOU UP WITH</div>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, lineHeight: 1.0, letterSpacing: "-0.5px", marginBottom: 14 }}>{ct?.label}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 42, fontWeight: 500, lineHeight: 1.0, letterSpacing: "-0.5px", marginBottom: 14 }}>{ct?.label}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <span style={{ fontFamily: FONT_DISPLAY, fontSize: 26, color: "#fff" }}>${ct?.price}</span>
+                      <span style={{ fontFamily: "'Fraunces', serif", fontSize: 26, color: "#fff" }}>${ct?.price}</span>
                       <span style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(255,255,255,0.5)" }} />
                       <span style={{ fontSize: 14, color: "rgba(255,255,255,0.8)" }}>with {provider.name}</span>
                     </div>
@@ -2806,7 +2806,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {/* Editorial masthead — matches screen 1 (centered, no photo) */}
             <div style={{ padding: "8px 4px 26px", textAlign: "center", marginBottom: 8 }}>
               <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 18px" }} />
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 38, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 12 }}>Pick your cut</h2>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 12 }}>Pick your cut</h2>
               <p style={{ color: "var(--text)", fontSize: 16, lineHeight: 1.5, fontWeight: 400, maxWidth: 320, margin: "0 auto" }}>Tap whichever's closest — your barber dials it in in the chair.</p>
             </div>
             {/* Cut cards — equal-height, photo forced to consistent ratio */}
@@ -2820,7 +2820,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     </div>
                     <div style={{ flex: 1, padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, minWidth: 0 }}>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 3 }}>{ct.label}</div>
+                        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 3 }}>{ct.label}</div>
                         <div style={{ fontSize: 13, color: "var(--gold)", fontWeight: 500 }}>${ct.price}</div>
                       </div>
                       <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
@@ -2909,7 +2909,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               </button>
               <button onClick={() => setCutHelperOpen("notSure")} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 13, color: "var(--text)", textAlign: "left", fontSize: 14 }}>
                 <div style={{ width: 38, height: 38, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 19, color: "var(--gold)", fontWeight: 500 }}>?</span>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 19, color: "var(--gold)", fontWeight: 500 }}>?</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
                   <span style={{ fontWeight: 500, fontSize: 15 }}>I'm not sure</span>
@@ -2927,7 +2927,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   {cutHelperOpen === "photo" && (
                     <>
                       <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
-                      <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.1, marginBottom: 10 }}>Here's the look</h3>
+                      <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1.1, marginBottom: 10 }}>Here's the look</h3>
                       <p style={{ color: "var(--text)", fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>We'll save this photo to your appointment so your barber sees it before you sit down.</p>
                       {helperPhotoUrl && (
                         <div style={{ width: "100%", aspectRatio: "4/3", borderRadius: 14, overflow: "hidden", background: "var(--panel2)", marginBottom: 18 }}>
@@ -2955,7 +2955,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                                 </div>
                                 <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
                                   <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 4 }}>YOUR MATCH</div>
-                                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>{photoResult.matchLabel}</div>
+                                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>{photoResult.matchLabel}</div>
                                 </div>
                               </div>
                               {photoResult.reason && (
@@ -2986,7 +2986,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   {cutHelperOpen === "notSure" && (
                     <>
                       <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
-                      <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.1, marginBottom: 10 }}>No worries — describe what you want</h3>
+                      <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1.1, marginBottom: 10 }}>No worries — describe what you want</h3>
                       <p style={{ color: "var(--text)", fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>Just type it in your own words. We'll match it to the right cut.</p>
                       <textarea
                         value={notSureText}
@@ -3047,7 +3047,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                                 </div>
                                 <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
                                   <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 4 }}>BEST MATCH</div>
-                                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>{notSureResult.matchLabel}</div>
+                                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>{notSureResult.matchLabel}</div>
                                 </div>
                               </div>
                               {notSureResult.reason && (
@@ -3070,7 +3070,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                                 </div>
                                 <div style={{ flex: 1, padding: "12px 16px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 3, minWidth: 0 }}>
                                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ct.label}</div>
+                                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ct.label}</div>
                                     <div style={{ fontSize: 14, color: "var(--text)", fontWeight: 500, flexShrink: 0 }}>${ct.price}</div>
                                   </div>
                                   {ct.desc && <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ct.desc}</div>}
@@ -3095,7 +3095,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {/* Editorial masthead matches Pick Your Cut */}
             <div style={{ padding: "8px 4px 26px", textAlign: "center", marginBottom: 8 }}>
               <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 18px" }} />
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 38, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 12 }}>Now the beard</h2>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 12 }}>Now the beard</h2>
               <p style={{ color: "var(--text)", fontSize: 16, lineHeight: 1.5, fontWeight: 400, maxWidth: 320, margin: "0 auto" }}>Tap the one that's closest — we'll set aside the right amount of time.</p>
             </div>
             {/* Beard cards — equal-height, single tap to select */}
@@ -3108,7 +3108,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       {img && <img src={imgUrl(img, 280)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
                     </div>
                     <div style={{ flex: 1, padding: "14px 18px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 4, minWidth: 0 }}>
-                      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.15 }}>{bt.label}</div>
+                      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.15 }}>{bt.label}</div>
                       {bt.desc && <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{bt.desc}</div>}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", padding: "0 16px" }}>
@@ -3129,9 +3129,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <div style={{ fontSize: 16 }}>{draft.name}{draft.cutTypes && cutType ? ` · ${draft.cutTypes.find((c) => c.id === cutType)?.label}` : ""}</div>
                 <button onClick={() => { if (draft.beardTypes && draft.beardTypes.length) { setCutPhase("beard"); setBeardType(null); } else if (draft.cutTypes && draft.cutTypes.length) { setCutPhase("type"); setCutType(null); } else { setDraft(null); setStep(1); } }} style={{ background: "none", color: "var(--sub)", fontSize: 15, textDecoration: "underline", padding: 0, marginTop: 2 }}>Change</button>
               </div>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, color: "var(--gold)" }}>${draft.cutTypes && cutType ? draft.cutTypes.find((c) => c.id === cutType)?.price : draft.price}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, color: "var(--gold)" }}>${draft.cutTypes && cutType ? draft.cutTypes.find((c) => c.id === cutType)?.price : draft.price}</div>
             </div>
-            {draft.addonGroups.length > 0 && <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, marginBottom: 18 }}>Any add-ons?</h2>}
+            {draft.addonGroups.length > 0 && <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 18 }}>Any add-ons?</h2>}
             {draft.addonGroups.length === 0 && <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300 }}>No add-ons for this service. Continue when ready.</p>}
             {draft.addonGroups.map((g) => (
               <div key={g.id} style={{ marginBottom: 28 }}>
@@ -3199,7 +3199,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           return (
             <div className="fade-up">
               <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 36, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Who and when</h2>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Who and when</h2>
               <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 26, fontWeight: 400, lineHeight: 1.5 }}>Tap a barber to lock in their next opening.</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {cards.map(({ p, next }) => (
@@ -3211,7 +3211,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <div style={{ flex: 1, padding: "16px 18px", display: "flex", flexDirection: "column", justifyContent: "center", minWidth: 0, gap: 6 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{p.name}</div>
+                            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{p.name}</div>
                             {p.role && <div style={{ fontSize: 12, color: "var(--faint)", letterSpacing: 1.5, marginTop: 3, textTransform: "uppercase" }}>{p.role}</div>}
                           </div>
                           <ChevronRight size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
@@ -3239,7 +3239,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                       <div style={{ width: 50, height: 50, borderRadius: "50%", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid var(--border)" }}><Users size={22} /></div>
                       <div>
-                        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>Anyone</div>
+                        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>Anyone</div>
                         <div style={{ fontSize: 13.5, color: "var(--text)", marginTop: 5, display: "flex", alignItems: "center", gap: 6 }}>
                           <Clock size={13} style={{ color: "var(--gold)" }} />
                           <span style={{ fontWeight: 500 }}>{fmtNext(anyoneNext.next)}</span>
@@ -3258,7 +3258,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {step === 4 && (
           <div className="fade-up">
             <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Your visit so far</h2>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Your visit so far</h2>
             <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 400, marginBottom: 24, lineHeight: 1.5 }}>Add anything else, or carry on to pick a time.</p>
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "8px 18px", marginBottom: 24 }}>
               {cart.map((e, i) => (
@@ -3366,7 +3366,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* CODE VERIFICATION — confirms the texted code (accepts any 6 digits until Twilio is live) */}
         <Sheet open={blockedNotice} onClose={() => setBlockedNotice(false)} align="top">
           <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Online booking unavailable</h2>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Online booking unavailable</h2>
           <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>We're not able to accept new appointments online at this time. Please check back later.</p>
           <button onClick={() => setBlockedNotice(false)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>OK</button>
         </Sheet>
@@ -3380,7 +3380,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             return (
               <>
                 <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
-                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 8 }}>You already have an appointment</h2>
+                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>You already have an appointment</h2>
                 <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>You're booked for <strong style={{ color: "var(--text)" }}>{dupWarn.existing.title || "an appointment"}</strong> on <strong style={{ color: "var(--text)" }}>{dayTxt}</strong> at <strong style={{ color: "var(--text)" }}>{timeTxt}</strong>{prov ? ` with ${prov.name}` : ""} — that's close to the one you're booking now. Want to keep both, or cancel the earlier one?</p>
                 <button className="lift" onClick={() => { const ph = dupWarn.phone, em = dupWarn.email; setDupWarn(null); doCommitBooking(ph, em); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>Keep both</button>
                 <button onClick={() => { const ex = dupWarn.existing, ph = dupWarn.phone, em = dupWarn.email; try { supabase.rpc('cancel_my_appointment', { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(ex.id) }); } catch (e) {} setMyAppts((cur) => cur.map((a) => a.id === ex.id ? { ...a, status: "cancelled" } : a)); setDupWarn(null); doCommitBooking(ph, em); }} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 14.5, fontWeight: 500, borderRadius: 12 }}>Cancel the {dayTxt} one</button>
@@ -3391,7 +3391,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* Client-type gate — fires when the shop's "Who can book" setting blocks this client type. */}
         <Sheet open={!!clientTypeBlock} onClose={() => setClientTypeBlock(null)} align="top">
           <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 8 }}>{clientTypeBlock === "returning_only" ? "Returning clients only" : "New clients only"}</h2>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>{clientTypeBlock === "returning_only" ? "Returning clients only" : "New clients only"}</h2>
           <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>{clientTypeBlock === "returning_only" ? "Online booking at this shop is currently open to returning clients only. Please give us a call to book your first visit." : "Online booking at this shop is currently for new clients only. Please give us a call to book your next visit."}{business?.phones?.[0]?.number ? ` Phone: ${business.phones[0].number}.` : ""}</p>
           <button onClick={() => setClientTypeBlock(null)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>OK</button>
         </Sheet>
@@ -3460,7 +3460,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {showWhoFor && matched && addingMember && (
           <div className="fade-up">
             <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>NEW PERSON</div>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Who are we adding?</h2>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Who are we adding?</h2>
             <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 22, fontWeight: 400, lineHeight: 1.5 }}>They'll be saved under your account for next time.</p>
             <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>First name</label>
             <input autoFocus value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="e.g. Leo" style={{ ...inputStyle, marginBottom: 16 }} />
@@ -3480,7 +3480,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {showSchedChoice && (
           <div className="fade-up">
             <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>{groupPeople.map((p) => (p.id ? p.name : "You")).map((n) => n.split(" ")[0]).join(" & ").toUpperCase()}</div>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>How do you want to book?</h2>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>How do you want to book?</h2>
             <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>We can get everyone in on the same visit, or just find the soonest opening for each.</p>
             <button className="lift" onClick={() => { setGroupMode("together"); setShowSchedChoice(false); setShowWizardIntro(true); setWizardIdx(0); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", marginBottom: 13, textAlign: "left", display: "flex", flexDirection: "column", gap: 4 }}>
               <span style={{ fontSize: 17, fontWeight: 500 }}>Together — same visit</span>
@@ -3535,7 +3535,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           return (
             <div className="fade-up">
               <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>{isFirst ? "LET'S START WITH" : "NEXT UP"} · {first.toUpperCase()}</div>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{isFirst ? `Let's start with ${first}` : `Now let's get ${first} taken care of`}</h2>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{isFirst ? `Let's start with ${first}` : `Now let's get ${first} taken care of`}</h2>
               <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>Person {wizardIdx + 1} of {groupPeople.length}.</p>
               {usualSvc && (
                 <div style={{ border: "1.5px solid var(--gold)", borderRadius: 16, overflow: "hidden", marginBottom: 13 }}>
@@ -3627,8 +3627,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} style={{ flexShrink: 0, width: 58, padding: "10px 0", borderRadius: 10, background: on ? "var(--gold)" : "transparent", border: "1px solid", borderColor: on ? "var(--gold)" : (isToday ? "var(--gold)" : "var(--line)"), color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", cursor: "pointer" }}>
                     <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{DAYS[d.getDay()].slice(0, 3).toUpperCase()}</div>
                     {isToday
-                      ? <div style={{ fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 600, color: on ? "var(--on-gold)" : "var(--gold)", lineHeight: "24px" }}>Today</div>
-                      : <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, lineHeight: "24px" }}>{d.getDate()}</div>}
+                      ? <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 600, color: on ? "var(--on-gold)" : "var(--gold)", lineHeight: "24px" }}>Today</div>
+                      : <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, lineHeight: "24px" }}>{d.getDate()}</div>}
                     <div style={{ fontSize: 10.5, letterSpacing: 0.5, opacity: 0.6, marginTop: 1 }}>{MONTHS[d.getMonth()].slice(0, 3)}</div>
                   </button>
                 );
@@ -3655,7 +3655,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <button className="lift" onClick={() => { setShowWaitlist(true); setWlName(matched ? matched.name : ""); setWlDays([relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate) : `${relativeDate(selectedDate)}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`]); setWlService(cart.map(describeEntry).join(", ")); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Join the waitlist →</button>
                 ) : (
                   <div style={{ background: "var(--panel)", borderRadius: 8, padding: 20, textAlign: "left" }}>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, marginBottom: 16 }}>Join the waitlist</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 16 }}>Join the waitlist</div>
 
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Your name</label>
                     <input value={wlName} onChange={(e) => setWlName(e.target.value)} placeholder="First and last name" style={{ ...inputStyle, marginBottom: 16 }} />
@@ -3671,7 +3671,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       {dateOptions.slice(0, 10).map((d, i) => { const lbl = relativeDate(d).includes(",") ? relativeDate(d) : `${relativeDate(d)}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; const on = wlDays.includes(lbl); return (
                         <button key={i} onClick={() => setWlDays((prev) => prev.includes(lbl) ? prev.filter((x) => x !== lbl) : [...prev, lbl])} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
                           <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
-                          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18 }}>{d.getDate()}</div>
+                          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{d.getDate()}</div>
                         </button>
                       ); })}
                     </div>
@@ -3735,7 +3735,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               </div>
             )}
 
-            {waitlistDone && <div style={{ background: "var(--panel)", borderRadius: 8, padding: 24, textAlign: "center" }}><CheckCircle2 size={32} style={{ color: "#7A9E9F", marginBottom: 12 }} /><div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, marginBottom: 6 }}>You're on the list</div><p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5 }}>We'll text {wlName ? wlName.split(" ")[0] : "you"} the moment a {wlWhen || ""} slot opens up. No need to check back.</p></div>}
+            {waitlistDone && <div style={{ background: "var(--panel)", borderRadius: 8, padding: 24, textAlign: "center" }}><CheckCircle2 size={32} style={{ color: "#7A9E9F", marginBottom: 12 }} /><div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>You're on the list</div><p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5 }}>We'll text {wlName ? wlName.split(" ")[0] : "you"} the moment a {wlWhen || ""} slot opens up. No need to check back.</p></div>}
 
             {!dateIsFull && !waitlistDone && (
               <div style={{ borderTop: "1px solid var(--line)", paddingTop: 22, textAlign: "center", marginTop: 8 }}>
@@ -3793,7 +3793,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {business?.bookingPhotos?.mode !== "off" && (
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginBottom: 18 }}>
               <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>PHOTOS {business?.bookingPhotos?.mode === "required" ? "· REQUIRED" : "· OPTIONAL"}</div>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 4 }}>Help us nail it</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 4 }}>Help us nail it</div>
               <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Up to 3 — a style you want, how your hair looks now, or anything that helps {provider.name === "Anyone" ? "your barber" : provider.name}.</p>
               <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 14, border: `1px dashed ${i < photos ? "var(--gold)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: i < photos ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent" }}>{i < photos ? <Check size={20} style={{ color: "var(--gold)" }} /> : <Camera size={18} style={{ color: "var(--faint)" }} />}</div>))}</div>
               <button onClick={() => setPhotos(Math.min(3, photos + 1))} disabled={photos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: photos >= 3 ? "var(--faint)" : "var(--text)", padding: 12, fontSize: 13.5, letterSpacing: 1.5, fontWeight: 500, borderRadius: 11 }}>{photos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${photos}/3)`}</button>
@@ -3868,7 +3868,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <Sheet open={!!contactConfirm && !!matched} onClose={() => setContactConfirm(null)} align="top" maxWidth={460}>
               <div style={{ padding: "20px 4px 12px" }}>
                 <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
-                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 6 }}>Confirm your info</h2>
+                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 6 }}>Confirm your info</h2>
                 <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5, marginBottom: 22 }}>
                   Reminders go to whatever you keep on file. Pick which to save.
                 </p>
@@ -3966,7 +3966,7 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
     <div className="fade-up">
       <button onClick={back} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", color: "var(--sub)", fontSize: 15, marginBottom: 18 }}><ArrowLeft size={18} /> Back</button>
       <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>FIRST VISIT · STEP {i + 1} OF {steps.length}</div>
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>{cur.label}</h2>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>{cur.label}</h2>
       <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>Pick the look closest to what you want — it helps us reserve exactly the right time for you.</p>
 
       {cur.kind === "list" && (
@@ -4102,7 +4102,7 @@ function ManageStandalone({ business, appts, setAppts, providers, services, onEx
       <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
           <button onClick={onExit} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
           <div style={{ width: 50 }} />
         </div>
         <ManageAppointment business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} initialPhone={null} dateOptions={dateOptions} onExit={onExit} showToast={() => {}} />
@@ -4152,7 +4152,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
   if (!confirmed) {
     return (
       <div className="fade-up">
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Manage your appointment</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Manage your appointment</h2>
         <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.5 }}>Enter the phone number you booked with. We'll text you a code — confirm it to see your appointments.</p>
         <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 14 }} />
         <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
@@ -4166,7 +4166,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 
   return (
     <div className="fade-up">
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Your appointments</h2>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Your appointments</h2>
       <p style={{ color: "var(--sub)", fontSize: 15, marginBottom: 22, fontWeight: 300 }}>{digits(phone).length === 10 ? `(${digits(phone).slice(0, 3)}) ${digits(phone).slice(3, 6)}-${digits(phone).slice(6)}` : phone}</p>
 
       {mine.length === 0 && <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 6, padding: 24, textAlign: "center", color: "var(--sub)", fontSize: 14 }}>No upcoming appointments found for this number.</div>}
@@ -4191,7 +4191,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
                     {dateOptions.slice(0, 10).map((d, i) => { const on = newDate && d.toDateString() === newDate.toDateString(); return (
                       <button key={i} onClick={() => { setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
                         <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
-                        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18 }}>{d.getDate()}</div>
+                        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{d.getDate()}</div>
                       </button>
                     ); })}
                   </div>
@@ -4849,7 +4849,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>{goalEditor === "daily" ? "DAILY GOAL" : "WEEKLY GOAL"}</div>
               <button onClick={() => setGoalEditor(null)} style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--panel2)", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={16} /></button>
             </div>
-            <h2 style={{ fontFamily: FONT_NUMERAL, fontSize: 28, fontWeight: 600, marginBottom: 6, lineHeight: 1.05 }}>Set {viewedProvider.name === me?.name ? "your" : `${viewedProvider.name}'s`} {goalEditor} target</h2>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 600, marginBottom: 6, lineHeight: 1.05 }}>Set {viewedProvider.name === me?.name ? "your" : `${viewedProvider.name}'s`} {goalEditor} target</h2>
             <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>
               {goalEditor === "daily"
                 ? "How much do you want to earn on a good day? Pulse fills the ring automatically as you complete cuts — no logging needed."
@@ -4858,8 +4858,8 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
 
             {/* Big input */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 14, padding: "14px 18px", marginBottom: 22 }}>
-              <span style={{ fontFamily: FONT_NUMERAL, fontSize: 32, fontWeight: 600, color: "var(--faint)" }}>$</span>
-              <input autoFocus type="number" inputMode="numeric" min="0" step={goalEditor === "daily" ? 25 : 50} value={goalInput} onChange={(e) => setGoalInput(e.target.value)} placeholder="0" style={{ flex: 1, background: "none", border: "none", color: "var(--text)", fontFamily: FONT_NUMERAL, fontSize: 32, fontWeight: 600, outline: "none", width: "100%" }} />
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 600, color: "var(--faint)" }}>$</span>
+              <input autoFocus type="number" inputMode="numeric" min="0" step={goalEditor === "daily" ? 25 : 50} value={goalInput} onChange={(e) => setGoalInput(e.target.value)} placeholder="0" style={{ flex: 1, background: "none", border: "none", color: "var(--text)", fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 600, outline: "none", width: "100%" }} />
             </div>
 
             <div style={{ display: "flex", gap: 10 }}>
@@ -5132,7 +5132,7 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
       <div style={{ marginBottom: 22 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>REVENUE</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{period === "week" ? "This week" : period === "month" ? "This month" : period === "year" ? "This year" : "Custom range"}</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{period === "week" ? "This week" : period === "month" ? "This month" : period === "year" ? "This year" : "Custom range"}</h2>
       </div>
 
       {/* Period toggle */}
@@ -5162,7 +5162,7 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
 
       {/* Hero number */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
           {fmtMoney(periodTotal)}
         </div>
         {delta && (
@@ -5204,7 +5204,7 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
           <div style={{ marginBottom: 30 }}>
             <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 14, fontWeight: 600 }}>EARNED PER CHAIR-HOUR</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -1.2, color: "var(--gold)" }}>{fmtMoney(revPerChairHr)}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -1.2, color: "var(--gold)" }}>{fmtMoney(revPerChairHr)}</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>per open chair-hour · {Math.round(chairHours)}h of chair time so far</div>
             </div>
           </div>
@@ -5241,7 +5241,7 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
               {topServices.map((row) => (
                 <div key={row.svc.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
                   <div style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{row.svc.name}</span>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500 }}>{row.svc.name}</span>
                     <span style={{ fontSize: 13, color: "var(--faint)", marginLeft: 8 }}>{row.count}×</span>
                   </div>
                   <div style={{ fontSize: 15, fontWeight: 500, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{fmtMoney(row.revenue)}</div>
@@ -5262,7 +5262,7 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
               {topClients.map((row) => (
                 <div key={row.client.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
                   <div style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{row.client.name}</span>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500 }}>{row.client.name}</span>
                     <span style={{ fontSize: 13, color: "var(--faint)", marginLeft: 8 }}>{row.count}×</span>
                   </div>
                   <div style={{ fontSize: 15, fontWeight: 500, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{fmtMoney(row.revenue)}</div>
@@ -5371,7 +5371,7 @@ function AppointmentsView({ appts, providers, services, onBack }) {
       <div style={{ marginBottom: 18 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>APPOINTMENTS &middot; CAPACITY</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95, margin: 0 }}>{periodLabel}</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1, margin: 0 }}>{periodLabel}</h2>
         <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10 }}><b style={{ color: "var(--text)", fontWeight: 600 }}>{booked}</b> booked &middot; <b style={{ color: "var(--text)", fontWeight: 600 }}>{occupancy}%</b> of chair time filled</div>
       </div>
 
@@ -5381,7 +5381,7 @@ function AppointmentsView({ appts, providers, services, onBack }) {
 
       {booked === 0 ? (
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "26px 20px", textAlign: "center" }}>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 8 }}>No appointments yet</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 8 }}>No appointments yet</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55 }}>Once bookings flow through Vero, this shows how full your chairs are, where the open time is, and what no-shows are costing you.</div>
         </div>
       ) : (
@@ -5389,7 +5389,7 @@ function AppointmentsView({ appts, providers, services, onBack }) {
       <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "20px 18px 18px", marginBottom: 30 }}>
         <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700, marginBottom: 10 }}>CHAIR OCCUPANCY</div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 14 }}>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 52, fontWeight: 500, lineHeight: 1, letterSpacing: -1.5, color: "var(--gold)" }}>{occupancy}%</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 52, fontWeight: 500, lineHeight: 1, letterSpacing: -1.5, color: "var(--gold)" }}>{occupancy}%</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>of your open chair time is booked</div>
         </div>
         <div style={{ height: 8, borderRadius: 4, background: "color-mix(in srgb, var(--gold) 18%, var(--panel2))", overflow: "hidden", marginBottom: 10 }}>
@@ -5403,11 +5403,11 @@ function AppointmentsView({ appts, providers, services, onBack }) {
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 14 }}>SCHEDULE HEALTH</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
           <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 14px" }}>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, lineHeight: 1, color: "var(--text)" }}>{noShowRate}%</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1, color: "var(--text)" }}>{noShowRate}%</div>
             <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 6 }}>no-show rate &middot; {noShow}</div>
           </div>
           <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 14px" }}>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, lineHeight: 1, color: "var(--text)" }}>{cancelRate}%</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1, color: "var(--text)" }}>{cancelRate}%</div>
             <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 6 }}>cancel rate &middot; {cancelled}</div>
           </div>
         </div>
@@ -5441,7 +5441,7 @@ function AppointmentsView({ appts, providers, services, onBack }) {
         {[["Completed", done], ["Upcoming", pending], ["No-shows", noShow], ["Cancelled", cancelled]].map(([lbl, n]) => (
           <div key={lbl} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 2px", borderTop: "1px solid var(--line)" }}>
             <span style={{ fontSize: 14.5 }}>{lbl}</span>
-            <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500 }}>{n}</span>
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500 }}>{n}</span>
           </div>
         ))}
       </div>
@@ -5553,7 +5553,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
       <div style={{ marginBottom: 20 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>CLIENTS · RETENTION</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{periodLabel}</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{periodLabel}</h2>
         <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10, lineHeight: 1.5 }}>
           <span style={{ fontWeight: 600, color: "var(--text)" }}>{totalClients}</span> active{rebookPct !== null ? <> · <span style={{ fontWeight: 600, color: "var(--text)" }}>{rebookPct}%</span> rebooked</> : null}
         </div>
@@ -5576,7 +5576,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
             <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700 }}>WIN BACK</div>
             <div style={{ fontSize: 12.5, color: "var(--sub)" }}>~{fmtMoney(atRisk)} at risk <span style={{ color: "var(--faint)" }}>(est.)</span></div>
           </div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, letterSpacing: -0.5, color: "var(--text)", marginBottom: 14 }}>{lapsed.length} overdue to rebook</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.5, color: "var(--text)", marginBottom: 14 }}>{lapsed.length} overdue to rebook</div>
           <div style={{ display: "grid", gap: 2 }}>
             {lapsed.slice(0, 5).map(({ c, over, since }) => (
               <button key={c.id} onClick={() => open(c)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "none", border: "none", borderTop: "1px solid color-mix(in srgb, var(--gold) 16%, var(--border))", padding: "12px 2px", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
@@ -5599,7 +5599,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
           <div style={{ marginBottom: 30 }}>
             <Eyebrow>REBOOKING RATE</Eyebrow>
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 8 }}>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 48, fontWeight: 500, lineHeight: 1, letterSpacing: -1.2, color: rebookPct >= 60 ? "var(--gold)" : "var(--text)" }}>{rebookPct}%</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 48, fontWeight: 500, lineHeight: 1, letterSpacing: -1.2, color: rebookPct >= 60 ? "var(--gold)" : "var(--text)" }}>{rebookPct}%</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>of recent clients already have their next visit booked</div>
             </div>
             <div style={{ fontSize: 12.5, color: "var(--faint)" }}>{rebooked} of {recent.length} seen in the last 90 days.</div>
@@ -5620,11 +5620,11 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
             <div style={{ display: "grid", gap: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--gold)" }} /><span style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>New</span></div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{newThisPeriod}</span><span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((newThisPeriod / totalActive) * 100)}%</span></div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{newThisPeriod}</span><span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((newThisPeriod / totalActive) * 100)}%</span></div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "color-mix(in srgb, var(--gold) 35%, var(--panel2))" }} /><span style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Returning</span></div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{returningThisPeriod}</span><span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((returningThisPeriod / totalActive) * 100)}%</span></div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{returningThisPeriod}</span><span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((returningThisPeriod / totalActive) * 100)}%</span></div>
               </div>
             </div>
           </div>
@@ -5656,7 +5656,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
           <div style={{ marginBottom: 30 }}>
             <Eyebrow>FIRST-VISIT RETENTION</Eyebrow>
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 8 }}>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, lineHeight: 1, letterSpacing: -1, color: retentionPct >= 60 ? "var(--gold)" : "var(--text)" }}>{retentionPct}%</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 42, fontWeight: 500, lineHeight: 1, letterSpacing: -1, color: retentionPct >= 60 ? "var(--gold)" : "var(--text)" }}>{retentionPct}%</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>of first-timers came back within 60 days</div>
             </div>
             <div style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5 }}>Based on {cohortSize} {cohortSize === 1 ? "client whose" : "clients whose"} first visit was 60–180 days ago.</div>
@@ -5673,7 +5673,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
             <div style={{ display: "grid", gap: 2 }}>
               {top.map(({ c, v, spend }) => (
                 <button key={c.id} onClick={() => open(c)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14, background: "none", border: "none", borderTop: "1px solid var(--line)", padding: "12px 2px", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
-                  <span style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{c.name}</span>
+                  <span style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500 }}>{c.name}</span>
                   <span style={{ flexShrink: 0, fontSize: 14.5, fontWeight: 500, fontVariantNumeric: "tabular-nums", color: "var(--sub)" }}>{v} {v === 1 ? "visit" : "visits"}{spend > 0 ? ` · ${fmtMoney(spend)}` : ""}</span>
                 </button>
               ))}
@@ -5834,7 +5834,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
       <div style={{ marginBottom: 22 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>SERVICE MIX</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
       </div>
 
       {/* Period toggle */}
@@ -5849,7 +5849,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
 
       {/* Hero — total visits, total revenue, avg rev/hr */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
           {totalVisits}
         </div>
         <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
@@ -5868,7 +5868,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
                   <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic", flexShrink: 0 }}>Top earner</div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topByRevenue.svc.name}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topByRevenue.svc.name}</div>
                     <div style={{ fontSize: 13, color: "var(--faint)", flexShrink: 0 }}>{fmtMoney(topByRevenue.revenue)}</div>
                   </div>
                 </div>
@@ -5877,7 +5877,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
                   <div style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic", flexShrink: 0 }}>Best per hour</div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topByPerHour.svc.name}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topByPerHour.svc.name}</div>
                     <div style={{ fontSize: 13, color: "var(--faint)", flexShrink: 0 }}>{fmtMoneyDec(topByPerHour.perHour)}/hr</div>
                   </div>
                 </div>
@@ -5894,7 +5894,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
           <div style={{ marginBottom: 30 }}>
             <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 14, fontWeight: 600 }}>ADD-ON ATTACH</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: topAddons.length ? 18 : 0 }}>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -1.2, color: "var(--gold)" }}>{attachRate}%</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -1.2, color: "var(--gold)" }}>{attachRate}%</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>of visits added an add-on{addonRevenue > 0 && <> &middot; <span style={{ fontWeight: 600, color: "var(--text)" }}>{fmtMoney(addonRevenue)}</span> extra</>}</div>
             </div>
             {topAddons.map((x) => (
@@ -5929,7 +5929,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
               return (
                 <div key={row.svc.id}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14, marginBottom: 6 }}>
-                    <div style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 500 }}>{row.svc.name}</div>
+                    <div style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500 }}>{row.svc.name}</div>
                     <div style={{ fontSize: 14, fontWeight: 500, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{labelFor(row)}</div>
                   </div>
                   <div style={{ height: 5, background: "var(--panel2)", borderRadius: 3, overflow: "hidden" }}>
@@ -6144,7 +6144,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
       <div style={{ marginBottom: 22 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>PER BARBER</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
       </div>
 
       {/* Period toggle */}
@@ -6160,7 +6160,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
       {/* Team total — hero */}
       {realProviders.length > 1 && teamVisits > 0 && (
         <div style={{ marginBottom: 28 }}>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
             {fmtMoney(teamRevenue)}
           </div>
           <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
@@ -6180,11 +6180,11 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
                   <Avatar size={42} initial={r.prov.name.charAt(0)} color={r.prov.color} photo={r.prov.photo} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.prov.name}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.prov.name}</div>
                     {r.prov.role && <div style={{ fontSize: 13, color: "var(--sub)" }}>{r.prov.role}</div>}
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, lineHeight: 1 }}>{fmtMoney(r.revenue)}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, lineHeight: 1 }}>{fmtMoney(r.revenue)}</div>
                     <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{r.visits} {r.visits === 1 ? "visit" : "visits"}</div>
                   </div>
                 </div>
@@ -6200,38 +6200,38 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 18px" }}>
                   <div>
                     <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>AVG TICKET</div>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500 }}>{r.visits > 0 ? fmtMoney(r.avgTicket) : "—"}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>{r.visits > 0 ? fmtMoney(r.avgTicket) : "—"}</div>
                   </div>
                   <div>
                     <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>TIPS</div>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500 }}>{r.tips > 0 ? fmtMoney(r.tips) : "—"}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>{r.tips > 0 ? fmtMoney(r.tips) : "—"}</div>
                   </div>
                   <div>
                     <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>REBOOKING</div>
                     {r.rebookPct !== null ? (
-                      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, color: r.rebookPct >= 50 ? "var(--gold)" : "var(--text)" }}>{r.rebookPct}%</div>
+                      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, color: r.rebookPct >= 50 ? "var(--gold)" : "var(--text)" }}>{r.rebookPct}%</div>
                     ) : (
                       <div style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic" }}>—</div>
                     )}
                   </div>
                   <div>
                     <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>OCCUPANCY</div>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500 }}>{r.occupancyPct}%</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>{r.occupancyPct}%</div>
                   </div>
                   <div>
                     <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>NO-SHOW RATE</div>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, color: r.noShow > 0 ? "var(--gold)" : "var(--text)" }}>{r.noShowRate}%</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, color: r.noShow > 0 ? "var(--gold)" : "var(--text)" }}>{r.noShowRate}%</div>
                   </div>
                   <div>
                     <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>TOP SERVICE</div>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.topService ? r.topService.svc.name : "—"}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.topService ? r.topService.svc.name : "—"}</div>
                     {r.topService && <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 1 }}>{r.topService.count}×</div>}
                   </div>
                   <div>
                     <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>60-DAY RETENTION</div>
                     {r.retentionPct !== null ? (
                       <>
-                        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, color: r.retentionPct >= 60 ? "var(--gold)" : "var(--text)" }}>{r.retentionPct}%</div>
+                        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, color: r.retentionPct >= 60 ? "var(--gold)" : "var(--text)" }}>{r.retentionPct}%</div>
                         <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 1 }}>of {r.cohortSize}</div>
                       </>
                     ) : (
@@ -6365,7 +6365,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 22px", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY }}>
         <div style={{ width: "100%", maxWidth: 340, textAlign: "center" }}>
           <div style={{ width: 28, height: 1.5, background: "var(--gold)", margin: "0 auto 16px" }} />
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, marginBottom: 8 }}>{business?.name || "Vero"}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, marginBottom: 8 }}>{business?.name || "Vero"}</div>
           <p style={{ color: "var(--sub)", fontSize: 14.5, marginBottom: 22 }}>Enter your PIN to open the dashboard.</p>
           <input autoFocus type="password" inputMode="numeric" value={lockPin} onChange={(e) => { setLockPin(e.target.value.replace(/\D/g, "").slice(0, 8)); setLockErr(false); }} onKeyDown={(e) => { if (e.key === "Enter") submitLock(); }} placeholder="••••" style={{ width: "100%", boxSizing: "border-box", textAlign: "center", letterSpacing: 10, background: "var(--panel2)", border: `1px solid ${lockErr ? "#c0392b" : "var(--border)"}`, borderRadius: 14, padding: "16px", color: "var(--text)", fontSize: 24, fontFamily: FONT_BODY, marginBottom: lockErr ? 8 : 18 }} />
           {lockErr && <div style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>That PIN didn't match. Try again.</div>}
@@ -6423,7 +6423,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
               return (
                 <>
                   <button onClick={() => { setPinFor(null); setPinEntry(""); setPinErr(false); }} style={{ background: "none", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, padding: 0, marginBottom: 14 }}><ArrowLeft size={16} /> Back</button>
-                  <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 6 }}>{p.name}'s PIN</h2>
+                  <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 6 }}>{p.name}'s PIN</h2>
                   <p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5, marginBottom: 18 }}>Enter your PIN to sign in.</p>
                   <input autoFocus type="password" inputMode="numeric" value={pinEntry} onChange={(e) => { setPinEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setPinErr(false); }} onKeyDown={(e) => { if (e.key === "Enter") submit(); }} placeholder="••••" style={{ width: "100%", boxSizing: "border-box", textAlign: "center", letterSpacing: 8, background: "var(--panel2)", border: `1px solid ${pinErr ? "#c0392b" : "var(--border)"}`, borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 22, fontFamily: FONT_BODY, marginBottom: pinErr ? 8 : 16 }} />
                   {pinErr && <div style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>That PIN didn't match. Try again.</div>}
@@ -6432,7 +6432,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
               );
             })() : (
               <>
-                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 6 }}>Who's at the chair?</h2>
+                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 6 }}>Who's at the chair?</h2>
                 <p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5, marginBottom: 20 }}>Tap your name. This device remembers, so you only see this once.</p>
                 <div style={{ display: "grid", gap: 8 }}>
                   {realProviders.map((p) => (
@@ -6501,7 +6501,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const SectionHeader = ({ title }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
       <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, fontSize: 16 }}><ChevronLeft size={20} /></button>
-      <div><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{form.name || "SERVICE"}</div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{title}</h2></div>
+      <div><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{form.name || "SERVICE"}</div><h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{title}</h2></div>
     </div>
   );
   const SaveBar = () => (
@@ -6654,7 +6654,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <div key={p.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, opacity: on ? 1 : 0.55 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: on ? 16 : 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ width: 30, height: 30, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 14 }}>{p.name.charAt(0)}</span>
+                  <span style={{ width: 30, height: 30, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 14 }}>{p.name.charAt(0)}</span>
                   <span style={{ fontSize: 16, fontWeight: 600 }}>{p.name}</span>
                 </div>
                 <Toggle on={on} onClick={() => setStaff(p.id, { on: !on })} />
@@ -6932,7 +6932,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           return (
             <div key={ct.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16, marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, lineHeight: 1.15 }}>{ct.label}</div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.15 }}>{ct.label}</div>
                 <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>{list.length} PHOTO{list.length === 1 ? "" : "S"}</div>
               </div>
               {ct.desc && <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginBottom: 12 }}>{ct.desc}</p>}
@@ -6953,7 +6953,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           return (
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16, marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500 }}>{form.name || "This service"}</div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>{form.name || "This service"}</div>
                 <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>{list.length} PHOTO{list.length === 1 ? "" : "S"}</div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
@@ -7033,7 +7033,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
               <button onClick={() => setLibForm(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /> Cut Styles</button>
             </div>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, paddingLeft: 4 }}>{libForm.label || "Edit style"}</h2>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, paddingLeft: 4 }}>{libForm.label || "Edit style"}</h2>
             <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20, paddingLeft: 4 }}>Edit this style once. When you save, the name, description and photo update on every service that uses it. Each service keeps its own price and time.</p>
             <div style={{ background: "var(--panel)", borderRadius: 16, padding: 20, border: "1px solid var(--border)" }}>
               <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>PHOTO</div>
@@ -7054,7 +7054,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
               <button onClick={() => setLibOpen(false)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /> Menu</button>
             </div>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 8, paddingLeft: 4 }}>Cut Styles</h2>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 8, paddingLeft: 4 }}>Cut Styles</h2>
             <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20, paddingLeft: 4 }}>Your styles in one place. Edit a style here and it updates on every service that offers it. Price and time stay set per service.</p>
             {(cutLibrary || []).length === 0 ? (
               <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, color: "var(--sub)", fontSize: 15, lineHeight: 1.5 }}>No styles yet. They'll appear here once your services have cut styles.</div>
@@ -7101,7 +7101,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 <button onClick={() => setEditing(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
                 <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>SERVICES</span>
               </div>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, letterSpacing: -0.3, marginBottom: 22, paddingLeft: 26 }}>{form.name || (editing === "new" ? "New service" : "Service")}</h2>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.3, marginBottom: 22, paddingLeft: 26 }}>{form.name || (editing === "new" ? "New service" : "Service")}</h2>
               <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
                 {hubRows.map((r, i) => (
                   <button key={r.id} onClick={() => setSection(r.id)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 18px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
@@ -7227,7 +7227,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   return (
     <div className="fade-up">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500 }}>Menu</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500 }}>Menu</h2>
         <button className="lift" onClick={openNew} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "10px 16px", borderRadius: 12, fontSize: 15, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> Add service</button>
       </div>
       <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 20, fontWeight: 300 }}>Group services into categories. Press and hold the handle to drag, or use the arrows. Your order is saved automatically.</p>
@@ -8200,7 +8200,7 @@ function ImportDataEditor({ showToast }) {
       {stage === "done" && (
         <div style={{ textAlign: "center", padding: "10px 0" }}>
           <CheckCircle2 size={40} style={{ color: "#5E8C61", marginBottom: 12 }} />
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, marginBottom: 6 }}>Import complete</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>Import complete</div>
           <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Brought over from {system}:</div>
           <div style={{ display: "grid", gap: 8, marginBottom: 20, textAlign: "left" }}>
             {[["1,240", "clients"], ["3,580", "past appointments"], ["612", "client notes"], ["48", "gift card balances"]].map(([n, label]) => (
@@ -8296,7 +8296,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   const SecHeader = ({ title, onBack, right }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
       <button onClick={onBack} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
-      <div style={{ flex: 1 }}><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{person ? person.name.toUpperCase() : "STAFF"}</div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{title}</h2></div>
+      <div style={{ flex: 1 }}><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{person ? person.name.toUpperCase() : "STAFF"}</div><h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{title}</h2></div>
       {right}
     </div>
   );
@@ -8326,7 +8326,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         )}
         {showArchived && archived.map((p) => (
           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "12px 16px" }}>
-            <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY }}>{p.name.charAt(0)}</div>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif" }}>{p.name.charAt(0)}</div>
             <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 500 }}>{p.name}</div><div style={{ fontSize: 13, color: "var(--faint)" }}>Archived</div></div>
             <button onClick={() => restore(p.id)} style={{ background: "none", color: "var(--gold)", fontSize: 14, fontWeight: 500 }}>Restore</button>
           </div>
@@ -8400,7 +8400,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
       </div>
     );
     const Group = ({ title, children }) => (
-      <div style={{ marginBottom: 8 }}><div style={{ fontSize: 17, fontWeight: 700, margin: "18px 0 4px", fontFamily: FONT_DISPLAY }}>{title}</div>{children}</div>
+      <div style={{ marginBottom: 8 }}><div style={{ fontSize: 17, fontWeight: 700, margin: "18px 0 4px", fontFamily: "'Fraunces', serif" }}>{title}</div>{children}</div>
     );
     return (
       <div className="appt-screen" style={{ paddingBottom: 40 }}>
@@ -8513,7 +8513,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
               <div style={{ padding: "6px 2px 8px" }}>
                 <div style={{ textAlign: "center", marginBottom: 20 }}>
                   <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>WORK HOURS</div>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginTop: 6 }}>{dayName}</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginTop: 6 }}>{dayName}</div>
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
@@ -8562,7 +8562,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                 <div style={{ padding: "4px 0 6px" }}>
                   <div style={{ textAlign: "center", marginBottom: 6 }}>
                     <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>REPEAT THESE HOURS</div>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginTop: 6 }}>{fmtTime(repeatFor.h.start)} – {fmtTime(repeatFor.h.end)}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginTop: 6 }}>{fmtTime(repeatFor.h.start)} – {fmtTime(repeatFor.h.end)}</div>
                   </div>
                   <p style={{ fontSize: 13.5, color: "var(--sub)", textAlign: "center", lineHeight: 1.5, marginBottom: 16 }}>Pick the days to copy this shift to.</p>
                   <div style={{ display: "grid", gap: 7, marginBottom: 16 }}>
@@ -8605,14 +8605,14 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
 
         {/* Sign-in PIN — what this person enters to sign in as themselves on the dashboard. */}
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: FONT_DISPLAY, marginBottom: 4 }}>Sign-in PIN</div>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Fraunces', serif", marginBottom: 4 }}>Sign-in PIN</div>
           <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, marginBottom: 14 }}>{person.name} enters this to sign in as themselves. Leave blank for no PIN (open sign-in).</div>
           <input value={person.pin || ""} onChange={(e) => patch(person.id, { pin: e.target.value.replace(/\D/g, "").slice(0, 6) })} inputMode="numeric" placeholder="e.g. 1234" style={{ width: 150, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 18, letterSpacing: 4, fontFamily: FONT_BODY }} />
         </div>
 
         {/* Role — Owner sees all barbers + shop totals; Barber sees only their own chair. */}
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: FONT_DISPLAY, marginBottom: 4 }}>Role</div>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Fraunces', serif", marginBottom: 4 }}>Role</div>
           <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, marginBottom: 14 }}>Owners see every barber's numbers and shop totals. Barbers see only their own chair.</div>
           <div style={{ display: "flex", gap: 8 }}>
             {[["barber", "Barber"], ["owner", "Owner"]].map(([id, label]) => {
@@ -8639,7 +8639,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
     const Card = ({ title, desc, on, onToggle, children }) => (
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
-          <div style={{ flex: 1 }}><div style={{ fontSize: 18, fontWeight: 700, fontFamily: FONT_DISPLAY }}>{title}</div><div style={{ fontSize: 14, color: "var(--sub)", marginTop: 4, lineHeight: 1.45 }}>{desc}</div></div>
+          <div style={{ flex: 1 }}><div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Fraunces', serif" }}>{title}</div><div style={{ fontSize: 14, color: "var(--sub)", marginTop: 4, lineHeight: 1.45 }}>{desc}</div></div>
           <Toggle on={on} onClick={onToggle} />
         </div>
         {on && children}
@@ -8651,7 +8651,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
 
         {/* Earnings goals — drive the Pulse goal ring + weekly bar. Personal to this barber. */}
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: FONT_DISPLAY, marginBottom: 4 }}>Earnings goals</div>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Fraunces', serif", marginBottom: 4 }}>Earnings goals</div>
           <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, marginBottom: 16 }}>Personal targets shown on {person.name}'s Pulse as a progress ring and weekly bar. Set to 0 to hide. Auto-tracks from completed appointments — no manual logging.</div>
           <div style={{ display: "grid", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -8738,7 +8738,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         {/* Live earnings readout */}
         <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid var(--gold)", borderRadius: 16, padding: 18, marginTop: 6 }}>
           <div style={{ fontSize: 12, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>ESTIMATED EARNINGS · THIS WEEK</div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 600, marginBottom: 4 }}>${est.total.toFixed(2)}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 600, marginBottom: 4 }}>${est.total.toFixed(2)}</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 14 }}>{est.basis} · {est.count} completed appt{est.count !== 1 ? "s" : ""}</div>
           {[["Service sales", `$${est.serviceSales.toFixed(2)}`], ["Service commission", `$${est.svcCommission.toFixed(2)}`], ["Hours scheduled", `${est.hours.toFixed(1)} h`], ["Hourly pay", `$${est.hourlyPay.toFixed(2)}`]].map(([k, v]) => (
             <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", fontSize: 14.5, borderTop: "1px solid color-mix(in srgb, var(--gold) 20%, transparent)" }}><span style={{ color: "var(--sub)" }}>{k}</span><span style={{ fontWeight: 600 }}>{v}</span></div>
@@ -8759,7 +8759,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         <div style={{ display: "grid", gap: 14 }}>
           {PERMISSION_SECTIONS.map((sec) => (
             <div key={sec.group} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px 6px" }}>
-              <div style={{ fontSize: 18, fontWeight: 700, fontFamily: FONT_DISPLAY, marginBottom: 4 }}>{sec.group}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Fraunces', serif", marginBottom: 4 }}>{sec.group}</div>
               {sec.items.map((it, i) => (
                 <div key={it.key} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, padding: "16px 0", borderTop: i ? "1px solid var(--line)" : "1px solid var(--line)" }}>
                   <div style={{ flex: 1 }}>
@@ -8793,7 +8793,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
       </div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
         <div style={{ marginBottom: 12 }}><Avatar size={92} photo={person.id === "anyone" ? null : staffPhoto(person)} initial={person.name.charAt(0)} color={person.color || "var(--gold)"} /></div>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600 }}>{person.name}</div>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600 }}>{person.name}</div>
         <div style={{ fontSize: 14, color: "var(--sub)" }}>{person.role}</div>
       </div>
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
@@ -9029,7 +9029,7 @@ function Explain({ title, children }) {
       <Sheet open={open} onClose={() => setOpen(false)} align="center" maxWidth={400}>
         <div style={{ padding: "4px 2px 6px" }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{title}</h3>
+            <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{title}</h3>
             <button onClick={() => setOpen(false)} aria-label="Close" style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)", flexShrink: 0, cursor: "pointer" }}><X size={16} /></button>
           </div>
           <div style={{ fontSize: 15, color: "var(--text2)", lineHeight: 1.6 }}>{children}</div>
@@ -9467,9 +9467,9 @@ function ArticleIllustration({ id }) {
   if (id === "how-clients-book") {
     return wrap(
       <svg width="100%" viewBox="0 0 360 150" style={{ maxWidth: 360 }} role="img" aria-label="Pick a service, choose a time, you're booked">
-        <text x="60" y="22" textAnchor="middle" fill={G} style={{ fontFamily: FONT_DISPLAY, fontSize: 13, letterSpacing: 1.5, opacity: 0.85 }}>01</text>
-        <text x="180" y="22" textAnchor="middle" fill={G} style={{ fontFamily: FONT_DISPLAY, fontSize: 13, letterSpacing: 1.5, opacity: 0.85 }}>02</text>
-        <text x="300" y="22" textAnchor="middle" fill={G} style={{ fontFamily: FONT_DISPLAY, fontSize: 13, letterSpacing: 1.5, opacity: 0.85 }}>03</text>
+        <text x="60" y="22" textAnchor="middle" fill={G} style={{ fontFamily: "'Fraunces', serif", fontSize: 13, letterSpacing: 1.5, opacity: 0.85 }}>01</text>
+        <text x="180" y="22" textAnchor="middle" fill={G} style={{ fontFamily: "'Fraunces', serif", fontSize: 13, letterSpacing: 1.5, opacity: 0.85 }}>02</text>
+        <text x="300" y="22" textAnchor="middle" fill={G} style={{ fontFamily: "'Fraunces', serif", fontSize: 13, letterSpacing: 1.5, opacity: 0.85 }}>03</text>
         <line x1="90" y1="70" x2="148" y2="70" stroke={G} strokeWidth="1.5" strokeDasharray="1 6" strokeLinecap="round" />
         <path d="M150 66 L155 70 L150 74" fill="none" stroke={G} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         <line x1="210" y1="70" x2="268" y2="70" stroke={G} strokeWidth="1.5" strokeDasharray="1 6" strokeLinecap="round" />
@@ -9486,9 +9486,9 @@ function ArticleIllustration({ id }) {
         <circle cx="180" cy="70" r="1.6" fill={G} />
         <circle cx="300" cy="70" r="28" fill={G} />
         <path d="M288 70 L297 79 L313 60" fill="none" stroke={ON} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-        <text x="60" y="124" textAnchor="middle" fill={T} style={{ fontFamily: FONT_DISPLAY, fontSize: 12.5, fontWeight: 500 }}>Pick a service</text>
-        <text x="180" y="124" textAnchor="middle" fill={T} style={{ fontFamily: FONT_DISPLAY, fontSize: 12.5, fontWeight: 500 }}>Choose a time</text>
-        <text x="300" y="124" textAnchor="middle" fill={T} style={{ fontFamily: FONT_DISPLAY, fontSize: 12.5, fontWeight: 500 }}>You're booked</text>
+        <text x="60" y="124" textAnchor="middle" fill={T} style={{ fontFamily: "'Fraunces', serif", fontSize: 12.5, fontWeight: 500 }}>Pick a service</text>
+        <text x="180" y="124" textAnchor="middle" fill={T} style={{ fontFamily: "'Fraunces', serif", fontSize: 12.5, fontWeight: 500 }}>Choose a time</text>
+        <text x="300" y="124" textAnchor="middle" fill={T} style={{ fontFamily: "'Fraunces', serif", fontSize: 12.5, fontWeight: 500 }}>You're booked</text>
       </svg>
     );
   }
@@ -9557,7 +9557,7 @@ function HelpCenter({ business, onBack }) {
   const renderBody = (body) => body.split("\n").map((line, i) => {
     const t = line.trim();
     if (!t) return <div key={i} style={{ height: 10 }} />;
-    if (t.startsWith("## ")) return <div key={i} style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 600, color: "var(--text)", margin: "14px 0 4px" }}>{renderInline(t.slice(3))}</div>;
+    if (t.startsWith("## ")) return <div key={i} style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 600, color: "var(--text)", margin: "14px 0 4px" }}>{renderInline(t.slice(3))}</div>;
     if (t.startsWith("- ")) return <div key={i} style={{ display: "flex", gap: 9, margin: "4px 0", color: "var(--sub)", fontSize: 15, lineHeight: 1.55 }}><span style={{ color: "var(--gold)", flexShrink: 0 }}>•</span><span>{renderInline(t.slice(2))}</span></div>;
     return <p key={i} style={{ color: "var(--sub)", fontSize: 15, lineHeight: 1.6, margin: "4px 0" }}>{renderInline(t)}</p>;
   });
@@ -9568,7 +9568,7 @@ function HelpCenter({ business, onBack }) {
       <div className="appt-screen fade-up" style={{ paddingBottom: 48 }}>
         <button onClick={() => setOpenArticle(null)} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "4px 0 18px", cursor: "pointer" }}><ArrowLeft size={17} /> All articles</button>
         <div style={{ fontSize: 11.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 8 }}>{a.category}</div>
-        <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 600, lineHeight: 1.1, margin: "0 0 16px", color: "var(--text)" }}>{a.title}</h1>
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 600, lineHeight: 1.1, margin: "0 0 16px", color: "var(--text)" }}>{a.title}</h1>
         {a.illustration && <ArticleIllustration id={a.illustration} />}
         <div>{renderBody(a.body)}</div>
 
@@ -9603,7 +9603,7 @@ function HelpCenter({ business, onBack }) {
         <span style={{ width: 28, height: 1.5, background: "var(--gold)" }} />
         <span style={{ fontSize: 12, letterSpacing: 3, color: "var(--faint)", textTransform: "uppercase" }}>Help Center</span>
       </div>
-      <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1.05, margin: "0 0 18px", color: "var(--text)" }}>How can we help?</h1>
+      <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1.05, margin: "0 0 18px", color: "var(--text)" }}>How can we help?</h1>
       <div style={{ position: "relative", marginBottom: 24 }}>
         <Search size={19} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--gold)", pointerEvents: "none" }} />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search help articles…" style={{ width: "100%", background: "var(--panel)", border: "1.5px solid var(--border)", borderRadius: 16, padding: "16px 16px 16px 48px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
@@ -10221,7 +10221,7 @@ function WaitlistView({ waitlist, setWaitlist, onText, showToast }) {
   return (
     <>
     <div className="fade-up">
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Waitlist</h2>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Waitlist</h2>
       <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 20, fontWeight: 300 }}>Clients hoping for an opening. Tap one to see their preferred time and notify them when a space frees up.</p>
       {waitlist.length === 0 ? <div style={{ color: "var(--faint)", fontSize: 14, textAlign: "center", padding: "40px 0" }}>No one waiting right now. When a day's full, clients can hop on here — and you'll be the first to know.</div> : (
         <div style={{ display: "grid", gap: 12 }}>{waitlist.map((w, i) => (
@@ -10243,7 +10243,7 @@ function WaitlistView({ waitlist, setWaitlist, onText, showToast }) {
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, maxHeight: "85vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26 }}>{open.name || "Client"}</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26 }}>{open.name || "Client"}</div>
                   <div style={{ fontSize: 14.5, color: "var(--sub)", marginTop: 2 }}><PhoneLink number={open.phone} /></div>
                 </div>
                 <button onClick={() => setOpenId(null)} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
@@ -10406,7 +10406,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
             <div style={{ ...fieldWrap }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 17 }}>{client.name.charAt(0)}</div>
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 17 }}>{client.name.charAt(0)}</div>
                   <div><div style={{ fontSize: 17, fontWeight: 500 }}>{client.name}</div><div style={{ fontSize: 14, color: "var(--sub)" }}>{client.phone || `${client.visits} visits`}</div></div>
                 </div>
                 <button onClick={() => setClient(null)} style={{ background: "none", color: "var(--gold)", fontSize: 14.5 }}>Change</button>
@@ -10453,7 +10453,7 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
                 <div style={{ display: "grid", gap: 6, maxHeight: 280, overflowY: "auto", marginTop: 16 }}>
                   {matches.map((c) => (
                     <button key={c.id} onClick={() => { setClient(c); setQ(""); }} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 14px", color: "var(--text)", textAlign: "left" }}>
-                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 14 }}>{c.name.charAt(0)}</div>
+                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 14 }}>{c.name.charAt(0)}</div>
                       <div style={{ flex: 1 }}><div style={{ fontSize: 15 }}>{c.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{c.phone || `${c.visits} visits`}</div></div>
                     </button>
                   ))}
@@ -10566,7 +10566,7 @@ function DatePickerSheet({ selectedDate, onPick, onClose }) {
         <button onClick={() => stepMonth(-1)} aria-label="Previous month" style={navBtn}><ChevronLeft size={17} /></button>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 4 }}>{year}</div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, letterSpacing: -0.3 }}>{MONTHS[monthIdx]}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, letterSpacing: -0.3 }}>{MONTHS[monthIdx]}</div>
         </div>
         <button onClick={() => stepMonth(1)} aria-label="Next month" style={navBtn}><ChevronRight size={17} /></button>
       </div>
@@ -11350,7 +11350,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       {waitlistMatch && createPortal((
         <div className="fade-in" onClick={() => setWaitlistMatch(null)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, maxHeight: "85vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}><Bell size={20} style={{ color: "var(--gold)" }} /><div style={{ fontFamily: FONT_DISPLAY, fontSize: 22 }}>A slot just opened</div></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}><Bell size={20} style={{ color: "var(--gold)" }} /><div style={{ fontFamily: "'Fraunces', serif", fontSize: 22 }}>A slot just opened</div></div>
             <div style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 18, lineHeight: 1.45 }}>{fmtTime(waitlistMatch.freed.start)} – {fmtTime(waitlistMatch.freed.end)} is now free. {wlRules.order === "longest" ? "Offer it to the longest-waiting match first?" : `These waitlisted client${waitlistMatch.matches.length > 1 ? "s" : ""} asked for this window — notify them with a link to book?`}</div>
             <div style={{ display: "grid", gap: 8, marginBottom: 18 }}>
               {waitlistMatch.matches.map((m, i) => {
@@ -11375,7 +11375,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           <div className="fade-in" onClick={() => setPending(null)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 55 }} />
           <div className="fade-in" style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 56, boxSizing: "border-box", pointerEvents: "none" }}>
             <div style={{ pointerEvents: "auto", width: "100%", maxWidth: 400, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, textAlign: "center", boxShadow: "0 18px 50px var(--shadow)" }}>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, marginBottom: 6 }}>Move appointment?</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, marginBottom: 6 }}>Move appointment?</div>
               <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, fontWeight: 300, marginBottom: 4 }}>{pending.appt.name} — {pending.appt.title}</div>
               <div style={{ fontSize: 15, color: "var(--sub)", marginBottom: 18 }}>
                 <span style={{ textDecoration: "line-through", opacity: 0.6 }}>{fmtTime(pending.appt.start)}</span>
@@ -11420,7 +11420,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         return createPortal((
           <div className="fade-in" onClick={() => setConflictModal(null)} style={{ position: "fixed", inset: 0, zIndex: 900, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, marginBottom: 8 }}>Already booked at this time</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, marginBottom: 8 }}>Already booked at this time</div>
               <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 18 }}>
                 {barberName} already has {first.name} at {fmtTime(first.start)}{more > 0 ? ` (and ${more} more)` : ""}.{nextSlotTxt ? ` Next open slot is ${nextSlotTxt}.` : ""} Book anyway?
               </div>
@@ -11436,7 +11436,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       {capWarn && createPortal((
         <div className="fade-in" onClick={() => setCapWarn(null)} style={{ position: "fixed", inset: 0, zIndex: 900, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, marginBottom: 8 }}>Daily limit reached</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, marginBottom: 8 }}>Daily limit reached</div>
             <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 18 }}>
               {capWarn.scope === "shop" ? "The shop is" : `${capWarn.who} is`} already at {capWarn.limit} appointment{capWarn.limit === 1 ? "" : "s"} that day — the max you set. Clients can't book online past this, but you can squeeze one in.
             </div>
@@ -11637,7 +11637,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
   if (stage === "review") return sheet(
     <div style={{ padding: "20px 24px 32px" }}>
       <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 500 }}>CHECKOUT</div>
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, letterSpacing: -0.5, marginBottom: 4 }}>{appt.name || "Walk-in"}</h2>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.5, marginBottom: 4 }}>{appt.name || "Walk-in"}</h2>
       <p style={{ color: "var(--sub)", fontSize: 15, marginBottom: 24, fontWeight: 300 }}>{service?.name || appt.title} with {provider?.name}</p>
       <div style={{ background: "var(--panel)", borderRadius: 18, border: "1px solid var(--line)", boxShadow: "var(--shadow-sm)", padding: "6px 18px", marginBottom: 24 }}>
         <CheckoutRow label={service?.name || appt.title} val={money(base)} />
@@ -11654,7 +11654,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
         <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", animation: "pulse 1.6s var(--ease) infinite" }} />
         <div style={{ position: "absolute", inset: 16, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center" }}><CreditCard size={32} style={{ color: "var(--on-gold)" }} /></div>
       </div>
-      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Insert or tap card</div>
+      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Insert or tap card</div>
       <p style={{ color: "var(--sub)", fontSize: 15.5, fontWeight: 300, marginBottom: 4 }}>{money(base)} — waiting for card…</p>
       <p style={{ color: "var(--faint)", fontSize: 13, marginTop: 18 }}>Simulated reader · advancing automatically</p>
     </div>
@@ -11663,7 +11663,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
   if (stage === "tip") return sheet(
     <div style={{ padding: "24px 24px 32px" }}>
       <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 500, textAlign: "center" }}>CARD READ · ADD A TIP</div>
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, textAlign: "center", marginBottom: 4 }}>Add a tip?</h2>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, textAlign: "center", marginBottom: 4 }}>Add a tip?</h2>
       <p style={{ color: "var(--sub)", fontSize: 15, textAlign: "center", marginBottom: 24, fontWeight: 300 }}>{service?.name || appt.title} · {money(base)}</p>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         {tipCfg.presets.map((p) => { const on = customTip == null && tipPct === p; return (
@@ -11686,12 +11686,12 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
       {stage === "approving" ? (
         <>
           <div style={{ width: 72, height: 72, borderRadius: "50%", border: "3px solid var(--line)", borderTopColor: "var(--gold)", margin: "0 auto 24px", animation: "spin .8s linear infinite" }} />
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500 }}>Approving…</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500 }}>Approving…</div>
         </>
       ) : (
         <div className="fade-in">
           <div style={{ width: 88, height: 88, borderRadius: "50%", background: "#3FA968", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px", animation: "popIn .4s var(--ease) both" }}><Check size={44} style={{ color: "#fff" }} strokeWidth={3} /></div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Approved</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Approved</div>
           <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300 }}>{money(total)} charged</p>
         </div>
       )}
@@ -11702,7 +11702,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
     <div style={{ padding: "28px 24px 32px" }}>
       <div style={{ textAlign: "center", marginBottom: 26 }}>
         <div style={{ width: 56, height: 56, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Repeat size={26} style={{ color: "var(--gold)" }} /></div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, lineHeight: 1.15 }}>{discountOn ? `Save ${discLabel} by rebooking now?` : "Book the next visit?"}</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, lineHeight: 1.15 }}>{discountOn ? `Save ${discLabel} by rebooking now?` : "Book the next visit?"}</h2>
         <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300 }}>{discountOn ? `Lock in ${appt.name ? appt.name.split(" ")[0] : "the next visit"}'s next ${service?.name || "appointment"} and take ${discLabel} off.` : `Lock in ${appt.name ? appt.name.split(" ")[0] : "the next visit"}'s next ${service?.name || "appointment"} before they head out.`}</p>
       </div>
       {(() => {
@@ -11754,7 +11754,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
     <div style={{ padding: "24px 22px 30px" }}>
       <button onClick={() => setStage("rebook")} style={{ background: "none", color: "var(--sub)", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 16 }}><ArrowLeft size={16} /> Back</button>
       <div style={{ textAlign: "center", marginBottom: 20 }}>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 25, fontWeight: 500, letterSpacing: -0.3, marginBottom: 6 }}>Pick a time</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, letterSpacing: -0.3, marginBottom: 6 }}>Pick a time</h2>
         <p style={{ color: "var(--sub)", fontSize: 14.5, fontWeight: 300 }}>{targetLabel}{provider?.name ? ` · ${provider.name}` : ""}</p>
       </div>
       {daySlots.off ? (
@@ -11791,7 +11791,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
   return sheet(
     <div className="fade-in" style={{ padding: "56px 28px 64px", textAlign: "center" }}>
       <div style={{ width: 72, height: 72, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px" }}><Check size={34} style={{ color: "var(--gold)" }} /></div>
-      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 8 }}>All done</div>
+      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 8 }}>All done</div>
       <p style={{ color: "var(--sub)", fontSize: 15.5, fontWeight: 300 }}>{money(total)} charged for today’s visit · receipt sent to {appt.name || "the client"}.</p>
 
       {hasSelection && (
@@ -11869,7 +11869,7 @@ function CardOnFileSheet({ open, onClose, client, onSaved, showToast }) {
       <div style={{ padding: "6px 4px 8px" }}>
         <div style={{ textAlign: "center", marginBottom: 18 }}>
           <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD ON FILE</div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
         </div>
         <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
         {!ready && !err && <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", marginBottom: 12 }}>Loading secure card field…</div>}
@@ -11924,7 +11924,7 @@ function RefundSheet({ open, onClose, client, payment, onApply, showToast }) {
         {done != null ? (
           <div style={{ textAlign: "center", padding: "14px 0 6px" }}>
             <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><CheckCircle2 size={34} color="var(--on-gold)" /></div>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 4 }}>Refunded ${done}</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 4 }}>Refunded ${done}</div>
             <div style={{ fontSize: 14.5, color: "var(--sub)" }}>{client?.name}</div>
             <button onClick={onClose} style={{ marginTop: 22, width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none" }}>DONE</button>
           </div>
@@ -11932,12 +11932,12 @@ function RefundSheet({ open, onClose, client, payment, onApply, showToast }) {
           <>
             <div style={{ textAlign: "center", marginBottom: 16 }}>
               <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>REFUND OR DISCOUNT</div>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 4 }}>Up to ${maxRefund.toFixed(2)} refundable</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 12 }}>
-              <span style={{ fontFamily: FONT_DISPLAY, fontSize: 28, color: "var(--sub)" }}>$</span>
-              <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: FONT_DISPLAY, fontSize: 28, color: "var(--text)", width: "100%", padding: 0 }} />
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, color: "var(--sub)" }}>$</span>
+              <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: "'Fraunces', serif", fontSize: 28, color: "var(--text)", width: "100%", padding: 0 }} />
             </div>
             {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
             <button onClick={refund} disabled={busy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: busy ? 0.6 : 1 }}><RefreshCw size={16} /> {busy ? "REFUNDING…" : "ISSUE REFUND"}</button>
@@ -12027,7 +12027,7 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
       <div style={{ marginBottom: 18 }}>
         <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
         <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>PAYMENTS &middot; MONEY FLOW</div>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{periodLabel}</div>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{periodLabel}</div>
         <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10 }}><b style={{ color: "var(--text)", fontWeight: 600 }}>{fmtMoney0(netIn)}</b> net &middot; {periodRows.length} charge{periodRows.length === 1 ? "" : "s"}</div>
       </div>
 
@@ -12037,25 +12037,25 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
 
       <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "20px 18px", marginBottom: 16 }}>
         <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700, marginBottom: 8 }}>MONEY IN</div>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 46, fontWeight: 500, lineHeight: 1, letterSpacing: -1.3 }}>{fmtMoney0(grossIn)}</div>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 46, fontWeight: 500, lineHeight: 1, letterSpacing: -1.3 }}>{fmtMoney0(grossIn)}</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, paddingTop: 14, borderTop: "1px solid color-mix(in srgb, var(--gold) 18%, var(--border))" }}>
           <span style={{ fontSize: 13.5, color: "var(--sub)" }}>&minus; Refunds</span>
-          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500, color: refundsOut > 0 ? "var(--text)" : "var(--faint)" }}>{fmtMoney0(refundsOut)}</span>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: refundsOut > 0 ? "var(--text)" : "var(--faint)" }}>{fmtMoney0(refundsOut)}</span>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
           <span style={{ fontSize: 14, color: "var(--text)", fontWeight: 600 }}>Net in your pocket</span>
-          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 600, color: "var(--gold)" }}>{fmtMoney0(netIn)}</span>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, color: "var(--gold)" }}>{fmtMoney0(netIn)}</span>
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px" }}>
           <div style={{ fontSize: 11, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600, marginBottom: 6 }}>TIPS</div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{fmtMoney0(tipsIn)}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{fmtMoney0(tipsIn)}</div>
         </div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px" }}>
           <div style={{ fontSize: 11, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600, marginBottom: 6 }}>NO-SHOW FEES</div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{fmtMoney0(noShowFees)}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{fmtMoney0(noShowFees)}</div>
         </div>
       </div>
 
@@ -12091,7 +12091,7 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
                 <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{r.note || (r.type === "no-show" ? "No-show fee" : "Sale")} · {fmtDay(r.ts)}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, textDecoration: r.status === "refunded" ? "line-through" : "none", color: r.status === "refunded" ? "var(--faint)" : "var(--text)" }}>{fmtMoney(r.amount)}</div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, textDecoration: r.status === "refunded" ? "line-through" : "none", color: r.status === "refunded" ? "var(--faint)" : "var(--text)" }}>{fmtMoney(r.amount)}</div>
                 <div style={{ marginTop: 2 }}>{statusPill(r.status)}</div>
               </div>
             </button>
@@ -12103,7 +12103,7 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
         {openRow && (
           <div style={{ padding: "6px 4px 8px" }}>
             <div style={{ textAlign: "center", marginBottom: 18 }}>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500 }}>{fmtMoney(openRow.amount)}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500 }}>{fmtMoney(openRow.amount)}</div>
               <div style={{ marginTop: 4 }}>{statusPill(openRow.status)}</div>
               {openRow.refunded > 0 && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 4 }}>{fmtMoney(openRow.refunded)} refunded</div>}
             </div>
@@ -12179,7 +12179,7 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast }
       <div style={{ padding: "6px 4px 8px" }}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD PAYMENT</div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500 }}>${(Math.round((amount || 0) * 100) / 100).toFixed(2)}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500 }}>${(Math.round((amount || 0) * 100) / 100).toFixed(2)}</div>
         </div>
         <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
         {!ready && !err && <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", marginBottom: 12 }}>Loading secure card field…</div>}
@@ -12246,7 +12246,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
       {done ? (
         <div style={{ padding: "40px 8px", textAlign: "center" }}>
           <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}><CheckCircle2 size={38} color="var(--on-gold)" /></div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Paid {fm(done.amount)}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Paid {fm(done.amount)}</div>
           <div style={{ fontSize: 14.5, color: "var(--sub)" }}>{done.method === "cash" ? "Cash" : "Card"}{client ? ` · ${client.name}` : ""}</div>
           {done.method === "cash" && done.change > 0 && <div style={{ fontSize: 18, color: "var(--text)", marginTop: 14, fontWeight: 600 }}>Change due: {fm(done.change)}</div>}
           <div style={{ display: "flex", gap: 10, marginTop: 28 }}>
@@ -12257,7 +12257,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
       ) : (
         <div style={{ padding: "2px 2px 12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500 }}>New sale</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500 }}>New sale</div>
             <button onClick={onClose} style={{ background: "var(--panel2)", border: "1px solid var(--border)", width: 38, height: 38, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={18} /></button>
           </div>
 
@@ -12296,7 +12296,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
                     <span style={{ minWidth: 18, textAlign: "center", fontSize: 14.5, fontWeight: 600 }}>{x.qty}</span>
                     <button onClick={() => setQty(x.id, 1)} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--text)", fontSize: 16, lineHeight: 1 }}>+</button>
                   </div>
-                  <div style={{ minWidth: 56, textAlign: "right", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 500 }}>{fm(x.price * x.qty)}</div>
+                  <div style={{ minWidth: 56, textAlign: "right", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500 }}>{fm(x.price * x.qty)}</div>
                   <button onClick={() => removeItem(x.id)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 2 }}><Trash2 size={15} /></button>
                 </div>
               ))}
@@ -12318,7 +12318,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--border)", paddingTop: 14, marginBottom: 16 }}>
                 <span style={{ fontSize: 15, fontWeight: 600 }}>Total</span>
-                <span style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500 }}>{fm(total)}</span>
+                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500 }}>{fm(total)}</span>
               </div>
 
               <div style={{ display: "flex", gap: 10 }}>
@@ -12332,11 +12332,11 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
           <Sheet open={payMode === "cash"} onClose={() => setPayMode(null)} align="center" maxWidth={380}>
             <div style={{ padding: "6px 4px 8px", textAlign: "center" }}>
               <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CASH</div>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, marginBottom: 16 }}>{fm(total)}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 16 }}>{fm(total)}</div>
               <div style={{ textAlign: "left", fontSize: 12, letterSpacing: 1, color: "var(--sub)", marginBottom: 6 }}>AMOUNT TENDERED</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "12px 16px", marginBottom: 12 }}>
-                <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--sub)" }}>$</span>
-                <input value={tendered} onChange={(e) => setTendered(e.target.value)} inputMode="decimal" autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--text)", width: "100%" }} />
+                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 24, color: "var(--sub)" }}>$</span>
+                <input value={tendered} onChange={(e) => setTendered(e.target.value)} inputMode="decimal" autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: "'Fraunces', serif", fontSize: 24, color: "var(--text)", width: "100%" }} />
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, marginBottom: 18 }}><span style={{ color: "var(--sub)" }}>Change due</span><span style={{ fontWeight: 600 }}>{fm(changeDue)}</span></div>
               <button onClick={() => { setPayMode(null); completeCash(); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none" }}>COMPLETE SALE</button>
@@ -12350,7 +12350,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
           {/* client picker */}
           <Sheet open={clientPick} onClose={() => setClientPick(false)} align="top" maxWidth={420}>
             <div style={{ padding: "4px 2px 10px" }}>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 12 }}>Attach a client</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 12 }}>Attach a client</div>
               <input value={clientQuery} onChange={(e) => setClientQuery(e.target.value)} placeholder="Search clients…" autoFocus style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", fontSize: 15, color: "var(--text)", marginBottom: 12, boxSizing: "border-box" }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: "50vh", overflowY: "auto" }}>
                 {matches.map((c) => (
@@ -12392,7 +12392,7 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
         {done != null ? (
           <div style={{ textAlign: "center", padding: "14px 0 6px" }}>
             <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><CheckCircle2 size={34} color="var(--on-gold)" /></div>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, marginBottom: 4 }}>Charged ${done}</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 4 }}>Charged ${done}</div>
             <div style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 2 }}>{client?.name}</div>
             {card && <div style={{ fontSize: 13.5, color: "var(--faint)" }}>{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : "Card"} ···· {card.last4}</div>}
             <button onClick={onClose} style={{ marginTop: 22, width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none" }}>DONE</button>
@@ -12401,12 +12401,12 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
           <>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CHARGE NO-SHOW FEE</div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
           {card && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 4 }}>{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : "Card"} ···· {card.last4}</div>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 12 }}>
-          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 28, color: "var(--sub)" }}>$</span>
-          <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: FONT_DISPLAY, fontSize: 28, color: "var(--text)", width: "100%", padding: 0 }} />
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, color: "var(--sub)" }}>$</span>
+          <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: "'Fraunces', serif", fontSize: 28, color: "var(--text)", width: "100%", padding: 0 }} />
         </div>
         {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
         <button onClick={charge} disabled={busy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: busy ? 0.6 : 1 }}><DollarSign size={16} /> {busy ? "CHARGING…" : "CHARGE CARD"}</button>
@@ -12551,7 +12551,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const TopBar = ({ left, title, right }) => (
     <div style={{ background: "var(--text)", borderBottom: "2px solid var(--gold)", padding: "calc(env(safe-area-inset-top, 0px) + 18px) 16px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 5 }}>
       <div style={{ minWidth: 64 }}>{left}</div>
-      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: "var(--bg)", letterSpacing: "0.2px" }}>{title}</div>
+      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 500, color: "var(--bg)", letterSpacing: "0.2px" }}>{title}</div>
       <div style={{ minWidth: 64, display: "flex", justifyContent: "flex-end", gap: 16, alignItems: "center" }}>{right}</div>
     </div>
   );
@@ -12665,11 +12665,11 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               <div style={{ padding: "24px 18px 22px", borderBottom: `1px solid ${T.line}`, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
                 <div>
                   <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 7 }}>Appointment</div>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 28, lineHeight: 1.05, color: T.text }}>{apptDateLabel()}</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, lineHeight: 1.05, color: T.text }}>{apptDateLabel()}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 7 }}>Time</div>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, lineHeight: 1.05, color: T.text }}>{fmtTime(appt.start)}</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, lineHeight: 1.05, color: T.text }}>{fmtTime(appt.start)}</div>
                 </div>
               </div>
 
@@ -12678,7 +12678,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   <div style={{ width: 54, height: 54, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, flexShrink: 0 }}>{initials}</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, lineHeight: 1.1 }}>{appt.name} {appt.vip && <span style={{ color: status.dot }}>★</span>}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, lineHeight: 1.1 }}>{appt.name} {appt.vip && <span style={{ color: status.dot }}>★</span>}</div>
                     <div style={{ fontSize: 15, color: T.sub }}>{client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client"}</div>
                   </div>
                   <button onClick={() => showToast("Opening message thread…")} style={{ width: 44, height: 44, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center" }}><MessageSquare size={18} /></button>
@@ -12707,12 +12707,12 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               {/* service block */}
               <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ display: "flex", alignItems: "baseline", marginBottom: 14, paddingBottom: 16, borderBottom: `1px solid ${T.line}` }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: T.text }}>{service?.name || appt.title}</span>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 24, color: T.text }}>{service?.name || appt.title}</span>
                   <span style={{ flex: 1, margin: "0 12px", borderBottom: `2px dotted ${T.faint}`, transform: "translateY(-5px)" }} />
                   {canEditPrice ? (
-                    <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontFamily: FONT_DISPLAY, fontSize: 24, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }}>${price}<Edit2 size={14} style={{ color: T.faint }} /></button>
+                    <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontFamily: "'Fraunces', serif", fontSize: 24, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }}>${price}<Edit2 size={14} style={{ color: T.faint }} /></button>
                   ) : (
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: T.text }}>${price}</span>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 24, color: T.text }}>${price}</span>
                   )}
                 </div>
                 {appt.detail && (
@@ -12781,7 +12781,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   <div className="fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 811, padding: 24 }}>
                   {!lateCascade ? (
                   <>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, marginBottom: 4 }}>How far behind?</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, marginBottom: 4 }}>How far behind?</div>
                   <div style={{ fontSize: 14, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>We'll send {nextClient ? nextClient.name : "your next client"} an in-app notification — no text message.</div>
                   <div style={{ display: "flex", gap: 10 }}>
                     {((business?.runningLate?.ranges) || ["5–10", "10–15"]).map((r) => (
@@ -12798,7 +12798,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   const tFirst = (target.name || "").split(" ")[0];
                   return (
                   <>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, marginBottom: 4 }}>{lateCascade.idx === 1 ? "Let the client after next know too?" : "And the next one in line?"}</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, marginBottom: 4 }}>{lateCascade.idx === 1 ? "Let the client after next know too?" : "And the next one in line?"}</div>
                   <div style={{ fontSize: 14, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>{target.name} is up at {fmtTime(target.start)}. As you catch up, they'd get a lighter heads-up.</div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
                     <span style={{ fontSize: 15, fontWeight: 500 }}>{target.name}</span>
@@ -12827,7 +12827,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 16 }}>When</div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 22, color: T.text }}>{apptDateLabel()}</span>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: T.text }}>{apptDateLabel()}</span>
                   <span style={{ fontSize: 12.5, color: T.faint, fontStyle: "italic" }}>moved on the calendar</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -12840,7 +12840,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               <div style={{ padding: "20px 18px", borderBottom: `1px solid ${T.line}`, display: "flex", alignItems: "center", gap: 14 }}>
                 <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 600, flexShrink: 0 }}>{initials}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 21, color: T.text }}>{appt.name}</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, color: T.text }}>{appt.name}</div>
                   <div style={{ fontSize: 14.5, color: T.sub }}>{client?.phone ? fmtPhone(client.phone) : "New client"}</div>
                 </div>
               </div>
@@ -12848,7 +12848,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               {/* SERVICE */}
               <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 10 }}>Service</div>
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 23, color: T.text, marginBottom: 4 }}>{service?.name || appt.title}</div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, color: T.text, marginBottom: 4 }}>{service?.name || appt.title}</div>
                 {appt.detail && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
                     {appt.detail.split(",").map((d, i) => (
@@ -12871,7 +12871,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 {canEditPrice && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20 }}>
                     <span style={{ fontSize: 15, color: T.sub }}>Price</span>
-                    <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontFamily: FONT_DISPLAY, fontSize: 21, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }}>${price}<Edit2 size={14} style={{ color: T.faint }} /></button>
+                    <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontFamily: "'Fraunces', serif", fontSize: 21, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }}>${price}<Edit2 size={14} style={{ color: T.faint }} /></button>
                   </div>
                 )}
               </div>
@@ -12890,11 +12890,11 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
         <div style={{ padding: "6px 4px 8px" }}>
           <div style={{ textAlign: "center", marginBottom: 18 }}>
             <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>EDIT PRICE</div>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500 }}>{service?.name || appt.title}</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{service?.name || appt.title}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 12 }}>
-            <span style={{ fontFamily: FONT_DISPLAY, fontSize: 28, color: "var(--sub)" }}>$</span>
-            <input type="text" inputMode="decimal" value={priceDraft} onChange={(e) => setPriceDraft(e.target.value)} placeholder={String(price)} autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: FONT_DISPLAY, fontSize: 28, color: "var(--text)", width: "100%", padding: 0 }} />
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, color: "var(--sub)" }}>$</span>
+            <input type="text" inputMode="decimal" value={priceDraft} onChange={(e) => setPriceDraft(e.target.value)} placeholder={String(price)} autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: "'Fraunces', serif", fontSize: 28, color: "var(--text)", width: "100%", padding: 0 }} />
           </div>
           <button onClick={savePrice} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", marginBottom: 10 }}><Check size={17} /> SAVE PRICE</button>
           {appt.price != null && (
@@ -12982,14 +12982,14 @@ function ReportsView({ appts, clients, providers, services, business }) {
   const Stat = ({ label, value, sub }) => (
     <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 12.5, letterSpacing: 1, color: "var(--faint)", marginBottom: 6, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
-      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 27, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, lineHeight: 1 }}>{value}</div>
       {sub && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 5 }}>{sub}</div>}
     </div>
   );
 
   return (
     <div className="fade-up" style={{ paddingBottom: 20 }}>
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 4 }}>Reports</h2>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 4 }}>Reports</h2>
       <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 16, fontWeight: 300 }}>How the shop is performing at a glance.</p>
 
       {/* range toggle */}
@@ -13197,7 +13197,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
       <div style={{ padding: "18px 4px 12px" }}>
         <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500 }}>Due to rebook</h2>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500 }}>Due to rebook</h2>
           {overdue.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, padding: "3px 8px", lineHeight: 1 }}>{overdue.length}</span>}
         </div>
         <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 18, lineHeight: 1.5 }}>Clients past their usual rebooking rhythm. Send a nudge — or skip them with ×.</p>
@@ -13232,7 +13232,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
         <div className="fade-in" onClick={() => setNudgeConfirm(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, maxHeight: "88vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24 }}>Send a rebook nudge</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24 }}>Send a rebook nudge</div>
               <button onClick={() => setNudgeConfirm(null)} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
             </div>
             <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 18, lineHeight: 1.5 }}>To <strong style={{ color: "var(--text)" }}>{o.c.name}</strong> · {o.over}d overdue</p>
