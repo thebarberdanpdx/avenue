@@ -2261,15 +2261,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", marginBottom: 14 }}>Welcome to</div>
             <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.08, letterSpacing: "-0.4px", margin: "0 0 12px", color: "var(--text)" }}>{business.name}</h1>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14, fontWeight: 400, lineHeight: 1.55, margin: "0 0 32px", maxWidth: 320 }}>Glad you're here. Let's find you a time.</p>
-            <div style={{ borderBottom: "1px solid var(--line)" }}>
-              <button onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "20px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" }}>
+            <div style={{ display: "grid", gap: 12 }}>
+              <button onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ width: "100%", textAlign: "left", background: "var(--gold)", border: "none", borderRadius: 12, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--on-gold)", cursor: "pointer" }}>
                 <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" }}>I've been here before</span>
-                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", fontWeight: 400, marginTop: 5 }}>We'll pull up your details</span>
+                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--on-gold)" }}>I've been here before</span>
+                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 400, marginTop: 5, color: "var(--on-gold)", opacity: 0.8 }}>We'll pull up your details</span>
                 </span>
-                <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                <ChevronRight size={20} style={{ color: "var(--on-gold)", flexShrink: 0, opacity: 0.9 }} />
               </button>
-              <button onClick={() => { setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "20px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" }}>
+              <button onClick={() => { setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "1px solid var(--border)", borderRadius: 12, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" }}>
                 <span style={{ minWidth: 0 }}>
                   <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" }}>It's my first time</span>
                   <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", fontWeight: 400, marginTop: 5 }}>Welcome — let's take a look</span>
@@ -2391,6 +2391,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const addNo = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: undefined }, finishAns: "no" } : e));
 
           const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
+          const firstSentence = (s) => { if (!s) return s; const m = String(s).match(/^.*?[.!?](\s|$)/); return m ? m[0].trim() : String(s); };
           const renderCard = (ct, selected, hidden) => {
             const img = ct.images && ct.images[0];
             return (
@@ -2401,7 +2402,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{ct.label || niceName[ct.id]}</span>
                     {ct.popular && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--gold)", fontWeight: 600 }}>Most common</span>}
                   </span>
-                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 5 }}>{ct.desc || friendly[ct.id]}</span>
+                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginTop: 6 }}>{firstSentence(ct.desc || friendly[ct.id])}</span>
                   {showPrices && <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, color: "var(--gold)", marginTop: 6 }}>${ct.price}</span>}
                 </span>
                 <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
@@ -2438,7 +2439,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       {cDur ? <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 3 }}>{cDur} min</span> : null}
                     </span> : null}
                   </div>
-                  {cDesc ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, lineHeight: 1.6, color: "var(--text2)", marginTop: 12 }}>{cDesc}</div> : null}
+                  {cDesc ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, lineHeight: 1.6, color: "var(--text2)", marginTop: 12 }}>{cDesc}</div> : null}
                   <button onClick={changeCut} style={{ marginTop: 16, background: "none", border: "none", color: "var(--gold)", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 600, letterSpacing: 0.3, padding: 0, cursor: "pointer" }}>‹ Choose a different style</button>
                 </div>
                 );
@@ -3604,10 +3605,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </div>
               );
             })()}
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Let's find a time</h2>
-              <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 400, lineHeight: 1.5 }}>Grab the soonest opening, or pick a day that works for you.</p>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Pick a time</div>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>When works for you?</h2>
             </div>
             {/* soonest available shortcut */}
             {(() => {
@@ -3616,23 +3616,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const isFirstToday = firstOpen.toDateString() === new Date().toDateString();
               const already = selectedDate && firstOpen.toDateString() === selectedDate.toDateString();
               return (
-                <button className="lift" onClick={() => { setSelectedDate(firstOpen); setSlot(null); setSlotConflict(false); }} style={{ width: "100%", textAlign: "left", background: already ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1.5px solid ${already ? "var(--gold)" : "var(--border2)"}`, borderRadius: 14, padding: "15px 17px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    <span style={{ fontSize: 11.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600 }}>SOONEST OPENING</span>
-                    <span style={{ fontSize: 16.5, fontWeight: 500 }}>{DAYS[firstOpen.getDay()]}, {MONTHS[firstOpen.getMonth()]} {firstOpen.getDate()}</span>
-                    <span style={{ fontSize: 13, color: "var(--sub)" }}>{isFirstToday ? "Today" : daysFromNow(firstOpen)}</span>
+                <button onClick={() => { setSelectedDate(firstOpen); setSlot(null); setSlotConflict(false); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: `1px solid ${already ? "var(--gold)" : "var(--border)"}`, borderRadius: 10, padding: "15px 17px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
+                  <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase" }}>Soonest opening</span>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: "var(--text)" }}>{DAYS[firstOpen.getDay()]}, {MONTHS[firstOpen.getMonth()]} {firstOpen.getDate()}</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}>{isFirstToday ? "Today" : daysFromNow(firstOpen)}</span>
                   </span>
-                  <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                  <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
                 </button>
               );
             })()}
-            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 12, fontFamily: FONT_DISPLAY }}>Or pick another day</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 12 }}>Or pick another day</div>
             <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 22 }}>
               {dateOptions.map((d, i) => {
                 const on = selectedDate && d.toDateString() === selectedDate.toDateString();
                 const isToday = d.toDateString() === new Date().toDateString();
                 return (
-                  <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} style={{ flexShrink: 0, width: 60, padding: "10px 0", borderRadius: 12, background: on ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: on ? "var(--gold)" : (isToday ? "var(--gold)" : "var(--border2)"), color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+                  <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} style={{ flexShrink: 0, width: 58, padding: "10px 0", borderRadius: 10, background: on ? "var(--gold)" : "transparent", border: "1px solid", borderColor: on ? "var(--gold)" : (isToday ? "var(--gold)" : "var(--line)"), color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", cursor: "pointer" }}>
                     <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{DAYS[d.getDay()].slice(0, 3).toUpperCase()}</div>
                     {isToday
                       ? <div style={{ fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 600, color: on ? "var(--on-gold)" : "var(--gold)", lineHeight: "24px" }}>Today</div>
@@ -3644,11 +3644,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             </div>
             {selectedDate && !dateIsFull && (<>
               {/* Selected day as a clean heading — keeps day-of-week + date + days-away phrasing for clarity */}
-              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
-              <div style={{ fontSize: 13.5, color: "var(--gold)", fontWeight: 500, marginBottom: 14 }}>{daysFromNow(selectedDate)}</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--text)", marginBottom: 3 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--gold)", fontWeight: 500, marginBottom: 16 }}>{daysFromNow(selectedDate)}</div>
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{slotsReady ? openSlots.map((t) => (<button key={t} className="lift" onClick={() => { setSlot(t); setSlotConflict(false); }} style={{ background: slot === t ? "var(--gold)" : "var(--panel2)", border: "1px solid", borderColor: slot === t ? "var(--gold)" : "var(--border2)", borderRadius: 10, padding: "13px 4px", color: slot === t ? "var(--on-gold)" : "var(--text)", fontSize: 14 }}>{fmtTime(t)}</button>)) : [0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 10 }} />))}</div>
-              {slot != null && <button className="lift" onClick={() => setStep(7)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, marginBottom: 24 }}>Continue →</button>}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{slotsReady ? openSlots.map((t) => (<button key={t} onClick={() => { setSlot(t); setSlotConflict(false); }} style={{ background: "transparent", border: slot === t ? "1.5px solid var(--gold)" : "1px solid var(--border)", borderRadius: 8, padding: "14px 4px", color: slot === t ? "var(--gold)" : "var(--text)", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>{fmtTime(t)}</button>)) : [0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 8 }} />))}</div>
+              {slot != null && <button onClick={() => setStep(7)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 24, border: "none", cursor: "pointer" }}>Continue →</button>}
             </>)}
 
             {/* date is fully booked → waitlist path */}
@@ -3756,35 +3756,35 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* STEP 7 — contact + EDITABLE policy */}
         {step === 7 && !showUsual && (
           <div className="fade-up">
-            <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{matched ? "Almost there" : "Last thing — your details"}</h2>
-            <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>{matched ? "Quick check before we lock this in." : "We'll text you a reminder before your visit."}</p>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Review</div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>{matched ? "Almost there" : "Last thing — your details"}</h2>
+            <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 24px", fontWeight: 400, lineHeight: 1.55 }}>{matched ? "Quick check before we lock this in." : "We'll text you a reminder before your visit."}</p>
 
             {/* Editorial summary card with gold accent — the booking at a glance */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "20px 22px", marginBottom: 22, boxShadow: "var(--shadow-sm)" }}>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>YOUR APPOINTMENT</div>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, lineHeight: 1.1, marginBottom: 6 }}>{relativeDate(selectedDate)}{relativeDate(selectedDate).includes(",") ? "" : `, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
-              <div style={{ fontSize: 15.5, color: "var(--text)", marginBottom: 14, lineHeight: 1.4 }}>{fmtTime(slot)} · with {provider.name}</div>
+            <div style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "18px 18px", marginBottom: 24 }}>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your appointment</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.2, marginBottom: 5, color: "var(--text)" }}>{relativeDate(selectedDate)}{relativeDate(selectedDate).includes(",") ? "" : `, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", marginBottom: 14, lineHeight: 1.4 }}>{fmtTime(slot)} · with {provider.name}</div>
               <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
                 {cart.map((e, i) => (
                   <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: i < cart.length - 1 ? 8 : 0, gap: 10 }}>
-                    <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.4 }}>{describeEntry(e)}</div>
+                    <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--text)", lineHeight: 1.4 }}>{describeEntry(e)}</div>
                   </div>
                 ))}
                 {cartTimeDelta !== 0 && (
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-                    <span style={{ fontSize: 14, color: "var(--sub)" }}>{cartTimeDelta > 0 ? "Peak time" : "Off-peak discount"}</span>
-                    <span style={{ fontSize: 14.5, color: cartTimeDelta > 0 ? "var(--text)" : "var(--gold)", fontWeight: 500 }}>{cartTimeDelta > 0 ? "+" : "−"}${Math.abs(cartTimeDelta)}</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)" }}>{cartTimeDelta > 0 ? "Peak time" : "Off-peak discount"}</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: cartTimeDelta > 0 ? "var(--text)" : "var(--gold)", fontWeight: 500 }}>{cartTimeDelta > 0 ? "+" : "−"}${Math.abs(cartTimeDelta)}</span>
                   </div>
                 )}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
-                  <span style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 500 }}>TOTAL</span>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--gold)", fontWeight: 500 }}>${cartAdjTotal}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+                  <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Total</span>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: "var(--text)", fontWeight: 500 }}>${cartAdjTotal}</span>
                 </div>
               </div>
             </div>
 
-            <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 12 }}>{matched ? "CONFIRM YOUR INFO" : "YOUR DETAILS"}</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, letterSpacing: 3, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>{matched ? "Confirm your info" : "Your details"}</div>
             <div style={{ display: "grid", gap: 11, marginBottom: 20 }}>
               <div style={{ display: "flex", gap: 11 }}>
                 <input placeholder="First name" style={{ ...inputStyle, flex: 1 }} value={newFirst} onChange={(e) => setNewFirst(e.target.value)} />
@@ -3868,7 +3868,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 return;
               }
               commitBooking(phone, newEmail);
-            }} style={{ width: "100%", background: canLock ? "var(--gold)" : "var(--border2)", color: canLock ? "var(--on-gold)" : "var(--faint)", padding: 17, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, boxShadow: canLock ? "var(--shadow-md)" : "none" }}>{needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : "LOCK IT IN"}</button>
+            }} style={{ width: "100%", background: canLock ? "var(--gold)" : "transparent", color: canLock ? "var(--on-gold)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : "LOCK IT IN"}</button>
               );
             })()}
 
