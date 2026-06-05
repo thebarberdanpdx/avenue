@@ -13421,7 +13421,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
   return (
     <div className="fade-up">
-      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> All clients</button>
+      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontFamily: "'Jost', sans-serif", fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> All clients</button>
 
       {/* Editorial profile header */}
       <div style={{ marginBottom: 22 }}>
@@ -13432,7 +13432,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
             <span style={{ position: "absolute", bottom: -2, right: -2, width: 22, height: 22, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={11} /></span>
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.3px", marginBottom: 4 }}>{live.name}</h2>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.3px", marginBottom: 4 }}>{live.name}</h2>
             <div style={{ color: "var(--sub)", fontSize: 13.5, lineHeight: 1.4 }}>
               {live.phone && <PhoneLink number={live.phone} />}
               {live.phone && live.email && " · "}
@@ -13446,7 +13446,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       {/* TAB BAR */}
       <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--line)", marginBottom: 22, overflowX: "auto" }}>
         {[["overview","Overview"],["timeline","Timeline"],["photos","Photos"],["times","Times"],["family","Family"]].map(([id, label]) => { const on = pfTab === id; return (
-          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontWeight: on ? 600 : 400, fontSize: 14.5, padding: "10px 10px" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
+          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontFamily: "'Jost', sans-serif", fontWeight: on ? 600 : 400, fontSize: 14, letterSpacing: 0.5, padding: "10px 10px" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
         ); })}
       </div>
       {picker && <StaffPhotoPicker hasPhoto={!!live.photo} onClose={() => setPicker(false)} onPick={setClientPhoto} onRemove={removeClientPhoto} />}
@@ -13454,7 +13454,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       {lightbox && (() => { const g = gallery.find((x) => x.id === lightbox); if (!g) return null; return (
         <Sheet open={true} onClose={() => setLightbox(null)} maxWidth={560}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22 }}>{niceDate(g.date)}</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22 }}>{niceDate(g.date)}</div>
             <button onClick={() => setLightbox(null)} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
           </div>
           <img src={imgUrl(g.photo, 800)} alt="" style={{ width: "100%", borderRadius: 14, marginBottom: 14, display: "block" }} />
@@ -13472,7 +13472,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         {/* Upcoming appointment — the key thing to see at a glance */}
         {nextAppt && (
           <div style={{ background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 14, padding: "16px 18px", marginBottom: 22 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700, marginBottom: 8 }}>UPCOMING APPOINTMENT</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>UPCOMING APPOINTMENT</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 38, height: 38, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 18%, var(--panel))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Calendar size={17} style={{ color: "var(--gold)" }} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -13486,7 +13486,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
         {/* Nudge to rebook — shown when no upcoming visit but they've been in before */}
         {!nextAppt && pastAppts.length > 0 && (
-          <button className="lift" onClick={nudgeFromProfile} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 13, fontWeight: 600, letterSpacing: 2, borderRadius: 12, border: "none", marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}>
+          <button className="lift" onClick={nudgeFromProfile} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 2, borderRadius: 12, border: "none", marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}>
             <Bell size={15} /> NUDGE TO REBOOK
           </button>
         )}
@@ -13494,7 +13494,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         {/* Recent visits — last few past appointments */}
         {pastAppts.length > 0 && (
           <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>RECENT VISITS</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>RECENT VISITS</div>
             <div style={{ display: "grid", gap: 8 }}>
               {pastAppts.map((a) => {
                 const apptProv = providers.find((p) => p.id === a.providerId);
@@ -13516,7 +13516,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
         {/* Client note — preferences, allergies, formulas */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)" }}>CLIENT NOTE</div>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)" }}>CLIENT NOTE</div>
           {!editingNote && <button onClick={() => setEditingNote(true)} style={{ background: "none", color: "var(--gold)", fontSize: 14, display: "flex", alignItems: "center", gap: 5 }}><Edit2 size={13} /> {live.notes ? "Edit" : "Add note"}</button>}
         </div>
         {editingNote ? (
@@ -13539,7 +13539,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       {/* GALLERY — photos of previous work */}
       {pfTab === "photos" && <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)" }}>GALLERY</div>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)" }}>GALLERY</div>
           <button onClick={() => setGalPicker(true)} style={{ background: "none", color: "var(--gold)", fontSize: 14, display: "flex", alignItems: "center", gap: 5 }}><Plus size={14} /> Add photo</button>
         </div>
         {gallery.length === 0 ? (
@@ -13561,7 +13561,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {/* TIMELINE — dated notes + appointment history (Mangomint-style) */}
       {pfTab === "timeline" && <div style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>TIMELINE</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>TIMELINE</div>
         {/* add a dated note */}
         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 14 }}>
           <textarea value={tlDraft} onChange={(e) => setTlDraft(e.target.value)} placeholder="Add an entry — color formula, product used, what you discussed…" rows={2} style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", boxSizing: "border-box" }} />
@@ -13630,7 +13630,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       {/* Block reason prompt */}
       <Sheet open={blockPrompt} onClose={() => setBlockPrompt(false)} align="top">
         <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Block {live.name.split(" ")[0]}?</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Block {live.name.split(" ")[0]}?</h2>
         <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>They won't be able to book online. Add a reason for your records — only you'll see it.</p>
         <textarea value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="e.g. Repeated no-shows, payment issue…" rows={3} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, lineHeight: 1.5, resize: "none", marginBottom: 16, boxSizing: "border-box" }} />
         <button onClick={confirmBlock} disabled={!blockReason.trim()} style={{ width: "100%", background: blockReason.trim() ? "#c0392b" : "var(--border)", color: blockReason.trim() ? "#fff" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>BLOCK FROM BOOKING</button>
@@ -13638,7 +13638,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       </Sheet>
 
       {pfTab === "times" && <div style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>REMEMBERED TIMING</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>REMEMBERED TIMING</div>
         <p style={{ fontSize: 15, color: "var(--sub)", marginBottom: 16, fontWeight: 300, lineHeight: 1.5 }}>Set how long this client actually takes for a service. It overrides the default and tightens their future booking slots.</p>
 
         {/* service dropdown */}
@@ -13697,7 +13697,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
             {family.map((m) => (
               <button key={m.id} className="lift" onClick={() => setOpenMember(m.id)} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", textAlign: "left", color: "var(--text)" }}>
-                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--panel2)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 17, flexShrink: 0 }}>{m.name.charAt(0)}</div>
+                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--panel2)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 17, flexShrink: 0 }}>{m.name.charAt(0)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15 }}>{m.name}</div>{m.note && <div style={{ fontSize: 13, color: "var(--sub)" }}>{m.note}</div>}</div>
                 <ChevronRight size={16} style={{ color: "var(--faint)" }} />
               </button>
@@ -13727,12 +13727,12 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           <div style={{ marginBottom: 28 }}>
             <button onClick={() => setOpenMember(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={15} /> Back to family</button>
             <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 20 }}>
-              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--panel2)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 20, flexShrink: 0 }}>{m.name.charAt(0)}</div>
-              <div><div style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{m.name}</div>{m.note && <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{m.note}</div>}</div>
+              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--panel2)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 20, flexShrink: 0 }}>{m.name.charAt(0)}</div>
+              <div><div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{m.name}</div>{m.note && <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{m.note}</div>}</div>
             </div>
-            <div style={{ fontSize: 13, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>NOTE</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>NOTE</div>
             <textarea value={m.note || ""} onChange={(e) => setMember({ note: e.target.value })} placeholder="Anything to remember about this person…" rows={3} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", boxSizing: "border-box", marginBottom: 22 }} />
-            <div style={{ fontSize: 13, letterSpacing: 2, color: "var(--faint)", marginBottom: 10 }}>PHOTOS</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 10 }}>PHOTOS</div>
             {(m.gallery || []).length === 0 ? (
               <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", marginBottom: 22 }}>No photos yet for {m.name}.</p>
             ) : (
@@ -13742,7 +13742,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
                 ))}
               </div>
             )}
-            <div style={{ fontSize: 13, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>VISIT HISTORY</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>VISIT HISTORY</div>
             {(() => { const mh = (appts || []).filter((a) => a.familyMemberId === m.id && a.serviceId && a.status !== "block"); return mh.length === 0
               ? <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", marginBottom: 22 }}>No visits just yet — their story starts here.</p>
               : <div style={{ display: "grid", gap: 8, marginBottom: 22 }}>{mh.map((a) => (<div key={a.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 14px" }}><div style={{ fontSize: 14.5 }}>{a.title}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{fmtTime(a.start)} – {fmtTime(a.end)}</div></div>))}</div>; })()}
