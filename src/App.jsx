@@ -3383,7 +3383,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Your number</h2>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 24px", fontWeight: 400, lineHeight: 1.55 }}>We'll text you a quick code to confirm it's you.</p>
-            <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
+            <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             {/* SMS opt-in disclosure — required by carriers (A2P 10DLC) so Twilio's reviewer can verify on the public booking page. */}
             <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
               By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
@@ -3691,7 +3691,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <input value={wlName} onChange={(e) => setWlName(e.target.value)} placeholder="First and last name" style={{ ...inputStyle, marginBottom: 16 }} />
 
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Phone</label>
-                    <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 16 }} />
+                    <input inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 16 }} />
                     <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
                       By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
                     </p>
@@ -3809,11 +3809,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>{matched ? "Confirm your info" : "Your details"}</div>
             <div style={{ display: "grid", gap: 11, marginBottom: 20 }}>
               <div style={{ display: "flex", gap: 11 }}>
-                <input placeholder="First name" style={{ ...inputStyle, flex: 1 }} value={newFirst} onChange={(e) => setNewFirst(e.target.value)} />
-                <input placeholder="Last name" style={{ ...inputStyle, flex: 1 }} value={newLast} onChange={(e) => setNewLast(e.target.value)} />
+                <input placeholder="First name" autoComplete="given-name" style={{ ...inputStyle, flex: 1 }} value={newFirst} onChange={(e) => setNewFirst(e.target.value)} />
+                <input placeholder="Last name" autoComplete="family-name" style={{ ...inputStyle, flex: 1 }} value={newLast} onChange={(e) => setNewLast(e.target.value)} />
               </div>
-              <input placeholder="Email" type="email" style={inputStyle} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
-              <input placeholder="Phone number" type="tel" style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input placeholder="Email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" style={inputStyle} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+              <input placeholder="Phone number" type="tel" inputMode="tel" autoComplete="tel" style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
               <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
                 By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
               </p>
@@ -4187,7 +4187,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
       <div className="fade-up">
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Manage your appointment</h2>
         <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.5 }}>Enter the phone number you booked with. We'll text you a code — confirm it to see your appointments.</p>
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 14 }} />
+        <input inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 14 }} />
         <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
           By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
         </p>
@@ -8387,8 +8387,8 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             <div style={{ display: "grid", gap: 14, padding: "14px 0" }}>
               <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Name</div><input value={person.name} onChange={(e) => patch(person.id, { name: e.target.value })} style={inputStyle} /></div>
               <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Role / title</div><input value={person.role} onChange={(e) => patch(person.id, { role: e.target.value })} style={inputStyle} /></div>
-              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Email</div><input value={person.email || ""} onChange={(e) => patch(person.id, { email: e.target.value })} style={inputStyle} /></div>
-              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Phone</div><input value={person.phone || ""} onChange={(e) => patch(person.id, { phone: e.target.value })} style={inputStyle} /></div>
+              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Email</div><input value={person.email || ""} onChange={(e) => patch(person.id, { email: e.target.value })} inputMode="email" autoCapitalize="none" style={inputStyle} /></div>
+              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Phone</div><input value={person.phone || ""} onChange={(e) => patch(person.id, { phone: e.target.value })} inputMode="tel" style={inputStyle} /></div>
               <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>User type</div>
                 <div style={{ display: "flex", gap: 8 }}>{["Admin", "Staff", "Front Desk"].map((t) => (
                   <button key={t} onClick={() => patch(person.id, { userType: t })} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${ut === t ? "var(--gold)" : "var(--border2)"}`, background: ut === t ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel2)", color: ut === t ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: ut === t ? 600 : 400 }}>{t}</button>
