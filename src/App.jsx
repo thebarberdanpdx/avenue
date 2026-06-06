@@ -802,6 +802,18 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(err, info) { try { console.error("[vero] UI error:", err, info); } catch (e) {} }
   render() {
     if (this.state.err) {
+      if (this.props.minimal) {
+        // Client-facing root crash: calm, on-brand, no stack trace.
+        return (
+          <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", background: "var(--bg, #14110E)", color: "var(--text, #F2EBDD)" }}>
+            <div style={{ maxWidth: 360 }}>
+              <div style={{ fontFamily: "var(--font-disp, 'Fraunces', Georgia, serif)", fontSize: 28, fontWeight: 600, marginBottom: 12, lineHeight: 1.15 }}>Something went wrong</div>
+              <p style={{ fontSize: 15.5, lineHeight: 1.55, color: "var(--sub, #B7AD9B)", marginBottom: 24 }}>The app hit a snag. Reload to pick up right where you left off — nothing was lost.</p>
+              <button onClick={() => { try { window.location.reload(); } catch (x) {} }} style={{ background: "var(--gold, #C8A24A)", color: "var(--on-gold, #14110E)", border: "none", borderRadius: 12, padding: "13px 28px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}>Reload</button>
+            </div>
+          </div>
+        );
+      }
       const e = this.state.err;
       return (
         <div style={{ padding: 24, maxWidth: 680, margin: "0 auto" }}>
@@ -816,7 +828,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-export default function App() {
+function App() {
   // Two front doors: gotvero.com (root) is the BUSINESS dashboard; gotvero.com/book is the
   // client booking link. Read the URL up front so a client never flashes the staff login.
   const [view, setView] = useState(() => {
@@ -1247,6 +1259,7 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Oswald:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        [data-appt], [data-appt] * { -webkit-user-select: none !important; -moz-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
         #app-root { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; line-height: 1.5; letter-spacing: 0.1px; }
         #app-root h1, #app-root h2, #app-root h3 { letter-spacing: -0.2px; color: var(--text); }
         #app-root a, #app-root button { color: inherit; }
@@ -1354,7 +1367,7 @@ export default function App() {
       {view === "client" && <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={goBooking} />}
       {view === "shop" && (session
-        ? <ShopDashboard authEmail={session?.user?.email || null} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} />
+        ? <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} />
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
@@ -1848,6 +1861,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [photos, setPhotos] = useState(0);       // 0–3 uploaded at booking
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
+  const [booking, setBooking] = useState(false);   // true while the confirmed booking is being saved to the server
+  const [bookErr, setBookErr] = useState(false);   // true if that save failed — client is told to retry, nothing was held
   // waitlist join form
   const [wlName, setWlName] = useState("");
   const [wlDays, setWlDays] = useState([]);        // preferred days (multi-select)
@@ -1858,11 +1873,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
   const lineTotal = (entry) => {
     const dc = activeMember || matched; // duration/notes come from the person being booked for
-    let p = entry.service.price, m = getDuration(dc, entry.service);
+    const provId = entry.provider && entry.provider.id !== "anyone" ? entry.provider.id : "dan"; // barber decides the per-service length; "anyone" books as Dan (matches the commit)
+    let p = entry.service.price, m = getDuration(dc, entry.service, provId);
     // cut type overrides the base price/time when present
     if (entry.service.cutTypes && entry.cutType) {
       const ct = entry.service.cutTypes.find((c) => c.id === entry.cutType);
-      if (ct) { p = ct.price; m = getDuration(dc, entry.service) + (ct.min || 0); }
+      if (ct) { p = ct.price; m = getDuration(dc, entry.service, provId) + (ct.min || 0); }
     }
     if (entry.service.beardTypes && entry.beardType) {
       const bt = entry.service.beardTypes.find((b) => b.id === entry.beardType);
@@ -2195,11 +2211,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     }
     const baseId = Date.now();
     let clientId = matched?.id || null;
+    let newClientRow = null;
     if (!matched && !activeMember) {
       clientId = "c" + baseId + Math.floor(Math.random() * 1000);
       const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
       setClients((cur) => [newClient, ...cur]);
-      if (!isStaff) { try { supabase.from('clients').insert({ id: String(clientId), shop_id: shopId, data: newClient }); } catch (e) {} }
+      if (!isStaff) newClientRow = { id: String(clientId), shop_id: shopId, data: newClient };
     } else if (matched) {
       // Returning client confirmed/updated their info — write the chosen values to their profile
       // so a barber-added record gets an email, a corrected name persists, etc.
@@ -2237,24 +2254,21 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       });
       if (!isSame) cursor += person.durMin;
     });
-    setAppts((cur) => [...cur, ...newAppts]);
-    if (!isStaff) { try { supabase.from('appointments').insert(newAppts.map((a) => ({ id: String(a.id), shop_id: shopId, data: a }))); } catch (e) {} }
-    // Booking confirmation text (client self-bookings only; fire-and-forget so it can never block or break a booking)
-    if (!isStaff) {
-      try {
-        const toE164 = (p) => { const d = String(p || "").replace(/\D/g, ""); if (d.length === 10) return "+1" + d; if (d.length === 11 && d[0] === "1") return "+" + d; return d ? (String(p).trim().startsWith("+") ? String(p).trim() : "+" + d) : ""; };
-        const smsTo = toE164(finalPhone);
-        if (smsTo) {
-          const firstNm = (matched?.firstName || newFirst || newName || "").trim().split(" ")[0] || "there";
-          const when0 = new Date(newAppts[0].bookedFor);
-          const dateStr = when0.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-          const timeStr = when0.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-          const confirmMsg = `Hi ${firstNm}, you're booked at ${business.name} on ${dateStr} at ${timeStr}. See you then!`;
-          supabase.functions.invoke("send-notification", { body: { number: smsTo, message: confirmMsg, type: "appointment" } }).catch(() => {});
-        }
-      } catch (e) {}
-    }
-    setBookedId(baseId); setStep(8);
+    // Staff/preview bookings persist through the dashboard's own save path — show success immediately.
+    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); setBookedId(baseId); setStep(8); return; }
+    // Public booking: the slot is never held while saving, and the client is only told they're booked
+    // once the server actually has it — so a failed save can never become a ghost booking.
+    setBooking(true); setBookErr(false);
+    const apptRows = newAppts.map((a) => ({ id: String(a.id), shop_id: shopId, data: a }));
+    const writes = [];
+    if (newClientRow) writes.push(supabase.from('clients').insert(newClientRow));
+    writes.push(supabase.from('appointments').insert(apptRows));
+    Promise.all(writes).then((results) => {
+      setBooking(false);
+      if (results.some((r) => r && r.error)) { setBookErr(true); return; } // nothing was held, nothing lost — they can just tap again
+      setAppts((cur) => [...cur, ...newAppts]);
+      setBookedId(baseId); setStep(8);
+    }).catch(() => { setBooking(false); setBookErr(true); });
   };
 
   return (
@@ -3177,10 +3191,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const who = activeMember || matched;
           const ct = cutType && draft.cutTypes ? draft.cutTypes.find((c) => c.id === cutType) : null;
           const bt = beardType && draft.beardTypes ? draft.beardTypes.find((b) => b.id === beardType) : null;
-          const draftDur = getDuration(who, draft) + (ct?.min || 0) + (bt?.min || 0);
+          const extraMin = (ct?.min || 0) + (bt?.min || 0);
+          const durFor = (pid) => getDuration(who, draft, pid) + extraMin; // each barber's own length for this service
           const realProviders = providers.filter((p) => p.id !== "anyone");
           // Compute each real barber's soonest opening
-          const cards = realProviders.map((p) => ({ p, next: findNextAvailable(p, draftDur) }));
+          const cards = realProviders.map((p) => ({ p, next: findNextAvailable(p, durFor(p.id)) }));
           // Soonest across all barbers (powers "Anyone")
           const anyoneNext = cards
             .filter((c) => c.next)
@@ -3303,7 +3318,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const usualSvc = lastAppt ? services.find((s) => s.id === lastAppt.serviceId) : null;
           const usualProv = providers.find((p) => p.id === (lastAppt?.providerId || who.provider)) || providers[1];
           if (!usualSvc) { setShowUsual(false); setStep(1); return null; }
-          const dur = getDuration(who, usualSvc);
+          const dur = getDuration(who, usualSvc, usualProv && usualProv.id !== "anyone" ? usualProv.id : "dan");
           const usualLine2 = lastAppt && lastAppt.lineItems && lastAppt.lineItems[0] ? lastAppt.lineItems[0] : null;
           const lastPhoto = (who.gallery && who.gallery.length) ? who.gallery[who.gallery.length - 1].photo : null;
           // Build the cart entry for their usual (used by both actions).
@@ -3368,7 +3383,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Your number</h2>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 24px", fontWeight: 400, lineHeight: 1.55 }}>We'll text you a quick code to confirm it's you.</p>
-            <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
+            <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             {/* SMS opt-in disclosure — required by carriers (A2P 10DLC) so Twilio's reviewer can verify on the public booking page. */}
             <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
               By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
@@ -3557,7 +3572,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <button onClick={() => setExpandUsual(!expandUsual)} style={{ width: "100%", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", color: "var(--text)", padding: "16px 18px", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, border: "none" }}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                       <span style={{ fontSize: 17, fontWeight: 500 }}>{first}'s usual</span>
-                      <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300 }}>{usualSvc.name} · {getDuration(who, usualSvc)} min{usualProv && usualProv.id !== "anyone" ? ` · with ${usualProv.name}` : ""}</span>
+                      <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300 }}>{usualSvc.name} · {getDuration(who, usualSvc, usualProv && usualProv.id !== "anyone" ? usualProv.id : "dan")} min{usualProv && usualProv.id !== "anyone" ? ` · with ${usualProv.name}` : ""}</span>
                     </span>
                     <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0, transform: expandUsual ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
                   </button>
@@ -3676,7 +3691,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <input value={wlName} onChange={(e) => setWlName(e.target.value)} placeholder="First and last name" style={{ ...inputStyle, marginBottom: 16 }} />
 
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Phone</label>
-                    <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 16 }} />
+                    <input inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 16 }} />
                     <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
                       By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
                     </p>
@@ -3794,11 +3809,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>{matched ? "Confirm your info" : "Your details"}</div>
             <div style={{ display: "grid", gap: 11, marginBottom: 20 }}>
               <div style={{ display: "flex", gap: 11 }}>
-                <input placeholder="First name" style={{ ...inputStyle, flex: 1 }} value={newFirst} onChange={(e) => setNewFirst(e.target.value)} />
-                <input placeholder="Last name" style={{ ...inputStyle, flex: 1 }} value={newLast} onChange={(e) => setNewLast(e.target.value)} />
+                <input placeholder="First name" autoComplete="given-name" style={{ ...inputStyle, flex: 1 }} value={newFirst} onChange={(e) => setNewFirst(e.target.value)} />
+                <input placeholder="Last name" autoComplete="family-name" style={{ ...inputStyle, flex: 1 }} value={newLast} onChange={(e) => setNewLast(e.target.value)} />
               </div>
-              <input placeholder="Email" type="email" style={inputStyle} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
-              <input placeholder="Phone number" type="tel" style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input placeholder="Email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" style={inputStyle} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+              <input placeholder="Phone number" type="tel" inputMode="tel" autoComplete="tel" style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
               <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
                 By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
               </p>
@@ -3865,7 +3880,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const baseOk = agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10;
               const canLock = baseOk && (!needsCard || cardOnFile);
               return (
-            <button className="lift" onMouseDown={(e) => e.preventDefault()} disabled={!canLock} onClick={() => {
+            <>
+            <button className="lift" onMouseDown={(e) => e.preventDefault()} disabled={!canLock || booking} onClick={() => {
               const digits = (s) => (s || "").replace(/\D/g, "");
               const phoneChanged = !!matched && digits(phone) !== digits(matched.phone);
               const emailChanged = !!matched && !!(matched.email && matched.email.trim()) && newEmail.trim() !== matched.email.trim();
@@ -3875,7 +3891,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 return;
               }
               commitBooking(phone, newEmail);
-            }} style={{ width: "100%", background: canLock ? "var(--gold)" : "transparent", color: canLock ? "var(--on-gold)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : "LOCK IT IN"}</button>
+            }} style={{ width: "100%", background: canLock ? "var(--gold)" : "transparent", color: canLock ? "var(--on-gold)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : "LOCK IT IN")}</button>
+            {bookErr && <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "color-mix(in srgb, #c0392b 14%, var(--panel))", color: "var(--text)", fontSize: 13.5, lineHeight: 1.45, textAlign: "center" }}>Couldn't confirm your booking — check your connection and tap again. Your time wasn't held, so nothing's lost.</div>}
+            </>
               );
             })()}
 
@@ -4169,7 +4187,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
       <div className="fade-up">
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Manage your appointment</h2>
         <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.5 }}>Enter the phone number you booked with. We'll text you a code — confirm it to see your appointments.</p>
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 14 }} />
+        <input inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 14 }} />
         <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
           By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
         </p>
@@ -6270,7 +6288,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
 // ============================================================
 // SHOP DASHBOARD — adds Menu editor + Settings
 // ============================================================
-function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary }) {
+function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId }) {
   const [tab, setTab] = useState("pulse");
   const [activeClient, setActiveClient] = useState(null);
   const [pulseDetail, setPulseDetail] = useState(null); // null | "revenue" — drill-in from Pulse
@@ -6411,7 +6429,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
-        {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} /></ErrorBoundary>}
+        {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} /></ErrorBoundary>}
       </div>
 
       {/* fixed bottom tab bar — anchors to viewport bottom. transform:translateZ(0) puts it on its own GPU layer so iOS Safari doesn't let it drift during scroll/overscroll. */}
@@ -8369,8 +8387,8 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             <div style={{ display: "grid", gap: 14, padding: "14px 0" }}>
               <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Name</div><input value={person.name} onChange={(e) => patch(person.id, { name: e.target.value })} style={inputStyle} /></div>
               <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Role / title</div><input value={person.role} onChange={(e) => patch(person.id, { role: e.target.value })} style={inputStyle} /></div>
-              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Email</div><input value={person.email || ""} onChange={(e) => patch(person.id, { email: e.target.value })} style={inputStyle} /></div>
-              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Phone</div><input value={person.phone || ""} onChange={(e) => patch(person.id, { phone: e.target.value })} style={inputStyle} /></div>
+              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Email</div><input value={person.email || ""} onChange={(e) => patch(person.id, { email: e.target.value })} inputMode="email" autoCapitalize="none" style={inputStyle} /></div>
+              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Phone</div><input value={person.phone || ""} onChange={(e) => patch(person.id, { phone: e.target.value })} inputMode="tel" style={inputStyle} /></div>
               <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>User type</div>
                 <div style={{ display: "flex", gap: 8 }}>{["Admin", "Staff", "Front Desk"].map((t) => (
                   <button key={t} onClick={() => patch(person.id, { userType: t })} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${ut === t ? "var(--gold)" : "var(--border2)"}`, background: ut === t ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel2)", color: ut === t ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: ut === t ? 600 : 400 }}>{t}</button>
@@ -9538,9 +9556,104 @@ function ArticleIllustration({ id }) {
   return null;
 }
 
+// Flip to true once the /api/help function (see api/help.js) is deployed with your Anthropic key.
+// Until then the "Ask the assistant" entry stays hidden so nothing half-working ships.
+const HELP_AI_ENABLED = false;
+
+// AI help assistant — answers ONLY from the help articles, via a small backend (/api/help)
+// that holds the API key. Refuses to guess; offers to open the matching guide.
+function HelpAssistant({ articles, onBack, onOpenArticle, supportHref }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const scroller = useRef(null);
+  useEffect(() => { if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight; }, [messages, loading]);
+
+  const suggestions = [
+    "How do I stop gaps in my schedule?",
+    "How do I block off my lunch?",
+    "A service is showing the wrong length",
+  ];
+
+  async function ask(q) {
+    const question = (q || "").trim();
+    if (!question || loading) return;
+    setInput("");
+    setMessages((m) => [...m, { role: "user", text: question }]);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/help", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, articles: articles.map((a) => ({ id: a.id, title: a.title, category: a.category, body: a.body })) }),
+      });
+      if (!res.ok) throw new Error("bad status");
+      const data = await res.json();
+      setMessages((m) => [...m, { role: "ai", ...data }]);
+    } catch (e) {
+      setMessages((m) => [...m, { role: "ai", intro: "I can't reach the assistant right now. You can browse the guides, or contact support and a real person will help.", steps: [], article: null, unsure: true }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="appt-screen fade-up" style={{ paddingBottom: 24, display: "flex", flexDirection: "column", minHeight: "70vh" }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "4px 0 14px", cursor: "pointer" }}><ArrowLeft size={17} /> Help Center</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <Sparkles size={20} style={{ color: "var(--gold)" }} />
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, margin: 0, color: "var(--text)" }}>Ask the assistant</h1>
+      </div>
+
+      <div ref={scroller} style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+        {messages.length === 0 && (
+          <div>
+            <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, marginBottom: 16 }}>Ask in plain words — I'll give you the steps and point you to the right guide. I only answer from this app's help, and I'll say so if I'm not sure.</p>
+            {suggestions.map((s) => (
+              <button key={s} onClick={() => ask(s)} className="lift" style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", color: "var(--sub)", borderRadius: 12, padding: "13px 15px", fontSize: 14, marginBottom: 9, cursor: "pointer", fontFamily: FONT_BODY }}>{s}</button>
+            ))}
+          </div>
+        )}
+        {messages.map((m, i) => m.role === "user" ? (
+          <div key={i} style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+            <div style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "10px 14px", borderRadius: "16px 16px 4px 16px", fontSize: 14.5, maxWidth: "82%", fontWeight: 500 }}>{m.text}</div>
+          </div>
+        ) : (
+          <div key={i} style={{ marginBottom: 16 }}>
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "16px 16px 16px 4px", padding: "14px 16px" }}>
+              <p style={{ color: "var(--text)", fontSize: 14.5, lineHeight: 1.5, margin: 0 }}>{m.intro}</p>
+              {Array.isArray(m.steps) && m.steps.length > 0 && (
+                <ol style={{ margin: "12px 0 0", padding: 0, listStyle: "none" }}>
+                  {m.steps.map((s, j) => (
+                    <li key={j} style={{ display: "flex", gap: 11, marginBottom: 9, color: "var(--sub)", fontSize: 14, lineHeight: 1.45 }}>
+                      <span style={{ flexShrink: 0, width: 21, height: 21, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 18%, transparent)", color: "var(--gold)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{j + 1}</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              {m.article && articles.some((a) => a.id === m.article) && (
+                <button onClick={() => onOpenArticle(m.article)} className="lift" style={{ marginTop: 13, display: "inline-flex", alignItems: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 14%, transparent)", color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 10, padding: "9px 14px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY }}>Open the full guide →</button>
+              )}
+              {m.unsure && <a href={supportHref} style={{ display: "inline-block", marginTop: 12, color: "var(--gold)", fontSize: 13.5, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 2 }}>Contact support →</a>}
+            </div>
+          </div>
+        ))}
+        {loading && <div style={{ color: "var(--faint)", fontSize: 14, padding: "4px 2px 16px" }}>Thinking…</div>}
+      </div>
+
+      <div style={{ display: "flex", gap: 9, alignItems: "center", paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ask(input)} placeholder="Ask a question…" style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "11px 16px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, outline: "none" }} />
+        <button onClick={() => ask(input)} disabled={!input.trim() || loading} className="lift" style={{ width: 42, height: 42, borderRadius: "50%", background: input.trim() && !loading ? "var(--gold)" : "var(--panel)", color: input.trim() && !loading ? "var(--on-gold)" : "var(--faint)", border: "none", flexShrink: 0, cursor: input.trim() && !loading ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center" }}><Send size={17} /></button>
+      </div>
+    </div>
+  );
+}
+
 function HelpCenter({ business, onBack }) {
   const [query, setQuery] = useState("");
   const [openArticle, setOpenArticle] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
   const SUPPORT_EMAIL = "support@gotvero.com";
   const supportHref = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Vero — help request")}`;
   // Open another help article and jump to the top (used by in-body links & "Related").
@@ -9611,6 +9724,8 @@ function HelpCenter({ business, onBack }) {
     );
   }
 
+  if (chatOpen) return <HelpAssistant articles={HELP_ARTICLES} supportHref={supportHref} onBack={() => setChatOpen(false)} onOpenArticle={(id) => { setChatOpen(false); goArticle(id); }} />;
+
   return (
     <div className="appt-screen fade-up" style={{ paddingBottom: 48 }}>
       <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "4px 0 16px", cursor: "pointer" }}><ArrowLeft size={17} /> Settings</button>
@@ -9624,6 +9739,16 @@ function HelpCenter({ business, onBack }) {
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search help articles…" style={{ width: "100%", background: "var(--panel)", border: "1.5px solid var(--border)", borderRadius: 16, padding: "16px 16px 16px 48px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
       </div>
 
+      {HELP_AI_ENABLED && !query && (
+        <button onClick={() => setChatOpen(true)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, padding: "15px 16px", marginBottom: 24, textAlign: "left", cursor: "pointer" }}>
+          <Sparkles size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>
+            <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Ask the assistant</span>
+            <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>Describe what you're trying to do, in your own words</span>
+          </span>
+          <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
+        </button>
+      )}
       {results ? (
         <div>
           <div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 12 }}>{results.length} result{results.length === 1 ? "" : "s"}</div>
@@ -9665,7 +9790,127 @@ function HelpCenter({ business, onBack }) {
 // Default online-booking settings, shared so SettingsView can fall back safely when a saved
 // shop has no `booking` block yet (MenuEditor has its own local defaultBooking()).
 const DEFAULT_BOOKING = { available: true, description: "", customPrice: false, promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false };
-function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary }) {
+// Test-book tool — fills the shop with a realistic busy week of fake clients,
+// appointments, and waitlist entries so the owner can see/feel/test a full book.
+// SAFETY: every record is tagged (_test:true) and given a "test_" id prefix, and
+// the wipe deletes ONLY those rows. It can never touch real bookings.
+function TestDataTool({ shopId, services, providers, appts, setAppts, clients, setClients, waitlist, setWaitlist, showToast }) {
+  const [busy, setBusy] = useState(false);
+  const [confirmWipe, setConfirmWipe] = useState(false);
+  const isTest = (x) => !!x && (String(x.id).startsWith("test_") || x._test === true);
+  const counts = {
+    clients: (clients || []).filter(isTest).length,
+    appts: (appts || []).filter(isTest).length,
+    waitlist: (waitlist || []).filter(isTest).length,
+  };
+  const hasTest = counts.clients + counts.appts + counts.waitlist > 0;
+
+  const FIRST = ["Mike", "Sarah", "James", "Tony", "Luis", "Andre", "Chris", "Devon", "Marcus", "Will", "Ray", "Nina", "Omar", "Jared", "Kyle", "Tess"];
+  const LAST = ["R", "T", "B", "M", "C", "D", "S", "L", "P", "K", "W", "G"];
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  async function generate() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const realProviders = (providers || []).filter((p) => p.id !== "anyone");
+      const bookable = (services || []).filter((s) => typeof s.duration === "number" && s.duration > 0 && s.price != null);
+      if (!realProviders.length || !bookable.length) { showToast("Add at least one staff member and one service first."); setBusy(false); return; }
+      const stamp = Date.now();
+
+      const newClients = [];
+      for (let i = 0; i < 12; i++) {
+        const f = pick(FIRST), l = pick(LAST);
+        newClients.push({ id: `test_c_${stamp}_${i}`, name: `${f} ${l}.`, firstName: f, lastName: l, email: "", phone: `555-01${String(10 + i).slice(-2)}`, provider: realProviders[i % realProviders.length].id, visits: Math.floor(Math.random() * 8), lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], _test: true });
+      }
+
+      const newAppts = [];
+      let cap = 80;
+      for (let dOff = 0; dOff < 7 && cap > 0; dOff++) {
+        const day = new Date(); day.setDate(day.getDate() + dOff);
+        for (const prov of realProviders) {
+          let t = 540; // 9:00 AM
+          while (t < 990 && cap > 0) { // up to ~4:30 PM
+            if (Math.random() < 0.22) { t += 15 + Math.floor(Math.random() * 3) * 15; continue; } // occasional gap
+            const svc = pick(bookable);
+            const dur = svc.duration;
+            if (t + dur > 1020) break;
+            const cl = pick(newClients);
+            const bf = new Date(day); bf.setHours(Math.floor(t / 60), t % 60, 0, 0);
+            newAppts.push({ id: `test_a_${stamp}_${newAppts.length}`, providerId: prov.id, clientId: cl.id, serviceId: svc.id, start: t, end: t + dur, status: "confirmed", name: cl.name, title: svc.name, price: svc.price, phone: cl.phone, bookedFor: bf.toISOString(), _test: true });
+            t += dur;
+            cap--;
+          }
+        }
+      }
+
+      const newWl = [];
+      for (let i = 0; i < 4; i++) {
+        const cl = newClients[i];
+        newWl.push({ id: `test_wl_${stamp}_${i}`, name: cl.name, phone: cl.phone, provider: realProviders[i % realProviders.length].name, day: ["This week", "Any day"][i % 2], when: ["morning", "midday", "afternoon"][i % 3], service: bookable[i % bookable.length].name, photos: 0, at: new Date().toLocaleString(), _test: true });
+      }
+
+      await Promise.all([
+        supabase.from("clients").insert(newClients.map((c) => ({ id: c.id, shop_id: shopId, data: c }))),
+        supabase.from("appointments").insert(newAppts.map((a) => ({ id: a.id, shop_id: shopId, data: a }))),
+        supabase.from("waitlist").insert(newWl.map((w) => ({ id: w.id, shop_id: shopId, data: w }))),
+      ]);
+
+      setClients((cur) => [...newClients, ...(cur || [])]);
+      setAppts((cur) => [...(cur || []), ...newAppts]);
+      setWaitlist((cur) => [...(cur || []), ...newWl]);
+      showToast(`Added ${newClients.length} test clients and ${newAppts.length} appointments.`);
+    } catch (e) {
+      showToast("Couldn't add test data — check your connection and try again.");
+    } finally { setBusy(false); }
+  }
+
+  async function wipe() {
+    if (busy) return;
+    setBusy(true); setConfirmWipe(false);
+    try {
+      await Promise.all([
+        supabase.from("clients").delete().eq("shop_id", shopId).like("id", "test_%"),
+        supabase.from("appointments").delete().eq("shop_id", shopId).like("id", "test_%"),
+        supabase.from("waitlist").delete().eq("shop_id", shopId).like("id", "test_%"),
+      ]);
+      setClients((cur) => (cur || []).filter((x) => !isTest(x)));
+      setAppts((cur) => (cur || []).filter((x) => !isTest(x)));
+      setWaitlist((cur) => (cur || []).filter((x) => !isTest(x)));
+      showToast("All test data removed.");
+    } catch (e) {
+      showToast("Couldn't remove test data — check your connection and try again.");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div>
+      <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, margin: "0 0 16px" }}>Fill your calendar with a week of fake clients and appointments so you can see and test a busy shop. Everything it creates is tagged and fully removable — it can never touch real bookings.</p>
+
+      {hasTest && (
+        <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 16, fontSize: 14, color: "var(--text)" }}>
+          Currently loaded: <strong>{counts.appts}</strong> appointments, <strong>{counts.clients}</strong> clients{counts.waitlist ? <>, <strong>{counts.waitlist}</strong> waitlist</> : null}.
+        </div>
+      )}
+
+      <button className="lift" onClick={generate} disabled={busy} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: 16, fontSize: 13.5, letterSpacing: 1, fontWeight: 600, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, textTransform: "uppercase" }}>{busy ? "Working…" : "Generate a busy week"}</button>
+
+      {hasTest && (confirmWipe ? (
+        <div style={{ marginTop: 14, padding: 14, border: "1px solid var(--border)", borderRadius: 12, background: "var(--panel)" }}>
+          <div style={{ fontSize: 14.5, color: "var(--text)", marginBottom: 12 }}>Remove all {counts.appts + counts.clients + counts.waitlist} test records? Your real bookings won't be touched.</div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={wipe} disabled={busy} style={{ flex: 1, background: "color-mix(in srgb, #c0392b 16%, var(--panel))", color: "var(--text)", border: "1px solid color-mix(in srgb, #c0392b 40%, transparent)", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Remove it all</button>
+            <button onClick={() => setConfirmWipe(false)} style={{ flex: 1, background: "transparent", color: "var(--sub)", border: "1px solid var(--border)", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>Keep it</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setConfirmWipe(true)} disabled={busy} style={{ width: "100%", marginTop: 12, background: "transparent", color: "var(--sub)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, fontSize: 13.5, fontWeight: 500, cursor: "pointer" }}>Remove all test data</button>
+      ))}
+    </div>
+  );
+}
+
+function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary, shopId, setAppts, setClients, waitlist, setWaitlist }) {
   // Fill in any missing top-level settings from the defaults so a sparse/older saved blob can't
   // crash a card that reads a nested field (a single absent key used to white-screen the whole page).
   const baseBiz = { ...DEFAULT_BUSINESS, ...(business || {}) };
@@ -9701,6 +9946,10 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
   // Each card: status line (live) + the editor shown when expanded. Grouped by category.
   const cards = [
+    {
+      id: "testdata", title: "Test Data", icon: Sparkles, category: "Reporting", subtitle: "Fill the calendar to test, then wipe it clean",
+      editor: <TestDataTool shopId={shopId} services={services} providers={providers} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} showToast={showToast} />,
+    },
     {
       id: "business", title: "Business Details", icon: User, category: "Business Setup",
       status: form.legalName, keywords: "name address logo branding contact email business details",
@@ -9991,7 +10240,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     { id: "msg",   label: "Messages clients get", icon: Bell, desc: "Every automatic text & email, in your words", settings: ["notifications", "messages"] },
     { id: "menu",  label: "Services & Menu", icon: ImageIcon, desc: "Your services, add-ons, photos & pricing", settings: ["servicesmenu"] },
     { id: "web",   label: "Your Website", icon: Globe, desc: "Your branded booking page & online presence", settings: ["website"] },
-    { id: "data",  label: "Reports & Insights", icon: BarChart3, desc: "Your numbers, AI tools & importing", settings: ["reports", "aicuthelper", "import"] },
+    { id: "data",  label: "Reports & Insights", icon: BarChart3, desc: "Your numbers, AI tools & importing", settings: ["reports", "aicuthelper", "import", "testdata"] },
   ];
   // Safety net: any card not placed above still appears (appended to Reports & Insights) so nothing is ever lost.
   // RETIRED cards are intentionally left out of the list (their function moved elsewhere).
@@ -10794,6 +11043,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
     // Only arm a long-press. Do NOT capture the touch — scrolling stays completely normal.
     // Tapping is handled separately by onClick. Dragging only starts after a long hold.
     dragRef.current = { id: a.id, startY: y, startX: x, origStart: a.start, dur: a.end - a.start, didDrag: false, armed: false };
+    // Touching an appointment AT ALL freezes the page immediately — no scroll while a block is held.
+    document.body.classList.add("scrub-lock");
+    document.addEventListener("touchmove", blockScrollRef.current, { passive: false });
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
     holdTimerRef.current = setTimeout(() => {
       const d = dragRef.current;
@@ -10802,7 +11054,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         setDrag({ id: a.id, deltaMin: 0, armed: true });
         if (navigator.vibrate) navigator.vibrate(12);
       }
-    }, 650);
+    }, 220);
   };
 
   useEffect(() => {
@@ -10811,26 +11063,34 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       const d = dragRef.current; if (!d || d.armed) return;
       const y = e.touches ? e.touches[0].clientY : e.clientY;
       const x = e.touches ? e.touches[0].clientX : e.clientX;
-      if (Math.abs(y - d.startY) > 3 || Math.abs(x - (d.startX || 0)) > 3) {
-        d.scrolled = true;
+      // Page is already frozen from touchstart, so a deliberate move means "start dragging now."
+      if (Math.abs(y - d.startY) > 8 || Math.abs(x - (d.startX || 0)) > 8) {
         if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+        d.armed = true;
+        setDrag({ id: d.id, deltaMin: 0, armed: true });
+        if (navigator.vibrate) navigator.vibrate(12);
       }
     };
     const watchEnd = () => {
       const d = dragRef.current;
       if (d && !d.armed) {
         if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+        // released without dragging (a tap) — lift the freeze we set on touch
+        document.body.classList.remove("scrub-lock");
+        document.removeEventListener("touchmove", blockScrollRef.current, { passive: false });
         setTimeout(() => { if (dragRef.current && !dragRef.current.armed) dragRef.current = null; }, 300);
       }
     };
     window.addEventListener("touchmove", watchMove, { passive: true });
     window.addEventListener("mousemove", watchMove);
     window.addEventListener("touchend", watchEnd);
+    window.addEventListener("touchcancel", watchEnd);
     window.addEventListener("mouseup", watchEnd);
     return () => {
       window.removeEventListener("touchmove", watchMove);
       window.removeEventListener("mousemove", watchMove);
       window.removeEventListener("touchend", watchEnd);
+      window.removeEventListener("touchcancel", watchEnd);
       window.removeEventListener("mouseup", watchEnd);
     };
   }, []);
@@ -10850,6 +11110,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       setDrag({ id: d.id, deltaMin, armed: true });
     };
     const up = () => {
+      // release the scroll freeze that armed-drag turned on
+      document.body.classList.remove("scrub-lock");
+      document.removeEventListener("touchmove", blockScrollRef.current, { passive: false });
       if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
       const d = dragRef.current;
       setDrag(null);
@@ -10866,11 +11129,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
     window.addEventListener("mouseup", up);
     window.addEventListener("touchmove", move, { passive: false });
     window.addEventListener("touchend", up);
+    window.addEventListener("touchcancel", up);
     return () => {
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
       window.removeEventListener("touchmove", move);
       window.removeEventListener("touchend", up);
+      window.removeEventListener("touchcancel", up);
     };
   }, [drag, appts, PPM]);
 
@@ -13867,3 +14132,7 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
     </div>
   );
 }
+
+// Default export wraps the app in the crash safety net.
+function AppWithSafetyNet() { return <ErrorBoundary minimal><App /></ErrorBoundary>; }
+export default AppWithSafetyNet;
