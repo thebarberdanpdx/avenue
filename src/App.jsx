@@ -9826,8 +9826,9 @@ function TestDataTool({ shopId, services, providers, appts, setAppts, clients, s
     setBusy(true);
     try {
       const realProviders = (providers || []).filter((p) => p.id !== "anyone");
-      const bookable = (services || []).filter((s) => typeof s.duration === "number" && s.duration > 0 && s.price != null);
-      if (!realProviders.length || !bookable.length) { showToast("Add at least one staff member and one service first."); setBusy(false); return; }
+      if (!realProviders.length) { showToast("Add a barber under Settings → Staff first."); setBusy(false); return; }
+      let bookable = (services || []).filter((s) => s && s.id != null).map((s) => ({ id: s.id, name: s.name || "Service", duration: (typeof s.duration === "number" && s.duration > 0) ? s.duration : 30, price: (s.price != null ? s.price : 0) }));
+      if (!bookable.length) bookable = [{ id: "test_svc_cut", name: "Haircut", duration: 30, price: 35 }, { id: "test_svc_cutbeard", name: "Cut & Beard", duration: 45, price: 50 }, { id: "test_svc_beard", name: "Beard Trim", duration: 20, price: 20 }];
       const stamp = Date.now();
 
       const newClients = [];
@@ -9876,7 +9877,7 @@ function TestDataTool({ shopId, services, providers, appts, setAppts, clients, s
         ? `Showing ${newAppts.length} appointments — but some didn't save to the server (they'll clear if you reload).`
         : `Added ${newClients.length} test clients and ${newAppts.length} appointments.`);
     } catch (e) {
-      showToast("Couldn't generate test data.");
+      showToast("Couldn't generate: " + (e && e.message ? e.message : "unknown error"));
     } finally { setBusy(false); }
   }
 
