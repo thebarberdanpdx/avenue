@@ -2191,7 +2191,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     doCommitBooking(finalPhone, finalEmail);
   };
 
-  const doCommitBooking = (finalPhone, finalEmail) => {
+  const doCommitBooking = async (finalPhone, finalEmail) => {
     // Re-check the slot is still free before writing — guards against a double-booking if the
     // chair got taken between showing times and tapping confirm.
     {
@@ -2213,10 +2213,22 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     let clientId = matched?.id || null;
     let newClientRow = null;
     if (!matched && !activeMember) {
-      clientId = "c" + baseId + Math.floor(Math.random() * 1000);
-      const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
-      setClients((cur) => [newClient, ...cur]);
-      if (!isStaff) newClientRow = { id: String(clientId), shop_id: shopId, data: newClient };
+      // Don't create a second profile for a phone that already exists — reuse it.
+      // (The public app has no client list, so we ask the server.)
+      let existing = null;
+      try { const { data } = await supabase.rpc("lookup_client_by_phone", { p_shop: shopId, p_phone: finalPhone }); if (data && data.id) existing = data; } catch (e) {}
+      if (!existing && Array.isArray(clients)) {
+        const dg = (finalPhone || "").replace(/\D/g, "");
+        existing = dg.length >= 10 ? clients.find((c) => (c.phone || "").replace(/\D/g, "") === dg) || null : null;
+      }
+      if (existing && existing.id) {
+        clientId = existing.id; // reuse the existing profile
+      } else {
+        clientId = "c" + baseId + Math.floor(Math.random() * 1000);
+        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
+        setClients((cur) => [newClient, ...cur]);
+        if (!isStaff) newClientRow = { id: String(clientId), shop_id: shopId, data: newClient };
+      }
     } else if (matched) {
       // Returning client confirmed/updated their info — write the chosen values to their profile
       // so a barber-added record gets an email, a corrected name persists, etc.
@@ -9850,18 +9862,21 @@ function TestDataTool({ shopId, services, providers, appts, setAppts, clients, s
         newWl.push({ id: `test_wl_${stamp}_${i}`, name: cl.name, phone: cl.phone, provider: realProviders[i % realProviders.length].name, day: ["This week", "Any day"][i % 2], when: ["morning", "midday", "afternoon"][i % 3], service: bookable[i % bookable.length].name, photos: 0, at: new Date().toLocaleString(), _test: true });
       }
 
-      await Promise.all([
+      // Show it immediately so testing isn't blocked, then persist in the background.
+      setClients((cur) => [...newClients, ...(cur || [])]);
+      setAppts((cur) => [...(cur || []), ...newAppts]);
+      setWaitlist((cur) => [...(cur || []), ...newWl]);
+      const results = await Promise.allSettled([
         supabase.from("clients").insert(newClients.map((c) => ({ id: c.id, shop_id: shopId, data: c }))),
         supabase.from("appointments").insert(newAppts.map((a) => ({ id: a.id, shop_id: shopId, data: a }))),
         supabase.from("waitlist").insert(newWl.map((w) => ({ id: w.id, shop_id: shopId, data: w }))),
       ]);
-
-      setClients((cur) => [...newClients, ...(cur || [])]);
-      setAppts((cur) => [...(cur || []), ...newAppts]);
-      setWaitlist((cur) => [...(cur || []), ...newWl]);
-      showToast(`Added ${newClients.length} test clients and ${newAppts.length} appointments.`);
+      const failed = results.some((r) => r.status === "rejected" || (r.value && r.value.error));
+      showToast(failed
+        ? `Showing ${newAppts.length} appointments — but some didn't save to the server (they'll clear if you reload).`
+        : `Added ${newClients.length} test clients and ${newAppts.length} appointments.`);
     } catch (e) {
-      showToast("Couldn't add test data — check your connection and try again.");
+      showToast("Couldn't generate test data.");
     } finally { setBusy(false); }
   }
 
