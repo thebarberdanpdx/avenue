@@ -10582,7 +10582,7 @@ function CreatePopover({ slot, providerName, onAppt, onBlock, onClose }) {
 // ============================================================
 // NEW APPOINTMENT — pick client + service, then book (full page)
 // ============================================================
-function NewAppointmentForm({ slot, providers, clients, services, onClose, onBook, onBlock }) {
+function NewAppointmentForm({ slot, providers, clients, services, appts, selectedDate, onClose, onBook, onBlock }) {
   const [provId, setProvId] = useState(slot.providerId);
   const staff = providers.filter((p) => p.role !== "owner-nonstaff");
   const [client, setClient] = useState(null);
@@ -10626,9 +10626,26 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
     return nameHit || phoneHit;
   }) : clients;
 
-  // generate selectable times (every 15 min across the working day)
+  // 5-minute time slots that actually fit, conflict-free, with the ones that sit
+  // flush against an existing appointment flagged "best" (no gap left in the day).
+  const sameDayLocal = (iso, ref) => { if (!iso || !ref) return false; const a = new Date(iso); return a.getFullYear() === ref.getFullYear() && a.getMonth() === ref.getMonth() && a.getDate() === ref.getDate(); };
+  const provObj = providers.find((p) => p.id === provId);
+  const apptDur = service ? ((service.staff && service.staff[provId] && service.staff[provId].duration) || service.duration || 30) : 30;
+  const slotDate = selectedDate || new Date();
+  const dow = slotDate.getDay();
+  const wh = (provObj && provObj.hours && provObj.hours[dow]) || { on: true, start: 6 * 60, end: 21 * 60 };
+  const winStart = wh.on ? wh.start : 6 * 60;
+  const winEnd = wh.on ? wh.end : 21 * 60;
+  const dayAppts = (appts || [])
+    .filter((a) => a.providerId === provId && sameDayLocal(a.bookedFor, slotDate) && a.status !== "cancelled" && a.status !== "done")
+    .map((a) => ({ start: a.start, end: a.end }));
   const timeOptions = [];
-  for (let m = 6 * 60; m <= 21 * 60; m += 15) timeOptions.push(m);
+  for (let m = winStart; m + apptDur <= winEnd; m += 5) {
+    const end = m + apptDur;
+    if (dayAppts.some((a) => m < a.end && end > a.start)) continue; // skip overlaps
+    timeOptions.push({ start: m, best: dayAppts.some((a) => a.end === m || a.start === end) });
+  }
+  const hasBest = timeOptions.some((s) => s.best);
 
   const fieldWrap = { padding: "26px 0", borderBottom: "1px solid var(--line)" };
 
@@ -10785,11 +10802,21 @@ function NewAppointmentForm({ slot, providers, clients, services, onClose, onBoo
             <span style={{ width: 50 }} />
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 40px" }}>
+            {hasBest && (
+              <div style={{ maxWidth: 460, margin: "0 auto 14px", display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4 }}>
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: "color-mix(in srgb, var(--gold) 30%, transparent)", border: "1px solid var(--gold)", flexShrink: 0 }} />
+                Gold times sit right against another appointment — no gap left behind.
+              </div>
+            )}
+            {timeOptions.length === 0 ? (
+              <div style={{ maxWidth: 460, margin: "0 auto", color: "var(--sub)", fontSize: 14.5, textAlign: "center", padding: "30px 0", lineHeight: 1.5 }}>No openings that fit this service{provObj ? ` in ${provObj.name.split(" ")[0]}'s day` : ""}. Try another barber or day.</div>
+            ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxWidth: 460, margin: "0 auto" }}>
-              {timeOptions.map((m) => { const on = m === startMin; return (
-                <button key={m} onClick={() => { setStartMin(m); setShowTimePick(false); }} style={{ padding: "14px 0", borderRadius: 10, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{fmtHM(m)}</button>
+              {timeOptions.map((s) => { const on = s.start === startMin; return (
+                <button key={s.start} onClick={() => { setStartMin(s.start); setShowTimePick(false); }} style={{ padding: "14px 0", borderRadius: 10, background: on ? "var(--gold)" : s.best ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", border: `1px solid ${on ? "var(--gold)" : s.best ? "var(--gold)" : "var(--border2)"}`, fontSize: 14.5, fontWeight: on || s.best ? 600 : 400 }}>{fmtHM(s.start)}</button>
               ); })}
             </div>
+            )}
           </div>
         </div>
       )}
@@ -11761,6 +11788,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           providers={providers}
           clients={clients}
           services={services}
+          appts={appts}
+          selectedDate={selectedDate}
           onClose={() => setNewApptSlot(null)}
           onBook={bookAppt}
           onBlock={({ providerId, start }) => {
@@ -11893,7 +11922,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
       .map((a) => ({ start: a.start, end: a.end }))
       .sort((a, b) => a.start - b.start);
     const out = [];
-    for (let t = h.start; t + apptDur <= h.end; t += 15) {
+    for (let t = h.start; t + apptDur <= h.end; t += 5) {
       const end = t + apptDur;
       const conflict = dayAppts.some((a) => t < a.end && end > a.start);
       if (conflict) continue;
