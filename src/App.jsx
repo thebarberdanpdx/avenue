@@ -10793,8 +10793,8 @@ const ROW_SIZES = [
   { id: "L", label: "L", pxPerHour: 200 },
   { id: "XL", label: "XL", pxPerHour: 300 },
 ];
-const DAY_START = 9 * 60;   // 9 AM
-const DAY_END = 15 * 60;    // 3 PM (scrolls)
+const DAY_START = 7 * 60;   // 7 AM
+const DAY_END = 22 * 60;    // 10 PM (scrolls)
 
 // ============================================================
 // CREATE POPOVER — appears at the long-press point, always on-screen
