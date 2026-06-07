@@ -13420,7 +13420,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
         {mode === "detail" ? (
           <>
             <TopBar
-              left={<button onClick={onClose} style={{ background: "none", color: "var(--bg)", display: "flex", alignItems: "center", gap: 2, fontSize: 15 }}><ChevronLeft size={22} /></button>}
+              left={<button onClick={onClose} style={{ background: "none", color: "var(--bg)", display: "flex", alignItems: "center", gap: 2, fontSize: 15 }}><X size={22} /></button>}
               title="Appointment"
               right={<>
                 <button onClick={() => setMenuOpen((v) => !v)} style={{ background: "none", color: "var(--bg)" }}><MoreHorizontal size={22} /></button>
