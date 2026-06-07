@@ -6431,7 +6431,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} onOpenClient={(c) => { setPulseDetail(null); setActiveClient(c); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
@@ -11266,7 +11266,7 @@ function decideCalendarGesture({ movedPx, heldMs, MOVE_PX = GESTURE_MOVE_PX, HOL
   return "pending";                                           // still deciding (a tap if released now)
 }
 /* ===== /CALENDAR-GESTURE-DECISION ===== */
-function CalendarView({ appts, setAppts, clients, setClients, providers, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me" }) {
   const sizeId = business?.calendarRowSize || "L";
   // Visible calendar window — configurable in Calendar Settings; falls back to 7 AM–10 PM.
   const DAY_START = ((business?.calendar?.dayStartHr ?? 7)) * 60;
@@ -11748,6 +11748,20 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   const selectedDate = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(0, 0, 0, 0); return d; }, [dayOffset]);
   const sameDay = (iso, refDate) => { if (!iso) return false; const a = new Date(iso); return a.getFullYear() === refDate.getFullYear() && a.getMonth() === refDate.getMonth() && a.getDate() === refDate.getDate(); };
 
+  // Column order:
+  //  1. The person being viewed (logged-in barber, or "view as X" from Pulse) leads.
+  //  2. Anyone OFF the selected day sinks to the far right and renders greyed.
+  //  3. Otherwise keep existing order (later: a business-defined drag order — Step C).
+  const focusedId = pulseView === "shop" ? null : (pulseView === "me" ? (me && me.id) : pulseView);
+  const isOffDay = (p) => { const h = p && p.hours && p.hours[selectedDate.getDay()]; return !h || !h.on; };
+  const orderedStaff = [...staff].sort((a, b) => {
+    const aOff = isOffDay(a), bOff = isOffDay(b);
+    if (aOff !== bOff) return aOff ? 1 : -1;            // off-day → far right
+    const aFoc = a.id === focusedId, bFoc = b.id === focusedId;
+    if (aFoc !== bFoc) return aFoc ? -1 : 1;            // viewed person → first
+    return staff.indexOf(a) - staff.indexOf(b);          // else keep order
+  });
+
   // Earliest open slot for a provider on a given date, respecting that day's working hours and
   // existing bookings. durMin = the appointment length to fit. + NEW and rebook default to this,
   // so a new booking lands at the earliest fair time — the barber can still drag it anywhere.
@@ -11860,7 +11874,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           </h2>
         </button>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, rowGap: 10, alignItems: "center" }}>
-          <button className="lift" onClick={() => { const pid = (staff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 16px", height: 40, borderRadius: 11, fontSize: 13, fontWeight: 600, fontFamily: "'Jost', sans-serif", letterSpacing: 1.2, display: "flex", alignItems: "center", gap: 7 }}><Plus size={15} strokeWidth={2.5} /> NEW</button>
+          <button className="lift" onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 16px", height: 40, borderRadius: 11, fontSize: 13, fontWeight: 600, fontFamily: "'Jost', sans-serif", letterSpacing: 1.2, display: "flex", alignItems: "center", gap: 7 }}><Plus size={15} strokeWidth={2.5} /> NEW</button>
           <button className="lift" onClick={() => setRegisterOpen(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border2)", padding: "0 16px", height: 40, borderRadius: 11, fontSize: 13, fontWeight: 600, letterSpacing: 1.2, display: "flex", alignItems: "center", gap: 7 }}><DollarSign size={15} style={{ color: "var(--gold)" }} /> SALE</button>
           <div style={{ flex: 1, minWidth: 8 }} />
           <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 40, borderRadius: 11, fontSize: 13.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 7, position: "relative", letterSpacing: 0.3 }}><Clock size={14} style={{ color: "var(--gold)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
@@ -11888,9 +11902,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
       {/* staff column headers */}
       <div style={{ display: "flex", borderBottom: "1px solid var(--line)" }}>
         <div style={{ width: 56, flexShrink: 0 }} />
-        {staff.map((p) => (
-          <div key={p.id} style={{ flex: 1, textAlign: "center", padding: "10px 0", fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 0.5, fontWeight: 500, color: p.color, borderLeft: "1px solid var(--line)" }}>{p.name}</div>
-        ))}
+        {orderedStaff.map((p) => { const off = isOffDay(p); return (
+          <div key={p.id} style={{ flex: 1, textAlign: "center", padding: "10px 0", fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 0.5, fontWeight: 500, color: off ? "var(--faint)" : p.color, opacity: off ? 0.6 : 1, borderLeft: "1px solid var(--line)" }}>{p.name}{off ? " · off" : ""}</div>
+        ); })}
       </div>
 
       {/* the timeline grid */}
@@ -11905,7 +11919,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
         </div>
 
         {/* columns */}
-        {staff.map((p) => {
+        {orderedStaff.map((p) => {
           // Lane-aware layout: when N appointments on this provider overlap in time,
           // split that section of the column into N side-by-side lanes so nothing hides behind anything.
           // Single appointments keep the full column width.
