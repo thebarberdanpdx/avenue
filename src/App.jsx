@@ -11888,7 +11888,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
                 else if (a.status === "in-service") accent = STATUS_COLORS["in-service"];
                 const isDone = a.status === "done";
                 // soft tinted background with a colored accent bar — clean & legible
-                const tint = `color-mix(in srgb, ${accent} 14%, var(--panel))`;
+                const tint = `color-mix(in srgb, ${accent} 62%, var(--panel))`;
                 const onColor = "var(--text)";
                 const blockBg = "repeating-linear-gradient(45deg, var(--panel2), var(--panel2) 7px, var(--line) 7px, var(--line) 14px)";
                 // Horizontal lane positioning — full width when alone, split into N equal lanes when overlapping.
