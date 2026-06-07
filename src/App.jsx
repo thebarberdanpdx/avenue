@@ -1333,6 +1333,11 @@ function App() {
         .appt-screen { animation: slideInRight .3s var(--ease) both; }
         @keyframes fadeInFixed { from { opacity:0; } to { opacity:1; } }
         .appt-screen-fixed { animation: fadeInFixed .25s var(--ease) both; }
+        /* Desktop: float the appointment screen as a centered dialog instead of a full-height strip */
+        @media (min-width: 700px) {
+          .appt-screen-fixed { background: var(--overlay) !important; align-items: center !important; justify-content: center !important; padding: 32px !important; }
+          .appt-screen-card { position: relative; height: auto !important; max-height: 88vh !important; overflow-y: auto !important; border-radius: 20px !important; border: 1px solid var(--line); box-shadow: 0 30px 70px -20px rgba(0,0,0,0.55); }
+        }
         /* Success bloom — used on the "You're in" check circle */
         @keyframes successBloom { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
         .success-bloom { animation: successBloom .65s var(--spring) both; }
@@ -13364,7 +13369,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   return (
     <Portal>
     <div className="appt-screen-fixed" style={{ position: "fixed", inset: 0, zIndex: 800, background: T.bg, display: "flex", flexDirection: "column", color: T.text, fontFamily: FONT_BODY }}>
-      <div style={{ width: "100%", maxWidth: 540, margin: "0 auto", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div className="appt-screen-card" style={{ width: "100%", maxWidth: 540, margin: "0 auto", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {mode === "detail" ? (
           <>
