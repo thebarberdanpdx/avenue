@@ -12235,8 +12235,15 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
   };
   const tipCfg = business?.tipping || { enabled: true, presets: [18, 20, 25], allowCustom: true, allowNoTip: true, smartDefault: 20 };
   const rebookCfg = business?.rebook || { enabled: true, discountEnabled: true, discountType: "amount", discount: 5, weeks: [2, 3, 4, 6, 8] };
-  // Rhythm intelligence: the client's real cadence → recommended rebook week (nearest offered option).
-  const cadenceDays = liveClient?.cadenceDays || null;
+  // Rhythm intelligence: the client's real cadence (avg gap between past visits) → recommended rebook week.
+  const cadenceDays = (() => {
+    const ds = (appts || [])
+      .filter((a) => liveClient && a.clientId === liveClient.id && a.bookedFor && (new Date(a.bookedFor).getTime() < Date.now() || a.status === "done") && a.status !== "cancelled")
+      .map((a) => new Date(a.bookedFor).getTime())
+      .sort((x, y) => x - y);
+    if (ds.length >= 2) { let g = 0; for (let i = 1; i < ds.length; i++) g += (ds[i] - ds[i - 1]) / 86400000; return Math.round(g / (ds.length - 1)); }
+    return liveClient?.cadenceDays || null;
+  })();
   const rhythmWeek = cadenceDays ? rebookCfg.weeks.reduce((best, w) => Math.abs(w * 7 - cadenceDays) < Math.abs(best * 7 - cadenceDays) ? w : best, rebookCfg.weeks[0]) : null;
   const base = lockedApptPrice(appt, service);
   const [stage, setStage] = useState("review"); // review → reader → tip → approving → approved → rebook → done
@@ -14222,6 +14229,16 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
     .filter((a) => a.bookedFor && (new Date(a.bookedFor).getTime() < now || a.status === "done") && a.status !== "cancelled")
     .sort((a, b) => new Date(b.bookedFor) - new Date(a.bookedFor))
     .slice(0, 4);
+  // Booking cadence: average gap between past visits (fallback to stored rhythm). Hidden if not enough history.
+  const cadenceAvg = (() => {
+    const ds = myAppts
+      .filter((a) => a.bookedFor && (new Date(a.bookedFor).getTime() < now || a.status === "done") && a.status !== "cancelled")
+      .map((a) => new Date(a.bookedFor).getTime())
+      .sort((x, y) => x - y);
+    if (ds.length >= 2) { let g = 0; for (let i = 1; i < ds.length; i++) g += (ds[i] - ds[i - 1]) / 86400000; return Math.round(g / (ds.length - 1)); }
+    return live.cadenceDays || null;
+  })();
+  const cadencePhrase = cadenceAvg == null ? null : (cadenceAvg < 11 ? `books about every ${cadenceAvg} days` : `books about every ${Math.round(cadenceAvg / 7)} week${Math.round(cadenceAvg / 7) === 1 ? "" : "s"}`);
   // Nudge handler for the Overview button — same persistence as the Clients-tab folder.
   const nudgeFromProfile = () => {
     setClients(clients.map((c) => c.id === client.id ? { ...c, nudgeDismissedAt: new Date().toISOString() } : c));
@@ -14283,7 +14300,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       {pfTab === "overview" && <div style={{ marginBottom: 28 }}>
         {/* Visit count + provider — moved down from the masthead. Plain text, no caps treatment. */}
         <div style={{ fontSize: 13.5, color: "var(--faint)", marginBottom: 18 }}>
-          {live.visits === 0 ? "First visit" : live.visits === 1 ? "1 visit" : `${live.visits} visits`} with {provider.name}
+          {live.visits === 0 ? "First visit" : live.visits === 1 ? "1 visit" : `${live.visits} visits`} with {provider.name}{cadencePhrase ? ` · ${cadencePhrase}` : ""}
         </div>
         {/* Upcoming appointment — the key thing to see at a glance */}
         {nextAppt && (
