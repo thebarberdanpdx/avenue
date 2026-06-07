@@ -12476,7 +12476,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
               );
             })}
           </div>
-          <button className="lift" disabled={chosenStart == null} onClick={() => setStage("done")} style={{ width: "100%", marginTop: 20, background: chosenStart == null ? "var(--panel2)" : "var(--gold)", color: chosenStart == null ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: chosenStart == null ? "none" : "var(--shadow-md)" }}>{chosenStart == null ? "TAP A TIME ABOVE" : (discountOn ? `BOOK ${fmtTime(chosenStart)} · SAVE ${discLabel}` : `BOOK ${fmtTime(chosenStart)}`)}</button>
+          <button className="lift" disabled={chosenStart == null} onClick={() => setStage("done")} style={{ width: "100%", marginTop: 20, background: chosenStart == null ? "var(--panel2)" : "linear-gradient(155deg,#FCE187 0%,#F4C84F 34%,#E5AC34 70%,#CF971F 100%)", color: chosenStart == null ? "var(--faint)" : "#33260A", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: chosenStart == null ? "none" : "0 10px 22px -8px rgba(190,135,20,.55), inset 0 1px 0 rgba(255,255,255,.6)" }}>{chosenStart == null ? "TAP A TIME ABOVE" : (discountOn ? `BOOK ${fmtTime(chosenStart)} · SAVE ${discLabel}` : `BOOK ${fmtTime(chosenStart)}`)}</button>
         </>
       )}
     </div>
