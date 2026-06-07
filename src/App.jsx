@@ -11747,7 +11747,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   const nextFreeSlot = (providerId) => earliestOpenSlot(providerId, selectedDate, 30);
 
   return (
-    <div className="fade-up">
+    <div className="fade-up" style={{ maxWidth: 780, margin: "0 auto" }}>
       {showWaitlistPanel && (
         <div onClick={() => setShowWaitlistPanel(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg)", borderBottomLeftRadius: 22, borderBottomRightRadius: 22, maxHeight: "85vh", overflowY: "auto", padding: "calc(20px + env(safe-area-inset-top)) 22px 30px", boxShadow: "0 20px 40px rgba(0,0,0,0.4)" }}>
