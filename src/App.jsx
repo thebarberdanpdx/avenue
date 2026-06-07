@@ -1333,11 +1333,8 @@ function App() {
         .appt-screen { animation: slideInRight .3s var(--ease) both; }
         @keyframes fadeInFixed { from { opacity:0; } to { opacity:1; } }
         .appt-screen-fixed { animation: fadeInFixed .25s var(--ease) both; }
-        /* Desktop: float the appointment screen as a centered dialog instead of a full-height strip */
-        @media (min-width: 700px) {
-          .appt-screen-fixed { background: var(--overlay) !important; align-items: center !important; justify-content: center !important; padding: 32px !important; }
-          .appt-screen-card { position: relative; height: auto !important; max-height: 88vh !important; max-width: 600px !important; overflow: hidden auto !important; border-radius: 20px !important; border: 1px solid var(--line); box-shadow: 0 30px 70px -20px rgba(0,0,0,0.55); }
-        }
+        /* Desktop dialog layout is handled inline via the JS wide state in AppointmentSheet
+           (reliable across PWA/standalone contexts; re-evaluates on resize). */
         /* Success bloom — used on the "You're in" check circle */
         @keyframes successBloom { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
         .success-bloom { animation: successBloom .65s var(--spring) both; }
@@ -13202,6 +13199,15 @@ function ProgressCard({ T, minutesLeft, minutesInto, dur, nextClient, nextIsWait
 function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
+  // Desktop dialog detection. Driven by JS (not a CSS media query) so it's reliable
+  // across PWA/standalone contexts, and re-evaluates on resize so it stays correct
+  // if the window changes while the sheet is open.
+  const [wide, setWide] = useState(() => typeof window !== "undefined" && window.innerWidth >= 700);
+  useEffect(() => {
+    const onResize = () => setWide(window.innerWidth >= 700);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const scrollTopRef = useRef(null);
   useEffect(() => {
     let raf1, raf2;
@@ -13408,8 +13414,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
 
   return (
     <Portal>
-    <div className="appt-screen-fixed" style={{ position: "fixed", inset: 0, zIndex: 800, background: T.bg, display: "flex", flexDirection: "column", color: T.text, fontFamily: FONT_BODY }}>
-      <div className="appt-screen-card" style={{ width: "100%", maxWidth: 540, margin: "0 auto", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div className="appt-screen-fixed" style={{ position: "fixed", inset: 0, zIndex: 800, background: wide ? "var(--overlay)" : T.bg, display: "flex", flexDirection: "column", alignItems: wide ? "center" : undefined, justifyContent: wide ? "center" : undefined, padding: wide ? 32 : undefined, color: T.text, fontFamily: FONT_BODY }}>
+      <div className="appt-screen-card" style={wide ? { width: "100%", maxWidth: 640, margin: "0 auto", height: "auto", maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden auto", position: "relative", borderRadius: 20, border: "1px solid var(--line)", background: T.bg, boxShadow: "0 30px 70px -20px rgba(0,0,0,0.55)" } : { width: "100%", maxWidth: 540, margin: "0 auto", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {mode === "detail" ? (
           <>
