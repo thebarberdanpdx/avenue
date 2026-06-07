@@ -13205,7 +13205,12 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               </>}
             />
 
-            <div ref={scrollTopRef} style={{ overflowY: "auto", flex: 1 }}>
+            {appt.status === "done" && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "13px 18px", background: T.chip, borderBottom: `1px solid ${T.line}`, color: T.sub, fontSize: 15, fontWeight: 600 }}>
+                <Check size={17} style={{ color: T.accent }} /> Completed & paid · ${price}
+              </div>
+            )}
+            <div ref={scrollTopRef} style={{ overflowY: "auto", flex: 1, opacity: appt.status === "done" ? 0.5 : 1, transition: "opacity .2s" }}>
               {/* status + check-in */}
               <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 9, background: T.chip, border: `1px solid ${T.line}`, padding: "8px 14px", borderRadius: 30 }}>
