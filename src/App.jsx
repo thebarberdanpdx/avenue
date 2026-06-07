@@ -11276,7 +11276,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   const startCheckout = (appt) => { setOpen(null); setCheckout(appt); };
   const finishCheckout = (id, summary) => {
     setAppts((cur) => {
-      const done = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a);
+      const done = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceStartedAt ? Date.now() : a.serviceEndedAt, pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a);
       // if they rebooked, drop a real future appointment on the calendar — confirmed, NOT prepaid
       if (summary && (summary.rebookWeeks != null || summary.rebookDate)) {
         const src = cur.find((a) => a.id === id);
@@ -13197,6 +13197,15 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     if (v === (client.notes || "")) return;
     setClients(clients.map((c) => c.id === client.id ? { ...c, notes: v } : c));
   };
+  // Auto-save the note a beat after typing stops, so it lands on the profile even without tapping out.
+  useEffect(() => {
+    if (!client) return;
+    const t = setTimeout(() => {
+      const v = wuNote.trim();
+      setClients((cs) => cs.map((c) => (c.id === client.id && (c.notes || "") !== v) ? { ...c, notes: v } : c));
+    }, 700);
+    return () => clearTimeout(t);
+  }, [wuNote]);
   const addWuPhoto = (file) => {
     if (!file || !client) return;
     const fr = new FileReader();
@@ -13226,6 +13235,10 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     if (!client || !service) return;
     setClients(clients.map((c) => c.id === client.id ? { ...c, customDurations: { ...(c.customDurations || {}), [service.id]: val } } : c));
   };
+  // What the system actually timed this visit (check-in → checkout). Shown as an option; doesn't override the default.
+  const timedMin = (appt.serviceStartedAt && appt.serviceEndedAt) ? Math.max(1, Math.round((appt.serviceEndedAt - appt.serviceStartedAt) / 60000)) : null;
+  const timedApply = timedMin != null ? Math.max(5, Math.round(timedMin / 5) * 5) : null;
+  const fmtClockTs = (ts) => new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
   // Live clock for the in-service timer. Prefer the real start timestamp (set when
   // marked in-service) so elapsed/left can't drift; fall back to the scheduled start.
@@ -13555,6 +13568,17 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                           </div>
                         </div>
                         <div style={{ fontSize: 12.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Booked at {service.duration} min. This sets {(client.name || "their").split(" ")[0]}'s time so future bookings get the right amount of chair.</div>
+                        {timedMin != null && (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12, padding: "11px 13px", borderRadius: 11, background: `color-mix(in srgb, #E5AC34 12%, ${T.panel})`, border: "1px solid color-mix(in srgb, #E5AC34 32%, transparent)" }}>
+                            <div style={{ fontSize: 13.5, color: T.text, lineHeight: 1.4 }}>
+                              <Clock size={13} style={{ color: "#CF971F", verticalAlign: "-2px", marginRight: 6 }} />
+                              This visit ran <strong>{timedMin} min</strong><span style={{ color: T.faint }}> · in {fmtClockTs(appt.serviceStartedAt)} → out {fmtClockTs(appt.serviceEndedAt)}</span>
+                            </div>
+                            {timedApply !== wuDur && (
+                              <button onClick={() => setWuDur(timedApply)} style={{ flexShrink: 0, background: "linear-gradient(155deg,#F4C84F,#CF971F)", color: "#33260A", border: "none", borderRadius: 9, padding: "8px 12px", fontSize: 12.5, fontWeight: 700, letterSpacing: 0.3, whiteSpace: "nowrap" }}>Use {timedApply}</button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                     {/* Photos — 3 tiles, camera or gallery */}
