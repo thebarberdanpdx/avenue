@@ -10211,6 +10211,146 @@ function TestDataTool({ shopId, services, providers, appts, setAppts, clients, s
   );
 }
 
+// Merge duplicate clients sharing a phone number. Newest record survives; visits sum;
+// history (gallery / customDurations / notes / messages / timeline) folds into the survivor;
+// appointments repoint to the survivor; loser rows are removed. Same-name groups merge on
+// "Merge all"; different-name groups (same phone) are listed for the owner to Merge/Skip.
+function MergeDuplicatesTool({ shopId, clients, setClients, appts, setAppts, showToast }) {
+  const [scanned, setScanned] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [skipped, setSkipped] = useState([]); // phone keys the owner chose to skip
+
+  const digits = (s) => (s || "").replace(/\D/g, "");
+  const recTime = (c) => { const t = Date.parse(c.lastActivity || c.lastVisit || ""); return isNaN(t) ? 0 : t; };
+  const nameKey = (c) => (c.name || `${c.firstName || ""} ${c.lastName || ""}`).trim().toLowerCase();
+
+  // Build groups of 2+ clients sharing a normalized phone (10+ digits only).
+  const groups = useMemo(() => {
+    const by = {};
+    (clients || []).forEach((c) => { const p = digits(c.phone); if (p.length >= 10) (by[p] = by[p] || []).push(c); });
+    return Object.entries(by)
+      .filter(([, list]) => list.length > 1)
+      .map(([phone, list]) => {
+        const sorted = [...list].sort((a, b) => recTime(b) - recTime(a)); // newest first
+        const names = new Set(sorted.map(nameKey));
+        return { phone, list: sorted, survivor: sorted[0], sameName: names.size === 1 };
+      });
+  }, [clients]);
+
+  const sameNameGroups = groups.filter((g) => g.sameName && !skipped.includes(g.phone));
+  const mixedGroups = groups.filter((g) => !g.sameName && !skipped.includes(g.phone));
+
+  // Merge a list of groups: returns {mergedSurvivors, loserIds, repointedAppts}.
+  async function mergeGroups(toMerge) {
+    if (busy || !toMerge.length) return;
+    setBusy(true);
+    try {
+      const loserIds = [];
+      const survivorById = {};
+      const repointMap = {}; // loserId -> survivorId
+      toMerge.forEach((g) => {
+        const winner = g.survivor;
+        const losers = g.list.filter((c) => c.id !== winner.id);
+        let merged = { ...winner };
+        let visits = Number(winner.visits) || 0;
+        losers.forEach((l) => {
+          visits += Number(l.visits) || 0;
+          merged.gallery = [...(merged.gallery || []), ...((l.gallery) || [])];
+          merged.messages = [...(merged.messages || []), ...((l.messages) || [])];
+          merged.timeline = [...(merged.timeline || []), ...((l.timeline) || [])];
+          merged.customDurations = { ...((l.customDurations) || {}), ...(merged.customDurations || {}) };
+          const ln = (l.notes || "").trim();
+          if (ln && !(merged.notes || "").includes(ln)) merged.notes = [(merged.notes || "").trim(), ln].filter(Boolean).join("\n");
+          if (!merged.email && l.email) merged.email = l.email;
+          loserIds.push(l.id);
+          repointMap[l.id] = winner.id;
+        });
+        merged.visits = visits;
+        survivorById[winner.id] = merged;
+      });
+
+      // Repoint appointments from any loser to its survivor.
+      const repointedAppts = (appts || []).filter((a) => repointMap[a.clientId]).map((a) => ({ ...a, clientId: repointMap[a.clientId] }));
+
+      // Update state immediately.
+      setClients((cur) => (cur || [])
+        .filter((c) => !loserIds.includes(c.id))
+        .map((c) => survivorById[c.id] ? survivorById[c.id] : c));
+      if (repointedAppts.length) {
+        const rp = {}; repointedAppts.forEach((a) => rp[a.id] = a);
+        setAppts((cur) => (cur || []).map((a) => rp[a.id] || a));
+      }
+
+      // Persist: upsert survivors + repointed appts, delete loser client rows.
+      const writes = [
+        supabase.from("clients").upsert(Object.values(survivorById).map((c) => ({ id: c.id, shop_id: shopId, data: c }))),
+        supabase.from("clients").delete().eq("shop_id", shopId).in("id", loserIds),
+      ];
+      if (repointedAppts.length) writes.push(supabase.from("appointments").upsert(repointedAppts.map((a) => ({ id: a.id, shop_id: shopId, data: a }))));
+      const results = await Promise.allSettled(writes);
+      const failed = results.some((r) => r.status === "rejected" || (r.value && r.value.error));
+      showToast(failed
+        ? `Merged ${loserIds.length} on screen — but some changes didn't save to the server (reload to re-check).`
+        : `Merged ${loserIds.length} duplicate${loserIds.length === 1 ? "" : "s"} into ${toMerge.length} profile${toMerge.length === 1 ? "" : "s"}.`);
+    } catch (e) {
+      showToast("Couldn't merge — check your connection and try again.");
+    } finally { setBusy(false); }
+  }
+
+  const groupSummary = (g) => {
+    const visits = g.list.reduce((s, c) => s + (Number(c.visits) || 0), 0);
+    const photos = g.list.reduce((s, c) => s + ((c.gallery || []).length), 0);
+    return `${g.list.length} records → ${visits} visit${visits === 1 ? "" : "s"}${photos ? `, ${photos} photo${photos === 1 ? "" : "s"}` : ""}`;
+  };
+  const fmtPhone = (p) => { const d = digits(p); return d.length === 10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : p; };
+
+  return (
+    <div>
+      <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, margin: "0 0 16px" }}>Find clients that share a phone number and combine them into one profile. The newest record is kept, visit counts add up, and all history and appointments move over. Nothing is changed until you choose to merge.</p>
+
+      {!scanned ? (
+        <button className="lift" onClick={() => setScanned(true)} disabled={busy} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: 16, fontSize: 13.5, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Scan for duplicates</button>
+      ) : (groups.length === 0 || (sameNameGroups.length === 0 && mixedGroups.length === 0)) ? (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, fontSize: 14.5, color: "var(--sub)" }}>No duplicates to merge. Everyone has a unique phone number{skipped.length ? " (skipped groups excluded)" : ""}.</div>
+      ) : (
+        <>
+          {sameNameGroups.length > 0 && (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>READY TO MERGE</div>
+              {sameNameGroups.map((g) => (
+                <div key={g.phone} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 14px", marginBottom: 10 }}>
+                  <div style={{ fontSize: 15.5, fontWeight: 600 }}>{g.survivor.name}</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{fmtPhone(g.phone)} · {groupSummary(g)}</div>
+                </div>
+              ))}
+              <button className="lift" onClick={() => mergeGroups(sameNameGroups)} disabled={busy} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: 15, fontSize: 13.5, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer", opacity: busy ? 0.6 : 1, marginTop: 4 }}>{busy ? "Merging…" : `Merge all (${sameNameGroups.length})`}</button>
+            </div>
+          )}
+
+          {mixedGroups.length > 0 && (
+            <div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>NEEDS YOUR CALL</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>These share a phone number but have different names — could be family on one number. Merge only if they're the same person.</div>
+              {mixedGroups.map((g) => (
+                <div key={g.phone} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 14px", marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 6 }}>{fmtPhone(g.phone)} · {groupSummary(g)}</div>
+                  {g.list.map((c, i) => (
+                    <div key={c.id} style={{ fontSize: 15, color: "var(--text)", marginBottom: 2 }}>{c.name}{i === 0 ? <span style={{ color: "var(--faint)", fontSize: 12.5 }}> · newest, kept</span> : null}</div>
+                  ))}
+                  <div style={{ display: "flex", gap: 10, marginTop: 11 }}>
+                    <button onClick={() => mergeGroups([g])} disabled={busy} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: 12, fontSize: 13.5, fontWeight: 600, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Merge</button>
+                    <button onClick={() => setSkipped((s) => [...s, g.phone])} disabled={busy} style={{ flex: 1, background: "transparent", color: "var(--sub)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, fontSize: 13.5, fontWeight: 500, cursor: "pointer" }}>Skip</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary, shopId, setAppts, setClients, waitlist, setWaitlist }) {
   // Fill in any missing top-level settings from the defaults so a sparse/older saved blob can't
   // crash a card that reads a nested field (a single absent key used to white-screen the whole page).
@@ -10250,6 +10390,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     {
       id: "testdata", title: "Test Data", icon: Sparkles, category: "Reporting", subtitle: "Fill the calendar to test, then wipe it clean",
       editor: <TestDataTool shopId={shopId} services={services} providers={providers} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} showToast={showToast} />,
+    },
+    {
+      id: "mergedupes", title: "Merge Duplicates", icon: Users, category: "Reporting", subtitle: "Combine clients that share a phone number",
+      keywords: "merge duplicate duplicates combine clients same phone number clean up cleanup dedupe deduplicate",
+      editor: <MergeDuplicatesTool shopId={shopId} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} showToast={showToast} />,
     },
     {
       id: "business", title: "Business Details", icon: User, category: "Business Setup",
