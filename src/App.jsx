@@ -6427,7 +6427,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} onOpenClient={(c) => { setPulseDetail(null); setActiveClient(c); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} me={me} isOwner={isOwner} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
@@ -11187,7 +11187,7 @@ function decideCalendarGesture({ movedPx, heldMs, MOVE_PX = GESTURE_MOVE_PX, HOL
   return "pending";                                           // still deciding (a tap if released now)
 }
 /* ===== /CALENDAR-GESTURE-DECISION ===== */
-function CalendarView({ appts, setAppts, clients, setClients, providers, services, business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true }) {
   const sizeId = business?.calendarRowSize || "L";
   const [showWaitlistPanel, setShowWaitlistPanel] = useState(false);
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
@@ -11899,7 +11899,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
                 const height = (a.end - a.start) * PPM - 2;
                 const service = services.find((s) => s.id === a.serviceId);
                 const isBlock = a.status === "block";
-                let accent = hexById(service?.color);
+                // cut-style color (set per cut in Cut Styles) wins; falls back to the service's own color
+                const _ctId = a.lineItems && a.lineItems[0] && a.lineItems[0].cutType;
+                const _ct = (_ctId && service && service.cutTypes) ? service.cutTypes.find((c) => c.id === _ctId) : null;
+                const _cutColor = (_ct && _ct.libId) ? ((cutLibrary || []).find((e) => e.id === _ct.libId) || {}).color : null;
+                let accent = hexById(_cutColor || service?.color);
                 if (a.status === "checked-in") accent = STATUS_COLORS["checked-in"];
                 else if (a.status === "in-service") accent = STATUS_COLORS["in-service"];
                 const isDone = a.status === "done";
