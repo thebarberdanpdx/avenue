@@ -11911,6 +11911,18 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
           return (
             <div key={p.id}
               style={{ flex: 1, position: "relative", height: gridHeight, borderLeft: "1px solid var(--line)" }}>
+              {/* off-shift shade: dim the hours outside this barber's shift for the selected day (behind cards, ignores taps) */}
+              {(() => {
+                const h = (p.hours || {})[selectedDate.getDay()];
+                const shade = "color-mix(in srgb, var(--text) 7%, transparent)";
+                if (!h || !h.on) return <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: gridHeight, background: shade, pointerEvents: "none" }} />;
+                const segs = [];
+                const sStart = Math.max(DAY_START, h.start);
+                const sEnd = Math.min(DAY_END, h.end);
+                if (sStart > DAY_START) segs.push(<div key="b" style={{ position: "absolute", left: 0, right: 0, top: 0, height: (sStart - DAY_START) * PPM, background: shade, pointerEvents: "none" }} />);
+                if (sEnd < DAY_END) segs.push(<div key="a" style={{ position: "absolute", left: 0, right: 0, top: (sEnd - DAY_START) * PPM, height: (DAY_END - sEnd) * PPM, background: shade, pointerEvents: "none" }} />);
+                return segs;
+              })()}
               {/* tap/long-press layer: tap opens form; long-press shows beige block to scrub time */}
               <div
                 onClick={(e) => onSlotClick(e, p.id, e.currentTarget.parentElement)}
