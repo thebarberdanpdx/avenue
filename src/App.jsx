@@ -1361,6 +1361,8 @@ function App() {
         #app-root button:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 38%, transparent); }
         @keyframes shimmer { 0% { background-position: -480px 0; } 100% { background-position: 480px 0; } }
         .skeleton { background: linear-gradient(90deg, var(--panel2) 25%, color-mix(in srgb, var(--panel2) 55%, var(--panel)) 50%, var(--panel2) 75%); background-size: 960px 100%; animation: shimmer 1.4s linear infinite; border-radius: 10px; }
+        @keyframes slotSweep { 0% { transform: translateX(-130%);} 55%,100% { transform: translateX(130%);} }
+        .vslot-sel::after { content:""; position:absolute; inset:0; background:linear-gradient(115deg, transparent 32%, rgba(255,255,255,.6) 50%, transparent 68%); transform:translateX(-130%); animation:slotSweep 3s ease-in-out infinite; pointer-events:none; }
       `}</style>
 
       {saveFailed && (
@@ -12440,10 +12442,16 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
             {daySlots.slots.map((s) => {
               const sel = chosenStart === s.start;
               return (
-                <button key={s.start} onClick={() => setChosenStart(s.start)} style={{ position: "relative", padding: "13px 0", borderRadius: 11, fontSize: 14.5, fontWeight: sel || s.best ? 600 : 400,
-                  background: sel ? "var(--gold)" : s.best ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "var(--panel)",
-                  color: sel ? "var(--on-gold)" : "var(--text)",
-                  border: `1px solid ${sel ? "var(--gold)" : s.best ? "var(--gold)" : "var(--border2)"}` }}>
+                <button key={s.start} onClick={() => setChosenStart(s.start)} className={sel ? "vslot-sel" : undefined} style={{ position: "relative", overflow: "hidden", padding: "14px 0", borderRadius: 13, fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: sel || s.best ? 600 : 500,
+                  background: sel
+                    ? "linear-gradient(155deg,#FCE187 0%,#F4C84F 34%,#E5AC34 70%,#CF971F 100%)"
+                    : s.best ? "color-mix(in srgb, #F4C84F 20%, var(--panel))" : "var(--panel)",
+                  color: sel ? "#33260A" : "var(--text)",
+                  border: `${s.best && !sel ? "1.5px" : "1px"} solid ${sel ? "#C8901C" : s.best ? "#E7C065" : "var(--border2)"}`,
+                  boxShadow: sel
+                    ? "0 8px 18px -6px rgba(190,135,20,.55), inset 0 1px 0 rgba(255,255,255,.6), inset 0 -2px 4px rgba(150,100,10,.22)"
+                    : s.best ? "0 2px 7px -2px rgba(199,151,40,.30)" : "0 1px 2px rgba(60,45,15,.05)" }}>
+                  {s.best && !sel && <span style={{ position: "absolute", top: 7, left: "50%", transform: "translateX(-50%)", width: 5, height: 5, borderRadius: "50%", background: "linear-gradient(145deg,#FAD879,#D99B1C)", boxShadow: "0 0 5px rgba(217,155,28,.6)" }} />}
                   {fmtTime(s.start)}
                 </button>
               );
