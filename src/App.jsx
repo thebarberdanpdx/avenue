@@ -13199,6 +13199,7 @@ function ProgressCard({ T, minutesLeft, minutesInto, dur, nextClient, nextIsWait
 function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
+  const [checkinOpen, setCheckinOpen] = useState(false); // CHECK-IN pill dropdown (In Lobby / In Service)
   // Desktop dialog detection. Driven by JS (not a CSS media query) so it's reliable
   // across PWA/standalone contexts, and re-evaluates on resize so it stays correct
   // if the window changes while the sheet is open.
@@ -13437,13 +13438,32 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
             <div style={{ opacity: appt.status === "done" ? 0.5 : 1, transition: "opacity .2s" }}>
               {/* status + check-in */}
               <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 9, background: T.chip, border: `1px solid ${T.line}`, padding: "8px 14px", borderRadius: 30 }}>
-                  <span style={{ width: 11, height: 11, borderRadius: "50%", background: status.dot }} />
-                  <span style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: 0.2 }}>{status.label}</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 9, background: T.chip, border: `1px solid ${T.line}`, padding: "8px 14px", borderRadius: 30 }}>
+                    <span style={{ width: 11, height: 11, borderRadius: "50%", background: status.dot }} />
+                    <span style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: 0.2 }}>{status.label}</span>
+                  </div>
+                  {appt.status === "confirmed" && (
+                    <div style={{ position: "relative" }}>
+                      <button className="lift" onClick={() => setCheckinOpen((v) => !v)} style={{ background: "none", border: `1px solid ${T.border2}`, color: T.sub, padding: "10px 20px", borderRadius: 30, fontSize: 13, letterSpacing: 1, fontWeight: 700 }}>CHECK-IN</button>
+                      {checkinOpen && (
+                        <>
+                          <div onClick={() => setCheckinOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 8 }} />
+                          <div className="appt-drop" style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, minWidth: 200, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 16, boxShadow: "0 14px 34px -10px rgba(0,0,0,0.35)", overflow: "hidden", zIndex: 9 }}>
+                            <button onClick={() => { setCheckinOpen(false); onSetStatus(appt.id, "checked-in", `${appt.name} checked in.`); }} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", background: "none", border: "none", borderBottom: `1px solid ${T.line}`, padding: "14px 17px", fontSize: 15.5, color: T.text }}>
+                              <span style={{ width: 10, height: 10, borderRadius: "50%", background: STATUS_COLORS["checked-in"], flexShrink: 0 }} />In Lobby
+                            </button>
+                            <button onClick={() => { setCheckinOpen(false); onSetStatus(appt.id, "in-service", `${appt.name} is in the chair.`); }} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", background: "none", border: "none", padding: "14px 17px", fontSize: 15.5, color: T.text }}>
+                              <span style={{ width: 10, height: 10, borderRadius: "50%", background: STATUS_COLORS["in-service"], flexShrink: 0 }} />In Service
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} is ready for you and will meet you in front."; const msg = wr.autoReadyMessage === false ? `${appt.name} marked in service.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`; onSetStatus(appt.id, "in-service", msg); }} style={{ background: "none", border: `1px solid ${T.border2}`, color: T.sub, padding: "10px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700 }}>NOTIFY · READY</button>}
+                  {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ background: "none", border: `1px solid ${T.border2}`, color: T.sub, padding: "10px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700 }}>CHECKOUT</button>}
                 </div>
-                {appt.status === "confirmed" && <button className="lift" onClick={() => onSetStatus(appt.id, "checked-in", `${appt.name} checked in.`)} style={{ width: "100%", marginTop: 14, background: "#3E8BD6", color: "#fff", border: "none", padding: "16px 22px", borderRadius: 14, fontSize: 16, letterSpacing: 1, fontWeight: 700 }}>CHECK-IN</button>}
-                {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} is ready for you and will meet you in front."; const msg = wr.autoReadyMessage === false ? `${appt.name} marked in service.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`; onSetStatus(appt.id, "in-service", msg); }} style={{ width: "100%", marginTop: 14, background: "#E0892F", color: "#fff", border: "none", padding: "16px 22px", borderRadius: 14, fontSize: 16, letterSpacing: 0.5, fontWeight: 700 }}>NOTIFY · READY</button>}
-                {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ width: "100%", marginTop: 14, background: "#0A0A0A", color: "#fff", border: "none", padding: "16px 22px", borderRadius: 14, fontSize: 16, letterSpacing: 1, fontWeight: 700 }}>COMPLETE & CHECKOUT</button>}
               </div>
 
               {/* PROGRESS CARD — live in-service timer; gated by Calendar Settings */}
