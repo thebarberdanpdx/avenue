@@ -6431,7 +6431,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} onOpenClient={(c) => { setPulseDetail(null); setActiveClient(c); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
@@ -10415,6 +10415,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             </div>
           );
         })()}
+        {(providers || []).filter((p) => p.id !== "anyone").length > 1 && (
+          <div style={{ marginTop: 22 }}>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>COLUMN ORDER</div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>Default left-to-right order of staff columns on the calendar. Whoever you're viewing still leads, and anyone off that day moves to the right.</div>
+            <ColumnOrderEditor providers={providers} setProviders={setProviders} />
+          </div>
+        )}
         </>
       ),
     },
@@ -11266,7 +11273,37 @@ function decideCalendarGesture({ movedPx, heldMs, MOVE_PX = GESTURE_MOVE_PX, HOL
   return "pending";                                           // still deciding (a tap if released now)
 }
 /* ===== /CALENDAR-GESTURE-DECISION ===== */
-function CalendarView({ appts, setAppts, clients, setClients, providers, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me" }) {
+// Reorders the provider array (= default left-to-right calendar column order).
+// Rendered in both the calendar's options panel and the Settings > Calendar card.
+// The viewed-as person still leads and off-day staff still sink right (handled in CalendarView);
+// this only sets the base/tiebreak order.
+function ColumnOrderEditor({ providers, setProviders }) {
+  const staff = (providers || []).filter((p) => p.id !== "anyone");
+  const move = (id, dir) => {
+    const arr = [...(providers || [])];
+    const order = arr.filter((p) => p.id !== "anyone");
+    const i = order.findIndex((p) => p.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= order.length) return;
+    [order[i], order[j]] = [order[j], order[i]];
+    const anyone = arr.filter((p) => p.id === "anyone");
+    setProviders([...order, ...anyone]);
+  };
+  if (staff.length < 2) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {staff.map((p, i) => (
+        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px" }}>
+          <span style={{ width: 11, height: 11, borderRadius: "50%", background: p.color, flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 15 }}>{p.name}</span>
+          <button onClick={() => move(p.id, -1)} disabled={i === 0} aria-label="Move up" style={{ background: "none", border: "none", padding: "4px 6px", color: i === 0 ? "var(--faint)" : "var(--sub)", opacity: i === 0 ? 0.4 : 1 }}><ChevronUp size={18} /></button>
+          <button onClick={() => move(p.id, 1)} disabled={i === staff.length - 1} aria-label="Move down" style={{ background: "none", border: "none", padding: "4px 6px", color: i === staff.length - 1 ? "var(--faint)" : "var(--sub)", opacity: i === staff.length - 1 ? 0.4 : 1 }}><ChevronDown size={18} /></button>
+        </div>
+      ))}
+    </div>
+  );
+}
+function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me" }) {
   const sizeId = business?.calendarRowSize || "L";
   // Visible calendar window — configurable in Calendar Settings; falls back to 7 AM–10 PM.
   const DAY_START = ((business?.calendar?.dayStartHr ?? 7)) * 60;
@@ -11836,6 +11873,15 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
                 })}
               </div>
             </div>
+
+            {/* Column order */}
+            {allStaff.length > 1 && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>COLUMN ORDER</div>
+                <ColumnOrderEditor providers={providers} setProviders={setProviders} />
+                <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Default left-to-right order. Whoever you're viewing still leads; anyone off that day moves to the right.</p>
+              </div>
+            )}
 
             {/* Legend */}
             <div>
