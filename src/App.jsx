@@ -1336,7 +1336,7 @@ function App() {
         /* Desktop: float the appointment screen as a centered dialog instead of a full-height strip */
         @media (min-width: 700px) {
           .appt-screen-fixed { background: var(--overlay) !important; align-items: center !important; justify-content: center !important; padding: 32px !important; }
-          .appt-screen-card { position: relative; height: auto !important; max-height: 88vh !important; overflow-y: auto !important; border-radius: 20px !important; border: 1px solid var(--line); box-shadow: 0 30px 70px -20px rgba(0,0,0,0.55); }
+          .appt-screen-card { position: relative; height: auto !important; max-height: 88vh !important; max-width: 600px !important; overflow: hidden auto !important; border-radius: 20px !important; border: 1px solid var(--line); box-shadow: 0 30px 70px -20px rgba(0,0,0,0.55); }
         }
         /* Success bloom — used on the "You're in" check circle */
         @keyframes successBloom { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
@@ -11747,7 +11747,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
   const nextFreeSlot = (providerId) => earliestOpenSlot(providerId, selectedDate, 30);
 
   return (
-    <div className="fade-up" style={{ maxWidth: 780, margin: "0 auto" }}>
+    <div className="fade-up" style={{ maxWidth: 1320, margin: "0 auto" }}>
       {showWaitlistPanel && (
         <div onClick={() => setShowWaitlistPanel(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg)", borderBottomLeftRadius: 22, borderBottomRightRadius: 22, maxHeight: "85vh", overflowY: "auto", padding: "calc(20px + env(safe-area-inset-top)) 22px 30px", boxShadow: "0 20px 40px rgba(0,0,0,0.4)" }}>
