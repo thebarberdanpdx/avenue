@@ -13085,6 +13085,48 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
   );
 }
 
+function ProgressCard({ T, minutesLeft, minutesInto, dur, nextClient, nextIsWaiting, fmtTime, lateNotified, onLetThemKnow }) {
+  const C = 207; // circumference for r=33
+  const pct = Math.min(100, Math.max(0, dur > 0 ? (minutesInto / dur) * 100 : 0));
+  const behind10 = minutesLeft <= 10;
+  const behind5 = minutesLeft <= 5;
+  const pillBg = behind5 ? "#D89A2E" : "#E8B04B";
+  const leftLabel = minutesLeft > 0 ? `${minutesLeft} min left` : (minutesLeft === 0 ? "Wrapping up" : `${Math.abs(minutesLeft)} min over`);
+  return (
+    <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 16, padding: 16 }}>
+        <div style={{ position: "relative", width: 72, height: 72, flexShrink: 0 }}>
+          <svg width="72" height="72" style={{ transform: "rotate(-90deg)" }}>
+            <circle cx="36" cy="36" r="33" fill="none" stroke="rgba(0,0,0,.08)" strokeWidth="6" />
+            <circle cx="36" cy="36" r="33" fill="none" stroke={T.accent} strokeWidth="6" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (pct / 100)} style={{ transition: "stroke-dashoffset 1s linear" }} />
+          </svg>
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, lineHeight: 1, color: T.text }}>{Math.abs(minutesLeft)}</span>
+            <span style={{ fontSize: 10, letterSpacing: 1, color: T.sub, textTransform: "uppercase" }}>min</span>
+          </div>
+        </div>
+        <div style={{ flex: 1 }}>
+          {behind10 && <span style={{ display: "inline-block", background: pillBg, color: "#3a2e10", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", padding: "5px 11px", borderRadius: 30, marginBottom: 7 }}>Wrapping up</span>}
+          <div style={{ fontSize: 18, fontWeight: 600, color: T.text }}>{leftLabel}</div>
+          <div style={{ fontSize: 13.5, color: T.sub, marginTop: 2 }}>{dur} min booked</div>
+        </div>
+      </div>
+      {behind10 && nextClient && (
+        <div style={{ marginTop: 12, border: `1.5px solid ${pillBg}`, borderRadius: 14, background: T.panel, padding: "15px 16px" }}>
+          {lateNotified ? (
+            <div style={{ fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Check size={15} /> Notified · running {lateNotified} min behind</div>
+          ) : (
+            <>
+              <div style={{ fontSize: 14, color: T.text, marginBottom: 12, lineHeight: 1.45 }}>{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running a few minutes behind?</div>
+              <button className="lift" onClick={onLetThemKnow} style={{ width: "100%", background: pillBg, color: "#3a2e10", padding: "13px", borderRadius: 11, fontSize: 14, fontWeight: 700, border: "none" }}>Let them know</button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
@@ -13117,6 +13159,46 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const client = clients.find((c) => c.id === appt.clientId);
   const service = services.find((s) => s.id === appt.serviceId);
   const dur = appt.end - appt.start;
+
+  // ---- Wrap-up: photos / note / service-time, auto-saved to the client profile ----
+  const [wuNote, setWuNote] = useState(client?.notes || "");
+  useEffect(() => { setWuNote(client?.notes || ""); }, [client?.id]);
+  const wuFileRef = useRef(null);
+  const saveWuNote = () => {
+    if (!client) return;
+    const v = wuNote.trim();
+    if (v === (client.notes || "")) return;
+    setClients(clients.map((c) => c.id === client.id ? { ...c, notes: v } : c));
+  };
+  const addWuPhoto = (file) => {
+    if (!file || !client) return;
+    const fr = new FileReader();
+    fr.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 800; let w = img.width, h = img.height;
+        if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+        else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
+        setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: [...(c.gallery || []), { id: "g" + Date.now(), photo: dataUrl, note: "", date: new Date().toISOString() }] } : c));
+        if (showToast) showToast("Photo saved to their profile.");
+      };
+      img.src = ev.target.result;
+    };
+    fr.readAsDataURL(file);
+  };
+  const removeWuPhoto = (gid) => {
+    if (!client) return;
+    setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: (c.gallery || []).filter((g) => g.id !== gid) } : c));
+  };
+  const wuDur = (client && service && client.customDurations && client.customDurations[service.id] != null) ? client.customDurations[service.id] : (service?.duration || dur);
+  const setWuDur = (val) => {
+    if (!client || !service) return;
+    setClients(clients.map((c) => c.id === client.id ? { ...c, customDurations: { ...(c.customDurations || {}), [service.id]: val } } : c));
+  };
 
   // Live clock for the in-service timer. Prefer the real start timestamp (set when
   // marked in-service) so elapsed/left can't drift; fall back to the scheduled start.
@@ -13260,7 +13342,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <Check size={17} style={{ color: T.accent }} /> Completed & paid · ${price}
               </div>
             )}
-            <div ref={scrollTopRef} style={{ overflowY: "auto", flex: 1, opacity: appt.status === "done" ? 0.5 : 1, transition: "opacity .2s" }}>
+            <div ref={scrollTopRef} style={{ overflowY: "auto", flex: 1 }}>
+            <div style={{ opacity: appt.status === "done" ? 0.5 : 1, transition: "opacity .2s" }}>
               {/* status + check-in */}
               <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 9, background: T.chip, border: `1px solid ${T.line}`, padding: "8px 14px", borderRadius: 30 }}>
@@ -13272,22 +13355,19 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ width: "100%", marginTop: 14, background: "#0A0A0A", color: "#fff", border: "none", padding: "16px 22px", borderRadius: 14, fontSize: 16, letterSpacing: 1, fontWeight: 700 }}>COMPLETE & CHECKOUT</button>}
               </div>
 
-              {/* RUNNING LATE — shows when in service and there's a next client (moved up for visibility) */}
-              {appt.status === "in-service" && nextClient && ((business && business.runningLate ? business.runningLate.enabled !== false : true)) && (
-                <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}`, background: "rgba(176,141,87,0.08)" }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                    <Clock size={18} style={{ color: T.accent, marginTop: 2, flexShrink: 0 }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 15.5, fontWeight: 600, color: T.text }}>{minutesLeftLive > 0 ? `${minutesLeftLive} min left in this appointment` : (minutesLeftLive === 0 ? "Wrapping up" : `${Math.abs(minutesLeftLive)} min over`)}</div>
-                      <div style={{ fontSize: 14, color: T.sub, marginTop: 2, lineHeight: 1.45 }}>{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running late?</div>
-                      {nextClient.lateNotified ? (
-                        <div style={{ marginTop: 10, fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Check size={15} /> Notified · running {nextClient.lateNotified} min behind</div>
-                      ) : (
-                        <button className="lift" onClick={() => setLateOpen(true)} style={{ marginTop: 10, background: T.accent, color: T.accentText, padding: "9px 18px", borderRadius: 24, fontSize: 14, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>LET THEM KNOW</button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+              {/* PROGRESS CARD — live in-service timer; gated by Calendar Settings */}
+              {appt.status === "in-service" && ((business && business.calendar) ? business.calendar.progressCard !== false : true) && (
+                <ProgressCard
+                  T={T}
+                  minutesLeft={minutesLeftLive}
+                  minutesInto={minutesIntoService}
+                  dur={dur}
+                  nextClient={(business && business.runningLate ? business.runningLate.enabled !== false : true) ? nextClient : null}
+                  nextIsWaiting={nextIsWaiting}
+                  fmtTime={fmtTime}
+                  lateNotified={nextClient && nextClient.lateNotified}
+                  onLetThemKnow={() => setLateOpen(true)}
+                />
               )}
 
               {/* FLEXIBILITY — barber can flag any upcoming appointment into the earlier-slot engine */}
@@ -13422,6 +13502,53 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     ))}
                   </div>
                   <p style={{ fontSize: 14, color: T.faint, marginTop: 8 }}>Uploaded by the client when booking.</p>
+                </div>
+              )}
+
+              </div>
+              {/* WRAP UP — photos / note / service time, auto-saved to the client profile */}
+              {client && (
+                <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, color: T.text, marginBottom: 3 }}>{(appt.status === "done" || appt.status === "completed") ? "Photos & notes" : "Wrap up"}</div>
+                  <div style={{ fontSize: 13.5, color: T.sub, marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}><Check size={14} style={{ color: T.accent }} /> Saved to {(client.name || "their").split(" ")[0]}'s profile automatically</div>
+                  <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 16, overflow: "hidden" }}>
+                    {/* Photos */}
+                    <div style={{ padding: 18 }}>
+                      <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Photos</div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        {(client.gallery || []).map((g) => (
+                          <div key={g.id} style={{ width: 72, height: 72, borderRadius: 12, overflow: "hidden", position: "relative", flexShrink: 0, background: T.chip }}>
+                            <img src={imgUrl(g.photo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                            <button onClick={() => removeWuPhoto(g.id)} style={{ position: "absolute", top: 4, right: 4, width: 21, height: 21, borderRadius: "50%", background: "rgba(0,0,0,.55)", color: "#fff", fontSize: 13, border: "none", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>×</button>
+                          </div>
+                        ))}
+                        <button className="lift" onClick={() => wuFileRef.current && wuFileRef.current.click()} style={{ width: 72, height: 72, borderRadius: 12, border: `1.5px dashed ${T.faint}`, background: "none", color: T.accent, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+                          <Plus size={20} /> Add
+                        </button>
+                        <input ref={wuFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { addWuPhoto(e.target.files && e.target.files[0]); e.target.value = ""; }} />
+                      </div>
+                    </div>
+                    {/* Note */}
+                    <div style={{ padding: 18, borderTop: `1px solid ${T.line}` }}>
+                      <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Note for next time</div>
+                      <textarea value={wuNote} onChange={(e) => setWuNote(e.target.value)} onBlur={saveWuNote} placeholder="Tighter on the sides. #2 guard, scissor on top…" rows={3} style={{ width: "100%", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "13px 14px", color: T.text, fontSize: 15.5, fontFamily: "'Jost', sans-serif", resize: "vertical", lineHeight: 1.5, outline: "none" }} />
+                    </div>
+                    {/* Service time */}
+                    {service && (
+                      <div style={{ padding: 18, borderTop: `1px solid ${T.line}` }}>
+                        <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Service time</div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                          <span style={{ fontSize: 15.5, color: T.sub }}>{(client.name || "their").split(" ")[0]}'s time for {service.name}</span>
+                          <div style={{ display: "flex", alignItems: "center", background: T.bg, border: `1px solid ${T.line}`, borderRadius: 11, overflow: "hidden", flexShrink: 0 }}>
+                            <button onClick={() => setWuDur(Math.max(5, wuDur - 5))} style={{ background: "none", border: "none", color: T.text, width: 44, height: 44, fontSize: 22 }}>−</button>
+                            <span style={{ width: 64, textAlign: "center", fontSize: 16, fontWeight: 700 }}>{wuDur} min</span>
+                            <button onClick={() => setWuDur(wuDur + 5)} style={{ background: "none", border: "none", color: T.text, width: 44, height: 44, fontSize: 22 }}>+</button>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 12.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Booked at {service.duration} min. This sets {(client.name || "their").split(" ")[0]}'s time so future bookings get the right amount of chair.</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
