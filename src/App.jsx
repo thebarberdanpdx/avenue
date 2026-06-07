@@ -13207,14 +13207,14 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
 
             <div ref={scrollTopRef} style={{ overflowY: "auto", flex: 1 }}>
               {/* status + check-in */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px", borderBottom: `1px solid ${T.line}` }}>
+              <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 9, background: T.chip, border: `1px solid ${T.line}`, padding: "8px 14px", borderRadius: 30 }}>
                   <span style={{ width: 11, height: 11, borderRadius: "50%", background: status.dot }} />
                   <span style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: 0.2 }}>{status.label}</span>
                 </div>
-                {appt.status === "confirmed" && <button className="lift" onClick={() => onSetStatus(appt.id, "checked-in", `${appt.name} checked in.`)} style={{ border: `1.5px solid ${T.line}`, color: T.text, background: "none", padding: "11px 22px", borderRadius: 30, fontSize: 15, letterSpacing: 1, fontWeight: 600 }}>CHECK-IN</button>}
-                {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} is ready for you and will meet you in front."; const msg = wr.autoReadyMessage === false ? `${appt.name} marked in service.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`; onSetStatus(appt.id, "in-service", msg); }} style={{ background: T.accent, color: T.accentText, padding: "11px 18px", borderRadius: 30, fontSize: 15, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>NOTIFY · READY</button>}
-                {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ background: T.accent, color: T.accentText, padding: "11px 22px", borderRadius: 30, fontSize: 15, letterSpacing: 1, fontWeight: 600, border: "none" }}>COMPLETE & CHECKOUT</button>}
+                {appt.status === "confirmed" && <button className="lift" onClick={() => onSetStatus(appt.id, "checked-in", `${appt.name} checked in.`)} style={{ width: "100%", marginTop: 14, background: "#3E8BD6", color: "#fff", border: "none", padding: "16px 22px", borderRadius: 14, fontSize: 16, letterSpacing: 1, fontWeight: 700 }}>CHECK-IN</button>}
+                {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} is ready for you and will meet you in front."; const msg = wr.autoReadyMessage === false ? `${appt.name} marked in service.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`; onSetStatus(appt.id, "in-service", msg); }} style={{ width: "100%", marginTop: 14, background: "#E0892F", color: "#fff", border: "none", padding: "16px 22px", borderRadius: 14, fontSize: 16, letterSpacing: 0.5, fontWeight: 700 }}>NOTIFY · READY</button>}
+                {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ width: "100%", marginTop: 14, background: "#0A0A0A", color: "#fff", border: "none", padding: "16px 22px", borderRadius: 14, fontSize: 16, letterSpacing: 1, fontWeight: 700 }}>COMPLETE & CHECKOUT</button>}
               </div>
 
               {/* RUNNING LATE — shows when in service and there's a next client (moved up for visibility) */}
@@ -13304,7 +13304,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   <div style={{ width: 54, height: 54, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, flexShrink: 0 }}>{initials}</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, lineHeight: 1.1 }}>{appt.name} {appt.vip && <span style={{ color: status.dot }}>★</span>}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.05, letterSpacing: -0.3 }}>{appt.name}</div>
                     <div style={{ fontSize: 15, color: T.sub }}>{client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client"}</div>
                   </div>
                   <button onClick={() => showToast("Opening message thread…")} style={{ width: 44, height: 44, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center" }}><MessageSquare size={18} /></button>
