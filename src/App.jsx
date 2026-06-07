@@ -12269,6 +12269,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
   const [rebookWeeks, setRebookWeeks] = useState(null);
   const [customDate, setCustomDate] = useState(null); // ISO date string when picked manually
   const [chosenStart, setChosenStart] = useState(null); // minutes-of-day the barber picked for the rebook
+  const [pickView, setPickView] = useState("list"); // "list" chips | "calendar" day-timeline
   const tipAmt = customTip != null ? customTip : +(base * tipPct / 100).toFixed(2);
   const total = +(base + tipAmt).toFixed(2);
   const money = (n) => `$${n.toFixed(2)}`;
@@ -12458,29 +12459,68 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
         <>
           {hasBest && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text2)", marginBottom: 12, lineHeight: 1.4 }}>
-              <span style={{ width: 12, height: 12, borderRadius: 4, background: "var(--gold)", flexShrink: 0 }} />
+              <span style={{ width: 12, height: 12, borderRadius: 4, background: "linear-gradient(145deg,#F4C84F,#CF971F)", flexShrink: 0 }} />
               Gold times sit right against another appointment — no gaps in {provider?.name ? provider.name.split(" ")[0] + "'s" : "the"} day.
             </div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-            {daySlots.slots.map((s) => {
-              const sel = chosenStart === s.start;
-              return (
-                <button key={s.start} onClick={() => setChosenStart(s.start)} className={sel ? "vslot-sel" : undefined} style={{ position: "relative", overflow: "hidden", padding: "14px 0", borderRadius: 13, fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: sel || s.best ? 600 : 500,
-                  background: sel
-                    ? "linear-gradient(155deg,#FCE187 0%,#F4C84F 34%,#E5AC34 70%,#CF971F 100%)"
-                    : s.best ? "color-mix(in srgb, #F4C84F 20%, var(--panel))" : "var(--panel)",
-                  color: sel ? "#33260A" : "var(--text)",
-                  border: `${s.best && !sel ? "1.5px" : "1px"} solid ${sel ? "#C8901C" : s.best ? "#E7C065" : "var(--border2)"}`,
-                  boxShadow: sel
-                    ? "0 8px 18px -6px rgba(190,135,20,.55), inset 0 1px 0 rgba(255,255,255,.6), inset 0 -2px 4px rgba(150,100,10,.22)"
-                    : s.best ? "0 2px 7px -2px rgba(199,151,40,.30)" : "0 1px 2px rgba(60,45,15,.05)" }}>
-                  {s.best && !sel && <span style={{ position: "absolute", top: 7, left: "50%", transform: "translateX(-50%)", width: 5, height: 5, borderRadius: "50%", background: "linear-gradient(145deg,#FAD879,#D99B1C)", boxShadow: "0 0 5px rgba(217,155,28,.6)" }} />}
-                  {fmtTime(s.start)}
-                </button>
-              );
-            })}
+          <div style={{ display: "flex", background: "var(--panel2)", borderRadius: 11, padding: 4, gap: 4, marginBottom: 14 }}>
+            {[["list", "List"], ["calendar", "Calendar"]].map(([v, lbl]) => { const on = pickView === v; return (
+              <button key={v} onClick={() => setPickView(v)} style={{ flex: 1, textAlign: "center", fontSize: 13, fontWeight: 600, padding: "9px 0", borderRadius: 8, border: "none", background: on ? "var(--panel)" : "transparent", color: on ? "var(--text)" : "var(--sub)", boxShadow: on ? "0 1px 3px rgba(0,0,0,.12)" : "none" }}>{lbl}</button>
+            ); })}
           </div>
+          {pickView === "list" ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              {daySlots.slots.map((s) => {
+                const sel = chosenStart === s.start;
+                return (
+                  <button key={s.start} onClick={() => setChosenStart(s.start)} className={sel ? "vslot-sel" : undefined} style={{ position: "relative", overflow: "hidden", padding: "14px 0", borderRadius: 13, fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: sel || s.best ? 600 : 500,
+                    background: sel
+                      ? "linear-gradient(155deg,#FCE187 0%,#F4C84F 34%,#E5AC34 70%,#CF971F 100%)"
+                      : s.best ? "color-mix(in srgb, #F4C84F 20%, var(--panel))" : "var(--panel)",
+                    color: sel ? "#33260A" : "var(--text)",
+                    border: `${s.best && !sel ? "1.5px" : "1px"} solid ${sel ? "#C8901C" : s.best ? "#E7C065" : "var(--border2)"}`,
+                    boxShadow: sel
+                      ? "0 8px 18px -6px rgba(190,135,20,.55), inset 0 1px 0 rgba(255,255,255,.6), inset 0 -2px 4px rgba(150,100,10,.22)"
+                      : s.best ? "0 2px 7px -2px rgba(199,151,40,.30)" : "0 1px 2px rgba(60,45,15,.05)" }}>
+                    {s.best && !sel && <span style={{ position: "absolute", top: 7, left: "50%", transform: "translateX(-50%)", width: 5, height: 5, borderRadius: "50%", background: "linear-gradient(145deg,#FAD879,#D99B1C)", boxShadow: "0 0 5px rgba(217,155,28,.6)" }} />}
+                    {fmtTime(s.start)}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (() => {
+            const dow = targetDate.getDay();
+            const h = (provider.hours && provider.hours[dow]) || { on: true, start: 9 * 60, end: 19 * 60 };
+            const winStart = h.start, winEnd = h.end, PPMt = 1.0;
+            const heightT = Math.max(160, (winEnd - winStart) * PPMt);
+            const dayBlocks = (appts || []).filter((a) => a.providerId === provider.id && sameDayLocal(a.bookedFor, targetDate) && a.status !== "cancelled" && a.status !== "done").sort((a, b) => a.start - b.start);
+            const seen = {}; const boxes = [];
+            daySlots.slots.forEach((s) => { if ((s.best || s.start % 60 === 0 || s.start === chosenStart) && !seen[s.start]) { seen[s.start] = 1; boxes.push(s); } });
+            return (
+              <div style={{ display: "flex" }}>
+                <div style={{ width: 42, flexShrink: 0, position: "relative", height: heightT }}>
+                  {Array.from({ length: Math.floor((winEnd - winStart) / 60) + 1 }).map((_, i) => { const t = winStart + i * 60; return (
+                    <div key={t} style={{ position: "absolute", top: (t - winStart) * PPMt - 6, right: 8, fontSize: 10.5, color: "var(--faint)" }}>{fmtTime(t).replace(":00", "")}</div>
+                  ); })}
+                </div>
+                <div style={{ flex: 1, position: "relative", height: heightT, borderLeft: "1px solid var(--border2)", background: `repeating-linear-gradient(var(--border2) 0 1px, transparent 1px ${60 * PPMt}px)` }}>
+                  {dayBlocks.map((a) => (
+                    <div key={a.id} style={{ position: "absolute", left: 4, right: 4, top: (a.start - winStart) * PPMt, height: Math.max(18, (a.end - a.start) * PPMt), borderRadius: 8, background: "var(--panel2)", borderLeft: "3px solid var(--border2)", padding: "3px 8px", fontSize: 11, color: "var(--sub)", overflow: "hidden", boxSizing: "border-box" }}>{(a.name || a.title || "Booked").split(" ")[0]}</div>
+                  ))}
+                  {boxes.map((s) => { const sel = chosenStart === s.start; return (
+                    <button key={s.start} onClick={() => setChosenStart(s.start)} style={{ position: "absolute", left: 4, right: 4, top: (s.start - winStart) * PPMt, height: 22, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 12.5, fontWeight: sel || s.best ? 600 : 500, overflow: "hidden",
+                      background: sel ? "linear-gradient(155deg,#FCE187,#E5AC34)" : s.best ? "color-mix(in srgb, #F4C84F 22%, var(--panel))" : "var(--panel)",
+                      color: sel ? "#33260A" : s.best ? "var(--text)" : "var(--faint)",
+                      border: sel ? "1px solid #C8901C" : s.best ? "1.5px solid #E7C065" : "1.5px dashed var(--border2)",
+                      boxShadow: sel ? "0 6px 14px -5px rgba(190,135,20,.6)" : "none" }}>
+                      {s.best && !sel && <span style={{ position: "absolute", top: 3, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "linear-gradient(145deg,#FAD879,#D99B1C)" }} />}
+                      {fmtTime(s.start)}
+                    </button>
+                  ); })}
+                </div>
+              </div>
+            );
+          })()}
           <button className="lift" disabled={chosenStart == null} onClick={() => setStage("done")} style={{ width: "100%", marginTop: 20, background: chosenStart == null ? "var(--panel2)" : "linear-gradient(155deg,#FCE187 0%,#F4C84F 34%,#E5AC34 70%,#CF971F 100%)", color: chosenStart == null ? "var(--faint)" : "#33260A", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: chosenStart == null ? "none" : "0 10px 22px -8px rgba(190,135,20,.55), inset 0 1px 0 rgba(255,255,255,.6)" }}>{chosenStart == null ? "TAP A TIME ABOVE" : (discountOn ? `BOOK ${fmtTime(chosenStart)} · SAVE ${discLabel}` : `BOOK ${fmtTime(chosenStart)}`)}</button>
         </>
       )}
