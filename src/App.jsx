@@ -10325,7 +10325,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "calendarsettings", title: "Calendar Settings", icon: Calendar, category: "Calendar & Appointments",
-      status: (() => { const c = form.calendar || {}; const on = []; if (c.progressCard !== false) on.push("progress card"); if (c.nowLine !== false) on.push("now line"); return on.length ? on.join(" · ") : "Both off"; })(),
+      status: (() => { const c = form.calendar || {}; const fmtHr = (h) => { const am = h < 12; const hr = h % 12 === 0 ? 12 : h % 12; return `${hr}${am ? "a" : "p"}`; }; const on = []; if (c.progressCard !== false) on.push("progress card"); if (c.nowLine !== false) on.push("now line"); return `${fmtHr(c.dayStartHr ?? 8)}–${fmtHr(c.dayEndHr ?? 19)}${on.length ? " · " + on.join(" · ") : ""}`; })(),
       keywords: "calendar progress card timer ring now line current time marker chair in service running late wrapping up live",
       editor: (
         <>
@@ -10338,6 +10338,35 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           <div style={{ textAlign: "left", paddingRight: 14 }}><div style={{ fontSize: 15, marginBottom: 2 }}>"Now" line on calendar</div><div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>A marker showing the current time across today's schedule.</div></div>
           <span style={{ width: 44, height: 26, borderRadius: 13, background: (form.calendar || {}).nowLine !== false ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: (form.calendar || {}).nowLine !== false ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
         </button>
+
+        {(() => {
+          const fmtHr = (h) => { const am = h < 12; const hr = h % 12 === 0 ? 12 : h % 12; return `${hr} ${am ? "AM" : "PM"}`; };
+          const startHr = (form.calendar || {}).dayStartHr ?? 8;
+          const endHr = (form.calendar || {}).dayEndHr ?? 19;
+          const setCal = (patch) => setForm({ ...form, calendar: { ...(form.calendar || {}), ...patch } });
+          const Stepper = ({ label, sub, value, onDec, onInc }) => (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", marginBottom: 10 }}>
+              <div><div style={{ fontSize: 15 }}>{label}</div><div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{sub}</div></div>
+              <div style={{ display: "flex", alignItems: "center", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 11, overflow: "hidden", flexShrink: 0 }}>
+                <button onClick={onDec} style={{ background: "none", border: "none", color: "var(--text)", width: 42, height: 42, fontSize: 22 }}>−</button>
+                <span style={{ width: 72, textAlign: "center", fontSize: 15.5, fontWeight: 600 }}>{fmtHr(value)}</span>
+                <button onClick={onInc} style={{ background: "none", border: "none", color: "var(--text)", width: 42, height: 42, fontSize: 22 }}>+</button>
+              </div>
+            </div>
+          );
+          return (
+            <div style={{ marginTop: 22 }}>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>VISIBLE HOURS</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>The time range your calendar shows. Set it to cover your real open hours.</div>
+              <Stepper label="Day starts" sub="Top of the calendar" value={startHr}
+                onDec={() => setCal({ dayStartHr: Math.max(5, startHr - 1) })}
+                onInc={() => setCal({ dayStartHr: Math.min(endHr - 1, startHr + 1) })} />
+              <Stepper label="Day ends" sub="Bottom of the calendar" value={endHr}
+                onDec={() => setCal({ dayEndHr: Math.max(startHr + 1, endHr - 1) })}
+                onInc={() => setCal({ dayEndHr: Math.min(23, endHr + 1) })} />
+            </div>
+          );
+        })()}
         </>
       ),
     },
@@ -10811,8 +10840,8 @@ const ROW_SIZES = [
   { id: "L", label: "L", pxPerHour: 200 },
   { id: "XL", label: "XL", pxPerHour: 300 },
 ];
-const DAY_START = 9 * 60;   // 9 AM
-const DAY_END = 15 * 60;    // 3 PM (scrolls)
+const DAY_START = 8 * 60;   // 8 AM
+const DAY_END = 19 * 60;    // 7 PM (scrolls)
 
 // ============================================================
 // CREATE POPOVER — appears at the long-press point, always on-screen
@@ -11191,6 +11220,10 @@ function decideCalendarGesture({ movedPx, heldMs, MOVE_PX = GESTURE_MOVE_PX, HOL
 /* ===== /CALENDAR-GESTURE-DECISION ===== */
 function CalendarView({ appts, setAppts, clients, setClients, providers, services, business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true }) {
   const sizeId = business?.calendarRowSize || "L";
+  // Visible calendar window — configurable in Calendar Settings; falls back to 8 AM–7 PM.
+  // These local consts shadow the module defaults for every grid calc inside this component.
+  const DAY_START = ((business?.calendar?.dayStartHr ?? 8)) * 60;
+  const DAY_END = ((business?.calendar?.dayEndHr ?? 19)) * 60;
   const [showWaitlistPanel, setShowWaitlistPanel] = useState(false);
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   const [open, setOpen] = useState(null);
