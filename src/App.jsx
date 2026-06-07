@@ -7047,7 +7047,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [libPicker, setLibPicker] = useState(false); // photo picker for the style being edited
   const libUsedCount = (entry) => services.filter((s) => (s.cutTypes || []).some((c) => (c.libId ? c.libId === entry.id : cutNorm(c.label) === cutNorm(entry.label)))).length;
   const saveLibStyle = () => {
-    const entry = { ...libForm, label: (libForm.label || "").trim(), desc: libForm.desc || "", images: Array.isArray(libForm.images) ? libForm.images.filter(Boolean) : [] };
+    const entry = { ...libForm, label: (libForm.label || "").trim(), desc: libForm.desc || "", color: libForm.color || null, images: Array.isArray(libForm.images) ? libForm.images.filter(Boolean) : [] };
     if (!entry.label) { showToast("Give this style a name first."); return; }
     const used = libUsedCount(entry);
     setCutLibrary((lib) => { const arr = lib || []; return arr.some((e) => e.id === entry.id) ? arr.map((e) => (e.id === entry.id ? entry : e)) : [...arr, entry]; });
@@ -7082,6 +7082,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <input value={libForm.label || ""} onChange={(e) => setLibForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Skin Fade" style={{ ...inputStyle, fontSize: 17, padding: "16px 16px", marginBottom: 16 }} />
               <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>DESCRIPTION</div>
               <textarea value={libForm.desc || ""} onChange={(e) => setLibForm((f) => ({ ...f, desc: e.target.value }))} placeholder="Shown to clients under the name" rows={6} style={{ ...inputStyle, fontSize: 16, padding: "14px 16px", resize: "vertical", minHeight: 150, lineHeight: 1.55 }} />
+              <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8, marginTop: 18 }}>CALENDAR COLOR</div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button onClick={() => setLibForm((f) => ({ ...f, color: null }))} title="No color — use the service's color" style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", border: !libForm.color ? "2px solid var(--text)" : "2px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!libForm.color && <Check size={15} style={{ color: "var(--text)" }} />}</button>
+                {SERVICE_PALETTE.map((c) => { const on = libForm.color === c.id; return (
+                  <button key={c.id} onClick={() => setLibForm((f) => ({ ...f, color: c.id }))} title={c.name} style={{ width: 34, height: 34, borderRadius: "50%", background: c.hex, border: on ? "2px solid var(--text)" : "2px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={15} style={{ color: "var(--on-gold)" }} />}</button>
+                ); })}
+              </div>
+              <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Paints this cut on the calendar everywhere it's used. Leave the first (dashed) chip selected to fall back to the service's own color.</p>
             </div>
             <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 14, lineHeight: 1.5 }}>{libUsedCount(libForm) > 0 ? `Used in ${libUsedCount(libForm)} service${libUsedCount(libForm) > 1 ? "s" : ""}. Saving updates all of them.` : "Not used by any service yet."}</p>
             <button onClick={saveLibStyle} className="lift" style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 17, fontWeight: 600, borderRadius: 14, marginTop: 16, border: "none" }}>Save style</button>
