@@ -6574,7 +6574,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const cutTypesSection = (
     <>
       <SectionHeader title="Cut Types" />
-      <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Tick the styles this service offers, then set this service's price and time for each. Edit a style's name, description and photo in Menu &rsaquo; Cut Styles.</p>
+      <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Tick the styles this service offers, then set this service's price and time for each. Editing a style's name, description or color updates it on every service that offers it.</p>
       {(cutLibrary || []).length === 0 ? (
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, color: "var(--sub)", fontSize: 15, lineHeight: 1.5, marginBottom: 14 }}>You don't have any cut styles yet. Tap "+ New style" below to create one.</div>
       ) : (cutLibrary || []).map((entry) => {
@@ -6601,6 +6601,20 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   </div>
                 </div>
                 <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Leave time blank to use this service's default ({form.duration || 45} min).</div>
+                <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 14 }}>
+                  <div style={{ fontSize: 13.5, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>NAME</div>
+                  <input value={entry.label || ""} onChange={(e) => setLibField(entry, { label: e.target.value })} placeholder="e.g. Skin Fade" style={{ ...inputStyle, fontSize: 16, padding: "13px 16px", marginBottom: 14 }} />
+                  <div style={{ fontSize: 13.5, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>DESCRIPTION</div>
+                  <textarea value={entry.desc || ""} onChange={(e) => setLibField(entry, { desc: e.target.value })} placeholder="Shown to clients under the name" rows={4} style={{ ...inputStyle, fontSize: 15, padding: "12px 16px", resize: "vertical", minHeight: 92, lineHeight: 1.5, marginBottom: 14 }} />
+                  <div style={{ fontSize: 13.5, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>CALENDAR COLOR</div>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button onClick={() => setLibField(entry, { color: null })} title="No color — use the service's color" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--panel2)", border: !entry.color ? "2px solid var(--text)" : "2px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!entry.color && <Check size={14} style={{ color: "var(--text)" }} />}</button>
+                    {SERVICE_PALETTE.map((c) => { const on = entry.color === c.id; return (
+                      <button key={c.id} onClick={() => setLibField(entry, { color: c.id })} title={c.name} style={{ width: 32, height: 32, borderRadius: "50%", background: c.hex, border: on ? "2px solid var(--text)" : "2px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={14} style={{ color: "var(--on-gold)" }} />}</button>
+                    ); })}
+                  </div>
+                  <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.45 }}>This cut's color wins over the service color on the calendar. Leave the dashed chip selected to use the service color instead. Name, description &amp; color are shared — editing here updates this style on every service.</p>
+                </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 14 }}>
                   <span style={{ fontSize: 15 }}>Mark as most common<span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Shows a "Most common" badge to clients</span></span>
                   <Toggle on={!!ct.popular} onClick={() => setStylePopular(entry)} />
@@ -7062,6 +7076,20 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     }) })));
     setLibForm(null);
     showToast(used > 0 ? "Updated everywhere this style is used." : "Style saved.");
+  };
+
+  // Edit a shared cut style's fields (name / desc / color) directly from the per-service
+  // Cut Types screen. Writes to the shared library AND mirrors label/desc into every service
+  // that offers this style (same propagation as saveLibStyle), so edits show up everywhere.
+  const setLibField = (entry, patch) => {
+    setCutLibrary((lib) => (lib || []).map((e) => (e.id === entry.id ? { ...e, ...patch } : e)));
+    if ("label" in patch || "desc" in patch) {
+      setServices(services.map((s) => ({ ...s, cutTypes: (s.cutTypes || []).map((c) => {
+        const match = c.libId ? c.libId === entry.id : cutNorm(c.label) === cutNorm(entry.label);
+        if (!match) return c;
+        return { ...c, ...("label" in patch ? { label: patch.label } : {}), ...("desc" in patch ? { desc: patch.desc } : {}) };
+      }) })));
+    }
   };
 
   // ---- full-page Cut Styles editor ----
@@ -13445,7 +13473,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   </div>
                   {appt.status === "confirmed" && (
                     <div style={{ position: "relative" }}>
-                      <button className="lift" onClick={() => setCheckinOpen((v) => !v)} style={{ background: "none", border: `1px solid ${T.border2}`, color: T.sub, padding: "10px 20px", borderRadius: 30, fontSize: 13, letterSpacing: 1, fontWeight: 700 }}>CHECK-IN</button>
+                      <button className="lift" onClick={() => setCheckinOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--gold)", border: "none", color: "var(--on-gold)", padding: "11px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 1, fontWeight: 700, boxShadow: "var(--shadow)" }}>CHECK-IN <ChevronDown size={15} style={{ transform: checkinOpen ? "rotate(180deg)" : "none", transition: "transform .18s var(--ease)" }} /></button>
                       {checkinOpen && (
                         <>
                           <div onClick={() => setCheckinOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 8 }} />
@@ -13461,8 +13489,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       )}
                     </div>
                   )}
-                  {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} is ready for you and will meet you in front."; const msg = wr.autoReadyMessage === false ? `${appt.name} marked in service.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`; onSetStatus(appt.id, "in-service", msg); }} style={{ background: "none", border: `1px solid ${T.border2}`, color: T.sub, padding: "10px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700 }}>NOTIFY · READY</button>}
-                  {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ background: "none", border: `1px solid ${T.border2}`, color: T.sub, padding: "10px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700 }}>CHECKOUT</button>}
+                  {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} is ready for you and will meet you in front."; const msg = wr.autoReadyMessage === false ? `${appt.name} marked in service.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`; onSetStatus(appt.id, "in-service", msg); }} style={{ background: "var(--gold)", border: "none", color: "var(--on-gold)", padding: "11px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700, boxShadow: "var(--shadow)" }}>NOTIFY · READY</button>}
+                  {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ background: "var(--gold)", border: "none", color: "var(--on-gold)", padding: "11px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700, boxShadow: "var(--shadow)" }}>CHECKOUT</button>}
                 </div>
               </div>
 
