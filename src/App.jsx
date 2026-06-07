@@ -77,6 +77,14 @@ const SERVICE_PALETTE = [
   { id: "mauve", name: "Mauve", hex: "#9C7A8E" },
   { id: "teal", name: "Teal", hex: "#5E8C8C" },
   { id: "sand", name: "Sand", hex: "#A89878" },
+  { id: "cobalt", name: "Cobalt", hex: "#3B82F6" },
+  { id: "emerald", name: "Emerald", hex: "#22C55E" },
+  { id: "marigold", name: "Marigold", hex: "#EAB308" },
+  { id: "tangerine", name: "Tangerine", hex: "#F97316" },
+  { id: "cherry", name: "Cherry", hex: "#EF4444" },
+  { id: "fuchsia", name: "Fuchsia", hex: "#EC4899" },
+  { id: "violet", name: "Violet", hex: "#8B5CF6" },
+  { id: "turquoise", name: "Turquoise", hex: "#06B6D4" },
 ];
 const STATUS_COLORS = {
   "checked-in": "#8B6FB0", // purple — client has arrived
