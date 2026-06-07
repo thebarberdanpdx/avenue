@@ -77,6 +77,14 @@ const SERVICE_PALETTE = [
   { id: "mauve", name: "Mauve", hex: "#9C7A8E" },
   { id: "teal", name: "Teal", hex: "#5E8C8C" },
   { id: "sand", name: "Sand", hex: "#A89878" },
+  { id: "cobalt", name: "Cobalt", hex: "#3B82F6" },
+  { id: "emerald", name: "Emerald", hex: "#22C55E" },
+  { id: "marigold", name: "Marigold", hex: "#EAB308" },
+  { id: "tangerine", name: "Tangerine", hex: "#F97316" },
+  { id: "cherry", name: "Cherry", hex: "#EF4444" },
+  { id: "fuchsia", name: "Fuchsia", hex: "#EC4899" },
+  { id: "violet", name: "Violet", hex: "#8B5CF6" },
+  { id: "turquoise", name: "Turquoise", hex: "#06B6D4" },
 ];
 const STATUS_COLORS = {
   "checked-in": "#8B6FB0", // purple — client has arrived
@@ -6419,7 +6427,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} onOpenClient={(c) => { setPulseDetail(null); setActiveClient(c); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} me={me} isOwner={isOwner} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
@@ -7039,7 +7047,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [libPicker, setLibPicker] = useState(false); // photo picker for the style being edited
   const libUsedCount = (entry) => services.filter((s) => (s.cutTypes || []).some((c) => (c.libId ? c.libId === entry.id : cutNorm(c.label) === cutNorm(entry.label)))).length;
   const saveLibStyle = () => {
-    const entry = { ...libForm, label: (libForm.label || "").trim(), desc: libForm.desc || "", images: Array.isArray(libForm.images) ? libForm.images.filter(Boolean) : [] };
+    const entry = { ...libForm, label: (libForm.label || "").trim(), desc: libForm.desc || "", color: libForm.color || null, images: Array.isArray(libForm.images) ? libForm.images.filter(Boolean) : [] };
     if (!entry.label) { showToast("Give this style a name first."); return; }
     const used = libUsedCount(entry);
     setCutLibrary((lib) => { const arr = lib || []; return arr.some((e) => e.id === entry.id) ? arr.map((e) => (e.id === entry.id ? entry : e)) : [...arr, entry]; });
@@ -7074,6 +7082,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <input value={libForm.label || ""} onChange={(e) => setLibForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Skin Fade" style={{ ...inputStyle, fontSize: 17, padding: "16px 16px", marginBottom: 16 }} />
               <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>DESCRIPTION</div>
               <textarea value={libForm.desc || ""} onChange={(e) => setLibForm((f) => ({ ...f, desc: e.target.value }))} placeholder="Shown to clients under the name" rows={6} style={{ ...inputStyle, fontSize: 16, padding: "14px 16px", resize: "vertical", minHeight: 150, lineHeight: 1.55 }} />
+              <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8, marginTop: 18 }}>CALENDAR COLOR</div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button onClick={() => setLibForm((f) => ({ ...f, color: null }))} title="No color — use the service's color" style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", border: !libForm.color ? "2px solid var(--text)" : "2px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!libForm.color && <Check size={15} style={{ color: "var(--text)" }} />}</button>
+                {SERVICE_PALETTE.map((c) => { const on = libForm.color === c.id; return (
+                  <button key={c.id} onClick={() => setLibForm((f) => ({ ...f, color: c.id }))} title={c.name} style={{ width: 34, height: 34, borderRadius: "50%", background: c.hex, border: on ? "2px solid var(--text)" : "2px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={15} style={{ color: "var(--on-gold)" }} />}</button>
+                ); })}
+              </div>
+              <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Paints this cut on the calendar everywhere it's used. Leave the first (dashed) chip selected to fall back to the service's own color.</p>
             </div>
             <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 14, lineHeight: 1.5 }}>{libUsedCount(libForm) > 0 ? `Used in ${libUsedCount(libForm)} service${libUsedCount(libForm) > 1 ? "s" : ""}. Saving updates all of them.` : "Not used by any service yet."}</p>
             <button onClick={saveLibStyle} className="lift" style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 17, fontWeight: 600, borderRadius: 14, marginTop: 16, border: "none" }}>Save style</button>
@@ -10324,53 +10340,6 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       ),
     },
     {
-      id: "calendarsettings", title: "Calendar Settings", icon: Calendar, category: "Calendar & Appointments",
-      status: (() => { const c = form.calendar || {}; const fmtHr = (h) => { const am = h < 12; const hr = h % 12 === 0 ? 12 : h % 12; return `${hr}${am ? "a" : "p"}`; }; const on = []; if (c.progressCard !== false) on.push("progress card"); if (c.nowLine !== false) on.push("now line"); return `${fmtHr(c.dayStartHr ?? 8)}–${fmtHr(c.dayEndHr ?? 19)}${on.length ? " · " + on.join(" · ") : ""}`; })(),
-      keywords: "calendar progress card timer ring now line current time marker chair in service running late wrapping up live",
-      editor: (
-        <>
-        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 16, lineHeight: 1.5 }}>Control the live elements on your calendar and chair view.</div>
-        <button onClick={() => setForm({ ...form, calendar: { ...(form.calendar || {}), progressCard: (form.calendar || {}).progressCard === false ? true : false } })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, color: "var(--text)", marginBottom: 12, textAlign: "left" }}>
-          <div style={{ textAlign: "left", paddingRight: 14 }}><div style={{ fontSize: 15, marginBottom: 2 }}>Appointment progress card</div><div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>Show a live timer on in-service appointments, with a gentle heads-up when you're running close.</div></div>
-          <span style={{ width: 44, height: 26, borderRadius: 13, background: (form.calendar || {}).progressCard !== false ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: (form.calendar || {}).progressCard !== false ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-        </button>
-        <button onClick={() => setForm({ ...form, calendar: { ...(form.calendar || {}), nowLine: (form.calendar || {}).nowLine === false ? true : false } })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, color: "var(--text)", textAlign: "left" }}>
-          <div style={{ textAlign: "left", paddingRight: 14 }}><div style={{ fontSize: 15, marginBottom: 2 }}>"Now" line on calendar</div><div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>A marker showing the current time across today's schedule.</div></div>
-          <span style={{ width: 44, height: 26, borderRadius: 13, background: (form.calendar || {}).nowLine !== false ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: (form.calendar || {}).nowLine !== false ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-        </button>
-
-        {(() => {
-          const fmtHr = (h) => { const am = h < 12; const hr = h % 12 === 0 ? 12 : h % 12; return `${hr} ${am ? "AM" : "PM"}`; };
-          const startHr = (form.calendar || {}).dayStartHr ?? 8;
-          const endHr = (form.calendar || {}).dayEndHr ?? 19;
-          const setCal = (patch) => setForm({ ...form, calendar: { ...(form.calendar || {}), ...patch } });
-          const Stepper = ({ label, sub, value, onDec, onInc }) => (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", marginBottom: 10 }}>
-              <div><div style={{ fontSize: 15 }}>{label}</div><div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{sub}</div></div>
-              <div style={{ display: "flex", alignItems: "center", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 11, overflow: "hidden", flexShrink: 0 }}>
-                <button onClick={onDec} style={{ background: "none", border: "none", color: "var(--text)", width: 42, height: 42, fontSize: 22 }}>−</button>
-                <span style={{ width: 72, textAlign: "center", fontSize: 15.5, fontWeight: 600 }}>{fmtHr(value)}</span>
-                <button onClick={onInc} style={{ background: "none", border: "none", color: "var(--text)", width: 42, height: 42, fontSize: 22 }}>+</button>
-              </div>
-            </div>
-          );
-          return (
-            <div style={{ marginTop: 22 }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>VISIBLE HOURS</div>
-              <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>The time range your calendar shows. Set it to cover your real open hours.</div>
-              <Stepper label="Day starts" sub="Top of the calendar" value={startHr}
-                onDec={() => setCal({ dayStartHr: Math.max(5, startHr - 1) })}
-                onInc={() => setCal({ dayStartHr: Math.min(endHr - 1, startHr + 1) })} />
-              <Stepper label="Day ends" sub="Bottom of the calendar" value={endHr}
-                onDec={() => setCal({ dayEndHr: Math.max(startHr + 1, endHr - 1) })}
-                onInc={() => setCal({ dayEndHr: Math.min(23, endHr + 1) })} />
-            </div>
-          );
-        })()}
-        </>
-      ),
-    },
-    {
       id: "scheduling", title: "Scheduling Options", icon: Clock, category: "Calendar & Appointments",
       status: (() => { const bk = form.booking || {}; const parts = []; if (bk.bufferBefore || bk.bufferAfter) parts.push(`${bk.bufferBefore || 0}/${bk.bufferAfter || 0}m buffer`); const hd = bk.horizonDays; const winLabel = hd === 0 ? "no cutoff" : (hd >= 90 ? `${Math.round(hd / 30)}mo window` : `${hd || 60}d window`); parts.push(winLabel); return parts.join(" · "); })(),
       keywords: "scheduling buffer before after turnover cleanup gap minimum notice lead time booking window advance ahead days how far",
@@ -10840,8 +10809,8 @@ const ROW_SIZES = [
   { id: "L", label: "L", pxPerHour: 200 },
   { id: "XL", label: "XL", pxPerHour: 300 },
 ];
-const DAY_START = 8 * 60;   // 8 AM
-const DAY_END = 19 * 60;    // 7 PM (scrolls)
+const DAY_START = 7 * 60;   // 7 AM
+const DAY_END = 22 * 60;    // 10 PM (scrolls)
 
 // ============================================================
 // CREATE POPOVER — appears at the long-press point, always on-screen
@@ -11218,12 +11187,8 @@ function decideCalendarGesture({ movedPx, heldMs, MOVE_PX = GESTURE_MOVE_PX, HOL
   return "pending";                                           // still deciding (a tap if released now)
 }
 /* ===== /CALENDAR-GESTURE-DECISION ===== */
-function CalendarView({ appts, setAppts, clients, setClients, providers, services, business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true }) {
   const sizeId = business?.calendarRowSize || "L";
-  // Visible calendar window — configurable in Calendar Settings; falls back to 8 AM–7 PM.
-  // These local consts shadow the module defaults for every grid calc inside this component.
-  const DAY_START = ((business?.calendar?.dayStartHr ?? 8)) * 60;
-  const DAY_END = ((business?.calendar?.dayEndHr ?? 19)) * 60;
   const [showWaitlistPanel, setShowWaitlistPanel] = useState(false);
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   const [open, setOpen] = useState(null);
@@ -11916,8 +11881,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
               {quarterLines.map((t) => { const isHour = t % 60 === 0; return (
                 <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, left: 0, right: 0, borderTop: isHour ? "1px solid var(--line)" : "1px solid color-mix(in srgb, var(--line) 50%, transparent)", height: 0, pointerEvents: "none" }} />
               ); })}
-              {/* live "now" line — only on today, only within the visible grid window; gated by Calendar Settings */}
-              {((business && business.calendar) ? business.calendar.nowLine !== false : true) && sameDay(selectedDate.toISOString(), today) && (() => {
+              {/* live "now" line — only on today, only within the visible grid window */}
+              {sameDay(selectedDate.toISOString(), today) && (() => {
                 const nowM = today.getHours() * 60 + today.getMinutes();
                 if (nowM < DAY_START || nowM > DAY_END) return null;
                 return (
@@ -11934,12 +11899,16 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
                 const height = (a.end - a.start) * PPM - 2;
                 const service = services.find((s) => s.id === a.serviceId);
                 const isBlock = a.status === "block";
-                let accent = hexById(service?.color);
+                // cut-style color (set per cut in Cut Styles) wins; falls back to the service's own color
+                const _ctId = a.lineItems && a.lineItems[0] && a.lineItems[0].cutType;
+                const _ct = (_ctId && service && service.cutTypes) ? service.cutTypes.find((c) => c.id === _ctId) : null;
+                const _cutColor = (_ct && _ct.libId) ? ((cutLibrary || []).find((e) => e.id === _ct.libId) || {}).color : null;
+                let accent = hexById(_cutColor || service?.color);
                 if (a.status === "checked-in") accent = STATUS_COLORS["checked-in"];
                 else if (a.status === "in-service") accent = STATUS_COLORS["in-service"];
                 const isDone = a.status === "done";
                 // soft tinted background with a colored accent bar — clean & legible
-                const tint = `color-mix(in srgb, ${accent} 14%, var(--panel))`;
+                const tint = `color-mix(in srgb, ${accent} 62%, var(--panel))`;
                 const onColor = "var(--text)";
                 const blockBg = "repeating-linear-gradient(45deg, var(--panel2), var(--panel2) 7px, var(--line) 7px, var(--line) 14px)";
                 // Horizontal lane positioning — full width when alone, split into N equal lanes when overlapping.
@@ -13066,51 +13035,6 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
   );
 }
 
-// Progress Card — live in-service timer (ring + minutes). Calm by default (theme accent);
-// at <=10 min a soft "Wrapping up" amber pill appears + the next-client heads-up; the pill
-// deepens slightly at <=5 min. Gated by the Calendar Settings "progress card" toggle.
-function ProgressCard({ T, minutesLeft, minutesInto, dur, nextClient, nextIsWaiting, fmtTime, lateNotified, onLetThemKnow }) {
-  const C = 207; // circumference for r=33
-  const pct = Math.min(100, Math.max(0, dur > 0 ? (minutesInto / dur) * 100 : 0));
-  const behind10 = minutesLeft <= 10;
-  const behind5 = minutesLeft <= 5;
-  const pillBg = behind5 ? "#D89A2E" : "#E8B04B";
-  const leftLabel = minutesLeft > 0 ? `${minutesLeft} min left` : (minutesLeft === 0 ? "Wrapping up" : `${Math.abs(minutesLeft)} min over`);
-  return (
-    <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 16, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 16, padding: 16 }}>
-        <div style={{ position: "relative", width: 72, height: 72, flexShrink: 0 }}>
-          <svg width="72" height="72" style={{ transform: "rotate(-90deg)" }}>
-            <circle cx="36" cy="36" r="33" fill="none" stroke="rgba(0,0,0,.08)" strokeWidth="6" />
-            <circle cx="36" cy="36" r="33" fill="none" stroke={T.accent} strokeWidth="6" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (pct / 100)} style={{ transition: "stroke-dashoffset 1s linear" }} />
-          </svg>
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, lineHeight: 1, color: T.text }}>{Math.abs(minutesLeft)}</span>
-            <span style={{ fontSize: 10, letterSpacing: 1, color: T.sub, textTransform: "uppercase" }}>min</span>
-          </div>
-        </div>
-        <div style={{ flex: 1 }}>
-          {behind10 && <span style={{ display: "inline-block", background: pillBg, color: "#3a2e10", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", padding: "5px 11px", borderRadius: 30, marginBottom: 7 }}>Wrapping up</span>}
-          <div style={{ fontSize: 18, fontWeight: 600, color: T.text }}>{leftLabel}</div>
-          <div style={{ fontSize: 13.5, color: T.sub, marginTop: 2 }}>{dur} min booked</div>
-        </div>
-      </div>
-      {behind10 && nextClient && (
-        <div style={{ marginTop: 12, border: `1.5px solid ${pillBg}`, borderRadius: 14, background: T.panel, padding: "15px 16px" }}>
-          {lateNotified ? (
-            <div style={{ fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Check size={15} /> Notified · running {lateNotified} min behind</div>
-          ) : (
-            <>
-              <div style={{ fontSize: 14, color: T.text, marginBottom: 12, lineHeight: 1.45 }}>{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running a few minutes behind?</div>
-              <button className="lift" onClick={onLetThemKnow} style={{ width: "100%", background: pillBg, color: "#3a2e10", padding: "13px", borderRadius: 11, fontSize: 14, fontWeight: 700, border: "none" }}>Let them know</button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
@@ -13143,46 +13067,6 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const client = clients.find((c) => c.id === appt.clientId);
   const service = services.find((s) => s.id === appt.serviceId);
   const dur = appt.end - appt.start;
-
-  // ---- Wrap-up: photos / note / service-time, auto-saved to the client profile ----
-  const [wuNote, setWuNote] = useState(client?.notes || "");
-  useEffect(() => { setWuNote(client?.notes || ""); }, [client?.id]);
-  const wuFileRef = useRef(null);
-  const saveWuNote = () => {
-    if (!client) return;
-    const v = wuNote.trim();
-    if (v === (client.notes || "")) return;
-    setClients(clients.map((c) => c.id === client.id ? { ...c, notes: v } : c));
-  };
-  const addWuPhoto = (file) => {
-    if (!file || !client) return;
-    const fr = new FileReader();
-    fr.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const max = 800; let w = img.width, h = img.height;
-        if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
-        else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
-        setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: [...(c.gallery || []), { id: "g" + Date.now(), photo: dataUrl, note: "", date: new Date().toISOString() }] } : c));
-        if (showToast) showToast("Photo saved to their profile.");
-      };
-      img.src = ev.target.result;
-    };
-    fr.readAsDataURL(file);
-  };
-  const removeWuPhoto = (gid) => {
-    if (!client) return;
-    setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: (c.gallery || []).filter((g) => g.id !== gid) } : c));
-  };
-  const wuDur = (client && service && client.customDurations && client.customDurations[service.id] != null) ? client.customDurations[service.id] : (service?.duration || dur);
-  const setWuDur = (val) => {
-    if (!client || !service) return;
-    setClients(clients.map((c) => c.id === client.id ? { ...c, customDurations: { ...(c.customDurations || {}), [service.id]: val } } : c));
-  };
 
   // Live clock for the in-service timer. Prefer the real start timestamp (set when
   // marked in-service) so elapsed/left can't drift; fall back to the scheduled start.
@@ -13321,31 +13205,39 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               </>}
             />
 
-            <div ref={scrollTopRef} style={{ overflowY: "auto", flex: 1 }}>
+            {appt.status === "done" && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "13px 18px", background: T.chip, borderBottom: `1px solid ${T.line}`, color: T.sub, fontSize: 15, fontWeight: 600 }}>
+                <Check size={17} style={{ color: T.accent }} /> Completed & paid · ${price}
+              </div>
+            )}
+            <div ref={scrollTopRef} style={{ overflowY: "auto", flex: 1, opacity: appt.status === "done" ? 0.5 : 1, transition: "opacity .2s" }}>
               {/* status + check-in */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px", borderBottom: `1px solid ${T.line}` }}>
+              <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 9, background: T.chip, border: `1px solid ${T.line}`, padding: "8px 14px", borderRadius: 30 }}>
                   <span style={{ width: 11, height: 11, borderRadius: "50%", background: status.dot }} />
                   <span style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: 0.2 }}>{status.label}</span>
                 </div>
-                {appt.status === "confirmed" && <button className="lift" onClick={() => onSetStatus(appt.id, "checked-in", `${appt.name} checked in.`)} style={{ border: `1.5px solid ${T.line}`, color: T.text, background: "none", padding: "11px 22px", borderRadius: 30, fontSize: 15, letterSpacing: 1, fontWeight: 600 }}>CHECK-IN</button>}
-                {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} is ready for you and will meet you in front."; const msg = wr.autoReadyMessage === false ? `${appt.name} marked in service.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`; onSetStatus(appt.id, "in-service", msg); }} style={{ background: T.accent, color: T.accentText, padding: "11px 18px", borderRadius: 30, fontSize: 15, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>NOTIFY · READY</button>}
-                {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ background: T.accent, color: T.accentText, padding: "11px 22px", borderRadius: 30, fontSize: 15, letterSpacing: 1, fontWeight: 600, border: "none" }}>COMPLETE & CHECKOUT</button>}
+                {appt.status === "confirmed" && <button className="lift" onClick={() => onSetStatus(appt.id, "checked-in", `${appt.name} checked in.`)} style={{ width: "100%", marginTop: 14, background: "#3E8BD6", color: "#fff", border: "none", padding: "16px 22px", borderRadius: 14, fontSize: 16, letterSpacing: 1, fontWeight: 700 }}>CHECK-IN</button>}
+                {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} is ready for you and will meet you in front."; const msg = wr.autoReadyMessage === false ? `${appt.name} marked in service.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`; onSetStatus(appt.id, "in-service", msg); }} style={{ width: "100%", marginTop: 14, background: "#E0892F", color: "#fff", border: "none", padding: "16px 22px", borderRadius: 14, fontSize: 16, letterSpacing: 0.5, fontWeight: 700 }}>NOTIFY · READY</button>}
+                {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ width: "100%", marginTop: 14, background: "#0A0A0A", color: "#fff", border: "none", padding: "16px 22px", borderRadius: 14, fontSize: 16, letterSpacing: 1, fontWeight: 700 }}>COMPLETE & CHECKOUT</button>}
               </div>
 
-              {/* PROGRESS CARD — live in-service timer; gated by Calendar Settings */}
-              {appt.status === "in-service" && ((business && business.calendar) ? business.calendar.progressCard !== false : true) && (
-                <ProgressCard
-                  T={T}
-                  minutesLeft={minutesLeftLive}
-                  minutesInto={minutesIntoService}
-                  dur={dur}
-                  nextClient={(business && business.runningLate ? business.runningLate.enabled !== false : true) ? nextClient : null}
-                  nextIsWaiting={nextIsWaiting}
-                  fmtTime={fmtTime}
-                  lateNotified={nextClient && nextClient.lateNotified}
-                  onLetThemKnow={() => setLateOpen(true)}
-                />
+              {/* RUNNING LATE — shows when in service and there's a next client (moved up for visibility) */}
+              {appt.status === "in-service" && nextClient && ((business && business.runningLate ? business.runningLate.enabled !== false : true)) && (
+                <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}`, background: "rgba(176,141,87,0.08)" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <Clock size={18} style={{ color: T.accent, marginTop: 2, flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15.5, fontWeight: 600, color: T.text }}>{minutesLeftLive > 0 ? `${minutesLeftLive} min left in this appointment` : (minutesLeftLive === 0 ? "Wrapping up" : `${Math.abs(minutesLeftLive)} min over`)}</div>
+                      <div style={{ fontSize: 14, color: T.sub, marginTop: 2, lineHeight: 1.45 }}>{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running late?</div>
+                      {nextClient.lateNotified ? (
+                        <div style={{ marginTop: 10, fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Check size={15} /> Notified · running {nextClient.lateNotified} min behind</div>
+                      ) : (
+                        <button className="lift" onClick={() => setLateOpen(true)} style={{ marginTop: 10, background: T.accent, color: T.accentText, padding: "9px 18px", borderRadius: 24, fontSize: 14, letterSpacing: 0.5, fontWeight: 600, border: "none" }}>LET THEM KNOW</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* FLEXIBILITY — barber can flag any upcoming appointment into the earlier-slot engine */}
@@ -13417,7 +13309,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   <div style={{ width: 54, height: 54, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, flexShrink: 0 }}>{initials}</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, lineHeight: 1.1 }}>{appt.name} {appt.vip && <span style={{ color: status.dot }}>★</span>}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.05, letterSpacing: -0.3 }}>{appt.name}</div>
                     <div style={{ fontSize: 15, color: T.sub }}>{client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client"}</div>
                   </div>
                   <button onClick={() => showToast("Opening message thread…")} style={{ width: 44, height: 44, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center" }}><MessageSquare size={18} /></button>
@@ -13480,52 +13372,6 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     ))}
                   </div>
                   <p style={{ fontSize: 14, color: T.faint, marginTop: 8 }}>Uploaded by the client when booking.</p>
-                </div>
-              )}
-
-              {/* WRAP UP — photos / note / service time, auto-saved to the client profile */}
-              {client && (
-                <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
-                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, color: T.text, marginBottom: 3 }}>{appt.status === "completed" ? "Photos & notes" : "Wrap up"}</div>
-                  <div style={{ fontSize: 13.5, color: T.sub, marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}><Check size={14} style={{ color: T.accent }} /> Saved to {(client.name || "their").split(" ")[0]}'s profile automatically</div>
-                  <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 16, overflow: "hidden" }}>
-                    {/* Photos */}
-                    <div style={{ padding: 18 }}>
-                      <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Photos</div>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        {(client.gallery || []).map((g) => (
-                          <div key={g.id} style={{ width: 72, height: 72, borderRadius: 12, overflow: "hidden", position: "relative", flexShrink: 0, background: T.chip }}>
-                            <img src={imgUrl(g.photo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                            <button onClick={() => removeWuPhoto(g.id)} style={{ position: "absolute", top: 4, right: 4, width: 21, height: 21, borderRadius: "50%", background: "rgba(0,0,0,.55)", color: "#fff", fontSize: 13, border: "none", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>×</button>
-                          </div>
-                        ))}
-                        <button className="lift" onClick={() => wuFileRef.current && wuFileRef.current.click()} style={{ width: 72, height: 72, borderRadius: 12, border: `1.5px dashed ${T.faint}`, background: "none", color: T.accent, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
-                          <Plus size={20} /> Add
-                        </button>
-                        <input ref={wuFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { addWuPhoto(e.target.files && e.target.files[0]); e.target.value = ""; }} />
-                      </div>
-                    </div>
-                    {/* Note */}
-                    <div style={{ padding: 18, borderTop: `1px solid ${T.line}` }}>
-                      <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Note for next time</div>
-                      <textarea value={wuNote} onChange={(e) => setWuNote(e.target.value)} onBlur={saveWuNote} placeholder="Tighter on the sides. #2 guard, scissor on top…" rows={3} style={{ width: "100%", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "13px 14px", color: T.text, fontSize: 15.5, fontFamily: "'Jost', sans-serif", resize: "vertical", lineHeight: 1.5, outline: "none" }} />
-                    </div>
-                    {/* Service time */}
-                    {service && (
-                      <div style={{ padding: 18, borderTop: `1px solid ${T.line}` }}>
-                        <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Service time</div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
-                          <span style={{ fontSize: 15.5, color: T.sub }}>{(client.name || "their").split(" ")[0]}'s time for {service.name}</span>
-                          <div style={{ display: "flex", alignItems: "center", background: T.bg, border: `1px solid ${T.line}`, borderRadius: 11, overflow: "hidden", flexShrink: 0 }}>
-                            <button onClick={() => setWuDur(Math.max(5, wuDur - 5))} style={{ background: "none", border: "none", color: T.text, width: 44, height: 44, fontSize: 22 }}>−</button>
-                            <span style={{ width: 64, textAlign: "center", fontSize: 16, fontWeight: 700 }}>{wuDur} min</span>
-                            <button onClick={() => setWuDur(wuDur + 5)} style={{ background: "none", border: "none", color: T.text, width: 44, height: 44, fontSize: 22 }}>+</button>
-                          </div>
-                        </div>
-                        <div style={{ fontSize: 12.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Booked at {service.duration} min. This sets {(client.name || "their").split(" ")[0]}'s time so future bookings get the right amount of chair.</div>
-                      </div>
-                    )}
-                  </div>
                 </div>
               )}
 
