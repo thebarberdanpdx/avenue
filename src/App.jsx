@@ -692,6 +692,20 @@ const relativeDate = (date) => { const today = new Date(); today.setHours(0,0,0,
 const daysFromNow = (date) => { const today = new Date(); today.setHours(0,0,0,0); const d = new Date(date); d.setHours(0,0,0,0); const diff = Math.round((d - today) / 86400000); if (diff === 0) return "Today"; if (diff === 1) return "Tomorrow"; if (diff < 7) return `in ${diff} days`; if (diff === 7) return "1 week away — next " + DAYS[d.getDay()]; if (diff < 14) return `${diff} days away — next week`; const wks = Math.round(diff / 7); return `about ${wks} weeks away`; };
 const DAYS_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const apptDateLabel = () => { const d = new Date(); return `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
+// Heartbeat: returns a Date that re-renders the component on an interval, so live
+// timers / "now" lines stay correct without a manual refresh. Recomputes from the
+// real clock each tick, so it can never drift or freeze. Default 1s; pass 30000 where
+// minute-resolution is enough. On wake/foreground the next tick self-corrects.
+function useNow(intervalMs = 1000) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), intervalMs);
+    const onVis = () => { if (!document.hidden) setNow(new Date()); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVis); };
+  }, [intervalMs]);
+  return now;
+}
 // Duration cascade: per-client override → per-staff default → service default.
 const getStaffEntry = (service, providerId) => (service && service.staff && providerId && service.staff[providerId]) || null;
 const getDuration = (client, service, providerId) => {
@@ -4293,7 +4307,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 // Barbers only see their own chair, period.
 // ============================================================
 function PulseView({ business, appts, setAppts, clients, setClients, services, providers, setProviders, me, isOwner, dataLoaded, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenPayments, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onOpenClient, onSignOut, showToast }) {
-  const now = new Date();
+  const now = useNow(30000);
   const realProviders = providers.filter((p) => p.id !== "anyone");
 
   // Resolve who/what we're showing:
@@ -4679,36 +4693,6 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           )}
         </>
       )}
-
-      {/* RIGHT NOW — what's happening on the chair */}
-      <div style={{ marginBottom: 26, background: "color-mix(in srgb, var(--gold) 13%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 16, padding: "17px 19px" }}>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 9, fontWeight: 600 }}>RIGHT NOW</div>
-        {inChair ? (
-          <>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 3, lineHeight: 1.15 }}>{inChair.name}</div>
-            <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>
-              {inChair.title} · <span style={{ color: "var(--gold)", fontWeight: 600 }}>{minutesLeft} min left</span> · started {minutesInChair} min ago
-            </div>
-          </>
-        ) : nextAppt ? (
-          <>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 3, lineHeight: 1.15 }}>Up next: {nextAppt.name}</div>
-            <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>
-              {nextAppt.title} at {fmtTime(nextAppt.start)} · <span style={{ color: "var(--gold)", fontWeight: 600 }}>in {minutesUntil} min</span>
-            </div>
-          </>
-        ) : todayApptsAll.length > 0 ? (
-          <>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 3, lineHeight: 1.15 }}>Day's done</div>
-            <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>No more bookings today. {fmtMoney(todayMoney)} in.</div>
-          </>
-        ) : (
-          <>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 3, lineHeight: 1.15 }}>Open chair</div>
-            <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>No appointments booked today.</div>
-          </>
-        )}
-      </div>
 
       {/* RUNNING LATE — surfaces on Pulse when the in-chair appointment is within the threshold of overrunning the next one,
           so the provider can text the next client without digging through the calendar. */}
@@ -11661,7 +11645,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
 
   const weekStartsOn = (business && business.weekStartsOn != null) ? business.weekStartsOn : 0;
   const week = useMemo(() => { const arr = []; const base = new Date(); const shift = (base.getDay() - weekStartsOn + 7) % 7; base.setDate(base.getDate() + dayOffset - shift); for (let i = 0; i < 7; i++) { const d = new Date(base); d.setDate(base.getDate() + i); arr.push(d); } return arr; }, [dayOffset, weekStartsOn]);
-  const today = new Date();
+  const today = useNow(30000);
   // The day currently being shown on the calendar (controlled by dayOffset)
   const selectedDate = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(0, 0, 0, 0); return d; }, [dayOffset]);
   const sameDay = (iso, refDate) => { if (!iso) return false; const a = new Date(iso); return a.getFullYear() === refDate.getFullYear() && a.getMonth() === refDate.getMonth() && a.getDate() === refDate.getDate(); };
@@ -11881,6 +11865,16 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, service
               {quarterLines.map((t) => { const isHour = t % 60 === 0; return (
                 <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, left: 0, right: 0, borderTop: isHour ? "1px solid var(--line)" : "1px solid color-mix(in srgb, var(--line) 50%, transparent)", height: 0, pointerEvents: "none" }} />
               ); })}
+              {/* live "now" line — only on today, only within the visible grid window */}
+              {sameDay(selectedDate.toISOString(), today) && (() => {
+                const nowM = today.getHours() * 60 + today.getMinutes();
+                if (nowM < DAY_START || nowM > DAY_END) return null;
+                return (
+                  <div style={{ position: "absolute", top: (nowM - DAY_START) * PPM, left: 0, right: 0, height: 0, borderTop: "2px solid #E0694B", zIndex: 25, pointerEvents: "none" }}>
+                    <span style={{ position: "absolute", left: -4, top: -5, width: 10, height: 10, borderRadius: "50%", background: "#E0694B" }} />
+                  </div>
+                );
+              })()}
               {/* appointment blocks */}
               {col.map((a) => {
                 const isDragging = drag && drag.id === a.id && drag.armed;
@@ -13054,6 +13048,15 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const service = services.find((s) => s.id === appt.serviceId);
   const dur = appt.end - appt.start;
 
+  // Live clock for the in-service timer. Prefer the real start timestamp (set when
+  // marked in-service) so elapsed/left can't drift; fall back to the scheduled start.
+  const liveNow = useNow(1000);
+  const nowMinTick = liveNow.getHours() * 60 + liveNow.getMinutes();
+  const minutesIntoService = appt.serviceStartedAt != null
+    ? Math.floor((liveNow.getTime() - appt.serviceStartedAt) / 60000)
+    : Math.max(0, nowMinTick - appt.start);
+  const minutesLeftLive = Math.round(dur - minutesIntoService);
+
   // ---- theme tokens: read straight from the active app theme ----
   const T = {
     bg: "var(--bg)", panel: "var(--panel)", line: "var(--line)", text: "var(--text)", sub: "var(--sub)",
@@ -13200,7 +13203,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                     <Clock size={18} style={{ color: T.accent, marginTop: 2, flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 15.5, fontWeight: 600, color: T.text }}>{(business?.runningLate?.thresholdMin) || 5} min left in this appointment</div>
+                      <div style={{ fontSize: 15.5, fontWeight: 600, color: T.text }}>{minutesLeftLive > 0 ? `${minutesLeftLive} min left in this appointment` : (minutesLeftLive === 0 ? "Wrapping up" : `${Math.abs(minutesLeftLive)} min over`)}</div>
                       <div style={{ fontSize: 14, color: T.sub, marginTop: 2, lineHeight: 1.45 }}>{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running late?</div>
                       {nextClient.lateNotified ? (
                         <div style={{ marginTop: 10, fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Check size={15} /> Notified · running {nextClient.lateNotified} min behind</div>
