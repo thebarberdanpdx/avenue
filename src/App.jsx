@@ -12475,6 +12475,12 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
   const tooLong = measuredMin != null && measuredMin > 180; // likely forgot to check out
   const showDurationSuggest = (business?.autoTiming?.enabled !== false) && suggestedMin != null && !tooLong && liveClient && service && suggestedMin !== currentDur;
   const [adjustMin, setAdjustMin] = useState(suggestedMin);
+  // Safety net: if the timer was never started (you forgot to tap In Service), we can't measure
+  // the real duration. Offer quick options at checkout so the client's learned time still gets set.
+  const forgotToStart = (business?.autoTiming?.enabled !== false) && !appt.serviceStartedAt && liveClient && service;
+  const bookedDur = (service && service.duration) ? service.duration : 45;
+  const [recoveredMin, setRecoveredMin] = useState(null); // chosen at checkout when forgotToStart
+  const recoverOptions = [bookedDur - 15, bookedDur, bookedDur + 15, bookedDur + 30].filter((m) => m >= 5);
   const saveDuration = (val) => {
     if (!liveClient || !service) return;
     setClients(clients.map((c) => c.id === liveClient.id ? { ...c, customDurations: { ...(c.customDurations || {}), [service.id]: val } } : c));
@@ -12567,6 +12573,20 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
         <CheckoutRow label={service?.name || appt.title} val={money(base)} />
         <div style={{ borderTop: "1px solid var(--line)" }}><CheckoutRow label="Total due" val={money(base)} bold /></div>
       </div>
+      {forgotToStart && (
+        <div style={{ background: "var(--panel)", borderRadius: 18, border: "1px solid var(--line)", padding: "16px 18px", marginBottom: 24 }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, marginBottom: 3 }}>How long did this take?</div>
+          <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 14, lineHeight: 1.45 }}>The timer wasn't started — pick the closest so it tunes {(liveClient.name || "this client").split(" ")[0]}'s next booking.</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 9 }}>
+            {recoverOptions.map((m) => { const on = recoveredMin === m; return (
+              <button key={m} onClick={() => { setRecoveredMin(m); saveDuration(m); }} style={{ padding: 13, borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--text)", fontSize: 15, fontWeight: on ? 600 : 400, textAlign: "center" }}>
+                {m} min{m === bookedDur ? <span style={{ display: "block", fontSize: 11, fontWeight: 400, opacity: 0.7 }}>booked</span> : null}
+              </button>
+            ); })}
+            <button onClick={() => { const v = prompt("How many minutes did it take?"); const n = Math.max(5, Math.round((parseFloat(v) || 0) / 5) * 5); if (n >= 5) { setRecoveredMin(n); saveDuration(n); } }} style={{ padding: 13, borderRadius: 11, border: `1px solid ${recoveredMin != null && !recoverOptions.includes(recoveredMin) ? "var(--gold)" : "var(--border2)"}`, background: recoveredMin != null && !recoverOptions.includes(recoveredMin) ? "var(--gold)" : "var(--panel2)", color: recoveredMin != null && !recoverOptions.includes(recoveredMin) ? "var(--on-gold)" : "var(--text)", fontSize: 15, textAlign: "center", gridColumn: "1 / -1" }}>{recoveredMin != null && !recoverOptions.includes(recoveredMin) ? `Custom · ${recoveredMin} min` : "Custom…"}</button>
+          </div>
+        </div>
+      )}
       <button className="lift" onClick={tapCard} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: "var(--shadow-md)" }}><CreditCard size={18} /> CHARGE CARD</button>
       <button onClick={onClose} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 6 }}>CANCEL</button>
     </div>
