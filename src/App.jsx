@@ -1815,6 +1815,30 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
 //   timeMode: "smart" | "pack" | "grid" | "all"  (default smart)
 //   gold: when true, force pack flavor and mark gap-closing slots as best (Gold Times)
 // ============================================================
+// resolveAnyone — when a booking's provider is "Anyone", pick the real barber.
+// Default rule: WHOEVER IS AVAILABLE FIRST — the soonest free real barber at the
+// chosen slot. Falls back to the first real barber if none are free (e.g. outside
+// hours). Used by the commit path so no "Anyone" booking silently lands on one chair.
+// ============================================================
+function resolveAnyone(providers, appts, dateObj, startMin, durMin) {
+  const reals = (providers || []).filter((p) => p && p.id !== "anyone" && !p.archived);
+  if (!reals.length) return "dan";
+  if (!(dateObj instanceof Date) || isNaN(dateObj) || typeof startMin !== "number") return reals[0].id;
+  const dow = dateObj.getDay();
+  const y = dateObj.getFullYear(), mo = dateObj.getMonth(), da = dateObj.getDate();
+  const sameDay = (iso) => { const x = new Date(iso); return !isNaN(x) && x.getFullYear() === y && x.getMonth() === mo && x.getDate() === da; };
+  const endMin = startMin + (durMin || 0);
+  const isFree = (p) => {
+    const h = p.hours && p.hours[dow];
+    if (!h || !h.on) return false;
+    if (startMin < h.start || endMin > h.end) return false;
+    return !(appts || []).some((a) => a && a.status !== "cancelled" && a.status !== "no-show" && a.providerId === p.id && a.bookedFor && sameDay(a.bookedFor) && typeof a.start === "number" && typeof a.end === "number" && startMin < a.end && endMin > a.start);
+  };
+  const free = reals.filter(isFree);
+  return (free[0] || reals[0]).id;
+}
+
+// ============================================================
 function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], business = {}, gold = false }) {
   if (!prov || prov.id === "anyone") prov = providers.find((p) => p.id === "dan") || providers[1] || providers[0];
   if (!prov || !date || !durMin) return [];
@@ -2232,7 +2256,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         const sMin = isMultiPerson ? (isSameChk ? slot : cursorChk) : slot;
         const eMin = sMin + person.durMin;
         if (!isSameChk) cursorChk += person.durMin;
-        const pid = person.prov.id === "anyone" ? "dan" : person.prov.id;
+        const pid = person.prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, sMin, person.durMin) : person.prov.id;
         return appts.some((a) => occupies(a) && a.providerId === pid && a.bookedFor && sameDay(a.bookedFor) && typeof a.start === "number" && typeof a.end === "number" && sMin < a.end && eMin > a.start);
       });
       if (clash) { setSlot(null); setStep(6); setSlotConflict(true); return; }
@@ -2253,7 +2277,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         clientId = existing.id; // reuse the existing profile
       } else {
         clientId = "c" + baseId + Math.floor(Math.random() * 1000);
-        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? "dan" : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
+        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30)) : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
         setClients((cur) => [newClient, ...cur]);
         if (!isStaff) newClientRow = { id: String(clientId), shop_id: shopId, data: newClient };
       }
@@ -2272,7 +2296,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       const title = person.items.map(describeEntry).join(", ");
       newAppts.push({
         id: baseId + pi,
-        providerId: prov.id === "anyone" ? "dan" : prov.id,
+        providerId: prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, startMin, person.durMin) : prov.id,
         clientId: clientId || "guest",
         familyMemberId: person.key === "self" ? null : person.key,
         bookedByName: person.key === "self" ? null : (matched?.name || newName.trim()),
