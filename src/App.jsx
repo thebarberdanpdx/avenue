@@ -13492,25 +13492,21 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const service = services.find((s) => s.id === appt.serviceId);
   const dur = appt.end - appt.start;
 
-  // ---- Wrap-up: photos / note / service-time, auto-saved to the client profile ----
+  // ---- Wrap-up: photos / note / service-time. Changes stage as "pending" and commit on the
+  // Save button so you get a clear "Saved ✓" confirmation. A quiet note fallback still auto-saves
+  // if the sheet closes before tapping, so nothing is ever lost.
   const [wuNote, setWuNote] = useState(client?.notes || "");
-  useEffect(() => { setWuNote(client?.notes || ""); }, [client?.id]);
+  const [wuDirty, setWuDirty] = useState(false);     // something changed since last save
+  const [wuSaved, setWuSaved] = useState(false);     // show "Saved ✓" briefly after a save
+  const [pendingDur, setPendingDur] = useState(null); // staged duration, applied on Save
+  useEffect(() => { setWuNote(client?.notes || ""); setWuDirty(false); setWuSaved(false); setPendingDur(null); }, [client?.id]);
   const wuFileRef = useRef(null);
-  const saveWuNote = () => {
+  // Fallback only: if the sheet closes with an unsaved note, persist it so it isn't lost.
+  useEffect(() => () => {
     if (!client) return;
-    const v = wuNote.trim();
-    if (v === (client.notes || "")) return;
-    setClients(clients.map((c) => c.id === client.id ? { ...c, notes: v } : c));
-  };
-  // Auto-save the note a beat after typing stops, so it lands on the profile even without tapping out.
-  useEffect(() => {
-    if (!client) return;
-    const t = setTimeout(() => {
-      const v = wuNote.trim();
-      setClients((cs) => cs.map((c) => (c.id === client.id && (c.notes || "") !== v) ? { ...c, notes: v } : c));
-    }, 700);
-    return () => clearTimeout(t);
-  }, [wuNote]);
+    const v = (wuNote || "").trim();
+    setClients((cs) => cs.map((c) => (c.id === client.id && (c.notes || "") !== v) ? { ...c, notes: v } : c));
+  }, []);
   const addWuPhoto = (file) => {
     if (!file || !client) return;
     const fr = new FileReader();
@@ -13525,6 +13521,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
         canvas.getContext("2d").drawImage(img, 0, 0, w, h);
         const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
         setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: [...(c.gallery || []), { id: "g" + Date.now(), photo: dataUrl, note: "", date: new Date().toISOString() }] } : c));
+        setWuSaved(true); setTimeout(() => setWuSaved(false), 2000);
         if (showToast) showToast("Photo saved to their profile.");
       };
       img.src = ev.target.result;
@@ -13535,10 +13532,23 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     if (!client) return;
     setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: (c.gallery || []).filter((g) => g.id !== gid) } : c));
   };
-  const wuDur = (client && service && client.customDurations && client.customDurations[service.id] != null) ? client.customDurations[service.id] : (service?.duration || dur);
-  const setWuDur = (val) => {
-    if (!client || !service) return;
-    setClients(clients.map((c) => c.id === client.id ? { ...c, customDurations: { ...(c.customDurations || {}), [service.id]: val } } : c));
+  const storedDur = (client && service && client.customDurations && client.customDurations[service.id] != null) ? client.customDurations[service.id] : (service?.duration || dur);
+  const wuDur = pendingDur != null ? pendingDur : storedDur; // show staged value if any
+  const setWuDur = (val) => { setPendingDur(val); setWuDirty(true); setWuSaved(false); };
+  // Commit all pending Wrap Up changes (note + duration) on the Save button.
+  const saveWrapUp = () => {
+    if (!client) return;
+    const v = (wuNote || "").trim();
+    setClients(clients.map((c) => {
+      if (c.id !== client.id) return c;
+      const next = { ...c };
+      if ((c.notes || "") !== v) next.notes = v;
+      if (pendingDur != null && service) next.customDurations = { ...(c.customDurations || {}), [service.id]: pendingDur };
+      return next;
+    }));
+    setPendingDur(null); setWuDirty(false); setWuSaved(true);
+    setTimeout(() => setWuSaved(false), 2500);
+    if (showToast) showToast("Wrap-up saved to their profile.");
   };
   // What the system actually timed this visit (check-in → checkout). Shown as an option; doesn't override the default.
   const timedMin = (appt.serviceStartedAt && appt.serviceEndedAt) ? Math.max(1, Math.round((appt.serviceEndedAt - appt.serviceStartedAt) / 60000)) : null;
@@ -13927,8 +13937,17 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     {/* Note — last, bigger box */}
                     <div style={{ padding: 18, borderTop: `1px solid ${T.line}` }}>
                       <div style={{ fontSize: 12.5, letterSpacing: 1.4, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 11 }}>Note for next time</div>
-                      <textarea value={wuNote} onChange={(e) => setWuNote(e.target.value)} onBlur={saveWuNote} placeholder="Tighter on the sides. #2 guard, scissor on top. Black coffee, no small talk…" rows={5} style={{ width: "100%", boxSizing: "border-box", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "15px 16px", color: T.text, fontSize: 16.5, fontFamily: "'Jost', sans-serif", resize: "vertical", lineHeight: 1.55, outline: "none", minHeight: 120 }} />
+                      <textarea value={wuNote} onChange={(e) => { setWuNote(e.target.value); setWuDirty(true); setWuSaved(false); }} placeholder="Tighter on the sides. #2 guard, scissor on top. Black coffee, no small talk…" rows={5} style={{ width: "100%", boxSizing: "border-box", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "15px 16px", color: T.text, fontSize: 16.5, fontFamily: "'Jost', sans-serif", resize: "vertical", lineHeight: 1.55, outline: "none", minHeight: 120 }} />
                     </div>
+                    {(wuDirty || wuSaved) && (
+                      <div style={{ padding: "0 18px 18px" }}>
+                        {wuDirty ? (
+                          <button className="lift" onClick={saveWrapUp} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 700, textTransform: "uppercase" }}>Save</button>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: 15, color: "#3FA968", fontSize: 14, fontWeight: 600 }}><Check size={17} strokeWidth={3} /> Saved</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
