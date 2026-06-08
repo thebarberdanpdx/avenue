@@ -13586,8 +13586,19 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const [draftDur, setDraftDur] = useState(dur);
   const [draftProvider, setDraftProvider] = useState(appt.providerId);
   const [draftNote, setDraftNote] = useState(appt.note || "");
-  const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setMode("edit"); setMenuOpen(false); };
-  const saveEdit = () => { onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote }); showToast("Appointment updated."); setMode("detail"); };
+  const apptDateObj = appt.bookedFor ? new Date(appt.bookedFor) : new Date();
+  const [draftDate, setDraftDate] = useState(apptDateObj);
+  const [activeEdit, setActiveEdit] = useState(null); // "atTime" | "svcTime" | "svcDur" — which inline stepper is open
+  const [dateOpen, setDateOpen] = useState(false);
+  const editing = mode === "edit";
+  const dLabel = (d) => `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  const decStart = () => setDraftStart((v) => Math.max(DAY_START, v - 5));
+  const incStart = () => setDraftStart((v) => Math.min(DAY_END - draftDur, v + 5));
+  const decDur = () => setDraftDur((v) => Math.max(5, v - 5));
+  const incDur = () => setDraftDur((v) => Math.min(240, v + 5));
+  const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setDraftDate(appt.bookedFor ? new Date(appt.bookedFor) : new Date()); setActiveEdit(null); setDateOpen(false); setMode("edit"); setMenuOpen(false); };
+  const cancelEdit = () => { setActiveEdit(null); setDateOpen(false); setMode("detail"); };
+  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); showToast("Appointment updated."); setActiveEdit(null); setMode("detail"); };
 
   // ---- price (admin-editable; per-appointment override stored on appt.price) ----
   const price = lockedApptPrice(appt, service);
@@ -13682,20 +13693,33 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     </div>
   );
 
+  const EDIT_CHIP = { display: "inline-flex", alignItems: "center", gap: 7, border: "1.5px solid #C9A24B", background: "#FBF6EA", padding: "5px 11px", borderRadius: 9, font: "inherit", color: T.text, cursor: "pointer", verticalAlign: "middle", lineHeight: 1.25 };
+  const StepBox = ({ value, onDec, onInc }) => (
+    <span style={{ display: "inline-flex", alignItems: "center", border: "1.5px solid #C9A24B", borderRadius: 30, background: "#FBF6EA", overflow: "hidden", verticalAlign: "middle" }}>
+      <button onClick={onDec} aria-label="Decrease" style={{ width: 34, height: 34, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", color: T.text, fontSize: 18, lineHeight: 1, cursor: "pointer" }}>−</button>
+      <button onClick={() => setActiveEdit(null)} aria-label="Done" style={{ height: 34, padding: "0 10px", minWidth: 64, textAlign: "center", fontSize: 15.5, fontWeight: 600, color: T.text, background: "none", border: "none", cursor: "pointer" }}>{value}</button>
+      <button onClick={onInc} aria-label="Increase" style={{ width: 34, height: 34, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", color: T.text, fontSize: 18, lineHeight: 1, cursor: "pointer" }}>+</button>
+    </span>
+  );
+
   return (
     <Portal>
     <div className="appt-screen-fixed" style={{ position: "fixed", inset: 0, zIndex: 800, background: wide ? "var(--overlay)" : T.bg, display: "flex", flexDirection: "column", alignItems: wide ? "center" : undefined, justifyContent: wide ? "center" : undefined, padding: wide ? 32 : undefined, color: T.text, fontFamily: FONT_BODY }}>
       <div className="appt-screen-card" style={wide ? { width: "100%", maxWidth: 640, margin: "0 auto", height: "auto", maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden auto", position: "relative", borderRadius: 20, border: "1px solid var(--line)", background: T.bg, boxShadow: "0 30px 70px -20px rgba(0,0,0,0.55)" } : { width: "100%", maxWidth: 540, margin: "0 auto", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-        {mode === "detail" ? (
+        {(mode === "detail" || mode === "edit") ? (
           <>
             <TopBar
-              left={<button onClick={onClose} style={{ background: "none", color: "var(--bg)", display: "flex", alignItems: "center", gap: 2, fontSize: 15 }}><X size={22} /></button>}
-              title="Appointment"
-              right={<>
-                <button onClick={() => setMenuOpen((v) => !v)} style={{ background: "none", color: "var(--bg)" }}><MoreHorizontal size={22} /></button>
-                <button onClick={startEdit} style={{ background: "none", color: "var(--bg)", fontSize: 15, fontWeight: 600 }}>Edit</button>
-              </>}
+              left={editing
+                ? <button onClick={cancelEdit} style={{ background: "none", color: "rgba(250,248,243,0.72)", fontSize: 15 }}>Cancel</button>
+                : <button onClick={onClose} style={{ background: "none", color: "var(--bg)", display: "flex", alignItems: "center", gap: 2, fontSize: 15 }}><X size={22} /></button>}
+              title={editing ? "Edit Appointment" : "Appointment"}
+              right={editing
+                ? <button onClick={saveEdit} style={{ background: "none", color: "#E7BE63", fontSize: 15.5, fontWeight: 700 }}>Save</button>
+                : <>
+                    <button onClick={() => setMenuOpen((v) => !v)} style={{ background: "none", color: "var(--bg)" }}><MoreHorizontal size={22} /></button>
+                    <button onClick={startEdit} style={{ background: "none", color: "var(--bg)", fontSize: 15, fontWeight: 600 }}>Edit</button>
+                  </>}
             />
 
             {appt.status === "done" && (
@@ -13793,14 +13817,28 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
 
               {/* On / At split */}
               <div style={{ display: "flex", borderBottom: `1px solid ${T.line}` }}>
-                <div style={{ flex: 1, padding: "16px 18px" }}>
+                <div style={{ flex: 1, padding: "14px 18px" }}>
                   <span style={{ fontStyle: "italic", color: T.faint, fontSize: 13, marginRight: 7 }}>On</span>
-                  <span style={{ fontSize: 16, fontWeight: 500, color: T.text }}>{apptDateLabel()}</span>
+                  {editing ? (
+                    <button onClick={() => setDateOpen(true)} style={EDIT_CHIP}>
+                      <Calendar size={14} style={{ color: "#9C7A2E" }} />
+                      <span style={{ fontSize: 16, fontWeight: 500 }}>{dLabel(draftDate)}</span>
+                      <ChevronDown size={13} style={{ color: "#9C7A2E" }} />
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: 16, fontWeight: 500, color: T.text }}>{dLabel(apptDateObj)}</span>
+                  )}
                 </div>
                 <div style={{ width: 1, background: T.line }} />
-                <div style={{ flex: 1, padding: "16px 18px" }}>
+                <div style={{ flex: 1, padding: "14px 18px" }}>
                   <span style={{ fontStyle: "italic", color: T.faint, fontSize: 13, marginRight: 7 }}>At</span>
-                  <span style={{ fontSize: 16, fontWeight: 500, color: T.text }}>{fmtTime(appt.start)}</span>
+                  {editing ? (
+                    activeEdit === "atTime"
+                      ? <StepBox value={fmtTime(draftStart)} onDec={decStart} onInc={incStart} />
+                      : <button onClick={() => setActiveEdit("atTime")} style={EDIT_CHIP}><span style={{ fontSize: 16, fontWeight: 500 }}>{fmtTime(draftStart)}</span><ChevronDown size={13} style={{ color: "#9C7A2E" }} /></button>
+                  ) : (
+                    <span style={{ fontSize: 16, fontWeight: 500, color: T.text }}>{fmtTime(appt.start)}</span>
+                  )}
                 </div>
               </div>
 
@@ -13866,8 +13904,18 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   <span style={{ fontStyle: "italic", color: T.faint, marginRight: 6 }}>with</span><span style={{ fontWeight: 500 }}>{provider.name}</span>
                   <span style={{ fontStyle: "italic", color: T.faint, margin: "0 6px 0 16px" }}>request:</span><span style={{ fontWeight: 500 }}>{appt.requestedProvider ? "this person ★" : "any"}</span>
                   <br />
-                  <span style={{ fontStyle: "italic", color: T.faint, marginRight: 6 }}>at</span><span style={{ fontWeight: 500 }}>{fmtTime(appt.start)}</span>
-                  <span style={{ fontStyle: "italic", color: T.faint, margin: "0 6px 0 16px" }}>for</span><span style={{ fontWeight: 500 }}>{dur} minutes</span>
+                  <span style={{ fontStyle: "italic", color: T.faint, marginRight: 6 }}>at</span>
+                  {editing ? (
+                    activeEdit === "svcTime"
+                      ? <StepBox value={fmtTime(draftStart)} onDec={decStart} onInc={incStart} />
+                      : <button onClick={() => setActiveEdit("svcTime")} style={{ ...EDIT_CHIP, padding: "3px 9px", borderRadius: 8 }}><span style={{ fontWeight: 500 }}>{fmtTime(draftStart)}</span><ChevronDown size={12} style={{ color: "#9C7A2E" }} /></button>
+                  ) : <span style={{ fontWeight: 500 }}>{fmtTime(appt.start)}</span>}
+                  <span style={{ fontStyle: "italic", color: T.faint, margin: "0 6px 0 16px" }}>for</span>
+                  {editing ? (
+                    activeEdit === "svcDur"
+                      ? <StepBox value={`${draftDur} min`} onDec={decDur} onInc={incDur} />
+                      : <button onClick={() => setActiveEdit("svcDur")} style={{ ...EDIT_CHIP, padding: "3px 9px", borderRadius: 8 }}><span style={{ fontWeight: 500 }}>{draftDur} minutes</span><ChevronDown size={12} style={{ color: "#9C7A2E" }} /></button>
+                  ) : <span style={{ fontWeight: 500 }}>{dur} minutes</span>}
                 </div>
               </div>
 
@@ -14042,76 +14090,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               </>
             )}
           </>
-        ) : (
-          /* ---------- EDIT MODE ---------- */
-          <>
-            <TopBar
-              left={<button onClick={() => setMode("detail")} style={{ background: "none", color: "rgba(250,248,243,0.72)", fontSize: 15.5 }}>Cancel</button>}
-              title="Edit Appointment"
-              right={<button onClick={saveEdit} style={{ background: "none", color: "var(--gold)", fontSize: 15.5, fontWeight: 700 }}>Save</button>}
-            />
-            <div style={{ overflowY: "auto", flex: 1 }}>
-              {/* WHEN */}
-              <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
-                <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 16 }}>When</div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: T.text }}>{apptDateLabel()}</span>
-                  <span style={{ fontSize: 12.5, color: T.faint, fontStyle: "italic" }}>moved on the calendar</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 15, color: T.sub }}>Start time</span>
-                  <EditStepperRow T={T} value={fmtTime(draftStart)} onDec={() => setDraftStart((v) => Math.max(DAY_START, v - 5))} onInc={() => setDraftStart((v) => Math.min(DAY_END - draftDur, v + 5))} />
-                </div>
-              </div>
-
-              {/* CLIENT */}
-              <div style={{ padding: "20px 18px", borderBottom: `1px solid ${T.line}`, display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 600, flexShrink: 0 }}>{initials}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, color: T.text }}>{appt.name}</div>
-                  <div style={{ fontSize: 14.5, color: T.sub }}>{client?.phone ? fmtPhone(client.phone) : "New client"}</div>
-                </div>
-              </div>
-
-              {/* SERVICE */}
-              <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
-                <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 10 }}>Service</div>
-                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, color: T.text, marginBottom: 4 }}>{service?.name || appt.title}</div>
-                {appt.detail && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
-                    {appt.detail.split(",").map((d, i) => (
-                      <span key={i} style={{ background: T.chip, color: T.text, padding: "7px 13px", borderRadius: 8, fontSize: 14.5 }}>{d.trim()}</span>
-                    ))}
-                  </div>
-                )}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 22 }}>
-                  <span style={{ fontSize: 15, color: T.sub }}>With</span>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {staff.map((p) => (
-                      <button key={p.id} onClick={() => setDraftProvider(p.id)} style={{ padding: "7px 15px", borderRadius: 20, border: `1.5px solid ${draftProvider === p.id ? T.accent : T.line}`, background: draftProvider === p.id ? T.accent : "none", color: draftProvider === p.id ? T.accentText : T.sub, fontSize: 14, fontWeight: draftProvider === p.id ? 600 : 500 }}>{p.name}</button>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 22 }}>
-                  <span style={{ fontSize: 15, color: T.sub }}>Duration</span>
-                  <EditStepperRow T={T} value={`${draftDur} min`} onDec={() => setDraftDur((v) => Math.max(5, v - 5))} onInc={() => setDraftDur((v) => Math.min(240, v + 5))} />
-                </div>
-                {canEditPrice && (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20 }}>
-                    <span style={{ fontSize: 15, color: T.sub }}>Price</span>
-                    <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontFamily: "'Fraunces', serif", fontSize: 21, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }}>${price}<Edit2 size={14} style={{ color: T.faint }} /></button>
-                  </div>
-                )}
-              </div>
-
-              {/* NOTE */}
-              <div style={{ padding: "22px 18px 30px" }}>
-                <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 12 }}>Note for this appointment</div>
-                <textarea value={draftNote} onChange={(e) => setDraftNote(e.target.value)} placeholder="Anything to remember for the chair…" rows={3} style={{ width: "100%", background: "var(--panel)", border: `1px solid ${T.line}`, borderRadius: 12, padding: "13px 14px", color: T.text, fontSize: 15.5, lineHeight: 1.5, fontFamily: FONT_BODY, resize: "vertical", outline: "none", minHeight: 92, boxSizing: "border-box" }} />
-              </div>
-            </div>
-          </>
-        )}
+        ) : null}
 
       {/* admin price editor — reachable from the detail or edit screen, in any status */}
       <Sheet open={priceOpen} onClose={() => setPriceOpen(false)} align="bottom" maxWidth={420}>
@@ -14134,9 +14113,54 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
 
       <CardOnFileSheet open={cardOpen} onClose={() => setCardOpen(false)} client={client} onSaved={saveCardToClient} showToast={showToast} />
       <ChargeCardSheet open={chargeOpen} onClose={() => setChargeOpen(false)} client={client} defaultAmount={price} onCharged={recordPayment} showToast={showToast} />
+
+      <Sheet open={dateOpen} onClose={() => setDateOpen(false)} align="bottom" maxWidth={380}>
+        <div style={{ padding: "2px 4px 8px" }}>
+          <div style={{ textAlign: "center", marginBottom: 4 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "#B58A2E", fontWeight: 600 }}>APPOINTMENT DATE</div>
+          </div>
+          <ApptDatePicker value={draftDate} T={T} onPick={(d) => { setDraftDate(d); setDateOpen(false); }} />
+          <button onClick={() => setDateOpen(false)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "10px 0 2px", marginTop: 4 }}>Cancel</button>
+        </div>
+      </Sheet>
       </div>
     </div>
     </Portal>
+  );
+}
+
+function ApptDatePicker({ value, onPick, T }) {
+  const [m, setM] = useState(() => { const d = new Date(value); d.setDate(1); d.setHours(0, 0, 0, 0); return d; });
+  const year = m.getFullYear(), month = m.getMonth();
+  const startPad = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const sel = new Date(value); sel.setHours(0, 0, 0, 0);
+  const same = (a, b) => a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const cells = [];
+  for (let i = 0; i < startPad; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+  const GOLD = "#B58A2E";
+  return (
+    <div style={{ padding: "4px 2px 2px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <button onClick={() => setM(new Date(year, month - 1, 1))} aria-label="Previous month" style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronLeft size={18} /></button>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, color: T.text }}>{MONTHS[month]} {year}</div>
+        <button onClick={() => setM(new Date(year, month + 1, 1))} aria-label="Next month" style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronRight size={18} /></button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3, marginBottom: 6 }}>
+        {["S", "M", "T", "W", "T", "F", "S"].map((w, i) => <div key={i} style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.5, color: T.faint, fontWeight: 600 }}>{w}</div>)}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3 }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const selected = same(d, sel), isToday = same(d, today);
+          return (
+            <button key={i} onClick={() => onPick(d)} style={{ height: 42, borderRadius: 10, border: selected ? "none" : (isToday ? `1px solid ${GOLD}` : "1px solid transparent"), background: selected ? GOLD : "none", color: selected ? "#fff" : T.text, fontSize: 15, fontWeight: selected ? 600 : 500, cursor: "pointer" }}>{d.getDate()}</button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
