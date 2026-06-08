@@ -11089,7 +11089,7 @@ function CreatePopover({ slot, providerName, onAppt, onBlock, onClose }) {
 // ============================================================
 // NEW APPOINTMENT — pick client + service, then book (full page)
 // ============================================================
-function NewAppointmentForm({ slot, providers, clients, services, appts, selectedDate, onClose, onBook, onBlock }) {
+function NewAppointmentForm({ slot, providers, clients, services, appts, selectedDate, onClose, onBook, onBlock, onPickDate }) {
   const [provId, setProvId] = useState(slot.providerId);
   const staff = providers.filter((p) => p.role !== "owner-nonstaff");
   const [client, setClient] = useState(null);
@@ -11116,10 +11116,11 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   const dur = service ? getDuration(client, service, provId) : 0;
   const price = service ? priceWithTimeRules(service, provId, new Date(), startMin) : 0;
   const canBook = service && (client || (walkIn && walkInFirst.trim() && walkInLast.trim() && walkInPhone.replace(/\D/g, "").length >= 10));
-  const dateLabel = (() => { const d = new Date(); return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })();
+  const dateLabel = (() => { const d = selectedDate || new Date(); return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })();
   const stepTime = (delta) => setStartMin((m) => Math.max(6 * 60, Math.min(21 * 60, m + delta)));
 
   const [showTimePick, setShowTimePick] = useState(false);
+  const [showDatePick, setShowDatePick] = useState(false);
   const scrollRef = useRef(null);
   useLayoutEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -11141,8 +11142,8 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   const slotDate = selectedDate || new Date();
   const dow = slotDate.getDay();
   const wh = (provObj && provObj.hours && provObj.hours[dow]) || { on: true, start: 6 * 60, end: 21 * 60 };
-  const winStart = wh.on ? wh.start : 6 * 60;
-  const winEnd = wh.on ? wh.end : 21 * 60;
+  const winStart = 6 * 60;   // staff can pick ANY time; out-of-schedule is flagged with a banner, never blocked
+  const winEnd = 22 * 60;
   const dayAppts = (appts || [])
     .filter((a) => a.providerId === provId && sameDayLocal(a.bookedFor, slotDate) && a.status !== "cancelled" && a.status !== "done")
     .map((a) => ({ start: a.start, end: a.end }));
@@ -11167,15 +11168,27 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
         <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 22px 24px" }}>
           {/* On [date] | At [time] split */}
           <div style={{ display: "flex", borderBottom: "1px solid var(--line)" }}>
-            <div style={{ flex: 1, padding: "26px 0", borderRight: "1px solid var(--line)" }}>
+            <button onClick={() => setShowDatePick(true)} style={{ flex: 1, padding: "26px 0", borderRight: "1px solid var(--line)", background: "none", textAlign: "left", color: "var(--text)" }}>
               <span style={{ fontSize: 17, color: "var(--faint)" }}>On </span>
               <span style={{ fontSize: 19, fontWeight: 600 }}>{dateLabel}</span>
-            </div>
+            </button>
             <button onClick={() => setShowTimePick(true)} style={{ flex: 1, padding: "26px 0", paddingLeft: 24, background: "none", textAlign: "left", color: "var(--text)" }}>
               <span style={{ fontSize: 17, color: "var(--faint)" }}>At </span>
               <span style={{ fontSize: 19, fontWeight: 600 }}>{fmtHM(startMin)}</span>
             </button>
           </div>
+          {(() => {
+            const w = provObj && provObj.hours && provObj.hours[(selectedDate || new Date()).getDay()];
+            const outside = !w || !w.on || startMin < w.start || (startMin + apptDur) > w.end;
+            if (!outside) return null;
+            const nm = provObj ? provObj.name.split(" ")[0] : "this barber";
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 25%, transparent)", borderRadius: 10, padding: "9px 13px", marginTop: 14, fontSize: 13, color: "var(--text2)", lineHeight: 1.4 }}>
+                <AlertCircle size={14} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                This is outside {nm}'s schedule.
+              </div>
+            );
+          })()}
 
           {/* provider chips — only those who offer the chosen service */}
           {(() => {
@@ -11324,6 +11337,29 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
               ); })}
             </div>
             )}
+          </div>
+        </div>
+      )}
+      {showDatePick && (
+        <div style={{ position: "absolute", inset: 0, background: "var(--bg)", zIndex: 5, display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "17px 18px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
+            <button onClick={() => setShowDatePick(false)} style={{ background: "none", color: "var(--gold)", fontSize: 16 }}>Cancel</button>
+            <span style={{ fontSize: 17, fontWeight: 600 }}>Pick a date</span>
+            <span style={{ width: 50 }} />
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "8px 14px 40px" }}>
+            <div style={{ maxWidth: 460, margin: "0 auto" }}>
+              <DatePickerSheet
+                selectedDate={selectedDate}
+                onClose={() => setShowDatePick(false)}
+                onPick={(d) => {
+                  if (onPickDate) onPickDate(d);
+                  const w = provObj && provObj.hours && provObj.hours[d.getDay()];
+                  setStartMin(w && typeof w.start === "number" ? w.start : 9 * 60);
+                  setShowDatePick(false);
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -11958,8 +11994,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     const prov = providers.find((p) => p.id === providerId) || providers[0];
     const dur = Math.max(15, Number(durMin) || 30);
     const h = prov && prov.hours && prov.hours[date.getDay()];
-    const open = (h && h.on) ? h.start : DAY_START;
-    const close = (h && h.on) ? h.end : DAY_END;
+    const open = h ? h.start : DAY_START;
+    const close = h ? h.end : DAY_END;
     const busy = (appts || [])
       .filter((a) => a.providerId === providerId && sameDay(a.bookedFor, date) && a.status !== "cancelled" && a.status !== "done")
       .map((a) => [a.start, a.end])
@@ -12405,6 +12441,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           appts={appts}
           selectedDate={selectedDate}
           onClose={() => setNewApptSlot(null)}
+          onPickDate={(d) => { const t0 = new Date(); t0.setHours(0, 0, 0, 0); const tg = new Date(d); tg.setHours(0, 0, 0, 0); setDayOffset(Math.round((tg - t0) / 86400000)); }}
           onBook={bookAppt}
           onBlock={({ providerId, start }) => {
             const id = Math.max(0, ...appts.map((a) => a.id)) + 1;
