@@ -13588,17 +13588,16 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const [draftNote, setDraftNote] = useState(appt.note || "");
   const apptDateObj = appt.bookedFor ? new Date(appt.bookedFor) : new Date();
   const [draftDate, setDraftDate] = useState(apptDateObj);
-  const [activeEdit, setActiveEdit] = useState(null); // "atTime" | "svcTime" | "svcDur" — which inline stepper is open
+  const [pickList, setPickList] = useState(null); // null | "time" | "dur" — which full-screen 5-min list is open
   const [dateOpen, setDateOpen] = useState(false);
   const editing = mode === "edit";
   const dLabel = (d) => `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
-  const decStart = () => setDraftStart((v) => Math.max(DAY_START, v - 5));
-  const incStart = () => setDraftStart((v) => Math.min(DAY_END - draftDur, v + 5));
-  const decDur = () => setDraftDur((v) => Math.max(5, v - 5));
-  const incDur = () => setDraftDur((v) => Math.min(240, v + 5));
-  const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setDraftDate(appt.bookedFor ? new Date(appt.bookedFor) : new Date()); setActiveEdit(null); setDateOpen(false); setMode("edit"); setMenuOpen(false); };
-  const cancelEdit = () => { setActiveEdit(null); setDateOpen(false); setMode("detail"); };
-  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); showToast("Appointment updated."); setActiveEdit(null); setMode("detail"); };
+  const fmtDur = (m) => { const h = Math.floor(m / 60), mm = m % 60; if (h === 0) return `${mm} min`; return mm === 0 ? `${h} hr` : `${h} hr ${mm} min`; };
+  const TIME_OPTS = []; for (let t = DAY_START; t <= DAY_END; t += 5) TIME_OPTS.push(t);
+  const DUR_OPTS = []; for (let m = 5; m <= 240; m += 5) DUR_OPTS.push(m);
+  const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setDraftDate(appt.bookedFor ? new Date(appt.bookedFor) : new Date()); setPickList(null); setDateOpen(false); setMode("edit"); setMenuOpen(false); };
+  const cancelEdit = () => { setPickList(null); setDateOpen(false); setMode("detail"); };
+  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); showToast("Appointment updated."); setPickList(null); setMode("detail"); };
 
   // ---- price (admin-editable; per-appointment override stored on appt.price) ----
   const price = lockedApptPrice(appt, service);
@@ -13681,7 +13680,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const TopBar = ({ left, title, right }) => (
     <div style={{ background: "var(--text)", borderBottom: "2px solid var(--gold)", padding: "calc(env(safe-area-inset-top, 0px) + 18px) 16px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 5 }}>
       <div style={{ minWidth: 64 }}>{left}</div>
-      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 500, color: "var(--bg)", letterSpacing: "0.2px" }}>{title}</div>
+      <div style={{ fontFamily: FONT_BODY, fontSize: 18, fontWeight: 600, color: "var(--bg)", letterSpacing: "0.3px" }}>{title}</div>
       <div style={{ minWidth: 64, display: "flex", justifyContent: "flex-end", gap: 16, alignItems: "center" }}>{right}</div>
     </div>
   );
@@ -13694,20 +13693,17 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   );
 
   const EDIT_CHIP = { display: "inline-flex", alignItems: "center", gap: 7, border: "1.5px solid #C9A24B", background: "#FBF6EA", padding: "5px 11px", borderRadius: 9, font: "inherit", color: T.text, cursor: "pointer", verticalAlign: "middle", lineHeight: 1.25 };
-  const StepBox = ({ value, onDec, onInc }) => (
-    <span style={{ display: "inline-flex", alignItems: "center", border: "1.5px solid #C9A24B", borderRadius: 30, background: "#FBF6EA", overflow: "hidden", verticalAlign: "middle" }}>
-      <button onClick={onDec} aria-label="Decrease" style={{ width: 34, height: 34, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", color: T.text, fontSize: 18, lineHeight: 1, cursor: "pointer" }}>−</button>
-      <button onClick={() => setActiveEdit(null)} aria-label="Done" style={{ height: 34, padding: "0 10px", minWidth: 64, textAlign: "center", fontSize: 15.5, fontWeight: 600, color: T.text, background: "none", border: "none", cursor: "pointer" }}>{value}</button>
-      <button onClick={onInc} aria-label="Increase" style={{ width: 34, height: 34, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", color: T.text, fontSize: 18, lineHeight: 1, cursor: "pointer" }}>+</button>
-    </span>
-  );
 
   return (
     <Portal>
     <div className="appt-screen-fixed" style={{ position: "fixed", inset: 0, zIndex: 800, background: wide ? "var(--overlay)" : T.bg, display: "flex", flexDirection: "column", alignItems: wide ? "center" : undefined, justifyContent: wide ? "center" : undefined, padding: wide ? 32 : undefined, color: T.text, fontFamily: FONT_BODY }}>
       <div className="appt-screen-card" style={wide ? { width: "100%", maxWidth: 640, margin: "0 auto", height: "auto", maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden auto", position: "relative", borderRadius: 20, border: "1px solid var(--line)", background: T.bg, boxShadow: "0 30px 70px -20px rgba(0,0,0,0.55)" } : { width: "100%", maxWidth: 540, margin: "0 auto", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-        {(mode === "detail" || mode === "edit") ? (
+        {pickList === "time" ? (
+          <ApptListPicker title="Time" options={TIME_OPTS} value={draftStart} fmtLabel={fmtTime} onPick={(v) => { setDraftStart(v); setPickList(null); }} onBack={() => setPickList(null)} T={T} />
+        ) : pickList === "dur" ? (
+          <ApptListPicker title="Duration" options={DUR_OPTS} value={draftDur} fmtLabel={fmtDur} onPick={(v) => { setDraftDur(v); setPickList(null); }} onBack={() => setPickList(null)} T={T} />
+        ) : (mode === "detail" || mode === "edit") ? (
           <>
             <TopBar
               left={editing
@@ -13833,9 +13829,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div style={{ flex: 1, padding: "14px 18px" }}>
                   <span style={{ fontStyle: "italic", color: T.faint, fontSize: 13, marginRight: 7 }}>At</span>
                   {editing ? (
-                    activeEdit === "atTime"
-                      ? <StepBox value={fmtTime(draftStart)} onDec={decStart} onInc={incStart} />
-                      : <button onClick={() => setActiveEdit("atTime")} style={EDIT_CHIP}><span style={{ fontSize: 16, fontWeight: 500 }}>{fmtTime(draftStart)}</span><ChevronDown size={13} style={{ color: "#9C7A2E" }} /></button>
+                    <button onClick={() => setPickList("time")} style={EDIT_CHIP}><span style={{ fontSize: 16, fontWeight: 500 }}>{fmtTime(draftStart)}</span><ChevronRight size={14} style={{ color: "#9C7A2E" }} /></button>
                   ) : (
                     <span style={{ fontSize: 16, fontWeight: 500, color: T.text }}>{fmtTime(appt.start)}</span>
                   )}
@@ -13900,21 +13894,17 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     ))}
                   </div>
                 )}
-                <div style={{ fontSize: 14, color: T.text, lineHeight: 1.8 }}>
+                <div style={{ fontSize: 16, color: T.text, lineHeight: 1.95 }}>
                   <span style={{ fontStyle: "italic", color: T.faint, marginRight: 6 }}>with</span><span style={{ fontWeight: 500 }}>{provider.name}</span>
                   <span style={{ fontStyle: "italic", color: T.faint, margin: "0 6px 0 16px" }}>request:</span><span style={{ fontWeight: 500 }}>{appt.requestedProvider ? "this person ★" : "any"}</span>
                   <br />
                   <span style={{ fontStyle: "italic", color: T.faint, marginRight: 6 }}>at</span>
                   {editing ? (
-                    activeEdit === "svcTime"
-                      ? <StepBox value={fmtTime(draftStart)} onDec={decStart} onInc={incStart} />
-                      : <button onClick={() => setActiveEdit("svcTime")} style={{ ...EDIT_CHIP, padding: "3px 9px", borderRadius: 8 }}><span style={{ fontWeight: 500 }}>{fmtTime(draftStart)}</span><ChevronDown size={12} style={{ color: "#9C7A2E" }} /></button>
+                    <button onClick={() => setPickList("time")} style={{ ...EDIT_CHIP, padding: "3px 9px", borderRadius: 8 }}><span style={{ fontWeight: 500 }}>{fmtTime(draftStart)}</span><ChevronRight size={13} style={{ color: "#9C7A2E" }} /></button>
                   ) : <span style={{ fontWeight: 500 }}>{fmtTime(appt.start)}</span>}
                   <span style={{ fontStyle: "italic", color: T.faint, margin: "0 6px 0 16px" }}>for</span>
                   {editing ? (
-                    activeEdit === "svcDur"
-                      ? <StepBox value={`${draftDur} min`} onDec={decDur} onInc={incDur} />
-                      : <button onClick={() => setActiveEdit("svcDur")} style={{ ...EDIT_CHIP, padding: "3px 9px", borderRadius: 8 }}><span style={{ fontWeight: 500 }}>{draftDur} minutes</span><ChevronDown size={12} style={{ color: "#9C7A2E" }} /></button>
+                    <button onClick={() => setPickList("dur")} style={{ ...EDIT_CHIP, padding: "3px 9px", borderRadius: 8 }}><span style={{ fontWeight: 500 }}>{fmtDur(draftDur)}</span><ChevronRight size={13} style={{ color: "#9C7A2E" }} /></button>
                   ) : <span style={{ fontWeight: 500 }}>{dur} minutes</span>}
                 </div>
               </div>
@@ -13940,7 +13930,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
                     <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: "linear-gradient(155deg,#F4C84F,#CF971F)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 10px -3px rgba(190,135,20,.5)" }}><Sparkles size={19} style={{ color: "#33260A" }} /></div>
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: T.text, lineHeight: 1 }}>Wrap Up</div>
+                    <div style={{ fontFamily: FONT_BODY, fontSize: 18, fontWeight: 600, color: T.text, lineHeight: 1 }}>Wrap Up</div>
                   </div>
                   <div style={{ fontSize: 13.5, color: T.sub, marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}><Check size={14} style={{ color: T.accent }} /> Photos, notes &amp; timing — saved to {(client.name || "their").split(" ")[0]} automatically</div>
                   <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 16, overflow: "hidden" }}>
@@ -13992,7 +13982,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     {/* Note — last, bigger box */}
                     <div style={{ padding: 18, borderTop: `1px solid ${T.line}` }}>
                       <div style={{ fontSize: 12.5, letterSpacing: 1.4, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 11 }}>Note for next time</div>
-                      <textarea value={wuNote} onChange={(e) => { setWuNote(e.target.value); setWuDirty(true); setWuSaved(false); }} placeholder="Tighter on the sides. #2 guard, scissor on top. Black coffee, no small talk…" rows={5} style={{ width: "100%", boxSizing: "border-box", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "15px 16px", color: T.text, fontSize: 16.5, fontFamily: "'Jost', sans-serif", resize: "vertical", lineHeight: 1.55, outline: "none", minHeight: 120 }} />
+                      <textarea value={wuNote} onChange={(e) => { setWuNote(e.target.value); setWuDirty(true); setWuSaved(false); }} placeholder="Tighter on the sides. #2 guard, scissor on top. Black coffee, no small talk…" rows={5} style={{ width: "100%", boxSizing: "border-box", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "15px 16px", color: T.text, fontSize: 16.5, resize: "vertical", lineHeight: 1.55, outline: "none", minHeight: 120 }} />
                     </div>
                     {(wuDirty || wuSaved) && (
                       <div style={{ padding: "0 18px 18px" }}>
@@ -14057,7 +14047,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   <div className="fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 811, padding: 24 }}>
                   {!lateCascade ? (
                   <>
-                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, marginBottom: 4 }}>How far behind?</div>
+                  <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, marginBottom: 4 }}>How far behind?</div>
                   <div style={{ fontSize: 14, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>We'll send {nextClient ? nextClient.name : "your next client"} an in-app notification — no text message.</div>
                   <div style={{ display: "flex", gap: 10 }}>
                     {((business?.runningLate?.ranges) || ["5–10", "10–15"]).map((r) => (
@@ -14074,7 +14064,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   const tFirst = (target.name || "").split(" ")[0];
                   return (
                   <>
-                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, marginBottom: 4 }}>{lateCascade.idx === 1 ? "Let the client after next know too?" : "And the next one in line?"}</div>
+                  <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, marginBottom: 4 }}>{lateCascade.idx === 1 ? "Let the client after next know too?" : "And the next one in line?"}</div>
                   <div style={{ fontSize: 14, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>{target.name} is up at {fmtTime(target.start)}. As you catch up, they'd get a lighter heads-up.</div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
                     <span style={{ fontSize: 15, fontWeight: 500 }}>{target.name}</span>
@@ -14097,11 +14087,11 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
         <div style={{ padding: "6px 4px 8px" }}>
           <div style={{ textAlign: "center", marginBottom: 18 }}>
             <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>EDIT PRICE</div>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{service?.name || appt.title}</div>
+            <div style={{ fontFamily: FONT_BODY, fontSize: 20, fontWeight: 600 }}>{service?.name || appt.title}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 12 }}>
-            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, color: "var(--sub)" }}>$</span>
-            <input type="text" inputMode="decimal" value={priceDraft} onChange={(e) => setPriceDraft(e.target.value)} placeholder={String(price)} autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: "'Fraunces', serif", fontSize: 28, color: "var(--text)", width: "100%", padding: 0 }} />
+            <span style={{ fontFamily: FONT_BODY, fontSize: 28, fontWeight: 600, color: "var(--sub)" }}>$</span>
+            <input type="text" inputMode="decimal" value={priceDraft} onChange={(e) => setPriceDraft(e.target.value)} placeholder={String(price)} autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: FONT_BODY, fontSize: 28, fontWeight: 600, color: "var(--text)", width: "100%", padding: 0 }} />
           </div>
           <button onClick={savePrice} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", marginBottom: 10 }}><Check size={17} /> SAVE PRICE</button>
           {appt.price != null && (
@@ -14129,6 +14119,30 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   );
 }
 
+function ApptListPicker({ title, options, value, fmtLabel, onPick, onBack, T }) {
+  const selRef = useRef(null);
+  useEffect(() => { if (selRef.current && selRef.current.scrollIntoView) selRef.current.scrollIntoView({ block: "start" }); }, []);
+  return (
+    <>
+      <div style={{ background: "var(--text)", borderBottom: "2px solid var(--gold)", padding: "calc(env(safe-area-inset-top, 0px) + 18px) 16px 16px", display: "flex", alignItems: "center", position: "sticky", top: 0, zIndex: 5 }}>
+        <button onClick={onBack} aria-label="Back" style={{ background: "none", border: "none", color: "var(--bg)", display: "flex", alignItems: "center", padding: 0, width: 32, cursor: "pointer" }}><ChevronLeft size={24} /></button>
+        <div style={{ flex: 1, textAlign: "center", fontFamily: FONT_BODY, fontSize: 18, fontWeight: 600, color: "var(--bg)", marginRight: 32, letterSpacing: "0.3px" }}>{title}</div>
+      </div>
+      <div style={{ overflowY: "auto", flex: 1 }}>
+        {options.map((v) => {
+          const sel = v === value;
+          return (
+            <button key={v} ref={sel ? selRef : null} onClick={() => onPick(v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", textAlign: "left", background: sel ? "#FBF6EA" : "none", border: "none", borderBottom: `1px solid ${T.line}`, padding: "16px 20px", fontSize: 17, fontWeight: sel ? 700 : 400, color: sel ? "#B58A2E" : T.text, cursor: "pointer" }}>
+              <span>{fmtLabel(v)}</span>
+              {sel && <Check size={18} style={{ color: "#B58A2E" }} />}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 function ApptDatePicker({ value, onPick, T }) {
   const [m, setM] = useState(() => { const d = new Date(value); d.setDate(1); d.setHours(0, 0, 0, 0); return d; });
   const year = m.getFullYear(), month = m.getMonth();
@@ -14145,7 +14159,7 @@ function ApptDatePicker({ value, onPick, T }) {
     <div style={{ padding: "4px 2px 2px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <button onClick={() => setM(new Date(year, month - 1, 1))} aria-label="Previous month" style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronLeft size={18} /></button>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, color: T.text }}>{MONTHS[month]} {year}</div>
+        <div style={{ fontFamily: FONT_BODY, fontSize: 18, fontWeight: 600, color: T.text }}>{MONTHS[month]} {year}</div>
         <button onClick={() => setM(new Date(year, month + 1, 1))} aria-label="Next month" style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronRight size={18} /></button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3, marginBottom: 6 }}>
