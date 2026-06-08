@@ -13404,13 +13404,15 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
   );
 }
 
-function ProgressCard({ T, minutesLeft, minutesInto, dur, nextClient, nextIsWaiting, fmtTime, lateNotified, onLetThemKnow }) {
+function ProgressCard({ T, minutesLeft, minutesInto, dur, nextClient, nextIsWaiting, startedLate, startedLateBy, fmtTime, lateNotified, onLetThemKnow }) {
   const C = 207; // circumference for r=33
   const pct = Math.min(100, Math.max(0, dur > 0 ? (minutesInto / dur) * 100 : 0));
   const behind10 = minutesLeft <= 10;
   const behind5 = minutesLeft <= 5;
   const pillBg = behind5 ? "#D89A2E" : "#E8B04B";
   const leftLabel = minutesLeft > 0 ? `${minutesLeft} min left` : (minutesLeft === 0 ? "Wrapping up" : `${Math.abs(minutesLeft)} min over`);
+  // Show the "notify next client" prompt when wrapping up close OR when this service started late.
+  const showLatePrompt = (behind10 || startedLate) && nextClient;
   return (
     <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 16, padding: 16 }}>
@@ -13430,13 +13432,13 @@ function ProgressCard({ T, minutesLeft, minutesInto, dur, nextClient, nextIsWait
           <div style={{ fontSize: 13.5, color: T.sub, marginTop: 2 }}>{dur} min booked</div>
         </div>
       </div>
-      {behind10 && nextClient && (
+      {showLatePrompt && (
         <div style={{ marginTop: 12, border: `1.5px solid ${pillBg}`, borderRadius: 14, background: T.panel, padding: "15px 16px" }}>
           {lateNotified ? (
             <div style={{ fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Check size={15} /> Notified · running {lateNotified} min behind</div>
           ) : (
             <>
-              <div style={{ fontSize: 14, color: T.text, marginBottom: 12, lineHeight: 1.45 }}>{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running a few minutes behind?</div>
+              <div style={{ fontSize: 14, color: T.text, marginBottom: 12, lineHeight: 1.45 }}>{startedLate && !behind10 ? `This one started about ${startedLateBy} min late. ` : ""}{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running a few minutes behind?</div>
               <button className="lift" onClick={onLetThemKnow} style={{ width: "100%", background: pillBg, color: "#3a2e10", padding: "13px", borderRadius: 11, fontSize: 14, fontWeight: 700, border: "none" }}>Let them know</button>
             </>
           )}
@@ -13552,14 +13554,21 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const timedApply = timedMin != null ? Math.max(5, Math.round(timedMin / 5) * 5) : null;
   const fmtClockTs = (ts) => new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
-  // Live clock for the in-service timer. Prefer the real start timestamp (set when
-  // marked in-service) so elapsed/left can't drift; fall back to the scheduled start.
+  // Live clock for the in-service timer.
+  //  - minutesInto = actual work elapsed (from the real In-Service tap; falls back to scheduled start)
+  //  - minutesLeftLive = time left in the SCHEDULED window (scheduled end − now), regardless of when
+  //    they actually started, so the slot is the slot.
   const liveNow = useNow(1000);
   const nowMinTick = liveNow.getHours() * 60 + liveNow.getMinutes();
   const minutesIntoService = appt.serviceStartedAt != null
     ? Math.floor((liveNow.getTime() - appt.serviceStartedAt) / 60000)
     : Math.max(0, nowMinTick - appt.start);
-  const minutesLeftLive = Math.round(dur - minutesIntoService);
+  const minutesLeftLive = Math.round((appt.start + dur) - nowMinTick);
+  // Late start: In Service tapped 5+ min after the scheduled start time.
+  const startedLateBy = appt.serviceStartedAt != null
+    ? Math.round((new Date(appt.serviceStartedAt).getHours() * 60 + new Date(appt.serviceStartedAt).getMinutes()) - appt.start)
+    : 0;
+  const startedLate = startedLateBy >= 5;
 
   // ---- theme tokens: read straight from the active app theme ----
   const T = {
@@ -13735,6 +13744,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   dur={dur}
                   nextClient={(business && business.runningLate ? business.runningLate.enabled !== false : true) ? nextClient : null}
                   nextIsWaiting={nextIsWaiting}
+                  startedLate={startedLate}
+                  startedLateBy={startedLateBy}
                   fmtTime={fmtTime}
                   lateNotified={nextClient && nextClient.lateNotified}
                   onLetThemKnow={() => setLateOpen(true)}
