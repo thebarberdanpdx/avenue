@@ -13552,6 +13552,17 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   // What the system actually timed this visit (check-in → checkout). Shown as an option; doesn't override the default.
   const timedMin = (appt.serviceStartedAt && appt.serviceEndedAt) ? Math.max(1, Math.round((appt.serviceEndedAt - appt.serviceStartedAt) / 60000)) : null;
   const timedApply = timedMin != null ? Math.max(5, Math.round(timedMin / 5) * 5) : null;
+  // Rolling average of clean, timed cuts for this client + service (includes today). Advisory only — never auto-applied.
+  const ceil5 = (m) => Math.max(5, Math.ceil(m / 5) * 5);
+  const cleanCuts = appts
+    .filter((a) => a.clientId === appt.clientId && a.serviceId === appt.serviceId && a.serviceStartedAt && a.serviceEndedAt)
+    .map((a) => ({ end: a.serviceEndedAt, min: Math.round((a.serviceEndedAt - a.serviceStartedAt) / 60000) }))
+    .filter((x) => x.min > 0 && x.min <= 180)
+    .sort((a, b) => b.end - a.end)
+    .slice(0, 5);
+  const avgMin = cleanCuts.length ? Math.round(cleanCuts.reduce((s, x) => s + x.min, 0) / cleanCuts.length) : null;
+  const suggestMin = avgMin != null ? ceil5(avgMin) : null;
+  const showAvg = cleanCuts.length >= 3;
   const fmtClockTs = (ts) => new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
   // Live clock for the in-service timer.
@@ -13948,13 +13959,21 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                         </div>
                         <div style={{ fontSize: 12.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Booked at {service.duration} min. This sets {(client.name || "their").split(" ")[0]}'s time so future bookings get the right amount of chair.</div>
                         {timedMin != null && (
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12, padding: "11px 13px", borderRadius: 11, background: `color-mix(in srgb, #E5AC34 12%, ${T.panel})`, border: "1px solid color-mix(in srgb, #E5AC34 32%, transparent)" }}>
+                          <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 11, background: `color-mix(in srgb, #E5AC34 12%, ${T.panel})`, border: "1px solid color-mix(in srgb, #E5AC34 32%, transparent)" }}>
                             <div style={{ fontSize: 13.5, color: T.text, lineHeight: 1.4 }}>
                               <Clock size={13} style={{ color: "#CF971F", verticalAlign: "-2px", marginRight: 6 }} />
                               This visit ran <strong>{timedMin} min</strong><span style={{ color: T.faint }}> · in {fmtClockTs(appt.serviceStartedAt)} → out {fmtClockTs(appt.serviceEndedAt)}</span>
                             </div>
-                            {timedApply !== wuDur && (
-                              <button onClick={() => setWuDur(timedApply)} style={{ flexShrink: 0, background: "linear-gradient(155deg,#F4C84F,#CF971F)", color: "#33260A", border: "none", borderRadius: 9, padding: "8px 12px", fontSize: 12.5, fontWeight: 700, letterSpacing: 0.3, whiteSpace: "nowrap" }}>Use {timedApply}</button>
+                            {showAvg && (
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 11, paddingTop: 11, borderTop: "1px solid color-mix(in srgb, #E5AC34 28%, transparent)" }}>
+                                <div style={{ fontSize: 13.5, color: T.text, lineHeight: 1.45 }}>
+                                  <strong>{(client.name || "They").split(" ")[0]} averages {avgMin} min</strong> → suggests {suggestMin}
+                                  <span style={{ display: "block", fontSize: 12, color: T.faint, marginTop: 2 }}>across their last {cleanCuts.length} timed visits · rounded up to the next 5</span>
+                                </div>
+                                {suggestMin !== wuDur && (
+                                  <button onClick={() => setWuDur(suggestMin)} style={{ flexShrink: 0, background: "linear-gradient(155deg,#F4C84F,#CF971F)", color: "#33260A", border: "none", borderRadius: 9, padding: "9px 13px", fontSize: 12.5, fontWeight: 700, letterSpacing: 0.3, whiteSpace: "nowrap" }}>Use {suggestMin}</button>
+                                )}
+                              </div>
                             )}
                           </div>
                         )}
