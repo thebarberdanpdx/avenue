@@ -13752,19 +13752,6 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 />
               )}
 
-              {/* FLEXIBILITY — barber can flag any upcoming appointment into the earlier-slot engine */}
-              {appt.status === "confirmed" && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15.5, fontWeight: 600, color: T.text }}>Notify if an earlier slot opens</div>
-                    <div style={{ fontSize: 13.5, color: T.sub, marginTop: 3, lineHeight: 1.4 }}>If a sooner spot frees up with {provider.name}, {((appt.name || "they").split(" ")[0])} gets first dibs.</div>
-                  </div>
-                  <button onClick={() => onUpdate(appt.id, { wantsEarlier: !appt.wantsEarlier })} aria-label={appt.wantsEarlier ? "On" : "Off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: appt.wantsEarlier ? T.accent : T.line, position: "relative", cursor: "pointer", transition: "background .2s" }}>
-                    <span style={{ position: "absolute", top: 3, left: appt.wantsEarlier ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
-                  </button>
-                </div>
-              )}
-
               {/* CHAIR-SIDE BRIEFING — full client story on check-in/in-service */}
               {(appt.status === "checked-in" || appt.status === "in-service") && client && (() => {
                 const g = (client.gallery || []);
@@ -13804,71 +13791,90 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 );
               })()}
 
-              {/* headline — what & when leads */}
-              <div style={{ padding: "20px 18px 16px" }}>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 24, lineHeight: 1.1, color: T.text }}>{service?.name || appt.title}</span>
-                  {canEditPrice ? (
-                    <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontFamily: "'Fraunces', serif", fontSize: 18, display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", flexShrink: 0 }}>${price}<Edit2 size={13} style={{ color: T.faint }} /></button>
-                  ) : (
-                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: T.text, flexShrink: 0 }}>${price}</span>
-                  )}
+              {/* On / At split */}
+              <div style={{ display: "flex", borderBottom: `1px solid ${T.line}` }}>
+                <div style={{ flex: 1, padding: "16px 18px" }}>
+                  <span style={{ fontStyle: "italic", color: T.faint, fontSize: 13, marginRight: 7 }}>On</span>
+                  <span style={{ fontSize: 16, fontWeight: 500, color: T.text }}>{apptDateLabel()}</span>
                 </div>
-                <div style={{ fontSize: 14, color: T.sub, marginTop: 5 }}>{apptDateLabel()} · {fmtTime(appt.start)} · {dur} min</div>
-                {appt.detail && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
-                    {appt.detail.split(",").map((d, i) => (
-                      <span key={i} style={{ background: T.chip, color: T.text, padding: "7px 13px", borderRadius: 8, fontSize: 13.5 }}>{d.trim()}</span>
-                    ))}
-                  </div>
-                )}
+                <div style={{ width: 1, background: T.line }} />
+                <div style={{ flex: 1, padding: "16px 18px" }}>
+                  <span style={{ fontStyle: "italic", color: T.faint, fontSize: 13, marginRight: 7 }}>At</span>
+                  <span style={{ fontSize: 16, fontWeight: 500, color: T.text }}>{fmtTime(appt.start)}</span>
+                </div>
               </div>
 
-              {/* client — secondary */}
-              <div style={{ padding: "14px 18px", borderTop: `1px solid ${T.line}` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {/* client */}
+              <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
                   {(() => {
                     const canOpen = client && onOpenClient;
                     const openProfile = () => { if (canOpen) { onClose(); onOpenClient(client); } };
                     return (
                       <>
-                        <button onClick={openProfile} disabled={!canOpen} style={{ width: 42, height: 42, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, flexShrink: 0, border: "none", padding: 0, cursor: canOpen ? "pointer" : "default" }}>{initials}</button>
+                        <button onClick={openProfile} disabled={!canOpen} style={{ width: 48, height: 48, borderRadius: "50%", background: client?.avatarColor || "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 600, flexShrink: 0, border: "none", padding: 0, cursor: canOpen ? "pointer" : "default" }}>{initials}</button>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <button onClick={openProfile} disabled={!canOpen} style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: canOpen ? "pointer" : "default", color: "inherit", display: "flex", alignItems: "center", gap: 5 }}>
-                            <span style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.1 }}>{appt.name}</span>
-                            {canOpen && <ChevronRight size={16} style={{ color: T.faint, flexShrink: 0 }} />}
+                            <span style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.1, color: T.text }}>{appt.name}</span>
+                            {canOpen && <ChevronRight size={17} style={{ color: T.faint, flexShrink: 0 }} />}
                           </button>
-                          <div style={{ fontSize: 12.5, color: T.sub, marginTop: 1 }}>{client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client"} · with {provider.name}</div>
+                          <div style={{ fontSize: 13, color: T.sub, marginTop: 2 }}>{client && client.since ? `Client since ${client.since}` : (client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client")}</div>
                         </div>
                       </>
                     );
                   })()}
-                  <button onClick={() => { const d = (client?.phone || appt.phone || "").replace(/\D/g, ""); if (d) { if (typeof window !== "undefined") window.location.href = `sms:${d}`; } else { showToast("No phone number on file."); } }} style={{ width: 40, height: 40, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><MessageSquare size={17} /></button>
+                  <button onClick={() => { const d = (client?.phone || appt.phone || "").replace(/\D/g, ""); if (d) { if (typeof window !== "undefined") window.location.href = `sms:${d}`; } else { showToast("No phone number on file."); } }} style={{ width: 42, height: 42, borderRadius: 11, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><MessageSquare size={17} /></button>
                 </div>
-                <div style={{ marginTop: 14, display: "grid", gap: 9 }}>
+                <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
                   <DetailRow T={T} label="Phone" value={client?.phone ? <PhoneLink number={client.phone} /> : "—"} accent />
                   <DetailRow T={T} label="Email" value={client?.email ? <EmailLink email={client.email} /> : "—"} />
-                  <DetailRow T={T} label="Card" value={
+                  <DetailRow T={T} label="Credit" value={
                     canEditPrice ? (
                       <button onClick={() => setCardOpen(true)} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: savedCard ? T.text : "var(--gold)", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500 }}>
-                        {savedCard ? `${savedCard.brand ? savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1) : "Card"} ···· ${savedCard.last4}` : "Add card on file"}
+                        {savedCard ? `${savedCard.brand ? savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1) : "Card"} ···· ${savedCard.last4}${savedCard.exp ? `  Exp: ${savedCard.exp}` : ""}` : "Add card on file"}
                         <Edit2 size={13} style={{ color: T.faint }} />
                       </button>
                     ) : (savedCard ? `${savedCard.brand || "Card"} ···· ${savedCard.last4}` : "No card on file")
-                  } icon={<CreditCard size={13} style={{ color: T.faint }} />} />
+                  } />
                 </div>
                 {client && client.notes && (
-                  <div style={{ marginTop: 14, background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 12, padding: "12px 14px", display: "flex", gap: 10 }}>
+                  <div style={{ marginTop: 16, background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 12, padding: "12px 14px", display: "flex", gap: 10 }}>
                     <AlertCircle size={15} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
                     <div style={{ fontSize: 14, color: T.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{client.notes}</div>
                   </div>
                 )}
               </div>
 
+              {/* service block */}
+              <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 13 }}>
+                  <span style={{ fontSize: 18, fontWeight: 600, color: T.text }}>{service?.name || appt.title}</span>
+                  {canEditPrice ? (
+                    <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontSize: 18, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", flexShrink: 0 }}>${price}<Edit2 size={13} style={{ color: T.faint }} /></button>
+                  ) : (
+                    <span style={{ fontSize: 18, fontWeight: 600, color: T.text, flexShrink: 0 }}>${price}</span>
+                  )}
+                </div>
+                {appt.detail && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 13 }}>
+                    {appt.detail.split(",").map((d, i) => (
+                      <span key={i} style={{ background: T.chip, color: T.text, padding: "7px 12px", borderRadius: 8, fontSize: 13.5 }}>{d.trim()}</span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ fontSize: 14, color: T.text, lineHeight: 1.8 }}>
+                  <span style={{ fontStyle: "italic", color: T.faint, marginRight: 6 }}>with</span><span style={{ fontWeight: 500 }}>{provider.name}</span>
+                  <span style={{ fontStyle: "italic", color: T.faint, margin: "0 6px 0 16px" }}>request:</span><span style={{ fontWeight: 500 }}>{appt.requestedProvider ? "this person ★" : "any"}</span>
+                  <br />
+                  <span style={{ fontStyle: "italic", color: T.faint, marginRight: 6 }}>at</span><span style={{ fontWeight: 500 }}>{fmtTime(appt.start)}</span>
+                  <span style={{ fontStyle: "italic", color: T.faint, margin: "0 6px 0 16px" }}>for</span><span style={{ fontWeight: 500 }}>{dur} minutes</span>
+                </div>
+              </div>
+
               {/* client-uploaded photos */}
               {appt.photos > 0 && (
-                <div style={{ padding: "14px 18px", borderTop: `1px solid ${T.line}` }}>
-                  <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>Client photos</div>
+                <div style={{ padding: "20px 18px", borderBottom: `1px solid ${T.line}` }}>
+                  <div style={{ fontSize: 15, color: T.sub, marginBottom: 12 }}>Client Photos</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     {Array.from({ length: Math.min(3, appt.photos) }).map((_, i) => (
                       <div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: T.chip, border: `1px solid ${T.line}` }}>
@@ -13876,7 +13882,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       </div>
                     ))}
                   </div>
-                  <p style={{ fontSize: 12.5, color: T.faint, marginTop: 8 }}>Uploaded by the client when booking.</p>
+                  <p style={{ fontSize: 14, color: T.faint, marginTop: 8 }}>Uploaded by the client when booking.</p>
                 </div>
               )}
 
@@ -13959,6 +13965,19 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14.5, color: T.text, marginBottom: 10 }}><Clock size={15} style={{ color: T.faint }} /> Booked Wed, May 20 at 9:02 AM</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14.5, color: T.text }}><User size={15} style={{ color: T.faint }} /> {fmtBookDate}</div>
               </div>
+
+              {/* FLEXIBILITY — earlier-slot opt-in, kept at the very bottom */}
+              {appt.status === "confirmed" && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", borderTop: `1px solid ${T.line}` }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>Notify if an earlier slot opens</div>
+                    <div style={{ fontSize: 13, color: T.sub, marginTop: 3, lineHeight: 1.4 }}>If a sooner spot frees up with {provider.name}, {((appt.name || "they").split(" ")[0])} gets first dibs.</div>
+                  </div>
+                  <button onClick={() => onUpdate(appt.id, { wantsEarlier: !appt.wantsEarlier })} aria-label={appt.wantsEarlier ? "On" : "Off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: appt.wantsEarlier ? T.accent : T.line, position: "relative", cursor: "pointer", transition: "background .2s" }}>
+                    <span style={{ position: "absolute", top: 3, left: appt.wantsEarlier ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* ••• action menu popover */}
@@ -14123,9 +14142,9 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
 
 function DetailRow({ T, label, value, accent, icon }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 15.5 }}>
-      <span style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 600, minWidth: 62 }}>{label}</span>
-      <span style={{ color: T.text, display: "flex", alignItems: "center", gap: 7, fontWeight: 500 }}>{icon}{value}</span>
+    <div style={{ display: "flex", alignItems: "baseline", gap: 14, fontSize: 16 }}>
+      <span style={{ fontStyle: "italic", color: T.faint, minWidth: 64, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: accent ? "var(--gold)" : T.text, display: "flex", alignItems: "center", gap: 7, fontWeight: 500 }}>{icon}{value}</span>
     </div>
   );
 }
