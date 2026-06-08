@@ -620,13 +620,21 @@ async function stripeApi(payload) {
 
 function PhoneLink({ number, style }) {
   const [open, setOpen] = useState(false);
+  const lp = useRef({ timer: null, fired: false, touch: false });
   if (!number) return null;
   const clean = String(number);
   const digits = clean.replace(/\D/g, "");
   const disp = fmtPhone(clean);
+  const start = () => { lp.current.touch = true; lp.current.fired = false; lp.current.timer = setTimeout(() => { lp.current.fired = true; setOpen(true); }, 450); };
+  const cancel = () => { if (lp.current.timer) { clearTimeout(lp.current.timer); lp.current.timer = null; } };
   return (
     <>
-      <button onClick={(e) => { e.stopPropagation(); setOpen(true); }} style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", ...style }}>{disp}</button>
+      <button
+        onTouchStart={(e) => { e.stopPropagation(); start(); }}
+        onTouchEnd={(e) => { e.stopPropagation(); cancel(); }}
+        onTouchMove={cancel}
+        onClick={(e) => { e.stopPropagation(); if (lp.current.touch) { lp.current.touch = false; return; } setOpen(true); }}
+        style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", ...style }}>{disp}</button>
       <Sheet open={open} onClose={() => setOpen(false)} align="bottom" maxWidth={420}>
         <div style={{ padding: "6px 4px 8px" }}>
           <div style={{ textAlign: "center", marginBottom: 18 }}>
@@ -646,11 +654,20 @@ function PhoneLink({ number, style }) {
   );
 }
 
-// Tap-to-email: simple mailto: anchor. Opens the user's default mail app.
+// Long-press (touch) or click (desktop) to open the device mail app, pre-addressed to the client.
 function EmailLink({ email, style }) {
+  const lp = useRef({ timer: null, touch: false });
   if (!email) return null;
+  const go = () => { if (typeof window !== "undefined") window.location.href = `mailto:${email}`; };
+  const start = () => { lp.current.touch = true; lp.current.timer = setTimeout(() => { go(); }, 450); };
+  const cancel = () => { if (lp.current.timer) { clearTimeout(lp.current.timer); lp.current.timer = null; } };
   return (
-    <a href={`mailto:${email}`} onClick={(e) => e.stopPropagation()} style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", ...style }}>{email}</a>
+    <button
+      onTouchStart={(e) => { e.stopPropagation(); start(); }}
+      onTouchEnd={(e) => { e.stopPropagation(); cancel(); }}
+      onTouchMove={cancel}
+      onClick={(e) => { e.stopPropagation(); if (lp.current.touch) { lp.current.touch = false; return; } go(); }}
+      style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 3, padding: 0, cursor: "pointer", font: "inherit", display: "inline", ...style }}>{email}</button>
   );
 }
 
@@ -6431,7 +6448,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} onOpenClient={(c) => { setPulseDetail(null); setActiveClient(c); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
@@ -11448,7 +11465,7 @@ function ColumnOrderEditor({ providers, setProviders }) {
     </div>
   );
 }
-function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me" }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient }) {
   const sizeId = business?.calendarRowSize || "L";
   // Visible calendar window — configurable in Calendar Settings; falls back to 7 AM–10 PM.
   const DAY_START = ((business?.calendar?.dayStartHr ?? 7)) * 60;
@@ -12425,6 +12442,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onCheckout={startCheckout}
           onUpdate={updateAppt}
           onDelete={deleteAppt}
+          onOpenClient={onOpenClient}
           showToast={showToast}
         />
       )}
@@ -13449,7 +13467,7 @@ function ProgressCard({ T, minutesLeft, minutesInto, dur, nextClient, nextIsWait
   );
 }
 
-function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, showToast }) {
+function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, onOpenClient, showToast }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
   const [checkinOpen, setCheckinOpen] = useState(false); // CHECK-IN pill dropdown (In Lobby / In Service)
@@ -13811,11 +13829,22 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               {/* client card */}
               <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ width: 54, height: 54, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, flexShrink: 0 }}>{initials}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.05, letterSpacing: -0.3 }}>{appt.name}</div>
-                    <div style={{ fontSize: 15, color: T.sub }}>{client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client"}</div>
-                  </div>
+                  {(() => {
+                    const canOpen = client && onOpenClient;
+                    const openProfile = () => { if (canOpen) { onClose(); onOpenClient(client); } };
+                    return (
+                      <>
+                        <button onClick={openProfile} disabled={!canOpen} style={{ width: 54, height: 54, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, flexShrink: 0, border: "none", padding: 0, cursor: canOpen ? "pointer" : "default" }}>{initials}</button>
+                        <div style={{ flex: 1 }}>
+                          <button onClick={openProfile} disabled={!canOpen} style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: canOpen ? "pointer" : "default", color: "inherit", display: "flex", alignItems: "center", gap: 7 }}>
+                            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.05, letterSpacing: -0.3 }}>{appt.name}</span>
+                            {canOpen && <ChevronRight size={20} style={{ color: T.faint, flexShrink: 0 }} />}
+                          </button>
+                          <div style={{ fontSize: 15, color: T.sub }}>{client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client"}</div>
+                        </div>
+                      </>
+                    );
+                  })()}
                   <button onClick={() => showToast("Opening message thread…")} style={{ width: 44, height: 44, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center" }}><MessageSquare size={18} /></button>
                 </div>
                 <div style={{ marginTop: 18, display: "grid", gap: 11 }}>
