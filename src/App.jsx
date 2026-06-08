@@ -1808,6 +1808,79 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
 }
 
 // ============================================================
+// SHARED BOOKING ENGINE — single source of truth for "which times to offer".
+// Used by the main booking flow, Gold Times rebook, reschedule, and group picker so
+// they can't drift. Returns [{ start, best }] where best = gap-closing (back-to-back) slot.
+//   timeMode: "smart" | "pack" | "grid" | "all"  (default smart)
+//   gold: when true, force pack flavor and mark gap-closing slots as best (Gold Times)
+// ============================================================
+function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], business = {}, gold = false }) {
+  if (!prov || prov.id === "anyone") prov = providers.find((p) => p.id === "dan") || providers[1] || providers[0];
+  if (!prov || !date || !durMin) return [];
+  const dow = date.getDay();
+  const h = prov.hours?.[dow];
+  if (!h || !h.on) return [];
+  const dayKey = (d) => d.toDateString();
+  const realCount = (filterFn) => (appts || []).filter((a) => a.status !== "cancelled" && a.status !== "block" && a.bookedFor && dayKey(new Date(a.bookedFor)) === dayKey(date) && filterFn(a)).length;
+  const provCap = Math.max(0, Number(prov.maxPerDay) || 0);
+  const shopCap = Math.max(0, Number(business?.booking?.dailyCap) || 0);
+  if (provCap > 0 && realCount((a) => a.providerId === prov.id) >= provCap) return [];
+  if (shopCap > 0 && realCount(() => true) >= shopCap) return [];
+  const busy = (appts || [])
+    .filter((a) => a.status !== "cancelled" && a.status !== "done" && a.providerId === prov.id && a.bookedFor && dayKey(new Date(a.bookedFor)) === dayKey(date))
+    .map((a) => { const s = a.start; const d = (a.end != null ? a.end - a.start : 30); return [s, s + (d > 0 ? d : 30)]; })
+    .sort((a, b) => a[0] - b[0]);
+  const isToday = date.toDateString() === new Date().toDateString();
+  const bk = business?.booking || {};
+  const leadMin = bk.leadTimeMin || 0;
+  const earliest = isToday ? (new Date().getHours() * 60 + new Date().getMinutes() + leadMin) : 0;
+  const bufBefore = Math.max(0, Number(bk.bufferBefore) || 0);
+  const bufAfter = Math.max(0, Number(bk.bufferAfter) || 0);
+  const overrunMin = Math.max(0, Number(prov.overrunMin) || 0);
+  const dayEnd = h.end + overrunMin;
+  const noClash = (t) => !busy.some(([bs, be]) => t < (be + bufAfter) && (t + durMin) > (bs - bufBefore));
+
+  const timeMode = gold ? "pack" : (bk.timeMode || (bk.avoidGaps === false ? "all" : "smart"));
+  const gridMin = Math.max(5, Number(bk.gridMin) || 30);
+  const candidates = new Set();
+
+  if (timeMode === "grid" || timeMode === "all") {
+    const step = timeMode === "grid" ? gridMin : 15;
+    const startT = timeMode === "grid" ? Math.ceil(h.start / step) * step : h.start;
+    for (let t = startT; t + durMin <= dayEnd; t += step) candidates.add(t);
+  } else {
+    // smart / pack — open runs between busy blocks, anchored flush to gaps.
+    const runs = [];
+    let cursor = h.start;
+    busy.forEach(([bs, be]) => { if (cursor < bs) runs.push([cursor, bs]); cursor = Math.max(cursor, be); });
+    if (cursor < dayEnd) runs.push([cursor, dayEnd]);
+    const earlyStart = bk.earlyStart !== false;
+    runs.forEach(([rs, re]) => {
+      const runLen = re - rs;
+      if (runLen < durMin) return;
+      const singleFit = runLen < durMin * 2;
+      candidates.add(rs);
+      const lastFit = re - durMin;
+      if (lastFit > rs && Math.abs(re - dayEnd) < 1 && !(earlyStart && singleFit)) candidates.add(lastFit);
+      // pack: also step flush through the run so back-to-back chains fill tight.
+      if (timeMode === "pack") { for (let t = rs; t + durMin <= re; t += durMin) candidates.add(t); }
+      else if (timeMode === "smart" && runLen >= durMin * 3) {
+        let mid = rs + Math.floor(runLen / 2); mid = Math.round(mid / 30) * 30;
+        if (mid >= rs && mid + durMin <= re && noClash(mid)) candidates.add(mid);
+      }
+    });
+  }
+
+  const out = [];
+  candidates.forEach((t) => {
+    if (t < earliest || t < h.start || t + durMin > dayEnd || !noClash(t)) return;
+    const best = busy.some(([bs, be]) => be === t || bs === t + durMin); // back-to-back = gap-closing
+    out.push({ start: t, best });
+  });
+  return out.sort((a, b) => a.start - b.start);
+}
+
+// ============================================================
 // CLIENT BOOKING FLOW
 // ============================================================
 function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit, onManage }) {
@@ -1970,97 +2043,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // ---------- REAL AVAILABILITY ENGINE ----------
   // For a barber on a given date, return free start-times that fit `durMin`,
   // based on their working hours minus appointments already booked that day.
-  const dayKey = (d) => d.toDateString();
-  const apptsOnDate = (provId, d) => (appts || []).filter((a) => {
-    if (a.status === "cancelled") return false;
-    if (a.providerId !== provId) return false;
-    const ad = a.bookedFor ? new Date(a.bookedFor) : null;
-    return ad && dayKey(ad) === dayKey(d);
-  }).map((a) => { const s = a.start; const dur = (a.end != null ? a.end - a.start : 30); return [s, s + (dur > 0 ? dur : 30)]; });
-
-  const freeSlotsFor = (prov, d, durMin) => {
-    if (!prov || prov.id === "anyone") prov = providers.find((p) => p.id === "dan") || providers[1];
-    const dow = d.getDay();
-    const h = prov.hours?.[dow];
-    if (!h || !h.on) return [];
-    // Daily caps (online clients are hard-blocked once a day is full; the barber can still override in-app).
-    const realCount = (filterFn) => (appts || []).filter((a) => a.status !== "cancelled" && a.status !== "block" && a.bookedFor && dayKey(new Date(a.bookedFor)) === dayKey(d) && filterFn(a)).length;
-    const provCap = Math.max(0, Number(prov.maxPerDay) || 0);
-    const shopCap = Math.max(0, Number(business?.booking?.dailyCap) || 0);
-    if (provCap > 0 && realCount((a) => a.providerId === prov.id) >= provCap) return [];
-    if (shopCap > 0 && realCount(() => true) >= shopCap) return [];
-    const busy = apptsOnDate(prov.id, d).slice().sort((a, b) => a[0] - b[0]); // [[start,end], ...] sorted
-    const isToday = d.toDateString() === new Date().toDateString();
-    const bk = business?.booking || {};
-    const leadMin = bk.leadTimeMin || 0;
-    const earliest = isToday ? (new Date().getHours() * 60 + new Date().getMinutes() + leadMin) : 0;
-
-    // Buffers: padding held open around each appointment (setup before / cleanup after).
-    const bufBefore = Math.max(0, Number(bk.bufferBefore) || 0);
-    const bufAfter = Math.max(0, Number(bk.bufferAfter) || 0);
-
-    // ---- Booking-times engine: which times we offer ----
-    // Back-compat: an old shop with avoidGaps:false and no timeMode behaves like "all".
-    const timeMode = bk.timeMode || (bk.avoidGaps === false ? "all" : "smart");
-    const gridMin = Math.max(5, Number(bk.gridMin) || 30);
-    // Per-barber: allow ending after closing time (up to N minutes), only if it fits flush
-    const overrunMin = Math.max(0, Number(prov.overrunMin) || 0);
-    const dayEnd = h.end + overrunMin;
-
-    // Helper: a time t with duration durMin doesn't clash with any existing busy (accounting for buffers around the busy block).
-    const noClash = (t) => !busy.some(([bs, be]) => t < (be + bufAfter) && (t + durMin) > (bs - bufBefore));
-
-    let candidates = new Set();
-
-    if (timeMode === "grid" || timeMode === "all") {
-      // Grid: clean clock at gridMin steps. All: every 15 min (max choice).
-      const step = timeMode === "grid" ? gridMin : 15;
-      // align grid to the hour so times read clean (9:00, 9:30…)
-      const startT = timeMode === "grid" ? Math.ceil(h.start / step) * step : h.start;
-      for (let t = startT; t + durMin <= dayEnd; t += step) candidates.add(t);
-    } else {
-      // smart / pack — build open runs (continuous blocks between busy appts).
-      const runs = []; // each: [runStart, runEnd]
-      let cursor = h.start;
-      busy.forEach(([bs, be]) => {
-        if (cursor < bs) runs.push([cursor, bs]);
-        cursor = Math.max(cursor, be);
-      });
-      if (cursor < dayEnd) runs.push([cursor, dayEnd]);
-
-      // Earlier-start rule (default on): when a gap has room for only ONE appointment
-      // (less than two services fit), anchor that booking to the earliest fair time and don't
-      // also offer a later slot for the same gap. Gaps big enough for 2+ keep all 3 anchors.
-      const earlyStart = bk.earlyStart !== false;
-      runs.forEach(([rs, re]) => {
-        const runLen = re - rs;
-        if (runLen < durMin) return; // service doesn't fit at all
-        const singleFit = runLen < durMin * 2; // only one appointment fits in this gap
-        // Always anchor the first slot at the start of the run (flush with whatever came before)
-        candidates.add(rs);
-        // End-of-day run also offers the last possible slot — UNLESS the earlier-start rule
-        // applies to a single-fit gap, in which case we keep just the earliest.
-        const lastFit = re - durMin;
-        if (lastFit > rs && Math.abs(re - dayEnd) < 1 && !(earlyStart && singleFit)) candidates.add(lastFit);
-        // "smart" adds a clean middle anchor on long open runs; "pack" stays strictly flush.
-        if (timeMode === "smart" && runLen >= durMin * 3) {
-          let mid = rs + Math.floor(runLen / 2);
-          mid = Math.round(mid / 30) * 30;
-          if (mid >= rs && mid + durMin <= re && noClash(mid)) candidates.add(mid);
-        }
-      });
-    }
-
-    const out = [];
-    candidates.forEach((t) => {
-      if (t < earliest) return;
-      if (t < h.start) return;
-      if (t + durMin > dayEnd) return;
-      if (!noClash(t)) return;
-      out.push(t);
-    });
-    return out.sort((a, b) => a - b);
-  };
+  const freeSlotsFor = (prov, d, durMin) =>
+    computeFreeSlots({ prov, date: d, durMin, providers, appts, business }).map((s) => s.start);
 
   // Multi-person: given a list of { prov, durMin }, find combined options.
   // Returns { sameTime: [startMin...], backToBack: [{ order:[{prov,start,dur}] }] }
@@ -4221,8 +4205,6 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
   const hoursUntil = (iso) => (new Date(iso) - new Date()) / 36e5;
   const canChange = (iso) => hoursUntil(iso) >= windowHrs;
 
-  const slots = useMemo(() => { const out = []; for (let t = 9 * 60; t + 45 <= 17 * 60; t += 45) out.push(t); return out; }, []);
-
   const doReschedule = (a) => {
     if (newDate == null || newSlot == null) return;
     const when = new Date(newDate); when.setHours(Math.floor(newSlot / 60), newSlot % 60, 0, 0);
@@ -4285,9 +4267,17 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
                   </div>
                   {newDate && (<>
                     <div style={{ fontSize: 15, color: "var(--faint)", letterSpacing: 1, marginBottom: 8 }}>Pick a time</div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-                      {slots.map((t) => { const on = newSlot === t; return (<button key={t} onClick={() => setNewSlot(t)} style={{ padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", fontSize: 15 }}>{fmtTime(t)}</button>); })}
-                    </div>
+                    {(() => {
+                      const prov = providers.find((p) => p.id === a.providerId);
+                      const dur = (a.end != null && a.start != null && a.end > a.start) ? (a.end - a.start) : ((services.find((s) => s.id === a.serviceId) || {}).duration || 45);
+                      const reSlots = prov ? computeFreeSlots({ prov, date: newDate, durMin: dur, providers, appts, business }) : [];
+                      if (!reSlots.length) return <div style={{ fontSize: 14, color: "var(--sub)", marginBottom: 16 }}>No open times that day — try another.</div>;
+                      return (
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                          {reSlots.map(({ start: t }) => { const on = newSlot === t; return (<button key={t} onClick={() => setNewSlot(t)} style={{ padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", fontSize: 15 }}>{fmtTime(t)}</button>); })}
+                        </div>
+                      );
+                    })()}
                   </>)}
                   {a.rebookDiscount > 0 && (
                     <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 10, padding: "11px 13px", marginBottom: 14 }}>
@@ -12556,19 +12546,8 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
     const dow = targetDate.getDay();
     const h = (provider.hours && provider.hours[dow]) || { on: true, start: 9 * 60, end: 19 * 60 };
     if (!h.on) return { off: true, slots: [] };
-    const dayAppts = (appts || [])
-      .filter((a) => a.providerId === provider.id && sameDayLocal(a.bookedFor, targetDate) && a.status !== "cancelled" && a.status !== "done")
-      .map((a) => ({ start: a.start, end: a.end }))
-      .sort((a, b) => a.start - b.start);
-    const out = [];
-    for (let t = h.start; t + apptDur <= h.end; t += 5) {
-      const end = t + apptDur;
-      const conflict = dayAppts.some((a) => t < a.end && end > a.start);
-      if (conflict) continue;
-      const backToBack = dayAppts.some((a) => a.end === t || a.start === end);
-      out.push({ start: t, best: backToBack });
-    }
-    return { off: false, slots: out };
+    const slots = computeFreeSlots({ prov: provider, date: targetDate, durMin: apptDur, providers: [provider], appts, business, gold: true });
+    return { off: false, slots };
   })();
   const hasBest = daySlots.slots.some((s) => s.best);
 
