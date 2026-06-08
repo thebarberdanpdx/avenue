@@ -10192,6 +10192,47 @@ function TestDataTool({ shopId, services, providers, appts, setAppts, clients, s
     } finally { setBusy(false); }
   }
 
+  // One-tap loader for Dan's real schedule today (transcribed from his calendar screenshots).
+  // Links each appointment to an existing client by name when possible (no duplicates), otherwise
+  // creates a light client record. These are REAL bookings (not tagged test) so they fully function.
+  // Stable ids make re-tapping idempotent — it overwrites the same rows instead of duplicating.
+  async function loadDanDay() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const dan = (providers || []).find((p) => p.id === "dan") || (providers || []).find((p) => /dan/i.test(p.name || "")) || (providers || []).filter((p) => p.id !== "anyone")[0];
+      if (!dan) { showToast("Couldn't find Dan as a barber — add him under Settings → Staff first."); setBusy(false); return; }
+      const svc = (services || []).find((s) => /hair/i.test(s.name || "")) || (services || []).find((s) => s && s.id != null) || { id: "svc_haircut", name: "Haircut", duration: 35, price: 35 };
+      const bf = new Date(); bf.setHours(0, 0, 0, 0); const bfISO = bf.toISOString();
+      const day = [
+        { n: "Tom Sabiel", t: "Rebooked Haircut", s: 540, e: 575 },
+        { n: "Greg Kuhns", t: "Haircut", s: 580, e: 615 },
+        { n: "Jake Hendrickson", t: "Haircut", s: 620, e: 655 },
+        { n: "Frank Mathis", t: "Haircut", s: 655, e: 720 },
+        { n: "Roger Delorenzo", t: "Rebooked Haircut", s: 720, e: 750 },
+        { n: "Rj Williams", t: "Haircut", s: 750, e: 785 },
+      ];
+      const nameOf = (c) => (c.name || `${c.firstName || ""} ${c.lastName || ""}`).trim().toLowerCase();
+      const newClients = [];
+      const apptRows = day.map((d, i) => {
+        const existing = (clients || []).find((c) => nameOf(c) === d.n.toLowerCase());
+        let cid;
+        if (existing) { cid = existing.id; }
+        else {
+          cid = `dan_day_c${i + 1}`;
+          const parts = d.n.split(" ");
+          newClients.push({ id: cid, name: d.n, firstName: parts[0] || d.n, lastName: parts.slice(1).join(" "), email: "", phone: "", provider: dan.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] });
+        }
+        return { id: `dan_day_${i + 1}`, providerId: dan.id, clientId: cid, serviceId: svc.id, start: d.s, end: d.e, status: "confirmed", name: d.n, title: d.t, price: svc.price != null ? svc.price : 0, phone: existing ? (existing.phone || "") : "", bookedFor: bfISO };
+      });
+      if (newClients.length) setClients((cur) => [...newClients, ...(cur || [])]);
+      setAppts((cur) => { const ids = new Set(apptRows.map((a) => a.id)); return [...(cur || []).filter((a) => !ids.has(a.id)), ...apptRows]; });
+      showToast(`Loaded Dan's day — ${apptRows.length} appointments for today.`);
+    } catch (e) {
+      showToast("Couldn't load the day: " + (e && e.message ? e.message : "unknown error"));
+    } finally { setBusy(false); }
+  }
+
   return (
     <div>
       <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, margin: "0 0 16px" }}>Fill your calendar with a week of fake clients and appointments so you can see and test a busy shop. Everything it creates is tagged and fully removable — it can never touch real bookings.</p>
@@ -10203,6 +10244,8 @@ function TestDataTool({ shopId, services, providers, appts, setAppts, clients, s
       )}
 
       <button className="lift" onClick={generate} disabled={busy} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: 16, fontSize: 13.5, letterSpacing: 1, fontWeight: 600, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, textTransform: "uppercase" }}>{busy ? "Working…" : "Generate a busy week"}</button>
+
+      <button className="lift" onClick={loadDanDay} disabled={busy} style={{ width: "100%", marginTop: 12, background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border2)", borderRadius: 12, padding: 14, fontSize: 13.5, letterSpacing: 0.3, fontWeight: 600, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>Load Dan's day (today)</button>
 
       {hasTest && (confirmWipe ? (
         <div style={{ marginTop: 14, padding: 14, border: "1px solid var(--border)", borderRadius: 12, background: "var(--panel)" }}>
