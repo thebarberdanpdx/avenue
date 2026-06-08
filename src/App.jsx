@@ -585,10 +585,11 @@ function Sheet({ open, onClose, children, align = "top", maxWidth = 520 }) {
 // Format a US phone for display: 5038402389 -> (503) 840-2389. Leaves non-standard numbers as-is.
 function fmtPhone(number) {
   if (!number) return "";
-  const d = String(number).replace(/\D/g, "");
+  let d = String(number).replace(/\D/g, "");
+  if (d.length === 11 && d[0] === "1") d = d.slice(1);     // drop US country code
+  if (d.length === 7) d = "503" + d;                        // 7-digit → default to shop area code
   if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
-  if (d.length === 11 && d[0] === "1") return `(${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7)}`;
-  return String(number);
+  return String(number);                                    // malformed → show as-is, never mangle
 }
 // ---- Stripe (client side) ----
 // The publishable key is meant to be public and safe to ship in the app bundle.
@@ -10126,7 +10127,7 @@ function TestDataTool({ shopId, services, providers, appts, setAppts, clients, s
       const newClients = [];
       for (let i = 0; i < 12; i++) {
         const f = pick(FIRST), l = pick(LAST);
-        newClients.push({ id: `test_c_${stamp}_${i}`, name: `${f} ${l}.`, firstName: f, lastName: l, email: "", phone: `555-01${String(10 + i).slice(-2)}`, provider: realProviders[i % realProviders.length].id, visits: Math.floor(Math.random() * 8), lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], _test: true });
+        newClients.push({ id: `test_c_${stamp}_${i}`, name: `${f} ${l}.`, firstName: f, lastName: l, email: "", phone: `503-555-01${String(10 + i).slice(-2)}`, provider: realProviders[i % realProviders.length].id, visits: Math.floor(Math.random() * 8), lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], _test: true });
       }
 
       const newAppts = [];
@@ -10309,7 +10310,6 @@ function MergeDuplicatesTool({ shopId, clients, setClients, appts, setAppts, sho
     const photos = g.list.reduce((s, c) => s + ((c.gallery || []).length), 0);
     return `${g.list.length} records → ${visits} visit${visits === 1 ? "" : "s"}${photos ? `, ${photos} photo${photos === 1 ? "" : "s"}` : ""}`;
   };
-  const fmtPhone = (p) => { const d = digits(p); return d.length === 10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : p; };
 
   return (
     <div>
@@ -13804,43 +13804,51 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 );
               })()}
 
-              {/* date + time — the ticket header */}
-              <div style={{ padding: "24px 18px 22px", borderBottom: `1px solid ${T.line}`, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
-                <div>
-                  <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 7 }}>Appointment</div>
-                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, lineHeight: 1.05, color: T.text }}>{apptDateLabel()}</div>
+              {/* headline — what & when leads */}
+              <div style={{ padding: "20px 18px 16px" }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 24, lineHeight: 1.1, color: T.text }}>{service?.name || appt.title}</span>
+                  {canEditPrice ? (
+                    <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontFamily: "'Fraunces', serif", fontSize: 18, display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", flexShrink: 0 }}>${price}<Edit2 size={13} style={{ color: T.faint }} /></button>
+                  ) : (
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: T.text, flexShrink: 0 }}>${price}</span>
+                  )}
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 7 }}>Time</div>
-                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, lineHeight: 1.05, color: T.text }}>{fmtTime(appt.start)}</div>
-                </div>
+                <div style={{ fontSize: 14, color: T.sub, marginTop: 5 }}>{apptDateLabel()} · {fmtTime(appt.start)} · {dur} min</div>
+                {appt.detail && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
+                    {appt.detail.split(",").map((d, i) => (
+                      <span key={i} style={{ background: T.chip, color: T.text, padding: "7px 13px", borderRadius: 8, fontSize: 13.5 }}>{d.trim()}</span>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* client card */}
-              <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              {/* client — secondary */}
+              <div style={{ padding: "14px 18px", borderTop: `1px solid ${T.line}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {(() => {
                     const canOpen = client && onOpenClient;
                     const openProfile = () => { if (canOpen) { onClose(); onOpenClient(client); } };
                     return (
                       <>
-                        <button onClick={openProfile} disabled={!canOpen} style={{ width: 54, height: 54, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, flexShrink: 0, border: "none", padding: 0, cursor: canOpen ? "pointer" : "default" }}>{initials}</button>
-                        <div style={{ flex: 1 }}>
-                          <button onClick={openProfile} disabled={!canOpen} style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: canOpen ? "pointer" : "default", color: "inherit", display: "flex", alignItems: "center", gap: 7 }}>
-                            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.05, letterSpacing: -0.3 }}>{appt.name}</span>
-                            {canOpen && <ChevronRight size={20} style={{ color: T.faint, flexShrink: 0 }} />}
+                        <button onClick={openProfile} disabled={!canOpen} style={{ width: 42, height: 42, borderRadius: "50%", background: "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, flexShrink: 0, border: "none", padding: 0, cursor: canOpen ? "pointer" : "default" }}>{initials}</button>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <button onClick={openProfile} disabled={!canOpen} style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: canOpen ? "pointer" : "default", color: "inherit", display: "flex", alignItems: "center", gap: 5 }}>
+                            <span style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.1 }}>{appt.name}</span>
+                            {canOpen && <ChevronRight size={16} style={{ color: T.faint, flexShrink: 0 }} />}
                           </button>
-                          <div style={{ fontSize: 15, color: T.sub }}>{client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client"}</div>
+                          <div style={{ fontSize: 12.5, color: T.sub, marginTop: 1 }}>{client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client"} · with {provider.name}</div>
                         </div>
                       </>
                     );
                   })()}
-                  <button onClick={() => showToast("Opening message thread…")} style={{ width: 44, height: 44, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center" }}><MessageSquare size={18} /></button>
+                  <button onClick={() => { const d = (client?.phone || appt.phone || "").replace(/\D/g, ""); if (d) { if (typeof window !== "undefined") window.location.href = `sms:${d}`; } else { showToast("No phone number on file."); } }} style={{ width: 40, height: 40, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><MessageSquare size={17} /></button>
                 </div>
-                <div style={{ marginTop: 18, display: "grid", gap: 11 }}>
+                <div style={{ marginTop: 14, display: "grid", gap: 9 }}>
                   <DetailRow T={T} label="Phone" value={client?.phone ? <PhoneLink number={client.phone} /> : "—"} accent />
                   <DetailRow T={T} label="Email" value={client?.email ? <EmailLink email={client.email} /> : "—"} />
-                  <DetailRow T={T} label="Credit" value={
+                  <DetailRow T={T} label="Card" value={
                     canEditPrice ? (
                       <button onClick={() => setCardOpen(true)} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: savedCard ? T.text : "var(--gold)", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500 }}>
                         {savedCard ? `${savedCard.brand ? savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1) : "Card"} ···· ${savedCard.last4}` : "Add card on file"}
@@ -13849,44 +13857,18 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     ) : (savedCard ? `${savedCard.brand || "Card"} ···· ${savedCard.last4}` : "No card on file")
                   } icon={<CreditCard size={13} style={{ color: T.faint }} />} />
                 </div>
-                {/* client's standing note — after contact so the name → contact read isn't interrupted */}
                 {client && client.notes && (
-                  <div style={{ marginTop: 18, background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 14, padding: "13px 15px", display: "flex", gap: 11 }}>
-                    <AlertCircle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
-                    <div style={{ fontSize: 14.5, color: T.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{client.notes}</div>
+                  <div style={{ marginTop: 14, background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 12, padding: "12px 14px", display: "flex", gap: 10 }}>
+                    <AlertCircle size={15} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+                    <div style={{ fontSize: 14, color: T.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{client.notes}</div>
                   </div>
                 )}
-              </div>
-
-              {/* service block */}
-              <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
-                <div style={{ display: "flex", alignItems: "baseline", marginBottom: 14, paddingBottom: 16, borderBottom: `1px solid ${T.line}` }}>
-                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 24, color: T.text }}>{service?.name || appt.title}</span>
-                  <span style={{ flex: 1, margin: "0 12px", borderBottom: `2px dotted ${T.faint}`, transform: "translateY(-5px)" }} />
-                  {canEditPrice ? (
-                    <button onClick={openPriceEditor} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: T.text, fontFamily: "'Fraunces', serif", fontSize: 24, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }}>${price}<Edit2 size={14} style={{ color: T.faint }} /></button>
-                  ) : (
-                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 24, color: T.text }}>${price}</span>
-                  )}
-                </div>
-                {appt.detail && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-                    {appt.detail.split(",").map((d, i) => (
-                      <span key={i} style={{ background: T.chip, color: T.text, padding: "8px 14px", borderRadius: 8, fontSize: 15 }}>{d.trim()}</span>
-                    ))}
-                  </div>
-                )}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 22px", fontSize: 15 }}>
-                  <span><span style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginRight: 8 }}>With</span><span style={{ color: T.text, fontWeight: 600 }}>{provider.name}</span></span>
-                  <span><span style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginRight: 8 }}>At</span><span style={{ color: T.text, fontWeight: 600 }}>{fmtTime(appt.start)}</span></span>
-                  <span><span style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginRight: 8 }}>For</span><span style={{ color: T.text, fontWeight: 600 }}>{dur} min</span></span>
-                </div>
               </div>
 
               {/* client-uploaded photos */}
               {appt.photos > 0 && (
-                <div style={{ padding: "0 18px 20px" }}>
-                  <div style={{ fontSize: 15, color: T.sub, letterSpacing: 0.3, marginBottom: 12 }}>Client Photos</div>
+                <div style={{ padding: "14px 18px", borderTop: `1px solid ${T.line}` }}>
+                  <div style={{ fontSize: 13, color: T.sub, marginBottom: 10 }}>Client photos</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     {Array.from({ length: Math.min(3, appt.photos) }).map((_, i) => (
                       <div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: T.chip, border: `1px solid ${T.line}` }}>
@@ -13894,7 +13876,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       </div>
                     ))}
                   </div>
-                  <p style={{ fontSize: 14, color: T.faint, marginTop: 8 }}>Uploaded by the client when booking.</p>
+                  <p style={{ fontSize: 12.5, color: T.faint, marginTop: 8 }}>Uploaded by the client when booking.</p>
                 </div>
               )}
 
