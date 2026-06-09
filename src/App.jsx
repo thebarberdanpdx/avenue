@@ -10826,6 +10826,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     {
       id: "rebook_usual", title: "Book the Usual", icon: Repeat, category: "Online Booking",
       status: (form.bookUsual?.enabled === false) ? "Off" : "On",
+      toggle: { on: form.bookUsual?.enabled !== false, set: (v) => setForm({ ...form, bookUsual: { ...(form.bookUsual || {}), enabled: v } }) },
       keywords: "usual same as last time rebook repeat returning client one tap quick book",
       editor: <ToggleSetting label="Offer 'the usual' to returning clients" desc="When a returning client books, show their last service for one-tap rebooking before the full menu." on={form.bookUsual?.enabled !== false} onToggle={(v) => setForm({ ...form, bookUsual: { ...(form.bookUsual || {}), enabled: v } })} />,
     },
@@ -10879,6 +10880,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     {
       id: "showprices", title: "Show Prices While Booking", icon: DollarSign, category: "Online Booking",
       status: ((form.bookingStep || {}).showPrices === true) ? "On — clients see prices" : "Off — prices hidden",
+      toggle: { on: (form.bookingStep || {}).showPrices === true, set: (v) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), showPrices: v } }) },
       keywords: "price prices show display total cost amount add-on style money hide booking flow running total reveal",
       editor: <ToggleSetting label="Show prices while booking" desc="When on, clients see each style and add-on's price, plus a running total as they choose add-ons. When off, no prices appear during booking (today's default)." on={(form.bookingStep || {}).showPrices === true} onToggle={(v) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), showPrices: v } })} />,
     },
@@ -10933,7 +10935,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const CATS = [
     { id: "shop",  label: "Your Shop", icon: User,       desc: "Your name, hours, branding & logo", settings: ["business", "hours", "appearance", "theme", "locations", "phones"] },
     { id: "staff", label: "Staff",      icon: Users,      desc: "Add or edit staff — hours, access, pay & booking", settings: ["staff", "staffpin"] },
-    { id: "book",  label: "Online Booking", tag: "What clients see when booking", icon: Calendar, desc: "How clients book you online", settings: ["booking", "showprices", "avoidgaps", "newclient", "family", "refphotos", "waitlist", "rebook_usual"] },
+    { id: "book",  label: "Online Booking", tag: "What clients see when booking", icon: Calendar, desc: "What clients see and how they book you online", settings: ["avoidgaps", "anyonerouting", "showprices", "rebook_usual", "booking", "newclient", "staffselection", "family", "refphotos", "waitlist"], groups: [
+      { label: "How clients book", ids: ["avoidgaps", "anyonerouting", "showprices", "rebook_usual"] },
+      { label: "Who can book", ids: ["booking", "newclient", "staffselection", "family", "refphotos"] },
+      { label: "Filling openings", ids: ["waitlist"] },
+    ] },
     { id: "smart", label: "Smart Timing", smart: true, icon: Sparkles, desc: "The scheduling smarts that save you time", settings: ["autotiming", "overduebuffer", "runninglate"] },
     { id: "dayof", label: "Day-of Tools", icon: Clock,    desc: "Managing the day as it happens", settings: ["scheduling", "waitingroom", "photos"] },
     { id: "pay",   label: "Checkout & Money", icon: CreditCard, desc: "Tipping, payments, rebooking & no-show protection", settings: ["tipping", "checkout", "rebookco", "policy"] },
@@ -11023,20 +11029,32 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   }
 
   // One clean, roomy settings row — name + info-i, a one-line status, an arrow. No per-row icon clutter.
-  const SettingRow = ({ c, first }) => {
+  const SettingRow = ({ c, first, refreshed }) => {
     const explainText = c.explain || <>This is the “{c.title}” setting. Open it to adjust the options. If you're not sure, the defaults are sensible to leave as they are.</>;
+    const hasToggle = refreshed && !!c.toggle;
     return (
       <div style={{ position: "relative", background: "var(--panel)", borderTop: first ? "none" : "1px solid var(--line)" }}>
-        <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 12, padding: "18px 18px", textAlign: "left", cursor: "pointer" }}>
+        <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 11, padding: "17px 17px", textAlign: "left", cursor: "pointer" }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 16, fontWeight: 500 }}>{c.title}</span>
               {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
             </div>
-            {(c.subtitle || c.status) && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>}
+            {refreshed
+              ? (c.subtitle && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle}</div>)
+              : ((c.subtitle || c.status) && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>)}
           </div>
           <span onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, display: "flex", alignItems: "center" }}><Explain title={c.title}>{explainText}</Explain></span>
-          <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
+          {hasToggle ? (
+            <span onClick={(e) => { e.stopPropagation(); c.toggle.set(!c.toggle.on); }} role="switch" aria-checked={c.toggle.on} aria-label={c.title} style={{ width: 46, height: 28, borderRadius: 28, flexShrink: 0, background: c.toggle.on ? "var(--teal)" : "var(--border2)", position: "relative", transition: "background .2s", cursor: "pointer" }}>
+              <span style={{ position: "absolute", top: 3, left: c.toggle.on ? 21 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
+            </span>
+          ) : (
+            <>
+              {refreshed && c.status && <span style={{ fontSize: 14.5, color: "var(--gold)", fontWeight: 500, textAlign: "right", flexShrink: 0, maxWidth: "44%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</span>}
+              <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
+            </>
+          )}
         </button>
       </div>
     );
@@ -11127,9 +11145,24 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                 </div>
                 <p style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300, lineHeight: 1.45 }}>{cat.desc}</p>
               </div>
-              <div style={{ background: "var(--panel)", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}>
-                {catCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} />)}
-              </div>
+              {cat.groups ? (
+                cat.groups.map((g) => {
+                  const groupCards = g.ids.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
+                  if (!groupCards.length) return null;
+                  return (
+                    <div key={g.label} style={{ marginBottom: 22 }}>
+                      <div style={{ fontSize: 11, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 8px" }}>{g.label}</div>
+                      <div style={{ background: "var(--panel)", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}>
+                        {groupCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ background: "var(--panel)", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}>
+                  {catCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} />)}
+                </div>
+              )}
             </div>
           );
         })()
