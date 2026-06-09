@@ -87,7 +87,7 @@ const SERVICE_PALETTE = [
   { id: "turquoise", name: "Turquoise", hex: "#06B6D4" },
 ];
 const STATUS_COLORS = {
-  "checked-in": "#8B6FB0", // purple — client has arrived
+  "checked-in": "#8B5CF6", // vivid purple — client has self-checked-in / in the lobby
   "in-service": "#D98BA0", // reddish/pink — in the chair
   done: "var(--border2)",         // muted/greyed — finished, recedes
 };
@@ -164,7 +164,7 @@ const DEFAULT_BUSINESS = {
   waitingRoom: {
     selfCheckIn: false,        // (needs link/QR) clients can check themselves in
     autoReadyMessage: true,    // send a "we're ready for you" notice on Notify·Ready
-    readyMessage: "{provider} is ready for you and will meet you in front.",
+    readyMessage: "{provider} will meet you at the door.",
     showWaitingList: true,     // show a live "who's waiting" panel
     notifyOnArrival: true,     // ping the provider when a client checks in
   },
@@ -1323,6 +1323,7 @@ function App() {
         @keyframes screenIn { from { opacity: 0; transform: translateY(10px) scale(0.992);} to {opacity:1; transform:none;} }
         @keyframes pulse { 0% { transform: scale(0.92); opacity: 0.7; } 50% { transform: scale(1.06); opacity: 0.3; } 100% { transform: scale(0.92); opacity: 0.7; } }
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes lobbyStart { 0%,100% { box-shadow: 0 8px 20px -8px rgba(110,139,116,.5), 0 0 0 0 rgba(110,139,116,0); } 50% { box-shadow: 0 8px 20px -8px rgba(110,139,116,.6), 0 0 0 5px rgba(110,139,116,.18); } }
         @keyframes popIn { 0% { transform: scale(0); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
         @keyframes dropDown { from { opacity: 0; transform: translateY(-24px);} to {opacity:1; transform:none;} }
         .appt-drop { animation: dropDown .32s var(--ease) both; }
@@ -13191,7 +13192,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 // ============================================================
 const APPT_STATUSES = [
   { id: "confirmed", label: "Confirmed", dot: "#3FB8AF" },
-  { id: "checked-in", label: "Waiting", dot: "#A78BC8" },
+  { id: "checked-in", label: "In lobby", dot: "#8B5CF6" },
   { id: "in-service", label: "In Service", dot: "#E59BB3" },
   { id: "done", label: "Done", dot: "#6FAE72" },
   { id: "unconfirmed", label: "Unconfirmed", dot: "#E0A45E" },
@@ -14135,21 +14136,24 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
 }
 
 function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, title, nextClient, nextIsWaiting, startedLate, startedLateBy, fmtTime, lateNotified, onLetThemKnow }) {
-  const CUT = "#7CA084";   // cool sage signature for the in-chair spotlight — reads well on dark in any theme
-  const OVER = "#D89A4B";  // warm amber once the cut runs past its booked time
-  const C = 264;           // circumference for r=42
+  const CUT = "#7CA084";    // calm sage — comfortably on time
+  const WARN = "#D89A4B";   // amber — 10 min or less left
+  const URGENT = "#C8702E"; // burnt amber — 5 min or less, or over (warm, never red)
+  const C = 264;            // circumference for r=42
   const totalSec = secondsInto != null ? secondsInto : (minutesInto || 0) * 60;
   const mm = Math.floor(totalSec / 60), ss = totalSec % 60;
   const over = minutesLeft < 0;
+  const min10 = minutesLeft <= 10;
+  const min5 = minutesLeft <= 5;
+  const stage = min5 ? URGENT : (min10 ? WARN : CUT);
   const pct = Math.min(100, Math.max(0, dur > 0 ? (totalSec / (dur * 60)) * 100 : 0));
-  const ringColor = over ? OVER : CUT;
-  const behind10 = minutesLeft <= 10;
-  const tagColor = (behind10 || over) ? OVER : CUT;
-  const tagLabel = behind10 ? "Wrapping up" : "Cutting";
+  const ringColor = stage;
+  const tagColor = stage;
+  const tagLabel = min10 ? "Wrapping up" : "Cutting";
   const leftBig = minutesLeft > 0 ? `${minutesLeft}` : (minutesLeft === 0 ? "0" : `+${Math.abs(minutesLeft)}`);
   const leftLab = minutesLeft >= 0 ? "min left" : "min over";
   const pillBg = minutesLeft <= 5 ? "#D89A2E" : "#E8B04B";
-  const showLatePrompt = (behind10 || startedLate) && nextClient;
+  const showLatePrompt = (min10 || startedLate) && nextClient;
   return (
     <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
       <div style={{ background: "radial-gradient(120% 120% at 50% 0%, #26241F 0%, #1A1916 62%)", border: "1px solid #34322C", borderRadius: 18, padding: 18, boxShadow: "0 14px 36px rgba(18,14,8,.34)", color: "#F4EFE4" }}>
@@ -14177,7 +14181,7 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
           <div style={{ flex: 1, minWidth: 0 }}>
             {title && <div style={{ fontSize: 16, fontWeight: 600, color: "#F4EFE4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>}
             <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginTop: 10 }}>
-              <span style={{ fontSize: 21, fontWeight: 600, color: over ? OVER : "#F4EFE4", fontVariantNumeric: "tabular-nums" }}>{leftBig}</span>
+              <span style={{ fontSize: 21, fontWeight: 600, color: min10 ? stage : "#F4EFE4", fontVariantNumeric: "tabular-nums" }}>{leftBig}</span>
               <span style={{ fontSize: 13, color: "rgba(244,239,228,.55)" }}>{leftLab}</span>
             </div>
             <div style={{ fontSize: 13, color: "rgba(244,239,228,.5)", marginTop: 3 }}>{dur} min booked</div>
@@ -14499,9 +14503,9 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               {/* status + check-in */}
               <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 9, background: T.chip, border: `1px solid ${T.line}`, padding: "8px 14px", borderRadius: 30 }}>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 9, background: appt.status === "checked-in" ? `color-mix(in srgb, ${status.dot} 11%, var(--panel))` : T.chip, border: `1px solid ${appt.status === "checked-in" ? `color-mix(in srgb, ${status.dot} 32%, ${T.line})` : T.line}`, padding: "8px 14px", borderRadius: 30 }}>
                     <span style={{ width: 11, height: 11, borderRadius: "50%", background: status.dot }} />
-                    <span style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: 0.2 }}>{status.label}</span>
+                    <span style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: 0.2, color: appt.status === "checked-in" ? status.dot : T.text }}>{status.label}</span>
                   </div>
                   {appt.status === "confirmed" && (
                     <div style={{ position: "relative" }}>
@@ -14521,9 +14525,12 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       )}
                     </div>
                   )}
-                  {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} is ready for you and will meet you in front."; const msg = wr.autoReadyMessage === false ? `${appt.name} marked in service.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`; onSetStatus(appt.id, "in-service", msg); }} style={{ background: "var(--gold)", border: "none", color: "var(--on-gold)", padding: "11px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700, boxShadow: "var(--shadow)" }}>NOTIFY · READY</button>}
+                  {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} will meet you at the door."; showToast(wr.autoReadyMessage === false ? `${appt.name} notified.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`); }} style={{ background: STATUS_COLORS["checked-in"], border: "none", color: "#fff", padding: "11px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700, boxShadow: "0 6px 16px -8px rgba(124,58,237,.55)" }}>NOTIFY CLIENT</button>}
                   {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ background: "var(--gold)", border: "none", color: "var(--on-gold)", padding: "11px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700, boxShadow: "var(--shadow)" }}>CHECKOUT</button>}
                 </div>
+                {appt.status === "checked-in" && (
+                  <button onClick={() => onSetStatus(appt.id, "in-service", `${appt.name} is in the chair.`)} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", border: "none", background: "#6E8B74", color: "#fff", fontWeight: 700, fontSize: 15, padding: "15px", borderRadius: 14, marginTop: 16, cursor: "pointer", animation: "lobbyStart 2.4s ease-in-out infinite" }}>Start service</button>
+                )}
               </div>
 
               {/* PROGRESS CARD — live in-service timer; gated by Calendar Settings */}
