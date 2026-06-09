@@ -6621,16 +6621,18 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const SectionHeader = ({ title }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
       <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, fontSize: 16 }}><ChevronLeft size={20} /></button>
-      <div><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{form.name || "SERVICE"}</div><h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{title}</h2></div>
+      <div><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{form.name || "SERVICE"}</div><h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{title}</h2></div>
     </div>
   );
   const SaveBar = () => (
     <button className="lift" onClick={save} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 13, boxShadow: "var(--shadow-md)", marginTop: 26 }}>SAVE SERVICE</button>
   );
-  const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", transition: "background .2s", flexShrink: 0, border: "none", cursor: "pointer" }}>
-      <span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
-    </button>
+  // Toggle now uses the global <Toggle> (50×29) — local duplicate removed for consistency.
+
+  // Shared field label (sentence-case) + clean numeric input, replacing the old ALL-CAPS eyebrows
+  // and the bare gold inline inputs. Money stays free-typed (odd dollar amounts); 5-min times too.
+  const FieldLabel = ({ children }) => (
+    <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>{children}</div>
   );
 
   // ---- CUT TYPES section ----
@@ -6671,31 +6673,31 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
                 <div style={{ display: "flex", gap: 12 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13.5, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>PRICE ($)</div>
-                    <input type="number" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setStyle(entry, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="35" style={{ ...inputStyle, fontSize: 17, padding: "14px 16px" }} />
+                    <FieldLabel>Price ($)</FieldLabel>
+                    <input type="number" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setStyle(entry, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="35" style={{ ...inputStyle, fontSize: 16, padding: "14px 16px" }} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13.5, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>TIME (MIN)</div>
-                    <input type="number" value={ct.duration === undefined || ct.duration === null || ct.duration === "" ? "" : ct.duration} onChange={(e) => setStyle(entry, { duration: e.target.value === "" ? "" : Number(e.target.value) })} placeholder={String(form.duration || 45)} style={{ ...inputStyle, fontSize: 17, padding: "14px 16px" }} />
+                    <FieldLabel>Time (min)</FieldLabel>
+                    <input type="number" value={ct.duration === undefined || ct.duration === null || ct.duration === "" ? "" : ct.duration} onChange={(e) => setStyle(entry, { duration: e.target.value === "" ? "" : Number(e.target.value) })} placeholder={String(form.duration || 45)} style={{ ...inputStyle, fontSize: 16, padding: "14px 16px" }} />
                   </div>
                 </div>
-                <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Leave time blank to use this service's default ({form.duration || 45} min).</div>
+                <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.4 }}>Leave time blank to use this service's default ({form.duration || 45} min).</div>
                 <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 14 }}>
-                  <div style={{ fontSize: 13.5, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>NAME</div>
+                  <FieldLabel>Name</FieldLabel>
                   <input value={entry.label || ""} onChange={(e) => setLibField(entry, { label: e.target.value })} placeholder="e.g. Skin Fade" style={{ ...inputStyle, fontSize: 16, padding: "13px 16px", marginBottom: 14 }} />
-                  <div style={{ fontSize: 13.5, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>DESCRIPTION</div>
+                  <FieldLabel>Description</FieldLabel>
                   <textarea value={entry.desc || ""} onChange={(e) => setLibField(entry, { desc: e.target.value })} placeholder="Shown to clients under the name" rows={4} style={{ ...inputStyle, fontSize: 15, padding: "12px 16px", resize: "vertical", minHeight: 92, lineHeight: 1.5, marginBottom: 14 }} />
-                  <div style={{ fontSize: 13.5, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>CALENDAR COLOR</div>
+                  <FieldLabel>Calendar color</FieldLabel>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <button onClick={() => setLibField(entry, { color: null })} title="No color — use the service's color" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--panel2)", border: !entry.color ? "2px solid var(--text)" : "2px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!entry.color && <Check size={14} style={{ color: "var(--text)" }} />}</button>
                     {SERVICE_PALETTE.map((c) => { const on = entry.color === c.id; return (
                       <button key={c.id} onClick={() => setLibField(entry, { color: c.id })} title={c.name} style={{ width: 32, height: 32, borderRadius: "50%", background: c.hex, border: on ? "2px solid var(--text)" : "2px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={14} style={{ color: "var(--on-gold)" }} />}</button>
                     ); })}
                   </div>
-                  <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.45 }}>This cut's color wins over the service color on the calendar. Leave the dashed chip selected to use the service color instead. Name, description &amp; color are shared — editing here updates this style on every service.</p>
+                  <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.45 }}>This cut's color wins over the service color on the calendar. Leave the dashed chip selected to use the service color instead. Name, description &amp; color are shared — editing here updates this style on every service.</p>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 14 }}>
-                  <span style={{ fontSize: 15 }}>Mark as most common<span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Shows a "Most common" badge to clients</span></span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, borderTop: "1px solid var(--line)", paddingTop: 16, marginTop: 14 }}>
+                  <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Mark as most common</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Shows a “Most common” badge to clients.</span></span>
                   <Toggle on={!!ct.popular} onClick={() => setStylePopular(entry)} />
                 </div>
               </div>
@@ -6713,20 +6715,20 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     <>
       <SectionHeader title="Details" />
       <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>SERVICE PHOTO</div>
+        <FieldLabel>Service photo</FieldLabel>
         <button onClick={() => setPicker({ target: "service" })} className="lift" style={{ width: "100%", height: 160, borderRadius: 14, border: "1px solid var(--border)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, padding: 0 }}>
           {form.photo ? <img src={imgUrl(form.photo, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={28} /><span style={{ fontSize: 15 }}>Choose photo (library or upload)</span></>}
         </button>
         {form.photo && <button onClick={() => setPicker({ target: "service" })} style={{ background: "none", color: "var(--gold)", fontSize: 15, marginTop: 8 }}>Change photo</button>}
       </div>
-      <div style={{ display: "grid", gap: 12, marginBottom: 18 }}>
-        <div><div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>NAME</div><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Signature Cut" style={inputStyle} /></div>
+      <div style={{ display: "grid", gap: 16, marginBottom: 18 }}>
+        <div><FieldLabel>Name</FieldLabel><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Signature Cut" style={inputStyle} /></div>
         <div style={{ display: "flex", gap: 12 }}>
-          <div style={{ flex: 1 }}><div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>PRICE ($)</div><input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="42" style={inputStyle} /></div>
-          <div style={{ flex: 1 }}><div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>DURATION (MIN)</div><input type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="45" style={inputStyle} /></div>
+          <div style={{ flex: 1 }}><FieldLabel>Price ($)</FieldLabel><input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="42" style={inputStyle} /></div>
+          <div style={{ flex: 1 }}><FieldLabel>Duration (min)</FieldLabel><input type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="45" style={inputStyle} /></div>
         </div>
         <div>
-          <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>CATEGORY</div>
+          <FieldLabel>Category</FieldLabel>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {cats.map((c) => { const on = (form.category || cats[0]) === c; return (
               <button key={c} onClick={() => setForm({ ...form, category: c })} style={{ background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: on ? "var(--gold)" : "var(--text)", padding: "8px 14px", borderRadius: 20, fontSize: 14, fontWeight: on ? 600 : 400 }}>{c}</button>
@@ -6734,26 +6736,25 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           </div>
         </div>
       </div>
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>CALENDAR COLOR</div>
+      <div style={{ marginBottom: 6 }}>
+        <FieldLabel>Calendar color</FieldLabel>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {SERVICE_PALETTE.map((c) => { const on = (form.color || "sage") === c.id; return (
             <button key={c.id} onClick={() => setForm({ ...form, color: c.id })} title={c.name} style={{ width: 34, height: 34, borderRadius: "50%", background: c.hex, border: on ? "2px solid var(--text)" : "2px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={15} style={{ color: "var(--on-gold)" }} />}</button>
           ); })}
         </div>
-        <p style={{ fontSize: 14, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Shows on the calendar before a client checks in. Once they're checked in or in service, the block switches to the status color.</p>
+        <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 10, lineHeight: 1.5, fontWeight: 400 }}>Shows on the calendar before a client checks in. Once they're checked in or in service, the block switches to the status color.</p>
       </div>
       {(() => {
         const isCombo = !!form.isCombo || (form.comboOf || []).length > 0;
         return (
-          <div style={{ marginBottom: 22 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 15 }}>This is a combo<span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Bundles other services, at the price &amp; duration you set above</span></span>
+          <div>
+            <Row title="This is a combo" desc="Bundles other services, at the price & duration you set above.">
               <Toggle on={isCombo} onClick={() => setForm({ ...form, isCombo: !isCombo, comboOf: isCombo ? [] : (form.comboOf || []) })} />
-            </div>
+            </Row>
             {isCombo && (
               <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>INCLUDES</div>
+                <FieldLabel>Includes</FieldLabel>
                 <div style={{ display: "grid", gap: 8 }}>
                   {services.filter((s) => s.id !== editing && !((s.comboOf || []).length)).map((s) => {
                     const on = (form.comboOf || []).includes(s.id);
@@ -6779,49 +6780,51 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const staffSection = (
     <>
       <SectionHeader title="Staff" />
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Everyone offers this by default. Turn someone off if they don't, or set their own time and price. Blank means they use the service default ({form.duration || "—"} min · ${form.price || "—"}).</p>
-      <div style={{ display: "grid", gap: 12 }}>
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Everyone offers this by default. Turn someone off, or give them their own time and price. Blank = the service default ({form.duration || "—"} min · ${form.price || "—"}).</p>
+      <div style={{ display: "grid", gap: 14 }}>
         {staffList.map((p) => {
           const e = form.staff[p.id] || { on: true, duration: null, price: null };
           const on = e.on !== false;
+          const durSet = e.duration != null && e.duration !== "";
+          const priceSet = e.price != null && e.price !== "";
           return (
-            <div key={p.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, opacity: on ? 1 : 0.55 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: on ? 16 : 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ width: 30, height: 30, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 14 }}>{p.name.charAt(0)}</span>
-                  <span style={{ fontSize: 16, fontWeight: 600 }}>{p.name}</span>
+            <div key={p.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "2px 16px", boxShadow: "var(--shadow-sm)", opacity: on ? 1 : 0.6 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0", borderBottom: on ? "1px solid var(--line)" : "none" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                  <span style={{ width: 36, height: 36, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 16 }}>{p.name.charAt(0)}</span>
+                  <span style={{ fontSize: 16, fontWeight: 500 }}>{p.name}</span>
                 </div>
                 <Toggle on={on} onClick={() => setStaff(p.id, { on: !on })} />
               </div>
               {on && (
-                <div style={{ display: "grid", gap: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)" }}>
-                    <span style={{ fontSize: 15, color: "var(--text2)" }}>Duration</span>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
-                        <input type="number" value={e.duration ?? ""} onChange={(ev) => setStaff(p.id, { duration: ev.target.value })} placeholder={String(form.duration || "—")} style={{ width: 60, background: "transparent", border: "none", color: "var(--gold)", fontSize: 17, fontWeight: 700, textAlign: "right", fontFamily: FONT_BODY }} />
-                        <span style={{ fontSize: 15, color: "var(--gold)", fontWeight: 700 }}>min</span>
-                      </div>
-                      {e.duration != null && e.duration !== "" && <button onClick={() => setStaff(p.id, { duration: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5 }}>Reset to default</button>}
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: "1px solid var(--line)" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 15.5, fontWeight: 500 }}>Duration</div>
+                      {durSet && <button onClick={() => setStaff(p.id, { duration: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5, marginTop: 3, padding: 0 }}>Default · {form.duration || "—"} min · reset</button>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <input type="number" value={e.duration ?? ""} onChange={(ev) => setStaff(p.id, { duration: ev.target.value })} placeholder={String(form.duration || "—")} style={{ width: 66, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 10px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
+                      <span style={{ fontSize: 14, color: "var(--sub)" }}>min</span>
                     </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)" }}>
-                    <span style={{ fontSize: 15, color: "var(--text2)" }}>Price</span>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 2, justifyContent: "flex-end" }}>
-                        <span style={{ fontSize: 17, color: "var(--text)" }}>$</span>
-                        <input type="number" value={e.price ?? ""} onChange={(ev) => setStaff(p.id, { price: ev.target.value })} placeholder={String(form.price || "—")} style={{ width: 70, background: "transparent", border: "none", color: "var(--text)", fontSize: 17, textAlign: "right", fontFamily: FONT_BODY }} />
-                      </div>
-                      {e.price != null && e.price !== "" && <button onClick={() => setStaff(p.id, { price: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5 }}>Reset to default</button>}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 15.5, fontWeight: 500 }}>Price</div>
+                      {priceSet && <button onClick={() => setStaff(p.id, { price: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5, marginTop: 3, padding: 0 }}>Default · ${form.price || "—"} · reset</button>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <span style={{ fontSize: 15, color: "var(--sub)" }}>$</span>
+                      <input type="number" value={e.price ?? ""} onChange={(ev) => setStaff(p.id, { price: ev.target.value })} placeholder={String(form.price || "—")} style={{ width: 74, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 10px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
                     </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
           );
         })}
       </div>
-      <p style={{ fontSize: 14, color: "var(--faint)", marginTop: 16 }}>To add a service provider, go to Staff & Hours in Settings.</p>
+      <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 16, lineHeight: 1.5 }}>To add a barber, go to My team in Settings.</p>
       <SaveBar />
     </>
   );
@@ -6832,8 +6835,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const featureOnly = (i) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => ({ ...x, featured: idx === i ? !x.featured : false })) }));
   const customizationsSection = (
     <>
-      <SectionHeader title="Add-ons &amp; Customizations" />
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Extras a client can add when booking — like a hot towel, a facial, or a wash. Choose if each one adds to the price, adds time, or both.</p>
+      <SectionHeader title="Add-ons" />
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Extras a client can add when booking — a hot towel, a wash, a facial. Choose whether each one adds price, time, or both.</p>
       {form.addonGroups.map((g, i) => {
         if (g.type !== "addon") {
           // Yes/No choice — kept simple
@@ -6863,13 +6866,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <textarea value={it.desc || ""} onChange={(e) => setItem(i, { desc: e.target.value })} placeholder="Short description (optional) — shown to clients" rows={2} style={{ ...inputStyle, padding: "10px 12px", resize: "vertical", marginBottom: 14, lineHeight: 1.4 }} />
 
             {/* Adds to the price? */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid var(--line)" }}>
-              <span style={{ fontSize: 15, color: "var(--text2)" }}>Adds to the price</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+              <span style={{ fontSize: 15.5, fontWeight: 500 }}>Adds to the price</span>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 {addsPrice && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <span style={{ fontSize: 16, color: "var(--text)" }}>$</span>
-                    <input type="number" value={it.price ?? ""} onChange={(e) => setItem(i, { price: e.target.value })} placeholder="5" style={{ width: 56, background: "transparent", border: "none", color: "var(--text)", fontSize: 16, textAlign: "right", fontFamily: FONT_BODY }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                    <span style={{ fontSize: 15, color: "var(--sub)" }}>$</span>
+                    <input type="number" value={it.price ?? ""} onChange={(e) => setItem(i, { price: e.target.value })} placeholder="5" style={{ width: 60, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 10px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
                   </div>
                 )}
                 <Toggle on={addsPrice} onClick={() => setItem(i, { addsPrice: !addsPrice })} />
@@ -6877,13 +6880,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             </div>
 
             {/* Adds time? */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid var(--line)" }}>
-              <span style={{ fontSize: 15, color: "var(--text2)" }}>Adds time to the appointment</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+              <span style={{ fontSize: 15.5, fontWeight: 500 }}>Adds time</span>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 {addsTime && (
                   <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <input type="number" value={it.min ?? ""} onChange={(e) => setItem(i, { min: e.target.value })} placeholder="10" style={{ width: 46, background: "transparent", border: "none", color: "var(--gold)", fontSize: 16, fontWeight: 700, textAlign: "right", fontFamily: FONT_BODY }} />
-                    <span style={{ fontSize: 14, color: "var(--gold)", fontWeight: 700 }}>min</span>
+                    <input type="number" value={it.min ?? ""} onChange={(e) => setItem(i, { min: e.target.value })} placeholder="10" style={{ width: 56, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 10px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
+                    <span style={{ fontSize: 14, color: "var(--sub)" }}>min</span>
                   </div>
                 )}
                 <Toggle on={addsTime} onClick={() => setItem(i, { addsTime: !addsTime })} />
@@ -6891,8 +6894,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             </div>
 
             {/* Feature in the first-timer booking flow */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0 2px", borderTop: "1px solid var(--line)" }}>
-              <span style={{ fontSize: 15, color: "var(--text2)", display: "flex", flexDirection: "column" }}>Feature for new clients<span style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Show this one in the first-time booking flow</span></span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0" }}>
+              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Feature for new clients</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Show this one in the first-time booking flow.</span></span>
               <Toggle on={!!g.featured} onClick={() => featureOnly(i)} />
             </div>
           </div>
@@ -6909,52 +6912,56 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // ---- ONLINE BOOKING section ----
   const b = form.booking || defaultBooking();
   const bookingRow = (label, key, help) => (
-    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "16px 0", borderTop: "1px solid var(--line)", gap: 16 }}>
-      <div style={{ flex: 1 }}><div style={{ fontSize: 15.5, color: "var(--text)" }}>{label}</div>{help && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 3, lineHeight: 1.4 }}>{help}</div>}</div>
+    <Row title={label} desc={help}>
       <Toggle on={!!b[key]} onClick={() => setBooking({ [key]: !b[key] })} />
-    </div>
+    </Row>
   );
+  const bookingPreview = () => {
+    if (!b.available) return `${form.name || "This service"} is hidden from online booking — clients can't book it themselves.`;
+    const who = (b.whoCanBook === "returning") ? "Returning clients" : "Anyone";
+    let s = `${who} can book ${form.name || "this service"} online`;
+    if (form.price || form.duration) s += ` ($${form.price || "—"}, ${form.duration || "—"} min)`;
+    s += ".";
+    if (b.promptToCall) s += " New clients are asked to call instead.";
+    if (b.requireCard) s += " A card is held to reserve.";
+    if (b.requirePayment) s += " Full payment is taken at booking.";
+    return s;
+  };
   const bookingSection = (
     <>
-      <SectionHeader title="Online Booking" />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0 16px" }}>
-        <div><div style={{ fontSize: 15.5, color: "var(--text)" }}>Available in online booking</div><div style={{ fontSize: 13, color: "var(--faint)", marginTop: 3 }}>Clients can book this service themselves.</div></div>
-        <Toggle on={!!b.available} onClick={() => setBooking({ available: !b.available })} />
+      <SectionHeader title="Online booking" />
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "2px 16px", boxShadow: "var(--shadow-sm)" }}>
+        <Row title="Available in online booking" desc="Clients can book this service themselves.">
+          <Toggle on={!!b.available} onClick={() => setBooking({ available: !b.available })} />
+        </Row>
+        <div style={{ opacity: b.available ? 1 : 0.4, pointerEvents: b.available ? "auto" : "none" }}>
+          <Row stack title="Who can book it" desc="Limit complex work to clients you've seen before — new clients are asked to call.">
+            <Segmented inline options={[{ value: "all", label: "Everyone" }, { value: "returning", label: "Returning only" }]} value={b.whoCanBook || "all"} onChange={(v) => setBooking({ whoCanBook: v })} />
+          </Row>
+          {bookingRow("Custom price label", "customPrice", "Show a label like “from $42” instead of the exact price.")}
+          {bookingRow("Prompt to call", "promptToCall", "Ask clients to call instead of booking this online.")}
+          {bookingRow("Require home address", "requireAddress", "For in-home or mobile services.")}
+          {bookingRow("Require a card", "requireCard", "Hold a card on file to book — your no-show protection.")}
+          {bookingRow("Require payment at booking", "requirePayment", "Charge the full amount when booking online.")}
+        </div>
       </div>
 
-      {b.available && (
-        <div style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
-          <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4 }}>WHO CAN BOOK THIS ONLINE</div>
-          <div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 12, lineHeight: 1.5 }}>Limit a service to people who've been in before — handy for complex work you'd rather not give to a first-timer online.</div>
-          <div style={{ display: "grid", gap: 8 }}>
-            {[["all", "Everyone", "Any client can book this online"], ["returning", "Returning clients only", "New clients are asked to call instead"]].map(([val, lbl, desc]) => {
-              const on = (b.whoCanBook || "all") === val;
-              return (
-                <button key={val} onClick={() => setBooking({ whoCanBook: val })} style={{ width: "100%", textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "13px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
-                  <span><span style={{ fontSize: 15.5, fontWeight: 500, display: "block", color: "var(--text)" }}>{lbl}</span><span style={{ fontSize: 13, color: "var(--sub)" }}>{desc}</span></span>
-                  <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      <div style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
-        <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 6 }}>DIRECT LINK</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", borderRadius: 10, padding: "11px 13px" }}>
+      <div style={{ marginTop: 18 }}>
+        <FieldLabel>Direct link</FieldLabel>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 13px" }}>
           <span style={{ flex: 1, fontSize: 14, color: "var(--gold)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>booking.meridian.app/{(business.name || "studio").toLowerCase().replace(/\s+/g, "")}/{form.id}</span>
           <button onClick={() => showToast("Link copied.")} style={{ background: "none", color: "var(--sub)" }}><Copy size={16} /></button>
         </div>
       </div>
-      <div style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
-        <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 8 }}>DESCRIPTION</div>
+      <div style={{ marginTop: 16 }}>
+        <FieldLabel>Booking page description</FieldLabel>
         <textarea value={b.description} onChange={(e) => setBooking({ description: e.target.value })} rows={4} placeholder="Describe this service for clients booking online…" style={{ ...inputStyle, resize: "vertical", lineHeight: 1.55 }} />
       </div>
-      {bookingRow("Customize price display", "customPrice", "Show a custom label instead of the exact price (e.g. “from $42”).")}
-      {bookingRow("Show prompt-to-call", "promptToCall", "Ask clients to call instead of booking this online.")}
-      {bookingRow("Require home address", "requireAddress", "For in-home or mobile services.")}
-      {bookingRow("Require a credit card", "requireCard", "Hold a card on file to book.")}
-      {bookingRow("Require payment at booking", "requirePayment", "Charge the full amount when booking online.")}
+
+      <div style={{ marginTop: 18, background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 22%, transparent)", borderRadius: 14, padding: "14px 16px" }}>
+        <div style={{ fontSize: 10.5, letterSpacing: 1.4, color: "var(--gold)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>How this reads to clients</div>
+        <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.55 }}>{bookingPreview()}</div>
+      </div>
       <SaveBar />
     </>
   );
@@ -7119,12 +7126,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   })();
   const hubRows = [
     { id: "details", label: "Details", sub: `$${form.price || "—"} · ${form.duration || "—"} min` },
-    { id: "cuttypes", label: "Cut Types", sub: (form.cutTypes && form.cutTypes.length) ? `${form.cutTypes.length} option${form.cutTypes.length === 1 ? "" : "s"}` : "None" },
+    { id: "cuttypes", label: "Cut types", sub: (form.cutTypes && form.cutTypes.length) ? `${form.cutTypes.length} option${form.cutTypes.length === 1 ? "" : "s"}` : "None" },
     { id: "staff", label: "Staff", sub: `${staffList.filter((p) => form.staff[p.id]?.on !== false).length} of ${staffList.length} offering` },
-    { id: "customizations", label: "Add-ons & Customizations", sub: `${form.addonGroups.length} option group${form.addonGroups.length !== 1 ? "s" : ""}` },
-    { id: "refphotos", label: "Reference Photos for AI", sub: refPhotoCount === 0 ? "None yet" : `${refPhotoCount} photo${refPhotoCount === 1 ? "" : "s"}` },
-    { id: "booking", label: "Online Booking", sub: !b.available ? "Off" : ((b.whoCanBook === "returning") ? "Returning clients only" : "Available to everyone") },
-    { id: "timerules", label: "Hours & Pricing", sub: (form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Always available" },
+    { id: "customizations", label: "Add-ons", sub: `${form.addonGroups.length} group${form.addonGroups.length !== 1 ? "s" : ""}` },
+    { id: "refphotos", label: "Reference photos", sub: refPhotoCount === 0 ? "None yet" : `${refPhotoCount} photo${refPhotoCount === 1 ? "" : "s"}` },
+    { id: "booking", label: "Online booking", sub: !b.available ? "Off" : ((b.whoCanBook === "returning") ? "Returning only" : "Everyone") },
+    { id: "timerules", label: "Hours & pricing", sub: (form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Always available" },
   ];
 
   // Reorder hooks must be declared before any early return (Rules of Hooks).
@@ -7257,12 +7264,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 <button onClick={() => setEditing(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
                 <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>SERVICES</span>
               </div>
-              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.3, marginBottom: 22, paddingLeft: 26 }}>{form.name || (editing === "new" ? "New service" : "Service")}</h2>
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, letterSpacing: -0.3, marginBottom: 22 }}>{form.name || (editing === "new" ? "New service" : "Service")}</h2>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
                 {hubRows.map((r, i) => (
-                  <button key={r.id} onClick={() => setSection(r.id)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 18px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
-                    <div><div style={{ fontSize: 17 }}>{r.label}</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>{r.sub}</div></div>
-                    <ChevronRight size={20} style={{ color: "var(--faint)" }} />
+                  <button key={r.id} onClick={() => setSection(r.id)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "18px 17px", minHeight: 64, background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                    <span style={{ fontSize: 16.5, fontWeight: 500, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.label}</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, minWidth: 0 }}>
+                      <span style={{ fontSize: 15, color: "var(--gold)", fontWeight: 500, textAlign: "right", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.sub}</span>
+                      <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                    </span>
                   </button>
                 ))}
               </div>
