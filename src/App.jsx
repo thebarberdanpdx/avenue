@@ -12661,22 +12661,21 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
         />
       </Sheet>
       <RegisterView open={registerOpen} onClose={() => setRegisterOpen(false)} services={services} business={business} setBusiness={setBusiness} clients={clients} setClients={setClients} providers={providers} me={me} showToast={showToast} />
-      {/* Calendar header — date headline gets room to breathe, then a tidy action row that wraps instead of bunching. */}
-      <div style={{ marginTop: 12, marginBottom: 28 }}>
-        <div style={{ width: 28, height: 2, background: "var(--gold)", marginBottom: 22 }} />
-        <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, margin: "0 0 24px", textAlign: "left", color: "inherit", cursor: "pointer", display: "block", width: "auto" }}>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 12, fontWeight: 600 }}>{`${DAYS[selectedDate.getDay()]} · ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`.toUpperCase()}</div>
-          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1, margin: 0, display: "flex", alignItems: "center", gap: 12 }}>
+      {/* Calendar header — date headline + a clean action row. VISUAL ONLY; all handlers unchanged. */}
+      <div style={{ marginTop: 10, marginBottom: 20 }}>
+        <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, margin: "0 0 14px", textAlign: "left", color: "inherit", cursor: "pointer", display: "block", width: "auto" }}>
+          <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", marginBottom: 5, fontWeight: 600, textTransform: "uppercase" }}>{`${DAYS[selectedDate.getDay()]} · ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.5, lineHeight: 1, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
             <span>{relativeDate(selectedDate)}</span>
-            <ChevronDown size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+            <ChevronDown size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
           </h2>
         </button>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, rowGap: 10, alignItems: "center" }}>
-          <button className="lift" onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 16px", height: 40, borderRadius: 11, fontSize: 13, fontWeight: 600, fontFamily: "'Jost', sans-serif", letterSpacing: 1.2, display: "flex", alignItems: "center", gap: 7 }}><Plus size={15} strokeWidth={2.5} /> NEW</button>
-          <button className="lift" onClick={() => setRegisterOpen(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border2)", padding: "0 16px", height: 40, borderRadius: 11, fontSize: 13, fontWeight: 600, letterSpacing: 1.2, display: "flex", alignItems: "center", gap: 7 }}><DollarSign size={15} style={{ color: "var(--gold)" }} /> SALE</button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button className="lift" onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 18px", height: 42, borderRadius: 13, fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 7 }}><Plus size={16} strokeWidth={2.4} /> New</button>
+          <button className="lift" onClick={() => setRegisterOpen(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 16px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 6, boxShadow: "var(--shadow-sm)" }}><DollarSign size={15} style={{ color: "var(--gold)" }} /> Sale</button>
           <div style={{ flex: 1, minWidth: 8 }} />
-          <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 40, borderRadius: 11, fontSize: 13.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 7, position: "relative", letterSpacing: 0.3 }}><Clock size={14} style={{ color: "var(--gold)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
-          <button onClick={() => setShowCalendarOptions(true)} title="Calendar view" style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", width: 40, height: 40, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center" }}><Settings size={15} /></button>
+          <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 7, position: "relative", boxShadow: "var(--shadow-sm)" }}><Clock size={14} style={{ color: "var(--gold)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 18, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
+          <button onClick={() => setShowCalendarOptions(true)} title="Calendar view" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 42, height: 42, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow-sm)" }}><Settings size={16} /></button>
         </div>
       </div>
 
@@ -12688,7 +12687,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const isSelected = d.toDateString() === selectedDate.toDateString();
           const isToday = offset === 0;
           return (
-            <button key={offset} data-today={isToday ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: "start", textAlign: "center", padding: "12px 4px 14px", borderRadius: 14, background: isSelected ? "var(--text)" : "transparent", color: isSelected ? "var(--bg)" : "var(--sub)", border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
+            <button key={offset} data-today={isToday ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: "start", textAlign: "center", padding: "12px 4px 14px", borderRadius: 14, background: isSelected ? "var(--gold)" : "transparent", color: isSelected ? "var(--bg)" : "var(--sub)", border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.8 : 0.55 }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1 }}>{d.getDate()}</div>
               {!isSelected && isToday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "var(--gold)" }} />}
