@@ -10974,20 +10974,25 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   // ---- Category grid: concrete, plain-named buckets. Every setting lives in exactly one,
   // so nothing falls through to search-only. Tap a tile → that category's list. ----
   const CATS = [
-    { id: "shop",  label: "Your Shop", icon: User,       desc: "Your name, hours, branding & logo", settings: ["business", "hours", "appearance", "theme", "locations", "phones"] },
-    { id: "staff", label: "Staff",      icon: Users,      desc: "Add or edit staff — hours, access, pay & booking", settings: ["staff", "staffpin"] },
-    { id: "book",  label: "Online Booking", tag: "What clients see when booking", icon: Calendar, desc: "What clients see and how they book you online", settings: ["avoidgaps", "anyonerouting", "showprices", "rebook_usual", "booking", "newclient", "staffselection", "family", "refphotos", "waitlist"], groups: [
-      { label: "How clients book", ids: ["avoidgaps", "anyonerouting", "showprices", "rebook_usual"] },
-      { label: "Who can book", ids: ["booking", "newclient", "staffselection", "family", "refphotos"] },
-      { label: "Filling openings", ids: ["waitlist"] },
+    { id: "shop",  label: "My shop", icon: User, desc: "Name, hours, locations & look", settings: ["business", "hours", "locations", "phones", "appearance", "theme"] },
+    { id: "staff", label: "My team", icon: Users, desc: "Barbers — hours, access & pay", settings: ["staff", "staffpin"] },
+    { id: "menu",  label: "Services & menu", icon: Scissors, desc: "What you offer & pricing", settings: ["servicesmenu", "aicuthelper"] },
+    { id: "book",  label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "What clients see and how they book you online", settings: ["avoidgaps", "anyonerouting", "booking", "newclient", "showprices", "rebook_usual", "refphotos", "family"], groups: [
+      { label: "The times they see", ids: ["avoidgaps", "anyonerouting"] },
+      { label: "Your booking page", ids: ["booking", "newclient", "showprices", "rebook_usual", "refphotos", "family"] },
     ] },
-    { id: "smart", label: "Smart Timing", smart: true, icon: Sparkles, desc: "The scheduling smarts that save you time", settings: ["autotiming", "overduebuffer", "runninglate"] },
-    { id: "dayof", label: "Day-of Tools", icon: Clock,    desc: "Managing the day as it happens", settings: ["scheduling", "waitingroom", "photos"] },
-    { id: "pay",   label: "Checkout & Money", icon: CreditCard, desc: "Tipping, payments, rebooking & no-show protection", settings: ["tipping", "checkout", "rebookco", "policy"] },
-    { id: "msg",   label: "Messages clients get", icon: Bell, desc: "Every automatic text & email, in your words", settings: ["notifications", "messages"] },
-    { id: "menu",  label: "Services & Menu", icon: ImageIcon, desc: "Your services, add-ons, photos & pricing", settings: ["servicesmenu"] },
-    { id: "web",   label: "Your Website", icon: Globe, desc: "Your branded booking page & online presence", settings: ["website"] },
-    { id: "data",  label: "Reports & Insights", icon: BarChart3, desc: "Your numbers, AI tools & importing", settings: ["reports", "aicuthelper", "import", "testdata"] },
+    { id: "dayof", label: "My calendar & day", icon: Clock, desc: "Running the day & schedule rules", settings: ["scheduling", "calendarsettings", "waitlist", "photos", "waitingroom", "runninglate", "overduebuffer", "autotiming"], groups: [
+      { label: "Scheduling", ids: ["scheduling", "calendarsettings", "waitlist", "photos"] },
+      { label: "During the day", ids: ["waitingroom", "runninglate", "overduebuffer"] },
+      { label: "Smart timing", ids: ["autotiming"] },
+    ] },
+    { id: "pay",   label: "Checkout & money", icon: CreditCard, desc: "Payments, tips & no-shows", settings: ["checkout", "tipping", "rebookco", "policy"] },
+    { id: "msg",   label: "Messages", icon: Bell, desc: "Texts & emails — clients and your team", settings: ["messages", "notifications", "bookingwords"], groups: [
+      { label: "Clients", ids: ["messages", "bookingwords"] },
+      { label: "My team", ids: ["notifications"] },
+    ] },
+    { id: "web",   label: "Website", icon: Globe, desc: "Your branded booking page online", settings: ["website"] },
+    { id: "data",  label: "Reports & data", icon: BarChart3, desc: "Your numbers, importing & tools", settings: ["reports", "import", "mergedupes", "testdata"] },
   ];
   // Safety net: any card not placed above still appears (appended to Reports & Insights) so nothing is ever lost.
   // RETIRED cards are intentionally left out of the list (their function moved elsewhere).
@@ -11075,26 +11080,26 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     const hasToggle = refreshed && !!c.toggle;
     return (
       <div style={{ position: "relative", background: "var(--panel)", borderTop: first ? "none" : "1px solid var(--line)" }}>
-        <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 11, padding: "17px 17px", textAlign: "left", cursor: "pointer" }}>
+        <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 12, padding: refreshed ? "18px 17px" : "17px 17px", minHeight: refreshed ? 64 : "auto", textAlign: "left", cursor: "pointer" }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 16, fontWeight: 500 }}>{c.title}</span>
-              {c.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
+              <span style={{ fontSize: 16.5, fontWeight: 500, letterSpacing: "-0.1px", whiteSpace: refreshed ? "nowrap" : "normal", overflow: refreshed ? "hidden" : "visible", textOverflow: "ellipsis" }}>{c.title}</span>
+              {c.smart && <span style={{ fontSize: 8.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", background: "color-mix(in srgb, var(--gold) 12%, transparent)", borderRadius: 5, padding: "3px 6px", flexShrink: 0 }}>SMART</span>}
             </div>
             {refreshed
-              ? (c.subtitle && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle}</div>)
+              ? (c.subtitle && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 4, lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle}</div>)
               : ((c.subtitle || c.status) && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>)}
           </div>
-          <span onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, display: "flex", alignItems: "center" }}><Explain title={c.title}>{explainText}</Explain></span>
+          {!refreshed && <span onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, display: "flex", alignItems: "center" }}><Explain title={c.title}>{explainText}</Explain></span>}
           {hasToggle ? (
-            <span onClick={(e) => { e.stopPropagation(); c.toggle.set(!c.toggle.on); }} role="switch" aria-checked={c.toggle.on} aria-label={c.title} style={{ width: 46, height: 28, borderRadius: 28, flexShrink: 0, background: c.toggle.on ? "var(--teal)" : "var(--border2)", position: "relative", transition: "background .2s", cursor: "pointer" }}>
-              <span style={{ position: "absolute", top: 3, left: c.toggle.on ? 21 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
+            <span onClick={(e) => { e.stopPropagation(); c.toggle.set(!c.toggle.on); }} role="switch" aria-checked={c.toggle.on} aria-label={c.title} style={{ width: 48, height: 29, borderRadius: 30, flexShrink: 0, background: c.toggle.on ? "var(--gold)" : "var(--border2)", position: "relative", transition: "background .2s", cursor: "pointer" }}>
+              <span style={{ position: "absolute", top: 3, left: c.toggle.on ? 22 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
             </span>
           ) : (
-            <>
-              {refreshed && c.status && <span style={{ fontSize: 14.5, color: "var(--gold)", fontWeight: 500, textAlign: "right", flexShrink: 0, maxWidth: "44%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</span>}
-              <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
-            </>
+            <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              {refreshed && c.status && <span style={{ fontSize: 15, color: "var(--gold)", fontWeight: 500, textAlign: "right", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</span>}
+              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            </span>
           )}
         </button>
       </div>
