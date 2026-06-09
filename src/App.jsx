@@ -7929,18 +7929,18 @@ function Row({ title, desc, children, stack }) {
   if (stack) {
     // Wider controls (segmented pickers, steppers) drop to their own line, left-aligned.
     return (
-      <div style={{ padding: "16px 0", borderBottom: "1px solid var(--line)" }}>
+      <div style={{ padding: "18px 0", borderBottom: "1px solid var(--line)" }}>
         <div style={{ fontSize: 15.5, fontWeight: 500 }}>{title}</div>
-        {desc && <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 400, marginTop: 3, lineHeight: 1.4 }}>{desc}</div>}
-        <div style={{ marginTop: 11, display: "flex", justifyContent: "flex-start" }}>{children}</div>
+        {desc && <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 400, marginTop: 4, lineHeight: 1.45 }}>{desc}</div>}
+        <div style={{ marginTop: 13, display: "flex", justifyContent: "flex-start" }}>{children}</div>
       </div>
     );
   }
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: "1px solid var(--line)" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "18px 0", borderBottom: "1px solid var(--line)" }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15.5, fontWeight: 500 }}>{title}</div>
-        {desc && <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 400, marginTop: 3, lineHeight: 1.4 }}>{desc}</div>}
+        {desc && <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 400, marginTop: 4, lineHeight: 1.45 }}>{desc}</div>}
       </div>
       <div style={{ flexShrink: 0 }}>{children}</div>
     </div>
@@ -10899,8 +10899,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const cancel = () => { setForm(business); setOpenCard(null); };
 
   const field = (label, key, multiline) => (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>{label}</div>
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 11.5, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600, marginBottom: 8 }}>{label}</div>
       {multiline
         ? <textarea value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} rows={5} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
         : <input value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} style={inputStyle} />}
@@ -10908,8 +10908,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   );
 
   const bword = (label, key, placeholder) => (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>{label}</div>
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 11.5, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600, marginBottom: 8 }}>{label}</div>
       <input value={(form.bookingStep && form.bookingStep[key]) || ""} placeholder={placeholder || ""} onChange={(e) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), [key]: e.target.value } })} style={inputStyle} />
     </div>
   );
