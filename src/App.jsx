@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "re
 import { createPortal } from "react-dom";
 import { supabase } from './supabaseClient'
 import {
-  Calendar, Phone, Check, ChevronRight, ChevronLeft, ChevronDown, MessageSquare, Bell, User, Camera,
+  Calendar, Phone, Check, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MessageSquare, Bell, User, Camera,
   Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock,
   Settings, Image as ImageIcon, Lock, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
@@ -154,6 +154,11 @@ const DEFAULT_BUSINESS = {
     maxGapMin: 0,            // don't offer a slot if it would leave a gap LARGER than this on either side (0 = no max)
     minGapMin: 0,            // don't offer a slot that would leave a gap SMALLER than this (0 = no min)
     emptyDayMode: "all",     // "all" = offer all increments on empty days; "anchored" = only earliest of each shift
+    // ---- "Anyone" routing — which real barber gets a booking made for "Anyone" ----
+    // "soonest" (default) | "share" | "roundRobin" | "topChairs". The last two
+    // walk anyoneOrder (array of provider ids) — rotation order / priority order.
+    anyoneMode: "soonest",
+    anyoneOrder: [],
   },
   // ---- Waiting Room / check-in behavior (Calendar & Appointments → Waiting Room) ----
   waitingRoom: {
@@ -1816,11 +1821,17 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
 //   gold: when true, force pack flavor and mark gap-closing slots as best (Gold Times)
 // ============================================================
 // resolveAnyone — when a booking's provider is "Anyone", pick the real barber.
-// Default rule: WHOEVER IS AVAILABLE FIRST — the soonest free real barber at the
-// chosen slot. Falls back to the first real barber if none are free (e.g. outside
-// hours). Used by the commit path so no "Anyone" booking silently lands on one chair.
+// Honors business.booking.anyoneMode (passed via the optional `business` arg):
+//   "soonest"    (DEFAULT) — whoever is available first at the chosen slot.
+//   "share"      — the real barber with the lightest day so far.
+//   "roundRobin" — rotate through business.booking.anyoneOrder, in order.
+//   "topChairs"  — fill business.booking.anyoneOrder front-to-back (priority).
+// All modes only consider barbers FREE at the slot; each falls back gracefully
+// (free-soonest, then first real). Signature stays backward-compatible: callers
+// that omit `business` get the original soonest behavior.
+// Used by the commit path so no "Anyone" booking silently lands on one chair.
 // ============================================================
-function resolveAnyone(providers, appts, dateObj, startMin, durMin) {
+function resolveAnyone(providers, appts, dateObj, startMin, durMin, business) {
   const reals = (providers || []).filter((p) => p && p.id !== "anyone" && !p.archived);
   if (!reals.length) return "dan";
   if (!(dateObj instanceof Date) || isNaN(dateObj) || typeof startMin !== "number") return reals[0].id;
@@ -1828,13 +1839,44 @@ function resolveAnyone(providers, appts, dateObj, startMin, durMin) {
   const y = dateObj.getFullYear(), mo = dateObj.getMonth(), da = dateObj.getDate();
   const sameDay = (iso) => { const x = new Date(iso); return !isNaN(x) && x.getFullYear() === y && x.getMonth() === mo && x.getDate() === da; };
   const endMin = startMin + (durMin || 0);
+  const liveOnDay = (a) => a && a.status !== "cancelled" && a.status !== "no-show" && a.bookedFor && sameDay(a.bookedFor);
   const isFree = (p) => {
     const h = p.hours && p.hours[dow];
     if (!h || !h.on) return false;
     if (startMin < h.start || endMin > h.end) return false;
-    return !(appts || []).some((a) => a && a.status !== "cancelled" && a.status !== "no-show" && a.providerId === p.id && a.bookedFor && sameDay(a.bookedFor) && typeof a.start === "number" && typeof a.end === "number" && startMin < a.end && endMin > a.start);
+    return !(appts || []).some((a) => liveOnDay(a) && a.providerId === p.id && typeof a.start === "number" && typeof a.end === "number" && startMin < a.end && endMin > a.start);
   };
   const free = reals.filter(isFree);
+  const mode = business?.booking?.anyoneMode || "soonest";
+  // Day load per provider (used by share + round-robin turn calc).
+  const loadOf = (pid) => (appts || []).filter((a) => liveOnDay(a) && a.providerId === pid).length;
+  // Owner-defined order (rotation / priority), filtered to current real barbers.
+  const orderIds = (business?.booking?.anyoneOrder || []).filter((id) => reals.some((r) => r.id === id));
+  const ordered = orderIds.length
+    ? [...orderIds.map((id) => reals.find((r) => r.id === id)), ...reals.filter((r) => !orderIds.includes(r.id))]
+    : reals;
+
+  if (mode === "share" && free.length) {
+    return [...free].sort((a, b) => loadOf(a.id) - loadOf(b.id))[0].id;
+  }
+  if (mode === "roundRobin" && ordered.length) {
+    // Turn = total bookings on the day so far, mod the lineup length. Walk
+    // forward from that turn to the first barber who is actually free.
+    const total = reals.reduce((n, p) => n + loadOf(p.id), 0);
+    const startIdx = total % ordered.length;
+    for (let i = 0; i < ordered.length; i++) {
+      const cand = ordered[(startIdx + i) % ordered.length];
+      if (isFree(cand)) return cand.id;
+    }
+    return (free[0] || ordered[0]).id;
+  }
+  if (mode === "topChairs" && ordered.length) {
+    // First free barber in priority order.
+    const pick = ordered.find((p) => isFree(p));
+    if (pick) return pick.id;
+    return (free[0] || ordered[0]).id;
+  }
+  // "soonest" (default): the first free real barber, else first real.
   return (free[0] || reals[0]).id;
 }
 
@@ -2256,7 +2298,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         const sMin = isMultiPerson ? (isSameChk ? slot : cursorChk) : slot;
         const eMin = sMin + person.durMin;
         if (!isSameChk) cursorChk += person.durMin;
-        const pid = person.prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, sMin, person.durMin) : person.prov.id;
+        const pid = person.prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, sMin, person.durMin, business) : person.prov.id;
         return appts.some((a) => occupies(a) && a.providerId === pid && a.bookedFor && sameDay(a.bookedFor) && typeof a.start === "number" && typeof a.end === "number" && sMin < a.end && eMin > a.start);
       });
       if (clash) { setSlot(null); setStep(6); setSlotConflict(true); return; }
@@ -2277,7 +2319,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         clientId = existing.id; // reuse the existing profile
       } else {
         clientId = "c" + baseId + Math.floor(Math.random() * 1000);
-        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30)) : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
+        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30), business) : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
         setClients((cur) => [newClient, ...cur]);
         if (!isStaff) newClientRow = { id: String(clientId), shop_id: shopId, data: newClient };
       }
@@ -2296,7 +2338,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       const title = person.items.map(describeEntry).join(", ");
       newAppts.push({
         id: baseId + pi,
-        providerId: prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, startMin, person.durMin) : prov.id,
+        providerId: prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, startMin, person.durMin, business) : prov.id,
         clientId: clientId || "guest",
         familyMemberId: person.key === "self" ? null : person.key,
         bookedByName: person.key === "self" ? null : (matched?.name || newName.trim()),
@@ -9550,6 +9592,83 @@ function BookingTimesEditor({ b, onChange }) {
   );
 }
 
+// Writes business.booking.anyoneMode (+ anyoneOrder for the two ordered modes).
+// Mirrors BookingTimesEditor's card/radio/example look. Powers resolveAnyone.
+function AnyoneRoutingEditor({ b, onChange, providers = [] }) {
+  const mode = b.anyoneMode || "soonest";
+  const reals = (providers || []).filter((p) => p && p.id !== "anyone" && !p.archived);
+  // Resolve the saved order to real barbers, then append any not yet listed.
+  const savedOrder = (b.anyoneOrder || []).filter((id) => reals.some((r) => r.id === id));
+  const order = [...savedOrder, ...reals.filter((r) => !savedOrder.includes(r.id)).map((r) => r.id)];
+  const nameOf = (id) => { const p = reals.find((r) => r.id === id); return p ? (p.name || p.id) : id; };
+  const move = (idx, dir) => {
+    const j = idx + dir;
+    if (j < 0 || j >= order.length) return;
+    const next = [...order];
+    const t = next[idx]; next[idx] = next[j]; next[j] = t;
+    onChange({ anyoneOrder: next });
+  };
+  const modes = [
+    { v: "soonest", label: "Whoever's available first", smart: true,
+      desc: "Books the barber who can take the client soonest.",
+      example: "Client wants 2:00. Heather's free at 2:00 but Dan isn't open until 3:30 — it goes to Heather." },
+    { v: "share", label: "Share the work",
+      desc: "Books whoever has the lightest day so far.",
+      example: "Dan already has 6 cuts on the books and Heather has 2 — the next \u201cAnyone\u201d booking goes to Heather." },
+    { v: "roundRobin", label: "Take turns, in order",
+      desc: "Rotates through your barbers in the order you set.",
+      example: "Dan, then Heather, then back to Dan — one after another, in turn." },
+    { v: "topChairs", label: "Fill top chairs first",
+      desc: "Loads your best earners before sending overflow elsewhere.",
+      example: "Fills Dan's day first, then spills extra bookings into Heather's." },
+  ];
+  const showOrder = mode === "roundRobin" || mode === "topChairs";
+  const orderHdr = mode === "roundRobin" ? "ROTATION ORDER" : "PRIORITY ORDER";
+  return (
+    <div>
+      <div style={{ display: "grid", gap: 9 }}>
+        {modes.map((m) => {
+          const on = mode === m.v;
+          return (
+            <button key={m.v} onClick={() => onChange({ anyoneMode: m.v })} style={{ width: "100%", textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: "15px 16px", cursor: "pointer" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{m.label}</span>
+                  {m.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>DEFAULT</span>}
+                </div>
+                <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
+              </div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 5 }}>{m.desc}</div>
+              {on && (
+                <div style={{ marginTop: 12, background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
+                  <div style={{ fontSize: 10.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, marginBottom: 5 }}>FOR EXAMPLE</div>
+                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55 }}>{m.example}</div>
+                </div>
+              )}
+              {on && showOrder && reals.length > 1 && (
+                <div style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
+                  <div style={{ fontSize: 10.5, letterSpacing: 1.5, color: "var(--sub)", fontWeight: 700, marginBottom: 7 }}>{orderHdr}</div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {order.map((id, i) => (
+                      <div key={id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 10px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 9 }}>
+                        <span style={{ width: 19, height: 19, borderRadius: "50%", background: "var(--text)", color: "var(--panel)", fontSize: 10.5, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
+                        <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(id)}</span>
+                        <button onClick={() => move(i, -1)} disabled={i === 0} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)", color: i === 0 ? "var(--border2)" : "var(--text)", cursor: i === 0 ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Move up"><ChevronUp size={16} /></button>
+                        <button onClick={() => move(i, 1)} disabled={i === order.length - 1} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)", color: i === order.length - 1 ? "var(--border2)" : "var(--text)", cursor: i === order.length - 1 ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Move down"><ChevronDown size={16} /></button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 13, fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5 }}>A client can always pick a specific barber instead. This only applies when they choose &ldquo;Anyone.&rdquo;</div>
+    </div>
+  );
+}
+
 function ToggleSetting({ label, desc, on, onToggle }) {
   return (
     <div style={{ padding: "6px 0" }}>
@@ -10656,6 +10775,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       status: (() => { const bk = form.booking || {}; const m = bk.timeMode || (bk.avoidGaps === false ? "all" : "smart"); return { grid: `Clean grid · every ${bk.gridMin || 30}m`, smart: "Smart Timing", pack: "Packed tight", all: "Show all times" }[m] || "Smart Timing"; })(),
       keywords: "booking times slots offered grid increment smart timing pack tight avoid gaps back to back fill dead time show all choice availability how clients book engine mode",
       editor: <BookingTimesEditor b={form.booking || DEFAULT_BOOKING} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
+    },
+    {
+      id: "anyonerouting", title: "First Available Routing", subtitle: "Which barber gets an \u201cAnyone\u201d booking", icon: Users, category: "Online Booking",
+      explain: <>When a client books without picking a specific barber, this decides who gets the appointment. <b>Whoever's available first</b> books the barber who can take them soonest. <b>Share the work</b> spreads bookings to whoever's lightest that day. <b>Take turns</b> rotates through your barbers in an order you set. <b>Fill top chairs first</b> loads your best earners before overflow. A client who picks a specific barber is never affected — this only applies to &ldquo;Anyone.&rdquo;</>,
+      status: (() => { const m = (form.booking || {}).anyoneMode || "soonest"; return { soonest: "Whoever's first", share: "Share the work", roundRobin: "Take turns", topChairs: "Top chairs first" }[m] || "Whoever's first"; })(),
+      keywords: "anyone first available routing which barber assign distribute share work round robin take turns rotation top chairs priority overflow no preference whoever soonest balance load",
+      editor: <AnyoneRoutingEditor b={form.booking || DEFAULT_BOOKING} providers={providers} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
     },
     {
       id: "waitingroom", title: "Waiting Room", icon: Users, category: "Calendar & Appointments",
