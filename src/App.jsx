@@ -4640,6 +4640,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
 
   // --- Picker state for the owner's "viewing as" dropdown ---
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [growthOpen, setGrowthOpen] = useState(false); // "How you're growing" full-screen
   // --- Inline goal editor: tap the ring (daily) or the week number (weekly) to set goals in place ---
   const [goalEditor, setGoalEditor] = useState(null); // null | "daily" | "weekly"
   const [goalInput, setGoalInput] = useState("");
@@ -4778,6 +4779,23 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 10px", textAlign: "center", boxShadow: "var(--shadow-sm)" }}>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{fmtMoney(avgTicket)}</div>
           <div style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 6 }}>Avg ticket</div>
+        </div>
+      </div>
+
+      {/* ZOOM OUT — growth + reports tiles (icon-over-label, like the menu grid) */}
+      <div style={{ marginBottom: 26 }}>
+        <div style={{ fontSize: 11.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 12px" }}>Zoom out</div>
+        <div style={{ display: "grid", gridTemplateColumns: (isOwner && onOpenRevenue) ? "1fr 1fr" : "1fr", gap: 11 }}>
+          <button onClick={() => setGrowthOpen(true)} style={{ textAlign: "left", font: "inherit", cursor: "pointer", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 116, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <TrendingUp size={26} style={{ color: "var(--gold)" }} />
+            <div><div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}>How you're growing</div><div style={{ fontSize: 12, color: "var(--sub)", marginTop: 3 }}>People keep coming back</div></div>
+          </button>
+          {(isOwner && onOpenRevenue) && (
+            <button onClick={onOpenRevenue} style={{ textAlign: "left", font: "inherit", cursor: "pointer", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 116, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <BarChart3 size={26} style={{ color: "var(--text)" }} />
+              <div><div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}>Reports</div><div style={{ fontSize: 12, color: "var(--sub)", marginTop: 3 }}>The full numbers</div></div>
+            </button>
+          )}
         </div>
       </div>
 
@@ -5139,6 +5157,10 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         );
       })()}
 
+      {growthOpen && (
+        <GrowthView appts={appts} scopeFilter={scopeFilter} services={services} clients={clients} onBack={() => setGrowthOpen(false)} />
+      )}
+
       {pickerOpen && (
         <div onClick={() => setPickerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 2000, overflowY: "auto" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", borderRadius: 20, border: "1px solid var(--border2)", padding: "20px 16px", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }}>
@@ -5175,6 +5197,98 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// HOW YOU'RE GROWING — plain-language growth screen opened from the
+// Pulse tile. No jargon, no ranking. Scoped by the caller's scopeFilter
+// so an owner can view this for the shop or any single barber.
+// ============================================================
+function GrowthView({ appts, scopeFilter, services, clients, onBack }) {
+  const done = (appts || []).filter((a) => a && a.status === "done" && (!scopeFilter || scopeFilter(a)));
+  const dateOf = (a) => (a.bookedFor ? new Date(a.bookedFor) : null);
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const priceOf = (a) => {
+    if (typeof a.price === "number") return a.price;
+    const s = (services || []).find((x) => x.id === a.serviceId);
+    return s && typeof s.price === "number" ? s.price : 0;
+  };
+  // Group done appts by client to read loyalty + new faces.
+  const byClient = {};
+  done.forEach((a) => { if (a.clientId) (byClient[a.clientId] = byClient[a.clientId] || []).push(a); });
+  const clientIds = Object.keys(byClient);
+  const totalClients = clientIds.length;
+  const returners = clientIds.filter((id) => byClient[id].length >= 2).length;
+  const regulars = clientIds.filter((id) => byClient[id].length >= 3).length;
+  const newThisMonth = clientIds.filter((id) => {
+    const ds = byClient[id].map(dateOf).filter(Boolean).sort((x, y) => x - y);
+    return ds.length && ds[0] >= monthStart;
+  }).length;
+  const priced = done.map(priceOf).filter((p) => p > 0);
+  const avg = priced.length ? Math.round(priced.reduce((s, p) => s + p, 0) / priced.length) : 0;
+  const allTime = done.length;
+  const weekKey = (d) => { const onejan = new Date(d.getFullYear(), 0, 1); const wk = Math.ceil(((d - onejan) / 86400000 + onejan.getDay() + 1) / 7); return d.getFullYear() + "-" + wk; };
+  const weekCounts = {}, dayMoney = {};
+  done.forEach((a) => { const d = dateOf(a); if (!d) return; const wk = weekKey(d); weekCounts[wk] = (weekCounts[wk] || 0) + 1; const dk = d.toDateString(); dayMoney[dk] = (dayMoney[dk] || 0) + priceOf(a); });
+  const bestWeek = Object.values(weekCounts).reduce((m, v) => (v > m ? v : m), 0);
+  const biggestDay = Math.round(Object.values(dayMoney).reduce((m, v) => (v > m ? v : m), 0));
+  const marks = [50, 100, 250, 500, 1000, 2000, 5000];
+  const nextMark = marks.find((m) => m > allTime) || Math.ceil((allTime + 1) / 1000) * 1000;
+  const toGo = nextMark - allTime;
+  const milePct = Math.min(100, Math.round((allTime / nextMark) * 100));
+  const established = allTime >= 8; // enough history for the full story
+
+  const heroStyle = { background: "linear-gradient(160deg, color-mix(in srgb, var(--gold) 11%, var(--panel)), var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 24%, var(--border))", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: 18, marginTop: 14 };
+  const groupStyle = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" };
+  const headLbl = { fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "20px 6px 9px" };
+  const statRow = (r, i) => (
+    <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "15px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+      <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 500 }}>{r.name}</div>
+      <div style={{ textAlign: "right" }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{r.value}</div>
+        {r.sub ? <div style={{ fontSize: 11.5, color: "var(--sub)", fontWeight: 600, marginTop: 4 }}>{r.sub}</div> : null}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="appt-screen-fixed" style={{ position: "fixed", inset: 0, zIndex: 2200, background: "var(--bg)", overflowY: "auto" }}>
+      <div style={{ maxWidth: 560, margin: "0 auto", padding: "18px 16px 44px" }}>
+        <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "none", color: "var(--sub)", fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer", padding: "6px 4px", marginBottom: 4 }}><span style={{ fontSize: 21, lineHeight: 0.6, marginRight: 1 }}>&#8249;</span> Back</button>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, letterSpacing: -0.4 }}>How you're growing</div>
+        <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3 }}>A look at the last few months.</div>
+
+        {!established ? (
+          <div style={heroStyle}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500 }}>Your story starts here.</div>
+            <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 9 }}>As you finish cuts, this fills in &mdash; who keeps coming back, your busiest weeks, the records you set. {allTime > 0 ? allTime + (allTime === 1 ? " cut" : " cuts") + " so far. Keep going." : "Wrap up your first cut to get started."}</div>
+          </div>
+        ) : (
+          <>
+            <div style={heroStyle}>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, letterSpacing: -0.3, lineHeight: 1.2 }}>People keep coming back.</div>
+              <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 9 }}><b style={{ color: "var(--gold)", fontWeight: 600 }}>{returners} of your {totalClients}</b> clients have come back for another cut.</div>
+            </div>
+
+            <div style={headLbl}>Your following</div>
+            <div style={groupStyle}>
+              {[{ name: "New faces this month", value: newThisMonth }, { name: "People who call you their barber", value: regulars }, { name: "You make per cut", value: "$" + avg }].map(statRow)}
+            </div>
+
+            <div style={headLbl}>Worth celebrating</div>
+            <div style={groupStyle}>
+              {[{ name: "Your best week ever", value: bestWeek, sub: "cuts" }, { name: "Biggest day yet", value: "$" + biggestDay }].map(statRow)}
+              <div style={{ padding: "14px 16px 15px", borderTop: "1px solid var(--line)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 14, marginBottom: 8 }}><span style={{ fontWeight: 500 }}>{toGo}{toGo === 1 ? " cut" : " cuts"} to your {nextMark}th</span><span style={{ color: "var(--sub)", fontSize: 13 }}>{allTime} so far</span></div>
+                <div style={{ height: 7, borderRadius: 7, background: "var(--panel2)", overflow: "hidden", border: "1px solid var(--line)" }}><span style={{ display: "block", height: "100%", width: milePct + "%", borderRadius: 7, background: "linear-gradient(90deg, #5C7763, var(--gold))" }} /></div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
