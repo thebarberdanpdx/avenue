@@ -4491,6 +4491,65 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   const cutOver = cutting && cutLeft < 0;
   const cutSvc = cutting ? (cutting.title || ((services || []).find((s) => s.id === cutting.serviceId) || {}).name || "") : "";
 
+  const [gapDismissed, setGapDismissed] = useState(false); // gap heads-up dismissed this session
+  const [gapPeek, setGapPeek] = useState(false);           // "view on calendar" peek sheet open
+  const [gapNotify, setGapNotify] = useState(false);       // notify client of the new time when moving
+  // --- Awkward-gap detector: a too-small sliver between two of a barber's bookings that
+  // ONE clean nudge (moving the later client up) would turn into bookable room. Scans the
+  // viewed barber (or every barber, in shop view) across the next 7 days. A packed sliver
+  // that would need a cascade of moves fails the test, so it never shows. ---
+  const gapBk = business.booking || {};
+  const gapPad = (Math.max(0, Number(gapBk.bufferAfter) || 0)) + (Math.max(0, Number(gapBk.bufferBefore) || 0));
+  const gapDayKey = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
+  const gapHoursFor = (prov, dow) => (prov && prov.hours && prov.hours[dow]) || (business.hours && business.hours[dow]) || DEFAULT_HOURS[dow];
+  const gapShortestFor = (prov) => {
+    const pid2 = prov && prov.id;
+    const offered = (services || []).filter((s) => { const se = s.staff && pid2 ? s.staff[pid2] : null; return !se || se.on !== false; });
+    const mins = offered.map((s) => getDuration(null, s, pid2) || s.duration || 0).filter((n) => n > 0);
+    return mins.length ? Math.min(...mins) : 30;
+  };
+  const findAwkwardGap = (prov) => {
+    if (!prov || prov.id === "anyone") return null;
+    const shortest = gapShortestFor(prov);
+    for (let off = 0; off < 7; off++) {
+      const d = new Date(todayStart); d.setDate(d.getDate() + off);
+      const hrs = gapHoursFor(prov, d.getDay());
+      if (!hrs || !hrs.on) continue;
+      const dayEnd = hrs.end;
+      const dk = gapDayKey(d.toISOString());
+      const day = (appts || []).filter((a) => a.providerId === prov.id && a.status !== "cancelled" && a.status !== "no-show" && typeof a.start === "number" && typeof a.end === "number" && a.bookedFor && gapDayKey(a.bookedFor) === dk).sort((a, b) => a.start - b.start);
+      if (day.length < 2) continue;
+      for (let i = 0; i < day.length - 1; i++) {
+        const P = day[i], N = day[i + 1];
+        if (off === 0 && N.start <= nowMin) continue;            // already past today
+        const sliver = (N.start - P.end) - gapPad;
+        if (!(sliver > 0 && sliver <= shortest)) continue;
+        const after = day[i + 2];
+        const roomAfter = ((after ? after.start : dayEnd) - N.end) - gapPad;
+        if ((roomAfter + sliver) >= shortest) {                  // one move opens bookable room
+          return { prov, date: new Date(d), N, gapMin: Math.round(sliver), atMin: P.end, moveToMin: P.end + (Math.max(0, Number(gapBk.bufferAfter) || 0)) };
+        }
+      }
+    }
+    return null;
+  };
+  const awkwardGap = gapDismissed ? null : (isShopView
+    ? realProviders.map(findAwkwardGap).filter(Boolean).sort((a, b) => (+a.date - +b.date) || (a.N.start - b.N.start))[0] || null
+    : findAwkwardGap(viewedProvider));
+  const gapDayName = awkwardGap ? awkwardGap.date.toLocaleDateString(undefined, { weekday: "long" }) : "";
+  // Silently slide an appointment up to close a sliver (keeps its length, respects buffer).
+  // notify=true → flag the reschedule text (dispatches once SMS is live).
+  const moveAppointmentUp = (gap, notify) => {
+    if (!gap || !gap.N) return;
+    const dur = gap.N.end - gap.N.start;
+    const newStart = gap.moveToMin;
+    setAppts((cur) => cur.map((a) => a.id === gap.N.id ? { ...a, start: newStart, end: newStart + dur } : a));
+    setGapPeek(false);
+    const who = (gap.N.name || "client").split(" ")[0];
+    if (showToast) showToast(notify ? `Moved ${who} to ${fmtTime(newStart)} — they'll get a text once messaging is live.` : `Moved ${who} to ${fmtTime(newStart)}.`);
+    // TODO(SMS live): when notify, dispatch the reschedule/moved template to gap.N.phone.
+  };
+
   // --- "Free until" calc — only meaningful if not currently in chair and there's a next appt ---
   const fmtTime = (m) => { const h = Math.floor(m / 60); const mm = m % 60; const ampm = h >= 12 ? "PM" : "AM"; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12}:${mm.toString().padStart(2, "0")} ${ampm}`; };
 
@@ -4778,6 +4837,25 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         </div>
       )}
 
+      {awkwardGap && (
+        <div style={{ position: "relative", marginBottom: 16, background: "linear-gradient(135deg, color-mix(in srgb, var(--gold) 10%, var(--panel)), var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 32%, var(--border))", borderRadius: 18, boxShadow: "var(--shadow)", padding: "15px 16px" }}>
+          <button onClick={() => setGapDismissed(true)} aria-label="Dismiss" style={{ position: "absolute", top: 11, right: 12, background: "none", border: "none", color: "var(--faint)", padding: 2, lineHeight: 0, cursor: "pointer" }}><X size={16} /></button>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, paddingRight: 22 }}>
+            <span style={{ width: 34, height: 34, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Clock size={18} /></span>
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500 }}>A gap worth tightening</span>
+          </div>
+          <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.45, marginTop: 10 }}>{gapDayName} has a <strong style={{ fontWeight: 600 }}>{awkwardGap.gapMin}-minute gap</strong> at {fmtTime(awkwardGap.atMin)} — too short to book. Moving <strong style={{ fontWeight: 600 }}>{awkwardGap.N.name || "the next client"}</strong> up to {fmtTime(awkwardGap.moveToMin)} would open a bookable slot later in {isShopView ? `${awkwardGap.prov.name}'s` : "your"} day.</div>
+          <div onClick={() => setGapNotify((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 13px", marginTop: 13, cursor: "pointer" }}>
+            <div><div style={{ fontSize: 13, fontWeight: 500 }}>Notify {(awkwardGap.N.name || "client").split(" ")[0]} of the new time</div><div style={{ fontSize: 11.5, color: gapNotify ? "var(--gold)" : "var(--sub)", marginTop: 1 }}>{gapNotify ? "On — we'll text the change" : "Off — moves silently"}</div></div>
+            <span role="switch" aria-checked={gapNotify} style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: gapNotify ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: gapNotify ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
+          </div>
+          <div style={{ display: "flex", gap: 9, marginTop: 11 }}>
+            <button onClick={() => setGapPeek(true)} style={{ flex: 1, background: "var(--panel)", color: "var(--gold)", border: "1.5px solid color-mix(in srgb, var(--gold) 40%, var(--border))", borderRadius: 11, padding: "11px 0", fontSize: 13, fontWeight: 600, fontFamily: FONT_BODY, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer" }}><Calendar size={15} /> View on calendar</button>
+            <button onClick={() => moveAppointmentUp(awkwardGap, gapNotify)} style={{ flex: 1.2, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "11px 0", fontSize: 13, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Move {(awkwardGap.N.name || "client").split(" ")[0]} up</button>
+          </div>
+        </div>
+      )}
+
       {needsStart && (
         <div style={{ marginBottom: 16, background: "color-mix(in srgb, var(--gold) 11%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, padding: "15px 16px", boxShadow: "var(--shadow-sm)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
@@ -5006,6 +5084,61 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       )}
 
       {/* VIEW PICKER — centered modal (owner only). Replaces the old fragile dropdown. */}
+      {gapPeek && awkwardGap && (() => {
+        const prov = awkwardGap.prov;
+        const dk = gapDayKey(awkwardGap.date.toISOString());
+        const dayAppts = (appts || []).filter((a) => a.providerId === prov.id && a.status !== "cancelled" && a.status !== "no-show" && typeof a.start === "number" && typeof a.end === "number" && a.bookedFor && gapDayKey(a.bookedFor) === dk).sort((a, b) => a.start - b.start);
+        const idx = dayAppts.findIndex((a) => a.id === awkwardGap.N.id);
+        const after = dayAppts[idx + 1];
+        const hrs = gapHoursFor(prov, awkwardGap.date.getDay());
+        const openEnd = after ? after.start : (hrs ? hrs.end : awkwardGap.N.end + 120);
+        const firstName = (awkwardGap.N.name || "they").split(" ")[0];
+        return (
+          <div onClick={() => setGapPeek(false)} style={{ position: "fixed", inset: 0, background: "rgba(30,26,20,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 2100 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 520, background: "var(--bg)", borderRadius: "24px 24px 0 0", boxShadow: "0 -10px 40px rgba(40,34,22,0.22)", padding: "10px 16px 22px", maxHeight: "82%", display: "flex", flexDirection: "column" }}>
+              <div style={{ width: 38, height: 4, borderRadius: 4, background: "var(--border2)", margin: "4px auto 12px" }} />
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500 }}>{awkwardGap.date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</div>
+              <div style={{ fontSize: 12, color: "var(--sub)", marginBottom: 12 }}>The {awkwardGap.gapMin}-min gap, in context{isShopView ? ` · ${prov.name}` : ""}</div>
+              <div style={{ overflowY: "auto" }}>
+                {dayAppts.map((a, i) => (
+                  <div key={a.id}>
+                    {i === idx && (
+                      <div style={{ display: "flex", gap: 9 }}>
+                        <div style={{ width: 52, flexShrink: 0, fontSize: 11, color: "var(--faint)", paddingTop: 9, textAlign: "right" }}>{fmtTime(awkwardGap.atMin)}</div>
+                        <div style={{ flex: 1, borderRadius: 10, padding: "9px 11px", marginBottom: 6, background: "repeating-linear-gradient(45deg, color-mix(in srgb, #C08A3E 10%, transparent), color-mix(in srgb, #C08A3E 10%, transparent) 6px, transparent 6px, transparent 12px)", border: "1px dashed color-mix(in srgb, #C08A3E 48%, var(--border))", color: "#C08A3E", fontSize: 11.5, fontWeight: 600, textAlign: "center" }}>{awkwardGap.gapMin}-min gap · too short to book</div>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 9 }}>
+                      <div style={{ width: 52, flexShrink: 0, fontSize: 11, color: "var(--faint)", paddingTop: 9, textAlign: "right" }}>{fmtTime(a.start)}</div>
+                      <div style={{ flex: 1, borderRadius: 10, padding: "9px 11px", marginBottom: 6, background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))" }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{a.name || "Booked"}</div>
+                        <div style={{ fontSize: 11.5, color: "var(--sub)" }}>{(a.title ? a.title + " · " : "") + fmtTime(a.start) + "–" + fmtTime(a.end)}</div>
+                      </div>
+                    </div>
+                    {i === idx && (
+                      <div style={{ display: "flex", gap: 9 }}>
+                        <div style={{ width: 52, flexShrink: 0, fontSize: 11, color: "var(--faint)", paddingTop: 9, textAlign: "right" }}>{fmtTime(awkwardGap.N.end)}</div>
+                        <div style={{ flex: 1, borderRadius: 10, padding: "11px", marginBottom: 6, background: "var(--panel2)", border: "1px dashed var(--border2)", color: "var(--faint)", fontSize: 11.5, textAlign: "center" }}>Open · {fmtTime(awkwardGap.N.end)}–{fmtTime(openEnd)} → grows if {firstName} moves up</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div onClick={() => setGapNotify((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 13px", marginTop: 14, cursor: "pointer" }}>
+                <div><div style={{ fontSize: 13, fontWeight: 500 }}>Notify {firstName} of the new time</div><div style={{ fontSize: 11.5, color: gapNotify ? "var(--gold)" : "var(--sub)", marginTop: 1 }}>{gapNotify ? "On — we'll text the change" : "Off — moves silently"}</div></div>
+                <span role="switch" aria-checked={gapNotify} style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: gapNotify ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: gapNotify ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
+              </div>
+              <div style={{ marginTop: 11, display: "flex", flexDirection: "column", gap: 9 }}>
+                <button onClick={() => moveAppointmentUp(awkwardGap, gapNotify)} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: "13px 0", fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, lineHeight: 1.25, cursor: "pointer" }}>Move {firstName} up to {fmtTime(awkwardGap.moveToMin)}<span style={{ display: "block", fontSize: 11.5, fontWeight: 400, opacity: 0.92, marginTop: 2 }}>{awkwardGap.gapMin} min earlier · {gapNotify ? `${firstName} gets a text with the new time` : "no message sent"}</span></button>
+                <button onClick={() => { const ph = awkwardGap.N.phone; const msg = `Hi ${firstName}, any chance you could come in around ${fmtTime(awkwardGap.moveToMin)} on ${gapDayName} instead? Would help me tighten the day. Thanks!`; if (ph) { window.location.href = `sms:${ph}?&body=${encodeURIComponent(msg)}`; } else if (showToast) { showToast("No phone on file for this client."); } }} style={{ background: "var(--panel)", color: "var(--gold)", border: "1.5px solid color-mix(in srgb, var(--gold) 40%, var(--border))", borderRadius: 12, padding: "12px 0", fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Text {firstName} first instead</button>
+                <button onClick={() => { setGapPeek(false); onNavigate && onNavigate("calendar", awkwardGap.date.toISOString()); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 600, padding: 4, fontFamily: FONT_BODY, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, cursor: "pointer" }}><Calendar size={14} /> Open full calendar to do it myself</button>
+                <button onClick={() => setGapPeek(false)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, fontWeight: 500, padding: 6, fontFamily: FONT_BODY, cursor: "pointer" }}>Not now</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {pickerOpen && (
         <div onClick={() => setPickerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 2000, overflowY: "auto" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", borderRadius: 20, border: "1px solid var(--border2)", padding: "20px 16px", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }}>
