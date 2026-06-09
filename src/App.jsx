@@ -13762,7 +13762,17 @@ function ProgressCard({ T, minutesLeft, minutesInto, dur, nextClient, nextIsWait
           </div>
         </div>
         <div style={{ flex: 1 }}>
-          {behind10 && <span style={{ display: "inline-block", background: pillBg, color: "#3a2e10", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", padding: "5px 11px", borderRadius: 30, marginBottom: 7 }}>Wrapping up</span>}
+          {behind10 ? (
+            <span style={{ display: "inline-block", background: pillBg, color: "#3a2e10", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", padding: "5px 11px", borderRadius: 30, marginBottom: 7 }}>Wrapping up</span>
+          ) : (minutesInto != null && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: `color-mix(in srgb, ${T.accent} 12%, ${T.panel})`, border: `1px solid color-mix(in srgb, ${T.accent} 30%, ${T.line})`, color: T.accent, fontSize: 12, fontWeight: 600, padding: "4px 11px 4px 9px", borderRadius: 30, marginBottom: 7 }}>
+              <span style={{ position: "relative", width: 9, height: 9 }}>
+                <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: `color-mix(in srgb, ${T.accent} 40%, transparent)`, animation: "pulse 1.6s var(--ease) infinite" }} />
+                <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: T.accent }} />
+              </span>
+              Cutting{minutesInto >= 1 ? ` · ${minutesInto} min in` : ""}
+            </span>
+          ))}
           <div style={{ fontSize: 18, fontWeight: 600, color: T.text }}>{leftLabel}</div>
           <div style={{ fontSize: 13.5, color: T.sub, marginTop: 2 }}>{dur} min booked</div>
         </div>
