@@ -4813,61 +4813,61 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
               <span style={{ width: 28, height: 1.5, background: "var(--gold)" }} />
-              <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: 0, lineHeight: 1.1, color: "var(--text)" }}>Wrap Up</h3>
+              <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, margin: 0, lineHeight: 1, color: "var(--text)" }}>Wrap Up</h3>
             </div>
-            {wrapUp.map((a) => {
-              const d = a.pendingDurationSave;
-              const client = clients.find((c) => c.id === a.clientId);
-              const onSave = () => {
-                setClients((cur) => cur.map((c) => c.id === d.clientId ? { ...c, customDurations: { ...(c.customDurations || {}), [d.serviceId]: d.suggestedMin } } : c));
-                setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, pendingDurationSave: null } : x));
-                if (showToast) showToast(`Saved — ${d.serviceName} books at ${d.suggestedMin} min for ${(d.clientName || "").split(" ")[0]}.`);
-              };
-              const onDismiss = () => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, pendingDurationSave: null } : x)); };
-              const editing = noteFor && noteFor.id === a.id;
-              return (
-                <div key={a.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", marginBottom: 8 }}>
-                  {d ? (
-                    <>
-                      <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 12 }}>
-                        <strong>{d.clientName}</strong>'s {d.serviceName} took <strong style={{ color: "var(--gold)" }}>{d.measuredMin} min</strong>{d.currentDur != null ? ` (was scheduled for ${d.currentDur} min)` : ""}. Save {d.suggestedMin} min as their new time?
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+              {wrapUp.map((a, i) => {
+                const d = a.pendingDurationSave;
+                const client = clients.find((c) => c.id === a.clientId);
+                const onSave = () => {
+                  setClients((cur) => cur.map((c) => c.id === d.clientId ? { ...c, customDurations: { ...(c.customDurations || {}), [d.serviceId]: d.suggestedMin } } : c));
+                  setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, pendingDurationSave: null } : x));
+                  if (showToast) showToast(`Saved — ${d.serviceName} books at ${d.suggestedMin} min for ${(d.clientName || "").split(" ")[0]}.`);
+                };
+                const onDismiss = () => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, pendingDurationSave: null } : x)); };
+                const onClear = () => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, noteLogged: true } : x)); if (showToast) showToast("Cleared from wrap-up."); };
+                const editing = noteFor && noteFor.id === a.id;
+                return (
+                  <div key={a.id} style={{ padding: "14px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 15.5, fontWeight: 500 }}>{d ? `${d.clientName}${d.serviceName ? ` · ${d.serviceName}` : ""}` : (client?.name || a.name || "This client")}</div>
+                        <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.45 }}>{d ? (<>Ran <strong style={{ color: "var(--gold)", fontWeight: 600 }}>{d.measuredMin} min</strong>{d.currentDur != null ? ` · scheduled ${d.currentDur}` : ""} — save as their time?</>) : "Cut done — add a note or photo to their profile."}</div>
                       </div>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button className="lift" onClick={onSave} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: "10px 14px", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", letterSpacing: 0.5 }}>SAVE {d.suggestedMin} MIN</button>
-                        <button onClick={onDismiss} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: "10px 14px", borderRadius: 10, fontSize: 14 }}>Discard</button>
+                      {!d && !editing && client && <button onClick={onClear} aria-label="Clear from wrap-up" style={{ background: "none", color: "var(--faint)", fontSize: 20, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}>×</button>}
+                    </div>
+
+                    {d && (
+                      <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
+                        <button className="lift" onClick={onSave} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: "9px 12px", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none" }}>Save {d.suggestedMin} min</button>
+                        <button onClick={onDismiss} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: "9px 12px", borderRadius: 10, fontSize: 14, fontWeight: 500 }}>Discard</button>
                       </div>
-                    </>
-                  ) : (
-                    <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 12 }}>
-                      <strong>{client?.name || a.name || "This client"}</strong>'s cut is done — add a note or photo to their profile.
-                    </div>
-                  )}
-                  {client && (editing ? (
-                    <div style={{ marginTop: d ? 10 : 0 }}>
-                      <textarea autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Formula, what you did, preferences — anything to remember." rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, resize: "vertical", lineHeight: 1.5, outline: "none" }} />
-                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <button className="lift" onClick={() => {
-                          const text = noteDraft.trim();
-                          if (text) setClients((cur) => cur.map((c) => c.id === a.clientId ? { ...c, notes: (c.notes ? c.notes + "\n" : "") + text } : c));
-                          setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, hasNote: true } : x));
-                          setNoteFor(null); setNoteDraft("");
-                          if (showToast && text) showToast("Note added to their profile.");
-                        }} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: "10px 14px", borderRadius: 10, fontSize: 14, fontWeight: 600 }}>Save note</button>
-                        <button onClick={() => { setNoteFor(null); setNoteDraft(""); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: "10px 14px", borderRadius: 10, fontSize: 14 }}>Cancel</button>
+                    )}
+
+                    {client && (editing ? (
+                      <div style={{ marginTop: 11 }}>
+                        <textarea autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Formula, what you did, preferences — anything to remember." rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, resize: "vertical", lineHeight: 1.5, outline: "none" }} />
+                        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                          <button className="lift" onClick={() => {
+                            const text = noteDraft.trim();
+                            if (text) setClients((cur) => cur.map((c) => c.id === a.clientId ? { ...c, notes: (c.notes ? c.notes + "\n" : "") + text } : c));
+                            setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, hasNote: true } : x));
+                            setNoteFor(null); setNoteDraft("");
+                            if (showToast && text) showToast("Note added to their profile.");
+                          }} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: "9px 12px", borderRadius: 10, fontSize: 14, fontWeight: 600 }}>Save note</button>
+                          <button onClick={() => { setNoteFor(null); setNoteDraft(""); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: "9px 12px", borderRadius: 10, fontSize: 14, fontWeight: 500 }}>Cancel</button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <>
-                    <div style={{ display: "flex", gap: 8, marginTop: d ? 10 : 0 }}>
-                      <button className="lift" onClick={() => { setNoteFor(a); setNoteDraft(""); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 12%, var(--panel2))", border: "1.5px solid color-mix(in srgb, var(--gold) 36%, var(--border))", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontWeight: 600 }}><Edit2 size={16} style={{ color: "var(--gold)" }} /> Note</button>
-                      <button className="lift" onClick={() => { photoTargetRef.current = a; if (photoInputRef.current) photoInputRef.current.click(); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 12%, var(--panel2))", border: "1.5px solid color-mix(in srgb, var(--gold) 36%, var(--border))", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontWeight: 600 }}><Camera size={16} style={{ color: "var(--gold)" }} /> Photo</button>
-                    </div>
-                    {!d && <button onClick={() => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, noteLogged: true } : x)); if (showToast) showToast("Cleared from wrap-up."); }} style={{ width: "100%", background: "transparent", border: "none", color: "var(--faint)", fontSize: 13, padding: "10px 0 2px", marginTop: 6 }}>Nothing to add — clear this</button>}
-                    </>
-                  ))}
-                </div>
-              );
-            })}
+                    ) : (
+                      <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
+                        <button className="lift" onClick={() => { setNoteFor(a); setNoteDraft(""); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px", color: "var(--text)", fontSize: 14, fontWeight: 500 }}><Edit2 size={15} style={{ color: "var(--gold)" }} /> Note</button>
+                        <button className="lift" onClick={() => { photoTargetRef.current = a; if (photoInputRef.current) photoInputRef.current.click(); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px", color: "var(--text)", fontSize: 14, fontWeight: 500 }}><Camera size={15} style={{ color: "var(--gold)" }} /> Photo</button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
       })()}
