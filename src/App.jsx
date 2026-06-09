@@ -7504,12 +7504,13 @@ function Toggle({ on, onClick }) {
   );
 }
 
-function Stepper({ value, onChange, min = 0, max = 999, step = 1, suffix }) {
+function Stepper({ value, onChange, min = 0, max = 999, step = 1, suffix, zeroLabel }) {
+  const display = (zeroLabel && value === 0) ? zeroLabel : `${value}${suffix ? ` ${suffix}` : ""}`;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <button onClick={() => onChange(Math.max(min, value - step))} style={{ width: 32, height: 32, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 18, lineHeight: 1 }}>−</button>
-      <span style={{ minWidth: 64, textAlign: "center", fontSize: 15, color: "var(--text)" }}>{value}{suffix ? ` ${suffix}` : ""}</span>
-      <button onClick={() => onChange(Math.min(max, value + step))} style={{ width: 32, height: 32, borderRadius: 6, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 18, lineHeight: 1 }}>+</button>
+    <div style={{ display: "inline-flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: 11, overflow: "hidden" }}>
+      <button onClick={() => onChange(Math.max(min, value - step))} aria-label="Decrease" style={{ width: 42, height: 38, border: "none", borderRight: "1px solid var(--border)", background: "var(--panel2)", color: "var(--text)", fontSize: 19, lineHeight: 1, cursor: "pointer" }}>−</button>
+      <span style={{ minWidth: 70, textAlign: "center", fontSize: 15, fontWeight: 500, color: "var(--text)", padding: "0 6px" }}>{display}</span>
+      <button onClick={() => onChange(Math.min(max, value + step))} aria-label="Increase" style={{ width: 42, height: 38, border: "none", borderLeft: "1px solid var(--border)", background: "var(--panel2)", color: "var(--text)", fontSize: 19, lineHeight: 1, cursor: "pointer" }}>+</button>
     </div>
   );
 }
@@ -7569,7 +7570,7 @@ function NotificationsEditor({ n, onChange }) {
   const setEvent = (k, patch) => onChange({ ...(n || {}), [aud]: { ...data, [k]: { ...(data[k] || {}), ...patch } } });
   return (
     <div>
-      <Segmented options={NOTIF_AUDIENCES.map((a) => ({ value: a.key, label: a.label }))} value={aud} onChange={setAud} />
+      <Segmented full options={NOTIF_AUDIENCES.map((a) => ({ value: a.key, label: a.label }))} value={aud} onChange={setAud} />
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>{grp.desc}</p>
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 12px" }}>
         {grp.events.map((ev, i) => {
@@ -7602,22 +7603,35 @@ function NotificationsEditor({ n, onChange }) {
   );
 }
 
-function Segmented({ options, value, onChange }) {
+function Segmented({ options, value, onChange, full }) {
   return (
-    <div style={{ display: "flex", background: "var(--panel2)", borderRadius: 6, padding: 3, gap: 2 }}>
-      {options.map((o) => (
-        <button key={o.value} onClick={() => onChange(o.value)} style={{ flex: 1, padding: "8px 10px", borderRadius: 14, fontSize: 15, background: value === o.value ? "var(--gold)" : "transparent", color: value === o.value ? "var(--on-gold)" : "var(--sub)", fontWeight: value === o.value ? 500 : 400, whiteSpace: "nowrap" }}>{o.label}</button>
-      ))}
+    <div style={{ display: full ? "flex" : "inline-flex", width: full ? "100%" : "auto", background: "var(--panel2)", borderRadius: 11, padding: 3, gap: 2 }}>
+      {options.map((o) => {
+        const on = value === o.value;
+        return (
+          <button key={o.value} onClick={() => onChange(o.value)} style={{ border: "none", flex: full ? 1 : "0 0 auto", background: on ? "var(--gold)" : "transparent", padding: "7px 13px", borderRadius: 9, fontSize: 13.5, fontFamily: FONT_BODY, color: on ? "var(--on-gold)" : "var(--sub)", fontWeight: on ? 500 : 400, whiteSpace: "nowrap", cursor: "pointer" }}>{o.label}</button>
+        );
+      })}
     </div>
   );
 }
 
-function Row({ title, desc, children }) {
+function Row({ title, desc, children, stack }) {
+  if (stack) {
+    // Wider controls (segmented pickers, steppers) drop to their own line, left-aligned.
+    return (
+      <div style={{ padding: "16px 0", borderBottom: "1px solid var(--line)" }}>
+        <div style={{ fontSize: 15.5, fontWeight: 500 }}>{title}</div>
+        {desc && <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 400, marginTop: 3, lineHeight: 1.4 }}>{desc}</div>}
+        <div style={{ marginTop: 11, display: "flex", justifyContent: "flex-start" }}>{children}</div>
+      </div>
+    );
+  }
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 15 }}>{title}</div>
-        {desc && <div style={{ fontSize: 14.5, color: "var(--sub)", fontWeight: 300, marginTop: 2, lineHeight: 1.4 }}>{desc}</div>}
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: "1px solid var(--line)" }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15.5, fontWeight: 500 }}>{title}</div>
+        {desc && <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 400, marginTop: 3, lineHeight: 1.4 }}>{desc}</div>}
       </div>
       <div style={{ flexShrink: 0 }}>{children}</div>
     </div>
@@ -7647,39 +7661,39 @@ function BookingRulesEditor({ b, onChange }) {
       </Row>
 
       <div style={{ opacity: b.enabled ? 1 : 0.4, pointerEvents: b.enabled ? "auto" : "none" }}>
-        <Row title="Multiple services per booking" desc="Allow more than one service in a single appointment.">
+        <Row title="Multiple services per booking" desc="More than one service in a single appointment.">
           <Toggle on={b.allowMultiple !== false} onClick={() => set({ allowMultiple: b.allowMultiple === false ? true : false })} />
         </Row>
 
-        <Row title="Who can book" desc="Limit online booking by client type.">
+        <Row stack title="Who can book" desc="Limit online booking by client type.">
           <Segmented options={[{ value: "all", label: "All" }, { value: "returning", label: "Returning" }, { value: "new", label: "New" }]} value={b.clientType || "all"} onChange={(v) => set({ clientType: v })} />
         </Row>
 
-        <Row title="Require a card" desc="Hold a card to reserve (your no-show protection).">
+        <Row title="Require a card" desc="Hold a card to reserve — your no-show protection.">
           <Toggle on={b.requireCard} onClick={() => set({ requireCard: !b.requireCard })} />
         </Row>
 
-        <Row title="Deposit" desc="Take a deposit at the time of booking.">
-          <Segmented options={[{ value: "none", label: "None" }, { value: "fixed", label: "$ Fixed" }, { value: "percent", label: "%" }]} value={b.deposit?.mode || "none"} onChange={(v) => setDep({ mode: v })} />
-        </Row>
-        {b.deposit?.mode && b.deposit.mode !== "none" && (
-          <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 0 14px", borderBottom: "1px solid var(--line)" }}>
-            <Stepper value={b.deposit.amount} onChange={(v) => setDep({ amount: v })} min={0} max={b.deposit.mode === "percent" ? 100 : 500} step={5} suffix={b.deposit.mode === "percent" ? "%" : "$"} />
+        <Row stack title="Deposit" desc="Take a deposit at the time of booking.">
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
+            <Segmented options={[{ value: "none", label: "None" }, { value: "fixed", label: "$ Fixed" }, { value: "percent", label: "%" }]} value={b.deposit?.mode || "none"} onChange={(v) => setDep({ mode: v })} />
+            {b.deposit?.mode && b.deposit.mode !== "none" && (
+              <Stepper value={b.deposit.amount} onChange={(v) => setDep({ amount: v })} min={0} max={b.deposit.mode === "percent" ? 100 : 500} step={5} suffix={b.deposit.mode === "percent" ? "%" : "$"} />
+            )}
           </div>
-        )}
-
-        <Row title="Max appointments per day (whole shop)" desc="Cap total bookings across all barbers in a day. Clients can't book online past this; you can still add one manually. 0 = no limit.">
-          <Stepper value={b.dailyCap || 0} onChange={(v) => set({ dailyCap: v })} min={0} max={200} step={1} />
         </Row>
 
-        <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginTop: 18, fontStyle: "italic" }}>
-          Buffer, minimum notice, and booking window live in Settings → Scheduling Options. Per-barber daily caps live under each staff member's Work Hours.
+        <Row stack title="Max bookings per day" desc="Cap total online bookings across the whole shop. You can still add one manually.">
+          <Stepper value={b.dailyCap || 0} onChange={(v) => set({ dailyCap: v })} min={0} max={200} step={1} zeroLabel="No limit" />
+        </Row>
+
+        <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 16, fontStyle: "italic" }}>
+          Buffer, minimum notice, and booking window live in Calendar &amp; day → Scheduling. Per-barber daily caps live under each staff member.
         </p>
       </div>
 
-      <div style={{ marginTop: 18, background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 6, padding: "14px 16px" }}>
-        <div style={{ fontSize: 13, letterSpacing: 1, color: "var(--gold)", marginBottom: 6 }}>HOW THIS READS TO CLIENTS</div>
-        <div style={{ fontSize: 15, color: "var(--text2)", lineHeight: 1.6, fontWeight: 300 }}>{preview()}</div>
+      <div style={{ marginTop: 18, background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 22%, transparent)", borderRadius: 14, padding: "14px 16px" }}>
+        <div style={{ fontSize: 10.5, letterSpacing: 1.4, color: "var(--gold)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>How this reads to clients</div>
+        <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.55 }}>{preview()}</div>
       </div>
     </div>
   );
@@ -11051,16 +11065,16 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   if (active) {
     const Icon = active.icon;
     return (
-      <div className="appt-screen" style={{ width: "100%", padding: "12px 6px 40px" }}>
+      <div className="appt-screen" style={{ width: "100%", padding: "16px 6px 40px" }}>
         <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontFamily: "'Jost', sans-serif", fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
         <div style={{ marginBottom: 22 }}>
           <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.4px" }}>{active.title}</h2>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 29, fontWeight: 500, lineHeight: 1.1, letterSpacing: "-0.3px" }}>{active.title}</h2>
             {active.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "3px 7px" }}>SMART</span>}
           </div>
-          {active.subtitle && <div style={{ fontSize: 15, color: "var(--gold)", marginTop: 6, fontWeight: 500 }}>{active.subtitle}</div>}
-          {active.status && <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.4, marginTop: 6 }}>{active.status}</div>}
+          {active.subtitle && <div style={{ fontSize: 14.5, color: "var(--gold)", marginTop: 7, fontWeight: 500 }}>{active.subtitle}</div>}
+          {active.status && <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4, marginTop: 4 }}>{active.status}</div>}
         </div>
 
         {active.fullBleed
