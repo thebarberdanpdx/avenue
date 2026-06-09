@@ -7962,25 +7962,31 @@ function BusinessHoursEditor({ hours, onChange }) {
   );
   return (
     <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Set the days and hours the shop is open. This drives the times clients can book and what shows on your calendar.</p>
-      {DAYNAMES.map((name, d) => {
-        const day = h[d] || { on: false, start: 540, end: 1020 };
-        return (
-          <div key={d} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 0", borderTop: d === 0 ? "none" : "1px solid var(--line)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
-              <Toggle on={day.on} onClick={() => setDay(d, { on: !day.on })} />
-              <span style={{ fontSize: 15.5, fontWeight: 500, color: day.on ? "var(--text)" : "var(--faint)", minWidth: 84 }}>{name}</span>
-            </div>
-            {day.on ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                <TimeScrollPicker value={day.start} onChange={(t) => setDay(d, { start: t, end: Math.max(t + 15, day.end) })} label={`${name} open`} compact />
-                <span style={{ color: "var(--faint)", fontSize: 14 }}>–</span>
-                <TimeScrollPicker value={day.end} onChange={(t) => setDay(d, { end: t })} minMin={day.start + 15} label={`${name} close`} compact />
+      <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>The days and hours the shop is open — this drives when clients can book and what shows on your calendar.</p>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+        {DAYNAMES.map((name, d) => {
+          const day = h[d] || { on: false, start: 540, end: 1020 };
+          return (
+            <div key={d} style={{ padding: "14px 16px", borderTop: d === 0 ? "none" : "1px solid var(--line)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <span style={{ fontSize: 15.5, fontWeight: 500, color: day.on ? "var(--text)" : "var(--faint)" }}>{name}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  {!day.on && <span style={{ fontSize: 14, color: "var(--faint)" }}>Closed</span>}
+                  <Toggle on={day.on} onClick={() => setDay(d, { on: !day.on })} />
+                </div>
               </div>
-            ) : <span style={{ fontSize: 14.5, color: "var(--faint)" }}>Closed</span>}
-          </div>
-        );
-      })}
+              {day.on && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 11 }}>
+                  <TimeScrollPicker value={day.start} onChange={(t) => setDay(d, { start: t, end: Math.max(t + 15, day.end) })} label={`${name} open`} compact />
+                  <span style={{ color: "var(--faint)", fontSize: 14 }}>–</span>
+                  <TimeScrollPicker value={day.end} onChange={(t) => setDay(d, { end: t })} minMin={day.start + 15} label={`${name} close`} compact />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>Tap a time to change it. Days that are off show as Closed.</p>
     </div>
   );
 }
