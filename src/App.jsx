@@ -7925,6 +7925,56 @@ function Segmented({ options, value, onChange, inline }) {
   );
 }
 
+function BookingWordingPreview({ bs }) {
+  const [pv, setPv] = useState("cat");
+  bs = bs || {};
+  const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
+  const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)", margin: "11px 0 0" };
+  const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 0" };
+  const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, color: "var(--text)" };
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden", background: "var(--panel)", boxShadow: "var(--shadow-sm)", marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 13px", borderBottom: "1px solid var(--line)", background: "var(--panel2)" }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
+        <span style={{ fontSize: 11, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>What clients see</span>
+      </div>
+      <div style={{ padding: "12px 13px 0" }}>
+        <Segmented options={[{ value: "cat", label: "Category" }, { value: "cut", label: "Cut" }, { value: "time", label: "Timing" }]} value={pv} onChange={setPv} />
+      </div>
+      <div style={{ padding: "20px 18px 24px", background: "var(--bg)", marginTop: 12 }}>
+        {pv === "cat" && (
+          <div>
+            <div style={EYE}>Book an appointment</div>
+            <div style={HEAD}>{bs.catHead || "What are you here for today?"}</div>
+            <div style={LEAD}>{bs.catLead || "Tell us the vibe — we'll take it from there."}</div>
+            <div style={{ marginTop: 22 }}>
+              {["Haircut", "Beard"].map((n) => (
+                <div key={n} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--line)", padding: "16px 2px" }}>
+                  <span style={NAME}>{n}</span><ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {pv === "cut" && (
+          <div>
+            <span style={{ display: "inline-block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 40%, transparent)", borderRadius: 20, padding: "5px 13px", marginBottom: 16 }}>{bs.greeting || "First time? Welcome in"}</span>
+            <div style={HEAD}>{bs.head || "What are we doing today?"}</div>
+            <div style={LEAD}>{bs.lead || "Just pick your style — we'll handle the details in the chair."}</div>
+          </div>
+        )}
+        {pv === "time" && (
+          <div>
+            <div style={EYE}>Haircut</div>
+            <div style={{ ...HEAD, fontSize: 20 }}>{bs.changeQ || "Same price either way — how much are we taking off?"}</div>
+            <div style={LEAD}>{bs.priceLine || "Helps us hold the right amount of time for you."}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Row({ title, desc, children, stack }) {
   if (stack) {
     // Wider controls (segmented pickers, steppers) drop to their own line, left-aligned.
@@ -10941,6 +10991,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "bookingwords", title: "Booking Wording", icon: MessageSquare, category: "Business Setup",
       status: "Customize", keywords: "booking copy wording headlines titles category cut question text voice customize edit words",
       editor: (<>
+        <BookingWordingPreview bs={form.bookingStep || {}} />
         <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The words clients see while booking. Leave any field blank to use the default shown in grey.</div>
         <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, margin: "2px 0 8px" }}>CATEGORY SCREEN</div>
         {bword("HEADLINE", "catHead", "What are you here for today?")}
@@ -12728,10 +12779,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       </div>
 
       {/* staff column headers */}
-      <div style={{ display: "flex", borderBottom: "1px solid var(--line)" }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
         <div style={{ width: 56, flexShrink: 0 }} />
         {orderedStaff.map((p) => { const off = isOffDay(p); return (
-          <div key={p.id} style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, borderLeft: "1px solid var(--line)", opacity: off ? 0.55 : 1, minWidth: 0 }}>
+          <div key={p.id} style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: off ? 0.55 : 1, minWidth: 0 }}>
             <span style={{ width: 22, height: 22, borderRadius: "50%", background: off ? "var(--border2)" : p.color, color: "#fff", fontSize: 10.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(p.name || "?").charAt(0).toUpperCase()}</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: off ? "var(--faint)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}{off ? " · off" : ""}</span>
           </div>
@@ -12739,7 +12790,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       </div>
 
       {/* the timeline grid */}
-      <div style={{ display: "flex", position: "relative" }}>
+      <div style={{ display: "flex", position: "relative", gap: 10 }}>
         {/* time gutter — every 15 min; hours bold, quarters lighter */}
         <div style={{ width: 56, flexShrink: 0, position: "relative", height: gridHeight }}>
           {quarterLines.filter((t) => t < DAY_END).map((t) => { const isHour = t % 60 === 0; return (
@@ -12785,7 +12836,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           })();
           return (
             <div key={p.id}
-              style={{ flex: 1, position: "relative", height: gridHeight, borderLeft: "1px solid var(--line)" }}>
+              style={{ flex: 1, position: "relative", height: gridHeight, background: "color-mix(in srgb, var(--panel2) 45%, var(--bg))", borderRadius: 14, boxShadow: "inset 0 0 0 1px var(--line)", overflow: "hidden" }}>
               {/* off-shift shade: dim the hours outside this barber's shift for the selected day (behind cards, ignores taps) */}
               {(() => {
                 const h = (p.hours || {})[selectedDate.getDay()];
