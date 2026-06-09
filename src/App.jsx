@@ -10955,13 +10955,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       </>),
     },
     {
-      id: "hours", title: "Business Hours", icon: Clock, category: "Business Setup",
+      id: "hours", fullBleed: true, title: "Business Hours", icon: Clock, category: "Business Setup",
       status: (() => { const days = ["Su","Mo","Tu","We","Th","Fr","Sa"]; const openDays = days.filter((_, d) => form.hours?.[d]?.on); return openDays.length ? `${openDays.length} days open` : "Closed"; })(),
       keywords: "business hours open close days week schedule times when open availability",
       editor: <BusinessHoursEditor hours={form.hours} onChange={(h) => setForm({ ...form, hours: h })} />,
     },
     {
-      id: "locations", title: "Locations", icon: MapPinIcon, category: "Business Setup",
+      id: "locations", fullBleed: true, title: "Locations", icon: MapPinIcon, category: "Business Setup",
       status: form.multiLocation ? `${(form.locations || []).length} locations` : "Single location", keywords: "location locations multi multiple branch shop store address chain franchise",
       editor: <LocationsEditor business={form} setForm={setForm} />,
     },
@@ -10972,7 +10972,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <PhoneNumbersEditor phones={form.phones || []} onChange={(ph) => setForm({ ...form, phones: ph })} />,
     },
     {
-      id: "import", title: "Import Data", icon: Upload, category: "Business Setup",
+      id: "import", fullBleed: true, title: "Import Data", icon: Upload, category: "Business Setup",
       status: "Bring clients & history over",
       keywords: "import data migrate transfer clients appointments notes history switch from square glossgenius vagaro boulevard booksy csv export upload move",
       editor: <ImportDataEditor shopId={shopId} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} showToast={showToast} />,
@@ -10983,7 +10983,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} showToast={showToast} business={form} />),
     },
     {
-      id: "notifications", title: "Notifications", icon: Bell, category: "Business Setup",
+      id: "notifications", fullBleed: true, title: "Notifications", icon: Bell, category: "Business Setup",
       status: "Clients, providers & shop",
       keywords: "notifications alerts sms text email push reminders confirmation canceled rescheduled waitlist birthday end of day summary lapsed first time client who gets notified",
       editor: <NotificationsEditor n={form.notifications} onChange={(nx) => setForm({ ...form, notifications: nx })} />,
@@ -11239,7 +11239,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       ),
     },
     {
-      id: "messages", title: "Automated Messages", icon: MessageSquare, category: "Automated Messages",
+      id: "messages", fullBleed: true, title: "Automated Messages", icon: MessageSquare, category: "Automated Messages",
       explain: <>Every automatic text and email your clients get — booking confirmation, reminders, "we're ready for you," cancellations, deposit receipts — laid out so you can read the exact words and change any of them. Tap a message to edit it, pick whether it goes by text, email, or both, and use tags like {"{client}"} that fill in automatically. Turn off any you don't want sent.</>,
       status: `${(form.messages || []).filter((m) => m.enabled).length} active`, keywords: "automated messages reminders texts email confirmation check-in waitlist booked canceled rescheduled wording edit deposit no-show",
       editor: <MessagesEditor messages={form.messages || []} onChange={(msgs) => setForm({ ...form, messages: msgs })} business={form} />,
