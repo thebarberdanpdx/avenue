@@ -4458,6 +4458,9 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
 
   const todayMoney = sumRevenue(todayStart, tomorrowStart);
   const yesterdayMoney = sumRevenue(yesterdayStart, todayStart);
+  // Per-barber + shop "today" totals for the scope picker (absolute, independent of current scope).
+  const provToday = (pid) => appts.filter((a) => a.providerId === pid && isRevenue(a) && inRange(a, todayStart, tomorrowStart)).reduce((s, a) => s + apptPrice(a), 0);
+  const shopToday = appts.filter((a) => isRevenue(a) && inRange(a, todayStart, tomorrowStart)).reduce((s, a) => s + apptPrice(a), 0);
   const thisWeekMoney = sumRevenue(weekStart, nextWeekStart);
   const lastWeekMoney = sumRevenue(lastWeekStart, weekStart);
 
@@ -4722,7 +4725,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                 ) : (
                   <Avatar size={26} initial={viewedProvider?.name?.charAt(0)} color={viewedProvider?.color} photo={viewedProvider?.photo} />
                 )}
-                <span style={{ fontSize: 13, color: "var(--text)", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isShopView ? "All shop" : viewedProvider?.name}</span>
+                <span style={{ fontSize: 13, color: "var(--text)", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isShopView ? "Whole shop" : viewedProvider?.name}</span>
                 <ChevronDown size={14} style={{ color: "var(--faint)" }} />
               </button>
             </div>
@@ -4804,9 +4807,15 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             <div><div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}>How you're growing</div><div style={{ fontSize: 12, color: "var(--sub)", marginTop: 3 }}>People keep coming back</div></div>
           </button>
           {(isOwner && onOpenRevenue) && (
-            <button onClick={onOpenRevenue} style={{ gridColumn: "1 / -1", textAlign: "left", font: "inherit", cursor: "pointer", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 92, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <button onClick={onOpenRevenue} style={{ gridColumn: (isOwner && onOpenBarbers && realProviders.length > 1) ? "auto" : "1 / -1", textAlign: "left", font: "inherit", cursor: "pointer", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 116, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <BarChart3 size={26} style={{ color: "var(--text)" }} />
               <div><div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}>Reports</div><div style={{ fontSize: 12, color: "var(--sub)", marginTop: 3 }}>The full numbers</div></div>
+            </button>
+          )}
+          {(isOwner && onOpenBarbers && realProviders.length > 1) && (
+            <button onClick={onOpenBarbers} style={{ textAlign: "left", font: "inherit", cursor: "pointer", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 116, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <Users size={26} style={{ color: "var(--text)" }} />
+              <div><div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}>Team</div><div style={{ fontSize: 12, color: "var(--sub)", marginTop: 3 }}>Compare each barber</div></div>
             </button>
           )}
         </div>
@@ -5181,28 +5190,33 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         <div onClick={() => setPickerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 2000, overflowY: "auto" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", borderRadius: 20, border: "1px solid var(--border2)", padding: "20px 16px", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px", marginBottom: 14 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>VIEWING AS</div>
+              <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>WHOSE NUMBERS?</div>
               <button onClick={() => setPickerOpen(false)} style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--panel2)", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={16} /></button>
             </div>
             <div style={{ display: "grid", gap: 4 }}>
+              <button onClick={() => { setPulseView("shop"); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 12px", background: pulseView === "shop" ? "var(--panel2)" : "transparent", color: "var(--text)", border: `1px solid ${pulseView === "shop" ? "var(--border2)" : "transparent"}`, borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 20%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={15} style={{ color: "var(--gold)" }} /></div>
+                <span style={{ flex: 1, fontWeight: 500 }}>Whole shop</span>
+                <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500 }}>{fmtMoney(shopToday)}</span>
+                {pulseView === "shop" && <Check size={17} style={{ color: "var(--gold)" }} />}
+              </button>
               <button onClick={() => { setPulseView("me"); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 12px", background: pulseView === "me" ? "var(--panel2)" : "transparent", color: "var(--text)", border: `1px solid ${pulseView === "me" ? "var(--border2)" : "transparent"}`, borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
                 <Avatar size={32} initial={me?.name?.charAt(0)} color={me?.color} photo={me?.photo} />
-                <span style={{ flex: 1, fontWeight: 500 }}>{me?.name} (you)</span>
+                <span style={{ flex: 1, fontWeight: 500 }}>Just my chair</span>
+                <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500 }}>{fmtMoney(provToday(me?.id))}</span>
                 {pulseView === "me" && <Check size={17} style={{ color: "var(--gold)" }} />}
               </button>
+              {realProviders.filter((p) => p.id !== me?.id).length > 0 && (
+                <div style={{ fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "10px 8px 3px" }}>Your barbers</div>
+              )}
               {realProviders.filter((p) => p.id !== me?.id).map((p) => (
                 <button key={p.id} onClick={() => { setPulseView(p.id); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 12px", background: pulseView === p.id ? "var(--panel2)" : "transparent", color: "var(--text)", border: `1px solid ${pulseView === p.id ? "var(--border2)" : "transparent"}`, borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
                   <Avatar size={32} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
                   <span style={{ flex: 1, fontWeight: 500 }}>{p.name}</span>
+                  <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500 }}>{fmtMoney(provToday(p.id))}</span>
                   {pulseView === p.id && <Check size={17} style={{ color: "var(--gold)" }} />}
                 </button>
               ))}
-              <div style={{ height: 1, background: "var(--line)", margin: "6px 6px" }} />
-              <button onClick={() => { setPulseView("shop"); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 12px", background: pulseView === "shop" ? "var(--panel2)" : "transparent", color: "var(--text)", border: `1px solid ${pulseView === "shop" ? "var(--border2)" : "transparent"}`, borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
-                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 20%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={15} style={{ color: "var(--gold)" }} /></div>
-                <span style={{ flex: 1, fontWeight: 500 }}>All shop (combined)</span>
-                {pulseView === "shop" && <Check size={17} style={{ color: "var(--gold)" }} />}
-              </button>
               {onSignOut && (
                 <>
                   <div style={{ height: 1, background: "var(--line)", margin: "6px 6px" }} />
