@@ -8549,7 +8549,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       {err && <div style={{ background: "color-mix(in srgb, #c0392b 12%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, transparent)", borderRadius: 12, padding: "11px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text)" }}>{err}</div>}
 
       {stage === "pick" && (<>
-        <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WHERE ARE YOU COMING FROM?</div>
+        <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 10 }}>Where are you coming from?</div>
         <div style={{ display: "grid", gap: 8 }}>
           {SYSTEMS.map((s) => { const on = system === s; return (
             <button key={s} onClick={() => setSystem(s)} style={{ textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, display: "flex", justifyContent: "space-between", alignItems: "center" }}>{s}{on && <Check size={17} style={{ color: "var(--gold)" }} />}</button>
@@ -8571,19 +8571,19 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
 
       {stage === "map" && (<>
         <div style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 6, lineHeight: 1.5 }}>We read <strong style={{ color: "var(--text)" }}>{parsed.rows.length}</strong> rows from <strong style={{ color: "var(--text)" }}>{fileName}</strong>. Match your columns below — we've guessed where we could. Appointment fields are optional.</div>
-        <div style={{ display: "grid", gap: 10, margin: "16px 0" }}>
-          {FIELD_LABELS.map(([k, label]) => (
-            <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <span style={{ fontSize: 14, color: "var(--text)", flexShrink: 0, width: 130 }}>{label}</span>
-              <select value={map[k] || ""} onChange={(e) => setMap((m) => ({ ...m, [k]: e.target.value }))} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "10px 12px", color: "var(--text)", fontSize: 14 }}>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden", margin: "16px 0" }}>
+          {FIELD_LABELS.map(([k, label], i) => (
+            <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+              <span style={{ fontSize: 14.5, color: "var(--text)", flexShrink: 0 }}>{label}</span>
+              <select value={map[k] || ""} onChange={(e) => setMap((m) => ({ ...m, [k]: e.target.value }))} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px", color: "var(--text)", fontSize: 14, maxWidth: 165 }}>
                 <option value="">— none —</option>
                 {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
               </select>
             </div>
           ))}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingTop: 6, borderTop: "1px solid var(--line)" }}>
-            <span style={{ fontSize: 14, color: "var(--text)", flexShrink: 0, width: 130 }}>Default barber</span>
-            <select value={defProv} onChange={(e) => setDefProv(e.target.value)} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "10px 12px", color: "var(--text)", fontSize: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 16px", borderTop: "1px solid var(--line)" }}>
+            <span style={{ fontSize: 14.5, color: "var(--text)", flexShrink: 0 }}>Default barber</span>
+            <select value={defProv} onChange={(e) => setDefProv(e.target.value)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px", color: "var(--text)", fontSize: 14, maxWidth: 165 }}>
               {realProviders.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -8594,20 +8594,20 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       </>)}
 
       {stage === "preview" && built && (<>
-        <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 12 }}>READY TO IMPORT</div>
-        <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-          {[["New clients", built.newClients.length], ["Already on file (reused)", built.reused], ["Appointments", built.newAppts.length], ["— past", built.past], ["— upcoming", built.future]].map(([label, n]) => (
-            <div key={label} style={{ display: "flex", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 16px" }}>
-              <span style={{ fontSize: 14.5, color: "var(--sub)" }}>{label}</span><span style={{ fontSize: 15, fontWeight: 600 }}>{n}</span>
+        <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 12 }}>Ready to import</div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden", marginBottom: 16 }}>
+          {[["New clients", built.newClients.length, false], ["Already on file (reused)", built.reused, false], ["Appointments", built.newAppts.length, false], ["past", built.past, true], ["upcoming", built.future, true]].map(([label, n, sub], i) => (
+            <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+              <span style={{ fontSize: 14.5, color: "var(--sub)", paddingLeft: sub ? 14 : 0 }}>{label}</span><span style={{ fontSize: sub ? 15 : 16, fontWeight: sub ? 500 : 600, color: sub ? "var(--sub)" : "var(--text)" }}>{n}</span>
             </div>
           ))}
         </div>
         {built.newClients.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12.5, color: "var(--faint)", marginBottom: 8 }}>FIRST FEW CLIENTS</div>
-            <div style={{ display: "grid", gap: 6 }}>
-              {built.newClients.slice(0, 5).map((c) => (
-                <div key={c.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 13px", fontSize: 13.5 }}>
+            <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>First few clients</div>
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+              {built.newClients.slice(0, 5).map((c, i) => (
+                <div key={c.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "11px 14px", borderTop: i ? "1px solid var(--line)" : "none", fontSize: 14 }}>
                   <span style={{ color: "var(--text)", fontWeight: 500 }}>{c.name}</span>
                   <span style={{ color: "var(--faint)" }}>{c.phone || c.email || "—"}</span>
                 </div>
@@ -8632,7 +8632,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>Import complete</div>
           <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>{result.clients} clients{result.reused ? ` (${result.reused} already on file)` : ""} and {result.appts} appointments are in your book{result.failed ? " — some rows didn't save, see toast." : "."}</div>
           <button onClick={undo} style={{ width: "100%", background: "transparent", border: "1px solid color-mix(in srgb, #c0392b 40%, var(--border))", color: "var(--text)", padding: 13, fontSize: 14, borderRadius: 10, marginBottom: 10 }}>Undo this import</button>
-          <button className="lift" onClick={reset} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><RefreshCw size={16} /> IMPORT ANOTHER FILE</button>
+          <button className="lift" onClick={reset} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 14.5, fontWeight: 500, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><RefreshCw size={16} /> Import another file</button>
         </div>
       )}
     </div>
