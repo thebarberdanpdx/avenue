@@ -14134,42 +14134,54 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
   );
 }
 
-function ProgressCard({ T, minutesLeft, minutesInto, dur, nextClient, nextIsWaiting, startedLate, startedLateBy, fmtTime, lateNotified, onLetThemKnow }) {
-  const C = 207; // circumference for r=33
-  const pct = Math.min(100, Math.max(0, dur > 0 ? (minutesInto / dur) * 100 : 0));
+function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, title, nextClient, nextIsWaiting, startedLate, startedLateBy, fmtTime, lateNotified, onLetThemKnow }) {
+  const CUT = "#7CA084";   // cool sage signature for the in-chair spotlight — reads well on dark in any theme
+  const OVER = "#D89A4B";  // warm amber once the cut runs past its booked time
+  const C = 264;           // circumference for r=42
+  const totalSec = secondsInto != null ? secondsInto : (minutesInto || 0) * 60;
+  const mm = Math.floor(totalSec / 60), ss = totalSec % 60;
+  const over = minutesLeft < 0;
+  const pct = Math.min(100, Math.max(0, dur > 0 ? (totalSec / (dur * 60)) * 100 : 0));
+  const ringColor = over ? OVER : CUT;
   const behind10 = minutesLeft <= 10;
-  const behind5 = minutesLeft <= 5;
-  const pillBg = behind5 ? "#D89A2E" : "#E8B04B";
-  const leftLabel = minutesLeft > 0 ? `${minutesLeft} min left` : (minutesLeft === 0 ? "Wrapping up" : `${Math.abs(minutesLeft)} min over`);
-  // Show the "notify next client" prompt when wrapping up close OR when this service started late.
+  const tagColor = (behind10 || over) ? OVER : CUT;
+  const tagLabel = behind10 ? "Wrapping up" : "Cutting";
+  const leftBig = minutesLeft > 0 ? `${minutesLeft}` : (minutesLeft === 0 ? "0" : `+${Math.abs(minutesLeft)}`);
+  const leftLab = minutesLeft >= 0 ? "min left" : "min over";
+  const pillBg = minutesLeft <= 5 ? "#D89A2E" : "#E8B04B";
   const showLatePrompt = (behind10 || startedLate) && nextClient;
   return (
     <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 16, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 16, padding: 16 }}>
-        <div style={{ position: "relative", width: 72, height: 72, flexShrink: 0 }}>
-          <svg width="72" height="72" style={{ transform: "rotate(-90deg)" }}>
-            <circle cx="36" cy="36" r="33" fill="none" stroke="rgba(0,0,0,.08)" strokeWidth="6" />
-            <circle cx="36" cy="36" r="33" fill="none" stroke={T.accent} strokeWidth="6" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (pct / 100)} style={{ transition: "stroke-dashoffset 1s linear" }} />
-          </svg>
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, lineHeight: 1, color: T.text }}>{Math.abs(minutesLeft)}</span>
-            <span style={{ fontSize: 10, letterSpacing: 1, color: T.sub, textTransform: "uppercase" }}>min</span>
-          </div>
-        </div>
-        <div style={{ flex: 1 }}>
-          {behind10 ? (
-            <span style={{ display: "inline-block", background: pillBg, color: "#3a2e10", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", padding: "5px 11px", borderRadius: 30, marginBottom: 7 }}>Wrapping up</span>
-          ) : (minutesInto != null && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: `color-mix(in srgb, ${T.accent} 12%, ${T.panel})`, border: `1px solid color-mix(in srgb, ${T.accent} 30%, ${T.line})`, color: T.accent, fontSize: 12, fontWeight: 600, padding: "4px 11px 4px 9px", borderRadius: 30, marginBottom: 7 }}>
-              <span style={{ position: "relative", width: 9, height: 9 }}>
-                <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: `color-mix(in srgb, ${T.accent} 40%, transparent)`, animation: "pulse 1.6s var(--ease) infinite" }} />
-                <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: T.accent }} />
-              </span>
-              Cutting{minutesInto >= 1 ? ` · ${minutesInto} min in` : ""}
+      <div style={{ background: "radial-gradient(120% 120% at 50% 0%, #26241F 0%, #1A1916 62%)", border: "1px solid #34322C", borderRadius: 18, padding: 18, boxShadow: "0 14px 36px rgba(18,14,8,.34)", color: "#F4EFE4" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 16 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8, background: `color-mix(in srgb, ${tagColor} 18%, transparent)`, border: `1px solid color-mix(in srgb, ${tagColor} 45%, transparent)`, color: tagColor, fontSize: 11.5, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", padding: "5px 12px 5px 10px", borderRadius: 30 }}>
+            <span style={{ position: "relative", width: 9, height: 9 }}>
+              <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: `color-mix(in srgb, ${tagColor} 45%, transparent)`, animation: "pulse 1.7s var(--ease) infinite" }} />
+              <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: tagColor }} />
             </span>
-          ))}
-          <div style={{ fontSize: 18, fontWeight: 600, color: T.text }}>{leftLabel}</div>
-          <div style={{ fontSize: 13.5, color: T.sub, marginTop: 2 }}>{dur} min booked</div>
+            {tagLabel}
+          </span>
+          {name && <span style={{ fontSize: 15, fontWeight: 600, marginLeft: "auto", color: "#F4EFE4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "55%" }}>{name}</span>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <div style={{ position: "relative", width: 104, height: 104, flexShrink: 0 }}>
+            <svg width="104" height="104" style={{ transform: "rotate(-90deg)" }}>
+              <circle cx="52" cy="52" r="42" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="7" />
+              <circle cx="52" cy="52" r="42" fill="none" stroke={ringColor} strokeWidth="7" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - pct / 100)} style={{ transition: "stroke-dashoffset 1s linear, stroke .4s", filter: `drop-shadow(0 0 5px color-mix(in srgb, ${ringColor} 55%, transparent))` }} />
+            </svg>
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 26, lineHeight: 1, color: "#FBF7EE", fontVariantNumeric: "tabular-nums" }}>{mm}:{String(ss).padStart(2, "0")}</span>
+              <span style={{ fontSize: 9, letterSpacing: 2, color: "rgba(244,239,228,.5)", textTransform: "uppercase", marginTop: 4 }}>in chair</span>
+            </div>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {title && <div style={{ fontSize: 16, fontWeight: 600, color: "#F4EFE4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginTop: 10 }}>
+              <span style={{ fontSize: 21, fontWeight: 600, color: over ? OVER : "#F4EFE4", fontVariantNumeric: "tabular-nums" }}>{leftBig}</span>
+              <span style={{ fontSize: 13, color: "rgba(244,239,228,.55)" }}>{leftLab}</span>
+            </div>
+            <div style={{ fontSize: 13, color: "rgba(244,239,228,.5)", marginTop: 3 }}>{dur} min booked</div>
+          </div>
         </div>
       </div>
       {showLatePrompt && (
@@ -14314,6 +14326,9 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const minutesIntoService = appt.serviceStartedAt != null
     ? Math.floor((liveNow.getTime() - appt.serviceStartedAt) / 60000)
     : Math.max(0, nowMinTick - appt.start);
+  const secondsIntoService = appt.serviceStartedAt != null
+    ? Math.max(0, Math.floor((liveNow.getTime() - appt.serviceStartedAt) / 1000))
+    : Math.max(0, (nowMinTick - appt.start) * 60);
   const minutesLeftLive = Math.round((appt.start + dur) - nowMinTick);
   // Late start: In Service tapped 5+ min after the scheduled start time.
   const startedLateBy = appt.serviceStartedAt != null
@@ -14517,6 +14532,9 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   T={T}
                   minutesLeft={minutesLeftLive}
                   minutesInto={minutesIntoService}
+                  secondsInto={secondsIntoService}
+                  name={appt.name}
+                  title={appt.title}
                   dur={dur}
                   nextClient={(business && business.runningLate ? business.runningLate.enabled !== false : true) ? nextClient : null}
                   nextIsWaiting={nextIsWaiting}
