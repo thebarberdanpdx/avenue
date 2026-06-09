@@ -1907,7 +1907,12 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
   const dayEnd = h.end + overrunMin;
   const noClash = (t) => !busy.some(([bs, be]) => t < (be + bufAfter) && (t + durMin) > (bs - bufBefore));
 
-  const timeMode = gold ? "pack" : (bk.timeMode || (bk.avoidGaps === false ? "all" : "smart"));
+  // Per-barber override: prov.bookingStyle ("smart"|"pack"|"all") wins over the
+  // shop default; unset/"" or "shop" = follow the shop's timeMode.
+  const provStyle = prov.bookingStyle;
+  const shopMode = bk.timeMode || (bk.avoidGaps === false ? "all" : "smart");
+  const baseMode = (provStyle === "smart" || provStyle === "pack" || provStyle === "all") ? provStyle : shopMode;
+  const timeMode = gold ? "pack" : baseMode;
   const gridMin = Math.max(5, Number(bk.gridMin) || 30);
   const candidates = new Set();
 
@@ -8661,7 +8666,7 @@ function estimateEarnings(provider, appts, services, ref = new Date()) {
 // ============================================================
 // STAFF MEMBERS — Mangomint-style hub: list → member → sections
 // ============================================================
-function StaffMembersView({ providers, setProviders, services, setServices, appts, showToast }) {
+function StaffMembersView({ providers, setProviders, services, setServices, appts, showToast, business }) {
   const [openId, setOpenId] = useState(null);   // selected staff id (null = list)
   const [section, setSection] = useState(null); // null = hub, else section key
   const [showArchived, setShowArchived] = useState(false);
@@ -8997,6 +9002,42 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             <button onClick={() => patch(person.id, { maxPerDay: (Number(person.maxPerDay) || 0) + 1 })} style={{ width: 44, height: 44, borderRadius: 12, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 20 }}>+</button>
           </div>
         </div>
+        {(() => {
+          const bk = business?.booking || {};
+          const shopMode = bk.timeMode || (bk.avoidGaps === false ? "all" : "smart");
+          const shopLabel = { grid: "Clean grid", smart: "Smart Timing", pack: "Packed tight", all: "Show all times" }[shopMode] || "Smart Timing";
+          const cur = person.bookingStyle;
+          const opts = [
+            { v: "shop", label: "Use the shop setting", smart: false, cap: <>Follow whatever the shop's Booking Times is set to. <span style={{ color: "#C9A24B" }}>Right now that's {shopLabel}.</span></> },
+            { v: "smart", label: "Smart Timing", smart: true, cap: "Times shaped around how long each service takes, so the day fits together tightly. Best for most chairs." },
+            { v: "pack", label: "Packed tight", smart: false, cap: "Only times flush against existing cuts — no gaps between clients. Best for a busy chair." },
+            { v: "all", label: "Show all times", smart: false, cap: "Every open slot on the clock. Most choice for clients, but the day can end up with gaps." },
+          ];
+          const isOn = (v) => v === "shop" ? !(cur === "smart" || cur === "pack" || cur === "all") : cur === v;
+          return (
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginTop: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>How {person.name.split(" ")[0]}'s times are offered</div>
+              <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>When clients book {person.name.split(" ")[0]} online, this decides which open times they see. Leave on the shop default unless this chair should work differently.</p>
+              <div style={{ display: "grid", gap: 9 }}>
+                {opts.map((o) => {
+                  const on = isOn(o.v);
+                  return (
+                    <button key={o.v} onClick={() => patch(person.id, { bookingStyle: o.v === "shop" ? "" : o.v })} style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 12, background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 13, padding: "14px 15px", color: "var(--text)", cursor: "pointer" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 15.5, fontWeight: 500 }}>{o.label}</span>
+                          {o.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
+                        </div>
+                        <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{o.cap}</div>
+                      </div>
+                      <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   }
@@ -10644,7 +10685,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     {
       id: "staff", fullBleed: true, title: "Staff Members", icon: Users, category: "Business Setup",
       status: `${providers.filter((p) => p.id !== "anyone").length} staff`, keywords: "staff team employees hours days off schedule availability who works barber stylist",
-      editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} showToast={showToast} />),
+      editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} showToast={showToast} business={form} />),
     },
     {
       id: "notifications", title: "Notifications", icon: Bell, category: "Business Setup",
@@ -10777,7 +10818,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <BookingTimesEditor b={form.booking || DEFAULT_BOOKING} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
     },
     {
-      id: "anyonerouting", title: "First Available Routing", subtitle: "Which barber gets an \u201cAnyone\u201d booking", icon: Users, category: "Online Booking",
+      id: "anyonerouting", title: "When a client picks \u201cAnyone\u201d", subtitle: "Which barber gets the booking", icon: Users, category: "Online Booking",
       explain: <>When a client books without picking a specific barber, this decides who gets the appointment. <b>Whoever's available first</b> books the barber who can take them soonest. <b>Share the work</b> spreads bookings to whoever's lightest that day. <b>Take turns</b> rotates through your barbers in an order you set. <b>Fill top chairs first</b> loads your best earners before overflow. A client who picks a specific barber is never affected — this only applies to &ldquo;Anyone.&rdquo;</>,
       status: (() => { const m = (form.booking || {}).anyoneMode || "soonest"; return { soonest: "Whoever's first", share: "Share the work", roundRobin: "Take turns", topChairs: "Top chairs first" }[m] || "Whoever's first"; })(),
       keywords: "anyone first available routing which barber assign distribute share work round robin take turns rotation top chairs priority overflow no preference whoever soonest balance load",
@@ -10872,7 +10913,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <RebookCheckoutEditor r={form.rebook || { enabled: true, discountEnabled: true, discountType: "amount", discount: 5, weeks: [2,3,4,6,8] }} onChange={(rb) => setForm({ ...form, rebook: { ...(form.rebook || {}), ...rb } })} />,
     },
     {
-      id: "booking", title: "Online Booking", subtitle: "What clients see when booking", icon: Calendar, category: "Online Booking",
+      id: "booking", title: "Booking page rules", subtitle: "Lead time, deposit & card requirements", icon: Calendar, category: "Online Booking",
       explain: <>This is the heart of how clients book themselves online — the rules behind your booking link. How far ahead they can book, how much notice you need, whether a card's required, and the times they're offered. Set it once and clients can book around the clock without calling you.</>,
       status: bookingStatus(form.booking), keywords: "online booking link card required deposit lead time buffer cap gaps rebook setup how early advance days ahead far minimum notice times slots increments what clients see",
       editor: <BookingRulesEditor b={form.booking} onChange={(bk) => setForm({ ...form, booking: bk })} />,
@@ -10891,7 +10932,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <StaffSelectionEditor providers={providers} setProviders={setProviders} />,
     },
     {
-      id: "newclient", title: "New Client Experience", icon: Sparkles, category: "Online Booking",
+      id: "newclient", title: "How new clients pick a cut", icon: Sparkles, category: "Online Booking",
       status: (form.booking?.guidedConsult !== false) ? "Guided" : "Simple list",
       keywords: "new client experience guided consultation walkthrough cut finder quiz simple list first time onboarding help choose",
       editor: (
