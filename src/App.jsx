@@ -12700,7 +12700,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       <div style={{ display: "flex", borderBottom: "1px solid var(--line)" }}>
         <div style={{ width: 56, flexShrink: 0 }} />
         {orderedStaff.map((p) => { const off = isOffDay(p); return (
-          <div key={p.id} style={{ flex: 1, textAlign: "center", padding: "10px 0", fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 0.5, fontWeight: 500, color: off ? "var(--faint)" : p.color, opacity: off ? 0.6 : 1, borderLeft: "1px solid var(--line)" }}>{p.name}{off ? " · off" : ""}</div>
+          <div key={p.id} style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, borderLeft: "1px solid var(--line)", opacity: off ? 0.55 : 1, minWidth: 0 }}>
+            <span style={{ width: 22, height: 22, borderRadius: "50%", background: off ? "var(--border2)" : p.color, color: "#fff", fontSize: 10.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(p.name || "?").charAt(0).toUpperCase()}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: off ? "var(--faint)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}{off ? " · off" : ""}</span>
+          </div>
         ); })}
       </div>
 
@@ -12791,8 +12794,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 const nowM = today.getHours() * 60 + today.getMinutes();
                 if (nowM < DAY_START || nowM > DAY_END) return null;
                 return (
-                  <div style={{ position: "absolute", top: (nowM - DAY_START) * PPM, left: 0, right: 0, height: 0, borderTop: "2px solid #E0694B", zIndex: 25, pointerEvents: "none" }}>
-                    <span style={{ position: "absolute", left: -4, top: -5, width: 10, height: 10, borderRadius: "50%", background: "#E0694B" }} />
+                  <div style={{ position: "absolute", top: (nowM - DAY_START) * PPM, left: 0, right: 0, height: 0, borderTop: "2px solid var(--gold)", zIndex: 25, pointerEvents: "none" }}>
+                    <span style={{ position: "absolute", left: -4, top: -5, width: 10, height: 10, borderRadius: "50%", background: "var(--gold)" }} />
                   </div>
                 );
               })()}
@@ -12827,7 +12830,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     onClick={() => { const d = dragRef.current; if (d && (d.didDrag || d.scrolled)) return; setOpen(a); }}
                     onMouseDown={(e) => startDrag(e, a)} onTouchStart={(e) => startDrag(e, a)}
                     className={isDragging ? "" : "lift"}
-                    style={{ position: "absolute", top, ...lanePos, height, background: isBlock ? blockBg : (isDone ? "var(--panel2)" : tint), opacity: isDone ? 0.7 : 1, border: `1px solid ${isBlock ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`}`, borderLeft: `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : accent)}`, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
+                    style={{ position: "absolute", top, ...lanePos, height, background: isBlock ? blockBg : (isDone ? "var(--panel2)" : tint), opacity: isDone ? 0.7 : 1, border: `1px solid ${isBlock ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`}`, borderLeft: `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : accent)}`, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "var(--shadow-sm)", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
                     {/* name — always one line, never wraps or collides */}
                     <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{a.name}</span>
                     {/* time range — shown once room exists */}
