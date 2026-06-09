@@ -8700,6 +8700,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   const [workWeekRef, setWorkWeekRef] = useState(new Date());
   const [repeatFor, setRepeatFor] = useState(null); // { dow, h } when the "repeat on days" popup is open
   const [dayEdit, setDayEdit] = useState(null); // { dow } when editing one day's shift in a focused sheet
+  const [editMode, setEditMode] = useState(false); // team list: browse vs manage (reorder/archive)
 
   const staff = providers.filter((p) => p.id !== "anyone");
   const active = staff.filter((p) => !p.archived);
@@ -8720,17 +8721,26 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   };
   const archive = (pid) => { patch(pid, { archived: true }); setOpenId(null); showToast("Staff member archived."); };
   const restore = (pid) => { patch(pid, { archived: false }); showToast("Staff member restored."); };
+  // Reorder active members via up/down in edit mode — swaps their positions in the providers array.
+  const moveStaff = (pid, dir) => {
+    const ids = active.map((p) => p.id);
+    const i = ids.indexOf(pid), j = i + dir;
+    if (j < 0 || j >= ids.length) return;
+    const arr = [...providers];
+    const ai = arr.findIndex((p) => p.id === ids[i]);
+    const aj = arr.findIndex((p) => p.id === ids[j]);
+    [arr[ai], arr[aj]] = [arr[aj], arr[ai]];
+    setProviders(arr);
+  };
 
-  // shared UI
-  const Toggle = ({ on, onClick, dim }) => (
-    <button onClick={onClick} style={{ width: 48, height: 28, borderRadius: 16, background: on ? "var(--gold)" : "var(--border2)", position: "relative", transition: "background .2s", flexShrink: 0, opacity: dim ? 0.5 : 1 }}>
-      <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
-    </button>
+  // shared UI — Toggle now uses the global <Toggle> (50×29) for consistency.
+  const FieldLabel = ({ children }) => (
+    <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>{children}</div>
   );
   const SecHeader = ({ title, onBack, right }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
       <button onClick={onBack} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
-      <div style={{ flex: 1 }}><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{person ? person.name.toUpperCase() : "STAFF"}</div><h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{title}</h2></div>
+      <div style={{ flex: 1 }}><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{person ? person.name.toUpperCase() : "STAFF"}</div><h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{title}</h2></div>
       {right}
     </div>
   );
@@ -8739,32 +8749,48 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   if (!person) {
     return (
       <div>
-        <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300, margin: "0 0 16px" }}>Your team. Tap anyone to edit their photo, title, hours, access, and pay.</p>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
-          {active.map((p, i) => (
-            <button key={p.id} onClick={() => { setOpenId(p.id); setSection(null); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
-              <Avatar size={46} photo={p.id === "anyone" ? null : staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--gold)"} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: 16.5, fontWeight: 600 }}>{p.name}</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>{p.role}</div></div>
-              <ChevronRight size={20} style={{ color: "var(--faint)" }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 16px" }}>
+          <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, fontWeight: 400, flex: 1 }}>{editMode ? "Reorder with the arrows · tap − to archive." : "Tap anyone to edit their photo, title, hours, access, and pay."}</p>
+          <button onClick={() => setEditMode((v) => !v)} style={{ background: "none", color: "var(--gold)", fontSize: 15.5, fontWeight: editMode ? 600 : 500, padding: "2px 2px", flexShrink: 0 }}>{editMode ? "Done" : "Edit"}</button>
+        </div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+          {active.map((p, i) => editMode ? (
+            <div key={p.id} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "13px 16px", minHeight: 64, borderTop: i ? "1px solid var(--line)" : "none" }}>
+              <button onClick={() => archive(p.id)} aria-label={`Archive ${p.name}`} style={{ width: 24, height: 24, borderRadius: "50%", background: "#C2563F", color: "#fff", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "none", padding: 0, fontSize: 20, lineHeight: 0, fontWeight: 600 }}>−</button>
+              <Avatar size={42} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--gold)"} />
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 16, fontWeight: 500 }}>{p.name}</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>{p.role}</div></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
+                <button onClick={() => moveStaff(p.id, -1)} disabled={i === 0} style={{ background: "none", color: i === 0 ? "var(--faint)" : "var(--sub)", padding: 3, opacity: i === 0 ? 0.4 : 1 }}><ChevronUp size={18} /></button>
+                <button onClick={() => moveStaff(p.id, 1)} disabled={i === active.length - 1} style={{ background: "none", color: i === active.length - 1 ? "var(--faint)" : "var(--sub)", padding: 3, opacity: i === active.length - 1 ? 0.4 : 1 }}><ChevronDown size={18} /></button>
+              </div>
+            </div>
+          ) : (
+            <button key={p.id} onClick={() => { setOpenId(p.id); setSection(null); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "13px 16px", minHeight: 64, background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
+              <Avatar size={46} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--gold)"} />
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 16, fontWeight: 500 }}>{p.name}</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>{p.role}</div></div>
+              <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </button>
           ))}
         </div>
 
-        <button onClick={addStaff} className="lift" style={{ width: "100%", marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 14, padding: 16, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, boxShadow: "var(--shadow-sm)" }}><Plus size={18} /> ADD A STAFF MEMBER</button>
-
-        {archived.length > 0 && (
-          <button onClick={() => setShowArchived(!showArchived)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", color: "var(--text)" }}>
-            <span style={{ fontSize: 15.5, fontWeight: 600 }}>Show Archived Staff</span>
-            <ChevronRight size={18} style={{ color: "var(--faint)", transform: showArchived ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
-          </button>
+        {!editMode && (
+          <button onClick={addStaff} className="lift" style={{ width: "100%", marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, boxShadow: "var(--shadow-sm)" }}><Plus size={18} /> Add a team member</button>
         )}
-        {showArchived && archived.map((p) => (
-          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "12px 16px" }}>
-            <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--panel)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif" }}>{p.name.charAt(0)}</div>
-            <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 500 }}>{p.name}</div><div style={{ fontSize: 13, color: "var(--faint)" }}>Archived</div></div>
-            <button onClick={() => restore(p.id)} style={{ background: "none", color: "var(--gold)", fontSize: 14, fontWeight: 500 }}>Restore</button>
-          </div>
-        ))}
+
+        {!editMode && archived.length > 0 && (
+          <>
+            <div style={{ fontSize: 11.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "22px 0 9px 6px" }}>Archived</div>
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+              {archived.map((p, i) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 13, padding: "13px 16px", minHeight: 60, borderTop: i ? "1px solid var(--line)" : "none" }}>
+                  <Avatar size={40} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--faint)"} />
+                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15.5, fontWeight: 500, color: "var(--sub)" }}>{p.name}</div><div style={{ fontSize: 13, color: "var(--faint)" }}>Archived</div></div>
+                  <button onClick={() => restore(p.id)} style={{ background: "none", color: "var(--gold)", fontSize: 14, fontWeight: 500 }}>Restore</button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -8785,24 +8811,26 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         </div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "6px 18px" }}>
           {editingDetails ? (
-            <div style={{ display: "grid", gap: 14, padding: "14px 0" }}>
-              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Name</div><input value={person.name} onChange={(e) => patch(person.id, { name: e.target.value })} style={inputStyle} /></div>
-              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Role / title</div><input value={person.role} onChange={(e) => patch(person.id, { role: e.target.value })} style={inputStyle} /></div>
-              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Email</div><input value={person.email || ""} onChange={(e) => patch(person.id, { email: e.target.value })} inputMode="email" autoCapitalize="none" style={inputStyle} /></div>
-              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>Phone</div><input value={person.phone || ""} onChange={(e) => patch(person.id, { phone: e.target.value })} inputMode="tel" style={inputStyle} /></div>
-              <div><div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 5 }}>User type</div>
-                <div style={{ display: "flex", gap: 8 }}>{["Admin", "Staff", "Front Desk"].map((t) => (
-                  <button key={t} onClick={() => patch(person.id, { userType: t })} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${ut === t ? "var(--gold)" : "var(--border2)"}`, background: ut === t ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel2)", color: ut === t ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: ut === t ? 600 : 400 }}>{t}</button>
-                ))}</div>
+            <div style={{ padding: "8px 0 4px" }}>
+              <div style={{ display: "grid", gap: 15 }}>
+                <div><FieldLabel>Name</FieldLabel><input value={person.name} onChange={(e) => patch(person.id, { name: e.target.value })} style={inputStyle} /></div>
+                <div><FieldLabel>Role / title</FieldLabel><input value={person.role} onChange={(e) => patch(person.id, { role: e.target.value })} style={inputStyle} /></div>
+                <div><FieldLabel>Email</FieldLabel><input value={person.email || ""} onChange={(e) => patch(person.id, { email: e.target.value })} inputMode="email" autoCapitalize="none" style={inputStyle} /></div>
+                <div><FieldLabel>Phone</FieldLabel><input value={person.phone || ""} onChange={(e) => patch(person.id, { phone: e.target.value })} inputMode="tel" style={inputStyle} /></div>
+                <div><FieldLabel>User type</FieldLabel><Segmented options={[{ value: "Admin", label: "Admin" }, { value: "Staff", label: "Staff" }, { value: "Front Desk", label: "Front desk" }]} value={ut} onChange={(v) => patch(person.id, { userType: v })} /></div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ fontSize: 15 }}>Is service provider</span><Toggle on={person.isProvider !== false} onClick={() => patch(person.id, { isProvider: !(person.isProvider !== false) })} /></div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ fontSize: 15 }}>Enable in online booking</span><Toggle on={!!person.onlineBooking} onClick={() => patch(person.id, { onlineBooking: !person.onlineBooking })} /></div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)", marginTop: 8 }}>
+                <span style={{ fontSize: 15.5, fontWeight: 500 }}>Is a service provider</span><Toggle on={person.isProvider !== false} onClick={() => patch(person.id, { isProvider: !(person.isProvider !== false) })} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+                <span style={{ fontSize: 15.5, fontWeight: 500 }}>Enable in online booking</span><Toggle on={!!person.onlineBooking} onClick={() => patch(person.id, { onlineBooking: !person.onlineBooking })} />
+              </div>
             </div>
           ) : (
             <div>
               {[["Email", person.email || "—"], ["Phone", person.phone || "—"], ["User type", ut], ["Is service provider", person.isProvider !== false ? "Yes" : "No"], ["Enable in online booking", person.onlineBooking ? "Yes" : "No"]].map(([k, v], i) => (
                 <div key={k} style={{ padding: "16px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
-                  <div style={{ fontSize: 14, color: "var(--faint)", marginBottom: 3 }}>{k}</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 3 }}>{k}</div>
                   <div style={{ fontSize: 16, color: k === "Email" ? "var(--gold)" : "var(--text)" }}>{v}</div>
                 </div>
               ))}
@@ -8862,39 +8890,41 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         <SecHeader title="Services" onBack={() => setSection(null)} right={
           <button onClick={() => { const next = !!allOff; services.forEach((s) => setSvc(s.id, { on: next })); }} style={{ background: "none", color: "var(--gold)", fontSize: 15, fontWeight: 500 }}>{allOff ? "Enable all" : "Disable all"}</button>
         } />
-        <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginBottom: 14 }}>Same settings as each service's Staff tab — edit here or there, they stay in sync.</p>
+        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14, fontWeight: 400 }}>Same settings as each service's Staff tab — edit here or there, they stay in sync.</p>
         <div style={{ display: "grid", gap: 14 }}>
           {services.map((s) => {
             const e = entryFor(s); const on = e.on !== false;
+            const durSet = e.duration != null && e.duration !== "";
+            const priceSet = e.price != null && e.price !== "";
             return (
-              <div key={s.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16, opacity: on ? 1 : 0.55 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: on ? 14 : 0 }}>
-                  <span style={{ fontSize: 16.5, fontWeight: 700 }}>{s.name}</span>
+              <div key={s.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "2px 16px", boxShadow: "var(--shadow-sm)", opacity: on ? 1 : 0.6 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0", borderBottom: on ? "1px solid var(--line)" : "none" }}>
+                  <span style={{ fontSize: 16, fontWeight: 500 }}>{s.name}</span>
                   <Toggle on={on} onClick={() => setSvc(s.id, { on: !on })} />
                 </div>
                 {on && (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)" }}>
-                      <span style={{ fontSize: 15, color: "var(--text2)" }}>Duration</span>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
-                          <input type="number" value={e.duration ?? ""} onChange={(ev) => setSvc(s.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} placeholder={String(s.duration)} style={{ width: 56, background: "transparent", border: "none", color: "var(--gold)", fontSize: 17, fontWeight: 700, textAlign: "right", fontFamily: FONT_BODY }} />
-                          <span style={{ fontSize: 15, color: "var(--gold)", fontWeight: 700 }}>min</span>
-                        </div>
-                        {e.duration != null && <button onClick={() => setSvc(s.id, { duration: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5 }}>Reset to default</button>}
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: "1px solid var(--line)" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 15.5, fontWeight: 500 }}>Duration</div>
+                        {durSet && <button onClick={() => setSvc(s.id, { duration: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5, marginTop: 3, padding: 0 }}>Default · {s.duration} min · reset</button>}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                        <input type="number" value={e.duration ?? ""} onChange={(ev) => setSvc(s.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} placeholder={String(s.duration)} style={{ width: 66, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 10px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
+                        <span style={{ fontSize: 14, color: "var(--sub)" }}>min</span>
                       </div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)" }}>
-                      <span style={{ fontSize: 15, color: "var(--text2)" }}>Price</span>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 2, justifyContent: "flex-end" }}>
-                          <span style={{ fontSize: 17 }}>$</span>
-                          <input type="number" value={e.price ?? ""} onChange={(ev) => setSvc(s.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} placeholder={String(s.price)} style={{ width: 70, background: "transparent", border: "none", color: "var(--text)", fontSize: 17, textAlign: "right", fontFamily: FONT_BODY }} />
-                        </div>
-                        {e.price != null && <button onClick={() => setSvc(s.id, { price: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5 }}>Reset to default</button>}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 15.5, fontWeight: 500 }}>Price</div>
+                        {priceSet && <button onClick={() => setSvc(s.id, { price: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5, marginTop: 3, padding: 0 }}>Default · ${s.price} · reset</button>}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                        <span style={{ fontSize: 15, color: "var(--sub)" }}>$</span>
+                        <input type="number" value={e.price ?? ""} onChange={(ev) => setSvc(s.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} placeholder={String(s.price)} style={{ width: 74, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 10px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
                       </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             );
@@ -9018,13 +9048,13 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           };
           return <RepeatPopup />;
         })()}
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginTop: 16 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Max appointments per day</div>
-          <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Once {person.name.split(" ")[0]} hits this many in a day, online clients can't book more — you can still add one manually. Leave at 0 for no limit.</p>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button onClick={() => patch(person.id, { maxPerDay: Math.max(0, (Number(person.maxPerDay) || 0) - 1) })} style={{ width: 44, height: 44, borderRadius: 12, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 20 }}>−</button>
-            <div style={{ flex: 1, textAlign: "center", fontSize: 22, fontWeight: 600 }}>{(Number(person.maxPerDay) || 0) === 0 ? "No limit" : (Number(person.maxPerDay) || 0)}</div>
-            <button onClick={() => patch(person.id, { maxPerDay: (Number(person.maxPerDay) || 0) + 1 })} style={{ width: 44, height: 44, borderRadius: 12, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 20 }}>+</button>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "2px 18px", marginTop: 16, boxShadow: "var(--shadow-sm)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15.5, fontWeight: 500 }}>Max appointments per day</div>
+              <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Online clients can't book past this — you can still add one manually. Leave blank for no limit.</div>
+            </div>
+            <input type="number" min="0" value={person.maxPerDay || ""} onChange={(e) => patch(person.id, { maxPerDay: Math.max(0, parseInt(e.target.value || "0", 10)) })} placeholder="No limit" style={{ width: 88, flexShrink: 0, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 11px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
           </div>
         </div>
         {(() => {
@@ -9084,17 +9114,10 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
           <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Fraunces', serif", marginBottom: 4 }}>Role</div>
           <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, marginBottom: 14 }}>Owners see every barber's numbers and shop totals. Barbers see only their own chair.</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            {[["barber", "Barber"], ["owner", "Owner"]].map(([id, label]) => {
-              const on = (person.pulseRole || "barber") === id;
-              return (
-                <button key={id} onClick={() => patch(person.id, { pulseRole: id })} style={{ flex: 1, padding: "11px 12px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{label}</button>
-              );
-            })}
-          </div>
+          <Segmented options={[{ value: "barber", label: "Barber" }, { value: "owner", label: "Owner" }]} value={person.pulseRole || "barber"} onChange={(v) => patch(person.id, { pulseRole: v })} />
         </div>
 
-        <button onClick={() => { showToast && showToast("Saved."); setSection(null); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 13.5, letterSpacing: 2, fontWeight: 600, borderRadius: 12, cursor: "pointer", marginTop: 4 }}>SAVE</button>
+        <button onClick={() => { showToast && showToast("Saved."); setSection(null); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 13, cursor: "pointer", marginTop: 4 }}>Save</button>
       </div>
     );
   }
@@ -9120,24 +9143,18 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         <SecHeader title="Compensation" onBack={() => setSection(null)} />
 
         {/* Earnings goals — drive the Pulse goal ring + weekly bar. Personal to this barber. */}
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Fraunces', serif", marginBottom: 4 }}>Earnings goals</div>
-          <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, marginBottom: 16 }}>Personal targets shown on {person.name}'s Pulse as a progress ring and weekly bar. Set to 0 to hide. Auto-tracks from completed appointments — no manual logging.</div>
-          <div style={{ display: "grid", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <label style={{ fontSize: 15, color: "var(--text)" }}>Daily goal</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 15, color: "var(--faint)" }}>$</span>
-                <input type="number" min="0" step="25" value={person.dailyGoal || 0} onChange={(e) => patch(person.id, { dailyGoal: Math.max(0, parseInt(e.target.value || "0", 10)) })} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, width: 100, textAlign: "right" }} />
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <label style={{ fontSize: 15, color: "var(--text)" }}>Weekly goal</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 15, color: "var(--faint)" }}>$</span>
-                <input type="number" min="0" step="50" value={person.weeklyGoal || 0} onChange={(e) => patch(person.id, { weeklyGoal: Math.max(0, parseInt(e.target.value || "0", 10)) })} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, width: 100, textAlign: "right" }} />
-              </div>
-            </div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "2px 18px", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
+          <div style={{ padding: "16px 0 6px" }}>
+            <div style={{ fontSize: 18, fontWeight: 600, fontFamily: "'Fraunces', serif", marginBottom: 4 }}>Earnings goals</div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>Personal targets shown on {person.name.split(" ")[0]}'s Pulse. Set to 0 to hide — auto-tracks from completed appointments.</div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+            <span style={{ fontSize: 15.5, fontWeight: 500 }}>Daily goal</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ fontSize: 15, color: "var(--sub)" }}>$</span><input type="number" min="0" step="25" value={person.dailyGoal || 0} onChange={(e) => patch(person.id, { dailyGoal: Math.max(0, parseInt(e.target.value || "0", 10)) })} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 11px", color: "var(--text)", fontSize: 15, fontWeight: 500, fontFamily: FONT_BODY, width: 90, textAlign: "right" }} /></div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+            <span style={{ fontSize: 15.5, fontWeight: 500 }}>Weekly goal</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ fontSize: 15, color: "var(--sub)" }}>$</span><input type="number" min="0" step="50" value={person.weeklyGoal || 0} onChange={(e) => patch(person.id, { weeklyGoal: Math.max(0, parseInt(e.target.value || "0", 10)) })} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 11px", color: "var(--text)", fontSize: 15, fontWeight: 500, fontFamily: FONT_BODY, width: 90, textAlign: "right" }} /></div>
           </div>
         </div>
 
@@ -9247,30 +9264,38 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   }
 
   // ---------- MEMBER HUB ----------
+  const hubNotif = { ...defaultStaffNotifications(), ...(person.notifications || {}) };
+  const hubComp = { ...defaultComp(), ...(person.comp || {}) };
+  const hubSc = { ...defaultComp().service, ...hubComp.service };
+  const hubSvcOn = services.filter((s) => ((s.staff && s.staff[person.id] && s.staff[person.id].on) !== false)).length;
+  const hubDays = Object.values(person.hours || {}).filter((h) => h && h.on).length;
   const hubRows = [
     { id: "details", label: "Details" },
-    { id: "access", label: "Sign-in & access" },
-    { id: "notifications", label: "Notifications" },
-    { id: "services", label: "Services" },
-    { id: "hours", label: "Work Hours" },
-    { id: "comp", label: "Compensation" },
+    { id: "access", label: "Sign-in & access", value: (person.pulseRole === "owner" ? "Owner" : "Barber") },
+    { id: "notifications", label: "Notifications", value: (Object.values(hubNotif).some(Boolean) ? "On" : "Off") },
+    { id: "services", label: "Services", value: `${hubSvcOn} of ${services.length}` },
+    { id: "hours", label: "Work hours", value: hubDays ? `${hubDays} day${hubDays === 1 ? "" : "s"}` : "None set" },
+    { id: "comp", label: "Compensation", value: (hubSc.on ? (hubSc.type === "basic" ? `${hubSc.basicPct}% service` : "Sliding scale") : "Not set") },
     { id: "permissions", label: "Permissions" },
   ];
   return (
     <div className="appt-screen" style={{ paddingBottom: 40 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 18 }}>
-        <button onClick={() => setOpenId(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /> <span style={{ fontSize: 15 }}>Staff</span></button>
+        <button onClick={() => setOpenId(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /> <span style={{ fontSize: 15 }}>Team</span></button>
       </div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
         <div style={{ marginBottom: 12 }}><Avatar size={92} photo={person.id === "anyone" ? null : staffPhoto(person)} initial={person.name.charAt(0)} color={person.color || "var(--gold)"} /></div>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600 }}>{person.name}</div>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500 }}>{person.name}</div>
         <div style={{ fontSize: 14, color: "var(--sub)" }}>{person.role}</div>
       </div>
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
         {hubRows.map((r, i) => (
-          <button key={r.id} onClick={() => { setSection(r.id); setEditingDetails(false); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 18px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
-            <span style={{ fontSize: 17 }}>{r.label}</span>
-            <ChevronRight size={20} style={{ color: "var(--faint)" }} />
+          <button key={r.id} onClick={() => { setSection(r.id); setEditingDetails(false); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "18px 17px", minHeight: 64, background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
+            <span style={{ fontSize: 16.5, fontWeight: 500, letterSpacing: "-0.1px" }}>{r.label}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+              {r.value && <span style={{ fontSize: 15, color: "var(--gold)", fontWeight: 500, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.value}</span>}
+              <ChevronRight size={20} style={{ color: "var(--faint)" }} />
+            </span>
           </button>
         ))}
       </div>
