@@ -6582,6 +6582,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [editing, setEditing] = useState(null); // service id or "new"
   const [section, setSection] = useState(null); // null = hub, else "details"|"staff"|"customizations"|"booking"
   const [picker, setPicker] = useState(null); // {target}
+  const [editMode, setEditMode] = useState(false); // list view: browse vs manage (reorder/delete/rename)
   const cats = (categories && categories.length) ? categories : ["Services"];
   const staffList = (providers || []).filter((p) => p.id !== "anyone");
   // build a default staff map: everyone ON, no overrides (null = use service default)
@@ -7392,65 +7393,78 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
   return (
     <div className="fade-up">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500 }}>Menu</h2>
-        <button className="lift" onClick={openNew} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "10px 16px", borderRadius: 12, fontSize: 15, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> Add service</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: "-0.4px" }}>Menu</h2>
+        <button onClick={() => setEditMode((v) => !v)} style={{ background: "none", color: "var(--gold)", fontSize: 15.5, fontWeight: editMode ? 600 : 500, padding: "6px 2px" }}>{editMode ? "Done" : "Edit"}</button>
       </div>
-      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 20, fontWeight: 300 }}>Group services into categories. Press and hold the handle to drag, or use the arrows. Your order is saved automatically.</p>
+      <p style={{ color: "var(--sub)", fontSize: 13, marginBottom: 20, fontWeight: 400, lineHeight: 1.5 }}>{editMode ? "Drag the handle to reorder · tap − to remove." : "Your services, grouped. Tap one to edit it."}</p>
 
-      <button className="lift" onClick={() => { setLibForm(null); setLibOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", textAlign: "left", marginBottom: 22 }}>
-        <span style={{ minWidth: 0 }}>
-          <span style={{ display: "block", fontSize: 17, fontWeight: 500 }}>Cut Styles</span>
-          <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>Edit each style once — it updates everywhere it's used</span>
-        </span>
-        <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
-      </button>
+      {!editMode && (
+        <button className="lift" onClick={() => { setLibForm(null); setLibOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 16px", color: "var(--text)", textAlign: "left", marginBottom: 22, boxShadow: "var(--shadow-sm)", minHeight: 62 }}>
+          <span style={{ width: 38, height: 38, borderRadius: 11, background: "color-mix(in srgb, var(--gold) 16%, var(--panel))", color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Scissors size={19} /></span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 16, fontWeight: 500 }}>Cut styles</span>
+            <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>Edit once — updates everywhere it's used</span>
+          </span>
+          <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+        </button>
+      )}
 
       {cats.map((cat, ci) => {
         const inCat = services.filter((s) => (s.category || cats[0]) === cat);
+        const cardClipping = !(tDrag && tDrag.cat === cat);
         return (
-          <div key={cat} style={{ marginBottom: 26 }}>
+          <div key={cat} style={{ marginBottom: 22 }}>
             {/* category header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <GripVertical size={16} style={{ color: "var(--faint)" }} />
-              <span style={{ fontSize: 13, letterSpacing: 2, color: "var(--text2)", fontWeight: 700, flex: 1 }}>{cat.toUpperCase()}</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <button onClick={() => moveCategory(cat, -1)} disabled={ci === 0} style={{ background: "none", color: ci === 0 ? "var(--faint)" : "var(--sub)", padding: 4, opacity: ci === 0 ? 0.4 : 1 }}><ChevronRight size={16} style={{ transform: "rotate(-90deg)" }} /></button>
-                <button onClick={() => moveCategory(cat, 1)} disabled={ci === cats.length - 1} style={{ background: "none", color: ci === cats.length - 1 ? "var(--faint)" : "var(--sub)", padding: 4, opacity: ci === cats.length - 1 ? 0.4 : 1 }}><ChevronRight size={16} style={{ transform: "rotate(90deg)" }} /></button>
-                <button onClick={() => renameCategory(cat)} style={{ background: "none", color: "var(--sub)", padding: 4 }}><Edit2 size={14} /></button>
-                <button onClick={() => deleteCategory(cat)} style={{ background: "none", color: "#C2703D", padding: 4 }}><Trash2 size={14} /></button>
-              </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 9px 6px", minHeight: 22 }}>
+              <span style={{ flex: 1, fontSize: 11.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{cat}</span>
+              {editMode && (
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <button onClick={() => renameCategory(cat)} style={{ background: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 500, padding: 0 }}>Rename</button>
+                  {cats.length > 1 && <button onClick={() => deleteCategory(cat)} style={{ background: "none", color: "#C2703D", fontSize: 13.5, fontWeight: 500, padding: 0 }}>Delete</button>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <button onClick={() => moveCategory(cat, -1)} disabled={ci === 0} style={{ background: "none", color: ci === 0 ? "var(--faint)" : "var(--sub)", padding: 2, opacity: ci === 0 ? 0.4 : 1 }}><ChevronUp size={17} /></button>
+                    <button onClick={() => moveCategory(cat, 1)} disabled={ci === cats.length - 1} style={{ background: "none", color: ci === cats.length - 1 ? "var(--faint)" : "var(--sub)", padding: 2, opacity: ci === cats.length - 1 ? 0.4 : 1 }}><ChevronDown size={17} /></button>
+                  </div>
+                </div>
+              )}
             </div>
-            {/* services in this category */}
-            <div style={{ display: "grid", gap: 10 }}>
-              {inCat.length === 0 && <div style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "6px 2px" }}>No services in this category yet.</div>}
+            {/* services card */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: cardClipping ? "hidden" : "visible" }}>
+              {inCat.length === 0 && <div style={{ fontSize: 14, color: "var(--faint)", padding: "16px 16px" }}>No services here yet.</div>}
               {inCat.map((s, si) => {
                 const dd = tDrag;
                 const act = dd && dd.cat === cat;
                 const held = act && dd.id === s.id;
-                let ty = 0, sc = 1, zz = 1, sh = "var(--shadow-sm)", bd = "1px solid var(--border)";
+                let ty = 0, sc = 1, zz = 1;
                 let tr = "scale .17s ease, box-shadow .2s ease, border-color .2s ease";
                 if (held) {
-                  ty = dd.dy; sc = 1.03; zz = 50; sh = "0 16px 34px rgba(60,50,30,0.22)"; bd = "1.5px solid var(--gold)";
-                  tr = dd.dropping ? "translate .19s cubic-bezier(.2,.85,.25,1), scale .17s ease, box-shadow .2s ease, border-color .2s ease" : "scale .16s ease, box-shadow .16s ease, border-color .16s ease";
+                  ty = dd.dy; sc = 1.03; zz = 50;
+                  tr = dd.dropping ? "translate .19s cubic-bezier(.2,.85,.25,1), scale .17s ease, box-shadow .2s ease" : "scale .16s ease, box-shadow .16s ease";
                 } else if (act) {
-                  tr = "translate .22s cubic-bezier(.2,.85,.25,1), scale .17s ease, box-shadow .2s ease, border-color .2s ease";
+                  tr = "translate .22s cubic-bezier(.2,.85,.25,1), scale .17s ease, box-shadow .2s ease";
                   if (dd.overIndex > dd.fromIndex && si > dd.fromIndex && si <= dd.overIndex) ty = -dragRowH.current;
                   else if (dd.overIndex < dd.fromIndex && si >= dd.overIndex && si < dd.fromIndex) ty = dragRowH.current;
                 }
+                const hairline = si > 0 && !held;
                 return (
-                <div key={s.id} ref={(el) => { if (el) rowRefs.current[s.id] = el; }} data-sid={s.id} draggable onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} className="card" style={{ position: "relative", zIndex: zz, display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: bd, borderRadius: 16, padding: "15px 14px", boxShadow: sh, translate: `0px ${ty}px`, scale: String(sc), transition: tr, willChange: act ? "translate" : "auto" }}>
-                  <span onTouchStart={touchStart(s.id, cat, inCat.map((x) => x.id))} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchEnd} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", flexShrink: 0, padding: "8px 4px", cursor: held ? "grabbing" : "grab" }}><GripVertical size={18} style={{ color: held ? "var(--gold)" : "var(--faint)" }} /></span>
-                  <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--text)", minWidth: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 9, height: 9, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />{s.name}</div>
-                    <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>${s.price} · {s.duration} min{s.addonGroups.length ? ` · ${s.addonGroups.length} add-on${s.addonGroups.length !== 1 ? "s" : ""}` : ""}</div>
-                  </button>
-                  {/* up/down reorder (mobile-safe) */}
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <button onClick={() => moveService(s.id, -1)} disabled={si === 0} style={{ background: "none", color: si === 0 ? "var(--faint)" : "var(--sub)", padding: "2px 4px", opacity: si === 0 ? 0.4 : 1 }}><ChevronRight size={16} style={{ transform: "rotate(-90deg)" }} /></button>
-                    <button onClick={() => moveService(s.id, 1)} disabled={si === inCat.length - 1} style={{ background: "none", color: si === inCat.length - 1 ? "var(--faint)" : "var(--sub)", padding: "2px 4px", opacity: si === inCat.length - 1 ? 0.4 : 1 }}><ChevronRight size={16} style={{ transform: "rotate(90deg)" }} /></button>
-                  </div>
-                  <button onClick={() => remove(s.id)} style={{ background: "none", color: "#C2703D", padding: 6, flexShrink: 0 }}><Trash2 size={16} /></button>
+                <div key={s.id} ref={(el) => { if (el) rowRefs.current[s.id] = el; }} data-sid={s.id} draggable={editMode} onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} style={{ position: "relative", zIndex: zz, display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", padding: "14px 16px", minHeight: 60, borderTop: held ? "1.5px solid var(--gold)" : (hairline ? "1px solid var(--line)" : "none"), border: held ? "1.5px solid var(--gold)" : undefined, borderRadius: held ? 13 : 0, boxShadow: held ? "0 16px 34px rgba(60,50,30,0.22)" : "none", translate: `0px ${ty}px`, scale: String(sc), transition: tr, willChange: act ? "translate" : "auto" }}>
+                  {editMode && <button onClick={() => remove(s.id)} aria-label={`Remove ${s.name}`} style={{ width: 24, height: 24, borderRadius: "50%", background: "#C2703D", color: "#fff", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "none", padding: 0, fontSize: 20, lineHeight: 0, fontWeight: 600 }}>−</button>}
+                  <span style={{ width: 11, height: 11, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />
+                  {editMode ? (
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 16, fontWeight: 500, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                      <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>${s.price} · {s.duration} min</div>
+                    </div>
+                  ) : (
+                    <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--text)", minWidth: 0, padding: 0 }}>
+                      <div style={{ fontSize: 16, fontWeight: 500, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                      <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>${s.price} · {s.duration} min</div>
+                    </button>
+                  )}
+                  {editMode
+                    ? <span onTouchStart={touchStart(s.id, cat, inCat.map((x) => x.id))} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchEnd} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", flexShrink: 0, padding: "8px 2px 8px 8px", cursor: held ? "grabbing" : "grab" }}><GripVertical size={20} style={{ color: held ? "var(--gold)" : "var(--faint)" }} /></span>
+                    : <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />}
                 </div>
                 );
               })}
@@ -7459,7 +7473,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         );
       })}
 
-      <button onClick={addCategory} className="lift" style={{ display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "1px dashed var(--border2)", color: "var(--gold)", padding: "13px 16px", borderRadius: 12, fontSize: 15, width: "100%", justifyContent: "center", fontWeight: 500 }}><Plus size={17} /> Add category</button>
+      {!editMode && (
+        <>
+          <button className="lift" onClick={openNew} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Plus size={18} /> Add a service</button>
+          <button onClick={addCategory} className="lift" style={{ display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "1px dashed var(--border2)", color: "var(--gold)", padding: "13px 16px", borderRadius: 13, fontSize: 15, width: "100%", justifyContent: "center", fontWeight: 500 }}><Plus size={17} /> New category</button>
+        </>
+      )}
     </div>
   );
 }
