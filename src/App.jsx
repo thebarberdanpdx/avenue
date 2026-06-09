@@ -7938,17 +7938,17 @@ function WaitlistRulesEditor({ w, onChange }) {
     <div>
       <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 22 }}>When an appointment is cancelled, the system finds waitlisted clients whose preferred time and barber match the open slot, and reaches out with a link to book.</p>
 
-      <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>HOW IT SENDS</div>
+      <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>How it sends</div>
       <Opt active={w.mode === "ask"} title="Ask me first" sub="Show a confirmation listing who matches, and I send it." onClick={() => set({ mode: "ask" })} />
       <Opt active={w.mode === "silent"} title="Send automatically (silent)" sub="The system notifies matching clients on its own — no prompt." onClick={() => set({ mode: "silent" })} />
 
-      <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", margin: "20px 0 10px" }}>WHO IT REACHES</div>
+      <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, margin: "20px 0 8px" }}>Who it reaches</div>
       <Opt active={w.order === "longest"} title="Longest waiting first — one at a time" sub="Offer the slot to whoever has waited longest. If they don't book in time, it moves to the next person in line." onClick={() => set({ order: "longest" })} />
       <Opt active={w.order === "all"} title="First come, first serve — notify all at once" sub="Notify every matching client at the same time. Whoever books first gets the slot." onClick={() => set({ order: "all" })} />
 
       {w.order === "longest" && (
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WAIT BEFORE OFFERING TO THE NEXT PERSON</div>
+          <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>Wait before offering to the next person</div>
           <div style={{ display: "flex", gap: 8 }}>
             {delays.map((d) => { const on = (w.delayMin || 30) === d; return (
               <button key={d} onClick={() => set({ delayMin: d })} style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{d} min</button>
@@ -8123,26 +8123,6 @@ function PhoneNumbersEditor({ phones, onChange }) {
         </div>
       ))}
       <button className="lift" onClick={addPhone} style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 12, padding: 14, fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add phone number</button>
-    </div>
-  );
-}
-
-// Staff Selection — which staff appear as bookable in online booking.
-function StaffSelectionEditor({ providers, setProviders }) {
-  const staff = providers.filter((p) => p.id !== "anyone");
-  const toggle = (pid) => setProviders(providers.map((p) => p.id === pid ? { ...p, onlineBooking: !p.onlineBooking } : p));
-  return (
-    <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Choose who clients can book online. Turning someone off keeps them on your calendar but hides them from the public booking page.</p>
-      {staff.map((p, i) => (
-        <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 0", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Avatar size={40} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color} />
-            <div><div style={{ fontSize: 15.5, fontWeight: 500 }}>{p.name}</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>{p.role}</div></div>
-          </div>
-          <button onClick={() => toggle(p.id)} style={{ width: 44, height: 26, borderRadius: 13, background: p.onlineBooking ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: p.onlineBooking ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
-        </div>
-      ))}
     </div>
   );
 }
@@ -9610,7 +9590,7 @@ function NoShowEditor({ b, policy, onBooking, onPolicy }) {
 
       {/* Policy text */}
       <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18, marginTop: 18 }}>
-        <div style={{ fontSize: 14, letterSpacing: 2, color: "var(--faint)", marginBottom: 6 }}>POLICY CLIENTS AGREE TO</div>
+        <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>Policy clients agree to</div>
         <textarea value={policy} onChange={(e) => onPolicy(e.target.value)} rows={5} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
         <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 8 }}>Shown on the booking screen for clients to agree to. Write it to match your own rules and your state's regulations.</p>
       </div>
@@ -9654,7 +9634,7 @@ function BookingTimesEditor({ b, onChange }) {
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 5 }}>{m.desc}</div>
               {on && (
                 <div style={{ marginTop: 12, background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
-                  <div style={{ fontSize: 10.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, marginBottom: 5 }}>FOR EXAMPLE</div>
+                  <div style={{ fontSize: 11, letterSpacing: 0.3, color: "var(--gold)", fontWeight: 600, marginBottom: 5 }}>For example</div>
                   <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55 }}>{m.example}</div>
                 </div>
               )}
@@ -9732,7 +9712,7 @@ function AnyoneRoutingEditor({ b, onChange, providers = [] }) {
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 5 }}>{m.desc}</div>
               {on && (
                 <div style={{ marginTop: 12, background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
-                  <div style={{ fontSize: 10.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, marginBottom: 5 }}>FOR EXAMPLE</div>
+                  <div style={{ fontSize: 11, letterSpacing: 0.3, color: "var(--gold)", fontWeight: 600, marginBottom: 5 }}>For example</div>
                   <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55 }}>{m.example}</div>
                 </div>
               )}
@@ -10974,12 +10954,6 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       toggle: { on: (form.bookingStep || {}).showPrices === true, set: (v) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), showPrices: v } }) },
       keywords: "price prices show display total cost amount add-on style money hide booking flow running total reveal",
       editor: <ToggleSetting label="Show prices while booking" desc="When on, clients see each style and add-on's price, plus a running total as they choose add-ons. When off, no prices appear during booking (today's default)." on={(form.bookingStep || {}).showPrices === true} onToggle={(v) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), showPrices: v } })} />,
-    },
-    {
-      id: "staffselection", title: "Staff Selection", icon: Users, category: "Online Booking",
-      status: `${providers.filter((p) => p.id !== "anyone" && p.onlineBooking).length} bookable online`,
-      keywords: "staff selection online booking bookable show hide who clients book provider barber availability public page",
-      editor: <StaffSelectionEditor providers={providers} setProviders={setProviders} />,
     },
     {
       id: "newclient", title: "How new clients pick a cut", icon: Sparkles, category: "Online Booking",
