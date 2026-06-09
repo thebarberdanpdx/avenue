@@ -4474,6 +4474,11 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   const minutesUntil = nextAppt ? (nextAppt.start - nowMin) : null;
   const minutesLeft = inChair ? (inChair.end - nowMin) : null;
   const minutesInChair = inChair ? (nowMin - inChair.start) : null;
+  // Forgotten check-in: a slot that's happening right now but was never started (timer not tapped).
+  // Personal / per-barber view only, so "Start" is unambiguous.
+  const needsStart = (!isShopView && viewedProvider)
+    ? todayApptsAll.find((a) => a.start <= nowMin && a.end > nowMin && (a.status === "confirmed" || a.status === "checked-in"))
+    : null;
 
   // --- "Free until" calc — only meaningful if not currently in chair and there's a next appt ---
   const fmtTime = (m) => { const h = Math.floor(m / 60); const mm = m % 60; const ampm = h >= 12 ? "PM" : "AM"; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12}:${mm.toString().padStart(2, "0")} ${ampm}`; };
@@ -4783,6 +4788,25 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             </button>
           )}
         </>
+      )}
+
+      {needsStart && (
+        <div style={{ marginBottom: 16, background: "color-mix(in srgb, var(--gold) 11%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, padding: "15px 16px", boxShadow: "var(--shadow-sm)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <span style={{ position: "relative", width: 9, height: 9, flexShrink: 0 }}>
+              <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 40%, transparent)", animation: "pulse 1.6s var(--ease) infinite" }} />
+              <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "var(--gold)" }} />
+            </span>
+            <span style={{ fontSize: 15.5, fontWeight: 600 }}>{needsStart.name || "This client"} is on the chair</span>
+          </div>
+          <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 5, lineHeight: 1.45 }}>Their {fmtTime(needsStart.start)} {needsStart.title || "appointment"} hasn't been started. Tap to start the timer.</div>
+          <button className="lift" onClick={() => {
+            setAppts((cur) => cur.map((a) => a.id === needsStart.id ? { ...a, status: "in-service", serviceStartedAt: a.serviceStartedAt || Date.now() } : a));
+            if (showToast) showToast(`Started ${(needsStart.name || "the").split(" ")[0]}'s ${needsStart.title || "appointment"}.`);
+          }} style={{ marginTop: 12, width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: 12, fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <span style={{ width: 0, height: 0, borderLeft: "8px solid currentColor", borderTop: "5px solid transparent", borderBottom: "5px solid transparent" }} /> Start the timer
+          </button>
+        </div>
       )}
 
       {/* RUNNING LATE — surfaces on Pulse when the in-chair appointment is within the threshold of overrunning the next one,
