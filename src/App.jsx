@@ -7794,48 +7794,45 @@ function MessagesEditor({ messages, onChange, business }) {
   const update = (id, patch) => onChange(messages.map((m) => m.id === id ? { ...m, ...patch } : m));
   const insertTag = (m, tag) => update(m.id, { body: (m.body || "") + (m.body && !m.body.endsWith(" ") ? " " : "") + tag });
   const channelBadge = (ch) => {
-    const map = { text: ["Text", "#0A84FF"], email: ["Email", "var(--gold)"], both: ["Text + Email", "var(--sub)"] };
-    const [label, color] = map[ch] || map.text;
-    return <span style={{ fontSize: 11.5, letterSpacing: 0.5, color, border: `1px solid ${color}`, borderRadius: 20, padding: "2px 9px" }}>{label}</span>;
+    const map = { text: ["Text", "var(--sub)", "var(--border2)"], email: ["Email", "var(--gold)", "color-mix(in srgb, var(--gold) 45%, var(--border))"], both: ["Text + Email", "var(--sub)", "var(--border2)"] };
+    const [label, color, bc] = map[ch] || map.text;
+    return <span style={{ fontSize: 11, letterSpacing: 0.3, color, border: `1px solid ${bc}`, borderRadius: 20, padding: "2px 9px" }}>{label}</span>;
   };
+  const FieldLabel = ({ children }) => <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, margin: "16px 0 7px" }}>{children}</div>;
   return (
     <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.6, fontWeight: 300, marginBottom: 14 }}>Edit exactly what each automated message says. Tap a tag like {"{client}"} to drop in info the system fills automatically.</p>
-      <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel2))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "11px 14px", marginBottom: 18, fontSize: 13, color: "var(--text2)", lineHeight: 1.5 }}>
-        <b style={{ color: "var(--gold)" }}>Preview mode.</b> Texts start sending once your texting service is connected; emails send now. You can write and tweak everything here in the meantime.
+      <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, fontWeight: 400, marginBottom: 14 }}>What each automated message says. Tap one to edit it — tap a tag like {"{client}"} to drop in info Vero fills in automatically.</p>
+      <div style={{ background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 24%, transparent)", borderRadius: 12, padding: "11px 14px", marginBottom: 18, fontSize: 12.5, color: "var(--text2)", lineHeight: 1.5 }}>
+        <b style={{ color: "var(--gold)" }}>Preview mode.</b> Texts start sending once your texting service is connected; emails send now — you can write and tweak everything here meanwhile.
       </div>
-      <div style={{ display: "grid", gap: 10 }}>
-        {messages.map((m) => {
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+        {messages.map((m, i) => {
           const expanded = openId === m.id;
           return (
-            <div key={m.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", opacity: m.enabled ? 1 : 0.6 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px" }}>
-                <button onClick={() => setOpenId(expanded ? null : m.id)} style={{ background: "none", color: "var(--text)", textAlign: "left", flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+            <div key={m.id} style={{ padding: "0 16px", borderTop: i ? "1px solid var(--line)" : "none", opacity: m.enabled ? 1 : 0.55 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "15px 0" }}>
+                <button onClick={() => setOpenId(expanded ? null : m.id)} style={{ background: "none", color: "var(--text)", textAlign: "left", flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15.5, fontWeight: 500 }}>{m.label}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{channelBadge(m.channel)}<span style={{ fontSize: 12.5, color: "var(--sub)" }}>{m.timing}</span></div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>{channelBadge(m.channel)}<span style={{ fontSize: 12.5, color: "var(--sub)" }}>{m.timing}</span></div>
                 </button>
-                <button onClick={() => update(m.id, { enabled: !m.enabled })} aria-label={m.enabled ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: m.enabled ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, marginLeft: 12, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: m.enabled ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                  <ChevronRight size={18} style={{ color: "var(--faint)", transform: expanded ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+                  <Toggle on={m.enabled} onClick={() => update(m.id, { enabled: !m.enabled })} />
+                </div>
               </div>
               {expanded && (
-                <div style={{ padding: "4px 16px 18px", borderTop: "1px solid var(--line)" }}>
-                  <label style={{ fontSize: 13, color: "var(--faint)", display: "block", margin: "14px 0 8px" }}>Send as</label>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                    {[["text", "Text"], ["email", "Email"], ["both", "Both"]].map(([id, label]) => { const on = m.channel === id; return (
-                      <button key={id} onClick={() => update(m.id, { channel: id })} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
-                    ); })}
-                  </div>
-
-                  <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>Message</label>
-                  <textarea value={m.body} onChange={(e) => update(m.id, { body: e.target.value })} rows={4} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", outline: "none", marginBottom: 10 }} />
-
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+                <div style={{ padding: "2px 0 18px", borderTop: "1px solid var(--line)" }}>
+                  <FieldLabel>Send as</FieldLabel>
+                  <Segmented options={[{ value: "text", label: "Text" }, { value: "email", label: "Email" }, { value: "both", label: "Both" }]} value={m.channel} onChange={(v) => update(m.id, { channel: v })} />
+                  <FieldLabel>Message</FieldLabel>
+                  <textarea value={m.body} onChange={(e) => update(m.id, { body: e.target.value })} rows={4} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", outline: "none" }} />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
                     {MERGE_TAGS.map((tag) => (
-                      <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "5px 11px", color: "var(--gold)" }}>{tag}</button>
+                      <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 20, padding: "5px 11px", color: "var(--gold)" }}>{tag}</button>
                     ))}
                   </div>
-
-                  <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 8 }}>PREVIEW</div>
-                  <div style={{ background: m.channel === "email" ? "var(--panel)" : "#0A84FF", color: m.channel === "email" ? "var(--text)" : "#fff", border: m.channel === "email" ? "1px solid var(--border)" : "none", borderRadius: 16, borderBottomLeftRadius: m.channel === "email" ? 16 : 16, padding: "12px 15px", fontSize: 15, lineHeight: 1.45 }}>{fillSample(m.body, business)}</div>
+                  <FieldLabel>Preview</FieldLabel>
+                  <div style={{ background: m.channel === "email" ? "var(--panel)" : "#3A86E0", color: m.channel === "email" ? "var(--text)" : "#fff", border: m.channel === "email" ? "1px solid var(--border)" : "none", borderRadius: 16, padding: "11px 15px", fontSize: 14.5, lineHeight: 1.45 }}>{fillSample(m.body, business)}</div>
                 </div>
               )}
             </div>
