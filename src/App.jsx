@@ -11341,9 +11341,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     const Icon = active.icon;
     return (
       <div className="appt-screen" style={{ width: "100%", padding: "16px 6px 40px" }}>
-        <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontFamily: "'Jost', sans-serif", fontSize: 14.5, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
+        <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 500, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
         <div style={{ marginBottom: 22 }}>
-          <div style={{ width: 36, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 29, fontWeight: 500, lineHeight: 1.1, letterSpacing: "-0.3px" }}>{active.title}</h2>
             {active.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "3px 7px" }}>SMART</span>}
@@ -11354,10 +11353,10 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
         {active.fullBleed
           ? <div>{active.editor}</div>
-          : <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "20px 14px", boxShadow: "var(--shadow-sm)" }}>{active.editor}</div>}
+          : <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 18px", boxShadow: "var(--shadow-sm)" }}>{active.editor}</div>}
 
         {hasChanges && (
-          <button className="lift" onClick={() => save(`${active.title} saved.`)} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>SAVE CHANGES</button>
+          <button className="lift" onClick={() => save(`${active.title} saved.`)} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 15, fontWeight: 600, borderRadius: 14, border: "none" }}>Save changes</button>
         )}
       </div>
     );
@@ -11396,6 +11395,23 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   };
 
   if (helpOpen) return <HelpCenter business={business} onBack={() => setHelpOpen(false)} />;
+
+  // A single setting rendered as a square tile — same grammar as the home grid,
+  // so drilling into a category shows tiles, not a row list.
+  const SettingTile = ({ c }) => {
+    const Ic = c.icon;
+    const meta = c.status || c.subtitle || "";
+    return (
+      <button onClick={() => setOpenCard(c.id)} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 16, minHeight: 104, display: "flex", flexDirection: "column", boxShadow: "var(--shadow-sm)", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          {Ic && <Ic size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />}
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16.5, fontWeight: 500, letterSpacing: "-0.2px", lineHeight: 1.1 }}>{c.title}</span>
+          {c.smart && <span style={{ fontSize: 8.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 5px" }}>SMART</span>}
+        </span>
+        {meta && <span style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 11, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{meta}</span>}
+      </button>
+    );
+  };
 
   return (
     <div className="fade-up" style={{ width: "100%", padding: "12px 6px" }}>
@@ -11475,7 +11491,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           const catCards = cat.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
           return (
             <div className="screen-swap">
-              <button onClick={() => setOpenCat(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontFamily: "'Jost', sans-serif", fontSize: 14.5, marginBottom: 20, padding: 0, border: "none" }}><ArrowLeft size={16} /> All settings</button>
+              <button onClick={() => setOpenCat(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 500, marginBottom: 20, padding: 0, border: "none" }}><ArrowLeft size={16} /> All settings</button>
               <div style={{ marginBottom: 22 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
                   <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, letterSpacing: "-0.4px" }}>{cat.label}</h2>
@@ -11488,17 +11504,17 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                   const groupCards = g.ids.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
                   if (!groupCards.length) return null;
                   return (
-                    <div key={g.label} style={{ marginBottom: 22 }}>
-                      <div style={{ fontSize: 11, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 8px" }}>{g.label}</div>
-                      <div style={{ background: "var(--panel)", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}>
-                        {groupCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
+                    <div key={g.label} style={{ marginBottom: 24 }}>
+                      <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 4px 11px" }}>{g.label}</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        {groupCards.map((c) => <SettingTile key={c.id} c={c} />)}
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <div style={{ background: "var(--panel)", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}>
-                  {catCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} />)}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  {catCards.map((c) => <SettingTile key={c.id} c={c} />)}
                 </div>
               )}
             </div>
