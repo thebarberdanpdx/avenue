@@ -4479,6 +4479,17 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   const needsStart = (!isShopView && viewedProvider)
     ? todayApptsAll.find((a) => a.start <= nowMin && a.end > nowMin && (a.status === "confirmed" || a.status === "checked-in"))
     : null;
+  // Cutting now: a started (in-service) appt happening right now — mirror its two
+  // timer numbers onto Pulse. Personal view only. Elapsed prefers the real
+  // service-start stamp, falling back to the scheduled start.
+  const cutting = (!isShopView && viewedProvider) ? todayApptsAll.find((a) => a.status === "in-service") : null;
+  const cutDur = cutting ? Math.max(1, cutting.end - cutting.start) : 0;
+  const cutElapsed = cutting ? (cutting.serviceStartedAt ? Math.max(0, Math.floor((Date.now() - cutting.serviceStartedAt) / 60000)) : Math.max(0, nowMin - cutting.start)) : 0;
+  const cutLeft = cutting ? (cutDur - cutElapsed) : 0;
+  const cutPct = cutting ? Math.min(100, Math.round((cutElapsed / cutDur) * 100)) : 0;
+  const cutWrap = cutting && cutLeft <= 10;   // near or past the booked time
+  const cutOver = cutting && cutLeft < 0;
+  const cutSvc = cutting ? (cutting.title || ((services || []).find((s) => s.id === cutting.serviceId) || {}).name || "") : "";
 
   // --- "Free until" calc — only meaningful if not currently in chair and there's a next appt ---
   const fmtTime = (m) => { const h = Math.floor(m / 60); const mm = m % 60; const ampm = h >= 12 ? "PM" : "AM"; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12}:${mm.toString().padStart(2, "0")} ${ampm}`; };
@@ -4788,6 +4799,31 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             </button>
           )}
         </>
+      )}
+
+      {cutting && (
+        <div style={{ marginBottom: 16, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "15px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 15.5, fontWeight: 600 }}>{cutting.name || "In service"}</div>
+              {cutSvc && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>{cutSvc}</div>}
+            </div>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexShrink: 0, background: cutWrap ? "color-mix(in srgb, #C08A3E 13%, var(--panel2))" : "color-mix(in srgb, var(--gold) 12%, var(--panel2))", border: "1px solid " + (cutWrap ? "color-mix(in srgb, #C08A3E 30%, var(--border))" : "color-mix(in srgb, var(--gold) 26%, var(--border))"), color: cutWrap ? "#C08A3E" : "var(--gold)", fontSize: 12, fontWeight: 600, padding: "4px 11px 4px 9px", borderRadius: 30 }}>
+              <span style={{ position: "relative", width: 9, height: 9 }}>
+                <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: "currentColor", opacity: 0.35, animation: "pulse 1.6s var(--ease) infinite" }} />
+                <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "currentColor" }} />
+              </span>
+              {cutWrap ? "Wrapping up" : "Cutting"}
+            </span>
+          </div>
+          <div style={{ height: 6, borderRadius: 6, background: "var(--line)", marginTop: 13, overflow: "hidden" }}>
+            <div style={{ height: "100%", borderRadius: 6, width: cutPct + "%", background: cutWrap ? "#C08A3E" : "var(--gold)" }} />
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 9 }}>
+            <span style={{ fontSize: 13.5, color: "var(--sub)" }}><strong style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: "var(--text)", marginRight: 3 }}>{cutElapsed}</strong>min in</span>
+            <span style={{ fontSize: 13.5, color: (cutOver || cutWrap) ? "#C08A3E" : "var(--sub)" }}><strong style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: (cutOver || cutWrap) ? "#C08A3E" : "var(--text)", marginRight: 3 }}>{Math.abs(cutLeft)}</strong>{cutOver ? "min over" : "min left"}</span>
+          </div>
+        </div>
       )}
 
       {needsStart && (
