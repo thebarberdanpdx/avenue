@@ -88,7 +88,7 @@ const SERVICE_PALETTE = [
 ];
 const STATUS_COLORS = {
   "checked-in": "#8B5CF6", // vivid purple — client has self-checked-in / in the lobby
-  "in-service": "#D98BA0", // reddish/pink — in the chair
+  "in-service": "var(--gold)", // theme accent — in the chair
   done: "var(--border2)",         // muted/greyed — finished, recedes
 };
 const hexById = (id) => (SERVICE_PALETTE.find((c) => c.id === id) || SERVICE_PALETTE[0]).hex;
@@ -14137,8 +14137,23 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
   );
 }
 
+// Luminance guard so the in-service accent (theme --gold) stays legible on the dark cutting card.
+// Parses #hex or rgb(), and lightens toward white until it clears a contrast floor against the dark surface.
+function _accParse(s){ if(!s) return null; s=s.trim(); if(s[0]!=="#") return null; let h=s.slice(1); if(h.length===3) h=h.split("").map((c)=>c+c).join(""); if(h.length<6) return null; const n=parseInt(h.slice(0,6),16); if(isNaN(n)) return null; return {r:(n>>16)&255,g:(n>>8)&255,b:n&255}; }
+function _accLum(c){ const f=(x)=>{ x/=255; return x<=0.03928?x/12.92:Math.pow((x+0.055)/1.055,2.4); }; return 0.2126*f(c.r)+0.7152*f(c.g)+0.0722*f(c.b); }
+function accentOnDark(str, min){ let c=_accParse(str); if(!c) return null; const m=min||0.34; let guard=0; while(_accLum(c)<m && guard++<16){ c={r:c.r+(255-c.r)*0.16, g:c.g+(255-c.g)*0.16, b:c.b+(255-c.b)*0.16}; } return `rgb(${Math.round(c.r)}, ${Math.round(c.g)}, ${Math.round(c.b)})`; }
+
 function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, title, nextClient, nextIsWaiting, startedLate, startedLateBy, fmtTime, lateNotified, onLetThemKnow }) {
-  const CUT = "#7CA084";    // calm sage — comfortably on time
+  // Calm color = the theme accent (read live so a "Make it yours" override applies too), guarded for the dark card.
+  const [CUT, setCUT] = useState("#7CA084");
+  useEffect(() => {
+    try {
+      const root = document.getElementById("app-root");
+      const raw = root ? getComputedStyle(root).getPropertyValue("--gold").trim() : "";
+      const safe = accentOnDark(raw);
+      if (safe) setCUT(safe);
+    } catch (e) {}
+  }, []);
   const WARN = "#D89A4B";   // amber — 10 min or less left
   const URGENT = "#C8702E"; // burnt amber — 5 min or less, or over (warm, never red)
   const C = 264;            // circumference for r=42
