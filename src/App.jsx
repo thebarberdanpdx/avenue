@@ -12610,6 +12610,22 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   //  3. Otherwise keep existing order (later: a business-defined drag order — Step C).
   const focusedId = pulseView === "shop" ? null : (pulseView === "me" ? (me && me.id) : pulseView);
   const isOffDay = (p) => { const h = p && p.hours && p.hours[selectedDate.getDay()]; return !h || !h.on; };
+  // Display-only: open stretches between a barber's bookings during their shift, big enough to be worth filling.
+  const GAP_MIN = 20;
+  const gapsForProvider = (p) => {
+    const h = p && p.hours && p.hours[selectedDate.getDay()];
+    if (!h || !h.on) return [];
+    const isTodayView = sameDay(selectedDate.toISOString(), today);
+    const nowM = today.getHours() * 60 + today.getMinutes();
+    const items = (appts || []).filter((a) => a.providerId === p.id && sameDay(a.bookedFor, selectedDate) && a.status !== "cancelled" && typeof a.start === "number" && typeof a.end === "number").sort((a, b) => a.start - b.start);
+    if (items.length < 1) return [];
+    const out = [];
+    for (let i = 0; i < items.length - 1; i++) {
+      const gs = items[i].end, ge = items[i + 1].start;
+      if (ge - gs >= GAP_MIN && !(isTodayView && ge <= nowM)) out.push({ start: gs, end: ge });
+    }
+    return out;
+  };
   const orderedStaff = [...staff].sort((a, b) => {
     const aOff = isOffDay(a), bOff = isOffDay(b);
     if (aOff !== bOff) return aOff ? 1 : -1;            // off-day → far right
@@ -12741,14 +12757,20 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const isToday = sameDay(selectedDate.toISOString(), today);
           const booked = dayCount(() => true);
           const nowMin = today.getHours() * 60 + today.getMinutes();
-          const next = isToday ? (appts || []).filter((a) => a && a.status !== "cancelled" && a.status !== "block" && a.status !== "done" && a.bookedFor && sameDay(a.bookedFor, selectedDate) && typeof a.start === "number" && a.start >= nowMin).sort((a, b) => a.start - b.start)[0] : null;
-          const parts = [booked === 0 ? "Nothing booked yet" : `${booked} booked`];
-          if (next) parts.push(`next at ${fmtTime(next.start)}`);
-          else if (isToday && booked > 0) parts.push("all done");
+          const dayList = (appts || []).filter((a) => a && a.status !== "cancelled" && a.status !== "block" && a.status !== "done" && a.bookedFor && sameDay(a.bookedFor, selectedDate) && typeof a.start === "number").sort((a, b) => a.start - b.start);
+          const next = isToday ? dayList.find((a) => a.start >= nowMin) : dayList[0];
+          const gapCount = orderedStaff.reduce((n, p) => n + gapsForProvider(p).length, 0);
+          const chip = (v, k, accent) => (
+            <div style={{ flex: 1, background: accent ? "color-mix(in srgb, var(--amber) 9%, var(--panel))" : "var(--panel)", border: `1px solid ${accent ? "color-mix(in srgb, var(--amber) 32%, var(--border))" : "var(--line)"}`, borderRadius: 13, padding: "10px 12px", boxShadow: "var(--shadow-sm)", minWidth: 0 }}>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1, color: accent ? "var(--amber)" : "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v}</div>
+              <div style={{ fontSize: 10, color: "var(--sub)", marginTop: 5, letterSpacing: 0.3, textTransform: "uppercase" }}>{k}</div>
+            </div>
+          );
           return (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--sub)" }}>
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
-              <span>{parts.join(" · ")}</span>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              {chip(booked, "Booked")}
+              {chip(next ? fmtTime(next.start).replace(/:00/, "") : "—", "Next up")}
+              {chip(gapCount, "Gap to fill", gapCount > 0)}
             </div>
           );
         })()}
@@ -12871,6 +12893,12 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               {quarterLines.map((t) => { const isHour = t % 60 === 0; return (
                 <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, left: 0, right: 0, borderTop: isHour ? "1px solid var(--line)" : "1px solid color-mix(in srgb, var(--line) 50%, transparent)", height: 0, pointerEvents: "none" }} />
               ); })}
+              {/* open-gap markers — display only, sit behind the tap layer so tapping a gap still opens a new appointment */}
+              {gapsForProvider(p).map((g) => (
+                <div key={`gap-${g.start}`} style={{ position: "absolute", top: (g.start - DAY_START) * PPM + 1, left: 4, right: 4, height: (g.end - g.start) * PPM - 2, borderRadius: 10, border: "1px dashed color-mix(in srgb, var(--amber) 50%, var(--border))", background: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--amber) 8%, transparent), color-mix(in srgb, var(--amber) 8%, transparent) 6px, transparent 6px, transparent 12px)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 600, color: "var(--amber)", pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
+                  {(g.end - g.start) >= 30 ? `${g.end - g.start}-min gap` : ""}
+                </div>
+              ))}
               {/* live "now" line — only on today, only within the visible grid window */}
               {((business && business.calendar) ? business.calendar.nowLine !== false : true) && sameDay(selectedDate.toISOString(), today) && (() => {
                 const nowM = today.getHours() * 60 + today.getMinutes();
