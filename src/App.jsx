@@ -7730,47 +7730,43 @@ function LocationsEditor({ business, setForm }) {
   const removeLoc = (id) => setForm({ ...business, locations: locations.filter((l) => l.id !== id) });
   const F = ({ label, val, on }) => (
     <div style={{ marginBottom: 12 }}>
-      <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>{label}</label>
+      <label style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, display: "block", marginBottom: 6 }}>{label}</label>
       <input value={val} onChange={(e) => on(e.target.value)} style={inputStyle} />
     </div>
   );
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: business.multiLocation ? 18 : 0 }}>
-        <div style={{ paddingRight: 16 }}><div style={{ fontSize: 15 }}>Multiple locations</div><div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.5 }}>Turn on if you run more than one shop. Each location can have its own address, hours, and staff.</div></div>
-        <button onClick={() => setForm({ ...business, multiLocation: !business.multiLocation })} style={{ width: 44, height: 26, borderRadius: 13, background: business.multiLocation ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: business.multiLocation ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
-      </div>
+      <ToggleSetting label="Multiple locations" desc="Turn on if you run more than one shop. Each location can have its own address, hours, and staff." on={!!business.multiLocation} onToggle={(v) => setForm({ ...business, multiLocation: v })} />
 
       {business.multiLocation && (
         <>
-          <div style={{ display: "grid", gap: 10 }}>
-            {locations.map((l) => {
+          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden", marginTop: 18 }}>
+            {locations.map((l, i) => {
               const expanded = openId === l.id;
               return (
-                <div key={l.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
-                  <button onClick={() => setOpenId(expanded ? null : l.id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "none", color: "var(--text)", textAlign: "left" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <MapPinIcon size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
-                      <div><div style={{ fontSize: 15.5, fontWeight: 500 }}>{l.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{l.cityZip || "No address yet"}</div></div>
+                <div key={l.id} style={{ padding: "0 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                  <button onClick={() => setOpenId(expanded ? null : l.id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "15px 0", background: "none", color: "var(--text)", textAlign: "left" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                      <span style={{ width: 34, height: 34, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 14%, transparent)", color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><MapPinIcon size={17} /></span>
+                      <div style={{ minWidth: 0 }}><div style={{ fontSize: 15.5, fontWeight: 500 }}>{l.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{l.cityZip || "No address yet"}</div></div>
                     </div>
-                    <ChevronRight size={18} style={{ color: "var(--faint)", transform: expanded ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+                    <ChevronRight size={18} style={{ color: "var(--faint)", transform: expanded ? "rotate(90deg)" : "none", transition: "transform .2s", flexShrink: 0 }} />
                   </button>
                   {expanded && (
-                    <div style={{ padding: "4px 16px 18px", borderTop: "1px solid var(--line)" }}>
-                      <div style={{ height: 14 }} />
+                    <div style={{ padding: "10px 0 16px", borderTop: "1px solid var(--line)" }}>
                       <F label="Location name" val={l.name} on={(v) => setLoc(l.id, { name: v })} />
                       <F label="Address" val={l.address} on={(v) => setLoc(l.id, { address: v })} />
                       <F label="City, State ZIP" val={l.cityZip} on={(v) => setLoc(l.id, { cityZip: v })} />
                       <F label="Phone" val={l.phone} on={(v) => setLoc(l.id, { phone: v })} />
                       <F label="Hours (summary)" val={l.hours} on={(v) => setLoc(l.id, { hours: v })} />
-                      {locations.length > 1 && <button onClick={() => removeLoc(l.id)} style={{ marginTop: 4, background: "none", color: "#C2563F", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><Trash2 size={14} /> Remove location</button>}
+                      {locations.length > 1 && <button onClick={() => removeLoc(l.id)} style={{ marginTop: 4, background: "none", color: "#C2563F", fontSize: 13.5, display: "flex", alignItems: "center", gap: 6 }}><Trash2 size={14} /> Remove location</button>}
                     </div>
                   )}
                 </div>
               );
             })}
           </div>
-          <button className="lift" onClick={addLoc} style={{ width: "100%", marginTop: 12, background: "var(--panel2)", border: "1px dashed var(--border2)", color: "var(--text)", padding: 14, borderRadius: 10, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add location</button>
+          <button className="lift" onClick={addLoc} style={{ width: "100%", marginTop: 14, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: 14, color: "var(--gold)", fontSize: 15, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "var(--shadow-sm)" }}><Plus size={16} /> Add location</button>
         </>
       )}
     </div>
