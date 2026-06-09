@@ -794,7 +794,7 @@ function StaffLogin({ authReady, onBack }) {
             <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.5, margin: "0 0 26px" }}>Enter your email and we'll send a one-tap sign-in link. No password to remember.</p>
             <input type="email" value={email} autoFocus inputMode="email" autoCapitalize="none" placeholder="you@email.com" onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, padding: "16px 16px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, marginBottom: 12, boxSizing: "border-box" }} />
             {err && <p style={{ color: "#c0392b", fontSize: 13.5, margin: "0 0 12px" }}>{err}</p>}
-            <button className="lift" disabled={busy || !authReady} onClick={send} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "17px 20px", fontSize: 16, fontWeight: 500, borderRadius: 16, border: "none", boxShadow: "var(--shadow-md)", opacity: busy || !authReady ? 0.6 : 1, cursor: busy ? "default" : "pointer" }}>{busy ? "Sending…" : "Send sign-in link"}</button>
+            <button className="lift" disabled={busy || !authReady} onClick={send} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "17px 20px", fontSize: 16, fontWeight: 500, borderRadius: 16, border: "none", boxShadow: "var(--glow)", opacity: busy || !authReady ? 0.6 : 1, cursor: busy ? "default" : "pointer" }}>{busy ? "Sending…" : "Send sign-in link"}</button>
           </>
         ) : (
           <>
@@ -802,7 +802,7 @@ function StaffLogin({ authReady, onBack }) {
             <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.55, margin: "0 0 16px" }}>We sent a 6-digit code and a sign-in link to <strong style={{ color: "var(--text)", fontWeight: 500 }}>{email.trim().toLowerCase()}</strong>. Enter the code below to sign in right here in the app.</p>
             <input type="text" inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 8))} onKeyDown={(e) => { if (e.key === "Enter") verify(); }} placeholder="123456" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, padding: "16px 16px", color: "var(--text)", fontSize: 22, letterSpacing: 6, textAlign: "center", fontFamily: FONT_BODY, marginBottom: 12, boxSizing: "border-box" }} />
             {err && <p style={{ color: "#c0392b", fontSize: 13.5, margin: "0 0 12px" }}>{err}</p>}
-            <button className="lift" disabled={busy} onClick={verify} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "17px 20px", fontSize: 16, fontWeight: 500, borderRadius: 16, border: "none", boxShadow: "var(--shadow-md)", opacity: busy ? 0.6 : 1, cursor: busy ? "default" : "pointer", marginBottom: 14 }}>{busy ? "Signing in…" : "Sign in"}</button>
+            <button className="lift" disabled={busy} onClick={verify} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "17px 20px", fontSize: 16, fontWeight: 500, borderRadius: 16, border: "none", boxShadow: "var(--glow)", opacity: busy ? 0.6 : 1, cursor: busy ? "default" : "pointer", marginBottom: 14 }}>{busy ? "Signing in…" : "Sign in"}</button>
             <p style={{ color: "var(--faint)", fontSize: 13, fontWeight: 300, lineHeight: 1.5, margin: "0 0 16px" }}>On a computer you can also just tap the link in the email. Didn't get it? Check spam.</p>
             <button onClick={() => { setSent(false); setBusy(false); setCode(""); setErr(""); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "15px 20px", fontSize: 15, borderRadius: 14, border: "1px solid var(--border2)", cursor: "pointer" }}>Use a different email</button>
           </>
@@ -1292,6 +1292,8 @@ function App() {
           --shadow-sm: 0 1px 3px var(--shadow), 0 1px 2px rgba(0,0,0,0.03);
           --shadow-md: 0 6px 20px -6px var(--shadow), 0 2px 8px -3px var(--shadow);
           --shadow-lg: 0 24px 60px -16px var(--shadow), 0 8px 20px -8px var(--shadow);
+          --float: 0 10px 28px -14px var(--shadow), 0 3px 8px -4px var(--shadow);
+          --glow: 0 10px 26px -8px color-mix(in srgb, var(--gold) 42%, transparent), 0 2px 8px -4px var(--shadow);
           --radius: 16px;
         }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(14px);} to {opacity:1; transform:none;} }
@@ -1348,10 +1350,10 @@ function App() {
         button:active { transform: scale(0.96); }
         input, textarea, select { outline: none; font-family: ${FONT_BODY}; transition: border-color .2s var(--ease), box-shadow .2s var(--ease); }
         input:focus, textarea:focus, select:focus { border-color: var(--gold) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 18%, transparent); }
-        .lift { transition: transform .25s var(--spring), box-shadow .25s var(--ease), border-color .2s var(--ease), background .2s var(--ease); }
+        .lift { transition: transform .25s var(--spring), box-shadow .25s var(--ease), border-color .2s var(--ease), background .2s var(--ease); box-shadow: var(--float); }
         .lift-row { transition: background .15s var(--ease), padding-left .15s var(--ease); }
         .lift-row:active { background: color-mix(in srgb, var(--gold) 7%, transparent); padding-left: 12px; }
-        .lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
         .lift:active { transform: scale(0.96); box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
         .card { box-shadow: var(--shadow-sm); }
         ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 8px; } ::-webkit-scrollbar-track { background: transparent; }
@@ -1532,7 +1534,7 @@ function Storefront({ business, services = [], providers = [], categories = [], 
         <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "20px auto" }} />
         {w.tagline && <p style={{ fontSize: 17, color: "var(--sub)", fontWeight: 300, fontStyle: "italic", marginBottom: 8 }}>{w.tagline}</p>}
         {addr && <p style={{ fontSize: 13.5, color: "var(--faint)", letterSpacing: 0.5 }}>{addr}</p>}
-        <button className="lift" onClick={() => onPick("client")} style={{ marginTop: 30, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 14, padding: "17px 44px", fontSize: 14, letterSpacing: 2.5, fontWeight: 600, boxShadow: "var(--shadow-md)" }}>BOOK AN APPOINTMENT</button>
+        <button className="lift" onClick={() => onPick("client")} style={{ marginTop: 30, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 14, padding: "17px 44px", fontSize: 14, letterSpacing: 2.5, fontWeight: 600, boxShadow: "var(--glow)" }}>BOOK AN APPOINTMENT</button>
         {ig && (
           <div style={{ marginTop: 18 }}>
             <a href={`https://instagram.com/${ig}`} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "var(--text)", textDecoration: "none", fontSize: 14.5, border: "1px solid var(--border)", borderRadius: 12, padding: "11px 20px" }}>
@@ -1602,7 +1604,7 @@ function Storefront({ business, services = [], providers = [], categories = [], 
 
       {/* BOOK CTA (bottom) */}
       <div style={{ ...section, paddingTop: 12, textAlign: "center" }}>
-        <button className="lift" onClick={() => onPick("client")} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 14, padding: "17px 44px", fontSize: 14, letterSpacing: 2.5, fontWeight: 600, boxShadow: "var(--shadow-md)" }}>BOOK AN APPOINTMENT</button>
+        <button className="lift" onClick={() => onPick("client")} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 14, padding: "17px 44px", fontSize: 14, letterSpacing: 2.5, fontWeight: 600, boxShadow: "var(--glow)" }}>BOOK AN APPOINTMENT</button>
         <div style={{ marginTop: 22, display: "flex", gap: 18, justifyContent: "center" }}>
           <button onClick={() => onPick("manage")} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 3 }}>Manage my appointment</button>
         </div>
@@ -2940,7 +2942,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </div>
                 )}
 
-                <button className="lift" onClick={() => { setConsult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 18, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, marginBottom: 12, boxShadow: "var(--shadow-md)" }}>BOOK IT</button>
+                <button className="lift" onClick={() => { setConsult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 18, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, marginBottom: 12, boxShadow: "var(--glow)" }}>BOOK IT</button>
                 <button onClick={() => { setConsult(null); setCutType(null); setCutPhase("type"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 12, fontSize: 14.5, fontWeight: 500, borderRadius: 12 }}>Let me choose myself</button>
               </div>
             );
@@ -6821,7 +6823,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "color-mix(in srgb, var(--bg) 82%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderTop: "1px solid var(--line)", boxShadow: "0 -8px 30px -12px var(--shadow)", display: "flex", justifyContent: "space-around", alignItems: "stretch", padding: "10px 4px calc(10px + env(safe-area-inset-bottom))", zIndex: 20, transform: "translateZ(0)", WebkitTransform: "translateZ(0)", willChange: "transform" }}>
         {[["pulse", "Pulse", TrendingUp], ["calendar", "Calendar", Calendar], ["clients", "Clients", User], ["messages", "Messages", MessageSquare], ...(isOwner ? [["settings", "Settings", Settings]] : [])].map(([id, label, Icon]) => (
           <button key={id} onClick={() => { setTab(id); setActiveClient(null); setPulseDetail(null); }} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
-            <div style={{ position: "relative" }}>
+            <div style={{ position: "relative", padding: "5px 16px", borderRadius: 13, background: tab === id ? "color-mix(in srgb, var(--gold) 13%, transparent)" : "transparent", boxShadow: tab === id ? "0 5px 16px -6px color-mix(in srgb, var(--gold) 55%, transparent)" : "none", transition: "background .2s var(--ease), box-shadow .2s var(--ease)" }}>
               <Icon size={21} />
               {id === "waitlist" && waitlist.length > 0 && <span style={{ position: "absolute", top: -5, right: -9, background: "var(--gold)", color: "var(--on-gold)", fontSize: 12, fontWeight: 600, borderRadius: 8, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{waitlist.length}</span>}
             </div>
@@ -6924,7 +6926,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     </div>
   );
   const SaveBar = () => (
-    <button className="lift" onClick={save} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 13, boxShadow: "var(--shadow-md)", marginTop: 26 }}>SAVE SERVICE</button>
+    <button className="lift" onClick={save} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 13, boxShadow: "var(--glow)", marginTop: 26 }}>SAVE SERVICE</button>
   );
   // Toggle now uses the global <Toggle> (50×29) — local duplicate removed for consistency.
 
@@ -12902,7 +12904,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               />
               {/* beige "New Appointment" block shown while long-pressing / scrubbing */}
               {pressInd && pressInd.providerId === p.id && (
-                <div style={{ position: "absolute", top: (pressInd.start - DAY_START) * PPM, left: 3, right: 3, height: NEW_DUR * PPM - 2, background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", border: "1.5px solid var(--gold)", borderRadius: 12, padding: "8px 11px", zIndex: 30, pointerEvents: "none", boxShadow: "var(--shadow-md)" }}>
+                <div style={{ position: "absolute", top: (pressInd.start - DAY_START) * PPM, left: 3, right: 3, height: NEW_DUR * PPM - 2, background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", border: "1.5px solid var(--gold)", borderRadius: 12, padding: "8px 11px", zIndex: 30, pointerEvents: "none", boxShadow: "var(--glow)" }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "var(--gold)" }}>{fmtTime(pressInd.start)}</div>
                   <div style={{ fontSize: 13, color: "var(--text2)", fontWeight: 500 }}>New Appointment</div>
                 </div>
@@ -13315,7 +13317,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
           </div>
         </div>
       )}
-      <button className="lift" onClick={tapCard} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: "var(--shadow-md)" }}><CreditCard size={18} /> CHARGE CARD</button>
+      <button className="lift" onClick={tapCard} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: "var(--glow)" }}><CreditCard size={18} /> CHARGE CARD</button>
       <button onClick={onClose} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 6 }}>CANCEL</button>
     </div>
   , true, true);
@@ -13349,7 +13351,7 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
         {tipCfg.allowCustom && <button onClick={() => { const v = prompt("Custom tip amount ($)"); if (v != null) setCustomTip(Math.max(0, parseFloat(v) || 0)); }} style={{ flex: 1, padding: "13px 4px", borderRadius: 12, border: `1px solid ${customTip != null && customTip !== 0 ? "var(--gold)" : "var(--border2)"}`, background: customTip != null && customTip !== 0 ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel)", color: customTip != null && customTip !== 0 ? "var(--gold)" : "var(--text)", fontSize: 14 }}>{customTip != null && customTip !== 0 ? `Custom · ${money(customTip)}` : "Custom"}</button>}
         {tipCfg.allowNoTip && <button onClick={() => setCustomTip(0)} style={{ flex: 1, padding: "13px 4px", borderRadius: 12, border: `1px solid ${customTip === 0 ? "var(--gold)" : "var(--border2)"}`, background: customTip === 0 ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel)", color: customTip === 0 ? "var(--gold)" : "var(--sub)", fontSize: 14 }}>No tip</button>}
       </div>
-      <button className="lift" onClick={confirmTip} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: "var(--shadow-md)" }}>{tipAmt > 0 ? `TIP ${money(tipAmt)} · TOTAL ${money(total)}` : `CONTINUE · ${money(total)}`}</button>
+      <button className="lift" onClick={confirmTip} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: "var(--glow)" }}>{tipAmt > 0 ? `TIP ${money(tipAmt)} · TOTAL ${money(total)}` : `CONTINUE · ${money(total)}`}</button>
     </div>
   );
 
