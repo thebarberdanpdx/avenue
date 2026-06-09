@@ -9648,6 +9648,7 @@ function AppearancePicker({ theme, setTheme }) {
   const [tab, setTab] = useState("themes");
   const [accent, setAccent] = useState(null); // hex override or null
   const [fontPair, setFontPair] = useState(null);
+  const [expand, setExpand] = useState(null); // "accent" | "font" | null — Make-it-yours drawers
 
   // apply accent / font overrides live on the themed root (inline beats the .theme- class)
   useEffect(() => {
@@ -9662,8 +9663,6 @@ function AppearancePicker({ theme, setTheme }) {
     else { root.style.removeProperty("--font-disp"); root.style.removeProperty("--font-body"); }
     return () => { const r = document.getElementById("app-root"); if (r) { r.style.removeProperty("--font-disp"); r.style.removeProperty("--font-body"); } };
   }, [fontPair]);
-
-  const TABS = [["themes","Themes"],["palette","Palette"],["accent","Accent"],["font","Font"]];
 
   // a small realistic mini-mockup of the app painted in a given theme's palette
   const Mock = ({ th, accentHex }) => {
@@ -9693,117 +9692,86 @@ function AppearancePicker({ theme, setTheme }) {
 
   return (
     <div>
-      {/* tabs */}
-      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 20 }}>
-        {TABS.map(([id, label]) => { const on = tab === id; return (
-          <button key={id} onClick={() => setTab(id)} style={{ position: "relative", background: "none", color: on ? "var(--text)" : "var(--sub)", fontSize: 15, fontWeight: on ? 600 : 400, padding: "8px 14px 12px" }}>
-            {label}
-            {on && <span style={{ position: "absolute", left: 10, right: 10, bottom: -1, height: 2, background: "var(--gold)", borderRadius: 2 }} />}
-          </button>
-        ); })}
-      </div>
+      <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 22 }}>Each theme is a complete look — color, depth, and type together. Tap one to wear it everywhere.</div>
 
-      {tab === "themes" && (
-        <div style={{ display: "grid", gap: 24 }}>
-          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6 }}>Each theme is a complete look — palette and fonts together, built for your trade. Tap to apply it everywhere.</div>
-          {THEME_CATS.map((cat) => (
-            <div key={cat}>
-              <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 12 }}>{cat.toUpperCase()}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {THEMES.filter((t) => t.cat === cat).map((th) => { const on = theme === th.id; const v = th.t; return (
-                  <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 14, border: on ? "2px solid var(--gold)" : "1px solid var(--border)", overflow: "hidden", textAlign: "left", background: v.bg, display: "block", width: "100%" }}>
-                    {/* compact swatch — painted in the theme */}
-                    <div style={{ background: v.bg, padding: "14px 13px 12px", position: "relative", minHeight: 92 }}>
-                      {on && <div style={{ position: "absolute", top: 10, right: 10, width: 20, height: 20, borderRadius: "50%", background: v.gold, display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={12} style={{ color: v.onGold }} strokeWidth={3} /></div>}
-                      <div style={{ fontFamily: th.disp, color: v.text, fontSize: 22, fontWeight: 600, lineHeight: 1, letterSpacing: th.disp.includes("Bebas") ? 0.5 : -0.3, marginBottom: 12 }}>{th.name}</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                        <span style={{ width: 18, height: 18, borderRadius: "50%", background: v.gold }} />
-                        <span style={{ width: 13, height: 13, borderRadius: "50%", background: v.panel }} />
-                        <span style={{ width: 13, height: 13, borderRadius: "50%", background: v.panel2, border: `1px solid ${v.border2}` }} />
-                        <span style={{ fontSize: 9, letterSpacing: 1, color: v.faint, marginLeft: "auto", fontWeight: 600 }}>{th.dark ? "DARK" : "LIGHT"}</span>
-                      </div>
-                    </div>
-                    {/* name strip in the app's current chrome (not the swatch theme) */}
-                    <div style={{ padding: "8px 12px", background: "var(--panel)", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: 12.5, color: on ? "var(--gold)" : "var(--text)", lineHeight: 1.3 }}>{th.tagline}</span>
-                      {on && <span style={{ fontSize: 10, letterSpacing: 1, color: "var(--gold)", fontWeight: 600, flexShrink: 0, marginLeft: 6 }}>ON</span>}
-                    </div>
-                  </button>
-                ); })}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab === "palette" && (
-        <div>
-          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 18 }}>Light or dark — pick the canvas. The same themes, grouped by mood.</div>
-          {[["Light", false], ["Dark", true]].map(([grp, isDark]) => (
-            <div key={grp} style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 13, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>{grp.toUpperCase()}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {THEMES.filter((t) => t.dark === isDark).map((th) => { const on = theme === th.id; const v = th.t; return (
-                  <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 16, overflow: "hidden", border: on ? "2px solid var(--gold)" : "1px solid var(--border)", background: v.bg, textAlign: "left" }}>
-                    <div style={{ height: 64, background: v.bg, display: "flex", alignItems: "center", padding: "0 12px", gap: 6 }}>
-                      <span style={{ width: 22, height: 22, borderRadius: "50%", background: v.gold }} />
-                      <span style={{ width: 16, height: 16, borderRadius: "50%", background: v.panel2, border: `1px solid ${v.border2}` }} />
-                      <span style={{ fontFamily: th.disp, color: v.text, fontSize: 20, marginLeft: "auto" }}>Aa</span>
-                    </div>
-                    <div style={{ padding: "9px 12px", background: "var(--panel)", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: 13.5, fontWeight: 600, color: on ? "var(--gold)" : "var(--text)" }}>{th.name}</span>
-                      {on && <Check size={15} style={{ color: "var(--gold)" }} strokeWidth={3} />}
-                    </div>
-                  </button>
-                ); })}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab === "accent" && (
-        <div>
-          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 18 }}>Override just the accent color used for buttons and highlights, keeping your current theme.</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 22 }}>
-            <button onClick={() => setAccent(null)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, background: "none" }}>
-              <span style={{ width: 52, height: 52, borderRadius: "50%", border: accent ? "1px solid var(--border)" : "2px solid var(--gold)", background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)", fontSize: 11 }}>Theme</span>
-              <span style={{ fontSize: 12, color: !accent ? "var(--gold)" : "var(--sub)", fontWeight: !accent ? 600 : 400 }}>Default</span>
-            </button>
-            {ACCENTS.map((a) => { const on = accent === a.hex; return (
-              <button key={a.id} onClick={() => setAccent(a.hex)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, background: "none" }}>
-                <span style={{ width: 52, height: 52, borderRadius: "50%", background: a.hex, border: on ? "2px solid var(--text)" : "1px solid rgba(0,0,0,0.1)", boxShadow: on ? "0 0 0 3px var(--bg), 0 0 0 5px " + a.hex : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={18} style={{ color: "#fff" }} strokeWidth={3} />}</span>
-                <span style={{ fontSize: 12, color: on ? "var(--text)" : "var(--sub)", fontWeight: on ? 600 : 400 }}>{a.name}</span>
-              </button>
-            ); })}
-          </div>
-          {/* live preview */}
-          <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}>
-            <Mock th={THEMES.find((t) => t.id === theme)} accentHex={accent} />
-          </div>
-        </div>
-      )}
-
-      {tab === "font" && (
-        <div>
-          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 18 }}>Swap the typeface pairing while keeping your colors.</div>
-          <div style={{ display: "grid", gap: 12 }}>
-            <button onClick={() => setFontPair(null)} className="lift" style={{ textAlign: "left", padding: "16px 18px", borderRadius: 14, border: !fontPair ? "2px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div><div style={{ fontSize: 15, fontWeight: 600, color: !fontPair ? "var(--gold)" : "var(--text)" }}>Theme default</div><div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>Use the font that ships with this theme</div></div>
-              {!fontPair && <Check size={17} style={{ color: "var(--gold)" }} strokeWidth={3} />}
-            </button>
-            {FONT_PAIRS.map((f) => { const on = fontPair && fontPair.id === f.id; return (
-              <button key={f.id} onClick={() => setFontPair(f)} className="lift" style={{ textAlign: "left", padding: "16px 18px", borderRadius: 14, border: on ? "2px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div>
-                  <div style={{ fontFamily: f.disp, fontSize: 26, color: "var(--text)", lineHeight: 1 }}>Sanctuary</div>
-                  <div style={{ fontFamily: f.body, fontSize: 12.5, color: "var(--sub)", marginTop: 4 }}>{f.name} · {f.note}</div>
+      {THEME_CATS.map((cat) => (
+        <div key={cat} style={{ marginBottom: 26 }}>
+          <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>{cat.toUpperCase()}</div>
+          <div style={{ display: "grid", gap: 16 }}>
+            {THEMES.filter((t) => t.cat === cat).map((th) => { const on = theme === th.id; const v = th.t; return (
+              <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 18, border: on ? "2px solid var(--gold)" : "1px solid var(--border)", overflow: "hidden", textAlign: "left", background: v.bg, display: "block", width: "100%", position: "relative", boxShadow: on ? "0 10px 34px -14px color-mix(in srgb, var(--gold) 55%, transparent)" : "0 4px 18px -14px rgba(0,0,0,0.5)" }}>
+                {on && <div style={{ position: "absolute", top: 14, right: 14, zIndex: 2, width: 26, height: 26, borderRadius: "50%", background: v.gold, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}><Check size={15} style={{ color: v.onGold }} strokeWidth={3} /></div>}
+                <Mock th={th} accentHex={null} />
+                <div style={{ padding: "12px 16px", background: "var(--panel)", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ fontSize: 14.5, fontWeight: 600, color: on ? "var(--gold)" : "var(--text)" }}>{th.name}</div>
+                    <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 1 }}>{th.tagline}</div>
+                  </div>
+                  <span style={{ fontSize: 10, letterSpacing: 1.5, fontWeight: 600, color: on ? "var(--gold)" : "var(--faint)" }}>{on ? "ON" : (th.dark ? "DARK" : "LIGHT")}</span>
                 </div>
-                {on && <Check size={17} style={{ color: "var(--gold)" }} strokeWidth={3} />}
               </button>
             ); })}
           </div>
         </div>
-      )}
+      ))}
+
+      {/* Make it yours — accent + fonts, folded together under the gallery */}
+      <div style={{ marginTop: 8, borderTop: "1px solid var(--line)", paddingTop: 22 }}>
+        <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>MAKE IT YOURS</div>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 16 }}>Optional — nudge the accent or type while keeping your theme.</div>
+
+        <button onClick={() => setExpand(expand === "accent" ? null : "accent")} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: expand === "accent" ? 0 : 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ width: 26, height: 26, borderRadius: "50%", background: accent || "var(--gold)", flexShrink: 0, border: "1px solid rgba(0,0,0,0.12)" }} />
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Accent</div>
+              <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 1 }}>{accent ? ((ACCENTS.find((a) => a.hex === accent) || {}).name || "Custom") : "Theme default"}</div>
+            </div>
+          </div>
+          <ChevronDown size={18} style={{ color: "var(--faint)", transform: expand === "accent" ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+        </button>
+        {expand === "accent" && (
+          <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderTop: "none", borderRadius: "0 0 14px 14px", padding: "18px 16px", marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+              <button onClick={() => setAccent(null)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, background: "none" }}>
+                <span style={{ width: 50, height: 50, borderRadius: "50%", border: !accent ? "2px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)", fontSize: 10, letterSpacing: 0.5 }}>Theme</span>
+                <span style={{ fontSize: 11.5, color: !accent ? "var(--gold)" : "var(--sub)", fontWeight: !accent ? 600 : 400 }}>Default</span>
+              </button>
+              {ACCENTS.map((a) => { const aon = accent === a.hex; return (
+                <button key={a.id} onClick={() => setAccent(a.hex)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, background: "none" }}>
+                  <span style={{ width: 50, height: 50, borderRadius: "50%", background: a.hex, border: aon ? "2px solid var(--text)" : "1px solid rgba(0,0,0,0.1)", boxShadow: aon ? "0 0 0 3px var(--panel2), 0 0 0 5px " + a.hex : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{aon && <Check size={17} style={{ color: "#fff" }} strokeWidth={3} />}</span>
+                  <span style={{ fontSize: 11.5, color: aon ? "var(--text)" : "var(--sub)", fontWeight: aon ? 600 : 400 }}>{a.name}</span>
+                </button>
+              ); })}
+            </div>
+          </div>
+        )}
+
+        <button onClick={() => setExpand(expand === "font" ? null : "font")} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: expand === "font" ? 0 : 12 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Fonts</div>
+            <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 1 }}>{fontPair ? fontPair.name : "Theme default"}</div>
+          </div>
+          <ChevronDown size={18} style={{ color: "var(--faint)", transform: expand === "font" ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+        </button>
+        {expand === "font" && (
+          <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderTop: "none", borderRadius: "0 0 14px 14px", padding: "16px", display: "grid", gap: 10 }}>
+            <button onClick={() => setFontPair(null)} style={{ textAlign: "left", padding: "14px 16px", borderRadius: 12, border: !fontPair ? "2px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div><div style={{ fontSize: 14.5, fontWeight: 600, color: !fontPair ? "var(--gold)" : "var(--text)" }}>Theme default</div><div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>The type that ships with this theme</div></div>
+              {!fontPair && <Check size={16} style={{ color: "var(--gold)" }} strokeWidth={3} />}
+            </button>
+            {FONT_PAIRS.map((f) => { const fon = fontPair && fontPair.id === f.id; return (
+              <button key={f.id} onClick={() => setFontPair(f)} style={{ textAlign: "left", padding: "14px 16px", borderRadius: 12, border: fon ? "2px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontFamily: f.disp, fontSize: 24, color: "var(--text)", lineHeight: 1 }}>Sanctuary</div>
+                  <div style={{ fontFamily: f.body, fontSize: 12, color: "var(--sub)", marginTop: 4 }}>{f.name} · {f.note}</div>
+                </div>
+                {fon && <Check size={16} style={{ color: "var(--gold)" }} strokeWidth={3} />}
+              </button>
+            ); })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
