@@ -4671,23 +4671,23 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             </div>
           )}
         </div>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 8, fontWeight: 600, textTransform: "uppercase" }}>{todayLabel.toUpperCase()}</div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.3, lineHeight: 1.05, color: "var(--text)" }}>{headerName}</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 29, fontWeight: 500, letterSpacing: -0.3, lineHeight: 1.05, color: "var(--text)" }}>{headerName}</h2>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 6 }}>{todayLabel}</div>
       </div>
 
-      {/* TODAY — money + goal ring side by side (the cockpit hero) */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 24 }}>
+      {/* TODAY — hero card: money + goal ring */}
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, boxShadow: "var(--shadow)", padding: "18px 19px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 13 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 5, fontWeight: 600, textTransform: "uppercase" }}>{isShopView ? "TODAY · SHOP" : "TODAY · YOU"}</div>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 52, fontWeight: 500, color: "var(--text)", lineHeight: 0.95, letterSpacing: -1, marginBottom: 6 }}>
+          <div style={{ fontSize: 12, color: "var(--sub)", fontWeight: 500, marginBottom: 4 }}>{isShopView ? "Today · shop" : "Today"}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 46, fontWeight: 500, color: "var(--text)", lineHeight: 0.95, letterSpacing: -1 }}>
             {fmtMoney(todayMoney)}
           </div>
           {todayVsYesterday ? (
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: todayVsYesterday.up ? "var(--gold)" : "var(--sub)", lineHeight: 1.4 }}>
+            <div style={{ fontSize: 13.5, color: todayVsYesterday.up ? "var(--gold)" : "var(--sub)", lineHeight: 1.4, marginTop: 7 }}>
               {todayVsYesterday.up ? "+" : "−"}{fmtMoney(todayVsYesterday.abs)} vs {fmtMoney(yesterdayMoney)} yesterday
             </div>
           ) : (
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--sub)", lineHeight: 1.4 }}>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4, marginTop: 7 }}>
               {todayApptsAll.length === 0 ? "Nothing booked today yet." : `${todayApptsAll.length} ${todayApptsAll.length === 1 ? "visit" : "visits"} booked`}
             </div>
           )}
@@ -4695,111 +4695,63 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         {/* Goal ring — always shows in personal view (default target if none set). Tap to edit. */}
         {!isShopView && (
           <button onClick={() => openGoalEditor("daily")} style={{ textAlign: "center", flexShrink: 0, background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-            <svg width="96" height="96" viewBox="0 0 96 96">
+            <svg width="92" height="92" viewBox="0 0 96 96">
               <circle cx="48" cy="48" r="34" fill="none" stroke="var(--panel2)" strokeWidth="8" />
               <circle cx="48" cy="48" r="34" fill="none" stroke="var(--gold)" strokeWidth="8" strokeLinecap="round" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} transform="rotate(-90 48 48)" style={{ transition: "stroke-dashoffset .4s ease" }} />
               <text x="48" y="53" textAnchor="middle" fill="var(--text)" fontSize="23" fontFamily="'Fraunces', serif" fontWeight="600">{dailyPct}%</text>
             </svg>
-            <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 2 }}>{fmtMoney(todayMoney)} / {fmtMoney(dailyGoal)}</div>
-            <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--gold)", marginTop: 2, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> {goalIsDefault ? "SET GOAL" : "EDIT GOAL"}</div>
+            <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 1 }}>{fmtMoney(todayMoney)} / {fmtMoney(dailyGoal)}</div>
+            <div style={{ fontSize: 10.5, color: "var(--gold)", marginTop: 3, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> {goalIsDefault ? "Set goal" : "Edit goal"}</div>
           </button>
         )}
       </div>
 
       {/* STAT TILES — cuts, chair occupancy, avg ticket */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 9, marginBottom: 26 }}>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 10px", textAlign: "center" }}>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{cutsToday}</div>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.3, color: "var(--sub)", marginTop: 5, fontWeight: 600 }}>CUTS</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 11, marginBottom: 26 }}>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 10px", textAlign: "center", boxShadow: "var(--shadow-sm)" }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{cutsToday}</div>
+          <div style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 6 }}>Cuts</div>
         </div>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 10px", textAlign: "center" }}>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{occupancyToday}%</div>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.3, color: "var(--sub)", marginTop: 5, fontWeight: 600 }}>CHAIR FULL</div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 10px", textAlign: "center", boxShadow: "var(--shadow-sm)" }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{occupancyToday}%</div>
+          <div style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 6 }}>Chair full</div>
         </div>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 10px", textAlign: "center" }}>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{fmtMoney(avgTicket)}</div>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.3, color: "var(--sub)", marginTop: 5, fontWeight: 600 }}>AVG TICKET</div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 10px", textAlign: "center", boxShadow: "var(--shadow-sm)" }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{fmtMoney(avgTicket)}</div>
+          <div style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 6 }}>Avg ticket</div>
         </div>
       </div>
 
-      {/* OWNER-ONLY REPORTS — hidden for barbers */}
-      {isOwner && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 22px" }} />
-          {onOpenRevenue && (
-            <button onClick={onOpenRevenue} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <TrendingUp size={17} style={{ color: "var(--gold)" }} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>View revenue trend</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Week, month, year — top services and clients</div>
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-            </button>
-          )}
-          {onOpenPayments && (
-            <button onClick={onOpenPayments} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <CreditCard size={17} style={{ color: "var(--gold)" }} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>Payments</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Every charge — open one to refund or discount</div>
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-            </button>
-          )}
-          {onOpenAppointments && (
-            <button onClick={onOpenAppointments} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <BarChart3 size={17} style={{ color: "var(--gold)" }} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>View appointments</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Counts, no-shows, busiest day &amp; hour</div>
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-            </button>
-          )}
-          {onOpenClients && (
-            <button onClick={onOpenClients} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Users size={17} style={{ color: "var(--gold)" }} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>View clients</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>New vs returning, retention, top clients</div>
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-            </button>
-          )}
-          {onOpenServices && (
-            <button onClick={onOpenServices} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Sparkles size={17} style={{ color: "var(--gold)" }} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>View service mix</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>What drives revenue · $ per hour</div>
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-            </button>
-          )}
-          {onOpenBarbers && realProviders.length > 1 && (
-            <button onClick={onOpenBarbers} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginBottom: overdueCount > 0 ? 14 : 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Users size={17} style={{ color: "var(--gold)" }} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>View per barber</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)" }}>Each barber's revenue, occupancy &amp; retention</div>
-                </div>
-              </div>
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-            </button>
-          )}
-        </>
-      )}
+      {/* INSIGHTS — owner only, soft two-up grid (matches Settings) */}
+      {isOwner && (() => {
+        const insights = [
+          onOpenRevenue && { onClick: onOpenRevenue, Icon: TrendingUp, label: "Revenue trend", desc: "Week, month, year" },
+          onOpenPayments && { onClick: onOpenPayments, Icon: CreditCard, label: "Payments", desc: "Refund or discount" },
+          onOpenAppointments && { onClick: onOpenAppointments, Icon: BarChart3, label: "Appointments", desc: "No-shows, busiest hour" },
+          onOpenClients && { onClick: onOpenClients, Icon: Users, label: "Clients", desc: "New vs returning" },
+          onOpenServices && { onClick: onOpenServices, Icon: Sparkles, label: "Service mix", desc: "What drives revenue" },
+          (onOpenBarbers && realProviders.length > 1) && { onClick: onOpenBarbers, Icon: Users, label: "Team", desc: "Compare barbers" },
+        ].filter(Boolean);
+        if (!insights.length) return null;
+        return (
+          <div style={{ marginBottom: 26 }}>
+            <div style={{ fontSize: 11.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 12px" }}>Insights</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
+              {insights.map((it, i) => {
+                const Ic = it.Icon;
+                return (
+                  <button key={i} onClick={it.onClick} className="lift" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 15, minHeight: 104, display: "flex", flexDirection: "column", boxShadow: "var(--shadow-sm)", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                    <span style={{ width: 38, height: 38, borderRadius: 11, background: "color-mix(in srgb, var(--gold) 13%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Ic size={20} /></span>
+                    <span style={{ flex: 1 }} />
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15.5, fontWeight: 500, letterSpacing: "-0.2px", lineHeight: 1.1 }}>{it.label}</span>
+                    <span style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.3 }}>{it.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {cutting && (
         <div style={{ marginBottom: 16, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "15px 16px" }}>
