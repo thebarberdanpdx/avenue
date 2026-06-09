@@ -11263,25 +11263,25 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   // ---- Category grid: concrete, plain-named buckets. Every setting lives in exactly one,
   // so nothing falls through to search-only. Tap a tile → that category's list. ----
   const CATS = [
-    { id: "shop",  label: "My shop", icon: User, desc: "Name, hours, locations & look", settings: ["business", "hours", "locations", "phones", "appearance", "theme"] },
-    { id: "staff", label: "My team", icon: Users, desc: "Barbers — hours, access & pay", settings: ["staff", "staffpin"] },
+    { id: "shop",  label: "My shop", icon: User, desc: "Name, hours & look", settings: ["business", "hours", "locations", "phones", "appearance", "theme"] },
+    { id: "staff", label: "My team", icon: Users, desc: "Barbers, access & pay", settings: ["staff", "staffpin"] },
     { id: "menu",  label: "Services & menu", icon: Scissors, desc: "What you offer & pricing", settings: ["servicesmenu", "aicuthelper"] },
-    { id: "book",  label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "What clients see and how they book you online", settings: ["avoidgaps", "anyonerouting", "booking", "newclient", "showprices", "rebook_usual", "refphotos", "family"], groups: [
+    { id: "book",  label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "How clients book you", settings: ["avoidgaps", "anyonerouting", "booking", "newclient", "showprices", "rebook_usual", "refphotos", "family"], groups: [
       { label: "The times they see", ids: ["avoidgaps", "anyonerouting"] },
       { label: "Your booking page", ids: ["booking", "newclient", "showprices", "rebook_usual", "refphotos", "family"] },
     ] },
-    { id: "dayof", label: "My calendar & day", icon: Clock, desc: "Running the day & schedule rules", settings: ["scheduling", "calendarsettings", "waitlist", "photos", "waitingroom", "runninglate", "overduebuffer", "autotiming"], groups: [
+    { id: "dayof", label: "My calendar & day", icon: Clock, desc: "Running your day", settings: ["scheduling", "calendarsettings", "waitlist", "photos", "waitingroom", "runninglate", "overduebuffer", "autotiming"], groups: [
       { label: "Scheduling", ids: ["scheduling", "calendarsettings", "waitlist", "photos"] },
       { label: "During the day", ids: ["waitingroom", "runninglate", "overduebuffer"] },
       { label: "Smart timing", ids: ["autotiming"] },
     ] },
     { id: "pay",   label: "Checkout & money", icon: CreditCard, desc: "Payments, tips & no-shows", settings: ["checkout", "tipping", "rebookco", "policy"] },
-    { id: "msg",   label: "Messages", icon: Bell, desc: "Texts & emails — clients and your team", settings: ["messages", "notifications", "bookingwords"], groups: [
+    { id: "msg",   label: "Messages", icon: Bell, desc: "Texts & emails", settings: ["messages", "notifications", "bookingwords"], groups: [
       { label: "Clients", ids: ["messages", "bookingwords"] },
       { label: "My team", ids: ["notifications"] },
     ] },
-    { id: "web",   label: "Website", icon: Globe, desc: "Your branded booking page online", settings: ["website"] },
-    { id: "data",  label: "Reports & data", icon: BarChart3, desc: "Your numbers, importing & tools", settings: ["reports", "import", "mergedupes", "testdata"] },
+    { id: "web",   label: "Website", icon: Globe, desc: "Your booking page", settings: ["website"] },
+    { id: "data",  label: "Reports & data", icon: BarChart3, desc: "Your numbers & tools", settings: ["reports", "import", "mergedupes", "testdata"] },
   ];
   // Safety net: any card not placed above still appears (appended to Reports & Insights) so nothing is ever lost.
   // RETIRED cards are intentionally left out of the list (their function moved elsewhere).
@@ -11512,14 +11512,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             {CATS.map((cat) => {
               const Ic = cat.icon;
               return (
-                <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 16, minHeight: 116, display: "flex", flexDirection: "column", boxShadow: "var(--shadow-sm)", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-                  <span style={{ width: 40, height: 40, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 13%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}>{Ic && <Ic size={21} />}</span>
-                  <span style={{ flex: 1 }} />
-                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 17, minHeight: 104, display: "flex", flexDirection: "column", boxShadow: "var(--shadow-sm)", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                    {Ic && <Ic size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />}
                     <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16.5, fontWeight: 500, letterSpacing: "-0.2px", lineHeight: 1.1 }}>{cat.label}</span>
                     {cat.smart && <span style={{ fontSize: 8.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 5px" }}>SMART</span>}
                   </span>
-                  <span style={{ fontSize: 12, color: "var(--sub)", marginTop: 4, lineHeight: 1.35 }}>{cat.desc}</span>
+                  <span style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 11, lineHeight: 1.3 }}>{cat.desc}</span>
                 </button>
               );
             })}
