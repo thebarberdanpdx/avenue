@@ -9777,7 +9777,7 @@ function WebsiteEditor({ w, onChange, business, theme, setTheme }) {
   const ig = (w.instagram || "").replace(/^@/, "");
   const slug = (business?.name || "yourshop").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const veroUrl = `gotvero.com/${slug}`;
-  const fieldLabel = { fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 8 };
+  const fieldLabel = { fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 };
   const input = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
   const openPreview = () => { if (typeof window !== "undefined") window.open(window.location.origin + window.location.pathname + "#preview", "_blank"); };
 
@@ -9797,7 +9797,7 @@ function WebsiteEditor({ w, onChange, business, theme, setTheme }) {
 
         {/* Logo */}
         <div>
-          <div style={fieldLabel}>LOGO</div>
+          <div style={fieldLabel}>Logo</div>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{ width: 72, height: 72, borderRadius: 14, background: "var(--panel2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
               {w.logo ? <img src={imgUrl(w.logo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <ImageIcon size={22} style={{ color: "var(--faint)" }} />}
@@ -9812,24 +9812,24 @@ function WebsiteEditor({ w, onChange, business, theme, setTheme }) {
 
         {/* Theme — same dial as the app, surfaced here for convenience */}
         <div>
-          <div style={fieldLabel}>THEME</div>
+          <div style={fieldLabel}>Theme</div>
           <p style={{ fontSize: 13, color: "var(--sub)", marginTop: -2, marginBottom: 12, lineHeight: 1.5 }}>Your website and your dashboard share one look. Pick a theme here or under Your Shop — it's the same setting.</p>
           <AppearancePicker theme={theme} setTheme={setTheme} />
         </div>
 
         <div>
-          <div style={fieldLabel}>TAGLINE</div>
+          <div style={fieldLabel}>Tagline</div>
           <input value={w.tagline || ""} onChange={(e) => set("tagline", e.target.value)} placeholder="e.g. True to the craft." style={input} />
           <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 7, lineHeight: 1.5 }}>A short line under your name. Leave blank to hide.</p>
         </div>
 
         <div>
-          <div style={fieldLabel}>WELCOME TEXT (OPTIONAL)</div>
+          <div style={fieldLabel}>Welcome text (optional)</div>
           <textarea value={w.intro || ""} onChange={(e) => set("intro", e.target.value)} rows={4} placeholder="A sentence or two about your shop — what makes it yours." style={{ ...input, resize: "vertical", lineHeight: 1.6 }} />
         </div>
 
         <div>
-          <div style={fieldLabel}>INSTAGRAM</div>
+          <div style={fieldLabel}>Instagram</div>
           <div style={{ display: "flex", alignItems: "center", gap: 0, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
             <span style={{ padding: "13px 4px 13px 15px", color: "var(--sub)", fontSize: 15.5 }}>@</span>
             <input value={ig} onChange={(e) => set("instagram", e.target.value.replace(/[^a-zA-Z0-9._]/g, ""))} placeholder="yourshop" style={{ ...input, border: "none", background: "transparent", paddingLeft: 2 }} />
@@ -9839,15 +9839,15 @@ function WebsiteEditor({ w, onChange, business, theme, setTheme }) {
 
         {/* Section toggles */}
         <div>
-          <div style={fieldLabel}>SHOW ON THE PAGE</div>
-          <div style={{ display: "grid", gap: 10 }}>
-            {[["showServices", "Services & prices"], ["showTeam", "Your team"], ["showHours", "Hours"]].map(([k, lbl]) => {
+          <div style={fieldLabel}>Shown on your page</div>
+          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+            {[["showServices", "Services & prices"], ["showTeam", "Your team"], ["showHours", "Hours"]].map(([k, lbl], i) => {
               const on = w[k] !== false;
               return (
-                <button key={k} onClick={() => set(k, !on)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 16px", color: "var(--text)" }}>
-                  <span style={{ fontSize: 15 }}>{lbl}</span>
-                  <span style={{ width: 46, height: 27, borderRadius: 27, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: on ? 22 : 3, width: 21, height: 21, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} /></span>
-                </button>
+                <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "15px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                  <span style={{ fontSize: 15, fontWeight: 500 }}>{lbl}</span>
+                  <Toggle on={on} onClick={() => set(k, !on)} />
+                </div>
               );
             })}
           </div>
