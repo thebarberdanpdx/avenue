@@ -14067,16 +14067,21 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const [draftNote, setDraftNote] = useState(appt.note || "");
   const apptDateObj = appt.bookedFor ? new Date(appt.bookedFor) : new Date();
   const [draftDate, setDraftDate] = useState(apptDateObj);
+  const [notifyChange, setNotifyChange] = useState(false); // edit-mode: text the client about a time/day change
   const [pickList, setPickList] = useState(null); // null | "time" | "dur" — which full-screen 5-min list is open
   const [dateOpen, setDateOpen] = useState(false);
   const editing = mode === "edit";
+  // The notify toggle surfaces the moment the start time or the calendar day differs from what's booked.
+  const sameYMD = (a, b) => !!(a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate());
+  const timeOrDayChanged = editing && (draftStart !== appt.start || !sameYMD(draftDate, apptDateObj));
   const dLabel = (d) => `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
   const fmtDur = (m) => { const h = Math.floor(m / 60), mm = m % 60; if (h === 0) return `${mm} min`; return mm === 0 ? `${h} hr` : `${h} hr ${mm} min`; };
   const TIME_OPTS = []; for (let t = DAY_START; t <= DAY_END; t += 5) TIME_OPTS.push(t);
   const DUR_OPTS = []; for (let m = 5; m <= 240; m += 5) DUR_OPTS.push(m);
-  const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setDraftDate(appt.bookedFor ? new Date(appt.bookedFor) : new Date()); setPickList(null); setDateOpen(false); setMode("edit"); setMenuOpen(false); };
-  const cancelEdit = () => { setPickList(null); setDateOpen(false); setMode("detail"); };
-  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); showToast("Appointment updated."); setPickList(null); setMode("detail"); };
+  const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setDraftDate(appt.bookedFor ? new Date(appt.bookedFor) : new Date()); setNotifyChange(false); setPickList(null); setDateOpen(false); setMode("edit"); setMenuOpen(false); };
+  const cancelEdit = () => { setPickList(null); setDateOpen(false); setNotifyChange(false); setMode("detail"); };
+  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged; onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); showToast(willNotify ? "Updated — client will get a text once messaging is live." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
+  // TODO(SMS live): when willNotify, dispatch the reschedule/moved template to the client's phone.
 
   // ---- price (admin-editable; per-appointment override stored on appt.price) ----
   const price = lockedApptPrice(appt, service);
@@ -14314,6 +14319,16 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   )}
                 </div>
               </div>
+
+              {editing && timeOrDayChanged && (
+                <div onClick={() => setNotifyChange((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderBottom: `1px solid ${T.line}`, cursor: "pointer" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>Notify client of the new time</div>
+                    <div style={{ fontSize: 13, color: notifyChange ? "var(--gold)" : T.sub, marginTop: 2 }}>{notifyChange ? "We'll text them the change when you save" : "They won't be told unless you turn this on"}</div>
+                  </div>
+                  <span role="switch" aria-checked={notifyChange} style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: notifyChange ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: notifyChange ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
+                </div>
+              )}
 
               {/* client */}
               <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
