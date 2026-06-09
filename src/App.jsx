@@ -4641,6 +4641,9 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   // --- Picker state for the owner's "viewing as" dropdown ---
   const [pickerOpen, setPickerOpen] = useState(false);
   const [growthOpen, setGrowthOpen] = useState(false); // "How you're growing" full-screen
+  const [wrapOpen, setWrapOpen] = useState(false); // wrap-up sheet (opened from the tile)
+  const wrapIsRecent = (a) => { if (!a.bookedFor) return true; const days = Math.round((Date.now() - new Date(a.bookedFor).getTime()) / 86400000); return days >= 0 && days <= 7; };
+  const wrapUpList = viewedProvider ? appts.filter((a) => a.providerId === viewedProvider.id && a.status === "done" && (a.pendingDurationSave || (!a.hasNote && !a.hasPhotos && !a.noteLogged && clients.some((c) => c.id === a.clientId) && wrapIsRecent(a)))) : [];
   // --- Inline goal editor: tap the ring (daily) or the week number (weekly) to set goals in place ---
   const [goalEditor, setGoalEditor] = useState(null); // null | "daily" | "weekly"
   const [goalInput, setGoalInput] = useState("");
@@ -4782,16 +4785,26 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         </div>
       </div>
 
-      {/* ZOOM OUT — growth + reports tiles (icon-over-label, like the menu grid) */}
+      {/* TILES — wrap up (lights when cuts are waiting) + how you're growing; owners also get Reports */}
       <div style={{ marginBottom: 26 }}>
-        <div style={{ fontSize: 11.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 12px" }}>Zoom out</div>
-        <div style={{ display: "grid", gridTemplateColumns: (isOwner && onOpenRevenue) ? "1fr 1fr" : "1fr", gap: 11 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
+          {(() => {
+            const n = wrapUpList.length;
+            const lit = n > 0;
+            return (
+              <button onClick={() => (lit ? setWrapOpen(true) : (showToast && showToast("All caught up — nothing to log.")))} style={{ textAlign: "left", font: "inherit", cursor: "pointer", position: "relative", background: lit ? "linear-gradient(160deg, color-mix(in srgb, var(--gold) 13%, var(--panel)), var(--panel))" : "var(--panel)", border: lit ? "1px solid color-mix(in srgb, var(--gold) 42%, var(--border))" : "1px solid var(--border)", borderRadius: 18, boxShadow: lit ? "0 2px 12px color-mix(in srgb, var(--gold) 20%, transparent)" : "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 116, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                {lit && <span style={{ position: "absolute", top: 13, right: 13, minWidth: 23, height: 23, padding: "0 6px", borderRadius: 23, background: "var(--gold)", color: "var(--on-gold)", fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{n}</span>}
+                <Camera size={26} style={{ color: lit ? "var(--gold)" : "var(--faint)" }} />
+                <div><div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}>Wrap up</div><div style={{ fontSize: 12, color: lit ? "var(--gold)" : "var(--sub)", fontWeight: lit ? 600 : 400, marginTop: 3 }}>{lit ? (n + (n === 1 ? " cut to log" : " cuts to log")) : "All caught up"}</div></div>
+              </button>
+            );
+          })()}
           <button onClick={() => setGrowthOpen(true)} style={{ textAlign: "left", font: "inherit", cursor: "pointer", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 116, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
             <TrendingUp size={26} style={{ color: "var(--gold)" }} />
             <div><div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}>How you're growing</div><div style={{ fontSize: 12, color: "var(--sub)", marginTop: 3 }}>People keep coming back</div></div>
           </button>
           {(isOwner && onOpenRevenue) && (
-            <button onClick={onOpenRevenue} style={{ textAlign: "left", font: "inherit", cursor: "pointer", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 116, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <button onClick={onOpenRevenue} style={{ gridColumn: "1 / -1", textAlign: "left", font: "inherit", cursor: "pointer", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 92, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <BarChart3 size={26} style={{ color: "var(--text)" }} />
               <div><div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}>Reports</div><div style={{ fontSize: 12, color: "var(--sub)", marginTop: 3 }}>The full numbers</div></div>
             </button>
@@ -4909,20 +4922,21 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         </div>
       )}
 
-      {/* WRAP-UP — after a checkout, each finished cut lands here so nothing slips: verify the time if it ran long/short,
-          and add a note (→ profile notes) or a photo (→ their timeline). Personal / per-provider view only. */}
-      {viewedProvider && (() => {
-        const isRecent = (a) => { if (!a.bookedFor) return true; const days = Math.round((Date.now() - new Date(a.bookedFor).getTime()) / 86400000); return days >= 0 && days <= 7; };
-        const wrapUp = appts.filter((a) => a.providerId === viewedProvider.id && a.status === "done" && (
-          a.pendingDurationSave || (!a.hasNote && !a.hasPhotos && !a.noteLogged && clients.some((c) => c.id === a.clientId) && isRecent(a))
-        ));
-        if (wrapUp.length === 0) return null;
+      {/* WRAP-UP SHEET — opened from the Wrap-up tile. Each finished cut lands here so nothing slips:
+          verify the time if it ran long/short, and add a note (→ profile notes) or a photo (→ timeline). */}
+      {wrapOpen && viewedProvider && (() => {
+        const wrapUp = wrapUpList;
         return (
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <span style={{ width: 28, height: 1.5, background: "var(--gold)" }} />
-              <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, margin: 0, lineHeight: 1, color: "var(--text)" }}>Wrap Up</h3>
-            </div>
+          <div onClick={() => setWrapOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(30,26,20,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 2150 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, background: "var(--bg)", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: "10px 16px 22px", maxHeight: "85vh", overflowY: "auto" }}>
+              <div style={{ width: 38, height: 4, borderRadius: 4, background: "var(--border2)", margin: "3px auto 12px" }} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, margin: 0, lineHeight: 1, color: "var(--text)" }}>Wrap up</h3>
+                <button onClick={() => setWrapOpen(false)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Done</button>
+              </div>
+              {wrapUp.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "26px 10px", color: "var(--sub)", fontSize: 14.5 }}>All caught up — nothing to log right now.</div>
+              ) : (
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
               {wrapUp.map((a, i) => {
                 const d = a.pendingDurationSave;
@@ -4975,6 +4989,8 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                   </div>
                 );
               })}
+            </div>
+              )}
             </div>
           </div>
         );
