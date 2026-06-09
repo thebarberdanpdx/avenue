@@ -12686,7 +12686,22 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
             <ChevronDown size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
           </h2>
         </button>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {(() => {
+          const isToday = sameDay(selectedDate.toISOString(), today);
+          const booked = dayCount(() => true);
+          const nowMin = today.getHours() * 60 + today.getMinutes();
+          const next = isToday ? (appts || []).filter((a) => a && a.status !== "cancelled" && a.status !== "block" && a.status !== "done" && a.bookedFor && sameDay(a.bookedFor, selectedDate) && typeof a.start === "number" && a.start >= nowMin).sort((a, b) => a.start - b.start)[0] : null;
+          const parts = [booked === 0 ? "Nothing booked yet" : `${booked} booked`];
+          if (next) parts.push(`next at ${fmtTime(next.start)}`);
+          else if (isToday && booked > 0) parts.push("all done");
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--sub)" }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
+              <span>{parts.join(" · ")}</span>
+            </div>
+          );
+        })()}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 16 }}>
           <button className="lift" onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 18px", height: 42, borderRadius: 13, fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 7 }}><Plus size={16} strokeWidth={2.4} /> New</button>
           <button className="lift" onClick={() => setRegisterOpen(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 16px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 6, boxShadow: "var(--shadow-sm)" }}><DollarSign size={15} style={{ color: "var(--gold)" }} /> Sale</button>
           <div style={{ flex: 1, minWidth: 8 }} />
