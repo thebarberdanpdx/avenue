@@ -7975,6 +7975,22 @@ function BookingWordingPreview({ bs }) {
   );
 }
 
+function BrandingPreview({ logo }) {
+  const text = (logo && logo.trim()) || "Your business";
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden", background: "var(--panel)", boxShadow: "var(--shadow-sm)", marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 13px", borderBottom: "1px solid var(--line)", background: "var(--panel2)" }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
+        <span style={{ fontSize: 11, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Your logo, as clients see it</span>
+      </div>
+      <div style={{ padding: "34px 20px 38px", background: "var(--bg)", textAlign: "center" }}>
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(30px, 11vw, 46px)", fontWeight: 500, lineHeight: 1, letterSpacing: 1, margin: 0, color: "var(--text)", wordBreak: "break-word" }}>{text}</h1>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 14 }}>Book an appointment</div>
+      </div>
+    </div>
+  );
+}
+
 function Row({ title, desc, children, stack }) {
   if (stack) {
     // Wider controls (segmented pickers, steppers) drop to their own line, left-aligned.
@@ -11043,6 +11059,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "appearance", title: "Logo & Branding", icon: ImageIcon, category: "Business Setup",
       status: form.logoText ? form.logoText : "Business name", keywords: "logo branding wordmark business name header",
       editor: (<>
+        <BrandingPreview logo={form.logoText || form.name} />
         {field("LOGO WORDMARK (blank = business name)", "logoText")}
         <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: -6, marginBottom: 18 }}>Shown as your logo across the app. Leave blank to use the business name.</p>
       </>),
