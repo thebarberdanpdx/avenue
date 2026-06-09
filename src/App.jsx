@@ -6782,44 +6782,34 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     <>
       <SectionHeader title="Staff" />
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Everyone offers this by default. Turn someone off, or give them their own time and price. Blank = the service default ({form.duration || "—"} min · ${form.price || "—"}).</p>
-      <div style={{ display: "grid", gap: 14 }}>
-        {staffList.map((p) => {
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+        {staffList.map((p, i) => {
           const e = form.staff[p.id] || { on: true, duration: null, price: null };
           const on = e.on !== false;
-          const durSet = e.duration != null && e.duration !== "";
-          const priceSet = e.price != null && e.price !== "";
+          const overridden = (e.duration != null && e.duration !== "") || (e.price != null && e.price !== "");
           return (
-            <div key={p.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "2px 16px", boxShadow: "var(--shadow-sm)", opacity: on ? 1 : 0.6 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0", borderBottom: on ? "1px solid var(--line)" : "none" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                  <span style={{ width: 36, height: 36, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 16 }}>{p.name.charAt(0)}</span>
+            <div key={p.id} style={{ padding: "15px 16px", borderTop: i ? "1px solid var(--line)" : "none", opacity: on ? 1 : 0.5 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
+                  <span style={{ width: 34, height: 34, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 15, flexShrink: 0 }}>{p.name.charAt(0)}</span>
                   <span style={{ fontSize: 16, fontWeight: 500 }}>{p.name}</span>
                 </div>
                 <Toggle on={on} onClick={() => setStaff(p.id, { on: !on })} />
               </div>
               {on && (
-                <>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: "1px solid var(--line)" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 15.5, fontWeight: 500 }}>Duration</div>
-                      {durSet && <button onClick={() => setStaff(p.id, { duration: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5, marginTop: 3, padding: 0 }}>Default · {form.duration || "—"} min · reset</button>}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                      <input type="number" value={e.duration ?? ""} onChange={(ev) => setStaff(p.id, { duration: ev.target.value })} placeholder={String(form.duration || "—")} style={{ width: 66, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 10px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
-                      <span style={{ fontSize: 14, color: "var(--sub)" }}>min</span>
-                    </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap", paddingLeft: 45 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="number" value={e.duration ?? ""} placeholder={String(form.duration || "—")} onChange={(ev) => setStaff(p.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ width: 52, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 8px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "center", fontFamily: FONT_BODY }} />
+                    <span style={{ fontSize: 13, color: "var(--sub)" }}>min</span>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 15.5, fontWeight: 500 }}>Price</div>
-                      {priceSet && <button onClick={() => setStaff(p.id, { price: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5, marginTop: 3, padding: 0 }}>Default · ${form.price || "—"} · reset</button>}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                      <span style={{ fontSize: 15, color: "var(--sub)" }}>$</span>
-                      <input type="number" value={e.price ?? ""} onChange={(ev) => setStaff(p.id, { price: ev.target.value })} placeholder={String(form.price || "—")} style={{ width: 74, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 10px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
-                    </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 13, color: "var(--sub)" }}>$</span>
+                    <input type="number" value={e.price ?? ""} placeholder={String(form.price || "—")} onChange={(ev) => setStaff(p.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ width: 52, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 8px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "center", fontFamily: FONT_BODY }} />
                   </div>
-                </>
+                  {overridden
+                    ? <button onClick={() => setStaff(p.id, { duration: null, price: null })} style={{ marginLeft: "auto", background: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 500, padding: 0 }}>Reset</button>
+                    : <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--faint)" }}>Using defaults</span>}
+                </div>
               )}
             </div>
           );
@@ -8890,41 +8880,31 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         <SecHeader title="Services" onBack={() => setSection(null)} right={
           <button onClick={() => { const next = !!allOff; services.forEach((s) => setSvc(s.id, { on: next })); }} style={{ background: "none", color: "var(--gold)", fontSize: 15, fontWeight: 500 }}>{allOff ? "Enable all" : "Disable all"}</button>
         } />
-        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14, fontWeight: 400 }}>Same settings as each service's Staff tab — edit here or there, they stay in sync.</p>
-        <div style={{ display: "grid", gap: 14 }}>
-          {services.map((s) => {
+        <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14, fontWeight: 400 }}>Which services {person.name.split(" ")[0]} offers, and the time or price just for them. Blank = the shop default.</p>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+          {services.map((s, i) => {
             const e = entryFor(s); const on = e.on !== false;
-            const durSet = e.duration != null && e.duration !== "";
-            const priceSet = e.price != null && e.price !== "";
+            const overridden = (e.duration != null && e.duration !== "") || (e.price != null && e.price !== "");
             return (
-              <div key={s.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "2px 16px", boxShadow: "var(--shadow-sm)", opacity: on ? 1 : 0.6 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0", borderBottom: on ? "1px solid var(--line)" : "none" }}>
+              <div key={s.id} style={{ padding: "15px 16px", borderTop: i ? "1px solid var(--line)" : "none", opacity: on ? 1 : 0.5 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                   <span style={{ fontSize: 16, fontWeight: 500 }}>{s.name}</span>
                   <Toggle on={on} onClick={() => setSvc(s.id, { on: !on })} />
                 </div>
                 {on && (
-                  <>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: "1px solid var(--line)" }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 15.5, fontWeight: 500 }}>Duration</div>
-                        {durSet && <button onClick={() => setSvc(s.id, { duration: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5, marginTop: 3, padding: 0 }}>Default · {s.duration} min · reset</button>}
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                        <input type="number" value={e.duration ?? ""} onChange={(ev) => setSvc(s.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} placeholder={String(s.duration)} style={{ width: 66, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 10px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
-                        <span style={{ fontSize: 14, color: "var(--sub)" }}>min</span>
-                      </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <input type="number" value={e.duration ?? ""} placeholder={String(s.duration)} onChange={(ev) => setSvc(s.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ width: 52, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 8px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "center", fontFamily: FONT_BODY }} />
+                      <span style={{ fontSize: 13, color: "var(--sub)" }}>min</span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0" }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 15.5, fontWeight: 500 }}>Price</div>
-                        {priceSet && <button onClick={() => setSvc(s.id, { price: null })} style={{ background: "none", color: "var(--sub)", fontSize: 12.5, marginTop: 3, padding: 0 }}>Default · ${s.price} · reset</button>}
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                        <span style={{ fontSize: 15, color: "var(--sub)" }}>$</span>
-                        <input type="number" value={e.price ?? ""} onChange={(ev) => setSvc(s.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} placeholder={String(s.price)} style={{ width: 74, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 10px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
-                      </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13, color: "var(--sub)" }}>$</span>
+                      <input type="number" value={e.price ?? ""} placeholder={String(s.price)} onChange={(ev) => setSvc(s.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ width: 52, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 8px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "center", fontFamily: FONT_BODY }} />
                     </div>
-                  </>
+                    {overridden
+                      ? <button onClick={() => setSvc(s.id, { duration: null, price: null })} style={{ marginLeft: "auto", background: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 500, padding: 0 }}>Reset</button>
+                      : <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--faint)" }}>Using defaults</span>}
+                  </div>
                 )}
               </div>
             );
