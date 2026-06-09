@@ -6628,8 +6628,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     <button className="lift" onClick={save} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 13, boxShadow: "var(--shadow-md)", marginTop: 26 }}>SAVE SERVICE</button>
   );
   const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} style={{ width: 48, height: 28, borderRadius: 16, background: on ? "var(--gold)" : "var(--border2)", position: "relative", transition: "background .2s", flexShrink: 0 }}>
-      <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
+    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", transition: "background .2s", flexShrink: 0, border: "none", cursor: "pointer" }}>
+      <span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
     </button>
   );
 
@@ -7008,7 +7008,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
                     <span style={{ fontSize: 14.5, color: "var(--sub)" }}>{r.priceMode === "more" ? "Add" : "Take off"}</span>
                     <input type="number" value={r.amount || ""} onChange={(e) => setRule(r.id, { amount: e.target.value === "" ? 0 : Number(e.target.value) })} style={{ width: 80, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
-                    <Segmented options={[{ value: "amount", label: "$" }, { value: "percent", label: "%" }]} value={r.amountType} onChange={(v) => setRule(r.id, { amountType: v })} />
+                    <Segmented inline options={[{ value: "amount", label: "$" }, { value: "percent", label: "%" }]} value={r.amountType} onChange={(v) => setRule(r.id, { amountType: v })} />
                   </div>
                 )}
               </div>
@@ -7570,7 +7570,7 @@ function NotificationsEditor({ n, onChange }) {
   const setEvent = (k, patch) => onChange({ ...(n || {}), [aud]: { ...data, [k]: { ...(data[k] || {}), ...patch } } });
   return (
     <div>
-      <Segmented full options={NOTIF_AUDIENCES.map((a) => ({ value: a.key, label: a.label }))} value={aud} onChange={setAud} />
+      <Segmented options={NOTIF_AUDIENCES.map((a) => ({ value: a.key, label: a.label }))} value={aud} onChange={setAud} />
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>{grp.desc}</p>
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 12px" }}>
         {grp.events.map((ev, i) => {
@@ -7603,13 +7603,14 @@ function NotificationsEditor({ n, onChange }) {
   );
 }
 
-function Segmented({ options, value, onChange, full }) {
+function Segmented({ options, value, onChange, inline }) {
+  const stretch = !inline;
   return (
-    <div style={{ display: full ? "flex" : "inline-flex", width: full ? "100%" : "auto", background: "var(--panel2)", borderRadius: 11, padding: 3, gap: 2 }}>
+    <div style={{ display: stretch ? "flex" : "inline-flex", width: stretch ? "100%" : "auto", background: "var(--panel2)", borderRadius: 11, padding: 3, gap: 2 }}>
       {options.map((o) => {
         const on = value === o.value;
         return (
-          <button key={o.value} onClick={() => onChange(o.value)} style={{ border: "none", flex: full ? 1 : "0 0 auto", background: on ? "var(--gold)" : "transparent", padding: "7px 13px", borderRadius: 9, fontSize: 13.5, fontFamily: FONT_BODY, color: on ? "var(--on-gold)" : "var(--sub)", fontWeight: on ? 500 : 400, whiteSpace: "nowrap", cursor: "pointer" }}>{o.label}</button>
+          <button key={o.value} onClick={() => onChange(o.value)} style={{ border: "none", flex: stretch ? 1 : "0 0 auto", background: on ? "var(--gold)" : "transparent", padding: "7px 13px", borderRadius: 9, fontSize: 13.5, fontFamily: FONT_BODY, color: on ? "var(--on-gold)" : "var(--sub)", fontWeight: on ? 500 : 400, whiteSpace: "nowrap", cursor: "pointer" }}>{o.label}</button>
         );
       })}
     </div>
@@ -7666,7 +7667,7 @@ function BookingRulesEditor({ b, onChange }) {
         </Row>
 
         <Row stack title="Who can book" desc="Limit online booking by client type.">
-          <Segmented options={[{ value: "all", label: "All" }, { value: "returning", label: "Returning" }, { value: "new", label: "New" }]} value={b.clientType || "all"} onChange={(v) => set({ clientType: v })} />
+          <Segmented inline options={[{ value: "all", label: "All" }, { value: "returning", label: "Returning" }, { value: "new", label: "New" }]} value={b.clientType || "all"} onChange={(v) => set({ clientType: v })} />
         </Row>
 
         <Row title="Require a card" desc="Hold a card to reserve — your no-show protection.">
@@ -7675,7 +7676,7 @@ function BookingRulesEditor({ b, onChange }) {
 
         <Row stack title="Deposit" desc="Take a deposit at the time of booking.">
           <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
-            <Segmented options={[{ value: "none", label: "None" }, { value: "fixed", label: "$ Fixed" }, { value: "percent", label: "%" }]} value={b.deposit?.mode || "none"} onChange={(v) => setDep({ mode: v })} />
+            <Segmented inline options={[{ value: "none", label: "None" }, { value: "fixed", label: "$ Fixed" }, { value: "percent", label: "%" }]} value={b.deposit?.mode || "none"} onChange={(v) => setDep({ mode: v })} />
             {b.deposit?.mode && b.deposit.mode !== "none" && (
               <Stepper value={b.deposit.amount} onChange={(v) => setDep({ amount: v })} min={0} max={b.deposit.mode === "percent" ? 100 : 500} step={5} suffix={b.deposit.mode === "percent" ? "%" : "$"} />
             )}
@@ -7833,57 +7834,53 @@ function TippingEditor({ t, onChange }) {
   const set = (patch) => onChange({ ...t, ...patch });
   const setPreset = (i, val) => { const presets = [...t.presets]; presets[i] = Math.max(0, Math.min(100, parseInt(val) || 0)); onChange({ ...t, presets }); };
   const sampleTotal = 50; // preview on a $50 ticket
-  const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
-  );
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-        <div><div style={{ fontSize: 15 }}>Show tipping at checkout</div><div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>Clients pick a tip after their service.</div></div>
+      <Row title="Show tipping at checkout" desc="Clients pick a tip after their service.">
         <Toggle on={t.enabled} onClick={() => set({ enabled: !t.enabled })} />
-      </div>
+      </Row>
 
       {t.enabled && (<>
-        <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>Preset percentages</label>
-        <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
-          {t.presets.map((p, i) => (
-            <div key={i} style={{ flex: 1, position: "relative" }}>
-              <input type="number" value={p} onChange={(e) => setPreset(i, e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "13px 26px 13px 14px", color: "var(--text)", fontSize: 16, textAlign: "center", fontFamily: FONT_BODY }} />
-              <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--sub)", fontSize: 15, pointerEvents: "none" }}>%</span>
-            </div>
-          ))}
+        <div style={{ paddingTop: 16 }}>
+          <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>Preset percentages</label>
+          <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+            {t.presets.map((p, i) => (
+              <div key={i} style={{ flex: 1, position: "relative" }}>
+                <input type="number" value={p} onChange={(e) => setPreset(i, e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "13px 26px 13px 14px", color: "var(--text)", fontSize: 16, textAlign: "center", fontFamily: FONT_BODY }} />
+                <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--sub)", fontSize: 15, pointerEvents: "none" }}>%</span>
+              </div>
+            ))}
+          </div>
+
+          <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>Pre-highlighted suggestion</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            {t.presets.map((p, i) => { const on = t.smartDefault === p; return (
+              <button key={i} onClick={() => set({ smartDefault: p })} style={{ flex: 1, padding: "11px 0", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{p}%</button>
+            ); })}
+          </div>
         </div>
 
-        <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>Pre-highlighted suggestion</label>
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          {t.presets.map((p, i) => { const on = t.smartDefault === p; return (
-            <button key={i} onClick={() => set({ smartDefault: p })} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{p}%</button>
-          ); })}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)" }}>
-          <span style={{ fontSize: 14.5 }}>Allow custom amount</span>
+        <Row title="Allow custom amount">
           <Toggle on={t.allowCustom} onClick={() => set({ allowCustom: !t.allowCustom })} />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid var(--line)", marginBottom: 18 }}>
-          <span style={{ fontSize: 14.5 }}>Show "No tip" option</span>
+        </Row>
+        <Row title={'Show "No tip" option'}>
           <Toggle on={t.allowNoTip} onClick={() => set({ allowNoTip: !t.allowNoTip })} />
-        </div>
+        </Row>
 
         {/* live preview */}
-        <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WHAT CLIENTS SEE (on a ${sampleTotal} ticket)</div>
-        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: 16 }}>
+        <div style={{ fontSize: 10.5, letterSpacing: 1.4, color: "var(--faint)", fontWeight: 700, textTransform: "uppercase", margin: "18px 0 10px" }}>What clients see (on a ${sampleTotal} ticket)</div>
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: t.allowNoTip || t.allowCustom ? 10 : 0 }}>
             {t.presets.map((p, i) => { const on = t.smartDefault === p; return (
-              <div key={i} style={{ flex: 1, textAlign: "center", padding: "10px 4px", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)" }}>
+              <div key={i} style={{ flex: 1, textAlign: "center", padding: "10px 4px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)" }}>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{p}%</div>
                 <div style={{ fontSize: 12, opacity: 0.8 }}>${(sampleTotal * p / 100).toFixed(0)}</div>
               </div>
             ); })}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            {t.allowCustom && <div style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel)", fontSize: 13, color: "var(--sub)" }}>Custom</div>}
-            {t.allowNoTip && <div style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel)", fontSize: 13, color: "var(--sub)" }}>No tip</div>}
+            {t.allowCustom && <div style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--panel)", fontSize: 13, color: "var(--sub)" }}>Custom</div>}
+            {t.allowNoTip && <div style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--panel)", fontSize: 13, color: "var(--sub)" }}>No tip</div>}
           </div>
         </div>
       </>)}
@@ -7937,9 +7934,6 @@ function BusinessHoursEditor({ hours, onChange }) {
   const DAYNAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const h = hours || {};
   const setDay = (d, patch) => onChange({ ...h, [d]: { ...(h[d] || { on: false, start: 540, end: 1020 }), ...patch } });
-  const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
-  );
   // time options every 30 min from 6:00 to 22:00
   const opts = []; for (let t = 360; t <= 1320; t += 30) opts.push(t);
   const TimeSel = ({ value, onPick }) => (
@@ -8118,9 +8112,6 @@ function CheckoutSettingsEditor({ c, onChange }) {
   const setMethod = (i, val) => { const m = [...methods]; m[i] = val; set({ customMethods: m }); };
   const addMethod = () => set({ customMethods: [...methods, ""] });
   const removeMethod = (i) => set({ customMethods: methods.filter((_, j) => j !== i) });
-  const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
-  );
   const Card = ({ title, desc, children }) => (
     <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
       <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: desc ? 4 : 12 }}>{title}</div>
@@ -8186,9 +8177,6 @@ function CheckoutSettingsEditor({ c, onChange }) {
 // Waiting Room — how client check-in behaves (arrival → waiting → ready).
 function WaitingRoomEditor({ w, onChange }) {
   const set = (patch) => onChange({ ...w, ...patch });
-  const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
-  );
   const RowToggle = ({ title, desc, on, onClick, soon }) => (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14, opacity: soon ? 0.7 : 1 }}>
       <div><div style={{ fontSize: 15.5, fontWeight: 600 }}>{title} {soon && <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 20, padding: "1px 7px", marginLeft: 6 }}>WHEN LIVE</span>}</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{desc}</div></div>
@@ -8225,9 +8213,6 @@ function RunningLateEditor({ r, onChange }) {
   const setRange = (i, val) => { const a = [...ranges]; a[i] = val; set({ ranges: a }); };
   const addRange = () => set({ ranges: [...ranges, ""] });
   const removeRange = (i) => set({ ranges: ranges.filter((_, j) => j !== i) });
-  const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
-  );
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
@@ -8268,9 +8253,6 @@ function RunningLateEditor({ r, onChange }) {
 // "It's been a while" buffer — add time for overdue clients; charge or gift it.
 function OverdueBufferEditor({ b, onChange }) {
   const set = (patch) => onChange({ ...b, ...patch });
-  const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} aria-label={on ? "On" : "Off"} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
-  );
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
@@ -9510,9 +9492,6 @@ function NoShowEditor({ b, policy, onBooking, onPolicy }) {
     { v: 240, label: "4 hours" }, { v: 720, label: "12 hours" }, { v: 1440, label: "24 hours" }, { v: 2880, label: "48 hours" },
   ];
   const lead = b.leadTimeMin || 0;
-  const Toggle = ({ on, onClick }) => (
-    <button onClick={onClick} style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, border: "none", cursor: "pointer", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></button>
-  );
   return (
     <div style={{ display: "grid", gap: 0 }}>
       {/* Preview-mode notice */}
