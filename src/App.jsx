@@ -2235,6 +2235,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   }, [selectedDate, provider, providers, cartMin, appts, isMultiPerson, groupSlots, cart, business]);
   const slotIsSameTime = isMultiPerson && groupSlots && slot != null && groupSlots.sameTime.includes(slot);
   const dateIsFull = selectedDate && openSlots.length === 0;
+  // Best = gap-closing / no-wait times, surfaced for highlight on the client picker only.
+  // Computed separately so freeSlotsFor (group-booking math) keeps returning plain numbers.
+  const bestSet = useMemo(() => {
+    if (!selectedDate || isMultiPerson) return new Set();
+    const prov = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]);
+    if (!prov) return new Set();
+    return new Set(computeFreeSlots({ prov, date: selectedDate, durMin: effMin || 30, providers, appts, business, services }).filter((s) => s.best).map((s) => s.start));
+  }, [selectedDate, provider, providers, appts, isMultiPerson, cartMin, cart, business]);
   useEffect(() => {
     if (!selectedDate) { setSlotsReady(false); return; }
     setSlotsReady(false);
@@ -3780,7 +3788,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--text)", marginBottom: 3 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--gold)", fontWeight: 500, marginBottom: 16 }}>{daysFromNow(selectedDate)}</div>
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{slotsReady ? openSlots.map((t) => (<button key={t} onClick={() => { setSlot(t); setSlotConflict(false); }} style={{ background: "transparent", border: slot === t ? "1.5px solid var(--gold)" : "1px solid var(--border)", borderRadius: 8, padding: "14px 4px", color: slot === t ? "var(--gold)" : "var(--text)", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>{fmtTime(t)}</button>)) : [0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 8 }} />))}</div>
+              {!isMultiPerson && bestSet.size > 0 && openSlots.length > bestSet.size && (<div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--sub)", marginBottom: 11 }}><span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />Highlighted times have no wait — you're seen right away</div>)}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{slotsReady ? openSlots.map((t) => { const on = slot === t; const isBest = bestSet.has(t); return (<button key={t} onClick={() => { setSlot(t); setSlotConflict(false); }} style={{ background: on ? "var(--gold)" : isBest ? "color-mix(in srgb, var(--gold) 13%, transparent)" : "transparent", border: `${on || isBest ? "1.5px" : "1px"} solid ${on || isBest ? "var(--gold)" : "var(--border)"}`, borderRadius: 8, padding: "14px 4px", color: on ? "var(--on-gold)" : isBest ? "var(--gold)" : "var(--text)", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: on || isBest ? 600 : 500, cursor: "pointer" }}>{fmtTime(t)}</button>); }) : [0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 8 }} />))}</div>
               {slot != null && <button onClick={() => setStep(7)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 24, border: "none", cursor: "pointer" }}>Continue →</button>}
             </>)}
 
