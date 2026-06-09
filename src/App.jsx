@@ -11170,11 +11170,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
   return (
     <div className="fade-up" style={{ width: "100%", padding: "12px 6px" }}>
-      {/* Masthead — the search is the hero */}
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 10, fontWeight: 600, textTransform: "uppercase" }}>SETTINGS</div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, lineHeight: 0.98, letterSpacing: "-0.6px" }}>What do you want to change?</h2>
+      {/* Masthead */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ width: 30, height: 2, background: "var(--gold)", borderRadius: 2, marginBottom: 13 }} />
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1, letterSpacing: "-0.5px" }}>Settings</h2>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 7 }}>Your shop, your booking, your day.</div>
       </div>
 
       {/* HERO SEARCH */}
@@ -11186,14 +11186,17 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       {/* SLIM COCKPIT — quiet line under search; expands to a launch checklist; gone once done */}
       {showCockpit && !openCat && !q && (
         <div style={{ marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={() => setCockpitOpen((v) => !v)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, transparent)", borderRadius: 12, padding: "12px 14px", color: "var(--text)" }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
-              <span style={{ flex: 1, textAlign: "left", fontSize: 14, fontWeight: 500 }}>Get ready to launch</span>
-              <span style={{ fontSize: 12.5, color: "var(--gold)", fontWeight: 600 }}>{setupLeft.length + testLeft.length} left</span>
-              <ChevronDown size={16} style={{ color: "var(--faint)", transform: cockpitOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .2s" }} />
+          <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
+            <button onClick={() => setCockpitOpen((v) => !v)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 13, background: "linear-gradient(135deg, var(--gold), #5C7763)", border: "none", borderRadius: 20, padding: "16px 17px", color: "#fff", boxShadow: "0 8px 22px rgba(94,120,99,0.28)", textAlign: "left", cursor: "pointer" }}>
+              <span style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(255,255,255,0.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Sparkles size={19} style={{ color: "#fff" }} /></span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 16.5, display: "block", lineHeight: 1.15 }}>Finish setting up</span>
+                <span style={{ fontSize: 12.5, opacity: 0.9 }}>{setupItems.filter((s) => s.done).length} of {setupItems.length} done — almost ready to launch</span>
+              </span>
+              <span style={{ fontSize: 12.5, fontWeight: 600, background: "rgba(255,255,255,0.18)", padding: "5px 10px", borderRadius: 20, flexShrink: 0 }}>{setupLeft.length + testLeft.length} left</span>
+              <ChevronDown size={16} style={{ color: "rgba(255,255,255,0.85)", transform: cockpitOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .2s", flexShrink: 0 }} />
             </button>
-            <button onClick={() => setCockpitHidden(true)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 6, display: "flex" }}><X size={16} /></button>
+            <button onClick={() => setCockpitHidden(true)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 6, display: "flex", alignItems: "center" }}><X size={16} /></button>
           </div>
           {cockpitOpen && (
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, marginTop: 6, padding: "12px 14px" }}>
@@ -11273,20 +11276,21 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           );
         })()
       ) : (
-        // EMPTY STATE — the nine sections, right under the hero search
+        // EMPTY STATE — the nine sections as a soft two-up grid
         <div>
-          <div style={{ background: "var(--panel)", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}>
-            {CATS.map((cat, i) => {
+          <div style={{ fontSize: 11.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 12px" }}>All settings</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {CATS.map((cat) => {
+              const Ic = cat.icon;
               return (
-                <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ width: "100%", background: "var(--panel)", textAlign: "left", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "18px 18px", border: "none", borderTop: i ? "1px solid var(--line)" : "none" }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 16, fontWeight: 500 }}>{cat.label}</span>
-                      {cat.smart && <span style={{ fontSize: 9.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 6px" }}>SMART</span>}
-                    </div>
-                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.tag || cat.desc}</div>
-                  </div>
-                  <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 16, minHeight: 116, display: "flex", flexDirection: "column", boxShadow: "var(--shadow-sm)", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                  <span style={{ width: 40, height: 40, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 13%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}>{Ic && <Ic size={21} />}</span>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16.5, fontWeight: 500, letterSpacing: "-0.2px", lineHeight: 1.1 }}>{cat.label}</span>
+                    {cat.smart && <span style={{ fontSize: 8.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 5px" }}>SMART</span>}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--sub)", marginTop: 4, lineHeight: 1.35 }}>{cat.desc}</span>
                 </button>
               );
             })}
