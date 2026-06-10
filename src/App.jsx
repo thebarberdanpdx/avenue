@@ -215,7 +215,7 @@ const DEFAULT_BUSINESS = {
   // Merge tags {client} {provider} {service} {date} {time} {business} get filled in automatically.
   messages: [
     { id: "booked", label: "Appointment Booked", channel: "both", timing: "Right after booking", enabled: true,
-      body: "You're all set, {client}! Your {service} with {provider} at {business} is confirmed for {date} at {time}. Need to change it? Reply or tap the link in your confirmation." },
+      body: "Hi {client},\n\nYou're all set! Here's your booking information for {business}:\n\n{appointment}\n\n{location}\n\nCancellation policy:\n{policy}\n\nQuestions? Email {email} or call {phone}.\n\n{cancel link}\n\nThanks,\n{business}" },
     { id: "remind2d", label: "Reminder — 2 days before", channel: "email", timing: "2 days before", enabled: true,
       body: "Hi {client}, just a reminder of your upcoming {service} with {provider} at {business} on {date} at {time}. See you soon!" },
     { id: "remind24h", label: "Reminder — 24 hours before", channel: "text", timing: "24 hours before", enabled: true,
@@ -8672,17 +8672,98 @@ function LocationsEditor({ business, setForm }) {
 // ============================================================
 // MESSAGES EDITOR — edit the wording of each automated text/email
 // ============================================================
-const MERGE_TAGS = ["{client}", "{provider}", "{service}", "{date}", "{time}", "{business}"];
-const fillSample = (body, business) => body
-  .replace(/\{client\}/g, "Marcus")
-  .replace(/\{provider\}/g, "Dan")
-  .replace(/\{service\}/g, "Cut & Beard")
-  .replace(/\{date\}/g, "Thu, May 28")
-  .replace(/\{time\}/g, "12:50 PM")
-  .replace(/\{business\}/g, business?.legalName || "the studio");
+// Small {fact} tags fill in a single detail; {block} tags expand into a formatted card / button.
+const MERGE_FACTS = ["{client}", "{business}", "{service}", "{date}", "{time}", "{provider}", "{address}", "{phone}", "{email}"];
+const MERGE_BLOCKS = ["{appointment}", "{location}", "{policy}", "{cancel link}"];
+const MERGE_TAGS = [...MERGE_FACTS, ...MERGE_BLOCKS];
+const BLOCK_SET = new Set(MERGE_BLOCKS);
+
+// Build a sample context for previewing a message, using the shop's real details where we have them.
+function previewCtx(business) {
+  const b = business || {};
+  const phone = (b.phones && b.phones[0] && b.phones[0].number) || "(503) 555-0142";
+  const addr = [b.address, b.address2].filter(Boolean).join(", ") || "2077 NE Town Center Dr, Suite 120";
+  const locName = (b.multiLocation && b.locations && b.locations[0] && b.locations[0].name) || b.name || "Main Studio";
+  return {
+    client: "Marcus", business: b.name || "your shop", service: "Cut & Beard",
+    date: "Thursday, May 28", time: "12:50 PM", provider: "Dan",
+    address: addr, phone, email: b.email || "hello@yourshop.com",
+    policy: b.policy || "We kindly ask for 24 hours' notice to cancel or reschedule.",
+    locName, addons: ["Hot towel", "Straight razor"],
+  };
+}
+
+// Replace the small {fact} tags inline (leaves block tags untouched). Used for chips + text preview.
+function fillFacts(s, c) {
+  return String(s == null ? "" : s)
+    .replace(/\{client\}/g, c.client).replace(/\{provider\}/g, c.provider)
+    .replace(/\{service\}/g, c.service).replace(/\{date\}/g, c.date)
+    .replace(/\{time\}/g, c.time).replace(/\{business\}/g, c.business)
+    .replace(/\{address\}/g, c.address).replace(/\{phone\}/g, c.phone)
+    .replace(/\{email\}/g, c.email);
+}
+const fillSample = (body, business) => fillFacts(body, previewCtx(business));
+
+// Plain-text render (Text channel preview): block tags flatten to simple lines.
+function renderPlainPreview(body, business) {
+  const c = previewCtx(business);
+  let t = String(body || "");
+  t = t.replace(/\{appointment\}/g, `${c.date}\n${c.service}\nwith ${c.provider} at ${c.time}`);
+  t = t.replace(/\{location\}/g, `${c.locName}\n${c.address}`);
+  t = t.replace(/\{policy\}/g, c.policy);
+  t = t.replace(/\{cancel link\}/g, `To reschedule, call or text ${c.phone}.`);
+  return fillFacts(t, c);
+}
+
+// Rich email preview — the branded email with block tags expanded into cards/button.
+function EmailPreview({ body, business }) {
+  const c = previewCtx(business);
+  const card = { background: "var(--panel2)", border: "1px solid var(--line)", borderRadius: 12, padding: "13px 15px", margin: "10px 0", lineHeight: 1.55, fontSize: 14.5 };
+  const blockEl = (tag, key) => {
+    if (tag === "{appointment}") return (
+      <div key={key} style={card}>
+        <div style={{ color: "var(--sub)" }}>On <b style={{ color: "var(--text)" }}>{c.date}</b></div>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, marginTop: 4 }}>{c.service}</div>
+        <div style={{ color: "var(--sub)", fontSize: 13, marginTop: 2 }}>{c.addons.join(" · ")}</div>
+        <div style={{ color: "var(--sub)", marginTop: 5 }}>with <b style={{ color: "var(--text)" }}>{c.provider}</b> at <b style={{ color: "var(--text)" }}>{c.time}</b></div>
+      </div>
+    );
+    if (tag === "{location}") return (
+      <div key={key} style={card}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, color: "var(--gold)", marginBottom: 3 }}>{c.locName}</div>
+        {c.address}
+      </div>
+    );
+    if (tag === "{policy}") return <div key={key} style={card}>{c.policy}</div>;
+    if (tag === "{cancel link}") return (
+      <div key={key} style={{ textAlign: "center", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 15, padding: 13, borderRadius: 11, margin: "12px 0" }}>Reschedule or cancel</div>
+    );
+    return null;
+  };
+  const parts = String(body || "").split(/(\{appointment\}|\{location\}|\{policy\}|\{cancel link\})/g);
+  return (
+    <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ textAlign: "center", padding: "20px 18px 14px", borderBottom: "1px solid var(--line)" }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 20, letterSpacing: 1, textTransform: "uppercase" }}>{c.business}</div>
+      </div>
+      <div style={{ padding: "16px 18px 6px", fontSize: 14.5, lineHeight: 1.6 }}>
+        {parts.map((part, i) => {
+          if (BLOCK_SET.has(part)) return blockEl(part, i);
+          return fillFacts(part, c).split("\n").map((line, j) =>
+            line.trim()
+              ? <div key={i + "-" + j}>{line}</div>
+              : <div key={i + "-" + j} style={{ height: 8 }} />
+          );
+        })}
+      </div>
+      <div style={{ textAlign: "center", fontSize: 11.5, color: "var(--faint)", padding: "14px 18px", borderTop: "1px solid var(--line)", marginTop: 8 }}>Sent by {c.business} · Powered by Vero</div>
+    </div>
+  );
+}
 
 function MessagesEditor({ messages, onChange, business }) {
   const [openId, setOpenId] = useState(null);
+  const [previewId, setPreviewId] = useState(null);
   const update = (id, patch) => onChange(messages.map((m) => m.id === id ? { ...m, ...patch } : m));
   const insertTag = (m, tag) => update(m.id, { body: (m.body || "") + (m.body && !m.body.endsWith(" ") ? " " : "") + tag });
   const channelBadge = (ch) => {
@@ -8703,7 +8784,7 @@ function MessagesEditor({ messages, onChange, business }) {
           return (
             <div key={m.id} style={{ padding: "0 16px", borderTop: i ? "1px solid var(--line)" : "none", opacity: m.enabled ? 1 : 0.55 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "15px 0" }}>
-                <button onClick={() => setOpenId(expanded ? null : m.id)} style={{ background: "none", color: "var(--text)", textAlign: "left", flex: 1, minWidth: 0 }}>
+                <button onClick={() => { setPreviewId(null); setOpenId(expanded ? null : m.id); }} style={{ background: "none", color: "var(--text)", textAlign: "left", flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15.5, fontWeight: 500 }}>{m.label}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>{channelBadge(m.channel)}<span style={{ fontSize: 12.5, color: "var(--sub)" }}>{m.timing}</span></div>
                 </button>
@@ -8714,17 +8795,38 @@ function MessagesEditor({ messages, onChange, business }) {
               </div>
               {expanded && (
                 <div style={{ padding: "2px 0 18px", borderTop: "1px solid var(--line)" }}>
-                  <FieldLabel>Send as</FieldLabel>
-                  <Segmented options={[{ value: "text", label: "Text" }, { value: "email", label: "Email" }, { value: "both", label: "Both" }]} value={m.channel} onChange={(v) => update(m.id, { channel: v })} />
-                  <FieldLabel>Message</FieldLabel>
-                  <textarea value={m.body} onChange={(e) => update(m.id, { body: e.target.value })} rows={4} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", outline: "none" }} />
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
-                    {MERGE_TAGS.map((tag) => (
-                      <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 20, padding: "5px 11px", color: "var(--gold)" }}>{tag}</button>
-                    ))}
-                  </div>
-                  <FieldLabel>Preview</FieldLabel>
-                  <div style={{ background: m.channel === "email" ? "var(--panel)" : "#3A86E0", color: m.channel === "email" ? "var(--text)" : "#fff", border: m.channel === "email" ? "1px solid var(--border)" : "none", borderRadius: 16, padding: "11px 15px", fontSize: 14.5, lineHeight: 1.45 }}>{fillSample(m.body, business)}</div>
+                  {previewId === m.id ? (
+                    <>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "14px 0 10px" }}>
+                        <FieldLabel>Preview</FieldLabel>
+                        <button onClick={() => setPreviewId(null)} style={{ background: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>‹ Back to editing</button>
+                      </div>
+                      {m.channel === "text"
+                        ? <div style={{ background: "#3A86E0", color: "#fff", borderRadius: 16, padding: "12px 15px", fontSize: 14.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{renderPlainPreview(m.body, business)}</div>
+                        : <EmailPreview body={m.body} business={business} />}
+                      {m.channel === "both" && <p style={{ fontSize: 12, color: "var(--sub)", margin: "10px 2px 0" }}>The text version sends these same details as plain lines.</p>}
+                    </>
+                  ) : (
+                    <>
+                      <FieldLabel>Send as</FieldLabel>
+                      <Segmented options={[{ value: "text", label: "Text" }, { value: "email", label: "Email" }, { value: "both", label: "Both" }]} value={m.channel} onChange={(v) => update(m.id, { channel: v })} />
+                      <FieldLabel>Message</FieldLabel>
+                      <textarea value={m.body} onChange={(e) => update(m.id, { body: e.target.value })} rows={6} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", outline: "none" }} />
+                      <div style={{ fontSize: 12, color: "var(--sub)", margin: "13px 2px 7px" }}>Tap to insert a detail:</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {MERGE_FACTS.map((tag) => (
+                          <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 20, padding: "5px 11px", color: "var(--gold)" }}>{tag}</button>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--sub)", margin: "14px 2px 7px" }}>Or drop in a ready-made block:</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {MERGE_BLOCKS.map((tag) => (
+                          <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "color-mix(in srgb, var(--gold) 14%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 40%, var(--border))", borderRadius: 20, padding: "5px 11px", color: "var(--gold)", fontWeight: 500 }}>{tag}</button>
+                        ))}
+                      </div>
+                      <button onClick={() => setPreviewId(m.id)} style={{ width: "100%", marginTop: 18, background: "none", color: "var(--gold)", border: "1px solid var(--border)", borderRadius: 12, padding: 13, fontSize: 14.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Preview email</button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
