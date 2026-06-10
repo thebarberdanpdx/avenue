@@ -1029,6 +1029,10 @@ function App() {
     return FALLBACK;
   };
   const SHOP_ID = resolveShopId();
+  // Master ("All Locations") mode: turned on by the location switcher via ?master=1. SHOP_ID stays
+  // a real shop in the background (harmless); when masterMode is on we render the account overview
+  // instead of a single shop's dashboard.
+  const masterMode = (() => { try { return typeof window !== "undefined" && new URL(window.location.href).searchParams.get("master") === "1"; } catch (e) { return false; } })();
   const loadedRef = useRef(false); // blocks saves until the first load finishes (so seed data can't overwrite real data)
   const [dataLoaded, setDataLoaded] = useState(false); // true once the first load finishes — used to avoid flashing placeholder names
   const savingRef = useRef({});    // per-table { running, queued } — guarantees in-order saves
@@ -1400,7 +1404,9 @@ function App() {
       {view === "client" && <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} />}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={goBooking} />}
       {view === "shop" && (session
-        ? <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} />
+        ? (masterMode
+          ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} />
+          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
@@ -6716,6 +6722,13 @@ function LocationSwitcher({ current, fallbackName, authEmail }) {
         <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "64px 18px", zIndex: 120 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.45)" }}>
             <div style={{ padding: "16px 18px 12px", fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Switch location</div>
+            <button onClick={() => { try { const u = new URL(window.location.href); u.searchParams.set("master", "1"); u.searchParams.delete("shop"); window.location.href = u.toString(); } catch (e) {} }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>All Locations</div>
+                <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>Overview of every shop</div>
+              </div>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
             {shops.map((s) => {
               const on = s.shop_id === current;
               return (
@@ -6731,6 +6744,54 @@ function LocationSwitcher({ current, fallbackName, authEmail }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Master ("All Locations") overview — the account-level home. Lists every shop as a card;
+// tapping one enters that shop's dashboard. Built purely from get_my_shops (no new data reads).
+// Cross-shop stats (today's bookings) and the all-locations calendar come next.
+function MasterDashboard({ authEmail, onSignOutAccount }) {
+  const [shops, setShops] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try { const { data } = await supabase.rpc("get_my_shops"); if (alive && Array.isArray(data)) setShops(data); } catch (e) {}
+      if (alive) setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [authEmail]);
+  const accountName = (shops[0] && shops[0].account_name) || "All Locations";
+  const enter = (id) => { try { const u = new URL(window.location.href); u.searchParams.delete("master"); u.searchParams.set("shop", id); window.location.href = u.toString(); } catch (e) {} };
+  return (
+    <div style={{ position: "relative", minHeight: "100dvh", background: "var(--bg)", color: "var(--text)" }}>
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600 }}>ALL LOCATIONS</div>
+        <button onClick={() => onSignOutAccount && onSignOutAccount()} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, fontFamily: FONT_BODY, cursor: "pointer" }}>Sign out</button>
+      </div>
+      <div style={{ maxWidth: 560, margin: "0 auto", padding: "26px 16px 120px" }}>
+        <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.4px", marginBottom: 6 }}>{accountName}</h1>
+        <div style={{ fontSize: 14.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 22 }}>{loading ? "Loading your shops\u2026" : (shops.length + " " + (shops.length === 1 ? "location" : "locations"))}</div>
+        <div style={{ display: "grid", gap: 12 }}>
+          {shops.map((s) => (
+            <button key={s.shop_id} className="lift" onClick={() => enter(s.shop_id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "18px 18px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, cursor: "pointer", textAlign: "left" }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" /></svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.shop_name || s.shop_id}</div>
+                <div style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2 }}>{s.role === "owner" ? "Owner" : "Manager"} \u00b7 Tap to manage</div>
+              </div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+          ))}
+          {!loading && shops.length === 0 && (
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, color: "var(--sub)", fontSize: 14.5, fontFamily: FONT_BODY }}>No shops found for this account.</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
