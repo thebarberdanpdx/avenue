@@ -7304,11 +7304,149 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
 }
 
 // ---------- MENU EDITOR (add/edit/remove + photos) ----------
+// Categories — one direct-manipulation sheet: tap a name to rename in place, drag the
+// handle to reorder, the dashed row becomes a live field to add. Replaces three native
+// prompt() dialogs (add / rename) plus the scattered arrows + delete with one surface.
+function CategorySheet({ open, onClose, categories, setCategories, services, setServices, showToast }) {
+  const cats = (categories && categories.length) ? categories : ["Services"];
+  const [editIdx, setEditIdx] = useState(-1);
+  const [draft, setDraft] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [addDraft, setAddDraft] = useState("");
+  const [drag, setDrag] = useState(null); // { idx, dy, overIdx, dropping }
+  const rowH = useRef(67);
+  const startY = useRef(0);
+  const dropTimer = useRef(null);
+  useEffect(() => () => { if (dropTimer.current) clearTimeout(dropTimer.current); }, []);
+  // reset transient edit state whenever the sheet opens
+  useEffect(() => { if (open) { setEditIdx(-1); setAdding(false); setAddDraft(""); setDrag(null); } }, [open]);
+
+  const countFor = (cat) => (services || []).filter((s) => (s.category || cats[0]) === cat).length;
+
+  const beginRename = (i) => { setEditIdx(i); setDraft(cats[i]); };
+  const commitRename = (i) => {
+    const old = cats[i]; const name = (draft || "").trim();
+    setEditIdx(-1);
+    if (!name || name === old) return;
+    if (cats.includes(name)) { showToast("That category already exists."); return; }
+    setCategories(cats.map((c) => c === old ? name : c));
+    setServices((services || []).map((s) => (s.category || cats[0]) === old ? { ...s, category: name } : s));
+  };
+  const commitAdd = () => {
+    const name = (addDraft || "").trim();
+    setAdding(false); setAddDraft("");
+    if (!name) return;
+    if (cats.includes(name)) { showToast("That category already exists."); return; }
+    setCategories([...cats, name]);
+  };
+  const removeCat = (i) => {
+    if (cats.length <= 1) { showToast("Keep at least one category."); return; }
+    const name = cats[i]; const n = countFor(name);
+    const fallback = cats.find((c) => c !== name);
+    if (n) setServices((services || []).map((s) => (s.category || cats[0]) === name ? { ...s, category: fallback } : s));
+    setCategories(cats.filter((c) => c !== name));
+    showToast(n ? `"${name}" removed — ${n} service${n > 1 ? "s" : ""} moved to "${fallback}".` : `"${name}" removed.`);
+  };
+
+  // ---- pointer-drag reorder (mirrors the services-list drag) ----
+  const gripDown = (i) => (e) => {
+    if (editIdx !== -1) return;
+    e.preventDefault();
+    const row = e.currentTarget.closest("[data-catrow]");
+    if (row) rowH.current = row.offsetHeight + 11; // row height + marginBottom
+    startY.current = e.clientY;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (x) {}
+    setDrag({ idx: i, dy: 0, overIdx: i, dropping: false });
+  };
+  const gripMove = (e) => {
+    setDrag((d) => {
+      if (!d || d.dropping) return d;
+      const dy = e.clientY - startY.current;
+      const slots = Math.round(dy / rowH.current);
+      const overIdx = Math.max(0, Math.min(cats.length - 1, d.idx + slots));
+      return { ...d, dy, overIdx };
+    });
+  };
+  const gripUp = () => {
+    setDrag((d) => {
+      if (!d || d.dropping) return d;
+      if (d.idx === d.overIdx) return null;
+      const targetDy = (d.overIdx - d.idx) * rowH.current;
+      if (dropTimer.current) clearTimeout(dropTimer.current);
+      dropTimer.current = setTimeout(() => {
+        const arr = [...cats];
+        const [m] = arr.splice(d.idx, 1);
+        arr.splice(d.overIdx, 0, m);
+        setCategories(arr); setDrag(null); dropTimer.current = null;
+      }, 200);
+      return { ...d, dy: targetDy, dropping: true };
+    });
+  };
+
+  const focusSel = (el) => { if (el) { try { el.focus(); el.select(); } catch (x) {} } };
+  const card = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "0 1px 3px var(--shadow)" };
+  const nameStyle = { fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 19, letterSpacing: "-0.2px", lineHeight: 1.15, color: "var(--text)" };
+
+  return (
+    <Sheet open={open} onClose={onClose} align="bottom" maxWidth={480}>
+      <div style={{ width: 38, height: 5, borderRadius: 9, background: "var(--border2)", margin: "0 auto 14px" }} />
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 4 }}>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 25, letterSpacing: "-0.4px", margin: 0 }}>Categories</h2>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--gold)", fontFamily: FONT_BODY, fontWeight: 600, fontSize: 16, padding: "6px 2px" }}>Done</button>
+      </div>
+      <p style={{ fontSize: 13, color: "var(--sub)", margin: "0 0 16px" }}>Tap a name to rename · drag the handle to reorder.</p>
+
+      <div>
+        {cats.map((cat, i) => {
+          const held = drag && drag.idx === i;
+          let ty = 0, sc = 1, z = 1;
+          let transition = "transform .2s cubic-bezier(.2,.85,.25,1), box-shadow .2s ease, border-color .2s ease";
+          if (held) {
+            ty = drag.dy; sc = 1.03; z = 50;
+            transition = drag.dropping ? "transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease" : "none";
+          } else if (drag) {
+            if (drag.overIdx > drag.idx && i > drag.idx && i <= drag.overIdx) ty = -rowH.current;
+            else if (drag.overIdx < drag.idx && i >= drag.overIdx && i < drag.idx) ty = rowH.current;
+          }
+          return (
+            <div key={cat} data-catrow style={{ position: "relative", zIndex: z, display: "flex", alignItems: "center", gap: 12, padding: "14px 14px", marginBottom: 11, ...card, border: held ? "1px solid var(--gold)" : card.border, boxShadow: held ? "0 16px 34px -12px var(--shadow), 0 4px 10px -5px var(--shadow)" : card.boxShadow, transform: `translateY(${ty}px) scale(${sc})`, transition, willChange: drag ? "transform" : "auto" }}>
+              <span onPointerDown={gripDown(i)} onPointerMove={gripMove} onPointerUp={gripUp} onPointerCancel={gripUp} aria-label="Drag to reorder" style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", flexShrink: 0, display: "flex", alignItems: "center", padding: "4px 2px", cursor: held ? "grabbing" : "grab" }}><GripVertical size={20} style={{ color: held ? "var(--gold)" : "var(--faint)" }} /></span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {editIdx === i ? (
+                  <input ref={focusSel} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => commitRename(i)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitRename(i); } if (e.key === "Escape") setEditIdx(-1); }}
+                    style={{ ...nameStyle, width: "100%", border: "none", borderBottom: "1.5px solid var(--gold)", background: "transparent", outline: "none", padding: "0 0 2px" }} />
+                ) : (
+                  <div onClick={() => beginRename(i)} style={{ ...nameStyle, cursor: "text", display: "inline-block", borderBottom: "1.5px solid transparent" }}>{cat}</div>
+                )}
+                <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{countFor(cat)} {countFor(cat) === 1 ? "service" : "services"}</div>
+              </div>
+              <button onClick={() => removeCat(i)} aria-label={`Remove ${cat}`} style={{ flexShrink: 0, width: 30, height: 30, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--panel)", color: "var(--faint)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontSize: 20, lineHeight: 0, fontWeight: 500 }}>−</button>
+            </div>
+          );
+        })}
+      </div>
+
+      {adding ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "15px 14px", border: "1.5px solid var(--gold)", borderRadius: 16 }}>
+          <Plus size={19} style={{ color: "var(--gold)", flexShrink: 0 }} />
+          <input ref={focusSel} value={addDraft} onChange={(e) => setAddDraft(e.target.value)} onBlur={commitAdd}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitAdd(); } if (e.key === "Escape") { setAdding(false); setAddDraft(""); } }}
+            placeholder="Name this category…" style={{ ...nameStyle, flex: 1, minWidth: 0, border: "none", background: "transparent", outline: "none", padding: 0 }} />
+        </div>
+      ) : (
+        <button onClick={() => { setAddDraft(""); setAdding(true); }} className="lift" style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", background: "transparent", boxShadow: "none", border: "1.5px dashed var(--border2)", borderRadius: 16, padding: "15px 14px", color: "var(--sub)", fontFamily: FONT_BODY, fontSize: 16 }}><Plus size={19} /> New category</button>
+      )}
+    </Sheet>
+  );
+}
+
 function MenuEditor({ services, setServices, categories, setCategories, providers, business, showToast, cutLibrary, setCutLibrary }) {
   const [editing, setEditing] = useState(null); // service id or "new"
   const [section, setSection] = useState(null); // null = hub, else "details"|"staff"|"customizations"|"booking"
   const [picker, setPicker] = useState(null); // {target}
   const [editMode, setEditMode] = useState(false); // list view: browse vs manage (reorder/delete/rename)
+  const [catSheet, setCatSheet] = useState(false); // category manager sheet (add / rename / reorder / delete)
   const cats = (categories && categories.length) ? categories : ["Services"];
   const staffList = (providers || []).filter((p) => p.id !== "anyone");
   // build a default staff map: everyone ON, no overrides (null = use service default)
@@ -8065,32 +8203,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     newIds.forEach((id, j) => { arr[positions[j]] = services.find((x) => x.id === id); });
     commitOrder(arr);
   };
-  const moveCategory = (name, dir) => {
-    const arr = [...cats]; const i = arr.indexOf(name); const j = i + dir;
-    if (j < 0 || j >= arr.length) return;
-    [arr[i], arr[j]] = [arr[j], arr[i]]; setCategories(arr);
-  };
-  const addCategory = () => {
-    const name = (prompt("New category name") || "").trim();
-    if (!name) return;
-    if (cats.includes(name)) { showToast("That category already exists."); return; }
-    setCategories([...cats, name]); showToast(`Added category "${name}".`);
-  };
-  const renameCategory = (oldName) => {
-    const name = (prompt("Rename category", oldName) || "").trim();
-    if (!name || name === oldName) return;
-    if (cats.includes(name)) { showToast("That category already exists."); return; }
-    setCategories(cats.map((c) => c === oldName ? name : c));
-    setServices(services.map((s) => (s.category || cats[0]) === oldName ? { ...s, category: name } : s));
-    showToast("Category renamed.");
-  };
-  const deleteCategory = (name) => {
-    if (cats.length <= 1) { showToast("Keep at least one category."); return; }
-    const fallback = cats.find((c) => c !== name);
-    setServices(services.map((s) => (s.category || cats[0]) === name ? { ...s, category: fallback } : s));
-    setCategories(cats.filter((c) => c !== name));
-    showToast(`Category "${name}" removed; its services moved to "${fallback}".`);
-  };
+  // Category add / rename / reorder / delete now live in <CategorySheet> (one direct-manipulation surface).
   // drag-and-drop (works in the artifact frame; arrows are the mobile-safe fallback)
   const onDragStart = (id) => (e) => { dragId.current = id; e.dataTransfer && (e.dataTransfer.effectAllowed = "move"); };
   const onDropOn = (targetId, targetCat) => (e) => {
@@ -8134,16 +8247,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             {/* category header */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 9px 6px", minHeight: 22 }}>
               <span style={{ flex: 1, fontSize: 11.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{cat}</span>
-              {editMode && (
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <button onClick={() => renameCategory(cat)} style={{ background: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 500, padding: 0 }}>Rename</button>
-                  {cats.length > 1 && <button onClick={() => deleteCategory(cat)} style={{ background: "none", color: "#C2703D", fontSize: 13.5, fontWeight: 500, padding: 0 }}>Delete</button>}
-                  <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <button onClick={() => moveCategory(cat, -1)} disabled={ci === 0} style={{ background: "none", color: ci === 0 ? "var(--faint)" : "var(--sub)", padding: 2, opacity: ci === 0 ? 0.4 : 1 }}><ChevronUp size={17} /></button>
-                    <button onClick={() => moveCategory(cat, 1)} disabled={ci === cats.length - 1} style={{ background: "none", color: ci === cats.length - 1 ? "var(--faint)" : "var(--sub)", padding: 2, opacity: ci === cats.length - 1 ? 0.4 : 1 }}><ChevronDown size={17} /></button>
-                  </div>
-                </div>
-              )}
             </div>
             {/* services card */}
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: cardClipping ? "hidden" : "visible" }}>
@@ -8192,9 +8295,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       {!editMode && (
         <>
           <button className="lift" onClick={openNew} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Plus size={18} /> Add a service</button>
-          <button onClick={addCategory} className="lift" style={{ display: "flex", alignItems: "center", gap: 8, background: "transparent", boxShadow: "none", border: "1px dashed var(--border2)", color: "var(--gold)", padding: "13px 16px", borderRadius: 13, fontSize: 15, width: "100%", justifyContent: "center", fontWeight: 500 }}><Plus size={17} /> New category</button>
+          <button onClick={() => setCatSheet(true)} className="lift" style={{ display: "flex", alignItems: "center", gap: 8, background: "transparent", boxShadow: "none", border: "1px dashed var(--border2)", color: "var(--gold)", padding: "13px 16px", borderRadius: 13, fontSize: 15, width: "100%", justifyContent: "center", fontWeight: 500 }}><GripVertical size={16} /> Edit categories</button>
         </>
       )}
+      <CategorySheet open={catSheet} onClose={() => setCatSheet(false)} categories={categories} setCategories={setCategories} services={services} setServices={setServices} showToast={showToast} />
     </div>
   );
 }
