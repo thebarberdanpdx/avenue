@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       if (isNaN(apptMs) || apptMs <= now || apptMs - now > HORIZON_MS) continue;
 
       const client = clientById[a.clientId] || {};
-      const when = formatApptDateTime(a.bookedFor, TZ);
+      const when = formatApptDateTime(a.bookedFor, a.start);
       const ctx = {
         client: String(a.name || client.name || "there").split(" ")[0],
         service: a.title || (svcById[a.serviceId] && svcById[a.serviceId].name) || "your appointment",
