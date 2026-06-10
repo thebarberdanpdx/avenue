@@ -1009,6 +1009,10 @@ function App() {
     const hash = window.location.hash.toLowerCase();
     if (path === "/book" || path === "/client" || hash === "#book" || hash === "#client") return "client";
     if (path === "/manage" && new URLSearchParams(window.location.search).get("t")) return "managetoken";
+    // Pretty shop URL — gotvero.com/<slug> is that shop's PUBLIC booking page.
+    // (Staff reach a shop's dashboard via ?shop=<slug> or <slug>#staff; root stays the dashboard.)
+    const seg0 = path.split("/").filter(Boolean)[0];
+    if (seg0 && !["book", "client", "manage", "terms", "privacy", "preview", "index.html"].includes(seg0) && hash !== "#staff") return "client";
     return "shop";
   });
   const [clientNonce, setClientNonce] = useState(0); // bump to restart the booking flow fresh
@@ -1052,7 +1056,8 @@ function App() {
     if (typeof window === "undefined") return;
     const h = window.location.hash.toLowerCase();
     const path = window.location.pathname.toLowerCase().replace(/\/+$/, "");
-    const wantsBooking = path === "/book" || path === "/client" || h === "#book" || h === "#client";
+    const wantsBooking = path === "/book" || path === "/client" || h === "#book" || h === "#client"
+      || (() => { const s = path.split("/").filter(Boolean)[0]; return !!s && !["book", "client", "manage", "terms", "privacy", "preview", "index.html"].includes(s) && h !== "#staff"; })();
     if (wantsBooking) {
       // Client booking link: clear any leftover staff-login intent so it can't pull the
       // booking page into the dashboard, then show booking.
@@ -7592,7 +7597,7 @@ function OpenShopEditor({ onClose, onCreated }) {
     setBusy(false);
   };
 
-  const bookingLink = `https://gotvero.com/book?shop=${newSlug}`;
+  const bookingLink = `https://gotvero.com/${newSlug}`;
   const copyLink = () => { try { navigator.clipboard.writeText(bookingLink); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch (e) {} };
 
   const displayName = (phase === "done" ? newSlug && name : name).trim() || "Your shop";
