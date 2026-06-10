@@ -7458,7 +7458,7 @@ function MasterCalendar({ shops, onEnter }) {
         <button onClick={() => shift(1)} style={arrowBtn}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg></button>
       </div>
       {loading ? (
-        <div style={{ color: "var(--sub)", fontSize: 14, fontFamily: FONT_BODY, padding: "20px 2px" }}>Loading the day\u2026</div>
+        <div style={{ color: "var(--sub)", fontSize: 14, fontFamily: FONT_BODY, padding: "20px 2px" }}>Loading the day…</div>
       ) : (
         <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, WebkitOverflowScrolling: "touch" }}>
           {(shops || []).map((s) => {
@@ -7658,7 +7658,7 @@ function OpenShopEditor({ onClose, onCreated }) {
             {err ? <div style={{ marginTop: 14, color: "#FF8FA0", fontSize: 13 }}>{err}</div> : null}
 
             <button onClick={open} disabled={!canOpen} style={{ width: "100%", marginTop: 26, background: EC.grad, borderRadius: 13, padding: 15, textAlign: "center", color: "#fff", fontSize: 15.5, fontWeight: 600, fontFamily: GEIST, border: "none", cursor: canOpen ? "pointer" : "default", opacity: canOpen ? 1 : 0.5, boxShadow: canOpen ? "0 0 24px rgba(124,92,255,0.4)" : "none" }}>{busy ? "Opening\u2026" : "Open the doors"}</button>
-            <div style={{ textAlign: "center", marginTop: 11, fontSize: 12.5, color: EC.faint }}>Lights the sign \u00b7 seeds the {INDUSTRIES.find((x) => x[0] === industry)[1].toLowerCase()} menu \u00b7 goes live</div>
+            <div style={{ textAlign: "center", marginTop: 11, fontSize: 12.5, color: EC.faint }}>Lights the sign · seeds the {INDUSTRIES.find((x) => x[0] === industry)[1].toLowerCase()} menu · goes live</div>
           </>
         ) : (
           <>
@@ -7719,7 +7719,7 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.shop_name || s.shop_id}</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2 }}>{s.role === "owner" ? "Owner" : "Manager"} \u00b7 Tap to manage</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2 }}>{s.role === "owner" ? "Owner" : "Manager"} · Tap to manage</div>
                 </div>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
               </button>
