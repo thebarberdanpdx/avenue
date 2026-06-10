@@ -618,6 +618,137 @@ async function stripeApi(payload) {
   return data;
 }
 
+// Real card entry. In Live it mounts Stripe Elements and charges/saves for real;
+// in Test it's a safe simulation that touches no processor and charges nothing.
+// mode: "payment" (charge `amount` dollars) | "setup" (save a card, no charge).
+function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail, clientPhone, onClose, onDone }) {
+  const isPay = mode === "payment" && Number(amount) > 0;
+  const [phase, setPhase] = useState("entry"); // entry | done
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [result, setResult] = useState(null);
+  const cardBox = useRef(null);
+  const els = useRef(null);
+
+  useEffect(() => {
+    if (!live) return;
+    let dead = false;
+    (async () => {
+      const stripe = await getStripe();
+      if (dead) return;
+      if (!stripe || !cardBox.current) { setErr("Couldn't load the secure card field. Refresh and try again."); return; }
+      const elements = stripe.elements();
+      const card = elements.create("card", { style: { base: { fontSize: "16px", color: "#232221", fontFamily: "'Hanken Grotesk', sans-serif", "::placeholder": { color: "#A39C8A" } }, invalid: { color: "#B5564B" } } });
+      card.mount(cardBox.current);
+      card.on("change", (ev) => setErr(ev.error ? ev.error.message : ""));
+      els.current = { stripe, card };
+    })();
+    return () => { dead = true; try { els.current && els.current.card.unmount(); } catch (e) {} };
+  }, [live]);
+
+  const close = () => { if (busy) return; onClose && onClose(); };
+
+  const submit = async () => {
+    if (busy) return;
+    setErr(""); setBusy(true);
+    // ---- TEST mode: no Stripe, no charge ----
+    if (!live) {
+      setTimeout(() => { const r = { simulated: true, last4: "4242", paid: isPay }; setResult(r); setBusy(false); setPhase("done"); }, 600);
+      return;
+    }
+    // ---- LIVE mode: real Stripe, via the app's existing /api/stripe contract ----
+    try {
+      const e = els.current;
+      if (!e) { setErr("The card field isn't ready yet — give it a second."); setBusy(false); return; }
+      const pm = await e.stripe.createPaymentMethod({ type: "card", card: e.card });
+      if (pm.error) { setErr(pm.error.message || "Please check your card details."); setBusy(false); return; }
+      const c4 = pm.paymentMethod.card || {};
+      if (isPay) {
+        const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit" });
+        if (!intent.clientSecret) { setErr(intent.error || "Couldn't start the charge."); setBusy(false); return; }
+        const conf = await e.stripe.confirmCardPayment(intent.clientSecret, { payment_method: pm.paymentMethod.id });
+        if (conf.error) { setErr(conf.error.message || "Your card was declined. Try a different card."); setBusy(false); return; }
+        if (!conf.paymentIntent || conf.paymentIntent.status !== "succeeded") { setErr("The payment didn't complete. Try again."); setBusy(false); return; }
+        setResult({ paid: true, intentId: intent.id, last4: c4.last4 || "••••", brand: c4.brand });
+      } else {
+        const setup = await stripeApi({ action: "setup", customerId: null, name: clientName, email: clientEmail, phone: clientPhone });
+        if (!setup.clientSecret) { setErr(setup.error || "Couldn't set up the card."); setBusy(false); return; }
+        const conf = await e.stripe.confirmCardSetup(setup.clientSecret, { payment_method: pm.paymentMethod.id });
+        if (conf.error) { setErr(conf.error.message || "Your card was declined. Try a different card."); setBusy(false); return; }
+        setResult({ saved: true, pmId: pm.paymentMethod.id, stripeCustomerId: setup.customerId, last4: c4.last4 || "••••", brand: c4.brand });
+      }
+      setBusy(false); setPhase("done");
+    } catch (ex) { setErr(ex.message || "Something went wrong. Please try again."); setBusy(false); }
+  };
+
+  const A = "var(--gold)";
+  const field = { border: "1px solid var(--border)", borderRadius: 12, background: "var(--panel)", padding: "0 13px", height: 50, display: "flex", alignItems: "center", gap: 10 };
+
+  return (
+    <Portal>
+      <div onClick={close} style={{ position: "fixed", inset: 0, background: "var(--overlay, rgba(35,34,33,.45))", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)", zIndex: 4000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 460, borderRadius: "24px 24px 0 0", boxShadow: "0 -10px 40px rgba(40,34,22,.25)", padding: "8px 22px 26px", maxHeight: "92vh", overflowY: "auto" }}>
+          <div style={{ width: 38, height: 4, borderRadius: 3, background: "var(--border)", margin: "4px auto 14px" }} />
+          {phase === "done" ? (
+            <div style={{ textAlign: "center", padding: "20px 4px 10px" }}>
+              <div style={{ width: 60, height: 60, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", color: A, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Check size={30} /></div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, marginBottom: 8 }}>{isPay ? "Deposit paid — you're reserved" : "Card saved — you're reserved"}</div>
+              <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>
+                {isPay
+                  ? (live ? <>${amount} was charged and goes toward your total. A receipt is on its way.</> : <>${amount} went toward your total (test — no real charge). A confirmation is on its way.</>)
+                  : (live ? <>Your card is securely on file. You won't be charged unless you no-show or cancel late.</> : <>Your card is on file (test — nothing was sent to a processor).</>)}
+              </div>
+              <button onClick={() => onDone && onDone(result || { simulated: true, last4: "4242", paid: isPay })} style={{ width: "100%", background: A, color: "var(--on-gold)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Done</button>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 11, letterSpacing: 2, color: A, fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>{isPay ? "Deposit to reserve" : "Card to reserve"}</div>
+              {isPay ? (
+                <>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -1 }}>${amount}</div>
+                  <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 8 }}>Holds your spot and goes toward your <b style={{ color: "var(--text)" }}>${totalDue}</b> total. The rest is due at your visit.</div>
+                </>
+              ) : (
+                <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>We keep a card on file to hold your spot. You won't be charged unless you no-show or cancel late.</div>
+              )}
+
+              {!live && (
+                <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "11px 13px", margin: "16px 0 4px" }}>
+                  <AlertCircle size={16} style={{ color: A, flexShrink: 0, marginTop: 1 }} />
+                  <div style={{ fontSize: 12.5, color: A, lineHeight: 1.45 }}><b>Test mode.</b> Enter any details — nothing will be charged. Use card 4242 4242 4242 4242 to try it.</div>
+                </div>
+              )}
+
+              <div style={{ marginTop: 18 }}>
+                {live ? (
+                  <div ref={cardBox} style={{ ...field, display: "block", paddingTop: 15 }} />
+                ) : (
+                  <>
+                    <div style={field}>
+                      <CreditCard size={20} style={{ color: "var(--faint)" }} />
+                      <span style={{ fontSize: 15.5, color: "var(--text)", letterSpacing: ".4px" }}>4242 4242 4242 4242</span>
+                      <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, color: "var(--faint)", background: "var(--panel2)", padding: "3px 7px", borderRadius: 5 }}>TEST</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                      <div style={{ ...field, flex: 1 }}><span style={{ fontSize: 15.5, color: "var(--text)" }}>04 / 28</span></div>
+                      <div style={{ ...field, flex: 1 }}><span style={{ fontSize: 15.5, color: "var(--text)" }}>123</span></div>
+                    </div>
+                  </>
+                )}
+                {err && <div style={{ color: "#B5564B", fontSize: 12.5, marginTop: 8, paddingLeft: 2 }}>{err}</div>}
+              </div>
+
+              <button disabled={busy} onClick={submit} style={{ width: "100%", marginTop: 18, background: busy ? "var(--border2)" : A, color: "var(--on-gold)", border: "none", borderRadius: 13, padding: 16, fontSize: 15.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: busy ? "default" : "pointer", boxShadow: busy ? "none" : "0 10px 22px -10px rgba(110,139,116,.65)" }}>{busy ? "Processing…" : (isPay ? `Pay $${amount}` : "Save card")}</button>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14, fontSize: 11.5, color: "var(--faint)" }}><Lock size={13} /> Encrypted &amp; secure · Powered by Stripe</div>
+              <button onClick={close} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, marginTop: 12, cursor: "pointer", fontFamily: FONT_BODY, textDecoration: "underline", textUnderlineOffset: 3 }}>Cancel</button>
+            </>
+          )}
+        </div>
+      </div>
+    </Portal>
+  );
+}
+
 function PhoneLink({ number, style }) {
   const [open, setOpen] = useState(false);
   const lp = useRef({ timer: null, fired: false, touch: false });
@@ -2188,7 +2319,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [slot, setSlot] = useState(null);
   const [slotsReady, setSlotsReady] = useState(false);
   const [agreed, setAgreed] = useState(false);
-  const [cardOnFile, setCardOnFile] = useState(false); // simulated card-on-file for no-show protection
+  const [cardOnFile, setCardOnFile] = useState(false); // card-on-file / deposit captured for this booking
+  const [cardSheetOpen, setCardSheetOpen] = useState(false); // real Stripe card-entry sheet open
+  const [cardInfo, setCardInfo] = useState(null); // { last4, paid, saved } once captured
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [waitlistDone, setWaitlistDone] = useState(false);
   const [photos, setPhotos] = useState(0);       // 0–3 uploaded at booking
@@ -4132,13 +4265,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <span>I agree to the cancellation policy</span>
             </button>
 
-            {/* Card on file + deposit (simulated until a live processor is connected) */}
+            {/* Card on file / deposit — real Stripe in Live, safe simulation in Test */}
             {(() => {
               const bk = business.booking || {};
               const dep = bk.deposit || { mode: "none", amount: 0 };
               const needsCard = !!bk.requireCard || (dep.mode && dep.mode !== "none");
               if (!needsCard) return null;
               const depositAmt = dep.mode === "fixed" ? Number(dep.amount || 0) : dep.mode === "percent" ? Math.round(cartAdjTotal * (Number(dep.amount || 0) / 100)) : 0;
+              const livePay = business.payments?.live === true;
+              const last4 = (cardInfo && cardInfo.last4) || "••••";
               return (
                 <div style={{ background: "var(--panel)", border: `1px solid ${cardOnFile ? "color-mix(in srgb, var(--gold) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16 }}>
                   <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>{depositAmt > 0 ? "DEPOSIT TO RESERVE" : "CARD TO RESERVE"}</div>
@@ -4150,13 +4285,24 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   {cardOnFile ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px" }}>
                       <Check size={18} style={{ color: "var(--gold)" }} />
-                      <span style={{ fontSize: 14.5, color: "var(--text)" }}>Card added · •••• 4242</span>
-                      <button onClick={() => setCardOnFile(false)} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Change</button>
+                      <span style={{ fontSize: 14.5, color: "var(--text)" }}>{(cardInfo && cardInfo.paid) ? `Deposit paid · ${last4}` : `Card added · ${last4}`}</span>
+                      <button onClick={() => { setCardOnFile(false); setCardInfo(null); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Change</button>
                     </div>
                   ) : (
-                    <button onClick={() => setCardOnFile(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}><CreditCard size={17} style={{ color: "var(--gold)" }} /> Add a card</button>
+                    <button onClick={() => setCardSheetOpen(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}><CreditCard size={17} style={{ color: "var(--gold)" }} /> {depositAmt > 0 ? `Pay $${depositAmt} deposit` : "Add a card"}</button>
                   )}
-                  <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Secure card entry. {depositAmt > 0 ? "Deposit is" : "Charges are"} processed when card payments go live for this shop.</p>
+                  {!livePay && <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Secure card entry · test mode — no real charge yet.</p>}
+                  {cardSheetOpen && <StripeCardSheet
+                    live={livePay}
+                    mode={depositAmt > 0 ? "payment" : "setup"}
+                    amount={depositAmt}
+                    totalDue={cartAdjTotal}
+                    clientName={`${newFirst} ${newLast}`.trim()}
+                    clientEmail={newEmail}
+                    clientPhone={phone}
+                    onClose={() => setCardSheetOpen(false)}
+                    onDone={(res) => { setCardInfo(res || {}); setCardOnFile(true); setCardSheetOpen(false); }}
+                  />}
                 </div>
               );
             })()}
