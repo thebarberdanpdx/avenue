@@ -12167,145 +12167,171 @@ function CreatePopover({ slot, providerName, onAppt, onBlock, onClose }) {
 }
 
 // ============================================================
-// TIME BLOCK — centered detail window (label · duration · repeat)
+// Shared chrome for the calendar's full-screen form sheets (block + hours).
+// Solid sheet, portaled OUT of the transformed calendar so it pins to the
+// viewport instead of sinking. Flat underlined fields, action pinned low.
+// ============================================================
+const _SHEET = {
+  wrap: { position: "fixed", inset: 0, zIndex: 2000, background: "var(--bg)", display: "flex", flexDirection: "column", fontFamily: FONT_BODY },
+  head: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "calc(env(safe-area-inset-top) + 20px) 22px 16px" },
+  title: { fontSize: 21, fontWeight: 600, letterSpacing: -0.4 },
+  sub: { fontSize: 13, color: "var(--gold)", fontWeight: 500, marginTop: 5 },
+  cancel: { border: "1px solid var(--border)", background: "transparent", color: "var(--sub)", fontSize: 11, fontWeight: 600, letterSpacing: 1.2, padding: "9px 14px", borderRadius: 10, cursor: "pointer", flexShrink: 0, fontFamily: FONT_BODY },
+  onat: { display: "flex", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" },
+  cell: { flex: 1, padding: "16px 22px" },
+  k: { color: "var(--faint)", fontSize: 14, marginRight: 7 },
+  v: { fontSize: 16, fontWeight: 500 },
+  content: { flex: 1, padding: "8px 22px", minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch" },
+  uf: { width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 0 13px", borderBottom: "1px solid var(--border)", background: "none", textAlign: "left", cursor: "pointer", fontFamily: FONT_BODY },
+  tog: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "19px 0 14px", borderBottom: "1px solid var(--border)", cursor: "pointer" },
+  foot: { padding: "16px 22px calc(env(safe-area-inset-bottom) + 18px)" },
+  cta: { width: "100%", border: "none", borderRadius: 13, padding: "16px 0", fontSize: 15, fontWeight: 600, background: "var(--gold)", color: "var(--on-gold)", fontFamily: FONT_BODY, letterSpacing: 0.2, cursor: "pointer" },
+  pickRow: (sel) => ({ display: "block", width: "100%", textAlign: "left", padding: "15px 22px", background: sel ? "color-mix(in srgb, var(--gold) 14%, transparent)" : "transparent", border: "none", borderBottom: "1px solid var(--line)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 16, fontWeight: sel ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }),
+};
+function Switch({ on }) {
+  return (
+    <span style={{ width: 44, height: 26, borderRadius: 14, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, transition: "background .15s" }}>
+      <i style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: on ? "#fff" : "var(--faint)", transition: "left .15s" }} />
+    </span>
+  );
+}
+const _menuItem = (color = "var(--text)") => ({ display: "block", width: "100%", textAlign: "left", padding: "14px 14px", fontSize: 15.5, fontWeight: 500, borderRadius: 10, color, background: "none", border: "none", fontFamily: FONT_BODY, cursor: "pointer" });
+
+// ============================================================
+// TIME BLOCK — full sheet (on/at · duration · reason · repeat)
 // ============================================================
 function TimeBlockSheet({ providerName, dateLabel, startLabel, onClose, onConfirm }) {
-  const [label, setLabel] = useState("");
   const [dur, setDur] = useState(30);
-  const [custom, setCustom] = useState(false);
-  const [customMin, setCustomMin] = useState("60");
+  const [reason, setReason] = useState("");
   const [repeat, setRepeat] = useState(false);
-  const DURS = [15, 30, 45, 60];
-  const finalDur = custom ? Math.max(5, parseInt(customMin, 10) || 30) : dur;
-  const submit = () => onConfirm({ label: label.trim(), durMin: finalDur, repeat });
-
-  const fl = { display: "block", fontSize: 12, letterSpacing: 0.4, color: "var(--sub)", fontWeight: 600, margin: "0 0 8px" };
-  const inputStyle = { width: "100%", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", outline: "none" };
-
+  const [picking, setPicking] = useState(false);
+  const DURS = [15, 30, 45, 60, 90, 120, 180, 240];
+  const fmtDur = (m) => (m < 60 ? m + " min" : (m % 60 === 0 ? (m / 60) + (m === 60 ? " hour" : " hours") : Math.floor(m / 60) + "h " + (m % 60) + "m"));
   return (
-    <div onClick={onClose} className="fade-in" style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 80, display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, boxShadow: "var(--shadow-lg)", overflow: "hidden", animation: "popIn .2s var(--ease) both" }}>
-        <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 500, fontSize: 19 }}>Block off time</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--faint)", fontSize: 22, lineHeight: 1, padding: 0 }}>&times;</button>
+    <Portal>
+      <div className="fade-in" style={_SHEET.wrap}>
+        <div style={_SHEET.head}>
+          <div style={_SHEET.title}>{picking ? "How long?" : "New time block"}</div>
+          <button onClick={picking ? () => setPicking(false) : onClose} style={_SHEET.cancel}>{picking ? "BACK" : "CANCEL"}</button>
         </div>
-        <div style={{ padding: "18px 20px 20px" }}>
-          <div style={{ fontSize: 12.5, color: "var(--sub)", margin: "0 0 16px" }}>{providerName} · {dateLabel} · starts {startLabel}</div>
-
-          <label style={fl}>WHAT'S IT FOR? <span style={{ color: "var(--faint)", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span></label>
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Lunch, break, errand…" style={inputStyle} />
-
-          <div style={{ marginTop: 18 }}>
-            <label style={fl}>HOW LONG</label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {DURS.map((d) => {
-                const on = !custom && dur === d;
-                return (
-                  <button key={d} onClick={() => { setCustom(false); setDur(d); }} style={{ padding: "9px 14px", borderRadius: 10, border: on ? "1px solid var(--gold)" : "1px solid var(--border)", background: on ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "transparent", color: on ? "var(--text)" : "var(--sub)", fontSize: 13, fontWeight: 500, fontFamily: FONT_BODY }}>{d < 60 ? d + "m" : "1h"}</button>
-                );
-              })}
-              <button onClick={() => setCustom(true)} style={{ padding: "9px 14px", borderRadius: 10, border: custom ? "1px solid var(--gold)" : "1px solid var(--border)", background: custom ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "transparent", color: custom ? "var(--text)" : "var(--sub)", fontSize: 13, fontWeight: 500, fontFamily: FONT_BODY }}>Custom</button>
+        {picking ? (
+          <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+            {DURS.map((m) => (
+              <button key={m} onClick={() => { setDur(m); setPicking(false); }} style={_SHEET.pickRow(dur === m)}>{fmtDur(m)}</button>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div style={_SHEET.onat}>
+              <div style={_SHEET.cell}><span style={_SHEET.k}>On</span><span style={_SHEET.v}>{dateLabel}</span></div>
+              <div style={{ ..._SHEET.cell, borderLeft: "1px solid var(--line)" }}><span style={_SHEET.k}>At</span><span style={_SHEET.v}>{startLabel}</span></div>
             </div>
-            {custom && (
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
-                <input value={customMin} onChange={(e) => setCustomMin(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" style={{ ...inputStyle, width: 90 }} />
-                <span style={{ fontSize: 13.5, color: "var(--sub)" }}>minutes</span>
+            <div style={_SHEET.content}>
+              <button onClick={() => setPicking(true)} style={_SHEET.uf}>
+                <span style={{ fontSize: 17 }}>{fmtDur(dur)}</span>
+                <span style={{ color: "var(--faint)", fontSize: 13 }}>▾</span>
+              </button>
+              <div style={{ padding: "20px 0 13px", borderBottom: "1px solid var(--border)" }}>
+                <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Type a reason" style={{ width: "100%", background: "none", border: "none", outline: "none", color: "var(--text)", fontSize: 17, fontFamily: FONT_BODY }} />
               </div>
-            )}
-          </div>
-
-          <div onClick={() => setRepeat((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 14px", marginTop: 16, cursor: "pointer" }}>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 500 }}>Repeat weekly</div>
-              <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>Same time every week</div>
+              <div onClick={() => setRepeat((v) => !v)} style={_SHEET.tog}>
+                <span style={{ fontSize: 16 }}>Repeat weekly</span>
+                <Switch on={repeat} />
+              </div>
             </div>
-            <div style={{ width: 42, height: 25, borderRadius: 13, background: repeat ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, transition: "background .15s" }}>
-              <i style={{ position: "absolute", top: 3, left: repeat ? 20 : 3, width: 19, height: 19, borderRadius: "50%", background: repeat ? "#fff" : "var(--faint)", transition: "left .15s" }} />
+            <div style={_SHEET.foot}>
+              <button onClick={() => onConfirm({ label: reason.trim(), durMin: dur, repeat })} className="lift" style={_SHEET.cta}>Block off time</button>
             </div>
-          </div>
-
-          <button onClick={submit} className="lift" style={{ width: "100%", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 14.5, fontWeight: 600, background: "var(--gold)", color: "var(--on-gold)", fontFamily: FONT_BODY, marginTop: 20 }}>Block it off</button>
-        </div>
+          </>
+        )}
       </div>
-    </div>
+    </Portal>
   );
 }
 
 // ============================================================
-// BARBER HOURS — centered editor (working? · start/end · just-this-day vs recurring)
+// BARBER HOURS — full sheet (start/end · working · this day vs recurring)
 // ============================================================
 function BarberHoursSheet({ providerName, dateLabel, weekdayName, initial, fmtTime, onClose, onSave }) {
   const [on, setOn] = useState(initial?.on ?? true);
   const [start, setStart] = useState(initial?.start ?? 540);
   const [end, setEnd] = useState(initial?.end ?? 1020);
-  const [scope, setScope] = useState("day"); // "day" = just this date · "week" = every weekday
-  const [picking, setPicking] = useState(null); // "start" | "end" | null
+  const [scope, setScope] = useState("day");
+  const [picking, setPicking] = useState(null);
   const TIMES = [];
   for (let t = 300; t <= 1380; t += 15) TIMES.push(t);
   const valid = !on || end > start;
-
-  const fl = { display: "block", fontSize: 12, letterSpacing: 0.4, color: "var(--sub)", fontWeight: 600, margin: "0 0 8px" };
-  const field = { flex: 1, width: "100%", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, textAlign: "left", cursor: "pointer" };
-
   return (
-    <div onClick={onClose} className="fade-in" style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 80, display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, boxShadow: "var(--shadow-lg)", overflow: "hidden", animation: "popIn .2s var(--ease) both" }}>
-        <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 500, fontSize: 19 }}>{picking ? (picking === "start" ? "Start time" : "End time") : providerName + "’s hours"}</div>
-          <button onClick={picking ? () => setPicking(null) : onClose} style={{ background: "none", border: "none", color: "var(--faint)", fontSize: 24, lineHeight: 1, padding: 0, cursor: "pointer" }}>{picking ? "‹" : "×"}</button>
+    <Portal>
+      <div className="fade-in" style={_SHEET.wrap}>
+        <div style={_SHEET.head}>
+          <div>
+            <div style={_SHEET.title}>{picking ? (picking === "start" ? "Start time" : "End time") : providerName + "’s hours"}</div>
+            {!picking && <div style={_SHEET.sub}>{dateLabel}</div>}
+          </div>
+          <button onClick={picking ? () => setPicking(null) : onClose} style={_SHEET.cancel}>{picking ? "BACK" : "CANCEL"}</button>
         </div>
-
         {picking ? (
-          <div style={{ maxHeight: 340, overflowY: "auto", padding: "8px 0" }}>
-            {TIMES.map((t) => {
-              const sel = (picking === "start" ? start : end) === t;
-              return (
-                <button key={t} onClick={() => { if (picking === "start") { setStart(t); if (end <= t) setEnd(Math.min(1380, t + 60)); } else { setEnd(t); } setPicking(null); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 22px", background: sel ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "transparent", border: "none", color: sel ? "var(--text)" : "var(--sub)", fontSize: 15, fontWeight: sel ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }}>{fmtTime(t)}</button>
-              );
-            })}
+          <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+            {TIMES.map((t) => (
+              <button key={t} onClick={() => { if (picking === "start") { setStart(t); if (end <= t) setEnd(Math.min(1380, t + 60)); } else setEnd(t); setPicking(null); }} style={_SHEET.pickRow((picking === "start" ? start : end) === t)}>{fmtTime(t)}</button>
+            ))}
           </div>
         ) : (
-          <div style={{ padding: "18px 20px 20px" }}>
-            <div style={{ fontSize: 12.5, color: "var(--sub)", margin: "0 0 16px" }}>{dateLabel}</div>
-
-            <div onClick={() => setOn((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 14px", cursor: "pointer" }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 500 }}>Working this day</div>
-                <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>{on ? "Available for bookings" : "Marked as off"}</div>
+          <>
+            <div style={_SHEET.onat}>
+              <button onClick={() => on && setPicking("start")} style={{ ..._SHEET.cell, background: "none", border: "none", textAlign: "left", cursor: on ? "pointer" : "default", opacity: on ? 1 : 0.4, fontFamily: FONT_BODY }}><span style={_SHEET.k}>Start</span><span style={_SHEET.v}>{fmtTime(start)}</span></button>
+              <button onClick={() => on && setPicking("end")} style={{ ..._SHEET.cell, borderLeft: "1px solid var(--line)", background: "none", textAlign: "left", cursor: on ? "pointer" : "default", opacity: on ? 1 : 0.4, fontFamily: FONT_BODY }}><span style={_SHEET.k}>End</span><span style={_SHEET.v}>{fmtTime(end)}</span></button>
+            </div>
+            <div style={_SHEET.content}>
+              <div onClick={() => setOn((v) => !v)} style={{ ..._SHEET.tog, borderTop: "none" }}>
+                <span style={{ fontSize: 16 }}>Working this day</span>
+                <Switch on={on} />
               </div>
-              <div style={{ width: 42, height: 25, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, transition: "background .15s" }}>
-                <i style={{ position: "absolute", top: 3, left: on ? 20 : 3, width: 19, height: 19, borderRadius: "50%", background: on ? "#fff" : "var(--faint)", transition: "left .15s" }} />
+              {on && !valid && <div style={{ fontSize: 12, color: "#e0796a", marginTop: 10 }}>End needs to be after the start.</div>}
+              <div style={{ fontSize: 12, letterSpacing: 0.3, color: "var(--sub)", margin: "24px 0 12px" }}>Apply to</div>
+              <div style={{ display: "flex", gap: 10 }}>
+                {[["day", "Just this day"], ["week", "Every " + weekdayName]].map(([v, lbl]) => {
+                  const sel = scope === v;
+                  return (
+                    <button key={v} onClick={() => setScope(v)} style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: sel ? 600 : 500, color: sel ? "var(--gold)" : "var(--sub)", padding: "13px 0", border: sel ? "1px solid var(--gold)" : "1px solid var(--border)", borderRadius: 11, background: sel ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", fontFamily: FONT_BODY, cursor: "pointer" }}>{lbl}</button>
+                  );
+                })}
               </div>
             </div>
-
-            {on && (
-              <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={fl}>START</label>
-                  <button onClick={() => setPicking("start")} style={field}>{fmtTime(start)}</button>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={fl}>END</label>
-                  <button onClick={() => setPicking("end")} style={field}>{fmtTime(end)}</button>
-                </div>
-              </div>
-            )}
-            {on && !valid && <div style={{ fontSize: 12, color: "#e0796a", marginTop: 8 }}>End time needs to be after the start.</div>}
-
-            <div style={{ marginTop: 18 }}>
-              <label style={fl}>APPLY TO</label>
-              <div style={{ display: "flex", gap: 6, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 11, padding: 4 }}>
-                {[["day", "Just this day"], ["week", "Every " + weekdayName]].map(([v, lbl]) => (
-                  <button key={v} onClick={() => setScope(v)} style={{ flex: 1, border: "none", background: scope === v ? "var(--gold)" : "transparent", color: scope === v ? "var(--on-gold)" : "var(--sub)", fontWeight: 600, fontSize: 12.5, padding: "9px 0", borderRadius: 8, fontFamily: FONT_BODY, cursor: "pointer" }}>{lbl}</button>
-                ))}
-              </div>
+            <div style={_SHEET.foot}>
+              <button onClick={() => { if (valid) onSave({ on, start, end, scope }); }} disabled={!valid} className="lift" style={{ ..._SHEET.cta, background: valid ? "var(--gold)" : "var(--border)", color: valid ? "var(--on-gold)" : "var(--faint)", cursor: valid ? "pointer" : "default" }}>Save hours</button>
             </div>
-
-            <button onClick={() => { if (valid) onSave({ on, start, end, scope }); }} className="lift" disabled={!valid} style={{ width: "100%", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 14.5, fontWeight: 600, background: valid ? "var(--gold)" : "var(--border)", color: valid ? "var(--on-gold)" : "var(--faint)", fontFamily: FONT_BODY, marginTop: 20, cursor: valid ? "pointer" : "default" }}>Save hours</button>
-          </div>
+          </>
         )}
       </div>
-    </div>
+    </Portal>
+  );
+}
+
+// ============================================================
+// BARBER MENU — small popover off the column header (edit hours · set day off)
+// ============================================================
+function BarberMenu({ working, weekdayName, cx, top, onEditHours, onToggleDay, onClose }) {
+  const vw = (typeof window !== "undefined" ? (document.documentElement.clientWidth || window.innerWidth) : 390);
+  const MW = 220;
+  let left = cx - MW / 2;
+  if (left < 10) left = 10;
+  if (left + MW > vw - 10) left = vw - MW - 10;
+  const caretLeft = Math.max(16, Math.min(MW - 16, cx - left));
+  return (
+    <Portal>
+      <div onClick={onClose} className="fade-in" style={{ position: "fixed", inset: 0, zIndex: 2000, background: "var(--overlay)" }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ position: "fixed", left, top: top + 10, width: MW }}>
+          <div style={{ position: "absolute", top: -7, left: caretLeft - 7, width: 14, height: 14, background: "var(--panel)", borderLeft: "1px solid var(--border)", borderTop: "1px solid var(--border)", transform: "rotate(45deg)" }} />
+          <div style={{ position: "relative", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 7, boxShadow: "var(--shadow-lg)", animation: "popIn .16s var(--ease) both" }}>
+            <button onClick={onEditHours} style={_menuItem()}>Edit hours</button>
+            <div style={{ height: 1, background: "var(--line)", margin: "5px 12px" }} />
+            <button onClick={onToggleDay} style={_menuItem("var(--sub)")}>{working ? "Set " + weekdayName + " off" : "Open " + weekdayName}</button>
+          </div>
+        </div>
+      </div>
+    </Portal>
   );
 }
 
@@ -13139,21 +13165,36 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   };
 
   // Save a barber's hours — recurring weekly (this weekday) or a one-off override for just this date.
-  const saveHours = ({ on, start, end, scope }) => {
-    if (!hoursEdit) return;
-    const pid = hoursEdit.providerId;
+  const [hoursMenu, setHoursMenu] = useState(null); // { providerId, cx, top } → barber column-header popover
+  // Core writer: recurring weekly hours (scope 'week') or a one-off override for the selected date ('day').
+  const applyHours = (providerId, { on, start, end, scope }) => {
     const d = selectedDate;
     const dow = d.getDay();
     const key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
     const rec = { on, start, end };
     setProviders((cur) => cur.map((p) => {
-      if (p.id !== pid) return p;
+      if (p.id !== providerId) return p;
       if (scope === "week") return { ...p, hours: { ...(p.hours || {}), [dow]: rec } };
       return { ...p, hoursOverrides: { ...(p.hoursOverrides || {}), [key]: rec } };
     }));
-    setHoursEdit(null);
     const wd = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dow];
-    showToast(scope === "week" ? `Every ${wd} updated.` : `Hours updated for ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}.`);
+    const dl = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    showToast(scope === "week" ? `Every ${wd} updated.` : (on ? `Hours updated for ${dl}.` : `Marked off for ${dl}.`));
+  };
+  const saveHours = ({ on, start, end, scope }) => {
+    if (!hoursEdit) return;
+    applyHours(hoursEdit.providerId, { on, start, end, scope });
+    setHoursEdit(null);
+  };
+  // Quick toggle from the column-header menu: flip the selected day off, or re-open it on the weekly hours.
+  const toggleDayOff = (providerId) => {
+    const prov = providers.find((p) => p.id === providerId);
+    const cur = hoursForDate(prov, selectedDate);
+    const working = !!(cur && cur.on);
+    const dow = selectedDate.getDay();
+    const base = (prov && prov.hours && prov.hours[dow]) || DEFAULT_HOURS[dow] || { start: 540, end: 1020 };
+    applyHours(providerId, { on: !working, start: base.start, end: base.end, scope: "day" });
+    setHoursMenu(null);
   };
 
   // The actual save — runs after conflict has been resolved (no conflict, or provider chose to keep both).
@@ -13433,7 +13474,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
         <div style={{ width: 56, flexShrink: 0 }} />
         {orderedStaff.map((p) => { const off = isOffDay(p); const editable = p.id !== "anyone"; return (
-          <div key={p.id} onClick={editable ? () => setHoursEdit({ providerId: p.id }) : undefined} style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: off ? 0.55 : 1, minWidth: 0, cursor: editable ? "pointer" : "default" }}>
+          <div key={p.id} onClick={editable ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setHoursMenu({ providerId: p.id, cx: r.left + r.width / 2, top: r.bottom }); } : undefined} style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: off ? 0.55 : 1, minWidth: 0, cursor: editable ? "pointer" : "default" }}>
             <span style={{ width: 22, height: 22, borderRadius: "50%", background: off ? "var(--border2)" : p.color, color: "#fff", fontSize: 10.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(p.name || "?").charAt(0).toUpperCase()}</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: off ? "var(--faint)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}{off ? " · off" : ""}</span>
           </div>
@@ -13772,6 +13813,23 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onConfirm={confirmBlock}
         />
       )}
+
+      {hoursMenu && (() => {
+        const p = providers.find((x) => x.id === hoursMenu.providerId);
+        const eff = hoursForDate(p, selectedDate);
+        const wd = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][selectedDate.getDay()];
+        return (
+          <BarberMenu
+            working={!!(eff && eff.on)}
+            weekdayName={wd}
+            cx={hoursMenu.cx}
+            top={hoursMenu.top}
+            onEditHours={() => { setHoursEdit({ providerId: hoursMenu.providerId }); setHoursMenu(null); }}
+            onToggleDay={() => toggleDayOff(hoursMenu.providerId)}
+            onClose={() => setHoursMenu(null)}
+          />
+        );
+      })()}
 
       {hoursEdit && (() => {
         const p = providers.find((x) => x.id === hoursEdit.providerId);
