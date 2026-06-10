@@ -498,7 +498,7 @@ const THEMES = [
   // Electric is Vero's identity theme — the app default. Deep indigo, one violet→azure
   // gradient, and a single bright "live" lime reserved for what's happening right now.
   { id: "electric", name: "Electric", tagline: "Indigo, azure & a spark of lime", cat: "Dark", dark: true,
-    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.05,
+    disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.05,
     canvas: "radial-gradient(60% 46% at 12% 4%,rgba(124,92,255,.30),transparent 58%),radial-gradient(56% 46% at 94% 98%,rgba(52,195,240,.18),transparent 60%),#0E0A16",
     grad: "linear-gradient(135deg,#7C5CFF 0%,#34C3F0 100%)",
     t: { bg:"#0E0A16", panel:"#161024", panel2:"#1E1733", line:"#2A2140", border:"#2E2545", border2:"#473860", text:"#F5F3FC", text2:"#D8D2EC", sub:"#B9B3D4", faint:"#8E87AB", gold:"#8C6BFF", onGold:"#FFFFFF", live:"#C6F24E", shadow:"rgba(0,0,0,.6)", overlay:"rgba(8,5,16,0.82)" } },
@@ -1472,7 +1472,7 @@ function App() {
   return (
     <div id="app-root" className={`theme-${theme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--canvas, var(--bg))", color: "var(--text)", position: "relative" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Oswald:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Geist:wght@400;500;600;700&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Oswald:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         [data-appt], [data-appt] * { -webkit-user-select: none !important; -moz-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
         #app-root { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; line-height: 1.5; letter-spacing: 0.1px; }
