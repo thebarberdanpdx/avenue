@@ -1033,6 +1033,11 @@ function App() {
   // a real shop in the background (harmless); when masterMode is on we render the account overview
   // instead of a single shop's dashboard.
   const masterMode = (() => { try { return typeof window !== "undefined" && new URL(window.location.href).searchParams.get("master") === "1"; } catch (e) { return false; } })();
+  // Client-facing location chooser: the public booking page offers a "choose a location" step when
+  // this shop belongs to a multi-shop account. acctLocs is fetched (public RPC) for non-staff; once a
+  // client picks, ?loc=1 marks the choice so the chooser doesn't reappear that booking session.
+  const [acctLocs, setAcctLocs] = useState([]);
+  const locParam = (() => { try { return typeof window !== "undefined" && new URL(window.location.href).searchParams.get("loc") === "1"; } catch (e) { return false; } })();
   const loadedRef = useRef(false); // blocks saves until the first load finishes (so seed data can't overwrite real data)
   const [dataLoaded, setDataLoaded] = useState(false); // true once the first load finishes — used to avoid flashing placeholder names
   const savingRef = useRef({});    // per-table { running, queued } — guarantees in-order saves
@@ -1205,6 +1210,15 @@ function App() {
       lastRemoteRef.current.clients = list;
       setClients(list);
     })();
+    return () => { alive = false; };
+  }, [session]);
+
+  // Public booking: fetch this account's bookable locations (names only) so the booking page can
+  // offer a location chooser for multi-shop businesses. Non-staff only; single-shop returns empty.
+  useEffect(() => {
+    if (session) return;
+    let alive = true;
+    (async () => { try { const { data } = await supabase.rpc("get_account_locations", { p_shop_id: SHOP_ID }); if (alive && Array.isArray(data)) setAcctLocs(data); } catch (e) {} })();
     return () => { alive = false; };
   }, [session]);
 
@@ -1408,7 +1422,9 @@ function App() {
       )}
       {view === "terms" && <TermsPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "privacy" && <PrivacyPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
-      {view === "client" && <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} />}
+      {view === "client" && ((!session && acctLocs.length > 1 && !locParam)
+        ? <LocationChooser shopId={SHOP_ID} locations={acctLocs} business={business} />
+        : <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} />)}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={goBooking} />}
       {view === "shop" && (session
         ? (masterMode
@@ -1973,6 +1989,36 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
 // ============================================================
 // CLIENT BOOKING FLOW
 // ============================================================
+// Client-facing location chooser — shown before the booking flow when a logged-out visitor's
+// shop belongs to a multi-shop account. Picking a location reloads the booking page pointed at it
+// (?shop=<id>&loc=1); the loc flag stops the chooser from reappearing for that booking session.
+function LocationChooser({ shopId, locations, business }) {
+  const pick = (id) => { try { const u = new URL(window.location.href); u.searchParams.set("shop", id); u.searchParams.set("loc", "1"); window.location.href = u.toString(); } catch (e) {} };
+  return (
+    <div style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", display: "flex", flexDirection: "column", alignItems: "center", padding: "0 18px 60px" }}>
+      <div style={{ width: "100%", maxWidth: 460, paddingTop: 64 }}>
+        <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.08, letterSpacing: "-0.4px", marginBottom: 6 }}>Choose a location</h1>
+        <div style={{ fontSize: 15, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 26 }}>{(business && business.name) ? `Where would you like to book with ${business.name}?` : "Where would you like to book?"}</div>
+        <div style={{ display: "grid", gap: 12 }}>
+          {(locations || []).map((l) => (
+            <button key={l.shop_id} className="lift" onClick={() => pick(l.shop_id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "20px 18px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, cursor: "pointer", textAlign: "left" }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.shop_name || l.shop_id}</div>
+                <div style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2 }}>Tap to book here</div>
+              </div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit, onManage }) {
   const [step, setStep] = useState(0);
   const [bookingFor, setBookingFor] = useState(null); // null until chosen: "self" or "other"
