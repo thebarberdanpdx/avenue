@@ -7489,6 +7489,193 @@ function MasterCalendar({ shops, onEnter }) {
   );
 }
 
+// ============================================================
+// CONCIERGE — OPEN A NEW SHOP
+// Industry-specific starter menus + the setup screen (master mode only).
+// ============================================================
+const _seedBooking = (extra) => ({ available: true, description: "", customPrice: false, promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false, ...(extra || {}) });
+const _mkSvc = (i, name, duration, price, color, extra) => ({ id: `svc-${i}`, name, category: "Services", price, duration, color, photo: "", staff: {}, addonGroups: [], booking: _seedBooking(extra) });
+const STARTER_MENUS = {
+  barber: [
+    _mkSvc(1, "Haircut", 30, 35, "sage"),
+    _mkSvc(2, "Skin fade", 45, 45, "gold"),
+    _mkSvc(3, "Beard trim", 20, 20, "clay"),
+    _mkSvc(4, "Cut & beard", 50, 55, "slate"),
+    _mkSvc(5, "Line-up", 15, 20, "sage"),
+    _mkSvc(6, "Kids cut", 25, 28, "gold"),
+  ],
+  salon: [
+    _mkSvc(1, "Women's cut & style", 60, 65, "sage"),
+    _mkSvc(2, "Men's cut", 30, 35, "gold"),
+    _mkSvc(3, "Blowout", 45, 45, "clay"),
+    _mkSvc(4, "Root color touch-up", 90, 85, "slate"),
+    _mkSvc(5, "Full highlights", 150, 160, "sage"),
+    _mkSvc(6, "Balayage", 180, 200, "gold"),
+  ],
+  spa: [
+    _mkSvc(1, "60-min massage", 60, 95, "sage"),
+    _mkSvc(2, "90-min massage", 90, 135, "gold"),
+    _mkSvc(3, "Deep tissue", 60, 110, "clay"),
+    _mkSvc(4, "Signature facial", 60, 95, "slate"),
+    _mkSvc(5, "Express facial", 30, 55, "sage"),
+    _mkSvc(6, "Hot stone", 75, 125, "gold"),
+  ],
+  // Tattoo runs on deposits → requirePayment on for every line.
+  tattoo: [
+    _mkSvc(1, "Free consultation", 30, 0, "sage", { requireCard: false }),
+    _mkSvc(2, "Small piece (up to 2\")", 60, 120, "gold", { requirePayment: true }),
+    _mkSvc(3, "Hourly session", 60, 150, "clay", { requirePayment: true }),
+    _mkSvc(4, "Half-day (3-4 hr)", 240, 500, "slate", { requirePayment: true }),
+    _mkSvc(5, "Full-day (6-7 hr)", 420, 900, "sage", { requirePayment: true }),
+    _mkSvc(6, "Touch-up", 30, 0, "gold", { requireCard: false }),
+  ],
+};
+const INDUSTRIES = [["barber", "Barbershop"], ["salon", "Salon"], ["spa", "Spa"], ["tattoo", "Tattoo"]];
+const RESERVED_SLUGS = ["book", "manage", "client", "staff", "preview", "terms", "privacy", "www", "app", "gotvero", "index.html", "api", "admin", "master", "assets"];
+const slugify = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 30);
+
+// Electric-styled palette for this flow (the look every new shop is born into).
+const EC = { stage: "#0E0A16", card: "#161024", border: "#2E2545", field: "#1E1733", text: "#F5F3FC", sub: "#B9B3D4", faint: "#8E87AB", accent: "#8C6BFF", lime: "#C6F24E", grad: "linear-gradient(135deg,#7C5CFF 0%,#34C3F0 100%)" };
+const GEIST = "'Geist', sans-serif", INTERF = "'Inter', sans-serif";
+
+function OpenShopEditor({ onClose, onCreated }) {
+  const [industry, setIndustry] = useState("barber");
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [avail, setAvail] = useState(null); // null=unknown, true/false
+  const [checking, setChecking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [phase, setPhase] = useState("form"); // form | done
+  const [newSlug, setNewSlug] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const effSlug = slugTouched ? slug : slugify(name);
+  const reserved = RESERVED_SLUGS.includes(effSlug);
+
+  // Live availability check (debounced).
+  useEffect(() => {
+    if (phase !== "form") return;
+    setAvail(null); setErr("");
+    if (!effSlug || effSlug.length < 2 || reserved) return;
+    let alive = true; setChecking(true);
+    const t = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase.rpc("shop_slug_available", { p_slug: effSlug });
+        if (alive) setAvail(error ? null : !!data);
+      } catch (e) { if (alive) setAvail(null); }
+      if (alive) setChecking(false);
+    }, 350);
+    return () => { alive = false; clearTimeout(t); };
+  }, [effSlug, reserved, phase]);
+
+  const canOpen = !!name.trim() && effSlug.length >= 2 && !reserved && avail === true && !busy;
+
+  const open = async () => {
+    if (!canOpen) return;
+    setBusy(true); setErr("");
+    try {
+      const { data: created, error } = await supabase.rpc("create_shop", { p_slug: effSlug, p_name: name.trim() });
+      if (error || !created) { setErr(error ? error.message : "Couldn't open the shop."); setBusy(false); return; }
+      // First full save — boots the shop with a clean config in the Electric identity.
+      const biz = { ...DEFAULT_BUSINESS, name: name.trim(), industry, theme: "electric", address: "", address2: "", cityZip: "", email: "", legalName: "", phones: [{ id: "ph1", label: "Main", number: "" }] };
+      await supabase.from("shops").upsert({ id: created, name: name.trim(), settings: { ...biz, _categories: ["Services"] } });
+      // Seed the industry starter menu.
+      const menu = STARTER_MENUS[industry] || STARTER_MENUS.barber;
+      const rows = menu.map((s, i) => ({ id: s.id, shop_id: created, data: { ...s, order: i } }));
+      if (rows.length) await supabase.from("services").insert(rows);
+      setNewSlug(created); setPhase("done");
+    } catch (e) {
+      setErr("Something went wrong opening the shop.");
+    }
+    setBusy(false);
+  };
+
+  const bookingLink = `https://gotvero.com/book?shop=${newSlug}`;
+  const copyLink = () => { try { navigator.clipboard.writeText(bookingLink); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch (e) {} };
+
+  const displayName = (phase === "done" ? newSlug && name : name).trim() || "Your shop";
+  const displaySlug = (phase === "done" ? newSlug : effSlug) || "yourshop";
+  const initial = (displayName[0] || "V").toUpperCase();
+
+  // Shared nameplate preview.
+  const Plate = ({ live }) => (
+    <div style={{ background: EC.card, border: `1px solid ${EC.border}`, borderRadius: 18, overflow: "hidden", boxShadow: live ? "0 0 70px rgba(95,120,255,0.20)" : "0 0 50px rgba(95,120,255,0.12)" }}>
+      <div style={{ height: 3, background: EC.grad }} />
+      <div style={{ padding: "38px 28px", textAlign: "center" }}>
+        <div style={{ width: 44, height: 44, borderRadius: 13, margin: "0 auto 22px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 600, color: "#fff", background: EC.grad, fontFamily: GEIST }}>{initial}</div>
+        <div style={{ fontFamily: GEIST, fontSize: 30, fontWeight: 600, letterSpacing: 0.5, lineHeight: 1.12, color: EC.text, wordBreak: "break-word" }}>{displayName.toUpperCase()}</div>
+        <div style={{ margin: "20px 0 0", fontSize: 11, letterSpacing: 2.5, textTransform: "uppercase", color: live ? "#D9F2A0" : EC.faint, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontFamily: INTERF }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: live ? EC.lime : "#4A4463", boxShadow: live ? "0 0 12px rgba(198,242,78,1)" : "none" }} />
+          {live ? "Now booking" : "Not open yet"}
+        </div>
+        <div style={{ margin: "9px 0 0", fontSize: 13.5, fontFamily: INTERF }}><span style={{ color: EC.faint }}>gotvero.com/</span><span style={{ color: "#9D8BFF", fontWeight: 500 }}>{displaySlug}</span></div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight: "100dvh", background: `radial-gradient(60% 40% at 12% 4%,rgba(124,92,255,.22),transparent 58%),radial-gradient(56% 40% at 94% 98%,rgba(52,195,240,.14),transparent 60%),${EC.stage}`, color: EC.text, fontFamily: INTERF }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 18px", borderBottom: `1px solid #221A33` }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: EC.faint, fontWeight: 600 }}>OPEN A NEW SHOP</div>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: EC.sub, fontSize: 14, cursor: "pointer", fontFamily: INTERF }}>{phase === "done" ? "Done" : "Cancel"}</button>
+      </div>
+
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "24px 16px 80px" }}>
+        {phase === "form" ? (
+          <>
+            <Plate live={false} />
+
+            <div style={{ marginTop: 24 }}>
+              <div style={{ fontSize: 10.5, letterSpacing: 1.8, textTransform: "uppercase", color: EC.faint, marginBottom: 9 }}>What kind of shop</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {INDUSTRIES.map(([id, label]) => {
+                  const on = industry === id;
+                  return (
+                    <button key={id} onClick={() => setIndustry(id)} style={{ flex: "1 1 96px", background: EC.card, border: `1px solid ${on ? EC.accent : EC.border}`, boxShadow: on ? `0 0 0 1px ${EC.accent}, 0 0 22px rgba(124,92,255,0.22)` : "none", borderRadius: 12, padding: "13px 8px", color: on ? EC.text : EC.sub, fontSize: 13.5, fontWeight: 500, fontFamily: GEIST, cursor: "pointer" }}>{label}</button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ marginTop: 22 }}>
+              <div style={{ fontSize: 10.5, letterSpacing: 1.8, textTransform: "uppercase", color: EC.faint, marginBottom: 7 }}>Shop name</div>
+              <input value={name} autoFocus placeholder="The Fade Room" onChange={(e) => setName(e.target.value)} style={{ width: "100%", boxSizing: "border-box", background: EC.field, border: `1px solid ${EC.border}`, borderRadius: 11, padding: "12px 14px", color: EC.text, fontSize: 15.5, fontFamily: GEIST }} />
+            </div>
+
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontSize: 10.5, letterSpacing: 1.8, textTransform: "uppercase", color: EC.faint, marginBottom: 7 }}>Web address</div>
+              <div style={{ display: "flex", alignItems: "center", background: EC.field, border: `1px solid ${EC.border}`, borderRadius: 11, padding: "12px 14px" }}>
+                <span style={{ color: EC.faint, fontSize: 14.5 }}>gotvero.com/</span>
+                <input value={effSlug} placeholder="faderoom" onChange={(e) => { setSlugTouched(true); setSlug(slugify(e.target.value)); }} style={{ flex: 1, minWidth: 0, background: "none", border: "none", outline: "none", color: EC.text, fontSize: 14.5, fontWeight: 500, fontFamily: INTERF }} />
+                <span style={{ fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", color: reserved || avail === false ? "#FF8FA0" : (avail === true ? EC.lime : EC.faint) }}>
+                  {!effSlug || effSlug.length < 2 ? "" : reserved ? "reserved" : checking ? "checking\u2026" : avail === true ? "\u2713 free" : avail === false ? "taken" : ""}
+                </span>
+              </div>
+            </div>
+
+            {err ? <div style={{ marginTop: 14, color: "#FF8FA0", fontSize: 13 }}>{err}</div> : null}
+
+            <button onClick={open} disabled={!canOpen} style={{ width: "100%", marginTop: 26, background: EC.grad, borderRadius: 13, padding: 15, textAlign: "center", color: "#fff", fontSize: 15.5, fontWeight: 600, fontFamily: GEIST, border: "none", cursor: canOpen ? "pointer" : "default", opacity: canOpen ? 1 : 0.5, boxShadow: canOpen ? "0 0 24px rgba(124,92,255,0.4)" : "none" }}>{busy ? "Opening\u2026" : "Open the doors"}</button>
+            <div style={{ textAlign: "center", marginTop: 11, fontSize: 12.5, color: EC.faint }}>Lights the sign \u00b7 seeds the {INDUSTRIES.find((x) => x[0] === industry)[1].toLowerCase()} menu \u00b7 goes live</div>
+          </>
+        ) : (
+          <>
+            <div style={{ textAlign: "center", fontSize: 13, letterSpacing: 3, textTransform: "uppercase", color: EC.lime, marginBottom: 4, fontFamily: GEIST, textShadow: "0 0 18px rgba(198,242,78,0.4)" }}>The doors are open</div>
+            <div style={{ textAlign: "center", fontSize: 13.5, color: EC.sub, marginBottom: 22 }}>{displayName} is live and taking appointments</div>
+            <Plate live={true} />
+            <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 11 }}>
+              <button onClick={() => onCreated && onCreated(newSlug)} style={{ background: EC.grad, borderRadius: 12, padding: 14, textAlign: "center", color: "#fff", fontSize: 15, fontWeight: 600, fontFamily: GEIST, border: "none", cursor: "pointer", boxShadow: "0 0 24px rgba(124,92,255,0.38)" }}>Go to {displayName}'s dashboard &rarr;</button>
+              <button onClick={copyLink} style={{ background: "transparent", border: `1px solid ${EC.border}`, borderRadius: 12, padding: 13, textAlign: "center", color: EC.sub, fontSize: 14.5, fontWeight: 500, fontFamily: INTERF, cursor: "pointer" }}>{copied ? "\u2713 Booking link copied" : "Copy booking link"}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Master ("All Locations") overview — the account-level home. Lists every shop as a card;
 // tapping one enters that shop's dashboard. Built purely from get_my_shops (no new data reads).
 // Cross-shop stats (today's bookings) and the all-locations calendar come next.
@@ -7504,8 +7691,10 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
     return () => { alive = false; };
   }, [authEmail]);
   const [mtab, setMtab] = useState("home");
+  const [creating, setCreating] = useState(false);
   const accountName = (shops[0] && shops[0].account_name) || "All Locations";
   const enter = (id) => { try { const u = new URL(window.location.href); u.searchParams.delete("master"); u.searchParams.set("shop", id); window.location.href = u.toString(); } catch (e) {} };
+  if (creating) return <OpenShopEditor onClose={() => setCreating(false)} onCreated={enter} />;
   return (
     <div style={{ position: "relative", minHeight: "100dvh", background: "var(--bg)", color: "var(--text)" }}>
       <div style={{ borderBottom: "1px solid var(--line)", padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
@@ -7538,6 +7727,13 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
             {!loading && shops.length === 0 && (
               <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, color: "var(--sub)", fontSize: 14.5, fontFamily: FONT_BODY }}>No shops found for this account.</div>
             )}
+            <button className="lift" onClick={() => setCreating(true)} style={{ width: "100%", marginTop: 2, background: "var(--panel)", border: "1px dashed var(--border2)", borderRadius: 16, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", textAlign: "left" }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Plus size={20} style={{ color: "var(--gold)" }} /></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: "var(--text)" }}>Open a new shop</div>
+                <div style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2 }}>Name it, pick a trade, light the sign</div>
+              </div>
+            </button>
           </div>
         )}
         {mtab === "calendar" && <MasterCalendar shops={shops} onEnter={enter} />}
