@@ -252,6 +252,16 @@ const DEFAULT_HOURS = {
   5: { on: true, start: 540, end: 1020 },  // Fri 9–5
   6: { on: true, start: 540, end: 1020 },  // Sat 9–5
 };
+
+// Resolve a barber's working hours for a specific date: a one-off per-date override wins,
+// otherwise their recurring weekly schedule for that weekday. Returns { on, start, end } | null.
+function hoursForDate(prov, date) {
+  if (!prov || !date) return null;
+  const key = date.getFullYear() + "-" + date.getMonth() + "-" + date.getDate();
+  const ov = prov.hoursOverrides && prov.hoursOverrides[key];
+  if (ov) return ov;
+  return (prov.hours || {})[date.getDay()] || null;
+}
 const defaultStaffNotifications = () => ({ smsOnlineBooking: true, smsOtherBooking: true, emailOnlineBooking: false, appNewText: true, appNewChat: true, appMissedCall: true });
 const defaultComp = () => ({
   service: { on: false, type: "basic", basicPct: 0, tiers: [{ upTo: 500, pct: 30 }, { upTo: null, pct: 40 }] },
@@ -1930,7 +1940,7 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
   if (!prov || prov.id === "anyone") prov = providers.find((p) => p.id === "dan") || providers[1] || providers[0];
   if (!prov || !date || !durMin) return [];
   const dow = date.getDay();
-  const h = prov.hours?.[dow];
+  const h = hoursForDate(prov, date);
   if (!h || !h.on) return [];
   const dayKey = (d) => d.toDateString();
   const realCount = (filterFn) => (appts || []).filter((a) => a.status !== "cancelled" && a.status !== "block" && a.bookedFor && dayKey(new Date(a.bookedFor)) === dayKey(date) && filterFn(a)).length;
@@ -12222,6 +12232,84 @@ function TimeBlockSheet({ providerName, dateLabel, startLabel, onClose, onConfir
 }
 
 // ============================================================
+// BARBER HOURS — centered editor (working? · start/end · just-this-day vs recurring)
+// ============================================================
+function BarberHoursSheet({ providerName, dateLabel, weekdayName, initial, fmtTime, onClose, onSave }) {
+  const [on, setOn] = useState(initial?.on ?? true);
+  const [start, setStart] = useState(initial?.start ?? 540);
+  const [end, setEnd] = useState(initial?.end ?? 1020);
+  const [scope, setScope] = useState("day"); // "day" = just this date · "week" = every weekday
+  const [picking, setPicking] = useState(null); // "start" | "end" | null
+  const TIMES = [];
+  for (let t = 300; t <= 1380; t += 15) TIMES.push(t);
+  const valid = !on || end > start;
+
+  const fl = { display: "block", fontSize: 12, letterSpacing: 0.4, color: "var(--sub)", fontWeight: 600, margin: "0 0 8px" };
+  const field = { flex: 1, width: "100%", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, textAlign: "left", cursor: "pointer" };
+
+  return (
+    <div onClick={onClose} className="fade-in" style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 80, display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, boxShadow: "var(--shadow-lg)", overflow: "hidden", animation: "popIn .2s var(--ease) both" }}>
+        <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 500, fontSize: 19 }}>{picking ? (picking === "start" ? "Start time" : "End time") : providerName + "’s hours"}</div>
+          <button onClick={picking ? () => setPicking(null) : onClose} style={{ background: "none", border: "none", color: "var(--faint)", fontSize: 24, lineHeight: 1, padding: 0, cursor: "pointer" }}>{picking ? "‹" : "×"}</button>
+        </div>
+
+        {picking ? (
+          <div style={{ maxHeight: 340, overflowY: "auto", padding: "8px 0" }}>
+            {TIMES.map((t) => {
+              const sel = (picking === "start" ? start : end) === t;
+              return (
+                <button key={t} onClick={() => { if (picking === "start") { setStart(t); if (end <= t) setEnd(Math.min(1380, t + 60)); } else { setEnd(t); } setPicking(null); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 22px", background: sel ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "transparent", border: "none", color: sel ? "var(--text)" : "var(--sub)", fontSize: 15, fontWeight: sel ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }}>{fmtTime(t)}</button>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ padding: "18px 20px 20px" }}>
+            <div style={{ fontSize: 12.5, color: "var(--sub)", margin: "0 0 16px" }}>{dateLabel}</div>
+
+            <div onClick={() => setOn((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 14px", cursor: "pointer" }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>Working this day</div>
+                <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>{on ? "Available for bookings" : "Marked as off"}</div>
+              </div>
+              <div style={{ width: 42, height: 25, borderRadius: 13, background: on ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, transition: "background .15s" }}>
+                <i style={{ position: "absolute", top: 3, left: on ? 20 : 3, width: 19, height: 19, borderRadius: "50%", background: on ? "#fff" : "var(--faint)", transition: "left .15s" }} />
+              </div>
+            </div>
+
+            {on && (
+              <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={fl}>START</label>
+                  <button onClick={() => setPicking("start")} style={field}>{fmtTime(start)}</button>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={fl}>END</label>
+                  <button onClick={() => setPicking("end")} style={field}>{fmtTime(end)}</button>
+                </div>
+              </div>
+            )}
+            {on && !valid && <div style={{ fontSize: 12, color: "#e0796a", marginTop: 8 }}>End time needs to be after the start.</div>}
+
+            <div style={{ marginTop: 18 }}>
+              <label style={fl}>APPLY TO</label>
+              <div style={{ display: "flex", gap: 6, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 11, padding: 4 }}>
+                {[["day", "Just this day"], ["week", "Every " + weekdayName]].map(([v, lbl]) => (
+                  <button key={v} onClick={() => setScope(v)} style={{ flex: 1, border: "none", background: scope === v ? "var(--gold)" : "transparent", color: scope === v ? "var(--on-gold)" : "var(--sub)", fontWeight: 600, fontSize: 12.5, padding: "9px 0", borderRadius: 8, fontFamily: FONT_BODY, cursor: "pointer" }}>{lbl}</button>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={() => { if (valid) onSave({ on, start, end, scope }); }} className="lift" disabled={!valid} style={{ width: "100%", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 14.5, fontWeight: 600, background: valid ? "var(--gold)" : "var(--border)", color: valid ? "var(--on-gold)" : "var(--faint)", fontFamily: FONT_BODY, marginTop: 20, cursor: valid ? "pointer" : "default" }}>Save hours</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // NEW APPOINTMENT — pick client + service, then book (full page)
 // ============================================================
 function NewAppointmentForm({ slot, providers, clients, services, appts, selectedDate, onClose, onBook, onBlock, onPickDate }) {
@@ -12641,6 +12729,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const [createSlot, setCreateSlot] = useState(null); // { providerId, start } long-press to create
   const [newApptSlot, setNewApptSlot] = useState(null); // { providerId, start } → opens the pick-client+service form
   const [blockSlot, setBlockSlot] = useState(null); // { providerId, start } → opens the time-block detail window
+  const [hoursEdit, setHoursEdit] = useState(null); // { providerId } → opens the per-barber hours editor
   const [pressInd, setPressInd] = useState(null); // { providerId, start, y } live indicator while holding
   const [checkout, setCheckout] = useState(null); // appt being checked out
   const [showDatePicker, setShowDatePicker] = useState(false); // month-grid date jumper triggered by tapping the date header
@@ -13049,6 +13138,24 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     showToast(repeat ? `${label || "Time block"} set to repeat weekly.` : `Blocked off at ${fmtTime(start)}.`);
   };
 
+  // Save a barber's hours — recurring weekly (this weekday) or a one-off override for just this date.
+  const saveHours = ({ on, start, end, scope }) => {
+    if (!hoursEdit) return;
+    const pid = hoursEdit.providerId;
+    const d = selectedDate;
+    const dow = d.getDay();
+    const key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+    const rec = { on, start, end };
+    setProviders((cur) => cur.map((p) => {
+      if (p.id !== pid) return p;
+      if (scope === "week") return { ...p, hours: { ...(p.hours || {}), [dow]: rec } };
+      return { ...p, hoursOverrides: { ...(p.hoursOverrides || {}), [key]: rec } };
+    }));
+    setHoursEdit(null);
+    const wd = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dow];
+    showToast(scope === "week" ? `Every ${wd} updated.` : `Hours updated for ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}.`);
+  };
+
   // The actual save — runs after conflict has been resolved (no conflict, or provider chose to keep both).
   // Accepts an optional `overrideStart` so the conflict modal can slide the booking to the next free slot in one tap.
   const commitAppt = ({ providerId, start, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note }, overrideStart = null) => {
@@ -13131,7 +13238,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   //  2. Anyone OFF the selected day sinks to the far right and renders greyed.
   //  3. Otherwise keep existing order (later: a business-defined drag order — Step C).
   const focusedId = pulseView === "shop" ? null : (pulseView === "me" ? (me && me.id) : pulseView);
-  const isOffDay = (p) => { const h = p && p.hours && p.hours[selectedDate.getDay()]; return !h || !h.on; };
+  const isOffDay = (p) => { const h = hoursForDate(p, selectedDate); return !h || !h.on; };
   // Display-only: open stretches between a barber's bookings during their shift, big enough to be worth filling.
   const GAP_MIN = 20;
   const gapsForProvider = (p) => {
@@ -13162,7 +13269,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const earliestOpenSlot = (providerId, date, durMin = 30) => {
     const prov = providers.find((p) => p.id === providerId) || providers[0];
     const dur = Math.max(15, Number(durMin) || 30);
-    const h = prov && prov.hours && prov.hours[date.getDay()];
+    const h = hoursForDate(prov, date);
     const open = h ? h.start : DAY_START;
     const close = h ? h.end : DAY_END;
     const busy = (appts || [])
@@ -13325,8 +13432,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       {/* staff column headers */}
       <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
         <div style={{ width: 56, flexShrink: 0 }} />
-        {orderedStaff.map((p) => { const off = isOffDay(p); return (
-          <div key={p.id} style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: off ? 0.55 : 1, minWidth: 0 }}>
+        {orderedStaff.map((p) => { const off = isOffDay(p); const editable = p.id !== "anyone"; return (
+          <div key={p.id} onClick={editable ? () => setHoursEdit({ providerId: p.id }) : undefined} style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: off ? 0.55 : 1, minWidth: 0, cursor: editable ? "pointer" : "default" }}>
             <span style={{ width: 22, height: 22, borderRadius: "50%", background: off ? "var(--border2)" : p.color, color: "#fff", fontSize: 10.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(p.name || "?").charAt(0).toUpperCase()}</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: off ? "var(--faint)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}{off ? " · off" : ""}</span>
           </div>
@@ -13383,7 +13490,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               style={{ flex: 1, position: "relative", height: gridHeight, background: "color-mix(in srgb, var(--panel2) 45%, var(--bg))", borderRadius: 14, boxShadow: "inset 0 0 0 1px var(--line)", overflow: "hidden" }}>
               {/* off-shift shade: dim the hours outside this barber's shift for the selected day (behind cards, ignores taps) */}
               {(() => {
-                const h = (p.hours || {})[selectedDate.getDay()];
+                const h = hoursForDate(p, selectedDate);
                 const shade = "color-mix(in srgb, var(--text) 7%, transparent)";
                 if (!h || !h.on) return <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: gridHeight, background: shade, pointerEvents: "none" }} />;
                 const segs = [];
@@ -13665,6 +13772,23 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onConfirm={confirmBlock}
         />
       )}
+
+      {hoursEdit && (() => {
+        const p = providers.find((x) => x.id === hoursEdit.providerId);
+        const eff = hoursForDate(p, selectedDate) || { on: false, start: 540, end: 1020 };
+        const wd = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][selectedDate.getDay()];
+        return (
+          <BarberHoursSheet
+            providerName={p?.name || "Barber"}
+            dateLabel={selectedDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
+            weekdayName={wd}
+            initial={eff}
+            fmtTime={fmtTime}
+            onClose={() => setHoursEdit(null)}
+            onSave={saveHours}
+          />
+        );
+      })()}
 
       {/* full appointment experience: detail · ••• menu · edit */}
       {open && (
