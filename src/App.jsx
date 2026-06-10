@@ -88,7 +88,7 @@ const SERVICE_PALETTE = [
 ];
 const STATUS_COLORS = {
   "checked-in": "#8B5CF6", // vivid purple — client has self-checked-in / in the lobby
-  "in-service": "var(--gold)", // theme accent — in the chair
+  "in-service": "var(--live)", // the theme's "live now" accent — in the chair (equals --gold everywhere except Electric, where it's the lime spark)
   done: "var(--border2)",         // muted/greyed — finished, recedes
 };
 const hexById = (id) => (SERVICE_PALETTE.find((c) => c.id === id) || SERVICE_PALETTE[0]).hex;
@@ -495,6 +495,13 @@ const THEMES = [
     canvas: "linear-gradient(176deg,#F3ECE2,#E8DECE)",
     t: { bg:"#F3ECE2", panel:"#FBF7F0", panel2:"#E8DECE", line:"#DED3C0", border:"#DACEBB", border2:"#C0B299", text:"#241D15", text2:"#473A2C", sub:"#7A6A57", faint:"#AD9D86", gold:"#6F4E37", onGold:"#FFFFFF", shadow:"rgba(80,60,35,.09)", overlay:"rgba(36,29,21,0.34)" } },
   // ===== DARK =====
+  // Electric is Vero's identity theme — the app default. Deep indigo, one violet→azure
+  // gradient, and a single bright "live" lime reserved for what's happening right now.
+  { id: "electric", name: "Electric", tagline: "Indigo, azure & a spark of lime", cat: "Dark", dark: true,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.05,
+    canvas: "radial-gradient(60% 46% at 12% 4%,rgba(124,92,255,.30),transparent 58%),radial-gradient(56% 46% at 94% 98%,rgba(52,195,240,.18),transparent 60%),#0E0A16",
+    grad: "linear-gradient(135deg,#7C5CFF 0%,#34C3F0 100%)",
+    t: { bg:"#0E0A16", panel:"#161024", panel2:"#1E1733", line:"#2A2140", border:"#2E2545", border2:"#473860", text:"#F5F3FC", text2:"#D8D2EC", sub:"#B9B3D4", faint:"#8E87AB", gold:"#8C6BFF", onGold:"#FFFFFF", live:"#C6F24E", shadow:"rgba(0,0,0,.6)", overlay:"rgba(8,5,16,0.82)" } },
   { id: "noir", name: "Noir", tagline: "Midnight, lit in platinum", cat: "Dark", dark: true,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.08,
     canvas: "linear-gradient(176deg,#121211,#0B0B0A)",
@@ -519,18 +526,13 @@ const THEMES = [
     disp: "'Jost', sans-serif", body: "'Inter', sans-serif", grain: 0.06,
     canvas: "linear-gradient(176deg,#1C2024,#141719)",
     t: { bg:"#16181B", panel:"#21262B", panel2:"#282E34", line:"#323941", border:"#39414A", border2:"#515A64", text:"#EDF1F4", text2:"#CDD4DA", sub:"#8B939B", faint:"#565E66", gold:"#9FB4C4", onGold:"#12171B", shadow:"rgba(0,0,0,.55)", overlay:"rgba(8,10,12,0.8)" } },
-  { id: "electric", name: "Electric", tagline: "Neon dusk", cat: "Dark", dark: true,
-    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.05,
-    canvas: "radial-gradient(62% 48% at 14% 6%,rgba(124,92,255,.34),transparent 58%),radial-gradient(58% 46% at 92% 96%,rgba(255,92,157,.26),transparent 60%),#100B18",
-    grad: "linear-gradient(135deg,#7C5CFF 0%,#FF5C9D 100%)",
-    t: { bg:"#100B18", panel:"#181226", panel2:"#201733", line:"#2A2140", border:"#322748", border2:"#473860", text:"#F4F1FB", text2:"#D8D2EC", sub:"#B6B0CC", faint:"#7E7791", gold:"#8C6BFF", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.6)", overlay:"rgba(8,5,16,0.82)" } },
 ];
 const THEME_CATS = ["Light", "Dark"];
 const THEME_IDS = THEMES.map((t) => t.id);
 const buildThemeCSS = () => THEMES.map((th) => {
   const v = th.t;
   const grad = th.grad || `linear-gradient(135deg,${v.gold},${v.gold})`;
-  return `.theme-${th.id}{--bg:${v.bg};--canvas:${th.canvas || v.bg};--grain:${th.grain || 0};--grain-blend:${th.dark ? "overlay" : "multiply"};--panel:${v.panel};--panel2:${v.panel2};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--gold-grad:${grad};--on-gold:${v.onGold};--shadow:${v.shadow};--overlay:${v.overlay};--font-disp:${th.disp};--font-body:${th.body};}`;
+  return `.theme-${th.id}{--bg:${v.bg};--canvas:${th.canvas || v.bg};--grain:${th.grain || 0};--grain-blend:${th.dark ? "overlay" : "multiply"};--panel:${v.panel};--panel2:${v.panel2};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--gold-grad:${grad};--on-gold:${v.onGold};--live:${v.live || v.gold};--shadow:${v.shadow};--overlay:${v.overlay};--font-disp:${th.disp};--font-body:${th.body};}`;
 }).join("\n");
 
 // Portal: render full-screen overlays. Without react-dom we can't truly portal,
@@ -1121,8 +1123,8 @@ function App() {
     return Array.from(byKey.values());
   };
   const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
-  // Theme: stored on business.theme so it syncs across devices via Supabase. Falls back to "chrome" until loaded/set or if an old/unknown id is stored.
-  const theme = (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "noir";
+  // Theme: stored on business.theme so it syncs across devices via Supabase. Falls back to "electric" — Vero's identity theme — until loaded/set or if an old/unknown id is stored.
+  const theme = (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "electric";
   const setTheme = (newTheme) => setBusiness((b) => ({ ...(b || {}), theme: newTheme }));
 
   // ---- Supabase load + save (debounced) — shop-scoped tables (multi-tenant ready) ----
@@ -15643,12 +15645,12 @@ function _accLum(c){ const f=(x)=>{ x/=255; return x<=0.03928?x/12.92:Math.pow((
 function accentOnDark(str, min){ let c=_accParse(str); if(!c) return null; const m=min||0.34; let guard=0; while(_accLum(c)<m && guard++<16){ c={r:c.r+(255-c.r)*0.16, g:c.g+(255-c.g)*0.16, b:c.b+(255-c.b)*0.16}; } return `rgb(${Math.round(c.r)}, ${Math.round(c.g)}, ${Math.round(c.b)})`; }
 
 function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, title, nextClient, nextIsWaiting, startedLate, startedLateBy, fmtTime, lateNotified, onLetThemKnow }) {
-  // Calm color = the theme accent (read live so a "Make it yours" override applies too), guarded for the dark card.
+  // Calm color = the theme's "live now" accent (--live; equals --gold on every theme except Electric's lime), read live so a "Make it yours" override applies too, guarded for the dark card.
   const [CUT, setCUT] = useState("#7CA084");
   useEffect(() => {
     try {
       const root = document.getElementById("app-root");
-      const raw = root ? getComputedStyle(root).getPropertyValue("--gold").trim() : "";
+      const raw = root ? getComputedStyle(root).getPropertyValue("--live").trim() || getComputedStyle(root).getPropertyValue("--gold").trim() : "";
       const safe = accentOnDark(raw);
       if (safe) setCUT(safe);
     } catch (e) {}
