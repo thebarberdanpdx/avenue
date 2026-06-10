@@ -6748,6 +6748,83 @@ function LocationSwitcher({ current, fallbackName, authEmail }) {
   );
 }
 
+// Master Calendar — all-locations day view. Reads appointments across every shop in the account
+// (staff read full rows; appt carries its own `name`, so no per-shop client list is needed),
+// shows each shop as a column with that day's bookings under it. Column header taps into the shop.
+function MasterCalendar({ shops, onEnter }) {
+  const [day, setDay] = useState(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; });
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const ids = (shops || []).map((s) => s.shop_id);
+  const idKey = ids.join(",");
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setLoading(true);
+      try {
+        if (ids.length) {
+          const { data } = await supabase.from("appointments").select("data, shop_id").in("shop_id", ids);
+          if (alive && Array.isArray(data)) setRows(data);
+        }
+      } catch (e) {}
+      if (alive) setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [idKey]);
+  const apptTime = (a) => { const t = a && (a.bookedFor || a.start); if (!t && t !== 0) return null; const d = new Date(t); return isNaN(d.getTime()) ? null : d; };
+  const sameDay = (d) => !!d && d.getFullYear() === day.getFullYear() && d.getMonth() === day.getMonth() && d.getDate() === day.getDate();
+  const skip = (a) => a.status === "cancelled" || a.status === "no-show" || a.status === "block";
+  const forShop = (sid) => rows
+    .filter((r) => r.shop_id === sid && r.data && !skip(r.data))
+    .map((r) => ({ a: r.data, t: apptTime(r.data) }))
+    .filter((x) => sameDay(x.t))
+    .sort((x, y) => x.t - y.t);
+  const fmtDay = day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const isToday = sameDay(new Date());
+  const shift = (n) => { const d = new Date(day); d.setDate(d.getDate() + n); setDay(d); };
+  const arrowBtn = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, width: 36, height: 36, color: "var(--text)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <button onClick={() => shift(-1)} style={arrowBtn}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg></button>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, color: "var(--text)" }}>{fmtDay}</div>
+          {!isToday && <button onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setDay(d); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, fontFamily: FONT_BODY, cursor: "pointer", marginTop: 2 }}>Back to today</button>}
+        </div>
+        <button onClick={() => shift(1)} style={arrowBtn}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg></button>
+      </div>
+      {loading ? (
+        <div style={{ color: "var(--sub)", fontSize: 14, fontFamily: FONT_BODY, padding: "20px 2px" }}>Loading the day\u2026</div>
+      ) : (
+        <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, WebkitOverflowScrolling: "touch" }}>
+          {(shops || []).map((s) => {
+            const list = forShop(s.shop_id);
+            return (
+              <div key={s.shop_id} style={{ flex: "0 0 auto", width: 230, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+                <button onClick={() => onEnter && onEnter(s.shop_id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "13px 14px", background: "color-mix(in srgb, var(--gold) 10%, transparent)", border: "none", borderBottom: "1px solid var(--line)", cursor: "pointer", textAlign: "left" }}>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15.5, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.shop_name || s.shop_id}</span>
+                  <span style={{ fontSize: 12, color: "var(--sub)", fontFamily: FONT_BODY, flexShrink: 0 }}>{list.length}</span>
+                </button>
+                <div style={{ padding: 10, display: "grid", gap: 8, minHeight: 90 }}>
+                  {list.length === 0 ? (
+                    <div style={{ color: "var(--faint)", fontSize: 13, fontFamily: FONT_BODY, padding: "16px 4px", textAlign: "center" }}>No bookings</div>
+                  ) : list.map((x, i) => (
+                    <div key={i} style={{ background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 10, padding: "9px 11px" }}>
+                      <div style={{ fontSize: 12, color: "var(--gold)", fontWeight: 600, fontFamily: FONT_BODY }}>{x.t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>
+                      <div style={{ fontSize: 14, color: "var(--text)", fontFamily: FONT_BODY, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.a.name || "Booked"}</div>
+                      {x.a.serviceName && <div style={{ fontSize: 12, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.a.serviceName}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Master ("All Locations") overview — the account-level home. Lists every shop as a card;
 // tapping one enters that shop's dashboard. Built purely from get_my_shops (no new data reads).
 // Cross-shop stats (today's bookings) and the all-locations calendar come next.
@@ -6762,6 +6839,7 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
     })();
     return () => { alive = false; };
   }, [authEmail]);
+  const [mtab, setMtab] = useState("home");
   const accountName = (shops[0] && shops[0].account_name) || "All Locations";
   const enter = (id) => { try { const u = new URL(window.location.href); u.searchParams.delete("master"); u.searchParams.set("shop", id); window.location.href = u.toString(); } catch (e) {} };
   return (
@@ -6773,24 +6851,32 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
       <div style={{ maxWidth: 560, margin: "0 auto", padding: "26px 16px 120px" }}>
         <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
         <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.4px", marginBottom: 6 }}>{accountName}</h1>
-        <div style={{ fontSize: 14.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 22 }}>{loading ? "Loading your shops\u2026" : (shops.length + " " + (shops.length === 1 ? "location" : "locations"))}</div>
-        <div style={{ display: "grid", gap: 12 }}>
-          {shops.map((s) => (
-            <button key={s.shop_id} className="lift" onClick={() => enter(s.shop_id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "18px 18px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, cursor: "pointer", textAlign: "left" }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" /></svg>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.shop_name || s.shop_id}</div>
-                <div style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2 }}>{s.role === "owner" ? "Owner" : "Manager"} \u00b7 Tap to manage</div>
-              </div>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-            </button>
+        <div style={{ fontSize: 14.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 18 }}>{loading ? "Loading your shops\u2026" : (shops.length + " " + (shops.length === 1 ? "location" : "locations"))}</div>
+        <div style={{ display: "flex", gap: 6, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: 4, marginBottom: 20 }}>
+          {[["home", "Overview"], ["calendar", "Calendar"]].map((opt) => (
+            <button key={opt[0]} onClick={() => setMtab(opt[0])} style={{ flex: 1, padding: "9px 0", borderRadius: 9, border: "none", cursor: "pointer", fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY, color: mtab === opt[0] ? "var(--on-gold)" : "var(--sub)", background: mtab === opt[0] ? "var(--gold)" : "transparent" }}>{opt[1]}</button>
           ))}
-          {!loading && shops.length === 0 && (
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, color: "var(--sub)", fontSize: 14.5, fontFamily: FONT_BODY }}>No shops found for this account.</div>
-          )}
         </div>
+        {mtab === "home" && (
+          <div style={{ display: "grid", gap: 12 }}>
+            {shops.map((s) => (
+              <button key={s.shop_id} className="lift" onClick={() => enter(s.shop_id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "18px 18px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, cursor: "pointer", textAlign: "left" }}>
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" /></svg>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.shop_name || s.shop_id}</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2 }}>{s.role === "owner" ? "Owner" : "Manager"} \u00b7 Tap to manage</div>
+                </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
+            ))}
+            {!loading && shops.length === 0 && (
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, color: "var(--sub)", fontSize: 14.5, fontFamily: FONT_BODY }}>No shops found for this account.</div>
+            )}
+          </div>
+        )}
+        {mtab === "calendar" && <MasterCalendar shops={shops} onEnter={enter} />}
       </div>
     </div>
   );
