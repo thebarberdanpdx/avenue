@@ -8321,7 +8321,10 @@ function BusinessHoursEditor({ hours, onChange }) {
   );
   return (
     <div>
-      <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>The days and hours the shop is open — this drives when clients can book and what shows on your calendar.</p>
+      <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12, fontWeight: 400 }}>The hours your shop is open — shown to clients and used as the outer frame of your calendar.</p>
+      <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel2))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 18, fontSize: 12.5, color: "var(--text2)", lineHeight: 1.55 }}>
+        <b style={{ color: "var(--gold)", fontWeight: 600 }}>Display &amp; fallback only.</b> Each barber's bookable times come from their own <b style={{ fontWeight: 600 }}>Work hours</b> (Staff &rarr; Work hours) — these shop hours just frame your calendar and fill in for anyone who hasn&rsquo;t set theirs.
+      </div>
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
         {DAYNAMES.map((name, d) => {
           const day = h[d] || { on: false, start: 540, end: 1020 };
