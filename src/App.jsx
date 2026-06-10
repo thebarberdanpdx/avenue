@@ -15002,7 +15002,7 @@ function CheckoutRow({ label, val, bold }) {
 
 // Secure card-on-file capture. The card field is a Stripe Element — raw card numbers
 // go straight from the phone to Stripe and never touch our code or server.
-function CardOnFileSheet({ open, onClose, client, onSaved, showToast }) {
+function CardOnFileSheet({ open, onClose, client, onSaved, showToast, live }) {
   const cardBox = useRef(null);
   const stripeRef = useRef(null);
   const elRef = useRef(null);
@@ -15011,6 +15011,7 @@ function CardOnFileSheet({ open, onClose, client, onSaved, showToast }) {
   const [err, setErr] = useState("");
   useEffect(() => {
     if (!open) return;
+    if (!live) { setReady(true); setErr(""); return; }
     let dead = false;
     setReady(false); setErr("");
     getStripe().then((stripe) => {
@@ -15025,9 +15026,13 @@ function CardOnFileSheet({ open, onClose, client, onSaved, showToast }) {
     return () => { dead = true; try { elRef.current && elRef.current.unmount(); } catch (e) {} elRef.current = null; stripeRef.current = null; };
   }, [open]);
   const save = async () => {
-    const stripe = stripeRef.current, card = elRef.current;
-    if (!stripe || !card) return;
     setBusy(true); setErr("");
+    if (!live) {
+      setTimeout(() => { onSaved && onSaved({ stripeCustomerId: "cus_test", paymentMethodId: "pm_test", brand: "visa", last4: "4242", simulated: true }); showToast && showToast("Card saved on file (test mode)."); setBusy(false); onClose && onClose(); }, 500);
+      return;
+    }
+    const stripe = stripeRef.current, card = elRef.current;
+    if (!stripe || !card) { setBusy(false); return; }
     try {
       const pm = await stripe.createPaymentMethod({ type: "card", card });
       if (pm.error) throw new Error(pm.error.message);
@@ -15047,10 +15052,22 @@ function CardOnFileSheet({ open, onClose, client, onSaved, showToast }) {
           <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD ON FILE</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
         </div>
-        <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
-        {!ready && !err && <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", marginBottom: 12 }}>Loading secure card field…</div>}
+        {live ? (
+          <>
+            <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
+            {!ready && !err && <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", marginBottom: 12 }}>Loading secure card field…</div>}
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "11px 13px", marginBottom: 12 }}>
+              <AlertCircle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 12.5, color: "var(--gold)", lineHeight: 1.45 }}><b>Test mode.</b> No card is saved and nothing is charged. Turn on Live in Settings → Payments when you're ready.</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px", marginBottom: 12 }}><CreditCard size={18} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 15, color: "var(--text)" }}>Test card · 4242</span></div>
+          </>
+        )}
         {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
-        <button onClick={save} disabled={busy || !ready} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: (busy || !ready) ? 0.55 : 1 }}><Check size={17} /> {busy ? "SAVING…" : "SAVE CARD"}</button>
+        <button onClick={save} disabled={busy || (live && !ready)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: (busy || (live && !ready)) ? 0.55 : 1 }}><Check size={17} /> {busy ? "SAVING…" : (live ? "SAVE CARD" : "SAVE TEST CARD")}</button>
         <button onClick={onClose} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 6 }}>Cancel</button>
       </div>
     </Sheet>
@@ -15311,7 +15328,7 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
 }
 
 // One-time card sale for the register — enters a card now, charges it once.
-function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast }) {
+function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, live }) {
   const cardBox = useRef(null);
   const stripeRef = useRef(null);
   const elRef = useRef(null);
@@ -15320,6 +15337,7 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast }
   const [err, setErr] = useState("");
   useEffect(() => {
     if (!open) return;
+    if (!live) { setReady(true); setErr(""); setBusy(false); return; }
     let dead = false;
     setReady(false); setErr(""); setBusy(false);
     getStripe().then((stripe) => {
@@ -15334,9 +15352,13 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast }
     return () => { dead = true; try { elRef.current && elRef.current.unmount(); } catch (e) {} elRef.current = null; stripeRef.current = null; };
   }, [open]);
   const pay = async () => {
-    const stripe = stripeRef.current, card = elRef.current;
-    if (!stripe || !card) return;
     setBusy(true); setErr("");
+    if (!live) {
+      setTimeout(() => { onPaid && onPaid({ paymentIntentId: null, brand: "visa", last4: "4242", simulated: true }); setBusy(false); }, 600);
+      return;
+    }
+    const stripe = stripeRef.current, card = elRef.current;
+    if (!stripe || !card) { setBusy(false); return; }
     try {
       const pm = await stripe.createPaymentMethod({ type: "card", card });
       if (pm.error) throw new Error(pm.error.message);
@@ -15357,10 +15379,22 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast }
           <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD PAYMENT</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500 }}>${(Math.round((amount || 0) * 100) / 100).toFixed(2)}</div>
         </div>
-        <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
-        {!ready && !err && <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", marginBottom: 12 }}>Loading secure card field…</div>}
+        {live ? (
+          <>
+            <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
+            {!ready && !err && <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", marginBottom: 12 }}>Loading secure card field…</div>}
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "11px 13px", marginBottom: 12 }}>
+              <AlertCircle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 12.5, color: "var(--gold)", lineHeight: 1.45 }}><b>Test mode.</b> No card is charged. Turn on Live in Settings → Payments when you're ready to take real payments.</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px", marginBottom: 12 }}><CreditCard size={18} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 15, color: "var(--text)" }}>Test card · 4242</span></div>
+          </>
+        )}
         {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
-        <button onClick={pay} disabled={busy || !ready} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: (busy || !ready) ? 0.55 : 1 }}><CreditCard size={16} /> {busy ? "CHARGING…" : "CHARGE CARD"}</button>
+        <button onClick={pay} disabled={busy || (live && !ready)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: (busy || (live && !ready)) ? 0.55 : 1 }}><CreditCard size={16} /> {busy ? "CHARGING…" : (live ? "CHARGE CARD" : "RECORD TEST CHARGE")}</button>
         <button onClick={onClose} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 6 }}>Cancel</button>
       </div>
     </Sheet>
@@ -15521,7 +15555,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
           </Sheet>
 
           {/* card sheet */}
-          <CardSaleSheet open={payMode === "card"} onClose={() => setPayMode(null)} amount={total} description={`Vero sale — ${client?.name || "walk-in"}`} onPaid={(info) => { recordSale({ method: "card", ...info }); setPayMode(null); setDone({ amount: total, method: "card", change: 0 }); showToast(`Charged ${fm(total)} to card.`); }} showToast={showToast} />
+          <CardSaleSheet open={payMode === "card"} onClose={() => setPayMode(null)} amount={total} description={`Vero sale — ${client?.name || "walk-in"}`} onPaid={(info) => { recordSale({ method: "card", ...info }); setPayMode(null); setDone({ amount: total, method: "card", change: 0 }); showToast(`Charged ${fm(total)} to card.`); }} showToast={showToast} live={business.payments?.live === true} />
 
           {/* client picker */}
           <Sheet open={clientPick} onClose={() => setClientPick(false)} align="top" maxWidth={420}>
@@ -15543,7 +15577,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
 }
 
 // Charge a saved card (no-show fee). Reuses the card-on-file; nothing new to enter.
-function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, showToast }) {
+function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, showToast, live }) {
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -15555,6 +15589,10 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
     if (isNaN(n) || n <= 0) { setErr("Enter a valid amount."); return; }
     if (!card || !card.paymentMethodId || !card.stripeCustomerId) { setErr("No card on file for this client."); return; }
     setBusy(true); setErr("");
+    if (!live) {
+      setTimeout(() => { const amt = Math.round(n * 100) / 100; setDone(amt); if (onCharged) onCharged({ id: "pay_" + Date.now().toString(36), ts: Date.now(), amount: amt, type: "no-show", status: "paid", paymentIntentId: null, brand: card.brand || null, last4: card.last4 || null, note: "No-show fee (test)", refunded: 0, simulated: true }); showToast && showToast(`Charged $${amt} to ${client.name} (test mode).`); setBusy(false); }, 500);
+      return;
+    }
     try {
       const res = await stripeApi({ action: "charge", customerId: card.stripeCustomerId, paymentMethodId: card.paymentMethodId, amount: n, description: `No-show fee — ${client.name}` });
       if (res.status === "succeeded") { const amt = Math.round(n * 100) / 100; setDone(amt); if (onCharged) onCharged({ id: "pay_" + Date.now().toString(36), ts: Date.now(), amount: amt, type: "no-show", status: "paid", paymentIntentId: res.id || null, brand: card.brand || null, last4: card.last4 || null, note: "No-show fee", refunded: 0 }); showToast(`Charged $${amt} to ${client.name}.`); }
@@ -15580,12 +15618,16 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
           {card && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 4 }}>{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : "Card"} ···· {card.last4}</div>}
         </div>
+        {!live && <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "11px 13px", marginBottom: 12 }}>
+          <AlertCircle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+          <div style={{ fontSize: 12.5, color: "var(--gold)", lineHeight: 1.45 }}><b>Test mode.</b> No real charge — this records a test no-show fee only.</div>
+        </div>}
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 12 }}>
           <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, color: "var(--sub)" }}>$</span>
           <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: "'Fraunces', serif", fontSize: 28, color: "var(--text)", width: "100%", padding: 0 }} />
         </div>
         {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
-        <button onClick={charge} disabled={busy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: busy ? 0.6 : 1 }}><DollarSign size={16} /> {busy ? "CHARGING…" : "CHARGE CARD"}</button>
+        <button onClick={charge} disabled={busy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: busy ? 0.6 : 1 }}><DollarSign size={16} /> {busy ? "CHARGING…" : (live ? "CHARGE CARD" : "RECORD TEST FEE")}</button>
         <button onClick={onClose} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 6 }}>Cancel</button>
           </>
         )}
@@ -16396,8 +16438,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
         </div>
       </Sheet>
 
-      <CardOnFileSheet open={cardOpen} onClose={() => setCardOpen(false)} client={client} onSaved={saveCardToClient} showToast={showToast} />
-      <ChargeCardSheet open={chargeOpen} onClose={() => setChargeOpen(false)} client={client} defaultAmount={price} onCharged={recordPayment} showToast={showToast} />
+      <CardOnFileSheet open={cardOpen} onClose={() => setCardOpen(false)} client={client} onSaved={saveCardToClient} showToast={showToast} live={business.payments?.live === true} />
+      <ChargeCardSheet open={chargeOpen} onClose={() => setChargeOpen(false)} client={client} defaultAmount={price} onCharged={recordPayment} showToast={showToast} live={business.payments?.live === true} />
 
       <Sheet open={dateOpen} onClose={() => setDateOpen(false)} align="bottom" maxWidth={380}>
         <div style={{ padding: "2px 4px 8px" }}>
