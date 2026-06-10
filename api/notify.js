@@ -12,14 +12,16 @@
 //
 // Env: RESEND_API_KEY, EMAIL_FROM, SMS_LIVE, VONAGE_API_KEY, VONAGE_API_SECRET, VONAGE_FROM
 
-import { renderMessage, sendEmail, sendSms, resolveChannels } from "../lib/messaging.js";
+import { renderMessage, renderEmailHtml, renderPlainText, sendEmail, sendSms, resolveChannels } from "../lib/messaging.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   const b = req.body || {};
   const to = b.to || {};
   const SMS_LIVE = process.env.SMS_LIVE === "true";
-  const text = b.template ? renderMessage(b.template, b.context || {}) : (b.body || "");
+  const ctx = b.context || {};
+  const text = b.template ? renderPlainText(b.template, ctx) : (b.body || "");
+  const html = b.template ? renderEmailHtml(b.template, ctx) : undefined;
   if (!text) return res.status(400).json({ error: "nothing to send" });
 
   const email = String(to.email || "").trim();
@@ -27,7 +29,7 @@ export default async function handler(req, res) {
   const ch = resolveChannels({ channel: b.channel || "email", smsLive: SMS_LIVE, email, phone, smsOptOut: to.smsOptOut === true });
 
   const results = {};
-  try { if (ch.email) { await sendEmail({ to: email, subject: b.subject || "Your appointment", text }); results.email = "sent"; } }
+  try { if (ch.email) { await sendEmail({ to: email, subject: b.subject || "Your appointment", text, html }); results.email = "sent"; } }
   catch (e) { results.email = "error: " + e.message; }
   try { if (ch.sms) { await sendSms({ to: phone, text }); results.sms = "sent"; } }
   catch (e) { results.sms = "error: " + e.message; }
