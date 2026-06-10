@@ -10,7 +10,7 @@
 //   SHOP_TZ (default "America/Los_Angeles"), CRON_SECRET (optional, recommended)
 
 import { createClient } from "@supabase/supabase-js";
-import { renderMessage, parseOffsetMinutes, formatApptDateTime, sendEmail, sendSms, resolveChannels } from "../lib/messaging.js";
+import { renderMessage, renderEmailHtml, renderPlainText, parseOffsetMinutes, formatApptDateTime, sendEmail, sendSms, resolveChannels } from "../lib/messaging.js";
 
 const DEAD_STATUSES = ["canceled", "cancelled", "done", "no-show", "noshow", "completed"];
 
@@ -40,6 +40,11 @@ export default async function handler(req, res) {
     const reminders = (settings.messages || []).filter((m) => m.enabled && parseOffsetMinutes(m.timing) != null);
     if (!reminders.length) continue;
     const business = settings.name || "your barber";
+    const shopPhone = (settings.phones && settings.phones[0] && settings.phones[0].number) || "";
+    const shopEmail = settings.email || "";
+    const shopAddr = [settings.address, settings.address2].filter(Boolean).join(", ");
+    const shopLoc = (settings.multiLocation && settings.locations && settings.locations[0] && settings.locations[0].name) || settings.name || "";
+    const shopPolicy = settings.policy || "";
 
     const [appts, clients, provs, svcs] = await Promise.all([
       supa.from("appointments").select("id, data").eq("shop_id", shop.id),
@@ -60,13 +65,22 @@ export default async function handler(req, res) {
 
       const client = clientById[a.clientId] || {};
       const when = formatApptDateTime(a.bookedFor, a.start);
+      const addons = Array.isArray(a.addonLabels) ? a.addonLabels.filter(Boolean)
+                   : Array.isArray(a.addOns) ? a.addOns.map((x) => x && (x.name || x.label || x)).filter(Boolean)
+                   : Array.isArray(a.addons) ? a.addons.map((x) => x && (x.name || x.label || x)).filter(Boolean) : [];
       const ctx = {
         client: String(a.name || client.name || "there").split(" ")[0],
-        service: a.title || (svcById[a.serviceId] && svcById[a.serviceId].name) || "your appointment",
+        service: a.serviceName || (svcById[a.serviceId] && svcById[a.serviceId].name) || a.title || "your appointment",
         provider: (provById[a.providerId] && provById[a.providerId].name) || "your barber",
         business,
         date: when.date,
         time: when.time,
+        address: shopAddr,
+        phone: shopPhone,
+        email: shopEmail,
+        locName: shopLoc,
+        policy: shopPolicy,
+        addons,
       };
       const email = String(client.email || "").trim();
       const phone = String(client.phone || a.phone || "").replace(/\D/g, "");
@@ -85,10 +99,11 @@ export default async function handler(req, res) {
         const ch = resolveChannels({ channel: m.channel, smsLive: SMS_LIVE, email, phone, smsOptOut });
         if (!ch.email && !ch.sms) continue; // no reachable channel
 
-        const body = renderMessage(m.body, ctx);
+        const textBody = renderPlainText(m.body, ctx);
+        const htmlBody = renderEmailHtml(m.body, ctx);
         const via = [];
-        try { if (ch.email) { await sendEmail({ to: email, subject: `${business}: ${m.label}`, text: body }); via.push("email"); } } catch (e) { failed++; }
-        try { if (ch.sms) { await sendSms({ to: phone, text: body }); via.push("sms"); } } catch (e) { failed++; }
+        try { if (ch.email) { await sendEmail({ to: email, subject: `${business}: ${m.label}`, text: textBody, html: htmlBody }); via.push("email"); } } catch (e) { failed++; }
+        try { if (ch.sms) { await sendSms({ to: phone, text: textBody }); via.push("sms"); } } catch (e) { failed++; }
 
         if (via.length) {
           await supa.from("message_log").insert({ id: logId, shop_id: shop.id, appt_id: row.id, message_id: m.id, via: via.join("+"), sent_at: new Date().toISOString() });

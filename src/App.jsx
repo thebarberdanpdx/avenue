@@ -2198,6 +2198,25 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     });
     return picks.length ? `${entry.service.name} (${picks.join(", ")})` : entry.service.name;
   };
+  // Exact full option / add-on labels for an entry (no service name, no abbreviation) — persisted on
+  // the appointment so confirmations and reminders print the real menu wording, never a derived guess.
+  const optsFor = (entry) => {
+    const picks = [];
+    if (entry.intakeAnswers && entry.service.intake) {
+      const ik = entry.service.intake, a = entry.intakeAnswers;
+      if (ik.service && a.service) picks.push(ik.service.options.find((o) => o.id === a.service)?.label);
+      if (ik.style && a.style) picks.push(ik.style.options.find((o) => o.id === a.style)?.label);
+      return picks.filter(Boolean);
+    }
+    if (entry.service.cutTypes && entry.cutType) { const ct = entry.service.cutTypes.find((c) => c.id === entry.cutType); if (ct) picks.push(ct.label); }
+    if (entry.service.beardTypes && entry.beardType) { const bt = entry.service.beardTypes.find((b) => b.id === entry.beardType); if (bt) picks.push(bt.label); }
+    (entry.service.addonGroups || []).forEach((g) => {
+      const sel = entry.addons && entry.addons[g.id];
+      if (g.type === "choice" && sel) picks.push(g.options.find((o) => o.id === sel)?.label);
+      if (g.type === "addon" && sel) picks.push(g.item.name);
+    });
+    return picks.filter(Boolean);
+  };
   const provider = cart[0]?.provider || providers[0];
 
   // Time-of-day pricing adjustment for the cart at the chosen slot — surfaced on the review step
@@ -2448,6 +2467,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
       const prov = person.prov;
       const title = person.items.map(describeEntry).join(", ");
+      const serviceName = person.items.map((e) => e.service.name).join(", ");
+      const addonLabels = person.items.flatMap(optsFor);
       newAppts.push({
         id: baseId + pi,
         providerId: prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, startMin, person.durMin, business) : prov.id,
@@ -2462,6 +2483,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         status: "confirmed",
         name: person.name,
         title,
+        serviceName,
+        addonLabels,
         bookedFor: bookedFor.toISOString(),
         photos: pi === 0 ? photos : 0,
         hasPhotos: pi === 0 && photos > 0,
@@ -8685,11 +8708,11 @@ function previewCtx(business) {
   const addr = [b.address, b.address2].filter(Boolean).join(", ") || "2077 NE Town Center Dr, Suite 120";
   const locName = (b.multiLocation && b.locations && b.locations[0] && b.locations[0].name) || b.name || "Main Studio";
   return {
-    client: "Marcus", business: b.name || "your shop", service: "Cut & Beard",
+    client: "Marcus", business: b.name || "your shop", service: "Haircut + Beard",
     date: "Thursday, May 28", time: "12:50 PM", provider: "Dan",
     address: addr, phone, email: b.email || "hello@yourshop.com",
     policy: b.policy || "We kindly ask for 24 hours' notice to cancel or reschedule.",
-    locName, addons: ["Hot towel", "Straight razor"],
+    locName, addons: ["Skin Fade", "Hot Towel & Straight Razor"],
   };
 }
 
