@@ -1140,8 +1140,10 @@ function App() {
       // get_availability (no names/phones); signed-in staff load the full appointment rows.
       // Waitlist holds clients' phone numbers, so it loads ONLY for signed-in staff (session effect below).
       // Providers load via a sanitized public feed (no PINs/emails/phones); staff reload full rows below.
+      // If the sanitized feed hiccups, fall back to the direct load so a feed error can NEVER block saves.
       let pr = null;
-      try { const rp = await supabase.rpc('get_public_providers', { p_shop: SHOP_ID }); if (rp.error) { allLoaded = false; console.error('[vero] load providers failed:', rp.error); } else if (Array.isArray(rp.data)) pr = rp.data; } catch (e) { allLoaded = false; }
+      try { const rp = await supabase.rpc('get_public_providers', { p_shop: SHOP_ID }); if (!rp.error && Array.isArray(rp.data)) pr = rp.data; } catch (e) {}
+      if (pr === null) pr = await loadList('providers');
       if (pr && pr.length) setProviders(pr);
       const sv = await loadList('services');     if (sv) sv.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9)); if (sv && sv.length) setServices(sv);
 
