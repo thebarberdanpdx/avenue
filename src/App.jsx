@@ -12153,6 +12153,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const [dayOffset, setDayOffset] = useState(0);
   const [drag, setDrag] = useState(null);     // { id, deltaMin } while dragging
   const [pending, setPending] = useState(null); // { appt, newStart, newEnd } awaiting confirm
+  const [notifyMove, setNotifyMove] = useState(false); // drag-move: text the client the new time (default off/silent)
   const [createSlot, setCreateSlot] = useState(null); // { providerId, start } long-press to create
   const [newApptSlot, setNewApptSlot] = useState(null); // { providerId, start } → opens the pick-client+service form
   const [pressInd, setPressInd] = useState(null); // { providerId, start, y } live indicator while holding
@@ -12450,9 +12451,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
   const commitMove = (p) => {
     setAppts(appts.map((a) => a.id === p.appt.id ? { ...a, start: p.newStart, end: p.newEnd } : a));
-    showToast(`${p.appt.name} moved to ${fmtTime(p.newStart)}.`);
+    showToast(notifyMove ? `${p.appt.name} moved — they'll get a text once messaging is live.` : `${p.appt.name} moved to ${fmtTime(p.newStart)}.`);
     setPending(null);
     setConflictModal(null);
+    setNotifyMove(false);
   };
   const confirmMove = () => {
     if (!pending) return;
@@ -12462,6 +12464,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       const nextSlot = findNextFreeSlot(pending.appt.providerId, pending.newEnd, dur, pending.appt.id);
       setConflictModal({ mode: "move", moveData: { ...pending }, conflicts, nextSlot, dur });
       setPending(null);
+      setNotifyMove(false); // conflict resolution is a silent override — never auto-texts
       return;
     }
     commitMove(pending);
@@ -13025,7 +13028,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
       {pending && createPortal((
         <>
-          <div className="fade-in" onClick={() => setPending(null)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 55 }} />
+          <div className="fade-in" onClick={() => { setPending(null); setNotifyMove(false); }} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 55 }} />
           <div className="fade-in" style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 56, boxSizing: "border-box", pointerEvents: "none" }}>
             <div style={{ pointerEvents: "auto", width: "100%", maxWidth: 400, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, textAlign: "center", boxShadow: "0 18px 50px var(--shadow)" }}>
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, marginBottom: 6 }}>Move appointment?</div>
@@ -13035,8 +13038,15 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 <span style={{ margin: "0 8px", color: "var(--gold)" }}>→</span>
                 <span style={{ color: "var(--text)", fontWeight: 600 }}>{fmtTime(pending.newStart)} – {fmtTime(pending.newEnd)}</span>
               </div>
+              <div onClick={() => setNotifyMove((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, textAlign: "left", background: notifyMove ? "color-mix(in srgb, var(--gold) 8%, var(--panel2))" : "var(--panel2)", border: `1px solid ${notifyMove ? "color-mix(in srgb, var(--gold) 32%, var(--border))" : "var(--border)"}`, borderRadius: 13, padding: "12px 14px", marginBottom: 16, cursor: "pointer" }}>
+                <div>
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text)" }}>Notify client of the new time</div>
+                  <div style={{ fontSize: 12.5, color: notifyMove ? "var(--gold)" : "var(--sub)", marginTop: 2 }}>{notifyMove ? "We'll text them the change when you confirm" : "They won't be told unless you turn this on"}</div>
+                </div>
+                <span role="switch" aria-checked={notifyMove} style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: notifyMove ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: notifyMove ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
+              </div>
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => setPending(null)} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, letterSpacing: 1, borderRadius: 12 }}>CANCEL</button>
+                <button onClick={() => { setPending(null); setNotifyMove(false); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, letterSpacing: 1, borderRadius: 12 }}>CANCEL</button>
                 <button className="lift" onClick={confirmMove} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 12 }}>CONFIRM</button>
               </div>
             </div>
