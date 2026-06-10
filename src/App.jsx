@@ -13246,7 +13246,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     }
   }, []);
 
-  const setStatus = (id, status, msg) => { const freed = appts.find((a) => a.id === id); setAppts(appts.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) setTimeout(() => handleFreedSlot(freed), 350); };
+  const setStatus = (id, status, msg) => { const freed = appts.find((a) => a.id === id); setAppts(appts.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); setTimeout(() => handleFreedSlot(freed), 350); } };
   // open checkout instead of silently completing
   const startCheckout = (appt) => { setOpen(null); setCheckout(appt); };
   const finishCheckout = (id, summary) => {
@@ -13518,8 +13518,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   };
 
   const commitMove = (p) => {
-    setAppts(appts.map((a) => a.id === p.appt.id ? { ...a, start: p.newStart, end: p.newEnd } : a));
-    showToast(notifyMove ? `${p.appt.name} moved — they'll get a text once messaging is live.` : `${p.appt.name} moved to ${fmtTime(p.newStart)}.`);
+    const bf = new Date(p.appt.bookedFor); bf.setHours(Math.floor(p.newStart / 60), p.newStart % 60, 0, 0);
+    const moved = { ...p.appt, start: p.newStart, end: p.newEnd, bookedFor: bf.toISOString() };
+    setAppts(appts.map((a) => a.id === p.appt.id ? moved : a));
+    if (notifyMove) { const _cl = (clients || []).find((c) => c.id === p.appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: moved, business, providers, contact: { email: _cl.email || "", phone: p.appt.phone || _cl.phone || "" } }); }
+    showToast(notifyMove ? `${p.appt.name} moved — client notified.` : `${p.appt.name} moved to ${fmtTime(p.newStart)}.`);
     setPending(null);
     setConflictModal(null);
     setNotifyMove(false);
@@ -15558,7 +15561,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const DUR_OPTS = []; for (let m = 5; m <= 240; m += 5) DUR_OPTS.push(m);
   const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setDraftDate(appt.bookedFor ? new Date(appt.bookedFor) : new Date()); setNotifyChange(false); setPickList(null); setDateOpen(false); setMode("edit"); setMenuOpen(false); };
   const cancelEdit = () => { setPickList(null); setDateOpen(false); setNotifyChange(false); setMode("detail"); };
-  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged; onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); showToast(willNotify ? "Updated — client will get a text once messaging is live." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
+  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged; onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); if (willNotify) { const _cl = (clients || []).find((c) => c.id === appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: { ...appt, start: draftStart, end: draftStart + draftDur, providerId: draftProvider, bookedFor: bf.toISOString() }, business, providers, contact: { email: _cl.email || "", phone: appt.phone || _cl.phone || "" } }); } showToast(willNotify ? "Updated — client notified." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
   // TODO(SMS live): when willNotify, dispatch the reschedule/moved template to the client's phone.
 
   // ---- price (admin-editable; per-appointment override stored on appt.price) ----
