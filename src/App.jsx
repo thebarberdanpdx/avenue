@@ -1208,6 +1208,13 @@ function App() {
     return () => { alive = false; };
   }, [session]);
 
+  // When a signed-in user has been invited to an account, fold those invites into real
+  // memberships. Safe + idempotent: a no-op when there are no pending invites for their email.
+  useEffect(() => {
+    if (!session) return;
+    (async () => { try { await supabase.rpc("claim_my_invites"); } catch (e) {} })();
+  }, [session]);
+
   // Appointments load, session-keyed. The public gets TIMES ONLY (open/busy slots) via get_availability —
   // never names or phones; signed-in staff load the full appointment rows. Mirrors the clients effect above.
   useEffect(() => {
@@ -6748,6 +6755,142 @@ function LocationSwitcher({ current, fallbackName, authEmail }) {
   );
 }
 
+// Master Team — account-level people & permissions. Owners invite by email, set role
+// (owner/manager) and per-shop access for managers, and remove members; managers view the
+// team read-only. Backed by list_members / invite_member / set_member_* / remove_member /
+// cancel_invite. The invitee is folded in automatically when they next sign in (claim_my_invites).
+function MasterTeam({ shops }) {
+  const accountId = shops[0] && shops[0].account_id;
+  const isOwner = (shops || []).some((s) => s.role === "owner");
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showInvite, setShowInvite] = useState(false);
+  const [manage, setManage] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const [iEmail, setIEmail] = useState("");
+  const [iRole, setIRole] = useState("manager");
+  const [iShops, setIShops] = useState([]);
+  const load = async () => {
+    if (!accountId) { setLoading(false); return; }
+    try { const { data } = await supabase.rpc("list_members", { p_account_id: accountId }); setMembers(Array.isArray(data) ? data : []); } catch (e) {}
+    setLoading(false);
+  };
+  useEffect(() => { setLoading(true); load(); }, [accountId]);
+  const shopName = (id) => { const s = (shops || []).find((x) => x.shop_id === id); return s ? (s.shop_name || s.shop_id) : id; };
+  const accessLabel = (m) => m.role === "owner" ? "All shops" : ((!m.shop_ids || m.shop_ids.length === 0) ? "No shop access yet" : m.shop_ids.map(shopName).join(", "));
+  const resetInvite = () => { setIEmail(""); setIRole("manager"); setIShops([]); };
+  const toggleIShop = (id) => setIShops((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
+  const sendInvite = async () => {
+    const email = iEmail.trim();
+    if (!email || !/.+@.+\..+/.test(email)) { setNote("Enter a valid email."); return; }
+    setBusy(true); setNote("");
+    try { await supabase.rpc("invite_member", { p_account_id: accountId, p_email: email, p_role: iRole, p_shop_ids: iRole === "owner" ? [] : iShops }); await load(); setShowInvite(false); resetInvite(); }
+    catch (e) { setNote("Couldn't send the invite."); }
+    setBusy(false);
+  };
+  const doRole = async (m, role) => { setBusy(true); try { await supabase.rpc("set_member_role", { p_account_id: accountId, p_user_id: m.user_id, p_role: role }); await load(); setManage((cur) => cur ? { ...cur, role } : cur); } catch (e) { setNote("Couldn't change role."); } setBusy(false); };
+  const doShops = async (m, ids) => { setBusy(true); try { await supabase.rpc("set_member_shops", { p_account_id: accountId, p_user_id: m.user_id, p_shop_ids: ids }); await load(); setManage((cur) => cur ? { ...cur, shop_ids: ids } : cur); } catch (e) { setNote("Couldn't update access."); } setBusy(false); };
+  const doRemove = async (m) => { setBusy(true); try { await supabase.rpc("remove_member", { p_account_id: accountId, p_user_id: m.user_id }); await load(); setManage(null); } catch (e) { setNote("Couldn't remove."); } setBusy(false); };
+  const doCancelInvite = async (m) => { setBusy(true); try { await supabase.rpc("cancel_invite", { p_account_id: accountId, p_email: m.email }); await load(); setManage(null); } catch (e) { setNote("Couldn't cancel."); } setBusy(false); };
+
+  const overlay = { position: "fixed", inset: 0, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 130 };
+  const sheet = { width: "100%", maxWidth: 400, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.45)" };
+  const sheetTitle = { padding: "18px 18px 14px", fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, color: "var(--text)", borderBottom: "1px solid var(--line)", marginBottom: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+  const input = { width: "100%", boxSizing: "border-box", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 13px", fontSize: 15, color: "var(--text)", fontFamily: FONT_BODY, outline: "none" };
+  const chip = (on) => ({ padding: "8px 13px", borderRadius: 9, border: "1px solid " + (on ? "var(--gold)" : "var(--border)"), background: on ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "transparent", color: on ? "var(--text)" : "var(--sub)", fontSize: 13, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" });
+  const seg = (on) => ({ flex: 1, padding: "9px 0", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: FONT_BODY, color: on ? "var(--on-gold)" : "var(--sub)", background: on ? "var(--gold)" : "transparent" });
+  const dangerBtn = { width: "100%", background: "transparent", border: "1px solid var(--border)", color: "#c0392b", borderRadius: 11, padding: "13px 0", fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY }}>{loading ? "Loading the team\u2026" : (members.length + " " + (members.length === 1 ? "person" : "people"))}</div>
+        {isOwner && <button onClick={() => { setNote(""); resetInvite(); setShowInvite(true); }} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "9px 15px", fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Invite</button>}
+      </div>
+      {note && <div style={{ color: "#c0392b", fontSize: 13, fontFamily: FONT_BODY, marginBottom: 12 }}>{note}</div>}
+      <div style={{ display: "grid", gap: 10 }}>
+        {members.map((m, i) => (
+          <button key={i} onClick={() => { if (isOwner) { setNote(""); setManage(m); } }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "15px 16px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, cursor: isOwner ? "pointer" : "default", textAlign: "left" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text)", fontFamily: FONT_BODY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
+              <div style={{ fontSize: 12.5, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{accessLabel(m)}</div>
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, color: m.pending ? "var(--sub)" : "var(--on-gold)", background: m.pending ? "color-mix(in srgb, var(--sub) 18%, transparent)" : (m.role === "owner" ? "var(--gold)" : "color-mix(in srgb, var(--gold) 32%, transparent)"), flexShrink: 0 }}>{m.pending ? "Invited" : (m.role === "owner" ? "Owner" : "Manager")}</span>
+          </button>
+        ))}
+        {!loading && members.length === 0 && <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 20, color: "var(--sub)", fontSize: 14, fontFamily: FONT_BODY }}>No team members yet.</div>}
+      </div>
+
+      {showInvite && (
+        <div onClick={() => setShowInvite(false)} style={overlay}>
+          <div onClick={(e) => e.stopPropagation()} style={sheet}>
+            <div style={sheetTitle}>Invite to the team</div>
+            <div style={{ padding: "0 18px 18px" }}>
+              <input value={iEmail} onChange={(e) => setIEmail(e.target.value)} placeholder="their@email.com" inputMode="email" autoCapitalize="none" style={input} />
+              <div style={{ display: "flex", gap: 6, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, padding: 4, margin: "12px 0" }}>
+                {[["manager", "Manager"], ["owner", "Owner"]].map((o) => (
+                  <button key={o[0]} onClick={() => setIRole(o[0])} style={seg(iRole === o[0])}>{o[1]}</button>
+                ))}
+              </div>
+              {iRole === "manager" ? (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ fontSize: 12.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 8 }}>Which shops can they manage?</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {(shops || []).map((s) => (
+                      <button key={s.shop_id} onClick={() => toggleIShop(s.shop_id)} style={chip(iShops.includes(s.shop_id))}>{s.shop_name || s.shop_id}</button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 4 }}>Owners can manage every shop and the whole account.</div>
+              )}
+              <button disabled={busy} onClick={sendInvite} style={{ width: "100%", marginTop: 16, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "13px 0", fontSize: 14.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Send invite</button>
+              <div style={{ fontSize: 12, color: "var(--faint)", fontFamily: FONT_BODY, textAlign: "center", marginTop: 10, lineHeight: 1.4 }}>They join automatically the next time they sign into Vero with this email.</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {manage && (
+        <div onClick={() => setManage(null)} style={overlay}>
+          <div onClick={(e) => e.stopPropagation()} style={sheet}>
+            <div style={sheetTitle}>{manage.email}</div>
+            <div style={{ padding: "0 18px 18px" }}>
+              {manage.pending ? (
+                <div>
+                  <div style={{ fontSize: 13.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 16, lineHeight: 1.5 }}>Invited as {manage.role === "owner" ? "an owner" : "a manager"}. They'll join when they sign in with this email.</div>
+                  <button disabled={busy} onClick={() => doCancelInvite(manage)} style={dangerBtn}>Cancel invite</button>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 12.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 8 }}>Role</div>
+                  <div style={{ display: "flex", gap: 6, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, padding: 4, marginBottom: 18 }}>
+                    {[["manager", "Manager"], ["owner", "Owner"]].map((o) => (
+                      <button key={o[0]} disabled={busy} onClick={() => doRole(manage, o[0])} style={seg(manage.role === o[0])}>{o[1]}</button>
+                    ))}
+                  </div>
+                  {manage.role === "manager" && (
+                    <div style={{ marginBottom: 18 }}>
+                      <div style={{ fontSize: 12.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 8 }}>Shop access</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {(shops || []).map((s) => (
+                          <button key={s.shop_id} disabled={busy} onClick={() => { const cur = manage.shop_ids || []; const next = cur.includes(s.shop_id) ? cur.filter((x) => x !== s.shop_id) : [...cur, s.shop_id]; doShops(manage, next); }} style={chip((manage.shop_ids || []).includes(s.shop_id))}>{s.shop_name || s.shop_id}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <button disabled={busy} onClick={() => doRemove(manage)} style={dangerBtn}>Remove from account</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Master Calendar — all-locations day view. Reads appointments across every shop in the account
 // (staff read full rows; appt carries its own `name`, so no per-shop client list is needed),
 // shows each shop as a column with that day's bookings under it. Column header taps into the shop.
@@ -6853,7 +6996,7 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
         <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.4px", marginBottom: 6 }}>{accountName}</h1>
         <div style={{ fontSize: 14.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 18 }}>{loading ? "Loading your shops\u2026" : (shops.length + " " + (shops.length === 1 ? "location" : "locations"))}</div>
         <div style={{ display: "flex", gap: 6, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: 4, marginBottom: 20 }}>
-          {[["home", "Overview"], ["calendar", "Calendar"]].map((opt) => (
+          {[["home", "Overview"], ["calendar", "Calendar"], ["team", "Team"]].map((opt) => (
             <button key={opt[0]} onClick={() => setMtab(opt[0])} style={{ flex: 1, padding: "9px 0", borderRadius: 9, border: "none", cursor: "pointer", fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY, color: mtab === opt[0] ? "var(--on-gold)" : "var(--sub)", background: mtab === opt[0] ? "var(--gold)" : "transparent" }}>{opt[1]}</button>
           ))}
         </div>
@@ -6877,6 +7020,7 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
           </div>
         )}
         {mtab === "calendar" && <MasterCalendar shops={shops} onEnter={enter} />}
+        {mtab === "team" && <MasterTeam shops={shops} />}
       </div>
     </div>
   );
