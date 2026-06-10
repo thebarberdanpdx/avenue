@@ -497,11 +497,11 @@ const THEMES = [
   // ===== DARK =====
   // Electric is Vero's identity theme — the app default. Deep indigo, one violet→azure
   // gradient, and a single bright "live" lime reserved for what's happening right now.
-  { id: "electric", name: "Electric", tagline: "Indigo, azure & a spark of lime", cat: "Dark", dark: true,
-    disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.05,
-    canvas: "radial-gradient(60% 46% at 12% 4%,rgba(124,92,255,.30),transparent 58%),radial-gradient(56% 46% at 94% 98%,rgba(52,195,240,.18),transparent 60%),#0E0A16",
-    grad: "linear-gradient(135deg,#7C5CFF 0%,#34C3F0 100%)",
-    t: { bg:"#0E0A16", panel:"#161024", panel2:"#1E1733", line:"#2A2140", border:"#2E2545", border2:"#473860", text:"#F5F3FC", text2:"#D8D2EC", sub:"#B9B3D4", faint:"#8E87AB", gold:"#8C6BFF", onGold:"#FFFFFF", live:"#C6F24E", shadow:"rgba(0,0,0,.6)", overlay:"rgba(8,5,16,0.82)" } },
+  { id: "electric", name: "Electric", tagline: "Onyx & a spark of lime", cat: "Dark", dark: true,
+    disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.04,
+    canvas: "radial-gradient(70% 50% at 50% 0%,rgba(255,255,255,0.045),transparent 60%),#0B0B0C",
+    grad: "linear-gradient(135deg,#F4F5F7 0%,#D7D9DE 100%)",
+    t: { bg:"#0B0B0C", panel:"#141416", panel2:"#1B1C1F", line:"#222327", border:"#25262A", border2:"#34363B", text:"#F4F5F7", text2:"#D7D9DE", sub:"#9A9CA3", faint:"#6C6E75", gold:"#ECEDEF", onGold:"#101110", live:"#C6F24E", shadow:"rgba(0,0,0,.6)", overlay:"rgba(6,6,7,0.84)" } },
   { id: "noir", name: "Noir", tagline: "Midnight, lit in platinum", cat: "Dark", dark: true,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.08,
     canvas: "linear-gradient(176deg,#121211,#0B0B0A)",
@@ -7535,7 +7535,7 @@ const RESERVED_SLUGS = ["book", "manage", "client", "staff", "preview", "terms",
 const slugify = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 30);
 
 // Electric-styled palette for this flow (the look every new shop is born into).
-const EC = { stage: "#0E0A16", card: "#161024", border: "#2E2545", field: "#1E1733", text: "#F5F3FC", sub: "#B9B3D4", faint: "#8E87AB", accent: "#8C6BFF", lime: "#C6F24E", grad: "linear-gradient(135deg,#7C5CFF 0%,#34C3F0 100%)" };
+const EC = { stage: "#0B0B0C", card: "#141416", border: "#25262A", border2: "#34363B", field: "#1B1C1F", text: "#F4F5F7", sub: "#9A9CA3", faint: "#6C6E75", accent: "#ECEDEF", onAccent: "#101110", lime: "#C6F24E", grad: "linear-gradient(135deg,#F4F5F7 0%,#D7D9DE 100%)" };
 const GEIST = "'Geist', sans-serif", INTERF = "'Inter', sans-serif";
 
 function OpenShopEditor({ onClose, onCreated }) {
@@ -7601,22 +7601,22 @@ function OpenShopEditor({ onClose, onCreated }) {
 
   // Shared nameplate preview.
   const Plate = ({ live }) => (
-    <div style={{ background: EC.card, border: `1px solid ${EC.border}`, borderRadius: 18, overflow: "hidden", boxShadow: live ? "0 0 70px rgba(95,120,255,0.20)" : "0 0 50px rgba(95,120,255,0.12)" }}>
-      <div style={{ height: 3, background: EC.grad }} />
+    <div style={{ background: EC.card, border: `1px solid ${live ? "#3A4031" : EC.border}`, borderRadius: 18, overflow: "hidden", boxShadow: live ? "0 0 60px rgba(198,242,78,0.14)" : "0 0 40px rgba(0,0,0,0.5)" }}>
+      <div style={{ height: 3, background: EC.lime, opacity: live ? 1 : 0.18 }} />
       <div style={{ padding: "38px 28px", textAlign: "center" }}>
-        <div style={{ width: 44, height: 44, borderRadius: 13, margin: "0 auto 22px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 600, color: "#fff", background: EC.grad, fontFamily: GEIST }}>{initial}</div>
+        <div style={{ width: 44, height: 44, borderRadius: 13, margin: "0 auto 22px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 600, color: EC.onAccent, background: EC.accent, fontFamily: GEIST }}>{initial}</div>
         <div style={{ fontFamily: GEIST, fontSize: 30, fontWeight: 600, letterSpacing: 0.5, lineHeight: 1.12, color: EC.text, wordBreak: "break-word" }}>{displayName.toUpperCase()}</div>
         <div style={{ margin: "20px 0 0", fontSize: 11, letterSpacing: 2.5, textTransform: "uppercase", color: live ? "#D9F2A0" : EC.faint, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontFamily: INTERF }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: live ? EC.lime : "#4A4463", boxShadow: live ? "0 0 12px rgba(198,242,78,1)" : "none" }} />
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: live ? EC.lime : "#3C3E43", boxShadow: live ? "0 0 12px rgba(198,242,78,1)" : "none" }} />
           {live ? "Now booking" : "Not open yet"}
         </div>
-        <div style={{ margin: "9px 0 0", fontSize: 13.5, fontFamily: INTERF }}><span style={{ color: EC.faint }}>gotvero.com/</span><span style={{ color: "#9D8BFF", fontWeight: 500 }}>{displaySlug}</span></div>
+        <div style={{ margin: "9px 0 0", fontSize: 13.5, fontFamily: INTERF }}><span style={{ color: EC.faint }}>gotvero.com/</span><span style={{ color: "#E6E7EA", fontWeight: 500 }}>{displaySlug}</span></div>
       </div>
     </div>
   );
 
   return (
-    <div style={{ minHeight: "100dvh", background: `radial-gradient(60% 40% at 12% 4%,rgba(124,92,255,.22),transparent 58%),radial-gradient(56% 40% at 94% 98%,rgba(52,195,240,.14),transparent 60%),${EC.stage}`, color: EC.text, fontFamily: INTERF }}>
+    <div style={{ minHeight: "100dvh", background: `radial-gradient(70% 44% at 50% 0%,rgba(255,255,255,0.045),transparent 60%),${EC.stage}`, color: EC.text, fontFamily: INTERF }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 18px", borderBottom: `1px solid #221A33` }}>
         <div style={{ fontSize: 11, letterSpacing: 2, color: EC.faint, fontWeight: 600 }}>OPEN A NEW SHOP</div>
         <button onClick={onClose} style={{ background: "none", border: "none", color: EC.sub, fontSize: 14, cursor: "pointer", fontFamily: INTERF }}>{phase === "done" ? "Done" : "Cancel"}</button>
@@ -7633,7 +7633,7 @@ function OpenShopEditor({ onClose, onCreated }) {
                 {INDUSTRIES.map(([id, label]) => {
                   const on = industry === id;
                   return (
-                    <button key={id} onClick={() => setIndustry(id)} style={{ flex: "1 1 96px", background: EC.card, border: `1px solid ${on ? EC.accent : EC.border}`, boxShadow: on ? `0 0 0 1px ${EC.accent}, 0 0 22px rgba(124,92,255,0.22)` : "none", borderRadius: 12, padding: "13px 8px", color: on ? EC.text : EC.sub, fontSize: 13.5, fontWeight: 500, fontFamily: GEIST, cursor: "pointer" }}>{label}</button>
+                    <button key={id} onClick={() => setIndustry(id)} style={{ flex: "1 1 96px", background: on ? "#1F2024" : EC.card, border: `1px solid ${on ? EC.accent : EC.border}`, boxShadow: on ? `0 0 0 1px ${EC.accent}` : "none", borderRadius: 12, padding: "13px 8px", color: on ? EC.text : EC.sub, fontSize: 13.5, fontWeight: 500, fontFamily: GEIST, cursor: "pointer" }}>{label}</button>
                   );
                 })}
               </div>
@@ -7657,7 +7657,7 @@ function OpenShopEditor({ onClose, onCreated }) {
 
             {err ? <div style={{ marginTop: 14, color: "#FF8FA0", fontSize: 13 }}>{err}</div> : null}
 
-            <button onClick={open} disabled={!canOpen} style={{ width: "100%", marginTop: 26, background: EC.grad, borderRadius: 13, padding: 15, textAlign: "center", color: "#fff", fontSize: 15.5, fontWeight: 600, fontFamily: GEIST, border: "none", cursor: canOpen ? "pointer" : "default", opacity: canOpen ? 1 : 0.5, boxShadow: canOpen ? "0 0 24px rgba(124,92,255,0.4)" : "none" }}>{busy ? "Opening\u2026" : "Open the doors"}</button>
+            <button onClick={open} disabled={!canOpen} style={{ width: "100%", marginTop: 26, background: EC.lime, borderRadius: 13, padding: 15, textAlign: "center", color: "#10140A", fontSize: 15.5, fontWeight: 600, fontFamily: GEIST, border: "none", cursor: canOpen ? "pointer" : "default", opacity: canOpen ? 1 : 0.4, boxShadow: canOpen ? "0 0 26px rgba(198,242,78,0.32)" : "none" }}>{busy ? "Opening\u2026" : "Open the doors"}</button>
             <div style={{ textAlign: "center", marginTop: 11, fontSize: 12.5, color: EC.faint }}>Lights the sign · seeds the {INDUSTRIES.find((x) => x[0] === industry)[1].toLowerCase()} menu · goes live</div>
           </>
         ) : (
@@ -7666,7 +7666,7 @@ function OpenShopEditor({ onClose, onCreated }) {
             <div style={{ textAlign: "center", fontSize: 13.5, color: EC.sub, marginBottom: 22 }}>{displayName} is live and taking appointments</div>
             <Plate live={true} />
             <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 11 }}>
-              <button onClick={() => onCreated && onCreated(newSlug)} style={{ background: EC.grad, borderRadius: 12, padding: 14, textAlign: "center", color: "#fff", fontSize: 15, fontWeight: 600, fontFamily: GEIST, border: "none", cursor: "pointer", boxShadow: "0 0 24px rgba(124,92,255,0.38)" }}>Go to {displayName}'s dashboard &rarr;</button>
+              <button onClick={() => onCreated && onCreated(newSlug)} style={{ background: EC.accent, borderRadius: 12, padding: 14, textAlign: "center", color: EC.onAccent, fontSize: 15, fontWeight: 600, fontFamily: GEIST, border: "none", cursor: "pointer" }}>Go to {displayName}'s dashboard &rarr;</button>
               <button onClick={copyLink} style={{ background: "transparent", border: `1px solid ${EC.border}`, borderRadius: 12, padding: 13, textAlign: "center", color: EC.sub, fontSize: 14.5, fontWeight: 500, fontFamily: INTERF, cursor: "pointer" }}>{copied ? "\u2713 Booking link copied" : "Copy booking link"}</button>
             </div>
           </>
