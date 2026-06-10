@@ -4518,101 +4518,142 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
     } catch (e) { setPhase("error"); } finally { setBusy(false); }
   };
 
+  const A = "var(--gold)", ON = "var(--on-gold)", RED = "#B5564B";
   const Shell = ({ children }) => (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
-      <div style={{ width: "100%", maxWidth: 440, padding: "26px 20px 40px" }}>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, letterSpacing: 3, textTransform: "uppercase", textAlign: "center", marginBottom: 24 }}>{business.name}</div>
+      <div style={{ width: "100%", maxWidth: 412, padding: "26px 20px 44px" }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 12, letterSpacing: 4, textTransform: "uppercase", textAlign: "center", color: "var(--faint)", marginBottom: 18 }}>{business.name}</div>
         {children}
       </div>
     </div>
   );
-  const Tick = () => <div style={{ width: 54, height: 54, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 16%, transparent)", color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, margin: "14px auto 16px" }}>✓</div>;
-  const Title = ({ children }) => <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, textAlign: "center", margin: "8px 0 10px" }}>{children}</div>;
-  const Body = ({ children }) => <div style={{ fontSize: 14.5, color: "var(--sub)", textAlign: "center", lineHeight: 1.55, marginBottom: 22, padding: "0 6px" }}>{children}</div>;
-  const Row2 = ({ k, v }) => (
-    <div style={{ display: "flex", gap: 10, fontSize: 14.5, marginBottom: 9, lineHeight: 1.45 }}>
-      <span style={{ color: "var(--faint)", minWidth: 60 }}>{k}</span>
-      <span style={{ color: "var(--text)", fontWeight: 500 }}>{v}</span>
+  const ticketBox = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, boxShadow: "0 24px 50px -30px var(--shadow)", overflow: "hidden", position: "relative" };
+  const Band = ({ color }) => <div style={{ height: 6, background: color || "var(--gold-grad, var(--gold))" }} />;
+  const Perf = () => (
+    <div style={{ position: "relative", height: 26 }}>
+      <div style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", left: -13, width: 26, height: 26, borderRadius: "50%", background: "var(--canvas, var(--bg))" }} />
+      <div style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", right: -13, width: 26, height: 26, borderRadius: "50%", background: "var(--canvas, var(--bg))" }} />
+      <div style={{ position: "absolute", left: 18, right: 18, top: "50%", borderTop: "2px dashed var(--line)" }} />
     </div>
   );
-  const goBtn = { width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: 15, fontSize: 15, fontWeight: 600, cursor: "pointer" };
-  const ghostBtn = { width: "100%", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 12, padding: 15, fontSize: 15, fontWeight: 600, cursor: "pointer" };
+  const Tick = () => <div style={{ width: 56, height: 56, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 15%, transparent)", color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 27, margin: "6px auto 16px" }}>✓</div>;
+  const Title = ({ children }) => <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, textAlign: "center", margin: "8px 0 10px", lineHeight: 1.15 }}>{children}</div>;
+  const Body = ({ children }) => <div style={{ fontSize: 14, color: "var(--sub)", textAlign: "center", lineHeight: 1.55, marginBottom: 22, padding: "0 8px" }}>{children}</div>;
+  const goBtn = { width: "100%", background: A, color: ON, border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY, boxShadow: "0 8px 20px -10px var(--shadow)" };
+  const ghostBtn = { width: "100%", background: "transparent", color: "var(--sub)", border: "none", padding: 8, fontSize: 13.5, fontWeight: 500, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, fontFamily: FONT_BODY };
+  const centerCard = (children) => <div style={ticketBox}><Band /><div style={{ padding: 28 }}>{children}</div></div>;
 
-  if (phase === "loading") return <Shell><Body>Loading your appointment…</Body></Shell>;
-  if (phase === "error" || !appt) return <Shell><Title>Link not found</Title><Body>This appointment link is no longer valid. If you need to make a change, just give us a call.</Body><button onClick={onExit} style={goBtn}>Go to booking</button></Shell>;
+  if (phase === "loading") return <Shell>{centerCard(<Body>Loading your appointment…</Body>)}</Shell>;
+  if (phase === "error" || !appt) return <Shell>{centerCard(<><Title>Link not found</Title><Body>This appointment link is no longer valid. If you need to make a change, just give us a call.</Body><button onClick={onExit} style={goBtn}>Go to booking</button></>)}</Shell>;
 
   const when = fmtWhenObj(appt.bookedFor);
+  const dObj = new Date(appt.bookedFor);
+  const _h = dObj.getHours(), _m = dObj.getMinutes(), heroAP = _h >= 12 ? "PM" : "AM", heroHM = `${(_h % 12) || 12}:${String(_m).padStart(2, "0")}`;
   const addonsStr = Array.isArray(appt.addonLabels) ? appt.addonLabels.join(" · ") : "";
   const changeable = hoursUntil(appt.bookedFor) >= windowHrs;
-  const card = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "var(--shadow-sm)" };
+  const refCode = token ? token.slice(0, 6).toUpperCase().replace(/(.{3})(.{3})/, "$1·$2") : "";
 
-  if (phase === "cancelled") return <Shell><Tick /><Title>Appointment cancelled</Title><Body>That time has been released. We'd love to see you again whenever you're ready.</Body><button onClick={onExit} style={goBtn}>Book again</button></Shell>;
-  if (phase === "rescheduled") return <Shell><Tick /><Title>You're rescheduled</Title><Body>Your appointment is now set for {when.date} at {when.time}. A fresh confirmation is on its way.</Body><button onClick={onExit} style={ghostBtn}>Done</button></Shell>;
+  if (phase === "cancelled") return <Shell>{centerCard(<><Tick /><Title>Appointment released</Title><Body>That time is back on the books for someone else. We'd love to see you again whenever you're ready.</Body><button onClick={onExit} style={goBtn}>Book again</button></>)}</Shell>;
+  if (phase === "rescheduled") return <Shell>{centerCard(<><Tick /><Title>You're all set</Title><Body>Your appointment is now {when.date} at {when.time}. A fresh confirmation is on its way.</Body><button onClick={onExit} style={{ ...goBtn, background: "transparent", color: "var(--sub)", boxShadow: "none", textDecoration: "underline", textUnderlineOffset: 3 }}>Done</button></>)}</Shell>;
 
   if (phase === "cancel") return (
     <Shell>
-      <Title>Cancel this appointment?</Title>
-      <Body>Your {appt.serviceName || appt.title} with {prov ? prov.name : "your barber"} on {when.date} at {when.time} will be released. You can always book again.</Body>
-      <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-        <button disabled={busy} onClick={submitCancel} style={{ ...goBtn, background: "#B5564B" }}>{busy ? "Cancelling…" : "Yes, cancel it"}</button>
-        <button onClick={() => setPhase("view")} style={ghostBtn}>Keep my appointment</button>
+      <div style={ticketBox}>
+        <Band color="linear-gradient(90deg,#C76A5E,#B5564B)" />
+        <div style={{ padding: 28, textAlign: "center" }}>
+          <Title>Cancel this appointment?</Title>
+          <Body>Your {appt.serviceName || appt.title} with {prov ? prov.name : "your barber"} on {when.date} at {when.time} will be released. You can always book again.</Body>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button disabled={busy} onClick={submitCancel} style={{ ...goBtn, background: RED, boxShadow: "0 8px 20px -10px rgba(181,86,75,.6)" }}>{busy ? "Cancelling…" : "Yes, cancel it"}</button>
+            <button onClick={() => setPhase("view")} style={ghostBtn}>Keep my appointment</button>
+          </div>
+        </div>
       </div>
     </Shell>
   );
 
   if (phase === "resched") return (
     <Shell>
-      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>Pick a new time</div>
-      <div style={card}>
-        <div style={{ fontSize: 13, color: "var(--faint)", letterSpacing: 1, marginBottom: 8 }}>Day</div>
-        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 16 }}>
-          {dateOptions.map((d, i) => { const on = newDate && d.toDateString() === newDate.toDateString(); return (
-            <button key={i} onClick={() => { setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", cursor: "pointer" }}>
-              <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.7 }}>{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][d.getDay()]}</div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{d.getDate()}</div>
-            </button>
-          ); })}
-        </div>
-        {newDate && (<>
-          <div style={{ fontSize: 13, color: "var(--faint)", letterSpacing: 1, marginBottom: 8 }}>Time</div>
-          {reSlots.length === 0
+      <div style={ticketBox}>
+        <Band />
+        <div style={{ padding: "22px 22px 24px" }}>
+          <div style={{ fontSize: 10.5, letterSpacing: 2.5, color: A, fontWeight: 600, textTransform: "uppercase", marginBottom: 14 }}>Pick a new time</div>
+          <div style={{ display: "flex", gap: 9, overflowX: "auto", paddingBottom: 6, marginBottom: 18 }}>
+            {dateOptions.map((d, i) => { const on = newDate && d.toDateString() === newDate.toDateString(); return (
+              <button key={i} onClick={() => { setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, width: 54, padding: "10px 0", borderRadius: 13, border: `1px solid ${on ? A : "var(--border)"}`, background: on ? A : "var(--panel)", color: on ? ON : "var(--text)", textAlign: "center", cursor: "pointer", boxShadow: on ? "0 8px 18px -10px var(--shadow)" : "none" }}>
+                <div style={{ fontSize: 10.5, letterSpacing: 1, opacity: 0.72 }}>{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][d.getDay()]}</div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, marginTop: 1 }}>{d.getDate()}</div>
+              </button>
+            ); })}
+          </div>
+          {newDate && (reSlots.length === 0
             ? <div style={{ fontSize: 14, color: "var(--sub)" }}>No open times that day — try another.</div>
-            : <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            : <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
                 {reSlots.map(({ start: t, best }) => { const on = newSlot === t; return (
-                  <button key={t} onClick={() => setNewSlot(t)} style={{ padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : (best ? "color-mix(in srgb, var(--gold) 45%, var(--border))" : "var(--border2)")}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", fontSize: 15, cursor: "pointer" }}>{fmtTime(t)}</button>
+                  <button key={t} onClick={() => setNewSlot(t)} style={{ position: "relative", padding: "10px 15px", borderRadius: 11, border: `1px solid ${on ? A : (best ? "color-mix(in srgb, var(--gold) 45%, var(--border))" : "var(--border)")}`, background: on ? A : "var(--panel)", color: on ? ON : "var(--text)", fontSize: 14.5, cursor: "pointer" }}>
+                    {fmtTime(t)}
+                    {best && !on && <span style={{ position: "absolute", top: -7, right: -5, background: A, color: ON, fontSize: 7.5, letterSpacing: 0.5, padding: "2px 4px", borderRadius: 5, fontWeight: 700 }}>BEST</span>}
+                  </button>
                 ); })}
-              </div>}
-        </>)}
+              </div>)}
+        </div>
+        <Perf />
+        <div style={{ padding: "8px 22px 22px", display: "flex", flexDirection: "column", gap: 10 }}>
+          <button disabled={busy || newDate == null || newSlot == null} onClick={submitReschedule} style={{ ...goBtn, background: (newDate != null && newSlot != null) ? A : "var(--border)", color: (newDate != null && newSlot != null) ? ON : "var(--faint)", boxShadow: "none" }}>{busy ? "Saving…" : "Confirm new time"}</button>
+          <button onClick={() => { setPhase("view"); setNewDate(null); setNewSlot(null); }} style={ghostBtn}>Back to my appointment</button>
+        </div>
       </div>
-      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-        <button onClick={() => { setPhase("view"); setNewDate(null); setNewSlot(null); }} style={{ ...ghostBtn, flex: 1, width: "auto" }}>Back</button>
-        <button disabled={busy || newDate == null || newSlot == null} onClick={submitReschedule} style={{ flex: 1, background: (newDate != null && newSlot != null) ? "var(--gold)" : "var(--border2)", color: (newDate != null && newSlot != null) ? "var(--on-gold)" : "var(--faint)", border: "none", padding: 14, borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>{busy ? "Saving…" : "Confirm new time"}</button>
-      </div>
+      <div style={{ textAlign: "center", fontSize: 12, color: "var(--sub)", marginTop: 16 }}>Showing your real availability.</div>
     </Shell>
   );
 
   return (
     <Shell>
-      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>Your appointment</div>
-      <div style={card}>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, lineHeight: 1.15 }}>{appt.serviceName || appt.title}</div>
-        {addonsStr && <div style={{ color: "var(--sub)", fontSize: 13.5, marginTop: 4 }}>{addonsStr}</div>}
-        <div style={{ height: 1, background: "var(--line)", margin: "16px 0" }} />
-        <Row2 k="When" v={<>{when.date}<br /><span style={{ color: "var(--sub)", fontWeight: 400 }}>{when.time}</span></>} />
-        <Row2 k="With" v={prov ? prov.name : "your barber"} />
-        <Row2 k="Where" v={<>{business.name}<br /><span style={{ color: "var(--sub)", fontWeight: 400 }}>{[business.address, business.address2].filter(Boolean).join(", ")}</span></>} />
+      <div style={ticketBox}>
+        <Band />
+        <div style={{ padding: "24px 24px 20px" }}>
+          <div style={{ fontSize: 10.5, letterSpacing: 2.5, color: A, fontWeight: 600, textTransform: "uppercase", marginBottom: 18, display: "flex", alignItems: "center", gap: 8 }}>
+            <span>Your chair is reserved</span>
+            <span style={{ flex: 1, height: 1, background: "linear-gradient(90deg, color-mix(in srgb, var(--gold) 35%, transparent), transparent)" }} />
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 11, marginBottom: 3 }}>
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 46, fontWeight: 500, lineHeight: 0.95, letterSpacing: -1 }}>{heroHM}</span>
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: "var(--sub)" }}>{heroAP}</span>
+          </div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", letterSpacing: 0.3, marginBottom: 20 }}>{when.date}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, lineHeight: 1.12 }}>{appt.serviceName || appt.title}</div>
+          {addonsStr && <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 14.5, color: A, marginTop: 5 }}>{addonsStr}</div>}
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 16, fontSize: 14.5 }}>
+            <span style={{ width: 26, height: 26, borderRadius: "50%", background: A, color: ON, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif" }}>{(prov ? prov.name : "?").trim().charAt(0).toUpperCase()}</span>
+            <span>with <b>{prov ? prov.name : "your barber"}</b></span>
+          </div>
+        </div>
+        <Perf />
+        <div style={{ padding: "6px 24px 24px" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 18 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={A} strokeWidth="2" style={{ flexShrink: 0, marginTop: 2 }}><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>
+            <div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{business.name}</div>
+              <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 1 }}>{[business.address, business.address2].filter(Boolean).join(", ")}</div>
+            </div>
+          </div>
+          {changeable ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button onClick={() => { setPhase("resched"); setNewDate(null); setNewSlot(null); }} style={goBtn}>Reschedule</button>
+              <button onClick={() => setPhase("cancel")} style={ghostBtn}>Cancel this appointment</button>
+            </div>
+          ) : (
+            <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, textAlign: "center" }}>
+              This appointment is less than {windowHrs} hours away, so it can't be changed online. Please call us and we'll help.
+            </div>
+          )}
+          {refCode && <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px dotted var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 10, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase" }}>Confirmation</span>
+            <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 12.5, letterSpacing: 1, color: "var(--sub)" }}>{refCode}</span>
+          </div>}
+        </div>
       </div>
-      {changeable ? (
-        <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 11 }}>
-          <button onClick={() => { setPhase("resched"); setNewDate(null); setNewSlot(null); }} style={goBtn}>Reschedule</button>
-          <button onClick={() => setPhase("cancel")} style={{ width: "100%", background: "transparent", color: "#B5564B", border: "none", padding: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>Cancel appointment</button>
-          <div style={{ textAlign: "center", fontSize: 12, color: "var(--sub)", marginTop: 2 }}>Free to change or cancel up to {windowHrs} hours before.</div>
-        </div>
-      ) : (
-        <div style={{ marginTop: 18, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, textAlign: "center" }}>
-          This appointment is less than {windowHrs} hours away, so it can't be changed online. Please call us and we'll help.
-        </div>
-      )}
+      {changeable && <div style={{ textAlign: "center", fontSize: 12, color: "var(--sub)", marginTop: 16 }}>Free to change up to {windowHrs} hours before.</div>}
     </Shell>
   );
 }
