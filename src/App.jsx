@@ -2002,16 +2002,21 @@ function LocationChooser({ shopId, locations, business }) {
         <div style={{ fontSize: 15, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 26 }}>{(business && business.name) ? `Where would you like to book with ${business.name}?` : "Where would you like to book?"}</div>
         <div style={{ display: "grid", gap: 12 }}>
           {(locations || []).map((l) => (
-            <button key={l.shop_id} className="lift" onClick={() => pick(l.shop_id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "20px 18px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, cursor: "pointer", textAlign: "left" }}>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.shop_name || l.shop_id}</div>
-                <div style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2 }}>Tap to book here</div>
-              </div>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-            </button>
+            <div key={l.shop_id} className="lift" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+              <button onClick={() => pick(l.shop_id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "18px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.shop_name || l.shop_id}</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{[l.address, l.city_zip].filter(Boolean).join(", ") || "Tap to book here"}</div>
+                </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
+              {(l.address || l.city_zip) && (
+                <a href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent([l.shop_name, l.address, l.city_zip].filter(Boolean).join(" "))} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ display: "block", padding: "11px 18px", borderTop: "1px solid var(--line)", fontSize: 13, fontWeight: 600, color: "var(--gold)", fontFamily: FONT_BODY, textDecoration: "none" }}>Get directions →</a>
+              )}
+            </div>
           ))}
         </div>
       </div>
