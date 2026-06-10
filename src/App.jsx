@@ -3355,7 +3355,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {cards.map(({ p, next }) => (
                   <div key={p.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
-                    <button className="lift" onClick={() => commitWith(p, next)} style={{ width: "100%", display: "flex", alignItems: "stretch", background: "transparent", border: "none", padding: 0, color: "var(--text)", textAlign: "left" }}>
+                    <button className="lift" onClick={() => commitWith(p, next)} style={{ width: "100%", display: "flex", alignItems: "stretch", background: "transparent", boxShadow: "none", border: "none", padding: 0, color: "var(--text)", textAlign: "left" }}>
                       <div style={{ width: 92, flexShrink: 0, overflow: "hidden", background: "var(--panel2)", position: "relative" }}>
                         <img src={imgUrl(staffPhoto(p), 280)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                       </div>
@@ -4384,7 +4384,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
               ) : changeable ? (
                 <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
                   <button className="lift" onClick={() => { setReschedId(a.id); setNewDate(null); setNewSlot(null); }} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 15, letterSpacing: 1, fontWeight: 500, borderRadius: 8 }}>Reschedule</button>
-                  <button className="lift" onClick={() => setCancelId(a.id)} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 13, fontSize: 15, letterSpacing: 1, borderRadius: 8 }}>Cancel</button>
+                  <button className="lift" onClick={() => setCancelId(a.id)} style={{ flex: 1, background: "transparent", boxShadow: "none", border: "1px solid var(--border)", color: "var(--sub)", padding: 13, fontSize: 15, letterSpacing: 1, borderRadius: 8 }}>Cancel</button>
                 </div>
               ) : (
                 <div style={{ marginTop: 16, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "13px 15px", fontSize: 15, color: "var(--sub)", lineHeight: 1.5 }}>
@@ -7766,7 +7766,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       {!editMode && (
         <>
           <button className="lift" onClick={openNew} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Plus size={18} /> Add a service</button>
-          <button onClick={addCategory} className="lift" style={{ display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "1px dashed var(--border2)", color: "var(--gold)", padding: "13px 16px", borderRadius: 13, fontSize: 15, width: "100%", justifyContent: "center", fontWeight: 500 }}><Plus size={17} /> New category</button>
+          <button onClick={addCategory} className="lift" style={{ display: "flex", alignItems: "center", gap: 8, background: "transparent", boxShadow: "none", border: "1px dashed var(--border2)", color: "var(--gold)", padding: "13px 16px", borderRadius: 13, fontSize: 15, width: "100%", justifyContent: "center", fontWeight: 500 }}><Plus size={17} /> New category</button>
         </>
       )}
     </div>
@@ -8467,7 +8467,7 @@ function PhoneNumbersEditor({ phones, onChange }) {
           <input value={p.number} onChange={(e) => setPhone(p.id, { number: e.target.value })} placeholder="(555) 000-0000" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
         </div>
       ))}
-      <button className="lift" onClick={addPhone} style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 12, padding: 14, fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add phone number</button>
+      <button className="lift" onClick={addPhone} style={{ width: "100%", background: "transparent", boxShadow: "none", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 12, padding: 14, fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add phone number</button>
     </div>
   );
 }
@@ -8505,7 +8505,7 @@ function CheckoutSettingsEditor({ c, onChange }) {
             <button onClick={() => removeMethod(i)} style={{ background: "none", color: "var(--faint)", padding: "0 4px" }}><Trash2 size={16} /></button>
           </div>
         ))}
-        <button className="lift" onClick={addMethod} style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 10, padding: 11, fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 4 }}><Plus size={15} /> Add method</button>
+        <button className="lift" onClick={addMethod} style={{ width: "100%", background: "transparent", boxShadow: "none", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 10, padding: 11, fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 4 }}><Plus size={15} /> Add method</button>
       </Card>
 
       <div style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginBottom: 14, padding: "0 4px" }}>Tip buttons & options are set in <strong style={{ color: "var(--sub)" }}>Payments & Checkout → Tipping</strong>.</div>
@@ -8603,7 +8603,7 @@ function RunningLateEditor({ r, onChange }) {
               <button onClick={() => removeRange(i)} style={{ background: "none", color: "var(--faint)", padding: "0 4px" }}><Trash2 size={16} /></button>
             </div>
           ))}
-          <button className="lift" onClick={addRange} style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 10, padding: 11, fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 4 }}><Plus size={15} /> Add option</button>
+          <button className="lift" onClick={addRange} style={{ width: "100%", background: "transparent", boxShadow: "none", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 10, padding: 11, fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 4 }}><Plus size={15} /> Add option</button>
         </div>
 
         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
@@ -8981,7 +8981,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>Import complete</div>
           <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>{result.clients} clients{result.reused ? ` (${result.reused} already on file)` : ""} and {result.appts} appointments are in your book{result.failed ? " — some rows didn't save, see toast." : "."}</div>
           <button onClick={undo} style={{ width: "100%", background: "transparent", border: "1px solid color-mix(in srgb, #c0392b 40%, var(--border))", color: "var(--text)", padding: 13, fontSize: 14, borderRadius: 10, marginBottom: 10 }}>Undo this import</button>
-          <button className="lift" onClick={reset} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 14.5, fontWeight: 500, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><RefreshCw size={16} /> Import another file</button>
+          <button className="lift" onClick={reset} style={{ width: "100%", background: "transparent", boxShadow: "none", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 14.5, fontWeight: 500, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><RefreshCw size={16} /> Import another file</button>
         </div>
       )}
     </div>
@@ -14800,7 +14800,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                           </div>
                         ))}
                         {Array.from({ length: Math.max(1, 3 - (client.gallery || []).length) }).map((_, i) => (
-                          <button key={"wuadd" + i} className="lift" onClick={() => wuFileRef.current && wuFileRef.current.click()} style={{ width: 64, height: 64, borderRadius: 12, border: `1.5px dashed ${T.faint}`, background: "none", color: T.accent, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+                          <button key={"wuadd" + i} className="lift" onClick={() => wuFileRef.current && wuFileRef.current.click()} style={{ width: 64, height: 64, borderRadius: 12, border: `1.5px dashed ${T.faint}`, background: "none", boxShadow: "none", color: T.accent, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
                             <Plus size={20} /> Add
                           </button>
                         ))}
@@ -15818,7 +15818,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
               </div>
             </div>
           ) : (
-            <button onClick={() => setAddMemberOpen(true)} className="lift" style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add family member</button>
+            <button onClick={() => setAddMemberOpen(true)} className="lift" style={{ width: "100%", background: "transparent", boxShadow: "none", border: "1px dashed var(--border2)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add family member</button>
           )}
         </div>
       )}
