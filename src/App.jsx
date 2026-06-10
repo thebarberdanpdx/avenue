@@ -13246,7 +13246,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     }
   }, []);
 
-  const setStatus = (id, status, msg) => { const freed = appts.find((a) => a.id === id); setAppts(appts.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); setTimeout(() => handleFreedSlot(freed), 350); } };
+  const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts(appts.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } setTimeout(() => handleFreedSlot(freed), 350); } };
   // open checkout instead of silently completing
   const startCheckout = (appt) => { setOpen(null); setCheckout(appt); };
   const finishCheckout = (id, summary) => {
@@ -15397,6 +15397,8 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
 function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, onOpenClient, showToast }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [cancelNotify, setCancelNotify] = useState(false);
   const [checkinOpen, setCheckinOpen] = useState(false); // CHECK-IN pill dropdown (In Lobby / In Service)
   // Desktop dialog detection. Driven by JS (not a CSS media query) so it's reliable
   // across PWA/standalone contexts, and re-evaluates on resize so it stays correct
@@ -16022,10 +16024,30 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   <Divider T={T} />
                   <div style={{ padding: "6px 16px 4px", fontSize: 13, letterSpacing: 1.2, color: T.faint }}>SET STATUS</div>
                   {APPT_STATUSES.filter((s) => s.id !== "done").map((s) => (
-                    <button key={s.id} onClick={() => { onSetStatus(appt.id, s.id, `Marked ${s.label.toLowerCase()}.`); setMenuOpen(false); if (s.id === "no-show" && canEditPrice && savedCard) setChargeOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", background: appt.status === s.id ? T.chip : "none", color: T.text, fontSize: 15.5, textAlign: "left" }}>
+                    <button key={s.id} onClick={() => { if (s.id === "cancelled") { setMenuOpen(false); setCancelNotify(false); setCancelConfirm(true); return; } onSetStatus(appt.id, s.id, `Marked ${s.label.toLowerCase()}.`); setMenuOpen(false); if (s.id === "no-show" && canEditPrice && savedCard) setChargeOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", background: appt.status === s.id ? T.chip : "none", color: T.text, fontSize: 15.5, textAlign: "left" }}>
                       <span style={{ width: 12, height: 12, borderRadius: "50%", background: s.dot }} /> {s.label}
                     </button>
                   ))}
+                </div>
+              </>
+            )}
+
+            {cancelConfirm && (
+              <>
+                <div onClick={() => setCancelConfirm(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 20px 20px", boxSizing: "border-box" }}>
+                  <div className="fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 811, padding: 24 }}>
+                    <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, marginBottom: 4, color: T.text }}>Cancel this appointment?</div>
+                    <div style={{ fontSize: 14, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>{(appt.name || "This client")}'s {appt.serviceName || appt.title || "appointment"} will be marked cancelled and the slot freed.</div>
+                    <div onClick={() => setCancelNotify((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: T.chip, border: `1px solid ${T.line}`, borderRadius: 13, padding: "12px 14px", marginBottom: 18, cursor: "pointer" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>Notify the client</div>
+                        <div style={{ fontSize: 13, color: cancelNotify ? "var(--gold)" : T.sub, marginTop: 2 }}>{cancelNotify ? "We'll send them the cancellation message" : "They won't be told unless you turn this on"}</div>
+                      </div>
+                      <span role="switch" aria-checked={cancelNotify} style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: cancelNotify ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: cancelNotify ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
+                    </div>
+                    <button className="lift" onClick={() => { onSetStatus(appt.id, "cancelled", "Appointment cancelled.", cancelNotify); setCancelConfirm(false); }} style={{ width: "100%", background: "#B5564B", color: "#fff", border: "none", padding: "15px 0", borderRadius: 14, fontSize: 15.5, fontWeight: 600, cursor: "pointer" }}>Cancel appointment</button>
+                    <button onClick={() => setCancelConfirm(false)} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: T.sub, fontSize: 14.5, padding: 8, cursor: "pointer" }}>Keep it</button>
+                  </div>
                 </div>
               </>
             )}
