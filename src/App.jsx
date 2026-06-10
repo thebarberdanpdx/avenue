@@ -1138,14 +1138,15 @@ function App() {
       // the client list. (The in-code demo seed is also cleared for the public view by that effect.)
       // Appointments load moved to the session-keyed effect below: the public reads TIMES ONLY via
       // get_availability (no names/phones); signed-in staff load the full appointment rows.
-      const wl = await loadList('waitlist');     if (wl !== null) setWaitlist(wl);
-      // Providers & services: keep the in-code defaults if nothing's saved yet (the app needs them to function).
-      const pr = await loadList('providers');    if (pr && pr.length) setProviders(pr);
+      // Waitlist holds clients' phone numbers, so it loads ONLY for signed-in staff (session effect below).
+      // Providers load via a sanitized public feed (no PINs/emails/phones); staff reload full rows below.
+      let pr = null;
+      try { const rp = await supabase.rpc('get_public_providers', { p_shop: SHOP_ID }); if (rp.error) { allLoaded = false; console.error('[vero] load providers failed:', rp.error); } else if (Array.isArray(rp.data)) pr = rp.data; } catch (e) { allLoaded = false; }
+      if (pr && pr.length) setProviders(pr);
       const sv = await loadList('services');     if (sv) sv.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9)); if (sv && sv.length) setServices(sv);
 
       // Record the loaded baseline so the safe-delete reconciliation knows which rows this device
       // already knew about (so it never deletes a row another device adds later).
-      if (wl !== null) lastRemoteRef.current.waitlist = wl;
       if (pr && pr.length) lastRemoteRef.current.providers = pr;
       if (sv && sv.length) lastRemoteRef.current.services = sv;
 
@@ -1219,6 +1220,20 @@ function App() {
     if (session) return;
     let alive = true;
     (async () => { try { const { data } = await supabase.rpc("get_account_locations", { p_shop_id: SHOP_ID }); if (alive && Array.isArray(data)) setAcctLocs(data); } catch (e) {} })();
+    return () => { alive = false; };
+  }, [session]);
+
+  // Full barber records (with PINs) and the waitlist (client phone numbers) load ONLY for signed-in
+  // staff — overwriting the sanitized public baseline. For public visitors the waitlist stays empty.
+  useEffect(() => {
+    if (!session) { lastRemoteRef.current.waitlist = []; setWaitlist([]); return; }
+    let alive = true;
+    (async () => {
+      const pr = await supabase.from('providers').select('data').eq('shop_id', SHOP_ID);
+      if (alive && !pr.error && Array.isArray(pr.data)) { const list = pr.data.map((r) => r.data); lastRemoteRef.current.providers = list; if (list.length) setProviders(list); }
+      const wl = await supabase.from('waitlist').select('data').eq('shop_id', SHOP_ID);
+      if (alive && !wl.error && Array.isArray(wl.data)) { const list = wl.data.map((r) => r.data); lastRemoteRef.current.waitlist = list; setWaitlist(list); }
+    })();
     return () => { alive = false; };
   }, [session]);
 
