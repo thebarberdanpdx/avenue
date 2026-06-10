@@ -12157,6 +12157,71 @@ function CreatePopover({ slot, providerName, onAppt, onBlock, onClose }) {
 }
 
 // ============================================================
+// TIME BLOCK — centered detail window (label · duration · repeat)
+// ============================================================
+function TimeBlockSheet({ providerName, dateLabel, startLabel, onClose, onConfirm }) {
+  const [label, setLabel] = useState("");
+  const [dur, setDur] = useState(30);
+  const [custom, setCustom] = useState(false);
+  const [customMin, setCustomMin] = useState("60");
+  const [repeat, setRepeat] = useState(false);
+  const DURS = [15, 30, 45, 60];
+  const finalDur = custom ? Math.max(5, parseInt(customMin, 10) || 30) : dur;
+  const submit = () => onConfirm({ label: label.trim(), durMin: finalDur, repeat });
+
+  const fl = { display: "block", fontSize: 12, letterSpacing: 0.4, color: "var(--sub)", fontWeight: 600, margin: "0 0 8px" };
+  const inputStyle = { width: "100%", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", outline: "none" };
+
+  return (
+    <div onClick={onClose} className="fade-in" style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 80, display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, boxShadow: "var(--shadow-lg)", overflow: "hidden", animation: "popIn .2s var(--ease) both" }}>
+        <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 500, fontSize: 19 }}>Block off time</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--faint)", fontSize: 22, lineHeight: 1, padding: 0 }}>&times;</button>
+        </div>
+        <div style={{ padding: "18px 20px 20px" }}>
+          <div style={{ fontSize: 12.5, color: "var(--sub)", margin: "0 0 16px" }}>{providerName} · {dateLabel} · starts {startLabel}</div>
+
+          <label style={fl}>WHAT'S IT FOR? <span style={{ color: "var(--faint)", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span></label>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Lunch, break, errand…" style={inputStyle} />
+
+          <div style={{ marginTop: 18 }}>
+            <label style={fl}>HOW LONG</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {DURS.map((d) => {
+                const on = !custom && dur === d;
+                return (
+                  <button key={d} onClick={() => { setCustom(false); setDur(d); }} style={{ padding: "9px 14px", borderRadius: 10, border: on ? "1px solid var(--gold)" : "1px solid var(--border)", background: on ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "transparent", color: on ? "var(--text)" : "var(--sub)", fontSize: 13, fontWeight: 500, fontFamily: FONT_BODY }}>{d < 60 ? d + "m" : "1h"}</button>
+                );
+              })}
+              <button onClick={() => setCustom(true)} style={{ padding: "9px 14px", borderRadius: 10, border: custom ? "1px solid var(--gold)" : "1px solid var(--border)", background: custom ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "transparent", color: custom ? "var(--text)" : "var(--sub)", fontSize: 13, fontWeight: 500, fontFamily: FONT_BODY }}>Custom</button>
+            </div>
+            {custom && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+                <input value={customMin} onChange={(e) => setCustomMin(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" style={{ ...inputStyle, width: 90 }} />
+                <span style={{ fontSize: 13.5, color: "var(--sub)" }}>minutes</span>
+              </div>
+            )}
+          </div>
+
+          <div onClick={() => setRepeat((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 14px", marginTop: 16, cursor: "pointer" }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>Repeat weekly</div>
+              <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>Same time every week</div>
+            </div>
+            <div style={{ width: 42, height: 25, borderRadius: 13, background: repeat ? "var(--gold)" : "var(--border)", position: "relative", flexShrink: 0, transition: "background .15s" }}>
+              <i style={{ position: "absolute", top: 3, left: repeat ? 20 : 3, width: 19, height: 19, borderRadius: "50%", background: repeat ? "#fff" : "var(--faint)", transition: "left .15s" }} />
+            </div>
+          </div>
+
+          <button onClick={submit} className="lift" style={{ width: "100%", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 14.5, fontWeight: 600, background: "var(--gold)", color: "var(--on-gold)", fontFamily: FONT_BODY, marginTop: 20 }}>Block it off</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // NEW APPOINTMENT — pick client + service, then book (full page)
 // ============================================================
 function NewAppointmentForm({ slot, providers, clients, services, appts, selectedDate, onClose, onBook, onBlock, onPickDate }) {
@@ -12575,6 +12640,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const [notifyMove, setNotifyMove] = useState(false); // drag-move: text the client the new time (default off/silent)
   const [createSlot, setCreateSlot] = useState(null); // { providerId, start } long-press to create
   const [newApptSlot, setNewApptSlot] = useState(null); // { providerId, start } → opens the pick-client+service form
+  const [blockSlot, setBlockSlot] = useState(null); // { providerId, start } → opens the time-block detail window
   const [pressInd, setPressInd] = useState(null); // { providerId, start, y } live indicator while holding
   const [checkout, setCheckout] = useState(null); // appt being checked out
   const [showDatePicker, setShowDatePicker] = useState(false); // month-grid date jumper triggered by tapping the date header
@@ -12960,13 +13026,27 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       setCreateSlot(null);
       return;
     }
-    const dur = 30;
-    const id = "b" + Date.now() + Math.floor(Math.random() * 1000);
-    const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(start / 60), start % 60, 0, 0);
-    const newAppt = { id, providerId, clientId: null, serviceId: null, start, end: start + dur, bookedFor: bookedFor.toISOString(), status: "block", vip: false, name: "Time Block", title: "Blocked", detail: "" };
-    setAppts((cur) => [...cur, newAppt]);
+    // "Block off time" → open the detail window at eye level (label · duration · repeat)
+    setBlockSlot({ providerId, start });
     setCreateSlot(null);
-    showToast(`Time block added at ${fmtTime(start)}.`);
+  };
+
+  // Commit a time block from the detail window — one block, or a weekly series if repeat is on.
+  const confirmBlock = ({ label, durMin, repeat }) => {
+    if (!blockSlot) return;
+    const { providerId, start } = blockSlot;
+    const base = new Date(selectedDate);
+    const seriesId = repeat ? "s" + Date.now() + Math.floor(Math.random() * 1e6) : null;
+    const mk = (d, i) => {
+      const bf = new Date(d); bf.setHours(Math.floor(start / 60), start % 60, 0, 0);
+      return { id: "b" + Date.now() + "_" + i + "_" + Math.floor(Math.random() * 1e6), providerId, clientId: null, serviceId: null, start, end: start + durMin, bookedFor: bf.toISOString(), status: "block", vip: false, name: label || "Time Block", title: label || "Blocked", detail: "", repeat: repeat ? "weekly" : undefined, seriesId: seriesId || undefined };
+    };
+    const weeks = repeat ? 12 : 1;
+    const blocks = [];
+    for (let i = 0; i < weeks; i++) { const d = new Date(base); d.setDate(d.getDate() + i * 7); blocks.push(mk(d, i)); }
+    setAppts((cur) => [...cur, ...blocks]);
+    setBlockSlot(null);
+    showToast(repeat ? `${label || "Time block"} set to repeat weekly.` : `Blocked off at ${fmtTime(start)}.`);
   };
 
   // The actual save — runs after conflict has been resolved (no conflict, or provider chose to keep both).
@@ -13569,11 +13649,20 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onPickDate={(d) => { const t0 = new Date(); t0.setHours(0, 0, 0, 0); const tg = new Date(d); tg.setHours(0, 0, 0, 0); setDayOffset(Math.round((tg - t0) / 86400000)); }}
           onBook={bookAppt}
           onBlock={({ providerId, start }) => {
-            const id = Math.max(0, ...appts.map((a) => a.id)) + 1;
-            setAppts((cur) => [...cur, { id, providerId, clientId: null, serviceId: null, start, end: start + 30, status: "block", vip: false, name: "Time Block", title: "Blocked", detail: "" }]);
+            // hand off to the detail window instead of dropping a bare block
             setNewApptSlot(null);
-            showToast(`Time block added at ${fmtTime(start)}.`);
+            setBlockSlot({ providerId, start });
           }}
+        />
+      )}
+
+      {blockSlot && (
+        <TimeBlockSheet
+          providerName={(providers.find((p) => p.id === blockSlot.providerId) || {}).name || "Barber"}
+          dateLabel={selectedDate.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+          startLabel={fmtTime(blockSlot.start)}
+          onClose={() => setBlockSlot(null)}
+          onConfirm={confirmBlock}
         />
       )}
 
