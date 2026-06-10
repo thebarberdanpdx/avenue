@@ -7490,7 +7490,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     </div>
   );
   const SaveBar = () => (
-    <button className="lift" onClick={save} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 600, borderRadius: 13, boxShadow: "var(--glow)", marginTop: 26 }}>SAVE SERVICE</button>
+    <button className="lift" onClick={save} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 16, fontWeight: 600, borderRadius: 13, boxShadow: "var(--glow)", marginTop: 26 }}>Save service</button>
   );
   // Toggle now uses the global <Toggle> (50×29) — local duplicate removed for consistency.
 
@@ -8046,16 +8046,16 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, paddingLeft: 4 }}>{libForm.label || "Edit style"}</h2>
             <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20, paddingLeft: 4 }}>Edit this style once. When you save, the name, description and photo update on every service that uses it. Each service keeps its own price and time.</p>
             <div style={{ background: "var(--panel)", borderRadius: 16, padding: 20, border: "1px solid var(--border)" }}>
-              <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>PHOTO</div>
+              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>Photo</div>
               <button onClick={() => setLibPicker(true)} className="lift" style={{ width: "100%", height: 150, borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, padding: 0, marginBottom: 8 }}>
                 {libForm.images && libForm.images[0] ? <img src={imgUrl(libForm.images[0], 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} /><span style={{ fontSize: 15 }}>Add a photo (library or upload)</span></>}
               </button>
               {libForm.images && libForm.images.length > 0 && <button onClick={() => setLibForm((f) => ({ ...f, images: [] }))} style={{ background: "none", color: "var(--gold)", fontSize: 14, marginBottom: 16 }}>Remove photo</button>}
-              <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8, marginTop: 8 }}>NAME</div>
+              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8, marginTop: 8 }}>Name</div>
               <input value={libForm.label || ""} onChange={(e) => setLibForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Skin Fade" style={{ ...inputStyle, fontSize: 17, padding: "16px 16px", marginBottom: 16 }} />
-              <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>DESCRIPTION</div>
+              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>Description</div>
               <textarea value={libForm.desc || ""} onChange={(e) => setLibForm((f) => ({ ...f, desc: e.target.value }))} placeholder="Shown to clients under the name" rows={6} style={{ ...inputStyle, fontSize: 16, padding: "14px 16px", resize: "vertical", minHeight: 150, lineHeight: 1.55 }} />
-              <div style={{ fontSize: 15, letterSpacing: 2, color: "var(--faint)", marginBottom: 8, marginTop: 18 }}>CALENDAR COLOR</div>
+              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8, marginTop: 18 }}>Calendar color</div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <button onClick={() => setLibForm((f) => ({ ...f, color: null }))} title="No color — use the service's color" style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", border: !libForm.color ? "2px solid var(--text)" : "2px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!libForm.color && <Check size={15} style={{ color: "var(--text)" }} />}</button>
                 {SERVICE_PALETTE.map((c) => { const on = libForm.color === c.id; return (
