@@ -2450,16 +2450,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     // Public booking: the slot is never held while saving, and the client is only told they're booked
     // once the server actually has it — so a failed save can never become a ghost booking.
     setBooking(true); setBookErr(false);
-    const apptRows = newAppts.map((a) => ({ id: String(a.id), shop_id: shopId, data: a }));
-    const writes = [];
-    if (newClientRow) writes.push(supabase.from('clients').insert(newClientRow));
-    writes.push(supabase.from('appointments').insert(apptRows));
-    Promise.all(writes).then((results) => {
-      setBooking(false);
-      if (results.some((r) => r && r.error)) { setBookErr(true); return; } // nothing was held, nothing lost — they can just tap again
-      setAppts((cur) => [...cur, ...newAppts]);
-      setBookedId(baseId); setStep(8);
-    }).catch(() => { setBooking(false); setBookErr(true); });
+    supabase.rpc('book_public', { p_shop: shopId, p_client: newClientRow ? newClientRow.data : null, p_appts: newAppts })
+      .then(({ error }) => {
+        setBooking(false);
+        if (error) { setBookErr(true); return; } // nothing was held, nothing lost — they can just tap again
+        setAppts((cur) => [...cur, ...newAppts]);
+        setBookedId(baseId); setStep(8);
+      }).catch(() => { setBooking(false); setBookErr(true); });
   };
 
   return (
@@ -3949,7 +3946,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       if (!ready) return;
                       const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: wlName, phone, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", when: wlWhen, service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() };
                       setWaitlist((cur) => [...cur, wlEntry]);
-                      if (!isStaff) { try { supabase.from('waitlist').insert({ id: wlEntry.id, shop_id: shopId, data: wlEntry }); } catch (e) {} }
+                      if (!isStaff) { try { supabase.rpc('join_waitlist', { p_shop: shopId, p_entry: wlEntry }); } catch (e) {} }
                       setWaitlistDone(true); setShowWaitlist(false);
                     }} style={{ width: "100%", background: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--gold)" : "var(--border2)", color: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
                   </div>
