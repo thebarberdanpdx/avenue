@@ -505,12 +505,18 @@ const THEMES = [
     disp: "'Jost', sans-serif", body: "'Inter', sans-serif", grain: 0.06,
     canvas: "linear-gradient(176deg,#1C2024,#141719)",
     t: { bg:"#16181B", panel:"#21262B", panel2:"#282E34", line:"#323941", border:"#39414A", border2:"#515A64", text:"#EDF1F4", text2:"#CDD4DA", sub:"#8B939B", faint:"#565E66", gold:"#9FB4C4", onGold:"#12171B", shadow:"rgba(0,0,0,.55)", overlay:"rgba(8,10,12,0.8)" } },
+  { id: "electric", name: "Electric", tagline: "Neon dusk", cat: "Dark", dark: true,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.05,
+    canvas: "radial-gradient(62% 48% at 14% 6%,rgba(124,92,255,.34),transparent 58%),radial-gradient(58% 46% at 92% 96%,rgba(255,92,157,.26),transparent 60%),#100B18",
+    grad: "linear-gradient(135deg,#7C5CFF 0%,#FF5C9D 100%)",
+    t: { bg:"#100B18", panel:"#181226", panel2:"#201733", line:"#2A2140", border:"#322748", border2:"#473860", text:"#F4F1FB", text2:"#D8D2EC", sub:"#B6B0CC", faint:"#7E7791", gold:"#8C6BFF", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.6)", overlay:"rgba(8,5,16,0.82)" } },
 ];
 const THEME_CATS = ["Light", "Dark"];
 const THEME_IDS = THEMES.map((t) => t.id);
 const buildThemeCSS = () => THEMES.map((th) => {
   const v = th.t;
-  return `.theme-${th.id}{--bg:${v.bg};--canvas:${th.canvas || v.bg};--grain:${th.grain || 0};--grain-blend:${th.dark ? "overlay" : "multiply"};--panel:${v.panel};--panel2:${v.panel2};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--on-gold:${v.onGold};--shadow:${v.shadow};--overlay:${v.overlay};--font-disp:${th.disp};--font-body:${th.body};}`;
+  const grad = th.grad || `linear-gradient(135deg,${v.gold},${v.gold})`;
+  return `.theme-${th.id}{--bg:${v.bg};--canvas:${th.canvas || v.bg};--grain:${th.grain || 0};--grain-blend:${th.dark ? "overlay" : "multiply"};--panel:${v.panel};--panel2:${v.panel2};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--gold-grad:${grad};--on-gold:${v.onGold};--shadow:${v.shadow};--overlay:${v.overlay};--font-disp:${th.disp};--font-body:${th.body};}`;
 }).join("\n");
 
 // Portal: render full-screen overlays. Without react-dom we can't truly portal,
@@ -6675,6 +6681,60 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
 // ============================================================
 // SHOP DASHBOARD — adds Menu editor + Settings
 // ============================================================
+// Location switcher — multi-location foundation. Reads the shops this signed-in user can
+// access via get_my_shops(); with 0 or 1 it renders just the shop name exactly as before
+// (a no-op for single-shop accounts). With more than one, the name becomes a tappable control
+// that opens a sheet to switch shops. Switching reloads the dashboard pointed at the chosen
+// shop (?shop=<id>), reusing the existing URL resolver — so the live data path is untouched.
+function LocationSwitcher({ current, fallbackName, authEmail }) {
+  const [shops, setShops] = useState([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabase.rpc("get_my_shops");
+        if (alive && Array.isArray(data)) setShops(data);
+      } catch (e) { /* any error -> stay single-shop */ }
+    })();
+    return () => { alive = false; };
+  }, [authEmail]);
+  const nameStyle = { fontFamily: "'Fraunces', serif", fontSize: 18, letterSpacing: 0.3, fontWeight: 500, color: "var(--text)" };
+  const cur = shops.find((s) => s.shop_id === current);
+  const displayName = (cur && cur.shop_name) || fallbackName;
+  const go = (id) => { try { const u = new URL(window.location.href); u.searchParams.set("shop", id); window.location.href = u.toString(); } catch (e) {} };
+  if (!Array.isArray(shops) || shops.length <= 1) {
+    return <div style={nameStyle}>{displayName}</div>;
+  }
+  return (
+    <div style={{ display: "contents" }}>
+      <button onClick={() => setOpen(true)} style={{ display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", padding: 0, cursor: "pointer", maxWidth: "62vw" }}>
+        <span style={{ ...nameStyle, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+      </button>
+      {open && (
+        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "64px 18px", zIndex: 120 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.45)" }}>
+            <div style={{ padding: "16px 18px 12px", fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Switch location</div>
+            {shops.map((s) => {
+              const on = s.shop_id === current;
+              return (
+                <button key={s.shop_id} onClick={() => { if (on) { setOpen(false); } else { go(s.shop_id); } }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "none", border: "none", borderTop: "1px solid var(--line)", cursor: "pointer", textAlign: "left" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.shop_name || s.shop_id}</div>
+                    <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>{s.account_name}{s.role === "owner" ? " · Owner" : ""}</div>
+                  </div>
+                  {on && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId }) {
   const [tab, setTab] = useState("pulse");
   const [activeClient, setActiveClient] = useState(null);
@@ -6799,7 +6859,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     <div style={{ position: "relative", minHeight: "100dvh" }}>
       <div style={{ borderBottom: "1px solid var(--line)", padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
         <button onClick={() => { if (pulseDetail) { setPulseDetail(null); return; } if (tab === "pulse" && !activeClient) { onExit(); return; } setActiveClient(null); setTab("pulse"); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontFamily: "'Jost', sans-serif" }}><ArrowLeft size={16} /> {pulseDetail ? "Pulse" : (tab === "pulse" && !activeClient ? "Home" : "Pulse")}</button>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, letterSpacing: 0.3, fontWeight: 500, color: "var(--text)" }}>{business.name}</div>
+        <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} />
         <div style={{ width: 50 }} />
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
