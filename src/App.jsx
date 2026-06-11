@@ -10,6 +10,19 @@ import {
 } from "lucide-react";
 
 // ============================================================
+// NATIVE SHELL DETECTION (Capacitor) vs the website.
+// On the website, relative "/api/..." calls reach Vercel as usual (API_BASE = "").
+// Inside the iOS/Android app there is no local server, so those calls must be
+// sent to the live site instead.
+// ============================================================
+const IS_NATIVE = typeof window !== "undefined" && (
+  window.location.protocol === "capacitor:" ||
+  window.location.protocol === "ionic:" ||
+  !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform())
+);
+const API_BASE = IS_NATIVE ? "https://gotvero.com" : "";
+
+// ============================================================
 // PHOTO LIBRARY — curated "looks" baked in for the prototype.
 // In the live product this becomes a live Unsplash/Pexels feed.
 // (Using Unsplash CDN URLs as stand-ins for the curated set.)
@@ -613,7 +626,7 @@ function getStripe() {
 }
 // Call our serverless Stripe function. Throws with a readable message on failure.
 async function stripeApi(payload) {
-  const r = await fetch("/api/stripe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  const r = await fetch(API_BASE + "/api/stripe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
   let data = {};
   try { data = await r.json(); } catch (e) {}
   if (!r.ok || data.error) throw new Error(data.error || `Request failed (${r.status})`);
@@ -953,7 +966,7 @@ function StaffLogin({ authReady, onBack }) {
           <>
             <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.5px", margin: "0 0 12px" }}>Check your email</h1>
             <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.55, margin: "0 0 16px" }}>We sent a 6-digit code and a sign-in link to <strong style={{ color: "var(--text)", fontWeight: 500 }}>{email.trim().toLowerCase()}</strong>. Enter the code below to sign in right here in the app.</p>
-            <input type="text" inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 8))} onKeyDown={(e) => { if (e.key === "Enter") verify(); }} placeholder="123456" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, padding: "16px 16px", color: "var(--text)", fontSize: 22, letterSpacing: 6, textAlign: "center", fontFamily: FONT_BODY, marginBottom: 12, boxSizing: "border-box" }} />
+            <input type="text" inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} onKeyDown={(e) => { if (e.key === "Enter") verify(); }} placeholder="123456" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, padding: "16px 16px", color: "var(--text)", fontSize: 22, letterSpacing: 6, textAlign: "center", fontFamily: FONT_BODY, marginBottom: 12, boxSizing: "border-box" }} />
             {err && <p style={{ color: "#c0392b", fontSize: 13.5, margin: "0 0 12px" }}>{err}</p>}
             <button className="lift" disabled={busy} onClick={verify} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: "17px 20px", fontSize: 16, fontWeight: 500, borderRadius: 16, border: "none", boxShadow: "var(--glow)", opacity: busy ? 0.6 : 1, cursor: busy ? "default" : "pointer", marginBottom: 14 }}>{busy ? "Signing in…" : "Sign in"}</button>
             <p style={{ color: "var(--faint)", fontSize: 13, fontWeight: 300, lineHeight: 1.5, margin: "0 0 16px" }}>On a computer you can also just tap the link in the email. Didn't get it? Check spam.</p>
@@ -1182,6 +1195,41 @@ function App() {
     return FALLBACK;
   };
   const SHOP_ID = resolveShopId();
+
+  // ---- PUSH NOTIFICATIONS (native app only): register this device for booking
+  // alerts and save its token against the signed-in staff user + shop, so the
+  // backend knows where to send. No-ops on the web and fails quietly everywhere.
+  useEffect(() => {
+    if (!IS_NATIVE || !session?.user?.id) return;
+    let active = true;
+    (async () => {
+      try {
+        const { PushNotifications } = await import("@capacitor/push-notifications");
+        let perm = await PushNotifications.checkPermissions();
+        if (perm.receive === "prompt" || perm.receive === "prompt-with-rationale") {
+          perm = await PushNotifications.requestPermissions();
+        }
+        if (!active || perm.receive !== "granted") return;
+        try { await PushNotifications.removeAllListeners(); } catch (e) {}
+        await PushNotifications.addListener("registration", async (token) => {
+          try {
+            await supabase.from("device_tokens").upsert({
+              token: token.value,
+              user_id: session.user.id,
+              shop_id: SHOP_ID,
+              platform: "ios",
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "token" });
+          } catch (e) { try { console.warn("[vero] save push token failed", e); } catch (_) {} }
+        });
+        await PushNotifications.addListener("registrationError", (err) => {
+          try { console.warn("[vero] push registration error", err); } catch (e) {}
+        });
+        await PushNotifications.register();
+      } catch (e) { try { console.warn("[vero] push setup skipped", e); } catch (_) {} }
+    })();
+    return () => { active = false; };
+  }, [session?.user?.id, SHOP_ID]);
   // Master ("All Locations") mode: turned on by the location switcher via ?master=1. SHOP_ID stays
   // a real shop in the background (harmless); when masterMode is on we render the account overview
   // instead of a single shop's dashboard.
@@ -2234,7 +2282,7 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject }) 
       locName: (business.multiLocation && business.locations && business.locations[0] && business.locations[0].name) || business.name || "",
       cancelUrl: (typeof window !== "undefined" && appt.manageToken) ? `${window.location.origin}/manage?t=${appt.manageToken}` : "",
     };
-    fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: m.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: subject || `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
+    fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: m.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: subject || `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
   } catch (e) {}
 }
 
@@ -4656,7 +4704,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
         locName: (business.multiLocation && business.locations && business.locations[0] && business.locations[0].name) || business.name || "",
         cancelUrl: typeof window !== "undefined" ? `${window.location.origin}/manage?t=${token}` : "",
       };
-      fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: m.channel || "email", to: { email: (a.email || "").trim(), phone: (a.phone || "").trim(), smsOptOut: false }, subject: `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
+      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: m.channel || "email", to: { email: (a.email || "").trim(), phone: (a.phone || "").trim(), smsOptOut: false }, subject: `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
     } catch (e) {}
   };
 
@@ -11812,7 +11860,7 @@ function HelpAssistant({ articles, onBack, onOpenArticle, supportHref }) {
     setMessages((m) => [...m, { role: "user", text: question }]);
     setLoading(true);
     try {
-      const res = await fetch("/api/help", {
+      const res = await fetch(API_BASE + "/api/help", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question, articles: articles.map((a) => ({ id: a.id, title: a.title, category: a.category, body: a.body })) }),
