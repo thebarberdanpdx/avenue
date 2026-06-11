@@ -2746,6 +2746,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         // Fire the booking confirmation (event-driven). Fire-and-forget — the booking already
         // succeeded on the server, so a send failure must never affect it.
         fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` });
+        // Alert staff devices (native app push). Fire-and-forget; never affects the booking.
+        try {
+          const ap0 = newAppts[0] || {};
+          const whenStr = ap0.bookedFor ? new Date(ap0.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+          fetch(API_BASE + "/api/push", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shopId, title: "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") }),
+          }).catch(() => {});
+        } catch (e) {}
         setBookedId(baseId); setStep(8);
       }).catch(() => { setBooking(false); setBookErr(true); });
   };
