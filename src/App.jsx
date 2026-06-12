@@ -8104,7 +8104,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
-        {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} /></ErrorBoundary>}
+        {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} onSignOutAccount={onSignOutAccount} authEmail={authEmail} /></ErrorBoundary>}
       </div>
 
       {/* fixed bottom tab bar — anchors to viewport bottom. transform:translateZ(0) puts it on its own GPU layer so iOS Safari doesn't let it drift during scroll/overscroll. */}
@@ -12565,7 +12565,7 @@ function MergeDuplicatesTool({ shopId, clients, setClients, appts, setAppts, sho
   );
 }
 
-function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary, shopId, setAppts, setClients, waitlist, setWaitlist }) {
+function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary, shopId, setAppts, setClients, waitlist, setWaitlist, onSignOutAccount, authEmail }) {
   // Fill in any missing top-level settings from the defaults so a sparse/older saved blob can't
   // crash a card that reads a nested field (a single absent key used to white-screen the whole page).
   const baseBiz = { ...DEFAULT_BUSINESS, ...(business || {}) };
@@ -13245,6 +13245,15 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         </span>
         <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
       </button>
+
+      {onSignOutAccount && (
+        <div style={{ marginTop: 14 }}>
+          {authEmail && <div style={{ fontSize: 12.5, color: "var(--faint)", textAlign: "center", marginBottom: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Signed in as {authEmail}</div>}
+          <button onClick={() => { if (typeof window !== "undefined" && window.confirm("Log out of this account?")) onSignOutAccount(); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "none", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 16px", color: "var(--sub)", fontSize: 14.5, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" }}>
+            <Lock size={16} style={{ color: "var(--sub)" }} /> Log out
+          </button>
+        </div>
+      )}
     </div>
   );
 }
