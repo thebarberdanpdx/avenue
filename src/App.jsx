@@ -12034,94 +12034,93 @@ function PhotoModeSetting({ mode, onChange }) {
 function WebsiteEditor({ w, onChange, business, theme, setTheme }) {
   const set = (k, v) => onChange({ [k]: v });
   const [logoPicker, setLogoPicker] = useState(false);
+  const [igOpen, setIgOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const ig = (w.instagram || "").replace(/^@/, "");
   const slug = (business?.name || "yourshop").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const veroUrl = `gotvero.com/${slug}`;
-  const fieldLabel = { fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 };
+  const liveUrl = w.customDomain ? w.customDomain : veroUrl;
+  const fieldLabel = { fontSize: 13, color: "var(--sub)", fontWeight: 500, margin: "16px 0 7px" };
   const input = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+  const btn = { background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 16px", color: "var(--text)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" };
   const openPreview = () => { if (typeof window !== "undefined") window.open(window.location.origin + window.location.pathname + "#preview", "_blank"); };
-
+  const copyLink = () => {
+    try { navigator.clipboard.writeText("https://" + liveUrl); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch (e) {}
+  };
+  const Card = ({ label, dim, children, right }) => (
+    <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", boxShadow: "var(--shadow-sm)", opacity: dim ? 0.7 : 1 }}>
+      {label && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}><span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>{label}</span>{right}</div>}
+      {children}
+    </div>
+  );
   return (
-    <div style={{ display: "grid", gap: 22 }}>
+    <div style={{ display: "grid", gap: 14 }}>
       {logoPicker && <PhotoPicker onClose={() => setLogoPicker(false)} onPick={(id) => set("logo", id)} />}
       <ToggleSetting label="Show my branded website" desc="Visitors to your booking link land on a clean, branded page — your name, services, hours, team, and a Book button — styled to your theme." on={w.enabled === true} onToggle={(v) => set("enabled", v)} />
 
       {w.enabled === true && (<>
-        {/* Live address + preview */}
-        <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel2))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "14px 16px" }}>
-          <div style={{ fontSize: 12.5, color: "var(--sub)", marginBottom: 4 }}>Your website is live at</div>
-          <div style={{ fontSize: 16, fontWeight: 500, color: "var(--gold)", wordBreak: "break-all", marginBottom: 12 }}>{w.customDomain ? w.customDomain : veroUrl}</div>
-          <button onClick={openPreview} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 16px", color: "var(--text)", fontSize: 14, fontWeight: 500 }}><Globe size={15} style={{ color: "var(--gold)" }} /> Preview my website</button>
-          <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 9, lineHeight: 1.5 }}>Opens your real site in a new tab. Save first to preview your latest changes.</p>
-        </div>
+        <Card label="Your address">
+          <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text)", wordBreak: "break-all", marginBottom: 12 }}>{liveUrl}</div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button onClick={openPreview} style={btn}>Preview my website</button>
+            <button onClick={copyLink} style={{ ...btn, color: copied ? "var(--gold)" : "var(--sub)" }}>{copied ? "Copied" : "Copy link"}</button>
+          </div>
+          <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 10, lineHeight: 1.5 }}>Preview opens your real site in a new tab. Save first to see your latest changes.</p>
+        </Card>
 
-        {/* Logo */}
-        <div>
-          <div style={fieldLabel}>Logo</div>
+        <Card label="Branding">
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 72, height: 72, borderRadius: 14, background: "var(--panel2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
-              {w.logo ? <img src={imgUrl(w.logo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <ImageIcon size={22} style={{ color: "var(--faint)" }} />}
+            <div style={{ width: 64, height: 64, borderRadius: 14, background: "var(--panel2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+              {w.logo ? <img src={imgUrl(w.logo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <ImageIcon size={20} style={{ color: "var(--faint)" }} />}
             </div>
-            <div style={{ flex: 1 }}>
-              <button onClick={() => setLogoPicker(true)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 16px", color: "var(--text)", fontSize: 14, fontWeight: 500 }}>{w.logo ? "Change logo" : "Add a logo"}</button>
-              {w.logo && <button onClick={() => set("logo", "")} style={{ marginLeft: 10, background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 3 }}>Remove</button>}
+            <div>
+              <button onClick={() => setLogoPicker(true)} style={btn}>{w.logo ? "Change logo" : "Add a logo"}</button>
+              {w.logo && <button onClick={() => set("logo", "")} style={{ marginLeft: 10, background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 4, cursor: "pointer", fontFamily: "inherit" }}>Remove</button>}
             </div>
           </div>
-          <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 9, lineHeight: 1.5 }}>Shown at the top of your website. Leave blank to use your business name in text.</p>
-        </div>
-
-        {/* Theme — same dial as the app, surfaced here for convenience */}
-        <div>
-          <div style={fieldLabel}>Theme</div>
-          <p style={{ fontSize: 13, color: "var(--sub)", marginTop: -2, marginBottom: 12, lineHeight: 1.5 }}>Your website and your dashboard share one look. Pick a theme here or under Your Shop — it's the same setting.</p>
-          <AppearancePicker theme={theme} setTheme={setTheme} />
-        </div>
-
-        <div>
           <div style={fieldLabel}>Tagline</div>
           <input value={w.tagline || ""} onChange={(e) => set("tagline", e.target.value)} placeholder="e.g. True to the craft." style={input} />
-          <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 7, lineHeight: 1.5 }}>A short line under your name. Leave blank to hide.</p>
-        </div>
-
-        <div>
-          <div style={fieldLabel}>Welcome text (optional)</div>
+          <div style={fieldLabel}>Welcome text</div>
           <textarea value={w.intro || ""} onChange={(e) => set("intro", e.target.value)} rows={4} placeholder="A sentence or two about your shop — what makes it yours." style={{ ...input, resize: "vertical", lineHeight: 1.6 }} />
-        </div>
+          <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.5 }}>Leave the tagline or welcome blank to hide them.</p>
+        </Card>
 
-        <div>
-          <div style={fieldLabel}>Instagram</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 0, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-            <span style={{ padding: "13px 4px 13px 15px", color: "var(--sub)", fontSize: 15.5 }}>@</span>
-            <input value={ig} onChange={(e) => set("instagram", e.target.value.replace(/[^a-zA-Z0-9._]/g, ""))} placeholder="yourshop" style={{ ...input, border: "none", background: "transparent", paddingLeft: 2 }} />
-          </div>
-          <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 7, lineHeight: 1.5 }}>Adds a "See our work" button linking to your Instagram, so your feed is your photo gallery. Leave blank to hide.</p>
-        </div>
+        <Card label="Theme">
+          <p style={{ fontSize: 13, color: "var(--sub)", margin: "0 0 12px", lineHeight: 1.5 }}>Your website and your dashboard share one look — this is the same setting as under Your Shop.</p>
+          <AppearancePicker theme={theme} setTheme={setTheme} />
+        </Card>
 
-        {/* Section toggles */}
-        <div>
-          <div style={fieldLabel}>Shown on your page</div>
-          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
-            {[["showServices", "Services & prices"], ["showTeam", "Your team"], ["showHours", "Hours"]].map(([k, lbl], i) => {
-              const on = w[k] !== false;
-              return (
-                <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "15px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
-                  <span style={{ fontSize: 15, fontWeight: 500 }}>{lbl}</span>
-                  <Toggle on={on} onClick={() => set(k, !on)} />
+        <Card label="Shown on your page">
+          {[["showServices", "Services & prices"], ["showTeam", "Your team"], ["showHours", "Hours"]].map(([k, lbl], i) => {
+            const on = w[k] !== false;
+            return (
+              <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "13px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                <span style={{ fontSize: 15, fontWeight: 500 }}>{lbl}</span>
+                <Toggle on={on} onClick={() => set(k, !on)} />
+              </div>
+            );
+          })}
+          <div style={{ borderTop: "1px solid var(--line)", padding: "13px 0 2px" }}>
+            <button onClick={() => setIgOpen(!igOpen)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", color: "var(--text)", textAlign: "left" }}>
+              <span style={{ fontSize: 15, fontWeight: 500 }}>Instagram</span>
+              <span style={{ fontSize: 13.5, color: ig ? "var(--text2)" : "var(--faint)" }}>{ig ? `@${ig}` : "Not linked"}</span>
+            </button>
+            {igOpen && (
+              <div style={{ marginTop: 11 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 0, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+                  <span style={{ padding: "13px 4px 13px 15px", color: "var(--sub)", fontSize: 15.5 }}>@</span>
+                  <input value={ig} onChange={(e) => set("instagram", e.target.value.replace(/[^a-zA-Z0-9._]/g, ""))} placeholder="yourshop" style={{ ...input, border: "none", background: "transparent", paddingLeft: 2 }} />
                 </div>
-              );
-            })}
+                <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.5 }}>Adds a "See our work" button linking to your Instagram. Leave blank to hide.</p>
+              </div>
+            )}
           </div>
-        </div>
+        </Card>
 
-        {/* Custom domain — wired, but off until hosting/DNS is configured */}
-        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <div style={{ fontSize: 16, fontWeight: 500 }}>Use your own domain</div>
-            <span style={{ fontSize: 9.5, letterSpacing: 1, fontWeight: 700, color: "var(--sub)", border: "1px solid var(--border2)", borderRadius: 5, padding: "2px 6px" }}>COMING SOON</span>
-          </div>
-          <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 12 }}>Point your own web address (like yourshop.com) at your Vero site. We'll give you the exact records to add with your domain provider. This switches on once domain hosting is set up.</p>
-          <input value={w.customDomain || ""} onChange={(e) => set("customDomain", e.target.value.trim().toLowerCase())} placeholder="yourshop.com" style={{ ...input, opacity: 0.85 }} />
-        </div>
+        <Card label="Your own domain" dim right={<span style={{ fontSize: 12, color: "var(--sub)" }}>coming soon</span>}>
+          <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, margin: "0 0 12px" }}>Point your own web address (like yourshop.com) at your Vero site. We'll give you the exact records to add with your domain provider.</p>
+          <input value={w.customDomain || ""} onChange={(e) => set("customDomain", e.target.value.trim().toLowerCase())} placeholder="yourshop.com" style={input} />
+        </Card>
       </>)}
     </div>
   );
