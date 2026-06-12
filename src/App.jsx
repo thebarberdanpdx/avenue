@@ -2671,7 +2671,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
   // ---------- ATELIER "WHO & WHEN" (merged barber + day + time, single-person flow) ----------
   // Group bookings keep the legacy barber-card step; everything single-person routes here.
-  const atelierWW = step === 3 && !!draft && groupPeople.length <= 1;
+  const wwMerged = step === 3 && !!draft && groupPeople.length <= 1;
   const waWho = activeMember || matched;
   const waCt = cutType && draft?.cutTypes ? draft.cutTypes.find((c) => c.id === cutType) : null;
   const waBt = beardType && draft?.beardTypes ? draft.beardTypes.find((b) => b.id === beardType) : null;
@@ -2699,19 +2699,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     }
     return bk.curated ? curateStarts(list, Math.max(1, Number(bk.curatedN) || 6), d) : list;
   };
-  // While the Atelier screen is up, paint the whole canvas its dark edition.
-  useEffect(() => {
-    if (!atelierWW) return;
-    const root = document.getElementById("app-root");
-    if (!root) return;
-    const prev = root.style.background;
-    root.style.background = "#0B0B0B";
-    return () => { root.style.background = prev; };
-  }, [atelierWW]);
   // On entry / barber-tab switch: keep the current date if that barber has openings,
   // otherwise jump to their soonest open day; keep the chosen slot if still free, else first slot.
   useEffect(() => {
-    if (!atelierWW) return;
+    if (!wwMerged) return;
     const pid = waProvId || waReal[0]?.id;
     if (!pid) return;
     if (!waProvId) setWaProvId(pid);
@@ -2720,7 +2711,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (target !== selectedDate) setSelectedDate(target);
     const slots = target ? waSlotsFor(pid, target) : [];
     if (slot == null || !slots.includes(slot)) setSlot(slots.length ? slots[0] : null);
-  }, [atelierWW, waProvId]);
+  }, [wwMerged, waProvId]);
 
   const back = () => { setShowWaitlist(false); if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "change") { setSimpleStep((draft && draft.cutTypes && draft.cutTypes.length) ? "cut" : "what"); return; } if (simpleStep === "finish") { setSimpleStep("change"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 3 && simpleChange !== null && draft) { const anyone = providers.find((p) => p.id === "anyone") || providers[0]; const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: anyone, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }; setCart([entry]); const hasFinish = (draft.addonGroups || []).some((g) => g.type === "addon"); setStep(0); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setCutPhase("addons"); setStep(3); return; } setStep(step - 1); };
 
@@ -2896,12 +2887,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   return (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
       <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
-        {!atelierWW && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
           <div style={{ width: 50 }} />
-        </div>}
-        {step >= 3 && step <= 5 && !atelierWW && <Stepper active={0} />}
+        </div>
+        {step >= 3 && step <= 5 && (wwMerged ? <Stepper active={1} /> : <Stepper active={0} />)}
         {step === 6 && <Stepper active={1} />}
         {step >= 7 && <Stepper active={2} />}
 
@@ -3918,11 +3909,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           );
         })()}
 
-        {/* STEP 3 (single person) — ATELIER WHO & WHEN: barber + day + time in one screen */}
-        {atelierWW && (() => {
-          const A = { canvas: "#0B0B0B", ink: "#FFFFFF", sec: "#C9C9C9", ter: "#9A9A9A", hair: "#1E1E1E", cellB: "#333333", cellT: "#E4E4E4" };
+        {/* STEP 3 (single person) — MERGED WHO & WHEN: barber + day + time in one screen (theme-native) */}
+        {wwMerged && (() => {
           const pid = waProvId || waReal[0]?.id;
-          const prov = waReal.find((p) => p.id === pid) || null; // null ⇒ "First free"
+          const prov = waReal.find((p) => p.id === pid) || null; // null = First Available
           const daySlots = selectedDate ? waSlotsFor(pid, selectedDate) : [];
           const dayFull = !!selectedDate && daySlots.length === 0;
           const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -3946,51 +3936,52 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
             setSlot(null); setStep(6);
           };
-          const cell = (on) => ({ textAlign: "center", padding: "15px 4px", border: `1px solid ${on ? A.ink : A.cellB}`, background: on ? A.ink : "transparent", color: on ? A.canvas : A.cellT, borderRadius: 2, fontFamily: "'Space Grotesk', sans-serif", fontSize: 14, fontWeight: on ? 500 : 400, cursor: "pointer" });
+          const ready = selectedDate && slot != null;
+          const tabStyle = (on) => ({ background: "none", border: "none", padding: "0 1px 12px", marginBottom: -1, fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: on ? "var(--text)" : "var(--sub)", borderBottom: on ? "2px solid var(--gold)" : "2px solid transparent", cursor: "pointer" });
+          const cell = (on) => ({ textAlign: "center", padding: "15px 4px", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", borderRadius: 2, fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" });
           return (
-            <div className="fade-up" style={{ fontFamily: "'Space Grotesk', sans-serif", color: A.ink, paddingTop: 4 }}>
-              <button onClick={back} style={{ background: "none", border: "none", color: A.sec, display: "flex", alignItems: "center", gap: 6, fontSize: 14, padding: 0, marginBottom: 26, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}><ArrowLeft size={15} /> Back</button>
-              <div style={{ fontSize: 12, letterSpacing: 0.5, color: A.ter, marginBottom: 10 }}>{describeEntry({ service: draft, addons: draftAddons, cutType, beardType })} · {svcMin} min</div>
-              <h2 style={{ fontFamily: "'Bodoni Moda', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.05, margin: "0 0 26px", color: A.ink }}>Who &amp; when</h2>
+            <div className="fade-up" style={{ color: "var(--text)", paddingTop: 4 }}>
+              <div style={{ fontSize: 12.5, letterSpacing: 0.5, color: "var(--sub)", marginBottom: 10 }}>{describeEntry({ service: draft, addons: draftAddons, cutType, beardType })} · {svcMin} min</div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px", margin: "0 0 24px" }}>Who &amp; when</h2>
 
-              <div style={{ display: "flex", gap: 28, borderBottom: `1px solid ${A.hair}`, marginBottom: 24 }}>
-                {waReal.map((p) => { const on = pid === p.id; return (
-                  <button key={p.id} onClick={() => setWaProvId(p.id)} style={{ background: "none", border: "none", padding: "0 1px 12px", marginBottom: -1, fontFamily: "'Bodoni Moda', serif", fontSize: 20, color: on ? A.ink : A.sec, borderBottom: on ? `2px solid ${A.ink}` : "2px solid transparent", cursor: "pointer" }}>{p.name}</button>
-                ); })}
-                {waReal.length > 1 && (() => { const on = pid === "anyone"; return (
-                  <button onClick={() => setWaProvId("anyone")} style={{ background: "none", border: "none", padding: "0 1px 12px", marginBottom: -1, fontFamily: "'Bodoni Moda', serif", fontStyle: "italic", fontSize: 20, color: on ? A.ink : A.sec, borderBottom: on ? `2px solid ${A.ink}` : "2px solid transparent", cursor: "pointer" }}>First free</button>
-                ); })()}
+              <div style={{ display: "flex", gap: 28, borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
+                {waReal.map((p) => (
+                  <button key={p.id} onClick={() => setWaProvId(p.id)} style={tabStyle(pid === p.id)}>{p.name}</button>
+                ))}
+                {waReal.length > 1 && (
+                  <button onClick={() => setWaProvId("anyone")} style={tabStyle(pid === "anyone")}>First Available</button>
+                )}
               </div>
 
               <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 6, marginBottom: 22 }}>
                 {dateOptions.slice(0, 21).map((d, i) => { const on = selectedDate && d.toDateString() === selectedDate.toDateString(); return (
-                  <button key={i} onClick={() => { const s = waSlotsFor(pid, d); setSelectedDate(d); setSlot(s.length ? s[0] : null); setSlotConflict(false); }} style={{ flexShrink: 0, minWidth: 62, textAlign: "center", padding: "12px 6px 10px", border: `1px solid ${on ? A.ink : A.cellB}`, background: on ? A.ink : "transparent", borderRadius: 2, cursor: "pointer" }}>
-                    <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 11, letterSpacing: 2, color: on ? A.canvas : A.ter, whiteSpace: "nowrap" }}>{stripLbl(d)}</div>
-                    <div style={{ fontFamily: "'Bodoni Moda', serif", fontSize: 20, lineHeight: "26px", color: on ? A.canvas : A.cellT }}>{d.getDate()}</div>
+                  <button key={i} onClick={() => { const sl = waSlotsFor(pid, d); setSelectedDate(d); setSlot(sl.length ? sl[0] : null); setSlotConflict(false); }} style={{ flexShrink: 0, minWidth: 62, textAlign: "center", padding: "12px 6px 10px", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel)", borderRadius: 2, cursor: "pointer" }}>
+                    <div style={{ fontSize: 11, letterSpacing: 2, fontWeight: 500, color: on ? "var(--on-gold)" : (dayDiff(d) === 0 ? "var(--sub)" : "var(--faint)"), whiteSpace: "nowrap" }}>{stripLbl(d)}</div>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, lineHeight: "26px", color: on ? "var(--on-gold)" : "var(--text)" }}>{d.getDate()}</div>
                   </button>
                 ); })}
               </div>
 
               {selectedDate && !dayFull && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7, marginBottom: 26 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7, marginBottom: 24 }}>
                   {daySlots.map((t) => (<button key={t} onClick={() => { setSlot(t); setSlotConflict(false); }} style={cell(slot === t)}>{fmtTime(t)}</button>))}
                 </div>
               )}
               {dayFull && (
-                <div style={{ margin: "6px 0 26px" }}>
-                  <div style={{ fontFamily: "'Bodoni Moda', serif", fontStyle: "italic", fontSize: 17, color: A.sec, marginBottom: 14 }}>Fully booked that day — try another, or another barber.</div>
-                  <button onClick={toWaitlist} style={{ background: "none", border: "none", padding: 0, color: A.ink, fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, letterSpacing: 1, textDecoration: "underline", textUnderlineOffset: 4, cursor: "pointer" }}>Join the waitlist</button>
+                <div style={{ margin: "6px 0 24px" }}>
+                  <div style={{ fontSize: 15.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Fully booked that day — try another, or another barber.</div>
+                  <button onClick={toWaitlist} style={{ background: "none", border: "none", padding: 0, color: "var(--text)", fontSize: 13.5, fontWeight: 500, letterSpacing: 0.5, textDecoration: "underline", textUnderlineOffset: 4, cursor: "pointer" }}>Join the waitlist</button>
                 </div>
               )}
               {!selectedDate && (
-                <div style={{ fontFamily: "'Bodoni Moda', serif", fontStyle: "italic", fontSize: 17, color: A.sec, margin: "6px 0 26px" }}>No openings ahead{prov ? ` with ${prov.name}` : ""} — try another barber.</div>
+                <div style={{ fontSize: 15.5, color: "var(--sub)", lineHeight: 1.5, margin: "6px 0 24px" }}>No openings ahead{prov ? ` with ${prov.name}` : ""} — try another barber.</div>
               )}
 
-              <div style={{ borderTop: `1px solid ${A.hair}`, paddingTop: 18 }}>
-                {selectedDate && slot != null && (
-                  <div style={{ fontFamily: "'Bodoni Moda', serif", fontStyle: "italic", fontSize: 17, color: A.ink, marginBottom: 16 }}>{dayLbl} · {fmtTime(slot)}{withName ? ` with ${withName}` : ""}</div>
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
+                {ready && (
+                  <div style={{ fontSize: 15.5, color: "var(--text)", marginBottom: 14 }}><span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{dayLbl}</span> · {fmtTime(slot)}{withName ? ` with ${withName}` : ""}</div>
                 )}
-                <button disabled={!(selectedDate && slot != null)} onClick={commit} style={{ width: "100%", background: selectedDate && slot != null ? A.ink : A.hair, color: selectedDate && slot != null ? A.canvas : A.ter, border: "none", textAlign: "center", padding: 15, borderRadius: 2, fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, letterSpacing: 2.5, fontWeight: 500, cursor: selectedDate && slot != null ? "pointer" : "default" }}>CONTINUE</button>
+                <button disabled={!ready} onClick={commit} style={{ width: "100%", background: ready ? "var(--gold)" : "var(--panel2)", color: ready ? "var(--on-gold)" : "var(--faint)", border: "none", textAlign: "center", padding: 15, borderRadius: 2, fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", cursor: ready ? "pointer" : "default" }}>Continue</button>
               </div>
             </div>
           );
