@@ -2340,10 +2340,11 @@ function fireStaffPush({ shopId, title, appt }) {
   try {
     if (!shopId || !appt) return;
     const whenStr = appt.bookedFor ? new Date(appt.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+    const nNote = (appt.note || "").trim();
     fetch(API_BASE + "/api/push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shopId, title, body: [appt.name, appt.title || appt.serviceName, whenStr].filter(Boolean).join(" · ") }),
+      body: JSON.stringify({ shopId, title, body: [appt.name, appt.title || appt.serviceName, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : "") }),
     }).catch(() => {});
   } catch (e) {}
 }
@@ -2447,6 +2448,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [waitlistDone, setWaitlistDone] = useState(false);
   const [photos, setPhotos] = useState(0);       // 0–3 uploaded at booking
+  const [clientNote, setClientNote] = useState(""); // optional note for the barber — rides the appt, the push, and the feed
   const [confirmDetails, setConfirmDetails] = useState(false); // receipt: "details & policies" collapse
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
@@ -2852,6 +2854,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         serviceName,
         addonLabels,
         bookedFor: bookedFor.toISOString(),
+        note: pi === 0 ? clientNote.trim() : "",
         photos: pi === 0 ? photos : 0,
         hasPhotos: pi === 0 && photos > 0,
         bigChange: (simpleChange === "fresh" && people.length === 1) ? true : undefined,
@@ -2879,10 +2882,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         try {
           const ap0 = newAppts[0] || {};
           const whenStr = ap0.bookedFor ? new Date(ap0.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+          const nNote = (ap0.note || "").trim();
           fetch(API_BASE + "/api/push", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ shopId, title: "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") }),
+            body: JSON.stringify({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : "") }),
           }).catch(() => {});
         } catch (e) {}
         setBookedId(baseId); setStep(8);
@@ -4570,6 +4574,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               </p>
             </div>
 
+            {/* note for the barber — optional, lands on the appointment + the staff push */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginBottom: 18 }}>
+              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>NOTE · OPTIONAL</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 4 }}>Anything {provider.name === "Anyone" ? "your barber" : provider.name} should know?</div>
+              <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12 }}>What you're going for, anything different this time — it lands right on {provider.name === "Anyone" ? "their" : `${provider.name}'s`} phone.</p>
+              <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keeping the top" rows={3} style={{ ...inputStyle, marginBottom: 0, resize: "none", minHeight: 72, lineHeight: 1.5, fontFamily: FONT_BODY }} />
+              {clientNote.length > 0 && <div style={{ fontSize: 12, color: "var(--faint)", textAlign: "right", marginTop: 6 }}>{clientNote.length} / 200</div>}
+            </div>
+
             {/* photo upload — controlled by business.bookingPhotos.mode (off/optional/required) */}
             {business?.bookingPhotos?.mode !== "off" && (
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginBottom: 18 }}>
@@ -5268,7 +5281,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 // Owners get a "viewing as" picker to flip between barbers or shop totals.
 // Barbers only see their own chair, period.
 // ============================================================
-function PulseView({ business, appts, setAppts, clients, setClients, services, providers, setProviders, me, isOwner, dataLoaded, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenPayments, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onOpenClient, onSignOut, showToast }) {
+function PulseView({ business, appts, setAppts, clients, setClients, services, providers, setProviders, me, isOwner, dataLoaded, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenPayments, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onOpenClient, onSignOut, showToast, notifCount = 0, onOpenNotifications }) {
   const now = useNow(30000);
   const realProviders = providers.filter((p) => p.id !== "anyone");
 
@@ -5692,15 +5705,16 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         </div>
       </div>
 
-      {/* INSIGHTS — owner only, soft two-up grid (matches Settings) */}
-      {isOwner && (() => {
+      {/* INSIGHTS — soft two-up grid (matches Settings). Notifications tile shows for everyone; the rest is owner-only. */}
+      {(() => {
         const insights = [
-          onOpenRevenue && { onClick: onOpenRevenue, Icon: TrendingUp, label: "Revenue trend", desc: "Week, month, year" },
-          onOpenPayments && { onClick: onOpenPayments, Icon: CreditCard, label: "Payments", desc: "Refund or discount" },
-          onOpenAppointments && { onClick: onOpenAppointments, Icon: BarChart3, label: "Appointments", desc: "No-shows, busiest hour" },
-          onOpenClients && { onClick: onOpenClients, Icon: Users, label: "Clients", desc: "New vs returning" },
-          onOpenServices && { onClick: onOpenServices, Icon: Sparkles, label: "Service mix", desc: "What drives revenue" },
-          (onOpenBarbers && realProviders.length > 1) && { onClick: onOpenBarbers, Icon: Users, label: "Team", desc: "Compare barbers" },
+          onOpenNotifications && { onClick: onOpenNotifications, Icon: Bell, label: "Notifications", desc: "Bookings, changes, nudges", badge: notifCount },
+          isOwner && onOpenRevenue && { onClick: onOpenRevenue, Icon: TrendingUp, label: "Revenue trend", desc: "Week, month, year" },
+          isOwner && onOpenPayments && { onClick: onOpenPayments, Icon: CreditCard, label: "Payments", desc: "Refund or discount" },
+          isOwner && onOpenAppointments && { onClick: onOpenAppointments, Icon: BarChart3, label: "Appointments", desc: "No-shows, busiest hour" },
+          isOwner && onOpenClients && { onClick: onOpenClients, Icon: Users, label: "Clients", desc: "New vs returning" },
+          isOwner && onOpenServices && { onClick: onOpenServices, Icon: Sparkles, label: "Service mix", desc: "What drives revenue" },
+          (isOwner && onOpenBarbers && realProviders.length > 1) && { onClick: onOpenBarbers, Icon: Users, label: "Team", desc: "Compare barbers" },
         ].filter(Boolean);
         if (!insights.length) return null;
         return (
@@ -5710,7 +5724,8 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               {insights.map((it, i) => {
                 const Ic = it.Icon;
                 return (
-                  <button key={i} onClick={it.onClick} className="lift" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 15, minHeight: 104, display: "flex", flexDirection: "column", boxShadow: "var(--shadow-sm)", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                  <button key={i} onClick={it.onClick} className="lift" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 15, minHeight: 104, display: "flex", flexDirection: "column", boxShadow: "var(--shadow-sm)", textAlign: "left", color: "var(--text)", cursor: "pointer", position: "relative" }}>
+                    {it.badge > 0 && <span style={{ position: "absolute", top: 13, right: 13, minWidth: 22, height: 22, borderRadius: 11, padding: "0 7px", background: "var(--live, var(--gold))", color: "#0F1115", fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{it.badge > 9 ? "9+" : it.badge}</span>}
                     <span style={{ width: 38, height: 38, borderRadius: 11, background: "color-mix(in srgb, var(--gold) 13%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Ic size={20} /></span>
                     <span style={{ flex: 1 }} />
                     <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15.5, fontWeight: 500, letterSpacing: "-0.2px", lineHeight: 1.1 }}>{it.label}</span>
@@ -5951,19 +5966,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       </div>
 
 
-      {/* OVERDUE CTA — shown to everyone in their scope */}
-      {overdueCount > 0 && (
-        <button onClick={() => onNavigate && onNavigate("clients")} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "16px 18px", color: "var(--text)", cursor: "pointer", marginTop: isOwner ? 0 : 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Bell size={17} style={{ color: "var(--gold)" }} />
-            <div style={{ textAlign: "left" }}>
-              <div style={{ fontSize: 15, fontWeight: 500 }}>{overdueCount} client{overdueCount > 1 ? "s" : ""} overdue to rebook</div>
-              <div style={{ fontSize: 13, color: "var(--sub)" }}>Open the nudge folder</div>
-            </div>
-          </div>
-          <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-        </button>
-      )}
+      {/* The old overdue-rebook bell row now lives inside the Notifications feed. */}
 
       {/* INLINE GOAL EDITOR — centered modal (opens from the ring or week number) */}
       {goalEditor && viewedProvider && (
@@ -6190,6 +6193,125 @@ function GrowthView({ appts, scopeFilter, services, clients, onBack }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// NOTIFICATIONS — full-screen feed opened from the Pulse tile.
+// Derived from the same synced-appts watcher the header bell used:
+// new bookings (with the client's note), moves, cancellations,
+// plus a live overdue-to-rebook entry. Read state is per-device.
+// ============================================================
+function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, providers, isOwner, me, onBack, onOpenCalendar, onOpenNudge }) {
+  // Capture the seen-cut at mount so unread dots stay visible this visit, then mark everything seen.
+  const seenCutRef = useRef(notifSeenAt);
+  useEffect(() => { markSeen && markSeen(); }, []);
+  const seenCut = seenCutRef.current;
+
+  const provName = (id) => (providers.find((p) => p.id === id) || {}).name || "";
+  const fmtWhen = (iso, startMin) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const sm = startMin || 0, hr = Math.floor(sm / 60), mn = sm % 60, ap = hr >= 12 ? "PM" : "AM", h12 = (hr % 12) || 12;
+    return `${d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}, ${h12}:${String(mn).padStart(2, "0")} ${ap}`;
+  };
+  const fmtAgo = (ts) => {
+    const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (s < 60) return "now";
+    if (s < 3600) return `${Math.floor(s / 60)}m`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h`;
+    return `${Math.floor(s / 86400)}d`;
+  };
+
+  // Same overdue logic as the old Pulse bell row — now a pinned feed entry.
+  const overdueCount = (clients || []).filter((c) => {
+    if (!c.cadenceDays || !c.lastVisit) return false;
+    if (c.nudgeDismissedAt && new Date(c.nudgeDismissedAt) > new Date(c.lastVisit)) return false;
+    if (!isOwner && c.provider && c.provider !== me?.id) return false;
+    const days = Math.round((Date.now() - new Date(c.lastVisit)) / 86400000);
+    return (days - c.cadenceDays) > 0;
+  }).length;
+
+  // Group by calendar day of arrival.
+  const dayLabel = (ts) => {
+    const d = new Date(ts); const today = new Date();
+    const key = (x) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+    const yest = new Date(today); yest.setDate(yest.getDate() - 1);
+    if (key(d) === key(today)) return "Today";
+    if (key(d) === key(yest)) return "Yesterday";
+    return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  };
+  const groups = [];
+  for (const n of notifs) {
+    const label = dayLabel(n.ts);
+    let g = groups[groups.length - 1];
+    if (!g || g.label !== label) { g = { label, items: [] }; groups.push(g); }
+    g.items.push(n);
+  }
+
+  const kindMeta = (n) => {
+    if (n.kind === "new") return { Icon: Scissors, title: "New booking", live: true };
+    if (n.kind === "moved") return { Icon: RefreshCw, title: "Rescheduled", live: false };
+    return { Icon: X, title: "Canceled", live: false };
+  };
+
+  return (
+    <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 12px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, letterSpacing: -0.3 }}>Notifications</div>
+        {notifs.length > 0 && <button onClick={onClear} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 3, cursor: "pointer", padding: 4 }}>Clear all</button>}
+      </div>
+
+      {overdueCount > 0 && (
+        <button onClick={onOpenNudge} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, padding: "15px 16px", color: "var(--text)", cursor: "pointer", marginBottom: 18, textAlign: "left" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ width: 36, height: 36, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Bell size={16} /></span>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>{overdueCount} client{overdueCount > 1 ? "s" : ""} overdue to rebook</div>
+              <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1 }}>Open the nudge folder</div>
+            </div>
+          </div>
+          <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+        </button>
+      )}
+
+      {notifs.length === 0 && overdueCount === 0 && (
+        <div style={{ textAlign: "center", padding: "70px 20px", color: "var(--sub)" }}>
+          <Bell size={28} style={{ color: "var(--faint)", marginBottom: 12 }} />
+          <div style={{ fontSize: 15.5, fontWeight: 500, color: "var(--text)", marginBottom: 4 }}>You're all caught up</div>
+          <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>New bookings, changes, and cancellations land here as they happen.</div>
+        </div>
+      )}
+
+      {groups.map((g) => (
+        <div key={g.label} style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 11.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 10px" }}>{g.label}</div>
+          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+            {g.items.map((n, i) => {
+              const { Icon, title, live } = kindMeta(n);
+              const unread = n.ts > seenCut;
+              const subBits = [n.name, n.service && n.service !== n.name ? n.service : null, fmtWhen(n.when, n.start), provName(n.providerId)].filter(Boolean);
+              return (
+                <button key={n.id} onClick={onOpenCalendar} style={{ width: "100%", display: "flex", gap: 13, padding: "15px 16px 15px 18px", background: "none", border: "none", borderBottom: i < g.items.length - 1 ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left", cursor: "pointer", position: "relative" }}>
+                  {unread && <span style={{ position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)", width: 6, height: 6, borderRadius: "50%", background: "var(--live, var(--gold))" }} />}
+                  <span style={{ width: 36, height: 36, borderRadius: "50%", background: live ? "color-mix(in srgb, var(--live, var(--gold)) 14%, transparent)" : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", color: live ? "var(--live, var(--gold))" : "var(--sub)", flexShrink: 0 }}><Icon size={16} /></span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 15, fontWeight: 600, letterSpacing: -0.1 }}>{title}</span>
+                    <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>
+                      {n.kind === "moved" && n.prevWhen ? `${n.name} moved ${fmtWhen(n.prevWhen, n.prevStart)} → ${fmtWhen(n.when, n.start)}` : subBits.join(" · ")}
+                    </span>
+                    {n.kind === "new" && n.note ? (
+                      <span style={{ display: "block", marginTop: 8, background: "var(--panel2)", borderLeft: "2px solid var(--gold)", borderRadius: "0 9px 9px 0", padding: "8px 11px", fontSize: 13.5, color: "var(--text)", lineHeight: 1.45 }}>{"\uD83D\uDCDD \u201C" + n.note + "\u201D"}</span>
+                    ) : null}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--faint)", flexShrink: 0, paddingTop: 2 }}>{fmtAgo(n.ts)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -8112,8 +8234,19 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   // Each device derives its own bell from the same synced data, so it's reliable with
   // zero dependence on push delivery, Apple, or the carrier. The OS-push "buzz when
   // the app is closed" layer rides on these same events once the device token lands.
-  const [notifs, setNotifs] = useState([]);
-  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifs, setNotifs] = useState(() => {
+    // Feed survives an app relaunch — entries live per-device, pruned to 30 days / 50 items.
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem("vero_notif_feed_" + shopId);
+      if (!raw) return [];
+      const cut = Date.now() - 30 * 86400000;
+      return (JSON.parse(raw) || []).filter((n) => n && n.ts > cut).slice(0, 50);
+    } catch (e) { return []; }
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem("vero_notif_feed_" + shopId, JSON.stringify(notifs.slice(0, 50))); } catch (e) {}
+  }, [notifs, shopId]);
   const [notifSeenAt, setNotifSeenAt] = useState(() => {
     if (typeof window === "undefined") return Date.now();
     const v = window.localStorage.getItem("vero_notif_seen");
@@ -8126,7 +8259,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     if (!dataLoaded) return;
     const t = setTimeout(() => {
       const snap = {};
-      for (const a of (appts || [])) { if (a && a.id != null) snap[String(a.id)] = { start: a.start, bookedFor: a.bookedFor }; }
+      for (const a of (appts || [])) { if (a && a.id != null) snap[String(a.id)] = { start: a.start, bookedFor: a.bookedFor, status: a.status }; }
       apptSnapRef.current = snap;
       notifReadyRef.current = true;
     }, 1500);
@@ -8140,13 +8273,18 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     for (const a of (appts || [])) {
       if (!a || a.id == null) continue;
       const key = String(a.id);
-      nextSnap[key] = { start: a.start, bookedFor: a.bookedFor };
-      if (a.status === "block" || a.status === "cancelled") continue;
+      nextSnap[key] = { start: a.start, bookedFor: a.bookedFor, status: a.status };
+      if (a.status === "block") continue;
       const prev = snap[key];
+      const base = { apptId: key, name: a.name || a.title || "Client", service: a.serviceName || a.title || "", providerId: a.providerId, when: a.bookedFor, start: a.start, ts: Date.now() };
+      if (a.status === "cancelled") {
+        if (prev && prev.status !== "cancelled") fresh.push({ ...base, id: "nc_" + key + "_" + Date.now(), kind: "canceled" });
+        continue;
+      }
       if (!prev) {
-        fresh.push({ id: "nn_" + key + "_" + Date.now(), apptId: key, kind: "new", name: a.name || a.title || "New booking", providerId: a.providerId, when: a.bookedFor, start: a.start, ts: Date.now() });
+        fresh.push({ ...base, id: "nn_" + key + "_" + Date.now(), kind: "new", note: (a.note || "").trim() });
       } else if (prev.start !== a.start || prev.bookedFor !== a.bookedFor) {
-        fresh.push({ id: "nm_" + key + "_" + Date.now(), apptId: key, kind: "moved", name: a.name || a.title || "Client", providerId: a.providerId, when: a.bookedFor, start: a.start, ts: Date.now() });
+        fresh.push({ ...base, id: "nm_" + key + "_" + Date.now(), kind: "moved", prevWhen: prev.bookedFor, prevStart: prev.start });
       }
     }
     apptSnapRef.current = nextSnap;
@@ -8245,48 +8383,11 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       <div style={{ borderBottom: "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 16px) 20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
         <button onClick={() => { if (pulseDetail) { setPulseDetail(null); return; } if (tab === "pulse" && !activeClient) { onExit(); return; } setActiveClient(null); setTab("pulse"); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontFamily: "'Jost', sans-serif" }}><ArrowLeft size={16} /> {pulseDetail ? "Pulse" : (tab === "pulse" && !activeClient ? "Home" : "Pulse")}</button>
         <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} />
-        <div style={{ width: 50, display: "flex", justifyContent: "flex-end", position: "relative" }}>
-          <button
-            onClick={() => { setNotifOpen((v) => { const nv = !v; if (nv) markNotifsSeen(); return nv; }); }}
-            aria-label="Notifications"
-            style={{ background: "none", border: "none", padding: 6, position: "relative", color: "var(--text)", cursor: "pointer", lineHeight: 0 }}
-          >
-            <Bell size={20} />
-            {unseenCount > 0 && (
-              <span style={{ position: "absolute", top: 0, right: 0, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 9, background: "var(--live, var(--gold))", color: "#0F1115", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>{unseenCount > 9 ? "9+" : unseenCount}</span>
-            )}
-          </button>
-          {notifOpen && (
-            <>
-              <div onClick={() => setNotifOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div style={{ position: "absolute", top: 38, right: 0, width: 300, maxHeight: 380, overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "0 18px 50px rgba(0,0,0,0.45)", zIndex: 41 }}>
-                <div style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Notifications</span>
-                  {myNotifs.length > 0 && <button onClick={() => { setNotifs([]); setNotifOpen(false); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 12.5, cursor: "pointer" }}>Clear</button>}
-                </div>
-                {myNotifs.length === 0 ? (
-                  <div style={{ padding: "26px 16px", textAlign: "center", color: "var(--sub)", fontSize: 13.5 }}>You're all caught up.</div>
-                ) : myNotifs.map((n) => {
-                  const d = n.when ? new Date(n.when) : null;
-                  const sm = n.start || 0, hr = Math.floor(sm / 60), mn = sm % 60, ap = hr >= 12 ? "PM" : "AM", h12 = (hr % 12) || 12;
-                  const dayStr = d ? d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "";
-                  return (
-                    <button key={n.id} onClick={() => { setNotifOpen(false); setActiveClient(null); setPulseDetail(null); setTab("calendar"); }} style={{ width: "100%", textAlign: "left", background: "none", border: "none", borderBottom: "1px solid var(--border)", padding: "12px 16px", cursor: "pointer", display: "flex", gap: 11, alignItems: "flex-start" }}>
-                      <span style={{ width: 7, height: 7, borderRadius: 7, marginTop: 6, flexShrink: 0, background: n.kind === "new" ? "var(--live, var(--gold))" : "var(--sub)" }} />
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: "block", fontSize: 13.5, color: "var(--text)", fontWeight: 500 }}>{n.kind === "new" ? "New booking" : "Appointment moved"}{isOwner ? "" : ""}</span>
-                        <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{[n.name, dayStr && `${dayStr} · ${h12}:${String(mn).padStart(2, "0")} ${ap}`].filter(Boolean).join(" — ")}</span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
+        <div style={{ width: 50 }} />
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
-        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenPayments={() => setPulseDetail("payments")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} showToast={showToast} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenPayments={() => setPulseDetail("payments")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} showToast={showToast} notifCount={unseenCount} onOpenNotifications={() => setPulseDetail("notifications")} />}
+        {tab === "pulse" && pulseDetail === "notifications" && <NotificationsView notifs={myNotifs} notifSeenAt={notifSeenAt} markSeen={markNotifsSeen} onClear={() => setNotifs([])} clients={clients} providers={providers} isOwner={isOwner} me={me} onBack={() => setPulseDetail(null)} onOpenCalendar={() => { setPulseDetail(null); setTab("calendar"); }} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} business={business} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "payments" && <PaymentsView appts={appts} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={() => setPulseDetail(null)} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
@@ -17396,6 +17497,19 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   <span role="switch" aria-checked={notifyChange} style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: notifyChange ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: notifyChange ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
                 </div>
               )}
+
+              {/* appointment note — what the client typed at booking (or staff added). Read block in detail, textarea in edit. */}
+              {editing ? (
+                <div style={{ padding: "14px 18px", borderBottom: `1px solid ${T.line}` }}>
+                  <div style={{ fontSize: 11.5, letterSpacing: 1.5, color: T.sub, fontWeight: 600, marginBottom: 8 }}>APPOINTMENT NOTE</div>
+                  <textarea value={draftNote} onChange={(e) => setDraftNote(e.target.value)} placeholder="Anything to remember for this visit…" rows={2} style={{ width: "100%", boxSizing: "border-box", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 10, padding: "11px 13px", color: T.text, fontSize: 15, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", outline: "none" }} />
+                </div>
+              ) : (appt.note || "").trim() ? (
+                <div style={{ padding: "14px 18px", borderBottom: `1px solid ${T.line}` }}>
+                  <div style={{ fontSize: 11.5, letterSpacing: 1.5, color: T.sub, fontWeight: 600, marginBottom: 7 }}>{"\uD83D\uDCDD"} APPOINTMENT NOTE</div>
+                  <div style={{ background: T.chip, borderLeft: "2px solid var(--gold)", borderRadius: "0 9px 9px 0", padding: "10px 13px", fontSize: 14.5, color: T.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{appt.note.trim()}</div>
+                </div>
+              ) : null}
 
               {/* client */}
               <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
