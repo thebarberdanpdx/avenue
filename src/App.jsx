@@ -15717,6 +15717,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [prodPrice, setProdPrice] = useState("");
   const [payBusy, setPayBusy] = useState(false);
   const [payErr, setPayErr] = useState("");
+  const [pendingMethod, setPendingMethod] = useState(null); // chosen on the method screen; charged after tip
   const [paidRec, setPaidRec] = useState(null);     // the ledger record written on success
   const subtotal = +lines.reduce((s, l) => s + (Number(l.price) || 0), 0).toFixed(2);
   const tipAmt = customTip != null ? +Number(customTip).toFixed(2) : +(subtotal * tipPct / 100).toFixed(2);
@@ -15804,39 +15805,56 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     </div>
   ), document.body);
 
-  // ---------- 1 · SALE SUMMARY (editable) ----------
-  if (stage === "summary") return sheet(
-    <div style={{ padding: "20px 24px 32px" }}>
-      <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 500 }}>CHECKOUT</div>
-      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.5, marginBottom: 4 }}>{appt.name || "Walk-in"}</h2>
-      <p style={{ color: "var(--sub)", fontSize: 15, marginBottom: 22, fontWeight: 300 }}>{liveClient && liveClient.since ? `Client since ${liveClient.since}` : (service?.name || appt.title)}</p>
+  // Full-screen takeover for the POS stages (sheet stays for rebook/done).
+  const screen = (inner) => createPortal((
+    <div className="fade-in" style={{ position: "fixed", inset: 0, background: "var(--bg)", zIndex: 60, overflowY: "auto" }}>
+      <div style={{ maxWidth: 480, margin: "0 auto", minHeight: "100%", display: "flex", flexDirection: "column", padding: "max(20px, env(safe-area-inset-top)) 24px max(28px, env(safe-area-inset-bottom))", boxSizing: "border-box" }}>{inner}</div>
+    </div>
+  ), document.body);
+  const Header = ({ title, onBack, close }) => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 17, padding: 4, cursor: "pointer", width: 32, textAlign: "left" }}>{close ? <X size={19} /> : <ChevronLeft size={21} />}</button>
+      <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{title}</span>
+      <span style={{ width: 32 }} />
+    </div>
+  );
+  const goldBtn = { width: "100%", background: "var(--gold-grad, var(--gold))", color: "var(--on-gold)", padding: 17, fontSize: 14.5, fontWeight: 600, letterSpacing: 1.5, borderRadius: 16, border: "none", boxShadow: "var(--glow)", cursor: "pointer" };
+  const startMethod = (m) => {
+    setPayErr("");
+    if (tipCfg.enabled) { setPendingMethod(m); setStage("tipPick"); }
+    else executeCharge(m);
+  };
+  const executeCharge = (m) => {
+    if (m === "cash") { payCash(); return; }
+    if (m === "cof") { payCardOnFile(); return; }
+    if (m === "card") { setStage("card"); return; }
+  };
 
-      <div style={{ background: "var(--panel)", borderRadius: 18, border: "1px solid var(--line)", boxShadow: "var(--shadow-sm)", padding: "2px 18px", marginBottom: 16 }}>
-        {lines.map((l) => (
-          <div key={l.id} style={{ padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 500 }}>{l.name}{l.withName && <span style={{ color: "var(--sub)", fontWeight: 400 }}> with {l.withName}</span>}</div>
-                {appt.cutLabel && l.id === "main" && <div style={{ marginTop: 7 }}><span style={{ fontSize: 12, background: "var(--panel2)", borderRadius: 7, padding: "4px 9px", color: "var(--text2)" }}>{appt.cutLabel}</span></div>}
-              </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                {editLineId === l.id ? (
-                  <input autoFocus type="number" inputMode="decimal" defaultValue={l.price} onBlur={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setLines(lines.map((x) => x.id === l.id ? { ...x, price: v } : x)); setEditLineId(null); }} onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }} style={{ width: 86, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 9px", color: "var(--text)", fontSize: 15, textAlign: "right", fontFamily: FONT_BODY }} />
-                ) : <div style={{ fontSize: 16, fontWeight: 500 }}>{money(Number(l.price) || 0)}</div>}
-                <div style={{ marginTop: 7, display: "flex", gap: 12, justifyContent: "flex-end" }}>
-                  <button onClick={() => setEditLineId(editLineId === l.id ? null : l.id)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Edit</button>
-                  {l.id !== "main" && <button onClick={() => setLines(lines.filter((x) => x.id !== l.id))} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Remove</button>}
-                </div>
-              </div>
+  // ---------- 1 · SALE (full screen, editable) ----------
+  if (stage === "summary") return screen(
+    <>
+      <Header title="Checkout" close onBack={onClose} />
+      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, letterSpacing: "-0.4px" }}>{appt.name || "Walk-in"}</div>
+      <div style={{ fontSize: 13.5, color: "var(--sub)", margin: "5px 0 22px" }}>{liveClient && liveClient.since ? `Client since ${liveClient.since}` : (provider ? `With ${provider.name}` : "")}</div>
+      {lines.map((l) => (
+        <div key={l.id} style={{ borderTop: "1px solid var(--line)", padding: "16px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 16.5, fontWeight: 500 }}>{l.name}</div>
+            <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 4 }}>{[l.id === "main" ? appt.cutLabel : null, l.withName ? `with ${l.withName}` : (l.id !== "main" ? "Added" : null)].filter(Boolean).join(" · ")}</div>
+            <div style={{ marginTop: 6, display: "flex", gap: 14 }}>
+              <button onClick={() => setEditLineId(editLineId === l.id ? null : l.id)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Edit price</button>
+              {l.id !== "main" && <button onClick={() => setLines(lines.filter((x) => x.id !== l.id))} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Remove</button>}
             </div>
           </div>
-        ))}
-        <div style={{ display: "flex", gap: 10, padding: "14px 0 16px" }}>
-          <button onClick={() => setAddSheet("service")} style={{ flex: 1, textAlign: "center", border: "1px dashed var(--border2)", borderRadius: 11, padding: 12, fontSize: 14, color: "var(--gold)", background: "none", fontWeight: 500, cursor: "pointer" }}>+ Service</button>
-          <button onClick={() => { setProdName(""); setProdPrice(""); setAddSheet("product"); }} style={{ flex: 1, textAlign: "center", border: "1px dashed var(--border2)", borderRadius: 11, padding: 12, fontSize: 14, color: "var(--gold)", background: "none", fontWeight: 500, cursor: "pointer" }}>+ Product</button>
+          {editLineId === l.id
+            ? <input autoFocus type="number" inputMode="decimal" defaultValue={l.price} onBlur={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setLines(lines.map((x) => x.id === l.id ? { ...x, price: v } : x)); setEditLineId(null); }} onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }} style={{ width: 92, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 10px", color: "var(--text)", fontSize: 16, textAlign: "right", fontFamily: FONT_BODY }} />
+            : <div style={{ fontSize: 16.5, flexShrink: 0 }}>{money(Number(l.price) || 0)}</div>}
         </div>
+      ))}
+      <div style={{ display: "flex", gap: 10, padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+        <button onClick={() => setAddSheet(addSheet === "service" ? null : "service")} style={{ flex: 1, textAlign: "center", border: "1px solid var(--border)", background: "var(--panel)", borderRadius: 12, padding: 13, fontSize: 14, color: "var(--text2)", fontWeight: 500, cursor: "pointer" }}>+ Service</button>
+        <button onClick={() => { setProdName(""); setProdPrice(""); setAddSheet(addSheet === "product" ? null : "product"); }} style={{ flex: 1, textAlign: "center", border: "1px solid var(--border)", background: "var(--panel)", borderRadius: 12, padding: 13, fontSize: 14, color: "var(--text2)", fontWeight: 500, cursor: "pointer" }}>+ Product</button>
       </div>
-
       {addSheet === "service" && (
         <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16, maxHeight: 280, overflowY: "auto" }}>
           {(allServices || []).filter((sv) => !sv.archived).map((sv, i) => (
@@ -15854,71 +15872,104 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
             <input type="number" inputMode="decimal" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} placeholder="$ price" style={{ flex: 1, minWidth: 0, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
             <button disabled={!prodName.trim() || !(Number(prodPrice) > 0)} onClick={() => { setLines([...lines, { id: "ln_" + Date.now().toString(36), name: prodName.trim(), price: +Number(prodPrice).toFixed(2) }]); setAddSheet(null); }} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "12px 20px", fontSize: 14.5, fontWeight: 600, opacity: !prodName.trim() || !(Number(prodPrice) > 0) ? 0.5 : 1, cursor: "pointer" }}>Add</button>
           </div>
-          <button onClick={() => setAddSheet(null)} style={{ width: "100%", marginTop: 8, padding: 6, background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
         </div>
       )}
+      <div style={{ flex: 1 }} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", padding: "18px 2px 16px" }}>
+        <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>Total</span>
+        <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500 }}>{money(subtotal)}</span>
+      </div>
+      <button className="lift" onClick={() => { setPayErr(""); setStage("method"); }} style={goldBtn}>CONTINUE — {money(subtotal)}</button>
+    </>);
 
-      <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 4px", fontSize: 15, color: "var(--sub)" }}><span>Subtotal</span><span style={{ color: "var(--text)" }}>{money(subtotal)}</span></div>
-      <button onClick={() => setTipOpen(!tipOpen)} style={{ width: "100%", display: "flex", justifyContent: "space-between", background: "none", border: "none", padding: "10px 4px", fontSize: 15, color: "var(--sub)", cursor: "pointer", fontFamily: "inherit" }}>
-        <span>Tip <span style={{ color: "var(--gold)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3 }}>{tipOpen ? "done" : "change"}</span></span>
-        <span style={{ color: "var(--text)" }}>{money(tipAmt)}</span>
-      </button>
-      {tipOpen && tipCfg.enabled && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "2px 0 12px" }}>
+  // ---------- 2 · METHOD ----------
+  if (stage === "method") return screen(
+    <>
+      <Header title="Payment" onBack={() => setStage("summary")} />
+      <div style={{ textAlign: "center", margin: "10px 0 30px" }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Charging</div>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1 }}>{money(subtotal)}</div>
+        {tipCfg.enabled && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 9 }}>{appt.name || "Walk-in"} · tip comes next</div>}
+      </div>
+      {!liveMode && <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5 }}>Payments are in test mode — card options are off. Flip Payments to Live in Checkout &amp; money.</div>}
+      {payErr && <div style={{ background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{payErr}</div>}
+      <div style={{ display: "grid", gap: 12 }}>
+        {[
+          { id: "card", t: "Card reader", s: "Tap, chip, or key in", dis: !liveMode },
+          { id: "cof", t: "Card on file", s: cofCard ? `${(cofCard.brand || "Card").charAt(0).toUpperCase() + (cofCard.brand || "card").slice(1)} ··${cofCard.last4}${scOn ? ` · +${scPct}% card fee` : ""}` : "No card saved", dis: !liveMode || !cofCard },
+          { id: "cash", t: "Cash", s: "Mark as paid", dis: false },
+          { id: "gift", t: "Gift card", s: "Coming soon", dis: true },
+        ].map((m) => (
+          <button key={m.id} disabled={m.dis || payBusy} onClick={() => startMethod(m.id)} className={m.dis ? "" : "lift"} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "21px 20px", color: "var(--text)", textAlign: "left", opacity: m.dis ? 0.45 : 1, cursor: m.dis ? "default" : "pointer", boxShadow: "var(--shadow-sm)" }}>
+            <span><span style={{ display: "block", fontSize: 17, fontWeight: 600 }}>{m.t}</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{m.s}</span></span>
+            {!m.dis && <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />}
+          </button>
+        ))}
+      </div>
+    </>);
+
+  // ---------- 3 · TIP (after the method — clean, Square-style) ----------
+  if (stage === "tipPick") {
+    const isCof = pendingMethod === "cof";
+    const finalFor = (tAmt) => { const t = +(subtotal + tAmt).toFixed(2); return isCof && scOn ? +(t * (1 + scPct / 100)).toFixed(2) : t; };
+    const selAmt = customTip != null ? +Number(customTip).toFixed(2) : +(subtotal * tipPct / 100).toFixed(2);
+    const chargeNow = () => { setStage("charging"); executeCharge(pendingMethod); };
+    return screen(
+      <>
+        <Header title="Tip" onBack={() => setStage("method")} />
+        <div style={{ textAlign: "center", margin: "16px 0 30px" }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: "-0.4px" }}>Add a tip?</div>
+          <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 8 }}>on {money(subtotal)}{provider ? ` · with ${provider.name}` : ""}</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(3, tipCfg.presets.length)}, 1fr)`, gap: 10 }}>
           {tipCfg.presets.map((p) => { const on = customTip == null && tipPct === p; return (
-            <button key={p} onClick={() => { setTipPct(p); setCustomTip(null); }} style={{ flex: 1, minWidth: 64, padding: "11px 0", borderRadius: 11, border: on ? "1.5px solid var(--gold)" : "1px solid var(--border)", background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel)", color: on ? "var(--gold)" : "var(--text)", fontWeight: on ? 600 : 400, fontSize: 14.5, cursor: "pointer" }}>{p}%</button>
+            <button key={p} onClick={() => { setTipPct(p); setCustomTip(null); }} className="lift" style={{ background: on ? "var(--gold)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 18, padding: "22px 0 18px", textAlign: "center", color: on ? "var(--on-gold)" : "var(--text)", cursor: "pointer", boxShadow: on ? "var(--glow)" : "var(--shadow-sm)" }}>
+              <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 26 }}>{p}%</span>
+              <span style={{ display: "block", fontSize: 12, color: on ? "var(--on-gold)" : "var(--faint)", marginTop: 5, opacity: on ? 0.75 : 1 }}>{money(+(subtotal * p / 100).toFixed(2))}</span>
+            </button>
           ); })}
-          {tipCfg.allowNoTip !== false && <button onClick={() => setCustomTip(0)} style={{ flex: 1, minWidth: 64, padding: "11px 0", borderRadius: 11, border: customTip === 0 ? "1.5px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", color: customTip === 0 ? "var(--gold)" : "var(--sub)", fontSize: 14.5, cursor: "pointer" }}>None</button>}
-          {tipCfg.allowCustom !== false && <input type="number" inputMode="decimal" placeholder="$ custom" value={customTip != null && customTip !== 0 ? customTip : ""} onChange={(e) => setCustomTip(e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0))} style={{ flex: 1, minWidth: 84, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "11px 12px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY }} />}
         </div>
-      )}
-      <button className="lift" onClick={() => { setPayErr(""); setStage("method"); }} style={{ width: "100%", marginTop: 8, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 16, fontWeight: 600, borderRadius: 14, border: "none", boxShadow: "var(--glow)" }}>Charge {money(total)}</button>
-      <button onClick={onClose} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 8 }}>Not yet</button>
-    </div>, true);
-
-  // ---------- 2 · HOW ARE THEY PAYING ----------
-  if (stage === "method") {
-    const Row = ({ title, sub, right, onClick, disabled }) => (
-      <button disabled={disabled} onClick={onClick} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "17px 18px", background: "var(--panel)", border: "none", borderTop: "1px solid var(--line)", color: "var(--text)", textAlign: "left", opacity: disabled ? 0.45 : 1, cursor: disabled ? "default" : "pointer" }}>
-        <span style={{ fontSize: 16, fontWeight: 500 }}>{title}{sub && <span style={{ color: "var(--sub)", fontWeight: 400, fontSize: 13.5 }}> {sub}</span>}</span>
-        <span style={{ fontSize: 13, color: "var(--sub)", flexShrink: 0 }}>{right}</span>
-      </button>
-    );
-    return sheet(
-      <div style={{ padding: "20px 24px 32px" }}>
-        <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 500 }}>HOW ARE THEY PAYING?</div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, letterSpacing: -0.5, marginBottom: 18 }}>{money(total)}</h2>
-        {!liveMode && <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5 }}>Payments are in test mode — card options are off. Flip Payments to Live in Checkout &amp; money to charge cards.</div>}
-        {payErr && <div style={{ background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{payErr}</div>}
-        <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
-          <div style={{ borderTop: "none" }}><Row title="Card reader" right="Tap, chip, or swipe" disabled={!liveMode || payBusy} onClick={() => { setPayErr(""); setStage("card"); }} /></div>
-          <Row title="Card on file" sub={cofCard ? `${(cofCard.brand || "Card").charAt(0).toUpperCase() + (cofCard.brand || "card").slice(1)} ··${cofCard.last4}` : "none saved"} right={cofCard ? (payBusy ? "Charging…" : (scOn ? `+${scPct}% · ${money(cofTotal)}` : money(total))) : ""} disabled={!liveMode || !cofCard || payBusy} onClick={payCardOnFile} />
-          <Row title="Cash" right="Mark as paid" disabled={payBusy} onClick={payCash} />
-          <Row title="Gift card" right="coming soon" disabled />
+        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+          {tipCfg.allowCustom !== false && (
+            customTip != null && customTip !== 0
+              ? <input autoFocus type="number" inputMode="decimal" value={customTip} onChange={(e) => setCustomTip(e.target.value === "" ? 0.01 : Math.max(0, Number(e.target.value) || 0))} style={{ flex: 1, background: "var(--panel2)", border: "1.5px solid var(--gold)", borderRadius: 14, padding: "14px 16px", color: "var(--text)", fontSize: 16, textAlign: "center", fontFamily: FONT_BODY }} />
+              : <button onClick={() => setCustomTip(0.01)} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 14, fontSize: 14.5, color: "var(--text2)", fontWeight: 500, cursor: "pointer" }}>Custom amount</button>
+          )}
+          {tipCfg.allowNoTip !== false && <button onClick={() => setCustomTip(0)} style={{ flex: 1, background: "var(--panel)", border: `1px solid ${customTip === 0 ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: 14, fontSize: 14.5, color: customTip === 0 ? "var(--gold)" : "var(--text2)", fontWeight: 500, cursor: "pointer" }}>No tip</button>}
         </div>
-        <button onClick={() => setStage("summary")} style={{ width: "100%", marginTop: 14, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 8 }}>Back</button>
-      </div>, false);
+        <div style={{ flex: 1 }} />
+        <button className="lift" disabled={payBusy} onClick={chargeNow} style={{ ...goldBtn, background: "var(--live, var(--gold))", color: "var(--on-gold)", opacity: payBusy ? 0.6 : 1 }}>{payBusy ? "CHARGING…" : `CHARGE ${money(finalFor(selAmt))}`}</button>
+        {isCof && scOn && <div style={{ textAlign: "center", fontSize: 11.5, color: "var(--faint)", marginTop: 10 }}>{(cofCard?.brand || "Card").charAt(0).toUpperCase() + (cofCard?.brand || "card").slice(1)} ··{cofCard?.last4} · includes {scPct}% card fee</div>}
+      </>);
   }
 
-  // ---------- 2b · CARD PRESENT — manual entry until a reader is paired ----------
-  if (stage === "card") return sheet(
-    <CardChargeInline amount={total} appt={appt} onCancel={() => { setPayErr(""); setStage("method"); }} onPaid={(payRes) => { recordSale(makeRec("card", payRes, total)); setStage("approved"); }} money={money} />, false);
-
-
-  if (stage === "approving" || stage === "approved") return sheet(
-    <div style={{ padding: "64px 28px 72px", textAlign: "center" }}>
-      {stage === "approving" ? (
+  // ---------- charging spinner (card-on-file in flight) ----------
+  if (stage === "charging" && pendingMethod === "cof") return screen(
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+      {payErr ? (
         <>
-          <div style={{ width: 72, height: 72, borderRadius: "50%", border: "3px solid var(--line)", borderTopColor: "var(--gold)", margin: "0 auto 24px", animation: "spin .8s linear infinite" }} />
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500 }}>Approving…</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 10 }}>That didn't go through</div>
+          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5, maxWidth: 320, marginBottom: 22 }}>{payErr}</p>
+          <button onClick={() => setStage("method")} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 26px", color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}>Pick another way</button>
         </>
       ) : (
-        <div className="fade-in">
-          <div style={{ width: 88, height: 88, borderRadius: "50%", background: "#3FA968", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px", animation: "popIn .4s var(--ease) both" }}><Check size={44} style={{ color: "#fff" }} strokeWidth={3} /></div>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Approved</div>
-          <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300 }}>{money(total)} charged</p>
-        </div>
+        <>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", border: "3px solid var(--line)", borderTopColor: "var(--gold)", marginBottom: 24, animation: "spin .8s linear infinite" }} />
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500 }}>Charging…</div>
+        </>
       )}
+    </div>);
+
+  // ---------- card present — manual entry ----------
+  if (stage === "card" || (stage === "charging" && pendingMethod === "card")) return screen(
+    <CardChargeInline amount={(() => { const t = +(subtotal + tipAmt).toFixed(2); return t; })()} appt={appt} onCancel={() => { setPayErr(""); setStage(tipCfg.enabled ? "tipPick" : "method"); }} onPaid={(payRes) => { recordSale(makeRec("card", payRes, +(subtotal + tipAmt).toFixed(2))); setStage("approved"); }} money={money} />);
+
+
+  if (stage === "approving" || stage === "approved") return screen(
+    <div className="fade-in" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+      <div style={{ width: 96, height: 96, borderRadius: "50%", background: "var(--live, var(--gold))", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24, animation: "popIn .4s var(--ease) both", boxShadow: "var(--glow)" }}><Check size={48} style={{ color: "var(--on-gold)" }} strokeWidth={3} /></div>
+      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 8 }}>Paid</div>
+      <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300 }}>{money(paidRec ? paidRec.amount : total)}{paidRec ? ` · ${paidRec.method === "cash" ? "cash" : paidRec.method === "card-on-file" ? `${paidRec.brand ? paidRec.brand : "card"} on file ··${paidRec.last4 || ""}` : "card"}` : ""}</p>
     </div>
   );
 
