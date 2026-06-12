@@ -9751,50 +9751,64 @@ function BookingRulesEditor({ b, onChange }) {
 // LOCATIONS EDITOR — optional; off by default for solo shops
 // ============================================================
 function LocationsEditor({ business, setForm }) {
-  const [openId, setOpenId] = useState(null);
+  const [openId, setOpenId] = useState(null); // location id whose screen is open (null = list)
   const locations = business.locations || [];
   const setLoc = (id, patch) => setForm({ ...business, locations: locations.map((l) => l.id === id ? { ...l, ...patch } : l) });
   const addLoc = () => { const id = "loc" + Date.now(); setForm({ ...business, locations: [...locations, { id, name: "New Location", address: "", cityZip: "", phone: "", hours: "Mon–Fri · 9–5" }] }); setOpenId(id); };
-  const removeLoc = (id) => setForm({ ...business, locations: locations.filter((l) => l.id !== id) });
-  const F = ({ label, val, on }) => (
-    <div style={{ marginBottom: 12 }}>
+  const removeLoc = (id) => { if (typeof window !== "undefined" && !window.confirm("Remove this location?")) return; setForm({ ...business, locations: locations.filter((l) => l.id !== id) }); setOpenId(null); };
+  const F = ({ label, val, on, first }) => (
+    <div style={{ marginTop: first ? 0 : 14 }}>
       <label style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, display: "block", marginBottom: 6 }}>{label}</label>
       <input value={val} onChange={(e) => on(e.target.value)} style={inputStyle} />
     </div>
   );
+  const open = openId ? locations.find((l) => l.id === openId) : null;
+
+  // ---------- PER-LOCATION SCREEN ----------
+  if (business.multiLocation && open) {
+    const l = open;
+    return (
+      <div className="fade-up">
+        <button onClick={() => setOpenId(null)} style={{ background: "none", border: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, fontSize: 15, padding: 0, marginBottom: 16, cursor: "pointer", fontFamily: "inherit" }}><ChevronLeft size={18} /> Locations</button>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 18px" }}>{l.name || "Location"}</h2>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", boxShadow: "var(--shadow-sm)" }}>
+          <F first label="Location name" val={l.name} on={(v) => setLoc(l.id, { name: v })} />
+          <F label="Address" val={l.address} on={(v) => setLoc(l.id, { address: v })} />
+          <F label="City, State ZIP" val={l.cityZip} on={(v) => setLoc(l.id, { cityZip: v })} />
+          <F label="Phone" val={l.phone} on={(v) => setLoc(l.id, { phone: v })} />
+          <F label="Hours (summary)" val={l.hours} on={(v) => setLoc(l.id, { hours: v })} />
+        </div>
+        {locations.length > 1 && (
+          <div style={{ textAlign: "center", padding: "14px 0 0" }}>
+            <button onClick={() => removeLoc(l.id)} style={{ background: "none", border: "none", color: "#C2563F", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 4, padding: 8, cursor: "pointer", fontFamily: "inherit" }}>Remove location</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ---------- LIST ----------
   return (
     <div>
-      <ToggleSetting label="Multiple locations" desc="Turn on if you run more than one shop. Each location can have its own address, hours, and staff." on={!!business.multiLocation} onToggle={(v) => setForm({ ...business, multiLocation: v })} />
+      <ToggleSetting label="Multiple locations" desc="Turn on if you run more than one shop. Each location keeps its own address, hours, and phone." on={!!business.multiLocation} onToggle={(v) => setForm({ ...business, multiLocation: v })} />
 
       {business.multiLocation && (
         <>
           <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden", marginTop: 18 }}>
             {locations.map((l, i) => {
-              const expanded = openId === l.id;
+              const meta = [l.address, l.cityZip, l.hours].filter(Boolean).join(" · ");
               return (
-                <div key={l.id} style={{ padding: "0 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
-                  <button onClick={() => setOpenId(expanded ? null : l.id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "15px 0", background: "none", color: "var(--text)", textAlign: "left" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-                      <span style={{ width: 34, height: 34, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 14%, transparent)", color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><MapPinIcon size={17} /></span>
-                      <div style={{ minWidth: 0 }}><div style={{ fontSize: 15.5, fontWeight: 500 }}>{l.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{l.cityZip || "No address yet"}</div></div>
-                    </div>
-                    <ChevronRight size={18} style={{ color: "var(--faint)", transform: expanded ? "rotate(90deg)" : "none", transition: "transform .2s", flexShrink: 0 }} />
-                  </button>
-                  {expanded && (
-                    <div style={{ padding: "10px 0 16px", borderTop: "1px solid var(--line)" }}>
-                      <F label="Location name" val={l.name} on={(v) => setLoc(l.id, { name: v })} />
-                      <F label="Address" val={l.address} on={(v) => setLoc(l.id, { address: v })} />
-                      <F label="City, State ZIP" val={l.cityZip} on={(v) => setLoc(l.id, { cityZip: v })} />
-                      <F label="Phone" val={l.phone} on={(v) => setLoc(l.id, { phone: v })} />
-                      <F label="Hours (summary)" val={l.hours} on={(v) => setLoc(l.id, { hours: v })} />
-                      {locations.length > 1 && <button onClick={() => removeLoc(l.id)} style={{ marginTop: 4, background: "none", color: "#C2563F", fontSize: 13.5, display: "flex", alignItems: "center", gap: 6 }}><Trash2 size={14} /> Remove location</button>}
-                    </div>
-                  )}
-                </div>
+                <button key={l.id} onClick={() => setOpenId(l.id)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "15px 16px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15.5, fontWeight: 500 }}>{l.name}</div>
+                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meta || "No address yet"}</div>
+                  </div>
+                  <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                </button>
               );
             })}
           </div>
-          <button className="lift" onClick={addLoc} style={{ width: "100%", marginTop: 14, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: 14, color: "var(--gold)", fontSize: 15, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "var(--shadow-sm)" }}><Plus size={16} /> Add location</button>
+          <button className="lift" onClick={addLoc} style={{ width: "100%", marginTop: 14, background: "transparent", border: "1px dashed var(--border2)", borderRadius: 13, padding: 14, color: "var(--gold)", fontSize: 15, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add location</button>
         </>
       )}
     </div>
