@@ -628,7 +628,7 @@ function fmtPhone(number) {
 // ---- Stripe (client side) ----
 // The publishable key is meant to be public and safe to ship in the app bundle.
 // The SECRET key lives only in Vercel (env var) and is used by /api/stripe — never here.
-const STRIPE_PUBLISHABLE_KEY = "pk_live_51TdVev0XV9TtWHCqYNf2SU6kjZXGqGXGp2hSyjKzpbPWFgboCljXllRK9nJ4tESrSnhe6Rp82iGzyPyk7FxVzZCY00sZKQupPQ";
+const STRIPE_PUBLISHABLE_KEY = "pk_test_51TdVev0XV9TtWHCq8s4dGMpa6zLDn4otUSTcFNtlrRIPJGedN9dEKPeSQMZxFxJgEXW4cW2n1JjAT7p6MPS5Rdxe00bogFrsmR";
 let _stripePromise = null;
 function getStripe() {
   if (_stripePromise) return _stripePromise;
@@ -2391,6 +2391,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [codeEntry, setCodeEntry] = useState("");
   const [codeError, setCodeError] = useState(false);
   const [pendingMatch, setPendingMatch] = useState(null); // the client we found, awaiting code verify
+  const [clientEmail, setClientEmail] = useState("");      // email login: address entered on "I've been here before"
+  const [usePhone, setUsePhone] = useState(false);         // legacy phone path — kept intact (10DLC consent surface) until SMS is live
+  const [emailMasked, setEmailMasked] = useState("");      // masked address shown on the code screen
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginNoMatch, setLoginNoMatch] = useState(null);  // null | "nomatch" | "error"
   const [blockedNotice, setBlockedNotice] = useState(false); // shown when a blocked client tries to book
   const [dupWarn, setDupWarn] = useState(null); // { existing, phone, email } — client already has an appt within 10 days
   const [wantEarlier, setWantEarlier] = useState(false); // client opts in to be told if an earlier slot opens
@@ -4081,7 +4086,40 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         })()}
 
         {/* STEP 5 — phone */}
-        {step === 5 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && (
+        {step === 5 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && !usePhone && (
+          <div className="fade-up">
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>What's your email?</h2>
+            <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 24px", fontWeight: 400, lineHeight: 1.55 }}>The one we have on file from your last visit — we'll email you a quick sign-in code.</p>
+            <div style={{ position: "relative", marginBottom: 18 }}><Mail size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus inputMode="email" autoComplete="email" autoCapitalize="none" value={clientEmail} onChange={(e) => { setClientEmail(e.target.value); setLoginNoMatch(null); }} placeholder="you@email.com" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
+            {loginNoMatch === "nomatch" && (
+              <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", marginBottom: 16, fontSize: 14, lineHeight: 1.5, color: "var(--text)" }}>
+                We couldn't find that email on file. Double-check it, or <button onClick={() => { setLoginNoMatch(null); setStep(1); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer", fontFamily: "inherit" }}>book as a new client</button>.
+              </div>
+            )}
+            {loginNoMatch === "error" && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Couldn't send the code — give it another try in a moment.</p>}
+            <button className="lift" disabled={loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim())} onClick={async () => {
+              const em = clientEmail.trim().toLowerCase();
+              setLoginBusy(true); setLoginNoMatch(null);
+              try {
+                const res = await fetch(API_BASE + "/api/client-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, email: em }) });
+                const out = await res.json().catch(() => ({}));
+                if (res.ok && out && out.found) {
+                  setEmailMasked(out.masked || em);
+                  setPendingMatch(null); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true);
+                } else if (res.ok && out && out.found === false) {
+                  setLoginNoMatch("nomatch");
+                } else { setLoginNoMatch("error"); }
+              } catch (e) { setLoginNoMatch("error"); }
+              setLoginBusy(false);
+            }} style={{ width: "100%", background: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "transparent" : "var(--gold)", color: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "var(--faint)" : "var(--on-gold)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "1px solid var(--border)" : "none", cursor: "pointer" }}>{loginBusy ? "Sending…" : "Email my code →"}</button>
+            <p style={{ textAlign: "center", marginTop: 16 }}>
+              <button onClick={() => setStep(1)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>First time here? Book as a new client</button>
+            </p>
+          </div>
+        )}
+
+        {step === 5 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && usePhone && (
           <div className="fade-up">
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Your number</h2>
@@ -4093,6 +4131,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             </p>
             <p style={{ color: "var(--faint)", fontSize: 14, marginBottom: 22 }}>Try <span style={{ color: "var(--gold)", cursor: "pointer" }} onClick={() => setPhone("503-555-0142")}>503-555-0142</span> (returning client Marcus).</p>
             <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={async () => { const digits = phone.replace(/\D/g, ""); let found = null; try { const { data, error } = await supabase.rpc("lookup_client_by_phone", { p_shop: SHOP_ID, p_phone: phone }); if (!error && data) found = data; } catch (e) {} if (!found) found = clients.find((c) => (c.phone || "").replace(/\D/g, "") === digits) || null; if (found && found.blocked) { setBlockedNotice(true); return; } setPendingMatch(found); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "transparent" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: phone.replace(/\D/g, "").length < 10 ? "1px solid var(--border)" : "none", cursor: "pointer" }}>Text me a code →</button>
+            <p style={{ textAlign: "center", marginTop: 14 }}>
+              <button onClick={() => setUsePhone(false)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>Use my email instead</button>
+            </p>
           </div>
         )}
 
@@ -4132,12 +4173,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           <div className="fade-up">
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Verify</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 10px", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Enter your code</h2>
-            <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 8, fontWeight: 400, lineHeight: 1.5 }}>We sent a 6-digit code to <strong>{phone}</strong>.</p>
-            <p style={{ color: "var(--faint)", fontSize: 13, marginBottom: 24, fontWeight: 300, fontStyle: "italic" }}>Texting isn't live yet — enter any 6 digits to continue for now.</p>
+            <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 8, fontWeight: 400, lineHeight: 1.5 }}>{usePhone ? <>We sent a 6-digit code to <strong>{phone}</strong>.</> : <>We emailed a 6-digit code to <strong>{emailMasked}</strong>. It's good for 10 minutes.</>}</p>
+            {usePhone && <p style={{ color: "var(--faint)", fontSize: 13, marginBottom: 24, fontWeight: 300 }}>Texting isn't live yet — enter any 6 digits to continue for now.</p>}
+            {!usePhone && <div style={{ marginBottom: 16 }} />}
             <input autoFocus inputMode="numeric" value={codeEntry} onChange={(e) => { setCodeEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(false); }} placeholder="• • • • • •" style={{ ...inputStyle, textAlign: "center", fontSize: 28, letterSpacing: 8, marginBottom: codeError ? 8 : 18 }} />
-            {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Enter all 6 digits.</p>}
-            <button className="lift" onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } const found = pendingMatch; const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = list.filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
-            <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6 }}>Use a different number</button>
+            {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>{usePhone ? "Enter all 6 digits." : (codeEntry.length < 6 ? "Enter all 6 digits." : "That code didn't match — check the email and try again.")}</p>}
+            <button className="lift" disabled={loginBusy} onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } let found = pendingMatch; if (!usePhone) { setLoginBusy(true); try { const { data, error } = await supabase.rpc("verify_client_code", { p_shop: shopId, p_email: clientEmail.trim().toLowerCase(), p_code: codeEntry }); setLoginBusy(false); if (error || !data) { setCodeError(true); return; } found = data; } catch (e) { setLoginBusy(false); setCodeError(true); return; } } const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = list.filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
+            <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6 }}>{usePhone ? "Use a different number" : "Use a different email"}</button>
           </div>
         )}
 
