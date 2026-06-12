@@ -9897,90 +9897,89 @@ function EmailPreview({ body, business }) {
 }
 
 function MessagesEditor({ messages, onChange, business }) {
-  const [openId, setOpenId] = useState(null);
-  const [previewId, setPreviewId] = useState(null);
+  const [openId, setOpenId] = useState(null);   // message id whose screen is open (null = list)
+  const [preview, setPreview] = useState(false); // detail screen: editing vs preview
   const update = (id, patch) => onChange(messages.map((m) => m.id === id ? { ...m, ...patch } : m));
   const insertTag = (m, tag) => update(m.id, { body: (m.body || "") + (m.body && !m.body.endsWith(" ") ? " " : "") + tag });
   const restoreDefault = (m) => { const def = DEFAULT_MESSAGE_BODIES[m.id]; if (def != null) update(m.id, { body: def }); };
-  const channelBadge = (ch) => {
-    const map = { text: ["Text", "var(--sub)", "var(--border2)"], email: ["Email", "var(--gold)", "color-mix(in srgb, var(--gold) 45%, var(--border))"], both: ["Text + Email", "var(--sub)", "var(--border2)"] };
-    const [label, color, bc] = map[ch] || map.text;
-    return <span style={{ fontSize: 11, letterSpacing: 0.3, color, border: `1px solid ${bc}`, borderRadius: 20, padding: "2px 9px" }}>{label}</span>;
-  };
+  const channelLabel = (ch) => (ch === "email" ? "Email" : ch === "both" ? "Text + Email" : "Text");
   const FieldLabel = ({ children }) => <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, margin: "16px 0 7px" }}>{children}</div>;
+  const open = openId ? messages.find((m) => m.id === openId) : null;
+
+  // ---------- PER-MESSAGE SCREEN ----------
+  if (open) {
+    const m = open;
+    return (
+      <div className="fade-up">
+        <button onClick={() => { setOpenId(null); setPreview(false); }} style={{ background: "none", border: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, fontSize: 15, padding: 0, marginBottom: 16, cursor: "pointer", fontFamily: "inherit" }}><ChevronLeft size={18} /> Messages</button>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, letterSpacing: "-0.3px", margin: 0 }}>{m.label}</h2>
+          <Toggle on={m.enabled} onClick={() => update(m.id, { enabled: !m.enabled })} />
+        </div>
+        <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 18 }}>{m.timing}</div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", boxShadow: "var(--shadow-sm)" }}>
+          {preview ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500 }}>Preview</span>
+                <button onClick={() => setPreview(false)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>‹ Back to editing</button>
+              </div>
+              {m.channel === "text"
+                ? <div style={{ background: "#3A86E0", color: "#fff", borderRadius: 16, padding: "12px 15px", fontSize: 14.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{renderPlainPreview(m.body, business)}</div>
+                : <EmailPreview body={m.body} business={business} />}
+              {m.channel === "both" && <p style={{ fontSize: 12, color: "var(--sub)", margin: "10px 2px 0" }}>The text version sends these same details as plain lines.</p>}
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>Send as</div>
+              <Segmented options={[{ value: "text", label: "Text" }, { value: "email", label: "Email" }, { value: "both", label: "Both" }]} value={m.channel} onChange={(v) => update(m.id, { channel: v })} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "18px 0 8px" }}>
+                <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500 }}>Message</span>
+                {DEFAULT_MESSAGE_BODIES[m.id] != null && DEFAULT_MESSAGE_BODIES[m.id] !== m.body && (
+                  <button onClick={() => restoreDefault(m)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 4, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Restore default</button>
+                )}
+              </div>
+              <textarea value={m.body} onChange={(e) => update(m.id, { body: e.target.value })} rows={6} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", outline: "none" }} />
+              <div style={{ fontSize: 12, color: "var(--sub)", margin: "13px 2px 7px" }}>Tap to insert a detail</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {MERGE_FACTS.map((tag) => (
+                  <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 11px", color: "var(--text2)", cursor: "pointer", fontFamily: "inherit" }}>{tag}</button>
+                ))}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--sub)", margin: "14px 2px 7px" }}>Or drop in a ready-made block</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {MERGE_BLOCKS.map((tag) => (
+                  <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "color-mix(in srgb, var(--gold) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 8, padding: "6px 11px", color: "var(--gold)", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>{tag}</button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        {!preview && <button onClick={() => setPreview(true)} style={{ width: "100%", marginTop: 14, background: "none", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 12, padding: 13, fontSize: 14.5, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" }}>Preview</button>}
+      </div>
+    );
+  }
+
+  // ---------- LIST ----------
   return (
     <div>
-      <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, fontWeight: 400, marginBottom: 14 }}>What each automated message says. Tap one to edit it — tap a tag like {"{client}"} to drop in info Vero fills in automatically.</p>
-      <div style={{ background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 24%, transparent)", borderRadius: 12, padding: "11px 14px", marginBottom: 18, fontSize: 12.5, color: "var(--text2)", lineHeight: 1.5 }}>
-        <b style={{ color: "var(--gold)" }}>Preview mode.</b> Texts start sending once your texting service is connected; emails send now — you can write and tweak everything here meanwhile.
-      </div>
+      <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, fontWeight: 400, marginBottom: 16 }}>What each automated message says. Texts start sending once your texting service is connected; emails send now — you can write and tweak everything here meanwhile.</p>
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
-        {messages.map((m, i) => {
-          const expanded = openId === m.id;
-          return (
-            <div key={m.id} style={{ padding: "0 16px", borderTop: i ? "1px solid var(--line)" : "none", opacity: m.enabled ? 1 : 0.55 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "15px 0" }}>
-                <button onClick={() => { setPreviewId(null); setOpenId(expanded ? null : m.id); }} style={{ background: "none", color: "var(--text)", textAlign: "left", flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15.5, fontWeight: 500 }}>{m.label}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>{channelBadge(m.channel)}<span style={{ fontSize: 12.5, color: "var(--sub)" }}>{m.timing}</span></div>
-                </button>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                  <ChevronRight size={18} style={{ color: "var(--faint)", transform: expanded ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
-                  <Toggle on={m.enabled} onClick={() => update(m.id, { enabled: !m.enabled })} />
-                </div>
-              </div>
-              {expanded && (
-                <div style={{ padding: "2px 0 18px", borderTop: "1px solid var(--line)" }}>
-                  {previewId === m.id ? (
-                    <>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "14px 0 10px" }}>
-                        <FieldLabel>Preview</FieldLabel>
-                        <button onClick={() => setPreviewId(null)} style={{ background: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>‹ Back to editing</button>
-                      </div>
-                      {m.channel === "text"
-                        ? <div style={{ background: "#3A86E0", color: "#fff", borderRadius: 16, padding: "12px 15px", fontSize: 14.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{renderPlainPreview(m.body, business)}</div>
-                        : <EmailPreview body={m.body} business={business} />}
-                      {m.channel === "both" && <p style={{ fontSize: 12, color: "var(--sub)", margin: "10px 2px 0" }}>The text version sends these same details as plain lines.</p>}
-                    </>
-                  ) : (
-                    <>
-                      <FieldLabel>Send as</FieldLabel>
-                      <Segmented options={[{ value: "text", label: "Text" }, { value: "email", label: "Email" }, { value: "both", label: "Both" }]} value={m.channel} onChange={(v) => update(m.id, { channel: v })} />
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "16px 0 7px" }}>
-                        <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500 }}>Message</span>
-                        {DEFAULT_MESSAGE_BODIES[m.id] != null && DEFAULT_MESSAGE_BODIES[m.id] !== m.body && (
-                          <button onClick={() => restoreDefault(m)} style={{ background: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>↺ Restore default wording</button>
-                        )}
-                      </div>
-                      <textarea value={m.body} onChange={(e) => update(m.id, { body: e.target.value })} rows={6} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", outline: "none" }} />
-                      <div style={{ fontSize: 12, color: "var(--sub)", margin: "13px 2px 7px" }}>Tap to insert a detail:</div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {MERGE_FACTS.map((tag) => (
-                          <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 20, padding: "5px 11px", color: "var(--gold)" }}>{tag}</button>
-                        ))}
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--sub)", margin: "14px 2px 7px" }}>Or drop in a ready-made block:</div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {MERGE_BLOCKS.map((tag) => (
-                          <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "color-mix(in srgb, var(--gold) 14%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 40%, var(--border))", borderRadius: 20, padding: "5px 11px", color: "var(--gold)", fontWeight: 500 }}>{tag}</button>
-                        ))}
-                      </div>
-                      <button onClick={() => setPreviewId(m.id)} style={{ width: "100%", marginTop: 18, background: "none", color: "var(--gold)", border: "1px solid var(--border)", borderRadius: 12, padding: 13, fontSize: 14.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Preview email</button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {messages.map((m, i) => (
+          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderTop: i ? "1px solid var(--line)" : "none", opacity: m.enabled ? 1 : 0.55 }}>
+            <button onClick={() => { setPreview(false); setOpenId(m.id); }} style={{ background: "none", border: "none", color: "var(--text)", textAlign: "left", flex: 1, minWidth: 0, padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+              <div style={{ fontSize: 15.5, fontWeight: 500 }}>{m.label}</div>
+              <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 3 }}>{channelLabel(m.channel)} · {m.timing}</div>
+              <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(m.body || "").split("\n")[0]}</div>
+            </button>
+            <Toggle on={m.enabled} onClick={() => update(m.id, { enabled: !m.enabled })} />
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-// ============================================================
-// TIPPING EDITOR — preset % options clients see at checkout
-// ============================================================
 function TippingEditor({ t, onChange }) {
   const set = (patch) => onChange({ ...t, ...patch });
   const setPreset = (i, val) => { const presets = [...t.presets]; presets[i] = Math.max(0, Math.min(100, parseInt(val) || 0)); onChange({ ...t, presets }); };
