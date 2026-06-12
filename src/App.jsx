@@ -10083,45 +10083,75 @@ function WaitlistRulesEditor({ w, onChange }) {
 }
 function BusinessHoursEditor({ hours, onChange }) {
   const DAYNAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const h = hours || {};
+  const [openDay, setOpenDay] = useState(null); // dow currently expanded for time editing
   const setDay = (d, patch) => onChange({ ...h, [d]: { ...(h[d] || { on: false, start: 540, end: 1020 }), ...patch } });
-  // time options every 30 min from 6:00 to 22:00
-  const opts = []; for (let t = 360; t <= 1320; t += 30) opts.push(t);
-  const TimeSel = ({ value, onPick }) => (
-    <select value={value} onChange={(e) => onPick(parseInt(e.target.value))} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }}>
-      {opts.map((t) => <option key={t} value={t}>{fmtTime(t)}</option>)}
-    </select>
-  );
+  const fmtShort = (m) => { const hh = Math.floor(m / 60), mm = m % 60; const h12 = hh % 12 === 0 ? 12 : hh % 12; return `${h12}:${mm.toString().padStart(2, "0")}`; };
+  // Stamp this day's shift onto every other open day.
+  const copyToAll = (d) => {
+    const src = h[d]; if (!src || !src.on) return;
+    const next = { ...h };
+    for (let i = 0; i < 7; i++) { if (i !== d && next[i] && next[i].on) next[i] = { ...next[i], start: src.start, end: src.end }; }
+    onChange(next);
+  };
+  // Condensed week summary: consecutive same-shift open days collapse to a range (Mon → Sun order).
+  const summary = (() => {
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    const rows = []; const closed = [];
+    let run = null;
+    const flush = () => { if (!run) return; rows.push({ l: run.days.length > 2 ? `${run.days[0]} – ${run.days[run.days.length - 1]}` : run.days.join(" · "), r: `${fmtTime(run.start)} – ${fmtTime(run.end)}` }); run = null; };
+    order.forEach((d) => {
+      const day = h[d];
+      if (!day || !day.on) { flush(); closed.push(SHORT[d]); return; }
+      if (run && run.start === day.start && run.end === day.end) { run.days.push(SHORT[d]); return; }
+      flush();
+      run = { days: [SHORT[d]], start: day.start, end: day.end };
+    });
+    flush();
+    if (closed.length) rows.push({ l: closed.join(" · "), r: "Closed", muted: true });
+    return rows;
+  })();
   return (
     <div>
-      <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12, fontWeight: 400 }}>The hours your shop is open — shown to clients and used as the outer frame of your calendar.</p>
-      <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel2))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 18, fontSize: 12.5, color: "var(--text2)", lineHeight: 1.55 }}>
-        <b style={{ color: "var(--gold)", fontWeight: 600 }}>Display &amp; fallback only.</b> Each barber's bookable times come from their own <b style={{ fontWeight: 600 }}>Work hours</b> (Staff &rarr; Work hours) — these shop hours just frame your calendar and fill in for anyone who hasn&rsquo;t set theirs.
+      <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>The hours your shop is open — the outer frame of your calendar. Each barber's bookable times still come from their own work hours.</p>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
+        <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>This week</div>
+        {summary.map((r, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < summary.length - 1 ? "1px solid var(--line)" : "none", fontSize: 15 }}>
+            <span style={{ color: "var(--sub)" }}>{r.l}</span>
+            <span style={{ color: r.muted ? "var(--sub)" : "var(--text)" }}>{r.r}</span>
+          </div>
+        ))}
       </div>
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
         {DAYNAMES.map((name, d) => {
           const day = h[d] || { on: false, start: 540, end: 1020 };
+          const expanded = openDay === d && day.on;
           return (
             <div key={d} style={{ padding: "14px 16px", borderTop: d === 0 ? "none" : "1px solid var(--line)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <span style={{ fontSize: 15.5, fontWeight: 500, color: day.on ? "var(--text)" : "var(--faint)" }}>{name}</span>
+                <button onClick={() => { if (day.on) setOpenDay(expanded ? null : d); }} style={{ background: "none", border: "none", padding: 0, fontSize: 15.5, fontWeight: day.on ? 500 : 400, color: day.on ? "var(--text)" : "var(--sub)", cursor: day.on ? "pointer" : "default", textAlign: "left", flex: 1, fontFamily: "inherit" }}>{name}</button>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  {!day.on && <span style={{ fontSize: 14, color: "var(--faint)" }}>Closed</span>}
-                  <Toggle on={day.on} onClick={() => setDay(d, { on: !day.on })} />
+                  {day.on
+                    ? <button onClick={() => setOpenDay(expanded ? null : d)} style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "var(--text2)", cursor: "pointer", fontFamily: "inherit" }}>{fmtShort(day.start)} – {fmtShort(day.end)}</button>
+                    : <span style={{ fontSize: 14, color: "var(--sub)" }}>Closed</span>}
+                  <Toggle on={day.on} onClick={() => { const turningOn = !day.on; setDay(d, { on: turningOn }); setOpenDay(turningOn ? d : (openDay === d ? null : openDay)); }} />
                 </div>
               </div>
-              {day.on && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 11 }}>
+              {expanded && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 11, flexWrap: "wrap" }}>
                   <TimeScrollPicker value={day.start} onChange={(t) => setDay(d, { start: t, end: Math.max(t + 15, day.end) })} label={`${name} open`} compact />
                   <span style={{ color: "var(--faint)", fontSize: 14 }}>–</span>
                   <TimeScrollPicker value={day.end} onChange={(t) => setDay(d, { end: t })} minMin={day.start + 15} label={`${name} close`} compact />
+                  <button onClick={() => copyToAll(d)} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 4, padding: 0, cursor: "pointer", fontFamily: "inherit" }}>Copy to all open days</button>
                 </div>
               )}
             </div>
           );
         })}
       </div>
-      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>Tap a time to change it. Days that are off show as Closed.</p>
+      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>Tap a day's times to change them.</p>
     </div>
   );
 }
