@@ -10903,6 +10903,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   const [showArchived, setShowArchived] = useState(false);
   const [picker, setPicker] = useState(false);  // photo picker open
   const [editingDetails, setEditingDetails] = useState(false);
+  const [detailsDraft, setDetailsDraft] = useState(null); // local buffer while editing — commits once on Done (typing into global state races the server echo)
   const [workWeekRef, setWorkWeekRef] = useState(new Date());
   const [repeatFor, setRepeatFor] = useState(null); // { dow, h } when the "repeat on days" popup is open
   const [dayEdit, setDayEdit] = useState(null); // { dow } when editing one day's shift in a focused sheet
@@ -11007,7 +11008,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
     return (
       <div className="appt-screen" style={{ paddingBottom: 40 }}>
         {picker && <StaffPhotoPicker hasPhoto={!!person.photo} onClose={() => setPicker(false)} onPick={(id) => { patch(person.id, { photo: id }); setPicker(false); }} onRemove={() => { patch(person.id, { photo: null }); setPicker(false); }} />}
-        <SecHeader title="Details" onBack={() => setSection(null)} right={<button onClick={() => setEditingDetails(!editingDetails)} style={{ background: "none", color: "var(--gold)", fontSize: 16, fontWeight: 500 }}>{editingDetails ? "Done" : "Edit"}</button>} />
+        <SecHeader title="Details" onBack={() => setSection(null)} right={<button onClick={() => { if (editingDetails) { if (detailsDraft) patch(person.id, detailsDraft); setEditingDetails(false); setDetailsDraft(null); } else { setDetailsDraft({ name: person.name, role: person.role || "", email: person.email || "", phone: person.phone || "" }); setEditingDetails(true); } }} style={{ background: "none", color: "var(--gold)", fontSize: 16, fontWeight: 500 }}>{editingDetails ? "Done" : "Edit"}</button>} />
         {/* avatar */}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 22 }}>
           <button onClick={() => setPicker(true)} style={{ position: "relative", width: 96, height: 96, borderRadius: "50%", background: "none", border: "none", padding: 0 }}>
@@ -11019,10 +11020,10 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           {editingDetails ? (
             <div style={{ padding: "8px 0 4px" }}>
               <div style={{ display: "grid", gap: 15 }}>
-                <div><FieldLabel>Name</FieldLabel><input value={person.name} onChange={(e) => patch(person.id, { name: e.target.value })} style={inputStyle} /></div>
-                <div><FieldLabel>Role / title</FieldLabel><input value={person.role} onChange={(e) => patch(person.id, { role: e.target.value })} style={inputStyle} /></div>
-                <div><FieldLabel>Email</FieldLabel><input value={person.email || ""} onChange={(e) => patch(person.id, { email: e.target.value })} inputMode="email" autoCapitalize="none" style={inputStyle} /></div>
-                <div><FieldLabel>Phone</FieldLabel><input value={person.phone || ""} onChange={(e) => patch(person.id, { phone: e.target.value })} inputMode="tel" style={inputStyle} /></div>
+                <div><FieldLabel>Name</FieldLabel><input value={detailsDraft ? detailsDraft.name : person.name} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), name: e.target.value }))} style={inputStyle} /></div>
+                <div><FieldLabel>Role / title</FieldLabel><input value={detailsDraft ? detailsDraft.role : (person.role || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), role: e.target.value }))} style={inputStyle} /></div>
+                <div><FieldLabel>Email</FieldLabel><input value={detailsDraft ? detailsDraft.email : (person.email || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), email: e.target.value }))} inputMode="email" autoCapitalize="none" style={inputStyle} /></div>
+                <div><FieldLabel>Phone</FieldLabel><input value={detailsDraft ? detailsDraft.phone : (person.phone || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), phone: e.target.value }))} inputMode="tel" style={inputStyle} /></div>
                 <div><FieldLabel>User type</FieldLabel><Segmented options={[{ value: "Admin", label: "Admin" }, { value: "Staff", label: "Staff" }, { value: "Front Desk", label: "Front desk" }]} value={ut} onChange={(v) => patch(person.id, { userType: v })} /></div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)", marginTop: 8 }}>
