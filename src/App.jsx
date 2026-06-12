@@ -2676,7 +2676,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const waCt = cutType && draft?.cutTypes ? draft.cutTypes.find((c) => c.id === cutType) : null;
   const waBt = beardType && draft?.beardTypes ? draft.beardTypes.find((b) => b.id === beardType) : null;
   const waExtra = (waCt?.min || 0) + (waBt?.min || 0);
-  const waDurFor = (pid) => (draft ? getDuration(waWho, draft, pid) + waExtra : 30);
+  const waDurFor = (pid) => (draft ? getDuration(waWho, draft, pid) + waExtra + (simpleChange === "fresh" ? 10 : 0) : 30);
   const waReal = providers.filter((p) => p.id !== "anyone");
   // Time-rule blocks come from the DRAFT service here (it isn't in the cart yet).
   const waBlocked = (provId, d, t) => {
@@ -2722,7 +2722,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (slot == null || !slots.includes(slot)) setSlot(slots.length ? slots[0] : null);
   }, [atelierWW, waProvId]);
 
-  const back = () => { setShowWaitlist(false); if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "change") { setSimpleStep((draft && draft.cutTypes && draft.cutTypes.length) ? "cut" : "what"); return; } if (simpleStep === "finish") { setSimpleStep("change"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setCutPhase("addons"); setStep(3); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "change") { setSimpleStep((draft && draft.cutTypes && draft.cutTypes.length) ? "cut" : "what"); return; } if (simpleStep === "finish") { setSimpleStep("change"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 3 && simpleChange !== null && draft) { const anyone = providers.find((p) => p.id === "anyone") || providers[0]; const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: anyone, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }; setCart([entry]); const hasFinish = (draft.addonGroups || []).some((g) => g.type === "addon"); setStep(0); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setCutPhase("addons"); setStep(3); return; } setStep(step - 1); };
+
+  // Simple/quick flow hand-off: instead of the old "Anyone in particular?" + time picker,
+  // pop the quick-flow entry back into draft state and land on the merged Who & When.
+  const goWhoWhen = () => {
+    const e0 = cart[0];
+    if (e0) {
+      setDraft(e0.service);
+      setDraftAddons(e0.addons || {});
+      setCutType(e0.cutType || null);
+      setBeardType(e0.beardType || null);
+      setCart(cart.slice(1));
+    }
+    setCutPhase("addons");
+    setSimpleStep(null);
+    setStep(3);
+  };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -3124,7 +3140,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     );
                   })()}
 
-                  <button disabled={!canContinue} onClick={() => { if (canContinue) setSimpleStep("who"); }} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", cursor: canContinue ? "pointer" : "default", opacity: canContinue ? 1 : 0.3 }}>Continue</button>
+                  <button disabled={!canContinue} onClick={() => { if (canContinue) goWhoWhen(); }} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", cursor: canContinue ? "pointer" : "default", opacity: canContinue ? 1 : 0.3 }}>Continue</button>
                   {!canContinue && <p style={{ marginTop: 10, textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--faint)" }}>{asksChange && !simpleChange ? "Pick how much we're taking off" : (showAddon && !finAns ? "Add the finishing touch, or tap No thanks" : "")}</p>}
                 </div>
               )}
@@ -3137,7 +3153,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const proceedAfterChange = () => {
             // If the service offers a hot-towel / facial finishing touch, show it; otherwise go to who.
             const hasFinish = draft && (draft.addonGroups || []).some((g) => g.type === "addon");
-            setSimpleStep(hasFinish ? "finish" : "who");
+            if (hasFinish) setSimpleStep("finish"); else goWhoWhen();
           };
           return (
             <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column" }}>
@@ -3169,7 +3185,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const addons = (draft.addonGroups || []).filter((g) => g.type === "addon");
           // Show the owner-featured add-on; fall back to the first one if none is featured.
           const fin = addons.find((g) => g.featured) || addons.find((g) => g.required) || addons[0];
-          if (!fin) { setSimpleStep("who"); return null; }
+          if (!fin) { goWhoWhen(); return null; }
           const item = fin.item || {};
           const isOn = !!(cart[0] && cart[0].addons && cart[0].addons[fin.id]);
           const toggle = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...e.addons, [fin.id]: e.addons && e.addons[fin.id] ? undefined : true } } : e));
@@ -3210,7 +3226,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <span style={{ display: "block", marginTop: 14, background: isOn ? "var(--gold)" : "transparent", color: isOn ? "var(--on-gold)" : "var(--text)", textAlign: "center", padding: 12, borderRadius: 8, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", border: isOn ? "none" : "1px solid var(--border)" }}>{isOn ? "Added to your visit" : "Add it"}</span>
                 </span>
               </button>
-              <button onClick={() => setSimpleStep("who")} style={{ width: "100%", marginTop: 16, background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 0.3, padding: "10px 0", textAlign: "center", cursor: "pointer" }}>{isOn ? "Continue" : "No thanks, skip this"} →</button>
+              <button onClick={goWhoWhen} style={{ width: "100%", marginTop: 16, background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 0.3, padding: "10px 0", textAlign: "center", cursor: "pointer" }}>{isOn ? "Continue" : "No thanks, skip this"} →</button>
             </div>
           );
         })()}
