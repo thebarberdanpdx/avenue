@@ -1571,7 +1571,7 @@ function App() {
   return (
     <div id="app-root" className={`theme-${theme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--canvas, var(--bg))", color: "var(--text)", position: "relative" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Geist:wght@400;500;600;700&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Oswald:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400;1,6..96,500&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Geist:wght@400;500;600;700&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Oswald:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         [data-appt], [data-appt] * { -webkit-user-select: none !important; -moz-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
         #app-root { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; line-height: 1.5; letter-spacing: 0.1px; }
@@ -2445,6 +2445,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [confirmDetails, setConfirmDetails] = useState(false); // receipt: "details & policies" collapse
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
+  const [waProvId, setWaProvId] = useState(null); // Who & When merged screen: selected barber tab ("anyone" = First free)
   const [booking, setBooking] = useState(false);   // true while the confirmed booking is being saved to the server
   const [bookErr, setBookErr] = useState(false);   // true if that save failed — client is told to retry, nothing was held
   // waitlist join form
@@ -2668,7 +2669,60 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     return () => clearTimeout(id);
   }, [selectedDate]);
 
-  const back = () => { setShowWaitlist(false); if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "change") { setSimpleStep((draft && draft.cutTypes && draft.cutTypes.length) ? "cut" : "what"); return; } if (simpleStep === "finish") { setSimpleStep("change"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(6); return; } setStep(step - 1); };
+  // ---------- ATELIER "WHO & WHEN" (merged barber + day + time, single-person flow) ----------
+  // Group bookings keep the legacy barber-card step; everything single-person routes here.
+  const atelierWW = step === 3 && !!draft && groupPeople.length <= 1;
+  const waWho = activeMember || matched;
+  const waCt = cutType && draft?.cutTypes ? draft.cutTypes.find((c) => c.id === cutType) : null;
+  const waBt = beardType && draft?.beardTypes ? draft.beardTypes.find((b) => b.id === beardType) : null;
+  const waExtra = (waCt?.min || 0) + (waBt?.min || 0);
+  const waDurFor = (pid) => (draft ? getDuration(waWho, draft, pid) + waExtra : 30);
+  const waReal = providers.filter((p) => p.id !== "anyone");
+  // Time-rule blocks come from the DRAFT service here (it isn't in the cart yet).
+  const waBlocked = (provId, d, t) => {
+    const dow = d.getDay();
+    return (draft?.timeRules || []).some((r) => {
+      if (!r.block) return false;
+      if (r.scope && r.scope !== "all" && r.scope !== provId) return false;
+      if (r.days && r.days.length && !r.days.includes(dow)) return false;
+      return t >= r.start && t < r.end;
+    });
+  };
+  const waSlotsFor = (pid, d) => {
+    const bk = business?.booking || {};
+    let list;
+    if (pid === "anyone") {
+      list = [...new Set(waReal.flatMap((p) => freeSlotsFor(p, d, waDurFor(p.id), 15).filter((t) => !waBlocked(p.id, d, t))))].sort((a, b) => a - b);
+    } else {
+      const p = waReal.find((x) => x.id === pid);
+      list = p ? freeSlotsFor(p, d, waDurFor(pid), 15).filter((t) => !waBlocked(pid, d, t)) : [];
+    }
+    return bk.curated ? curateStarts(list, Math.max(1, Number(bk.curatedN) || 6), d) : list;
+  };
+  // While the Atelier screen is up, paint the whole canvas its dark edition.
+  useEffect(() => {
+    if (!atelierWW) return;
+    const root = document.getElementById("app-root");
+    if (!root) return;
+    const prev = root.style.background;
+    root.style.background = "#0B0B0B";
+    return () => { root.style.background = prev; };
+  }, [atelierWW]);
+  // On entry / barber-tab switch: keep the current date if that barber has openings,
+  // otherwise jump to their soonest open day; keep the chosen slot if still free, else first slot.
+  useEffect(() => {
+    if (!atelierWW) return;
+    const pid = waProvId || waReal[0]?.id;
+    if (!pid) return;
+    if (!waProvId) setWaProvId(pid);
+    const keepDate = selectedDate && waSlotsFor(pid, selectedDate).length > 0 ? selectedDate : null;
+    const target = keepDate || dateOptions.find((d) => waSlotsFor(pid, d).length > 0) || null;
+    if (target !== selectedDate) setSelectedDate(target);
+    const slots = target ? waSlotsFor(pid, target) : [];
+    if (slot == null || !slots.includes(slot)) setSlot(slots.length ? slots[0] : null);
+  }, [atelierWW, waProvId]);
+
+  const back = () => { setShowWaitlist(false); if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "change") { setSimpleStep((draft && draft.cutTypes && draft.cutTypes.length) ? "cut" : "what"); return; } if (simpleStep === "finish") { setSimpleStep("change"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setCutPhase("addons"); setStep(3); return; } setStep(step - 1); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -2826,12 +2880,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   return (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
       <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        {!atelierWW && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
           <div style={{ width: 50 }} />
-        </div>
-        {step >= 3 && step <= 5 && <Stepper active={0} />}
+        </div>}
+        {step >= 3 && step <= 5 && !atelierWW && <Stepper active={0} />}
         {step === 6 && <Stepper active={1} />}
         {step >= 7 && <Stepper active={2} />}
 
@@ -3751,7 +3805,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         )}
 
         {/* STEP 3 — BARBER + TIME, TOGETHER. Each barber's card shows their soonest opening. One tap = who AND when. */}
-        {step === 3 && draft && (() => {
+        {step === 3 && draft && groupPeople.length > 1 && (() => {
           const who = activeMember || matched;
           const ct = cutType && draft.cutTypes ? draft.cutTypes.find((c) => c.id === cutType) : null;
           const bt = beardType && draft.beardTypes ? draft.beardTypes.find((b) => b.id === beardType) : null;
@@ -3843,6 +3897,84 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <ChevronRight size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
                   </button>
                 )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* STEP 3 (single person) — ATELIER WHO & WHEN: barber + day + time in one screen */}
+        {atelierWW && (() => {
+          const A = { canvas: "#0B0B0B", ink: "#FFFFFF", sec: "#C9C9C9", ter: "#9A9A9A", hair: "#1E1E1E", cellB: "#333333", cellT: "#E4E4E4" };
+          const pid = waProvId || waReal[0]?.id;
+          const prov = waReal.find((p) => p.id === pid) || null; // null ⇒ "First free"
+          const daySlots = selectedDate ? waSlotsFor(pid, selectedDate) : [];
+          const dayFull = !!selectedDate && daySlots.length === 0;
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const dayDiff = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return Math.round((x - today) / 86400000); };
+          const stripLbl = (d) => { const dd = dayDiff(d); if (dd === 0) return "TODAY"; if (dd === 7) return `NEXT ${DAYS[d.getDay()].slice(0, 3).toUpperCase()}`; return DAYS[d.getDay()].slice(0, 3).toUpperCase(); };
+          const resolved = pid === "anyone" && selectedDate && slot != null ? waReal.find((p) => waSlotsFor(p.id, selectedDate).includes(slot)) : null;
+          const withName = prov ? prov.name : (resolved ? resolved.name : null);
+          const dayLbl = selectedDate ? (() => { const r = relativeDate(selectedDate); return r.includes(",") ? r : `${r}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`; })() : null;
+          const svcMin = waDurFor(prov ? prov.id : (waReal[0]?.id || "dan"));
+          const commit = () => {
+            const provFinal = prov || resolved || waReal[0];
+            const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: provFinal, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") };
+            setCart([...cart, entry]);
+            setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
+            setStep(7);
+          };
+          const toWaitlist = () => {
+            const provFinal = prov || waReal[0];
+            const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: provFinal, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") };
+            setCart([...cart, entry]);
+            setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
+            setSlot(null); setStep(6);
+          };
+          const cell = (on) => ({ textAlign: "center", padding: "15px 4px", border: `1px solid ${on ? A.ink : A.cellB}`, background: on ? A.ink : "transparent", color: on ? A.canvas : A.cellT, borderRadius: 2, fontFamily: "'Space Grotesk', sans-serif", fontSize: 14, fontWeight: on ? 500 : 400, cursor: "pointer" });
+          return (
+            <div className="fade-up" style={{ fontFamily: "'Space Grotesk', sans-serif", color: A.ink, paddingTop: 4 }}>
+              <button onClick={back} style={{ background: "none", border: "none", color: A.sec, display: "flex", alignItems: "center", gap: 6, fontSize: 14, padding: 0, marginBottom: 26, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}><ArrowLeft size={15} /> Back</button>
+              <div style={{ fontSize: 12, letterSpacing: 0.5, color: A.ter, marginBottom: 10 }}>{describeEntry({ service: draft, addons: draftAddons, cutType, beardType })} · {svcMin} min</div>
+              <h2 style={{ fontFamily: "'Bodoni Moda', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.05, margin: "0 0 26px", color: A.ink }}>Who &amp; when</h2>
+
+              <div style={{ display: "flex", gap: 28, borderBottom: `1px solid ${A.hair}`, marginBottom: 24 }}>
+                {waReal.map((p) => { const on = pid === p.id; return (
+                  <button key={p.id} onClick={() => setWaProvId(p.id)} style={{ background: "none", border: "none", padding: "0 1px 12px", marginBottom: -1, fontFamily: "'Bodoni Moda', serif", fontSize: 20, color: on ? A.ink : A.sec, borderBottom: on ? `2px solid ${A.ink}` : "2px solid transparent", cursor: "pointer" }}>{p.name}</button>
+                ); })}
+                {waReal.length > 1 && (() => { const on = pid === "anyone"; return (
+                  <button onClick={() => setWaProvId("anyone")} style={{ background: "none", border: "none", padding: "0 1px 12px", marginBottom: -1, fontFamily: "'Bodoni Moda', serif", fontStyle: "italic", fontSize: 20, color: on ? A.ink : A.sec, borderBottom: on ? `2px solid ${A.ink}` : "2px solid transparent", cursor: "pointer" }}>First free</button>
+                ); })()}
+              </div>
+
+              <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 6, marginBottom: 22 }}>
+                {dateOptions.slice(0, 21).map((d, i) => { const on = selectedDate && d.toDateString() === selectedDate.toDateString(); return (
+                  <button key={i} onClick={() => { const s = waSlotsFor(pid, d); setSelectedDate(d); setSlot(s.length ? s[0] : null); setSlotConflict(false); }} style={{ flexShrink: 0, minWidth: 62, textAlign: "center", padding: "12px 6px 10px", border: `1px solid ${on ? A.ink : A.cellB}`, background: on ? A.ink : "transparent", borderRadius: 2, cursor: "pointer" }}>
+                    <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 11, letterSpacing: 2, color: on ? A.canvas : A.ter, whiteSpace: "nowrap" }}>{stripLbl(d)}</div>
+                    <div style={{ fontFamily: "'Bodoni Moda', serif", fontSize: 20, lineHeight: "26px", color: on ? A.canvas : A.cellT }}>{d.getDate()}</div>
+                  </button>
+                ); })}
+              </div>
+
+              {selectedDate && !dayFull && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7, marginBottom: 26 }}>
+                  {daySlots.map((t) => (<button key={t} onClick={() => { setSlot(t); setSlotConflict(false); }} style={cell(slot === t)}>{fmtTime(t)}</button>))}
+                </div>
+              )}
+              {dayFull && (
+                <div style={{ margin: "6px 0 26px" }}>
+                  <div style={{ fontFamily: "'Bodoni Moda', serif", fontStyle: "italic", fontSize: 17, color: A.sec, marginBottom: 14 }}>Fully booked that day — try another, or another barber.</div>
+                  <button onClick={toWaitlist} style={{ background: "none", border: "none", padding: 0, color: A.ink, fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, letterSpacing: 1, textDecoration: "underline", textUnderlineOffset: 4, cursor: "pointer" }}>Join the waitlist</button>
+                </div>
+              )}
+              {!selectedDate && (
+                <div style={{ fontFamily: "'Bodoni Moda', serif", fontStyle: "italic", fontSize: 17, color: A.sec, margin: "6px 0 26px" }}>No openings ahead{prov ? ` with ${prov.name}` : ""} — try another barber.</div>
+              )}
+
+              <div style={{ borderTop: `1px solid ${A.hair}`, paddingTop: 18 }}>
+                {selectedDate && slot != null && (
+                  <div style={{ fontFamily: "'Bodoni Moda', serif", fontStyle: "italic", fontSize: 17, color: A.ink, marginBottom: 16 }}>{dayLbl} · {fmtTime(slot)}{withName ? ` with ${withName}` : ""}</div>
+                )}
+                <button disabled={!(selectedDate && slot != null)} onClick={commit} style={{ width: "100%", background: selectedDate && slot != null ? A.ink : A.hair, color: selectedDate && slot != null ? A.canvas : A.ter, border: "none", textAlign: "center", padding: 15, borderRadius: 2, fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, letterSpacing: 2.5, fontWeight: 500, cursor: selectedDate && slot != null ? "pointer" : "default" }}>CONTINUE</button>
               </div>
             </div>
           );
