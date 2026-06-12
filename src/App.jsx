@@ -22,6 +22,26 @@ const IS_NATIVE = typeof window !== "undefined" && (
 );
 const API_BASE = IS_NATIVE ? "https://gotvero.com" : "";
 
+// ---- ensureFreshSession ----------------------------------------------------
+// iOS freezes Supabase's token-refresh timer whenever the app is backgrounded,
+// so a staff login's access token can silently expire. Reopening the app then
+// looks logged in, but the next DB write goes out with a dead token and Postgres
+// rejects it with RLS error 42501. We call this right before each write: if a
+// session exists and is at/near expiry, refresh it first. Purely additive — when
+// there's no session it does nothing and never blocks a write, so it can't cause
+// a regression on the (already-working) web side.
+async function ensureFreshSession() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const sess = data && data.session;
+    if (!sess) return; // no auth session — leave existing behavior exactly as-is
+    const expMs = (sess.expires_at || 0) * 1000; // expiry is unix-seconds
+    if (Date.now() >= expMs - 60000) {           // refresh if expired or within 60s
+      await supabase.auth.refreshSession();
+    }
+  } catch (e) { /* never let the guard itself block a write */ }
+}
+
 // ============================================================
 // PHOTO LIBRARY — curated "looks" baked in for the prototype.
 // In the live product this becomes a live Unsplash/Pexels feed.
@@ -1062,6 +1082,30 @@ function App() {
     });
     return () => { mounted = false; try { sub.subscription.unsubscribe(); } catch (e) {} };
   }, []);
+  // ---- Native foreground refresh ----
+  // iOS suspends Supabase's refresh timer while the app is backgrounded. When the
+  // app comes back to the foreground we restart auto-refresh and re-pull the
+  // session so the token is valid before the user touches anything; while hidden
+  // we stop the timer (it can't fire anyway). Web ignores this — its timers never
+  // freeze. Pairs with ensureFreshSession() as the belt-and-suspenders guard.
+  useEffect(() => {
+    if (!IS_NATIVE) return;
+    const onVisible = () => {
+      if (typeof document !== "undefined" && document.hidden) {
+        try { supabase.auth.stopAutoRefresh(); } catch (e) {}
+        return;
+      }
+      try { supabase.auth.startAutoRefresh(); } catch (e) {}
+      supabase.auth.getSession().then(({ data }) => { setSession(data && data.session ? data.session : null); }).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    onVisible(); // kick once so a cold open refreshes too
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, []);
   const SHOP_PASSWORD = "avenue2026"; // change this to whatever you want
   // Staff reach the dashboard via a hidden URL: add #staff to the web address.
   // Clients never see anything about staff — the app opens straight into booking.
@@ -1197,39 +1241,40 @@ function App() {
   const SHOP_ID = resolveShopId();
 
   // ---- PUSH NOTIFICATIONS (native app only): register this device for booking
-  // alerts and save its token against the signed-in staff user + shop, so the
-  // backend knows where to send. No-ops on the web and fails quietly everywhere.
+  // alerts and save its token against the signed-in staff user + shop. Silent in
+  // the UI; each step logs to the console ("[vero push] ...") so a Mac-tethered
+  // session can still see exactly what happened without bothering the user.
   useEffect(() => {
-    if (!IS_NATIVE || !session?.user?.id) return;
-    let active = true;
+    const cap = typeof window !== "undefined" ? window.Capacitor : null;
+    const isNative = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
+    if (!isNative) return; // web: stay completely silent
+    if (!authReady) return; // wait until the app has actually checked the login state
     (async () => {
       try {
         const { PushNotifications } = await import("@capacitor/push-notifications");
+        if (!session?.user?.id) { console.log("[vero push] no session yet — will retry on sign-in"); return; }
         let perm = await PushNotifications.checkPermissions();
         if (perm.receive === "prompt" || perm.receive === "prompt-with-rationale") {
           perm = await PushNotifications.requestPermissions();
         }
-        if (!active || perm.receive !== "granted") return;
+        if (perm.receive !== "granted") { console.log("[vero push] permission:", perm.receive); try { window.localStorage.setItem("vero_push_status", "Phone alerts: permission is " + perm.receive); } catch (e) {} return; }
         try { await PushNotifications.removeAllListeners(); } catch (e) {}
         await PushNotifications.addListener("registration", async (token) => {
           try {
-            await supabase.from("device_tokens").upsert({
-              token: token.value,
-              user_id: session.user.id,
-              shop_id: SHOP_ID,
-              platform: "ios",
-              updated_at: new Date().toISOString(),
-            }, { onConflict: "token" });
-          } catch (e) { try { console.warn("[vero] save push token failed", e); } catch (_) {} }
+            await ensureFreshSession(); // make sure the JWT is fresh so auth.uid() resolves
+            const { error } = await supabase.rpc("save_device_token", { p_token: token.value, p_shop: SHOP_ID, p_platform: "ios" });
+            console.log(error ? "[vero push] token save FAILED: " + (error.message || "") : "[vero push] token saved — booking alerts on");
+            try { window.localStorage.setItem("vero_push_status", error ? ("Phone alerts: save error — " + (error.message || "unknown")) : "Phone alerts: ON \u2705"); } catch (e) {}
+          } catch (e) { console.log("[vero push] save threw: " + (e && e.message ? e.message : String(e))); try { window.localStorage.setItem("vero_push_status", "Phone alerts: save error — " + (e && e.message ? e.message : String(e))); } catch (_) {} }
         });
         await PushNotifications.addListener("registrationError", (err) => {
-          try { console.warn("[vero] push registration error", err); } catch (e) {}
+          console.log("[vero push] Apple registration error: " + (err && err.error ? err.error : JSON.stringify(err)));
+          try { window.localStorage.setItem("vero_push_status", "Phone alerts: Apple didn't return a token — " + (err && err.error ? err.error : "registration error")); } catch (e) {}
         });
         await PushNotifications.register();
-      } catch (e) { try { console.warn("[vero] push setup skipped", e); } catch (_) {} }
+      } catch (e) { console.log("[vero push] setup failed: " + (e && e.message ? e.message : String(e))); try { window.localStorage.setItem("vero_push_status", "Phone alerts: setup failed — " + (e && e.message ? e.message : String(e))); } catch (_) {} }
     })();
-    return () => { active = false; };
-  }, [session?.user?.id, SHOP_ID]);
+  }, [authReady, session?.user?.id, SHOP_ID]);
   // Master ("All Locations") mode: turned on by the location switcher via ?master=1. SHOP_ID stays
   // a real shop in the background (harmless); when masterMode is on we render the account overview
   // instead of a single shop's dashboard.
@@ -1253,6 +1298,7 @@ function App() {
     if (slot.running) { slot.queued = items; savingRef.current[table] = slot; return; }
     slot.running = true; slot.queued = null; savingRef.current[table] = slot;
     try {
+      await ensureFreshSession(); // refresh a stale token before writing (fixes native 42501)
       const list = items || [];
       const rows = list.map((it, i) => ({ id: String(it.id ?? `${table}_${i}`), shop_id: SHOP_ID, data: it }));
       // 1. Upsert what we currently have — adds new rows, updates existing ones, destroys nothing.
@@ -2283,6 +2329,22 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject }) 
       cancelUrl: (typeof window !== "undefined" && appt.manageToken) ? `${window.location.origin}/manage?t=${appt.manageToken}` : "",
     };
     fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: m.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: subject || `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
+  } catch (e) {}
+}
+
+// Buzz the shop's phones (native app push) about a staff-side appointment event.
+// Same server endpoint the online-booking path uses, so closed-app notifications
+// behave identically no matter where the change came from. Fire-and-forget — a
+// push failure must never affect the appointment itself.
+function fireStaffPush({ shopId, title, appt }) {
+  try {
+    if (!shopId || !appt) return;
+    const whenStr = appt.bookedFor ? new Date(appt.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+    fetch(API_BASE + "/api/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shopId, title, body: [appt.name, appt.title || appt.serviceName, whenStr].filter(Boolean).join(" · ") }),
+    }).catch(() => {});
   } catch (e) {}
 }
 
@@ -7760,7 +7822,7 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
   if (creating) return <OpenShopEditor onClose={() => setCreating(false)} onCreated={enter} />;
   return (
     <div style={{ position: "relative", minHeight: "100dvh", background: "var(--bg)", color: "var(--text)" }}>
-      <div style={{ borderBottom: "1px solid var(--line)", padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 16px) 20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
         <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600 }}>ALL LOCATIONS</div>
         <button onClick={() => onSignOutAccount && onSignOutAccount()} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, fontFamily: FONT_BODY, cursor: "pointer" }}>Sign out</button>
       </div>
@@ -7847,6 +7909,63 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   }, [authEmail, providers]);
   const me = providers.find((p) => p.id === signedInAs);
   const isOwner = me?.pulseRole === "owner";
+
+  // ---- In-app appointment notifications ----------------------------------
+  // One watcher over the synced appts list. Any appointment that newly appears, or
+  // whose time/day changes, becomes a notification — no matter the source: an online
+  // booking, an appointment you enter on your phone, or a drag-move on the calendar.
+  // Each device derives its own bell from the same synced data, so it's reliable with
+  // zero dependence on push delivery, Apple, or the carrier. The OS-push "buzz when
+  // the app is closed" layer rides on these same events once the device token lands.
+  const [notifs, setNotifs] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifSeenAt, setNotifSeenAt] = useState(() => {
+    if (typeof window === "undefined") return Date.now();
+    const v = window.localStorage.getItem("vero_notif_seen");
+    return v ? Number(v) : Date.now();
+  });
+  const apptSnapRef = useRef(null);     // id -> { start, bookedFor } at last observation
+  const notifReadyRef = useRef(false);  // gate so the initial backlog never floods the bell
+  // Seed the baseline ~1.5s after data loads (covers appts arriving in stages), then watch.
+  useEffect(() => {
+    if (!dataLoaded) return;
+    const t = setTimeout(() => {
+      const snap = {};
+      for (const a of (appts || [])) { if (a && a.id != null) snap[String(a.id)] = { start: a.start, bookedFor: a.bookedFor }; }
+      apptSnapRef.current = snap;
+      notifReadyRef.current = true;
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [dataLoaded]);
+  useEffect(() => {
+    if (!notifReadyRef.current) return; // baseline not seeded yet
+    const snap = apptSnapRef.current || {};
+    const nextSnap = {};
+    const fresh = [];
+    for (const a of (appts || [])) {
+      if (!a || a.id == null) continue;
+      const key = String(a.id);
+      nextSnap[key] = { start: a.start, bookedFor: a.bookedFor };
+      if (a.status === "block" || a.status === "cancelled") continue;
+      const prev = snap[key];
+      if (!prev) {
+        fresh.push({ id: "nn_" + key + "_" + Date.now(), apptId: key, kind: "new", name: a.name || a.title || "New booking", providerId: a.providerId, when: a.bookedFor, start: a.start, ts: Date.now() });
+      } else if (prev.start !== a.start || prev.bookedFor !== a.bookedFor) {
+        fresh.push({ id: "nm_" + key + "_" + Date.now(), apptId: key, kind: "moved", name: a.name || a.title || "Client", providerId: a.providerId, when: a.bookedFor, start: a.start, ts: Date.now() });
+      }
+    }
+    apptSnapRef.current = nextSnap;
+    if (fresh.length) setNotifs((cur) => [...fresh, ...cur].slice(0, 50));
+  }, [appts]);
+  // Owners see the whole shop; a barber sees their own chair (mirrors the per-role
+  // notification settings). Your own entries appear here too — that's intended.
+  const myNotifs = notifs.filter((n) => isOwner || n.providerId === signedInAs);
+  const unseenCount = myNotifs.filter((n) => n.ts > notifSeenAt).length;
+  const markNotifsSeen = () => {
+    const t = Date.now(); setNotifSeenAt(t);
+    try { window.localStorage.setItem("vero_notif_seen", String(t)); } catch (e) {}
+  };
+
   // Pulse 2.0: owners can also "view as" another barber or "shop" totals. Barbers can't.
   const [pulseView, setPulseView] = useState("me"); // "me" | "shop" | <providerId>
   // Reset pulseView whenever the signed-in user changes
@@ -7928,10 +8047,48 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
 
   return (
     <div style={{ position: "relative", minHeight: "100dvh" }}>
-      <div style={{ borderBottom: "1px solid var(--line)", padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 16px) 20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
         <button onClick={() => { if (pulseDetail) { setPulseDetail(null); return; } if (tab === "pulse" && !activeClient) { onExit(); return; } setActiveClient(null); setTab("pulse"); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontFamily: "'Jost', sans-serif" }}><ArrowLeft size={16} /> {pulseDetail ? "Pulse" : (tab === "pulse" && !activeClient ? "Home" : "Pulse")}</button>
         <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} />
-        <div style={{ width: 50 }} />
+        <div style={{ width: 50, display: "flex", justifyContent: "flex-end", position: "relative" }}>
+          <button
+            onClick={() => { setNotifOpen((v) => { const nv = !v; if (nv) markNotifsSeen(); return nv; }); }}
+            aria-label="Notifications"
+            style={{ background: "none", border: "none", padding: 6, position: "relative", color: "var(--text)", cursor: "pointer", lineHeight: 0 }}
+          >
+            <Bell size={20} />
+            {unseenCount > 0 && (
+              <span style={{ position: "absolute", top: 0, right: 0, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 9, background: "var(--live, var(--gold))", color: "#0F1115", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>{unseenCount > 9 ? "9+" : unseenCount}</span>
+            )}
+          </button>
+          {notifOpen && (
+            <>
+              <div onClick={() => setNotifOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div style={{ position: "absolute", top: 38, right: 0, width: 300, maxHeight: 380, overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "0 18px 50px rgba(0,0,0,0.45)", zIndex: 41 }}>
+                <div style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Notifications</span>
+                  {myNotifs.length > 0 && <button onClick={() => { setNotifs([]); setNotifOpen(false); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 12.5, cursor: "pointer" }}>Clear</button>}
+                </div>
+                {myNotifs.length === 0 ? (
+                  <div style={{ padding: "26px 16px", textAlign: "center", color: "var(--sub)", fontSize: 13.5 }}>You're all caught up.</div>
+                ) : myNotifs.map((n) => {
+                  const d = n.when ? new Date(n.when) : null;
+                  const sm = n.start || 0, hr = Math.floor(sm / 60), mn = sm % 60, ap = hr >= 12 ? "PM" : "AM", h12 = (hr % 12) || 12;
+                  const dayStr = d ? d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "";
+                  return (
+                    <button key={n.id} onClick={() => { setNotifOpen(false); setActiveClient(null); setPulseDetail(null); setTab("calendar"); }} style={{ width: "100%", textAlign: "left", background: "none", border: "none", borderBottom: "1px solid var(--border)", padding: "12px 16px", cursor: "pointer", display: "flex", gap: 11, alignItems: "flex-start" }}>
+                      <span style={{ width: 7, height: 7, borderRadius: 7, marginTop: 6, flexShrink: 0, background: n.kind === "new" ? "var(--live, var(--gold))" : "var(--sub)" }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: "block", fontSize: 13.5, color: "var(--text)", fontWeight: 500 }}>{n.kind === "new" ? "New booking" : "Appointment moved"}{isOwner ? "" : ""}</span>
+                        <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{[n.name, dayStr && `${dayStr} · ${h12}:${String(mn).padStart(2, "0")} ${ap}`].filter(Boolean).join(" — ")}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
         {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenPayments={() => setPulseDetail("payments")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} showToast={showToast} />}
@@ -7941,7 +8098,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} onOpenClient={(c) => { setPulseDetail(null); setActiveClient(c); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
@@ -8191,7 +8348,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const SectionHeader = ({ title }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
       <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, fontSize: 16 }}><ChevronLeft size={20} /></button>
-      <div><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{form.name || "SERVICE"}</div><h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{title}</h2></div>
+      <div><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{form.name || "SERVICE"}</div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{title}</h2></div>
     </div>
   );
   const SaveBar = () => (
@@ -8349,35 +8506,45 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // ---- STAFF section ----
   const staffSection = (
     <>
-      <SectionHeader title="Staff" />
+      <SectionHeader title="Staff & pricing" />
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Everyone offers this by default. Turn someone off, or give them their own time and price. Blank = the service default ({form.duration || "—"} min · ${form.price || "—"}).</p>
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
-        {staffList.map((p, i) => {
+      <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+        {staffList.map((p) => {
           const e = form.staff[p.id] || { on: true, duration: null, price: null };
           const on = e.on !== false;
-          const overridden = (e.duration != null && e.duration !== "") || (e.price != null && e.price !== "");
+          const durOver = e.duration != null && e.duration !== "";
+          const priceOver = e.price != null && e.price !== "";
+          const overridden = durOver || priceOver;
           return (
-            <div key={p.id} style={{ padding: "15px 16px", borderTop: i ? "1px solid var(--line)" : "none", opacity: on ? 1 : 0.5 }}>
+            <div key={p.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "15px 16px", opacity: on ? 1 : 0.55, transition: "opacity .18s ease" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
-                  <span style={{ width: 34, height: 34, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 15, flexShrink: 0 }}>{p.name.charAt(0)}</span>
-                  <span style={{ fontSize: 16, fontWeight: 500 }}>{p.name}</span>
+                  <span style={{ width: 34, height: 34, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 15, flexShrink: 0 }}>{p.name.charAt(0)}</span>
+                  <span style={{ fontSize: 16, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
                 </div>
                 <Toggle on={on} onClick={() => setStaff(p.id, { on: !on })} />
               </div>
               {on && (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap", paddingLeft: 45 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <input type="number" value={e.duration ?? ""} placeholder={String(form.duration || "—")} onChange={(ev) => setStaff(p.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ width: 52, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 8px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "center", fontFamily: FONT_BODY }} />
-                    <span style={{ fontSize: 13, color: "var(--sub)" }}>min</span>
+                <div style={{ marginTop: 13 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderTop: "1px solid var(--line)" }}>
+                    <span style={{ fontSize: 14, color: "var(--sub)" }}>Duration</span>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                      <input type="number" inputMode="numeric" value={e.duration ?? ""} placeholder={String(form.duration || "—")} onChange={(ev) => setStaff(p.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ width: 48, background: "transparent", border: "none", borderBottom: "1px solid var(--border2)", padding: "2px 0", color: durOver ? "var(--live)" : "var(--text)", fontSize: 16, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
+                      <span style={{ fontSize: 14, color: "var(--sub)" }}>min</span>
+                    </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 13, color: "var(--sub)" }}>$</span>
-                    <input type="number" value={e.price ?? ""} placeholder={String(form.price || "—")} onChange={(ev) => setStaff(p.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ width: 52, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 8px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "center", fontFamily: FONT_BODY }} />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderTop: "1px solid var(--line)" }}>
+                    <span style={{ fontSize: 14, color: "var(--sub)" }}>Price</span>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+                      <span style={{ fontSize: 16, fontWeight: 500, color: priceOver ? "var(--live)" : "var(--text)" }}>$</span>
+                      <input type="number" inputMode="decimal" value={e.price ?? ""} placeholder={String(form.price || "—")} onChange={(ev) => setStaff(p.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ width: 62, background: "transparent", border: "none", borderBottom: "1px solid var(--border2)", padding: "2px 0", color: priceOver ? "var(--live)" : "var(--text)", fontSize: 16, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
+                    </div>
                   </div>
-                  {overridden
-                    ? <button onClick={() => setStaff(p.id, { duration: null, price: null })} style={{ marginLeft: "auto", background: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 500, padding: 0 }}>Reset</button>
-                    : <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--faint)" }}>Using defaults</span>}
+                  <div style={{ paddingTop: 11, borderTop: "1px solid var(--line)", textAlign: "right" }}>
+                    {overridden
+                      ? <button onClick={() => setStaff(p.id, { duration: null, price: null })} style={{ background: "none", color: "var(--gold)", fontSize: 13, fontWeight: 500, padding: 0 }}>Reset to default</button>
+                      : <span style={{ fontSize: 13, color: "var(--faint)" }}>Using service default</span>}
+                  </div>
                 </div>
               )}
             </div>
@@ -8687,7 +8854,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const hubRows = [
     { id: "details", label: "Details", sub: `$${form.price || "—"} · ${form.duration || "—"} min` },
     { id: "cuttypes", label: "Cut types", sub: (form.cutTypes && form.cutTypes.length) ? `${form.cutTypes.length} option${form.cutTypes.length === 1 ? "" : "s"}` : "None" },
-    { id: "staff", label: "Staff", sub: `${staffList.filter((p) => form.staff[p.id]?.on !== false).length} of ${staffList.length} offering` },
+    { id: "staff", label: "Staff & pricing", sub: `${staffList.filter((p) => form.staff[p.id]?.on !== false).length} of ${staffList.length} offering` },
     { id: "customizations", label: "Add-ons", sub: `${form.addonGroups.length} group${form.addonGroups.length !== 1 ? "s" : ""}` },
     { id: "refphotos", label: "Reference photos", sub: refPhotoCount === 0 ? "None yet" : `${refPhotoCount} photo${refPhotoCount === 1 ? "" : "s"}` },
     { id: "booking", label: "Online booking", sub: !b.available ? "Off" : ((b.whoCanBook === "returning") ? "Returning only" : "Everyone") },
@@ -8777,7 +8944,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
               <button onClick={() => setLibOpen(false)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /> Menu</button>
             </div>
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 8, paddingLeft: 4 }}>Cut Styles</h2>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 8, paddingLeft: 4 }}>Cut Styles</h2>
             <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20, paddingLeft: 4 }}>Your styles in one place. Edit a style here and it updates on every service that offers it. Price and time stay set per service.</p>
             {(cutLibrary || []).length === 0 ? (
               <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, color: "var(--sub)", fontSize: 15, lineHeight: 1.5 }}>No styles yet. They'll appear here once your services have cut styles.</div>
@@ -8824,7 +8991,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 <button onClick={() => setEditing(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
                 <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>SERVICES</span>
               </div>
-              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, letterSpacing: -0.3, marginBottom: 22 }}>{form.name || (editing === "new" ? "New service" : "Service")}</h2>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: -0.3, marginBottom: 22 }}>{form.name || (editing === "new" ? "New service" : "Service")}</h2>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 17px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 500 }}>Visible to clients</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{b.available !== false ? "Shows on your booking page" : "Internal only — hidden from clients"}</div>
+                </div>
+                <Toggle on={b.available !== false} onClick={() => setBooking({ available: b.available === false })} />
+              </div>
               <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
                 {hubRows.map((r, i) => (
                   <button key={r.id} onClick={() => setSection(r.id)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "18px 17px", minHeight: 64, background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
@@ -8928,7 +9102,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   return (
     <div className="fade-up">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: "-0.4px" }}>Menu</h2>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, letterSpacing: "-0.4px" }}>Menu</h2>
         <button onClick={() => setEditMode((v) => !v)} style={{ background: "none", color: "var(--gold)", fontSize: 15.5, fontWeight: editMode ? 600 : 500, padding: "6px 2px" }}>{editMode ? "Done" : "Edit"}</button>
       </div>
       <p style={{ color: "var(--sub)", fontSize: 13, marginBottom: 20, fontWeight: 400, lineHeight: 1.5 }}>{editMode ? "Drag the handle to reorder · tap − to remove." : "Your services, grouped. Tap one to edit it."}</p>
@@ -8988,7 +9162,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   )}
                   {editMode
                     ? <span onTouchStart={touchStart(s.id, cat, inCat.map((x) => x.id))} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchEnd} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", flexShrink: 0, padding: "8px 2px 8px 8px", cursor: held ? "grabbing" : "grab" }}><GripVertical size={20} style={{ color: held ? "var(--gold)" : "var(--faint)" }} /></span>
-                    : <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />}
+                    : (() => { const live = s.booking?.available !== false; return (
+                      <>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: live ? "var(--live)" : "var(--sub)", flexShrink: 0, whiteSpace: "nowrap" }}>
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: live ? "var(--live)" : "var(--faint)" }} />{live ? "Live" : "Internal"}
+                        </span>
+                        <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                      </>
+                    ); })()}
                 </div>
                 );
               })}
@@ -13753,7 +13934,7 @@ function ColumnOrderEditor({ providers, setProviders }) {
     </div>
   );
 }
-function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId }) {
   const sizeId = business?.calendarRowSize || "L";
   // Visible calendar window — configurable in Calendar Settings; falls back to 7 AM–10 PM.
   const DAY_START = ((business?.calendar?.dayStartHr ?? 7)) * 60;
@@ -13805,6 +13986,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const dur = src.end - src.start;
           const startMin = (summary.rebookStart != null) ? summary.rebookStart : earliestOpenSlot(src.providerId, nd, dur);
           const newAppt = { ...src, id: "rb" + Date.now() + Math.floor(Math.random() * 1000), status: "confirmed", paid: null, prepaid: false, rebookDiscount: (business?.rebook?.discountEnabled !== false ? (business?.rebook?.discount || 0) : 0), rebookDiscountType: business?.rebook?.discountType || "amount", bookedFor: nd.toISOString(), start: startMin, end: startMin + dur, photos: 0, hasPhotos: false, hasNote: false };
+          fireStaffPush({ shopId, title: "New booking", appt: newAppt });
           done.push(newAppt);
         }
       }
@@ -14067,6 +14249,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     const moved = { ...p.appt, start: p.newStart, end: p.newEnd, bookedFor: bf.toISOString() };
     setAppts(appts.map((a) => a.id === p.appt.id ? moved : a));
     if (notifyMove) { const _cl = (clients || []).find((c) => c.id === p.appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: moved, business, providers, contact: { email: _cl.email || "", phone: p.appt.phone || _cl.phone || "" } }); }
+    fireStaffPush({ shopId, title: "Appointment moved", appt: moved });
     showToast(notifyMove ? `${p.appt.name} moved — client notified.` : `${p.appt.name} moved to ${fmtTime(p.newStart)}.`);
     setPending(null);
     setConflictModal(null);
@@ -14241,6 +14424,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     setAppts((cur) => [...cur, newAppt]);
     // Staff-created booking → fire the confirmation too (same engine as online bookings).
     fireApptNotify({ msgId: "booked", appt: newAppt, business, providers, contact: { email: (bookClient ? bookClient.email : walkInEmail) || "", phone: (bookClient ? bookClient.phone : walkInPhone) || "" }, subject: `${business.name}: Appointment confirmed` });
+    fireStaffPush({ shopId, title: "New booking", appt: newAppt });
     setNewApptSlot(null);
     setConflictModal(null);
     showToast(`${newAppt.name} booked at ${fmtTime(useStart)}.`);
@@ -14870,6 +15054,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       {open && (
         <AppointmentSheet
           appt={open}
+          shopId={shopId}
           providers={providers}
           clients={clients}
           setClients={setClients}
@@ -15981,7 +16166,7 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
   );
 }
 
-function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, onOpenClient, showToast }) {
+function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, onOpenClient, showToast, shopId }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
@@ -16150,7 +16335,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const DUR_OPTS = []; for (let m = 5; m <= 240; m += 5) DUR_OPTS.push(m);
   const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setDraftDate(appt.bookedFor ? new Date(appt.bookedFor) : new Date()); setNotifyChange(false); setPickList(null); setDateOpen(false); setMode("edit"); setMenuOpen(false); };
   const cancelEdit = () => { setPickList(null); setDateOpen(false); setNotifyChange(false); setMode("detail"); };
-  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged; onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); if (willNotify) { const _cl = (clients || []).find((c) => c.id === appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: { ...appt, start: draftStart, end: draftStart + draftDur, providerId: draftProvider, bookedFor: bf.toISOString() }, business, providers, contact: { email: _cl.email || "", phone: appt.phone || _cl.phone || "" } }); } showToast(willNotify ? "Updated — client notified." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
+  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged; onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); if (willNotify) { const _cl = (clients || []).find((c) => c.id === appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: { ...appt, start: draftStart, end: draftStart + draftDur, providerId: draftProvider, bookedFor: bf.toISOString() }, business, providers, contact: { email: _cl.email || "", phone: appt.phone || _cl.phone || "" } }); } if (timeOrDayChanged) { fireStaffPush({ shopId, title: "Appointment moved", appt: { ...appt, start: draftStart, bookedFor: bf.toISOString() } }); } showToast(willNotify ? "Updated — client notified." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
   // TODO(SMS live): when willNotify, dispatch the reschedule/moved template to the client's phone.
 
   // ---- price (admin-editable; per-appointment override stored on appt.price) ----
