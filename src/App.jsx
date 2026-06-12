@@ -628,7 +628,7 @@ function fmtPhone(number) {
 // ---- Stripe (client side) ----
 // The publishable key is meant to be public and safe to ship in the app bundle.
 // The SECRET key lives only in Vercel (env var) and is used by /api/stripe — never here.
-const STRIPE_PUBLISHABLE_KEY = "pk_live_51TdVev0XV9TtWHCqYNf2SU6kjZXGqGXGp2hSyjKzpbPWFgboCljXllRK9nJ4tESrSnhe6Rp82iGzyPyk7FxVzZCY00sZKQupPQ";
+const STRIPE_PUBLISHABLE_KEY = "pk_test_51TdVev0XV9TtWHCq8s4dGMpa6zLDn4otUSTcFNtlrRIPJGedN9dEKPeSQMZxFxJgEXW4cW2n1JjAT7p6MPS5Rdxe00bogFrsmR";
 let _stripePromise = null;
 function getStripe() {
   if (_stripePromise) return _stripePromise;
@@ -10332,6 +10332,8 @@ function PhoneNumbersEditor({ phones, onChange }) {
 
 // Checkout Settings — payment methods, signatures, receipts, and checkout behavior.
 function CheckoutSettingsEditor({ c, onChange }) {
+  const sc = (c && c.cofSurcharge) || {};
+  const scSet = (patch) => onChange({ ...c, cofSurcharge: { on: !!sc.on, pct: sc.pct ?? 1.5, ...patch } });
   const set = (patch) => onChange({ ...c, ...patch });
   const methods = c.customMethods || [];
   const setMethod = (i, val) => { const m = [...methods]; m[i] = val; set({ customMethods: m }); };
@@ -10364,6 +10366,22 @@ function CheckoutSettingsEditor({ c, onChange }) {
           </div>
         ))}
         <button className="lift" onClick={addMethod} style={{ width: "100%", background: "transparent", boxShadow: "none", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 10, padding: 11, fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 4 }}><Plus size={15} /> Add method</button>
+      </Card>
+
+      <Card title="Card-on-file surcharge" desc="Cards charged on file cost more to process. Turn this on to pass that fee to the client — the surcharged total shows up front at checkout.">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: sc.on ? 14 : 0 }}>
+          <span style={{ fontSize: 14.5, color: "var(--text2)" }}>Pass the fee to the client</span>
+          <Toggle on={!!sc.on} onClick={() => scSet({ on: !sc.on })} />
+        </div>
+        {sc.on && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ position: "relative", width: 110 }}>
+              <input type="number" inputMode="decimal" step="0.1" min="0" max="4" value={sc.pct ?? 1.5} onChange={(e) => scSet({ pct: Math.max(0, Math.min(4, Number(e.target.value) || 0)) })} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 26px 11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, textAlign: "center" }} />
+              <span style={{ position: "absolute", right: 11, top: "50%", transform: "translateY(-50%)", color: "var(--sub)", fontSize: 14, pointerEvents: "none" }}>%</span>
+            </div>
+            <span style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4 }}>Added on top of the total when charging a saved card. Most shops use 1.5%.</span>
+          </div>
+        )}
       </Card>
 
       <div style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginBottom: 14, padding: "0 4px" }}>Tip buttons & options are set in <strong style={{ color: "var(--sub)" }}>Payments & Checkout → Tipping</strong>.</div>
@@ -15565,6 +15583,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           service={services.find((s) => s.id === checkout.serviceId)}
           provider={providers.find((p) => p.id === checkout.providerId)}
           business={business}
+          setBusiness={setBusiness}
+          allServices={services}
           clients={clients}
           appts={appts}
           setClients={setClients}
@@ -15592,9 +15612,61 @@ const APPT_STATUSES = [
 ];
 
 // ============================================================
-// CHECKOUT — staged card-reader flow: charge → tap → tip → approved → rebook
+// CHECKOUT — real POS: editable sale → payment method → ledger record → rebook
 // ============================================================
-function Checkout({ appt, service, provider, business, clients, appts, setClients, showToast, onClose, onDone }) {
+// Card-present manual entry (until a hardware reader is paired): Stripe Element →
+// sale_intent → confirmCardPayment. Raw card numbers never touch our code or server.
+function CardChargeInline({ amount, appt, onCancel, onPaid, money }) {
+  const cardBox = useRef(null);
+  const stripeRef = useRef(null);
+  const elRef = useRef(null);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    let dead = false;
+    getStripe().then((stripe) => {
+      if (dead) return;
+      if (!stripe) { setErr("Couldn't load Stripe — check your connection."); return; }
+      stripeRef.current = stripe;
+      const elements = stripe.elements();
+      const card = elements.create("card", { style: { base: { fontSize: "16px", color: "#232221", fontFamily: "inherit", "::placeholder": { color: "#A39C8A" } } } });
+      elRef.current = card;
+      requestAnimationFrame(() => { if (!dead && cardBox.current) { try { card.mount(cardBox.current); setReady(true); } catch (e) { setErr("Couldn't open the card field."); } } });
+    });
+    return () => { dead = true; try { elRef.current && elRef.current.unmount(); } catch (e) {} elRef.current = null; stripeRef.current = null; };
+  }, []);
+  const charge = async () => {
+    const stripe = stripeRef.current, card = elRef.current;
+    if (!stripe || !card || busy) return;
+    setBusy(true); setErr("");
+    try {
+      const pm = await stripe.createPaymentMethod({ type: "card", card });
+      if (pm.error) throw new Error(pm.error.message);
+      const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: `Checkout — ${appt?.name || "client"}` });
+      if (!intent.clientSecret) throw new Error(intent.error || "Couldn't start the charge.");
+      const conf = await stripe.confirmCardPayment(intent.clientSecret, { payment_method: pm.paymentMethod.id });
+      if (conf.error) throw new Error(conf.error.message);
+      if (!conf.paymentIntent || conf.paymentIntent.status !== "succeeded") throw new Error("The payment didn't complete. Try again.");
+      const c4 = pm.paymentMethod.card || {};
+      onPaid({ id: conf.paymentIntent.id, brand: c4.brand || null, last4: c4.last4 || null });
+    } catch (e) { setErr(e.message || "Charge failed."); setBusy(false); return; }
+    setBusy(false);
+  };
+  return (
+    <div style={{ padding: "20px 24px 32px" }}>
+      <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 500 }}>CARD</div>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.5, marginBottom: 18 }}>{money(amount)}</h2>
+      <div style={{ background: "#FFFFFF", border: "1px solid var(--border)", borderRadius: 13, padding: "15px 14px", marginBottom: 12 }}><div ref={cardBox} /></div>
+      {err && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 12, lineHeight: 1.4 }}>{err}</p>}
+      <button className="lift" disabled={!ready || busy} onClick={charge} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 15.5, fontWeight: 600, borderRadius: 14, border: "none", opacity: !ready || busy ? 0.6 : 1 }}>{busy ? "Charging…" : `Charge ${money(amount)}`}</button>
+      <button onClick={onCancel} disabled={busy} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 8 }}>Back</button>
+      <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.5, marginTop: 10 }}>Manual entry for now — pairs with a tap-to-pay reader later.</p>
+    </div>
+  );
+}
+
+function Checkout({ appt, service, provider, business, setBusiness, clients, appts, setClients, allServices = [], showToast, onClose, onDone }) {
   // ---- auto-timing: measure actual service time, round UP to next 5 ----
   const measuredMin = appt.serviceStartedAt ? Math.round((Date.now() - appt.serviceStartedAt) / 60000) : null;
   const roundUp5 = (m) => Math.max(5, Math.ceil(m / 5) * 5);
@@ -15629,21 +15701,70 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
   })();
   const rhythmWeek = cadenceDays ? rebookCfg.weeks.reduce((best, w) => Math.abs(w * 7 - cadenceDays) < Math.abs(best * 7 - cadenceDays) ? w : best, rebookCfg.weeks[0]) : null;
   const base = lockedApptPrice(appt, service);
-  const [stage, setStage] = useState("review"); // review → reader → tip → approving → approved → rebook → done
-  const [tipPct, setTipPct] = useState(tipCfg.smartDefault ?? tipCfg.presets[0]);
-  const [customTip, setCustomTip] = useState(null);
+  const [stage, setStage] = useState("summary"); // summary → method → card → approved → rebook → done
+  const [tipPct, setTipPct] = useState(tipCfg.enabled ? (tipCfg.smartDefault ?? tipCfg.presets[0]) : 0);
+  const [customTip, setCustomTip] = useState(tipCfg.enabled ? null : 0);
+  const [tipOpen, setTipOpen] = useState(false);
   const [rebookWeeks, setRebookWeeks] = useState(null);
   const [customDate, setCustomDate] = useState(null); // ISO date string when picked manually
   const [chosenStart, setChosenStart] = useState(null); // minutes-of-day the barber picked for the rebook
   const [pickView, setPickView] = useState("list"); // "list" chips | "calendar" day-timeline
-  const tipAmt = customTip != null ? customTip : +(base * tipPct / 100).toFixed(2);
-  const total = +(base + tipAmt).toFixed(2);
+  // ---- POS sale lines: the appointment's locked total is the first line; more can be added ----
+  const [lines, setLines] = useState([{ id: "main", name: service?.name || appt.title || "Service", withName: provider?.name || null, price: base }]);
+  const [addSheet, setAddSheet] = useState(null);   // null | "service" | "product"
+  const [editLineId, setEditLineId] = useState(null);
+  const [prodName, setProdName] = useState("");
+  const [prodPrice, setProdPrice] = useState("");
+  const [payBusy, setPayBusy] = useState(false);
+  const [payErr, setPayErr] = useState("");
+  const [paidRec, setPaidRec] = useState(null);     // the ledger record written on success
+  const subtotal = +lines.reduce((s, l) => s + (Number(l.price) || 0), 0).toFixed(2);
+  const tipAmt = customTip != null ? +Number(customTip).toFixed(2) : +(subtotal * tipPct / 100).toFixed(2);
+  const total = +(subtotal + tipAmt).toFixed(2);
+  // Card-on-file surcharge — only when the shop turned it on in Checkout & money.
+  const scCfg = (business?.checkout && business.checkout.cofSurcharge) || {};
+  const scOn = !!scCfg.on;
+  const scPct = Number(scCfg.pct) > 0 ? Number(scCfg.pct) : 1.5;
+  const cofTotal = scOn ? +(total * (1 + scPct / 100)).toFixed(2) : total;
+  const liveMode = business?.payments?.live === true;
+  const cofCard = liveClient && liveClient.card && liveClient.card.paymentMethodId && liveClient.card.stripeCustomerId && !liveClient.card.simulated ? liveClient.card : null;
   const money = (n) => `$${n.toFixed(2)}`;
   const discountOn = rebookCfg.discountEnabled !== false && (rebookCfg.discount || 0) > 0;
   const discLabel = rebookCfg.discountType === "percent" ? `${rebookCfg.discount}%` : money(rebookCfg.discount);
 
-  const tapCard = () => { setStage("reader"); setTimeout(() => setStage(tipCfg.enabled ? "tip" : "approving"), 1700); };
-  const confirmTip = () => { setStage("approving"); setTimeout(() => setStage("approved"), 1400); };
+  // Write the sale into the ledger PaymentsView reads (client.payments, or business.sales for walk-ins).
+  const recordSale = (rec) => {
+    setPaidRec(rec);
+    if (liveClient) setClients(clients.map((c) => c.id === liveClient.id ? { ...c, payments: [...(c.payments || []), rec] } : c));
+    else if (setBusiness) setBusiness((b) => ({ ...b, sales: [...((b && b.sales) || []), { ...rec, clientName: appt.name || "Walk-in" }] }));
+  };
+  const makeRec = (methodId, payRes, charged) => ({
+    id: "pay_" + Date.now().toString(36),
+    ts: Date.now(),
+    apptId: appt.id,
+    type: "sale",
+    status: "paid",
+    method: methodId,
+    amount: charged,
+    tip: tipAmt,
+    surcharge: methodId === "card-on-file" && scOn ? +(charged - total).toFixed(2) : 0,
+    paymentIntentId: (payRes && payRes.id) || null,
+    brand: (payRes && payRes.brand) || null,
+    last4: (payRes && payRes.last4) || null,
+    note: lines.map((l) => l.name).join(" · ") + (provider ? ` — with ${provider.name}` : ""),
+    refunded: 0,
+  });
+  const payCash = () => { recordSale(makeRec("cash", null, total)); setStage("approved"); };
+  const payCardOnFile = async () => {
+    if (!cofCard || payBusy) return;
+    setPayBusy(true); setPayErr("");
+    try {
+      const res = await stripeApi({ action: "charge", customerId: cofCard.stripeCustomerId, paymentMethodId: cofCard.paymentMethodId, amount: cofTotal, description: `Checkout — ${appt.name || "client"}` });
+      if (res && res.status === "succeeded") { recordSale(makeRec("card-on-file", { id: res.id, brand: cofCard.brand, last4: cofCard.last4 }, cofTotal)); setStage("approved"); }
+      else { setPayErr(res && res.error ? res.error : `Stripe returned "${(res && res.status) || "an error"}" — the card may need to be present.`); }
+    } catch (e) { setPayErr(e.message || "Charge failed."); }
+    finally { setPayBusy(false); }
+  };
   useEffect(() => {
     if (stage === "approved") { const t = setTimeout(() => setStage(rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
     if (stage === "rebook" && rhythmWeek != null && rebookWeeks == null && !customDate) { setRebookWeeks(rhythmWeek); }
@@ -15683,66 +15804,106 @@ function Checkout({ appt, service, provider, business, clients, appts, setClient
     </div>
   ), document.body);
 
-  if (stage === "review") return sheet(
+  // ---------- 1 · SALE SUMMARY (editable) ----------
+  if (stage === "summary") return sheet(
     <div style={{ padding: "20px 24px 32px" }}>
       <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 500 }}>CHECKOUT</div>
       <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.5, marginBottom: 4 }}>{appt.name || "Walk-in"}</h2>
-      <p style={{ color: "var(--sub)", fontSize: 15, marginBottom: 24, fontWeight: 300 }}>{service?.name || appt.title} with {provider?.name}</p>
-      <div style={{ background: "var(--panel)", borderRadius: 18, border: "1px solid var(--line)", boxShadow: "var(--shadow-sm)", padding: "6px 18px", marginBottom: 24 }}>
-        <CheckoutRow label={service?.name || appt.title} val={money(base)} />
-        <div style={{ borderTop: "1px solid var(--line)" }}><CheckoutRow label="Total due" val={money(base)} bold /></div>
-      </div>
-      {forgotToStart && (
-        <div style={{ background: "var(--panel)", borderRadius: 18, border: "1px solid var(--line)", padding: "16px 18px", marginBottom: 24 }}>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, marginBottom: 3 }}>How long did this take?</div>
-          <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 14, lineHeight: 1.45 }}>The timer wasn't started — pick the closest so it tunes {(liveClient.name || "this client").split(" ")[0]}'s next booking.</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 9 }}>
-            {recoverOptions.map((m) => { const on = recoveredMin === m; return (
-              <button key={m} onClick={() => { setRecoveredMin(m); saveDuration(m); }} style={{ padding: 13, borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--text)", fontSize: 15, fontWeight: on ? 600 : 400, textAlign: "center" }}>
-                {m} min{m === bookedDur ? <span style={{ display: "block", fontSize: 11, fontWeight: 400, opacity: 0.7 }}>booked</span> : null}
-              </button>
-            ); })}
-            <button onClick={() => { const v = prompt("How many minutes did it take?"); const n = Math.max(5, Math.round((parseFloat(v) || 0) / 5) * 5); if (n >= 5) { setRecoveredMin(n); saveDuration(n); } }} style={{ padding: 13, borderRadius: 11, border: `1px solid ${recoveredMin != null && !recoverOptions.includes(recoveredMin) ? "var(--gold)" : "var(--border2)"}`, background: recoveredMin != null && !recoverOptions.includes(recoveredMin) ? "var(--gold)" : "var(--panel2)", color: recoveredMin != null && !recoverOptions.includes(recoveredMin) ? "var(--on-gold)" : "var(--text)", fontSize: 15, textAlign: "center", gridColumn: "1 / -1" }}>{recoveredMin != null && !recoverOptions.includes(recoveredMin) ? `Custom · ${recoveredMin} min` : "Custom…"}</button>
+      <p style={{ color: "var(--sub)", fontSize: 15, marginBottom: 22, fontWeight: 300 }}>{liveClient && liveClient.since ? `Client since ${liveClient.since}` : (service?.name || appt.title)}</p>
+
+      <div style={{ background: "var(--panel)", borderRadius: 18, border: "1px solid var(--line)", boxShadow: "var(--shadow-sm)", padding: "2px 18px", marginBottom: 16 }}>
+        {lines.map((l) => (
+          <div key={l.id} style={{ padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{l.name}{l.withName && <span style={{ color: "var(--sub)", fontWeight: 400 }}> with {l.withName}</span>}</div>
+                {appt.cutLabel && l.id === "main" && <div style={{ marginTop: 7 }}><span style={{ fontSize: 12, background: "var(--panel2)", borderRadius: 7, padding: "4px 9px", color: "var(--text2)" }}>{appt.cutLabel}</span></div>}
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                {editLineId === l.id ? (
+                  <input autoFocus type="number" inputMode="decimal" defaultValue={l.price} onBlur={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setLines(lines.map((x) => x.id === l.id ? { ...x, price: v } : x)); setEditLineId(null); }} onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }} style={{ width: 86, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 9px", color: "var(--text)", fontSize: 15, textAlign: "right", fontFamily: FONT_BODY }} />
+                ) : <div style={{ fontSize: 16, fontWeight: 500 }}>{money(Number(l.price) || 0)}</div>}
+                <div style={{ marginTop: 7, display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                  <button onClick={() => setEditLineId(editLineId === l.id ? null : l.id)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Edit</button>
+                  {l.id !== "main" && <button onClick={() => setLines(lines.filter((x) => x.id !== l.id))} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Remove</button>}
+                </div>
+              </div>
+            </div>
           </div>
+        ))}
+        <div style={{ display: "flex", gap: 10, padding: "14px 0 16px" }}>
+          <button onClick={() => setAddSheet("service")} style={{ flex: 1, textAlign: "center", border: "1px dashed var(--border2)", borderRadius: 11, padding: 12, fontSize: 14, color: "var(--gold)", background: "none", fontWeight: 500, cursor: "pointer" }}>+ Service</button>
+          <button onClick={() => { setProdName(""); setProdPrice(""); setAddSheet("product"); }} style={{ flex: 1, textAlign: "center", border: "1px dashed var(--border2)", borderRadius: 11, padding: 12, fontSize: 14, color: "var(--gold)", background: "none", fontWeight: 500, cursor: "pointer" }}>+ Product</button>
+        </div>
+      </div>
+
+      {addSheet === "service" && (
+        <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16, maxHeight: 280, overflowY: "auto" }}>
+          {(allServices || []).filter((sv) => !sv.archived).map((sv, i) => (
+            <button key={sv.id} onClick={() => { setLines([...lines, { id: "ln_" + Date.now().toString(36), name: sv.name, price: sv.price }]); setAddSheet(null); }} style={{ width: "100%", display: "flex", justifyContent: "space-between", gap: 12, padding: "14px 16px", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left", fontSize: 15, cursor: "pointer" }}>
+              <span>{sv.name}</span><span style={{ color: "var(--sub)" }}>${sv.price}</span>
+            </button>
+          ))}
+          <button onClick={() => setAddSheet(null)} style={{ width: "100%", padding: "12px 16px", background: "none", border: "none", borderTop: "1px solid var(--line)", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
         </div>
       )}
-      <button className="lift" onClick={tapCard} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: "var(--glow)" }}><CreditCard size={18} /> CHARGE CARD</button>
-      <button onClick={onClose} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 6 }}>CANCEL</button>
-    </div>
-  , true, true);
+      {addSheet === "product" && (
+        <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", padding: "14px 16px", marginBottom: 16 }}>
+          <input autoFocus value={prodName} onChange={(e) => setProdName(e.target.value)} placeholder="Product or item name" style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, marginBottom: 10 }} />
+          <div style={{ display: "flex", gap: 10 }}>
+            <input type="number" inputMode="decimal" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} placeholder="$ price" style={{ flex: 1, minWidth: 0, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
+            <button disabled={!prodName.trim() || !(Number(prodPrice) > 0)} onClick={() => { setLines([...lines, { id: "ln_" + Date.now().toString(36), name: prodName.trim(), price: +Number(prodPrice).toFixed(2) }]); setAddSheet(null); }} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "12px 20px", fontSize: 14.5, fontWeight: 600, opacity: !prodName.trim() || !(Number(prodPrice) > 0) ? 0.5 : 1, cursor: "pointer" }}>Add</button>
+          </div>
+          <button onClick={() => setAddSheet(null)} style={{ width: "100%", marginTop: 8, padding: 6, background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+        </div>
+      )}
 
-  if (stage === "reader") return sheet(
-    <div style={{ padding: "56px 28px 64px", textAlign: "center" }}>
-      <div style={{ position: "relative", width: 96, height: 96, margin: "0 auto 28px" }}>
-        <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", animation: "pulse 1.6s var(--ease) infinite" }} />
-        <div style={{ position: "absolute", inset: 16, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center" }}><CreditCard size={32} style={{ color: "var(--on-gold)" }} /></div>
-      </div>
-      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Insert or tap card</div>
-      <p style={{ color: "var(--sub)", fontSize: 15.5, fontWeight: 300, marginBottom: 4 }}>{money(base)} — waiting for card…</p>
-      <p style={{ color: "var(--faint)", fontSize: 13, marginTop: 18 }}>Simulated reader · advancing automatically</p>
-    </div>
-  , false, true);
+      <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 4px", fontSize: 15, color: "var(--sub)" }}><span>Subtotal</span><span style={{ color: "var(--text)" }}>{money(subtotal)}</span></div>
+      <button onClick={() => setTipOpen(!tipOpen)} style={{ width: "100%", display: "flex", justifyContent: "space-between", background: "none", border: "none", padding: "10px 4px", fontSize: 15, color: "var(--sub)", cursor: "pointer", fontFamily: "inherit" }}>
+        <span>Tip <span style={{ color: "var(--gold)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3 }}>{tipOpen ? "done" : "change"}</span></span>
+        <span style={{ color: "var(--text)" }}>{money(tipAmt)}</span>
+      </button>
+      {tipOpen && tipCfg.enabled && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "2px 0 12px" }}>
+          {tipCfg.presets.map((p) => { const on = customTip == null && tipPct === p; return (
+            <button key={p} onClick={() => { setTipPct(p); setCustomTip(null); }} style={{ flex: 1, minWidth: 64, padding: "11px 0", borderRadius: 11, border: on ? "1.5px solid var(--gold)" : "1px solid var(--border)", background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel)", color: on ? "var(--gold)" : "var(--text)", fontWeight: on ? 600 : 400, fontSize: 14.5, cursor: "pointer" }}>{p}%</button>
+          ); })}
+          {tipCfg.allowNoTip !== false && <button onClick={() => setCustomTip(0)} style={{ flex: 1, minWidth: 64, padding: "11px 0", borderRadius: 11, border: customTip === 0 ? "1.5px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", color: customTip === 0 ? "var(--gold)" : "var(--sub)", fontSize: 14.5, cursor: "pointer" }}>None</button>}
+          {tipCfg.allowCustom !== false && <input type="number" inputMode="decimal" placeholder="$ custom" value={customTip != null && customTip !== 0 ? customTip : ""} onChange={(e) => setCustomTip(e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0))} style={{ flex: 1, minWidth: 84, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "11px 12px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY }} />}
+        </div>
+      )}
+      <button className="lift" onClick={() => { setPayErr(""); setStage("method"); }} style={{ width: "100%", marginTop: 8, background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 16, fontWeight: 600, borderRadius: 14, border: "none", boxShadow: "var(--glow)" }}>Charge {money(total)}</button>
+      <button onClick={onClose} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 8 }}>Not yet</button>
+    </div>, true);
 
-  if (stage === "tip") return sheet(
-    <div style={{ padding: "24px 24px 32px" }}>
-      <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 500, textAlign: "center" }}>CARD READ · ADD A TIP</div>
-      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, textAlign: "center", marginBottom: 4 }}>Add a tip?</h2>
-      <p style={{ color: "var(--sub)", fontSize: 15, textAlign: "center", marginBottom: 24, fontWeight: 300 }}>{service?.name || appt.title} · {money(base)}</p>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        {tipCfg.presets.map((p) => { const on = customTip == null && tipPct === p; return (
-          <button key={p} onClick={() => { setCustomTip(null); setTipPct(p); }} style={{ flex: 1, padding: "18px 4px", borderRadius: 16, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
-            <div style={{ fontSize: 20, fontWeight: 700 }}>{p}%</div>
-            <div style={{ fontSize: 13, color: on ? "var(--on-gold)" : "var(--sub)", marginTop: 3 }}>{money(+(base * p / 100).toFixed(2))}</div>
-          </button>
-        ); })}
-      </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        {tipCfg.allowCustom && <button onClick={() => { const v = prompt("Custom tip amount ($)"); if (v != null) setCustomTip(Math.max(0, parseFloat(v) || 0)); }} style={{ flex: 1, padding: "13px 4px", borderRadius: 12, border: `1px solid ${customTip != null && customTip !== 0 ? "var(--gold)" : "var(--border2)"}`, background: customTip != null && customTip !== 0 ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel)", color: customTip != null && customTip !== 0 ? "var(--gold)" : "var(--text)", fontSize: 14 }}>{customTip != null && customTip !== 0 ? `Custom · ${money(customTip)}` : "Custom"}</button>}
-        {tipCfg.allowNoTip && <button onClick={() => setCustomTip(0)} style={{ flex: 1, padding: "13px 4px", borderRadius: 12, border: `1px solid ${customTip === 0 ? "var(--gold)" : "var(--border2)"}`, background: customTip === 0 ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel)", color: customTip === 0 ? "var(--gold)" : "var(--sub)", fontSize: 14 }}>No tip</button>}
-      </div>
-      <button className="lift" onClick={confirmTip} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: "var(--glow)" }}>{tipAmt > 0 ? `TIP ${money(tipAmt)} · TOTAL ${money(total)}` : `CONTINUE · ${money(total)}`}</button>
-    </div>
-  );
+  // ---------- 2 · HOW ARE THEY PAYING ----------
+  if (stage === "method") {
+    const Row = ({ title, sub, right, onClick, disabled }) => (
+      <button disabled={disabled} onClick={onClick} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "17px 18px", background: "var(--panel)", border: "none", borderTop: "1px solid var(--line)", color: "var(--text)", textAlign: "left", opacity: disabled ? 0.45 : 1, cursor: disabled ? "default" : "pointer" }}>
+        <span style={{ fontSize: 16, fontWeight: 500 }}>{title}{sub && <span style={{ color: "var(--sub)", fontWeight: 400, fontSize: 13.5 }}> {sub}</span>}</span>
+        <span style={{ fontSize: 13, color: "var(--sub)", flexShrink: 0 }}>{right}</span>
+      </button>
+    );
+    return sheet(
+      <div style={{ padding: "20px 24px 32px" }}>
+        <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 500 }}>HOW ARE THEY PAYING?</div>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, letterSpacing: -0.5, marginBottom: 18 }}>{money(total)}</h2>
+        {!liveMode && <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5 }}>Payments are in test mode — card options are off. Flip Payments to Live in Checkout &amp; money to charge cards.</div>}
+        {payErr && <div style={{ background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{payErr}</div>}
+        <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+          <div style={{ borderTop: "none" }}><Row title="Card reader" right="Tap, chip, or swipe" disabled={!liveMode || payBusy} onClick={() => { setPayErr(""); setStage("card"); }} /></div>
+          <Row title="Card on file" sub={cofCard ? `${(cofCard.brand || "Card").charAt(0).toUpperCase() + (cofCard.brand || "card").slice(1)} ··${cofCard.last4}` : "none saved"} right={cofCard ? (payBusy ? "Charging…" : (scOn ? `+${scPct}% · ${money(cofTotal)}` : money(total))) : ""} disabled={!liveMode || !cofCard || payBusy} onClick={payCardOnFile} />
+          <Row title="Cash" right="Mark as paid" disabled={payBusy} onClick={payCash} />
+          <Row title="Gift card" right="coming soon" disabled />
+        </div>
+        <button onClick={() => setStage("summary")} style={{ width: "100%", marginTop: 14, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 8 }}>Back</button>
+      </div>, false);
+  }
+
+  // ---------- 2b · CARD PRESENT — manual entry until a reader is paired ----------
+  if (stage === "card") return sheet(
+    <CardChargeInline amount={total} appt={appt} onCancel={() => { setPayErr(""); setStage("method"); }} onPaid={(payRes) => { recordSale(makeRec("card", payRes, total)); setStage("approved"); }} money={money} />, false);
+
 
   if (stage === "approving" || stage === "approved") return sheet(
     <div style={{ padding: "64px 28px 72px", textAlign: "center" }}>
