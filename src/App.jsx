@@ -8455,6 +8455,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [picker, setPicker] = useState(null); // {target}
   const [editMode, setEditMode] = useState(false); // list view: browse vs manage (reorder/delete/rename)
   const [catSheet, setCatSheet] = useState(false); // category manager sheet (add / rename / reorder / delete)
+  const [showArchived, setShowArchived] = useState(false); // list view: archived services collapse
   const cats = (categories && categories.length) ? categories : ["Services"];
   const staffList = (providers || []).filter((p) => p.id !== "anyone");
   // build a default staff map: everyone ON, no overrides (null = use service default)
@@ -8486,14 +8487,17 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     const clean = { ...form, price: Number(form.price), duration: Number(form.duration) || 30, staff: cleanStaff, booking: { ...defaultBooking(), ...(form.booking || {}) } };
     if (editing === "new") setServices([...services, clean]);
     else setServices(services.map((s) => (s.id === editing ? clean : s)));
-    setEditing(null); setSection(null); showToast(`Saved "${form.name}".`);
+    // MangoMint pattern: for an existing service, saving a section lands back on the
+    // read-only service view; only a brand-new service exits to the list.
+    if (editing === "new") setEditing(null);
+    setSection(null); showToast(`Saved "${form.name}".`);
   };
   const remove = (id) => { setServices(services.filter((s) => s.id !== id)); showToast("Service removed."); };
 
   // ---- shared building blocks ----
   const SectionHeader = ({ title }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
-      <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, fontSize: 16 }}><ChevronLeft size={20} /></button>
+      <button onClick={() => { if (editing !== "new") { const s = services.find((x) => x.id === editing); if (s) { const copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; setForm(copy); } } setSection(null); }} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, fontSize: 16 }}><ChevronLeft size={20} /></button>
       <div><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{form.name || "SERVICE"}</div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{title}</h2></div>
     </div>
   );
@@ -9131,6 +9135,68 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           : section === "refphotos" ? referencePhotosSection
           : section === "booking" ? bookingSection
           : section === "timerules" ? timeRulesSection
+          : editing !== "new" ? (() => {
+            // ---- READ-ONLY SERVICE VIEW (MangoMint pattern): calm cards, each with its own Edit ----
+            const live = b.available !== false;
+            const ViewCard = ({ label, sec, rows, empty }) => (
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>{label}</span>
+                  <button onClick={() => setSection(sec)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 4, padding: 0, cursor: "pointer" }}>Edit</button>
+                </div>
+                {(rows && rows.length) ? rows.map((r, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "11px 0", borderBottom: i < rows.length - 1 ? "1px solid var(--line)" : "none", fontSize: 15 }}>
+                    <span style={{ color: r.muted ? "var(--sub)" : "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.l}{r.req && <span style={{ fontStyle: "italic", color: "var(--sub)" }}> required</span>}</span>
+                    <span style={{ color: r.hi ? "var(--live)" : "var(--sub)", flexShrink: 0, fontWeight: r.hi ? 500 : 400 }}>{r.r}</span>
+                  </div>
+                )) : <div style={{ padding: "11px 0", fontSize: 14.5, color: "var(--faint)" }}>{empty || "None yet"}</div>}
+              </div>
+            );
+            const addonRows = (form.addonGroups || []).map((g) => g.type === "addon"
+              ? { l: g.item?.name || "Add-on", req: !!g.required, r: `$${g.item?.price ?? 0}${g.item?.min ? ` · +${g.item.min} min` : ""}` }
+              : { l: g.label || "Choice", r: `${(g.options || []).length} options` });
+            const staffRows = staffList.map((p) => {
+              const e = form.staff?.[p.id] || {};
+              if (e.on === false) return { l: p.name, r: "Not offering", muted: true };
+              const ov = (e.price !== null && e.price !== undefined && e.price !== "") || (e.duration !== null && e.duration !== undefined && e.duration !== "");
+              return { l: p.name, hi: ov, r: `$${(e.price ?? form.price) || "—"} · ${(e.duration ?? form.duration) || "—"} min` };
+            });
+            const cutRows = (form.cutTypes || []).map((c) => ({ l: c.label || "Style", r: c.price !== "" && c.price !== null && c.price !== undefined ? `$${c.price}` : "" }));
+            const archiveSvc = () => {
+              if (typeof window !== "undefined" && !window.confirm(form.archived ? `Restore "${form.name}" to your menu?` : `Archive "${form.name}"? It's hidden from booking and your list, and can be restored anytime.`)) return;
+              setServices(services.map((s) => (s.id === editing ? { ...s, archived: !form.archived } : s)));
+              setEditing(null); setSection(null);
+              showToast(form.archived ? "Service restored." : "Service archived.");
+            };
+            return (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 18 }}>
+                  <button onClick={() => setEditing(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
+                  <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>SERVICES</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
+                  <span style={{ width: 54, height: 54, borderRadius: 13, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{form.photo ? <img src={imgUrl(form.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ width: 13, height: 13, borderRadius: "50%", background: hexById(form.color) }} />}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, letterSpacing: -0.3, lineHeight: 1.1, margin: 0 }}>{form.name}</h2>
+                    <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", gap: 7 }}>
+                      ${form.price || "—"} · {form.duration || "—"} min
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: live ? "var(--live)" : "var(--sub)", fontWeight: 500, fontSize: 12.5 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: live ? "var(--live)" : "var(--faint)" }} />{live ? "Live" : "Internal"}</span>
+                    </div>
+                  </div>
+                </div>
+                <ViewCard label="Basics" sec="details" rows={[{ l: "Price", r: `$${form.price || "—"}` }, { l: "Duration", r: `${form.duration || "—"} min` }, { l: "Category", r: form.category || cats[0] }]} />
+                <ViewCard label="Online booking" sec="booking" rows={[{ l: "Visible to clients", r: live ? "On" : "Off", hi: live }, { l: "Who can book", r: b.whoCanBook === "returning" ? "Returning only" : "Everyone" }]} />
+                <ViewCard label="Add-ons asked" sec="customizations" rows={addonRows} empty="None — clients aren't asked anything extra" />
+                <ViewCard label="Staff & pricing" sec="staff" rows={staffRows} />
+                <ViewCard label="Cut types" sec="cuttypes" rows={cutRows} empty="None yet" />
+                <ViewCard label="Reference photos" sec="refphotos" rows={refPhotoCount ? [{ l: "Photos", r: String(refPhotoCount) }] : null} empty="None yet" />
+                <ViewCard label="Hours & pricing" sec="timerules" rows={(form.timeRules || []).length ? [{ l: "Rules", r: `${form.timeRules.length} rule${form.timeRules.length === 1 ? "" : "s"}` }] : null} empty="Always available — no time rules" />
+                <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
+                  <button onClick={archiveSvc} style={{ background: "none", border: "none", color: form.archived ? "var(--gold)" : "#C2703D", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 4, padding: 8, cursor: "pointer" }}>{form.archived ? "Restore service" : "Archive service"}</button>
+                </div>
+              </>
+            );
+          })()
           : (
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
@@ -9265,7 +9331,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       )}
 
       {cats.map((cat, ci) => {
-        const inCat = services.filter((s) => (s.category || cats[0]) === cat);
+        const inCat = services.filter((s) => !s.archived && (s.category || cats[0]) === cat);
         const cardClipping = !(tDrag && tDrag.cat === cat);
         return (
           <div key={cat} style={{ marginBottom: 22 }}>
@@ -9323,6 +9389,33 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           </div>
         );
       })}
+
+      {!editMode && (() => {
+        const arch = services.filter((s) => s.archived);
+        if (!arch.length) return null;
+        return (
+          <div style={{ marginBottom: 22 }}>
+            <button onClick={() => setShowArchived(!showArchived)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "1px dashed var(--border2)", borderRadius: 13, padding: "13px 16px", color: "var(--sub)", fontSize: 14.5, cursor: "pointer" }}>
+              <span>Archived ({arch.length})</span>
+              {showArchived ? <ChevronUp size={17} style={{ color: "var(--faint)" }} /> : <ChevronDown size={17} style={{ color: "var(--faint)" }} />}
+            </button>
+            {showArchived && (
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", marginTop: 10 }}>
+                {arch.map((s, i) => (
+                  <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                    <span style={{ width: 11, height: 11, borderRadius: "50%", background: hexById(s.color), flexShrink: 0, opacity: 0.5 }} />
+                    <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--sub)", minWidth: 0, padding: 0 }}>
+                      <div style={{ fontSize: 16, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                      <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>${s.price} · {s.duration} min</div>
+                    </button>
+                    <button onClick={() => { setServices(services.map((x) => (x.id === s.id ? { ...x, archived: false } : x))); showToast(`"${s.name}" restored.`); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 4, padding: 0, cursor: "pointer", flexShrink: 0 }}>Restore</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {!editMode && (
         <>
