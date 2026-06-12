@@ -2953,7 +2953,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const showPrices = bs.showPrices === true;
           const asksChange = draft.askChange !== false;
           const addons = (draft.addonGroups || []).filter((g) => g.type === "addon");
-          const fin = addons.find((g) => g.featured) || addons[0];
+          const fin = addons.find((g) => g.featured) || addons.find((g) => g.required) || addons[0];
           const offerFinish = draft.offerFinish !== false && !!fin;
           const finItem = fin ? (fin.item || {}) : {};
           const picked = !!(cart[0] && cart[0].cutType);
@@ -3113,7 +3113,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {simpleStep === "finish" && draft && (() => {
           const addons = (draft.addonGroups || []).filter((g) => g.type === "addon");
           // Show the owner-featured add-on; fall back to the first one if none is featured.
-          const fin = addons.find((g) => g.featured) || addons[0];
+          const fin = addons.find((g) => g.featured) || addons.find((g) => g.required) || addons[0];
           if (!fin) { setSimpleStep("who"); return null; }
           const item = fin.item || {};
           const isOn = !!(cart[0] && cart[0].addons && cart[0].addons[fin.id]);
@@ -3724,7 +3724,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <div style={{ display: "flex", alignItems: "center", gap: 14 }}><span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--faint)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--gold)" }} />}</span><span style={{ fontSize: 15 }}>{o.label}</span></div>
                     <span style={{ color: "var(--sub)", fontSize: 14, textAlign: "right" }}>{o.price > 0 ? `+ $${o.price}` : ""}{o.min > 0 ? <div style={{ fontSize: 14, color: "var(--faint)" }}>+ {o.min}min</div> : null}</span>
                   </button>); })}
-                {g.type === "addon" && (
+                {g.type === "addon" && g.required && (
+                  <div>
+                    <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 10 }}>{g.item.desc}</div>
+                    <button onClick={() => setDraftAddons({ ...draftAddons, [g.id]: true })} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: draftAddons[g.id] === true ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${draftAddons[g.id] === true ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: "var(--text)", textAlign: "left", marginBottom: 8 }}>
+                      <span style={{ fontSize: 15.5 }}>Yes, add it</span>
+                      <span style={{ fontSize: 14.5, color: draftAddons[g.id] === true ? "var(--gold)" : "var(--sub)" }}>+ ${g.item.price}</span>
+                    </button>
+                    <button onClick={() => setDraftAddons({ ...draftAddons, [g.id]: false })} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: draftAddons[g.id] === false ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${draftAddons[g.id] === false ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: draftAddons[g.id] === false ? "var(--text)" : "var(--sub)", textAlign: "left" }}>
+                      <span style={{ fontSize: 15.5 }}>No, thank you</span>
+                    </button>
+                  </div>
+                )}
+                {g.type === "addon" && !g.required && (
                   <button onClick={() => setDraftAddons({ ...draftAddons, [g.id]: draftAddons[g.id] ? false : true })} style={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 14, background: draftAddons[g.id] ? "rgba(176,141,87,0.08)" : "none", border: `1px solid ${draftAddons[g.id] ? "rgba(176,141,87,0.3)" : "var(--border)"}`, borderRadius: 6, padding: 14, color: "var(--text)", textAlign: "left", overflow: "hidden" }}>
                     {business.showAddonPhotos && g.photo && <img src={imgUrl(g.photo, 360)} alt="" style={{ width: 128, height: 128, borderRadius: 16, objectFit: "cover", flexShrink: 0 }} />}
                     <div style={{ flex: 1 }}><div style={{ fontSize: 15, marginBottom: 4 }}>{g.item.name}</div><div style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.5, fontWeight: 300 }}>{g.item.desc}</div></div>
@@ -3733,7 +3745,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 )}
               </div>
             ))}
-            <button className="lift" disabled={draft.addonGroups.some((g) => g.type === "choice" && !draftAddons[g.id])} onClick={() => setStep(3)} style={{ width: "100%", marginTop: 8, background: draft.addonGroups.some((g) => g.type === "choice" && !draftAddons[g.id]) ? "var(--border)" : "var(--gold)", color: draft.addonGroups.some((g) => g.type === "choice" && !draftAddons[g.id]) ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Continue</button>
+            <button className="lift" disabled={draft.addonGroups.some((g) => (g.type === "choice" && !draftAddons[g.id]) || (g.type === "addon" && g.required && draftAddons[g.id] === undefined))} onClick={() => setStep(3)} style={{ width: "100%", marginTop: 8, background: draft.addonGroups.some((g) => (g.type === "choice" && !draftAddons[g.id]) || (g.type === "addon" && g.required && draftAddons[g.id] === undefined)) ? "var(--border)" : "var(--gold)", color: draft.addonGroups.some((g) => (g.type === "choice" && !draftAddons[g.id]) || (g.type === "addon" && g.required && draftAddons[g.id] === undefined)) ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Continue</button>
           </div>
         )}
 
@@ -12565,6 +12577,120 @@ function MergeDuplicatesTool({ shopId, clients, setClients, appts, setAppts, sho
   );
 }
 
+// ---------- ADD-ONS — shop-level library ----------
+// Build an add-on once (photo, description, price), attach it to any services, and
+// optionally make it a must-answer question during booking. Saving materializes each
+// add-on into the assigned services' addonGroups (id "lib-<id>") so the booking flow
+// keeps working unchanged; legacy per-service groups are left untouched.
+function AddOnsEditor({ services, setServices, business, setBusiness, showToast }) {
+  const lib = business.addOnsLibrary || [];
+  const [editing, setEditing] = useState(null); // addon id or "new"
+  const [form, setForm] = useState(null);
+  const [picker, setPicker] = useState(false);
+  const blank = () => ({ id: "ao-" + Date.now(), name: "", price: "", extraMin: "", desc: "", photo: "", required: false, services: [] });
+  const svcList = (services || []);
+  const svcName = (id) => (svcList.find((s) => s.id === id) || {}).name || id;
+
+  const materialize = (nextLib) => {
+    setServices(svcList.map((s) => {
+      const keep = (s.addonGroups || []).filter((g) => !String(g.id || "").startsWith("lib-"));
+      const mine = nextLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({
+        id: "lib-" + a.id, type: "addon", label: a.name, photo: a.photo || "", required: !!a.required,
+        item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 },
+      }));
+      return { ...s, addonGroups: [...keep, ...mine] };
+    }));
+  };
+
+  const save = () => {
+    if (!form.name) { showToast("Give it a name."); return; }
+    const clean = { ...form, price: Number(form.price) || 0, extraMin: Number(form.extraMin) || 0 };
+    const nextLib = editing === "new" ? [...lib, clean] : lib.map((a) => (a.id === editing ? clean : a));
+    setBusiness({ ...business, addOnsLibrary: nextLib });
+    materialize(nextLib);
+    setEditing(null); setForm(null); showToast(`Saved "${clean.name}".`);
+  };
+  const remove = () => {
+    const nextLib = lib.filter((a) => a.id !== editing);
+    setBusiness({ ...business, addOnsLibrary: nextLib });
+    materialize(nextLib);
+    setEditing(null); setForm(null); showToast("Add-on removed.");
+  };
+  const toggleSvc = (id) => setForm((f) => ({ ...f, services: (f.services || []).includes(id) ? f.services.filter((x) => x !== id) : [...(f.services || []), id] }));
+
+  if (editing && form) {
+    return (
+      <div className="fade-up" style={{ paddingBottom: 40 }}>
+        {picker && <PhotoPicker onClose={() => setPicker(false)} onPick={(id) => { setForm((f) => ({ ...f, photo: id })); setPicker(false); }} />}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
+          <button onClick={() => { setEditing(null); setForm(null); }} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px" }}>{editing === "new" ? "New add-on" : form.name || "Add-on"}</h2>
+        </div>
+        <button onClick={() => setPicker(true)} className="lift" style={{ width: "100%", height: 150, borderRadius: 14, border: "1px solid var(--border)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, padding: 0, marginBottom: 18 }}>
+          {form.photo ? <img src={imgUrl(form.photo, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} /><span style={{ fontSize: 14, letterSpacing: 1 }}>Add a photo</span></>}
+        </button>
+        <div style={{ display: "grid", gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>Name</div>
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Hot Towel Finish" style={inputStyle} />
+          </div>
+          <div style={{ display: "flex", gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>Price ($)</div>
+              <input type="number" inputMode="decimal" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="8" style={inputStyle} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>Extra time (min)</div>
+              <input type="number" inputMode="numeric" value={form.extraMin} onChange={(e) => setForm({ ...form, extraMin: e.target.value })} placeholder="0" style={inputStyle} />
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>Description</div>
+            <textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} placeholder="What the client gets — shown while they book." rows={3} style={{ ...inputStyle, resize: "vertical", minHeight: 84, lineHeight: 1.55 }} />
+          </div>
+        </div>
+        <div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, margin: "26px 0 4px" }}>ASKED ON</div>
+        {svcList.length === 0 && <p style={{ fontSize: 14, color: "var(--faint)", padding: "12px 0" }}>No services yet.</p>}
+        {svcList.map((s) => {
+          const on = (form.services || []).includes(s.id);
+          return (
+            <button key={s.id} onClick={() => toggleSvc(s.id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "none", padding: "14px 2px", borderBottom: "1px solid var(--line)", color: on ? "var(--text)" : "var(--faint)", textAlign: "left", fontSize: 15.5 }}>
+              <span>{s.name}</span>
+              {on && <Check size={17} style={{ color: "var(--gold)", flexShrink: 0 }} />}
+            </button>
+          );
+        })}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 24 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 15.5, fontWeight: 500 }}>Must answer to book</div>
+            <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Client picks yes or no thanks before continuing.</div>
+          </div>
+          <Toggle on={!!form.required} onClick={() => setForm({ ...form, required: !form.required })} />
+        </div>
+        <button className="lift" onClick={save} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 16, fontWeight: 600, borderRadius: 13, boxShadow: "var(--glow)", marginTop: 28 }}>Save add-on</button>
+        {editing !== "new" && <button onClick={remove} style={{ width: "100%", background: "none", color: "#C2703D", fontSize: 14.5, fontWeight: 500, padding: 14, marginTop: 6 }}>Remove this add-on</button>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fade-up">
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 8 }}>Build once, attach to any service. Clients get asked while booking — required ones must be answered before they can continue.</p>
+      {lib.length === 0 && <p style={{ fontSize: 14.5, color: "var(--faint)", padding: "26px 0", textAlign: "center", fontStyle: "italic" }}>No add-ons yet.</p>}
+      {lib.map((a) => (
+        <button key={a.id} onClick={() => { setForm(JSON.parse(JSON.stringify(a))); setEditing(a.id); }} style={{ width: "100%", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, background: "none", padding: "20px 2px", borderBottom: "1px solid var(--line)", color: "var(--text)", textAlign: "left" }}>
+          <span style={{ minWidth: 0, flex: 1 }}>
+            <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500 }}>{a.name}</span>
+            <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 5, letterSpacing: 0.3 }}>{a.required ? "Required · " : ""}{(a.services || []).length ? (a.services || []).map(svcName).join(", ") : "Not attached yet"}</span>
+          </span>
+          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, flexShrink: 0 }}>${Number(a.price) || 0}</span>
+        </button>
+      ))}
+      <button className="lift" onClick={() => { setForm(blank()); setEditing("new"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 22 }}><Plus size={18} /> Add an add-on</button>
+    </div>
+  );
+}
+
 function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary, shopId, setAppts, setClients, waitlist, setWaitlist, onSignOutAccount, authEmail }) {
   // Fill in any missing top-level settings from the defaults so a sparse/older saved blob can't
   // crash a card that reads a nested field (a single absent key used to white-screen the whole page).
@@ -12896,6 +13022,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />,
     },
     {
+      id: "addons", fullBleed: true, title: "Add-ons", icon: Plus, category: "Services & Menu",
+      status: `${(business.addOnsLibrary || []).length} add-on${(business.addOnsLibrary || []).length === 1 ? "" : "s"}`,
+      keywords: "add-ons addons upsell extras hot towel beard oil required mandatory ask during booking attach services question upgrade",
+      editor: <AddOnsEditor services={services} setServices={setServices} business={business} setBusiness={setBusiness} showToast={showToast} />,
+    },
+    {
       id: "rebookco", title: "Rebooking at Checkout", icon: Repeat, category: "Payments & Checkout",
       status: (form.rebook?.enabled === false) ? "Off" : ((form.rebook?.discountEnabled !== false && (form.rebook?.discount || 0) > 0) ? `On · ${form.rebook?.discountType === "percent" ? form.rebook?.discount + "% off" : "$" + form.rebook?.discount + " off"}` : "On · no discount"),
       keywords: "rebook rebooking checkout discount percent dollar amount incentive next visit prompt save offer",
@@ -12959,7 +13091,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const CATS = [
     { id: "shop",  label: "My shop", icon: User, desc: "Name, hours & look", settings: ["business", "hours", "locations", "phones", "appearance", "theme"] },
     { id: "staff", label: "My team", icon: Users, desc: "Barbers, access & pay", settings: ["staff", "staffpin"] },
-    { id: "menu",  label: "Services & menu", icon: Scissors, desc: "What you offer & pricing", settings: ["servicesmenu", "aicuthelper"] },
+    { id: "menu",  label: "Services & menu", icon: Scissors, desc: "What you offer & pricing", settings: ["servicesmenu", "addons", "aicuthelper"] },
     { id: "book",  label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "How clients book you", settings: ["avoidgaps", "anyonerouting", "booking", "newclient", "showprices", "rebook_usual", "refphotos", "family"], groups: [
       { label: "The times they see", ids: ["avoidgaps", "anyonerouting"] },
       { label: "Your booking page", ids: ["booking", "newclient", "showprices", "rebook_usual", "refphotos", "family"] },
