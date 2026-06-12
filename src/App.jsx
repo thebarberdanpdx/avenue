@@ -628,7 +628,7 @@ function fmtPhone(number) {
 // ---- Stripe (client side) ----
 // The publishable key is meant to be public and safe to ship in the app bundle.
 // The SECRET key lives only in Vercel (env var) and is used by /api/stripe — never here.
-const STRIPE_PUBLISHABLE_KEY = "pk_test_51TdVev0XV9TtWHCq8s4dGMpa6zLDn4otUSTcFNtlrRIPJGedN9dEKPeSQMZxFxJgEXW4cW2n1JjAT7p6MPS5Rdxe00bogFrsmR";
+const STRIPE_PUBLISHABLE_KEY = "pk_live_51TdVev0XV9TtWHCqYNf2SU6kjZXGqGXGp2hSyjKzpbPWFgboCljXllRK9nJ4tESrSnhe6Rp82iGzyPyk7FxVzZCY00sZKQupPQ";
 let _stripePromise = null;
 function getStripe() {
   if (_stripePromise) return _stripePromise;
