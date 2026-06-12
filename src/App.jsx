@@ -11365,41 +11365,76 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
     );
   }
 
-  // ---------- MEMBER HUB ----------
+  // ---------- MEMBER HUB (read-only view, MangoMint pattern: calm cards, each with its own Edit) ----------
   const hubNotif = { ...defaultStaffNotifications(), ...(person.notifications || {}) };
   const hubComp = { ...defaultComp(), ...(person.comp || {}) };
   const hubSc = { ...defaultComp().service, ...hubComp.service };
   const hubSvcOn = services.filter((s) => ((s.staff && s.staff[person.id] && s.staff[person.id].on) !== false)).length;
-  const hubDays = Object.values(person.hours || {}).filter((h) => h && h.on).length;
-  const hubRows = [
-    { id: "details", label: "Details" },
-    { id: "access", label: "Sign-in & access", value: (person.pulseRole === "owner" ? "Owner" : "Barber") },
-    { id: "notifications", label: "Notifications", value: (Object.values(hubNotif).some(Boolean) ? "On" : "Off") },
-    { id: "services", label: "Services", value: `${hubSvcOn} of ${services.length}` },
-    { id: "hours", label: "Work hours", value: hubDays ? `${hubDays} day${hubDays === 1 ? "" : "s"}` : "None set" },
-    { id: "comp", label: "Compensation", value: (hubSc.on ? (hubSc.type === "basic" ? `${hubSc.basicPct}% service` : "Sliding scale") : "Not set") },
-    { id: "permissions", label: "Permissions" },
-  ];
+  const bookable = person.isProvider !== false && !!person.onlineBooking;
+  // Condense the weekly schedule: consecutive on-days with the same shift collapse to a range,
+  // off days collect into one muted row.
+  const hoursRows = (() => {
+    const order = [1, 2, 3, 4, 5, 6, 0]; // Mon → Sun
+    const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const rows = []; const off = [];
+    let run = null;
+    const flush = () => { if (!run) return; rows.push({ l: run.days.length > 2 ? `${run.days[0]} – ${run.days[run.days.length - 1]}` : run.days.join(" · "), r: `${fmtTime(run.start)} – ${fmtTime(run.end)}` }); run = null; };
+    order.forEach((dow) => {
+      const h = (person.hours || {})[dow];
+      if (!h || !h.on) { flush(); off.push(names[dow]); return; }
+      if (run && run.start === h.start && run.end === h.end) { run.days.push(names[dow]); return; }
+      flush();
+      run = { days: [names[dow]], start: h.start, end: h.end };
+    });
+    flush();
+    if (off.length) rows.push({ l: off.join(" · "), r: "Off", muted: true });
+    return rows.length ? rows : [{ l: "No days set", r: "", muted: true }];
+  })();
+  const HubCard = ({ label, sec, rows }) => (
+    <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>{label}</span>
+        {sec && <button onClick={() => { setSection(sec); setEditingDetails(false); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 4, padding: 0, cursor: "pointer" }}>Edit</button>}
+      </div>
+      {rows.map((r, i) => {
+        const inner = (
+          <>
+            <span style={{ color: "var(--sub)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.l}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+              <span style={{ color: r.muted ? "var(--sub)" : "var(--text)" }}>{r.r}</span>
+              {r.sec && <ChevronRight size={15} style={{ color: "var(--faint)" }} />}
+            </span>
+          </>
+        );
+        const rowStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "11px 0", borderBottom: i < rows.length - 1 ? "1px solid var(--line)" : "none", fontSize: 15, width: "100%" };
+        return r.sec
+          ? <button key={i} onClick={() => { setSection(r.sec); setEditingDetails(false); }} style={{ ...rowStyle, background: "none", border: "none", borderBottom: rowStyle.borderBottom, textAlign: "left", cursor: "pointer", padding: "11px 0" }}>{inner}</button>
+          : <div key={i} style={rowStyle}>{inner}</div>;
+      })}
+    </div>
+  );
   return (
     <div className="appt-screen" style={{ paddingBottom: 40 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 18 }}>
         <button onClick={() => setOpenId(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /> <span style={{ fontSize: 15 }}>Team</span></button>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
-        <div style={{ marginBottom: 12 }}><Avatar size={92} photo={person.id === "anyone" ? null : staffPhoto(person)} initial={person.name.charAt(0)} color={person.color || "var(--gold)"} /></div>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500 }}>{person.name}</div>
-        <div style={{ fontSize: 14, color: "var(--sub)" }}>{person.role}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
+        <Avatar size={56} photo={person.id === "anyone" ? null : staffPhoto(person)} initial={person.name.charAt(0)} color={person.color || "var(--gold)"} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, lineHeight: 1.1 }}>{person.name}</div>
+          <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", gap: 7 }}>
+            {person.role}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: bookable ? "var(--live)" : "var(--sub)", fontWeight: 500, fontSize: 12.5 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: bookable ? "var(--live)" : "var(--faint)" }} />{bookable ? "Bookable online" : "Not bookable online"}</span>
+          </div>
+        </div>
       </div>
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
-        {hubRows.map((r, i) => (
-          <button key={r.id} onClick={() => { setSection(r.id); setEditingDetails(false); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "18px 17px", minHeight: 64, background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
-            <span style={{ fontSize: 16.5, fontWeight: 500, letterSpacing: "-0.1px" }}>{r.label}</span>
-            <span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-              {r.value && <span style={{ fontSize: 15, color: "var(--gold)", fontWeight: 500, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.value}</span>}
-              <ChevronRight size={20} style={{ color: "var(--faint)" }} />
-            </span>
-          </button>
-        ))}
+      <HubCard label="Details" sec="details" rows={[{ l: "Email", r: person.email || "—" }, { l: "Phone", r: person.phone || "—" }, { l: "User type", r: person.userType || "Staff" }]} />
+      <HubCard label="Work hours" sec="hours" rows={hoursRows} />
+      <HubCard label="Services" sec="services" rows={[{ l: "Offering", r: `${hubSvcOn} of ${services.length}` }]} />
+      <HubCard label="Compensation" sec="comp" rows={[{ l: "Service commission", r: hubSc.on ? (hubSc.type === "basic" ? `${hubSc.basicPct}%` : "Sliding scale") : "Not set", muted: !hubSc.on }, { l: "Hourly", r: (hubComp.hourly && hubComp.hourly.on) ? `$${hubComp.hourly.rate}/hr` : "Off", muted: !(hubComp.hourly && hubComp.hourly.on) }]} />
+      <HubCard label="Sign-in & access" sec="access" rows={[{ l: "App access", r: person.pulseRole === "owner" ? "Owner" : "Barber" }, { l: "Notifications", r: Object.values(hubNotif).some(Boolean) ? "On" : "Off", sec: "notifications" }, { l: "Permissions", r: person.userType === "Admin" ? "Admin defaults" : "Staff defaults", sec: "permissions" }]} />
+      <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
+        <button onClick={() => { if (typeof window === "undefined" || window.confirm(`Archive ${person.name}? They're hidden from booking and the calendar, and can be restored anytime.`)) archive(person.id); }} style={{ background: "none", border: "none", color: "#C2563F", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 4, padding: 8, cursor: "pointer" }}>Archive {person.name}</button>
       </div>
     </div>
   );
