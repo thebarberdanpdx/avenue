@@ -14478,7 +14478,14 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
   const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts(appts.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } setTimeout(() => handleFreedSlot(freed), 350); } };
   // open checkout instead of silently completing
-  const startCheckout = (appt) => { setOpen(null); setCheckout(appt); };
+  const startCheckout = (appt, opts) => { setOpen(null); setCheckout(opts && opts.reopen ? { ...appt, __reopen: true } : appt); };
+  const [refundAppt, setRefundAppt] = useState(null); // appt whose payment is being refunded from the appointment sheet
+  // Everything ever charged against an appointment (ledger first, appt summary as fallback).
+  const paidForAppt = (appt) => {
+    const recs = clients.flatMap((c) => (c.payments || [])).concat((business && business.sales) || []).filter((r) => r.apptId === appt.id);
+    if (recs.length) return recs.reduce((s, r) => s + (r.amount || 0) - (r.refunded || 0), 0);
+    return (appt.paid && appt.paid.total) || 0;
+  };
   const finishCheckout = (id, summary) => {
     setAppts((cur) => {
       const done = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceStartedAt ? Date.now() : a.serviceEndedAt, pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a);
@@ -15570,11 +15577,16 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           appts={appts}
           onSetStatus={setStatus}
           onCheckout={startCheckout}
+          onRefund={(a) => { setOpen(null); setRefundAppt(a); }}
           onUpdate={updateAppt}
           onDelete={deleteAppt}
           onOpenClient={onOpenClient}
           showToast={showToast}
         />
+      )}
+
+      {refundAppt && (
+        <ApptRefundSheet appt={refundAppt} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} showToast={showToast} onClose={() => setRefundAppt(null)} />
       )}
 
       {checkout && (
@@ -15585,6 +15597,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           business={business}
           setBusiness={setBusiness}
           allServices={services}
+          reopen={!!checkout.__reopen}
+          alreadyPaid={checkout.__reopen ? +paidForAppt(checkout).toFixed(2) : 0}
           clients={clients}
           appts={appts}
           setClients={setClients}
@@ -15666,7 +15680,7 @@ function CardChargeInline({ amount, appt, onCancel, onPaid, money }) {
   );
 }
 
-function Checkout({ appt, service, provider, business, setBusiness, clients, appts, setClients, allServices = [], showToast, onClose, onDone }) {
+function Checkout({ appt, service, provider, business, setBusiness, clients, appts, setClients, allServices = [], reopen = false, alreadyPaid = 0, showToast, onClose, onDone }) {
   // ---- auto-timing: measure actual service time, round UP to next 5 ----
   const measuredMin = appt.serviceStartedAt ? Math.round((Date.now() - appt.serviceStartedAt) / 60000) : null;
   const roundUp5 = (m) => Math.max(5, Math.ceil(m / 5) * 5);
@@ -15720,13 +15734,16 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [pendingMethod, setPendingMethod] = useState(null); // chosen on the method screen; charged after tip
   const [paidRec, setPaidRec] = useState(null);     // the ledger record written on success
   const subtotal = +lines.reduce((s, l) => s + (Number(l.price) || 0), 0).toFixed(2);
-  const tipAmt = customTip != null ? +Number(customTip).toFixed(2) : +(subtotal * tipPct / 100).toFixed(2);
+  const tipAmt = reopen ? 0 : (customTip != null ? +Number(customTip).toFixed(2) : +(subtotal * tipPct / 100).toFixed(2));
+  // Reopened tickets only ever charge the balance — what's on the ticket minus what was already paid.
+  const balance = reopen ? Math.max(0, +(subtotal - alreadyPaid).toFixed(2)) : 0;
+  const chargeBase = reopen ? balance : +(subtotal + tipAmt).toFixed(2);
   const total = +(subtotal + tipAmt).toFixed(2);
   // Card-on-file surcharge — only when the shop turned it on in Checkout & money.
   const scCfg = (business?.checkout && business.checkout.cofSurcharge) || {};
   const scOn = !!scCfg.on;
   const scPct = Number(scCfg.pct) > 0 ? Number(scCfg.pct) : 1.5;
-  const cofTotal = scOn ? +(total * (1 + scPct / 100)).toFixed(2) : total;
+  const cofTotal = scOn ? +(chargeBase * (1 + scPct / 100)).toFixed(2) : chargeBase;
   const liveMode = business?.payments?.live === true;
   const cofCard = liveClient && liveClient.card && liveClient.card.paymentMethodId && liveClient.card.stripeCustomerId && !liveClient.card.simulated ? liveClient.card : null;
   const money = (n) => `$${n.toFixed(2)}`;
@@ -15748,14 +15765,14 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     method: methodId,
     amount: charged,
     tip: tipAmt,
-    surcharge: methodId === "card-on-file" && scOn ? +(charged - total).toFixed(2) : 0,
+    surcharge: methodId === "card-on-file" && scOn ? +(charged - chargeBase).toFixed(2) : 0,
     paymentIntentId: (payRes && payRes.id) || null,
     brand: (payRes && payRes.brand) || null,
     last4: (payRes && payRes.last4) || null,
-    note: lines.map((l) => l.name).join(" · ") + (provider ? ` — with ${provider.name}` : ""),
+    note: (reopen ? "Balance — " : "") + lines.map((l) => l.name).join(" · ") + (provider ? ` — with ${provider.name}` : ""),
     refunded: 0,
   });
-  const payCash = () => { recordSale(makeRec("cash", null, total)); setStage("approved"); };
+  const payCash = () => { recordSale(makeRec("cash", null, chargeBase)); setStage("approved"); };
   const payCardOnFile = async () => {
     if (!cofCard || payBusy) return;
     setPayBusy(true); setPayErr("");
@@ -15767,9 +15784,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     finally { setPayBusy(false); }
   };
   useEffect(() => {
-    if (stage === "approved") { const t = setTimeout(() => setStage(rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
+    if (stage === "approved") { const t = setTimeout(() => setStage(!reopen && rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
     if (stage === "rebook" && rhythmWeek != null && rebookWeeks == null && !customDate) { setRebookWeeks(rhythmWeek); }
-    if (stage === "done") { const t = setTimeout(() => onDone(appt.id, { total, totalLabel: money(total), tip: tipAmt, rebookWeeks, rebookDate: customDate, rebookStart: chosenStart, rebookLabel: hasSelection ? selectionLabel : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null }), 1200); return () => clearTimeout(t); }
+    if (stage === "done") { const grandTotal = reopen ? +(alreadyPaid + (paidRec ? paidRec.amount : 0)).toFixed(2) : total; const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt; const t = setTimeout(() => onDone(appt.id, { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, rebookWeeks, rebookDate: customDate, rebookStart: chosenStart, rebookLabel: hasSelection ? selectionLabel : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null }), 1200); return () => clearTimeout(t); }
   }, [stage]);
 
   const rebookDate = (weeks) => { const d = new Date(); d.setDate(d.getDate() + weeks * 7); return d; };
@@ -15821,8 +15838,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const goldBtn = { width: "100%", background: "var(--gold-grad, var(--gold))", color: "var(--on-gold)", padding: 17, fontSize: 14.5, fontWeight: 600, letterSpacing: 1.5, borderRadius: 16, border: "none", boxShadow: "var(--glow)", cursor: "pointer" };
   const startMethod = (m) => {
     setPayErr("");
-    if (tipCfg.enabled) { setPendingMethod(m); setStage("tipPick"); }
-    else executeCharge(m);
+    setPendingMethod(m);
+    if (tipCfg.enabled && !reopen) { setStage("tipPick"); }
+    else { if (m === "cof") setStage("charging"); executeCharge(m); }
   };
   const executeCharge = (m) => {
     if (m === "cash") { payCash(); return; }
@@ -15875,11 +15893,16 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         </div>
       )}
       <div style={{ flex: 1 }} />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", padding: "18px 2px 16px" }}>
-        <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>Total</span>
-        <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500 }}>{money(subtotal)}</span>
+      {reopen && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", padding: "14px 2px 0", fontSize: 14.5, color: "var(--sub)" }}>
+          <span>Paid earlier</span><span>−{money(alreadyPaid)}</span>
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: reopen ? "none" : "1px solid var(--line)", padding: reopen ? "10px 2px 16px" : "18px 2px 16px" }}>
+        <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{reopen ? "Balance due" : "Total"}</span>
+        <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500 }}>{money(reopen ? balance : subtotal)}</span>
       </div>
-      <button className="lift" onClick={() => { setPayErr(""); setStage("method"); }} style={goldBtn}>CONTINUE — {money(subtotal)}</button>
+      <button className="lift" disabled={reopen && balance <= 0} onClick={() => { setPayErr(""); setStage("method"); }} style={{ ...goldBtn, opacity: reopen && balance <= 0 ? 0.45 : 1 }}>{reopen ? (balance > 0 ? `CHARGE BALANCE — ${money(balance)}` : "NOTHING OWED") : `CONTINUE — ${money(subtotal)}`}</button>
     </>);
 
   // ---------- 2 · METHOD ----------
@@ -15888,8 +15911,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       <Header title="Payment" onBack={() => setStage("summary")} />
       <div style={{ textAlign: "center", margin: "10px 0 30px" }}>
         <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Charging</div>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1 }}>{money(subtotal)}</div>
-        {tipCfg.enabled && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 9 }}>{appt.name || "Walk-in"} · tip comes next</div>}
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1 }}>{money(reopen ? balance : subtotal)}</div>
+        {tipCfg.enabled && !reopen && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 9 }}>{appt.name || "Walk-in"} · tip comes next</div>}
+        {reopen && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 9 }}>Balance on a reopened ticket — no tip step</div>}
       </div>
       {!liveMode && <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5 }}>Payments are in test mode — card options are off. Flip Payments to Live in Checkout &amp; money.</div>}
       {payErr && <div style={{ background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{payErr}</div>}
@@ -15962,7 +15986,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
 
   // ---------- card present — manual entry ----------
   if (stage === "card" || (stage === "charging" && pendingMethod === "card")) return screen(
-    <CardChargeInline amount={(() => { const t = +(subtotal + tipAmt).toFixed(2); return t; })()} appt={appt} onCancel={() => { setPayErr(""); setStage(tipCfg.enabled ? "tipPick" : "method"); }} onPaid={(payRes) => { recordSale(makeRec("card", payRes, +(subtotal + tipAmt).toFixed(2))); setStage("approved"); }} money={money} />);
+    <CardChargeInline amount={chargeBase} appt={appt} onCancel={() => { setPayErr(""); setStage(tipCfg.enabled && !reopen ? "tipPick" : "method"); }} onPaid={(payRes) => { recordSale(makeRec("card", payRes, chargeBase)); setStage("approved"); }} money={money} />);
 
 
   if (stage === "approving" || stage === "approved") return screen(
@@ -16864,7 +16888,90 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
   );
 }
 
-function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onUpdate, onDelete, onOpenClient, showToast, shopId }) {
+// Refund (full or partial) straight from the appointment sheet. Card payments refund
+// through Stripe by payment intent; cash payments are recorded as returned.
+function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, showToast, onClose }) {
+  const live = business?.payments?.live === true;
+  const findRecs = () => {
+    const out = [];
+    clients.forEach((c) => (c.payments || []).forEach((p) => { if (p.apptId === appt.id) out.push({ ...p, _src: "client", _cid: c.id }); }));
+    ((business && business.sales) || []).forEach((p) => { if (p.apptId === appt.id) out.push({ ...p, _src: "sale" }); });
+    return out.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  };
+  const recs = findRecs();
+  const [selId, setSelId] = useState(recs.length === 1 ? recs[0].id : null);
+  const sel = recs.find((r) => r.id === selId) || null;
+  const remaining = sel ? Math.max(0, +(((sel.amount || 0) - (sel.refunded || 0))).toFixed(2)) : 0;
+  const [amt, setAmt] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(null);
+  useEffect(() => { if (sel) setAmt(String(remaining)); }, [selId]);
+  const patch = (rec, p) => {
+    if (rec._src === "client") setClients(clients.map((c) => c.id === rec._cid ? { ...c, payments: (c.payments || []).map((x) => x.id === rec.id ? { ...x, ...p } : x) } : c));
+    else if (setBusiness) setBusiness((b) => ({ ...b, sales: ((b && b.sales) || []).map((x) => x.id === rec.id ? { ...x, ...p } : x) }));
+  };
+  const doRefund = async () => {
+    const n = Math.round((Number(amt) || 0) * 100) / 100;
+    if (!sel || !(n > 0) || n > remaining || busy) { setErr(n > remaining ? `Max refundable is $${remaining.toFixed(2)}.` : "Enter an amount."); return; }
+    setBusy(true); setErr("");
+    try {
+      if (sel.paymentIntentId && live) {
+        const res = await stripeApi({ action: "refund", paymentIntentId: sel.paymentIntentId, amount: n });
+        if (!(res && (res.status === "succeeded" || res.status === "pending"))) throw new Error((res && res.error) || "Stripe couldn't process the refund.");
+      }
+      const newRefunded = +(((sel.refunded || 0) + n)).toFixed(2);
+      patch(sel, { refunded: newRefunded, status: newRefunded >= (sel.amount || 0) ? "refunded" : "partial" });
+      setDone(n);
+      showToast && showToast(`Refunded $${n.toFixed(2)}${sel.paymentIntentId ? " to the card" : " (cash)"}.`);
+    } catch (e) { setErr(e.message || "Refund failed."); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Sheet open onClose={busy ? undefined : onClose} align="center" maxWidth={420}>
+      <div style={{ padding: "8px 4px 10px" }}>
+        {done != null ? (
+          <div style={{ textAlign: "center", padding: "16px 0 8px" }}>
+            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><CheckCircle2 size={34} color="var(--on-gold)" /></div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 4 }}>Refunded ${done.toFixed(2)}</div>
+            <div style={{ fontSize: 14, color: "var(--sub)" }}>{appt.name}</div>
+            <button onClick={onClose} style={{ marginTop: 22, width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none" }}>DONE</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 6 }}>Refund {appt.name ? appt.name.split(" ")[0] : "client"}</h2>
+            {recs.length === 0 && <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.55 }}>No recorded payment is attached to this appointment. If it was charged before the new checkout, refund it from the Stripe dashboard.</p>}
+            {recs.length > 1 && (
+              <div style={{ margin: "10px 0 4px" }}>
+                {recs.map((r) => (
+                  <button key={r.id} onClick={() => setSelId(r.id)} style={{ width: "100%", display: "flex", justifyContent: "space-between", gap: 10, padding: "12px 14px", marginBottom: 8, background: selId === r.id ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${selId === r.id ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, color: "var(--text)", fontSize: 14, textAlign: "left", cursor: "pointer" }}>
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.method === "cash" ? "Cash" : r.last4 ? `Card ··${r.last4}` : "Card"} · {r.note || "Sale"}</span>
+                    <span style={{ flexShrink: 0, color: "var(--sub)" }}>${(((r.amount || 0) - (r.refunded || 0))).toFixed(2)} left</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {sel && (
+              <>
+                <p style={{ fontSize: 14, color: "var(--sub)", margin: "8px 0 14px", lineHeight: 1.5 }}>{sel.method === "cash" ? "Cash payment — this records the refund; hand back the cash." : `Goes back to the card${sel.last4 ? ` ··${sel.last4}` : ""}.`} Up to <strong style={{ color: "var(--text)" }}>${remaining.toFixed(2)}</strong>.</p>
+                <div style={{ position: "relative", marginBottom: 12 }}>
+                  <span style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", color: "var(--sub)", fontSize: 17 }}>$</span>
+                  <input type="number" inputMode="decimal" value={amt} onChange={(e) => { setAmt(e.target.value); setErr(""); }} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 16px 14px 30px", color: "var(--text)", fontSize: 18, fontFamily: FONT_BODY }} />
+                </div>
+                {err && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 12 }}>{err}</p>}
+                <button disabled={busy} onClick={doRefund} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14.5, fontWeight: 600, borderRadius: 13, border: "none", opacity: busy ? 0.6 : 1, cursor: "pointer" }}>{busy ? "Refunding…" : `Refund $${(Number(amt) || 0).toFixed(2)}`}</button>
+              </>
+            )}
+            <button disabled={busy} onClick={onClose} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: "var(--sub)", fontSize: 14, padding: 6, cursor: "pointer" }}>Cancel</button>
+          </>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
+function AppointmentSheet({ appt, appts, providers, clients, setClients, services, business, isOwner, me, onClose, onSetStatus, onCheckout, onRefund, onUpdate, onDelete, onOpenClient, showToast, shopId }) {
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
@@ -17485,7 +17592,14 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div onClick={() => setMenuOpen(false)} style={{ position: "absolute", inset: 0, zIndex: 8 }} />
                 <div className="fade-in" style={{ position: "absolute", top: 56, right: 14, width: 250, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,0.28)", zIndex: 9, overflow: "hidden", padding: "6px 0" }}>
                   <MenuItem T={T} danger icon={<Trash2 size={17} />} label="Cancel / Delete" onClick={() => onDelete(appt.id)} />
-                  <MenuItem T={T} icon={<DollarSign size={17} />} label="Checkout" onClick={() => { setMenuOpen(false); onCheckout(appt); }} />
+                  {appt.paid ? (
+                    <>
+                      <MenuItem T={T} icon={<DollarSign size={17} />} label="Reopen ticket" onClick={() => { setMenuOpen(false); onCheckout(appt, { reopen: true }); }} />
+                      {onRefund && <MenuItem T={T} icon={<RefreshCw size={17} />} label="Refund…" onClick={() => { setMenuOpen(false); onRefund(appt); }} />}
+                    </>
+                  ) : (
+                    <MenuItem T={T} icon={<DollarSign size={17} />} label="Checkout" onClick={() => { setMenuOpen(false); onCheckout(appt); }} />
+                  )}
                   {canEditPrice && savedCard && <MenuItem T={T} icon={<CreditCard size={17} />} label="Charge no-show fee" onClick={() => { setMenuOpen(false); setChargeOpen(true); }} />}
                   <Divider T={T} />
                   <MenuItem T={T} icon={<Repeat size={17} />} label="Make Repeating" onClick={() => { setMenuOpen(false); showToast("Repeating appointment set up."); }} />
