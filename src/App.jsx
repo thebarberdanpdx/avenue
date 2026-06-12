@@ -879,7 +879,7 @@ function TimeScrollPicker({ value, onChange, step = 15, minMin = 0, maxMin = 24 
 }
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const relativeDate = (date) => { const today = new Date(); today.setHours(0,0,0,0); const d = new Date(date); d.setHours(0,0,0,0); const diff = Math.round((d - today) / 86400000); if (diff === 0) return "Today"; if (diff === 1) return "Tomorrow"; if (diff > 1 && diff < 7) return DAYS[d.getDay()]; return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
+const relativeDate = (date) => { const today = new Date(); today.setHours(0,0,0,0); const d = new Date(date); d.setHours(0,0,0,0); const diff = Math.round((d - today) / 86400000); if (diff === 0) return "Today"; if (diff === 1) return "Tomorrow"; if (diff > 1 && diff < 7) return DAYS[d.getDay()]; if (diff >= 7 && diff < 14) return `Next ${DAYS[d.getDay()]}`; return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
 const daysFromNow = (date) => { const today = new Date(); today.setHours(0,0,0,0); const d = new Date(date); d.setHours(0,0,0,0); const diff = Math.round((d - today) / 86400000); if (diff === 0) return "Today"; if (diff === 1) return "Tomorrow"; if (diff < 7) return `in ${diff} days`; if (diff === 7) return "1 week away — next " + DAYS[d.getDay()]; if (diff < 14) return `${diff} days away — next week`; const wks = Math.round(diff / 7); return `about ${wks} weeks away`; };
 const DAYS_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const apptDateLabel = () => { const d = new Date(); return `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
@@ -2442,6 +2442,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [waitlistDone, setWaitlistDone] = useState(false);
   const [photos, setPhotos] = useState(0);       // 0–3 uploaded at booking
+  const [confirmDetails, setConfirmDetails] = useState(false); // receipt: "details & policies" collapse
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
   const [booking, setBooking] = useState(false);   // true while the confirmed booking is being saved to the server
@@ -4342,33 +4343,38 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* STEP 7 — contact + EDITABLE policy */}
         {step === 7 && !showUsual && (
           <div className="fade-up">
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Review</div>
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>{matched ? "Almost there" : "Last thing — your details"}</h2>
-            <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 24px", fontWeight: 400, lineHeight: 1.55 }}>{matched ? "Quick check before we lock this in." : "We'll text you a reminder before your visit."}</p>
-
-            {/* Editorial summary card with gold accent — the booking at a glance */}
-            <div style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "18px 18px", marginBottom: 24 }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your appointment</div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.2, marginBottom: 5, color: "var(--text)" }}>{relativeDate(selectedDate)}{relativeDate(selectedDate).includes(",") ? "" : `, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", marginBottom: 14, lineHeight: 1.4 }}>{fmtTime(slot)} · with {provider.name}</div>
-              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-                {cart.map((e, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: i < cart.length - 1 ? 8 : 0, gap: 10 }}>
-                    <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--text)", lineHeight: 1.4 }}>{describeEntry(e)}</div>
-                  </div>
-                ))}
-                {cartTimeDelta !== 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)" }}>{cartTimeDelta > 0 ? "Peak time" : "Off-peak discount"}</span>
-                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: cartTimeDelta > 0 ? "var(--text)" : "var(--gold)", fontWeight: 500 }}>{cartTimeDelta > 0 ? "+" : "−"}${Math.abs(cartTimeDelta)}</span>
-                  </div>
-                )}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
-                  <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Total</span>
-                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: "var(--text)", fontWeight: 500 }}>${cartAdjTotal}</span>
+            {(() => {
+              const lbl = relativeDate(selectedDate);
+              const nextWeek = lbl.startsWith("Next");
+              const hasFull = lbl.includes(",");
+              const dateFull = `${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
+              return (
+                <div style={{ textAlign: "center", margin: "10px 0 26px" }}>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, lineHeight: 1.15, color: "var(--text)" }}>{lbl}</div>
+                  {!hasFull && <div style={{ fontSize: 14, color: nextWeek ? "var(--gold)" : "var(--sub)", marginTop: 5, fontStyle: "italic", fontWeight: nextWeek ? 500 : 400 }}>{dateFull}{nextWeek ? " — not today" : ""}</div>}
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 48, fontWeight: 500, lineHeight: 1, marginTop: 14, color: "var(--text)" }}>{fmtTime(slot)}</div>
+                  <div style={{ fontSize: 14.5, color: "var(--text2)", marginTop: 12, lineHeight: 1.5, padding: "0 8px" }}>{cart.map((e) => describeEntry(e)).join(" · ")} · with {provider.name}</div>
+                  <div style={{ width: 30, height: 1, background: "var(--border2)", margin: "18px auto" }} />
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--text)" }}>${cartAdjTotal}</div>
+                  <button onClick={() => setConfirmDetails(!confirmDetails)} style={{ background: "none", color: "var(--sub)", fontSize: 13.5, marginTop: 14, textDecoration: "underline", padding: 4 }}>{confirmDetails ? "hide details" : "details & policies"}</button>
+                  {confirmDetails && (
+                    <div style={{ textAlign: "left", border: "1px solid var(--line)", borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
+                      {cart.map((e, i) => (
+                        <div key={i} style={{ fontSize: 13.5, color: "var(--text)", padding: "7px 0", borderBottom: "1px solid var(--line)", lineHeight: 1.4 }}>{describeEntry(e)}</div>
+                      ))}
+                      {cartTimeDelta !== 0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid var(--line)" }}>
+                          <span style={{ fontSize: 13, color: "var(--sub)" }}>{cartTimeDelta > 0 ? "Peak time" : "Off-peak discount"}</span>
+                          <span style={{ fontSize: 13.5, color: "var(--text)" }}>{cartTimeDelta > 0 ? "+" : "−"}${Math.abs(cartTimeDelta)}</span>
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, margin: "12px 0 6px" }}>CANCELLATION POLICY</div>
+                      <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.55 }}>{business.policy}</p>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
+              );
+            })()}
 
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>{matched ? "Confirm your info" : "Your details"}</div>
             <div style={{ display: "grid", gap: 11, marginBottom: 20 }}>
@@ -4394,11 +4400,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             </div>
             )}
 
-            {/* Policy + agreement */}
-            <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", marginBottom: 16 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>CANCELLATION POLICY</div>
-              <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55 }}>{business.policy}</p>
-            </div>
+            {/* Policy text now lives behind "details & policies" on the receipt; consent toggle stays. */}
             <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", color: "var(--text)", marginBottom: 16, fontSize: 14.5, padding: "4px 2px", width: "100%", textAlign: "left" }}>
               <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
               <span>I agree to the cancellation policy</span>
@@ -4468,7 +4470,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 return;
               }
               commitBooking(phone, newEmail);
-            }} style={{ width: "100%", background: canLock ? "var(--gold)" : "transparent", color: canLock ? "var(--on-gold)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : "LOCK IT IN")}</button>
+            }} style={{ width: "100%", background: canLock ? "var(--gold)" : "transparent", color: canLock ? "var(--on-gold)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : `BOOK FOR ${relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate).split(",")[0].toUpperCase() + " " + MONTHS[selectedDate.getMonth()].toUpperCase() + " " + selectedDate.getDate() : relativeDate(selectedDate).toUpperCase()}`)}</button>
             {bookErr && <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "color-mix(in srgb, #c0392b 14%, var(--panel))", color: "var(--text)", fontSize: 13.5, lineHeight: 1.45, textAlign: "center" }}>Couldn't confirm your booking — check your connection and tap again. Your time wasn't held, so nothing's lost.</div>}
             </>
               );
