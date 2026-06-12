@@ -10572,9 +10572,7 @@ function impStatus(txt, isPast) {
 // phone against who's already in the book). Every import is tagged with a batch id
 // so a bad one can be undone in one tap.
 function ImportDataEditor({ shopId, services = [], providers = [], clients = [], setClients, appts = [], setAppts, showToast }) {
-  const SYSTEMS = ["Square", "GlossGenius", "Vagaro", "Boulevard", "Booksy", "Acuity", "Other / CSV file"];
-  const [system, setSystem] = useState(null);
-  const [stage, setStage] = useState("pick"); // pick | upload | map | preview | running | done
+  const [stage, setStage] = useState("upload"); // upload | map | preview | running | done
   const [fileName, setFileName] = useState("");
   const [parsed, setParsed] = useState({ headers: [], rows: [] });
   const [map, setMap] = useState({});
@@ -10586,7 +10584,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
   const [err, setErr] = useState("");
   const fileRef = useRef(null);
 
-  const reset = () => { setSystem(null); setStage("pick"); setFileName(""); setParsed({ headers: [], rows: [] }); setMap({}); setBuilt(null); setResult(null); setBatchId(null); setErr(""); };
+  const reset = () => { setStage("upload"); setFileName(""); setParsed({ headers: [], rows: [] }); setMap({}); setBuilt(null); setResult(null); setBatchId(null); setErr(""); };
 
   const onFile = (e) => {
     const f = e.target.files && e.target.files[0];
@@ -10709,33 +10707,27 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
 
   return (
     <div>
-      <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel2))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 14, padding: 14, marginBottom: 18, fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>Bring a shop's clients and appointment history over from another system. Export their data as a CSV, upload it here, line up the columns, and preview exactly what comes in before anything saves.</div>
+      {["upload", "map", "preview"].includes(stage) && (
+        <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 14 }}>
+          {stage === "upload" ? "Step 1 of 3 · Upload" : stage === "map" ? "Step 2 of 3 · Line up columns" : "Step 3 of 3 · Preview"}
+        </div>
+      )}
+      {stage === "upload" && <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, margin: "0 0 16px" }}>Bring clients and appointment history over from another system. Upload their CSV export, line up the columns, and preview exactly what comes in before anything saves.</p>}
 
       {err && <div style={{ background: "color-mix(in srgb, #c0392b 12%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, transparent)", borderRadius: 12, padding: "11px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text)" }}>{err}</div>}
 
-      {stage === "pick" && (<>
-        <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 10 }}>Where are you coming from?</div>
-        <div style={{ display: "grid", gap: 8 }}>
-          {SYSTEMS.map((s) => { const on = system === s; return (
-            <button key={s} onClick={() => setSystem(s)} style={{ textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, display: "flex", justifyContent: "space-between", alignItems: "center" }}>{s}{on && <Check size={17} style={{ color: "var(--gold)" }} />}</button>
-          ); })}
-        </div>
-        <button className="lift" disabled={!system} onClick={() => setStage("upload")} style={{ width: "100%", marginTop: 16, background: system ? "var(--gold)" : "var(--border2)", color: system ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none" }}>Continue</button>
-      </>)}
-
       {stage === "upload" && (<>
-        <div style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 14, lineHeight: 1.5 }}>In <strong style={{ color: "var(--text)" }}>{system}</strong>, export your clients (and appointments, if it offers them) as a <strong style={{ color: "var(--text)" }}>CSV</strong> — usually under Settings → Export or Reports. Then upload the file here.</div>
+        <div style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 14, lineHeight: 1.5 }}>In your old system, export your clients (and appointments, if it offers them) as a <strong style={{ color: "var(--text)" }}>CSV</strong> — usually under Settings → Export or Reports. Then upload the file here.</div>
         <input ref={fileRef} type="file" accept=".csv,text/csv,text/plain" onChange={onFile} style={{ display: "none" }} />
         <button className="lift" onClick={() => fileRef.current && fileRef.current.click()} style={{ width: "100%", border: "1px dashed var(--border2)", background: "var(--panel2)", borderRadius: 14, padding: "34px 16px", color: "var(--sub)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
           <Upload size={30} style={{ color: "var(--faint)" }} />
           <span style={{ fontSize: 15, color: "var(--text)" }}>{fileName || "Choose your CSV file"}</span>
           <span style={{ fontSize: 13, color: "var(--faint)" }}>.csv — tap to choose</span>
         </button>
-        <button onClick={reset} style={{ width: "100%", marginTop: 12, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 8 }}>Back</button>
       </>)}
 
       {stage === "map" && (<>
-        <div style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 6, lineHeight: 1.5 }}>We read <strong style={{ color: "var(--text)" }}>{parsed.rows.length}</strong> rows from <strong style={{ color: "var(--text)" }}>{fileName}</strong>. Match your columns below — we've guessed where we could. Appointment fields are optional.</div>
+        <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 6, lineHeight: 1.5 }}>{fileName} · {parsed.rows.length} rows · we guessed the obvious ones. Appointment fields are optional.</div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden", margin: "16px 0" }}>
           {FIELD_LABELS.map(([k, label], i) => (
             <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
