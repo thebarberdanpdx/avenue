@@ -2510,6 +2510,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [wlDayTimes, setWlDayTimes] = useState({}); // per-day time pref: { [label]: "morning"|"afternoon"|"evening"|"any" | "custom" }
   const [wlDayCustom, setWlDayCustom] = useState({}); // per-day custom text when time === "custom"
   const [wlWhen, setWlWhen] = useState("");         // legacy single pref (kept for old refs)
+  const [wlFor, setWlFor] = useState("self");       // self | other | group (e.g. father/son, more than one appt)
   const [wlPhotos, setWlPhotos] = useState(0);
   const [wlAnyProvider, setWlAnyProvider] = useState(false); // false = only their provider (the respectful default)
   const [wlService, setWlService] = useState("");
@@ -2916,8 +2917,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       });
       if (!isSame) cursor += person.durMin;
     });
+    // If this person was sitting on the waitlist, a real booking takes them off it (matched by phone).
+    const _bphone = (finalPhone || "").replace(/\D/g, "");
+    const dropFromWaitlist = () => { if (!setWaitlist || !_bphone) return; setWaitlist((cur) => (cur || []).filter((w) => (w.phone || "").replace(/\D/g, "") !== _bphone)); };
     // Staff/preview bookings persist through the dashboard's own save path — show success immediately.
-    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); setBookedId(baseId); setStep(8); return; }
+    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); setBookedId(baseId); setStep(8); return; }
     // Public booking: the slot is never held while saving, and the client is only told they're booked
     // once the server actually has it — so a failed save can never become a ghost booking.
     setBooking(true); setBookErr(false);
@@ -2926,6 +2930,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         setBooking(false);
         if (error) { setBookErr(true); return; } // nothing was held, nothing lost — they can just tap again
         setAppts((cur) => [...cur, ...newAppts]);
+        dropFromWaitlist();
         // Fire the booking confirmation (event-driven). Fire-and-forget — the booking already
         // succeeded on the server, so a send failure must never affect it.
         fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` });
@@ -4491,16 +4496,24 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Your name</label>
                     <input value={wlName} onChange={(e) => setWlName(e.target.value)} placeholder="First and last name" style={{ ...inputStyle, marginBottom: 16 }} />
 
+                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Who's this for?</label>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                      {[["self", "Just me"], ["other", "Someone else"], ["group", "More than one"]].map(([v, label]) => { const on = wlFor === v; return (
+                        <button key={v} onClick={() => setWlFor(v)} style={{ flex: 1, padding: "12px 6px", borderRadius: 10, border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{label}</button>
+                      ); })}
+                    </div>
+                    {wlFor === "group" && <p style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5, margin: "-4px 0 16px" }}>Great — note who's coming and what each person wants in the photo step or service notes (e.g. you + your son). We'll look for room for everyone together.</p>}
+
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Phone</label>
                     <input inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 16 }} />
                     <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
                       By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
                     </p>
 
-                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Which days work? <span style={{ color: "var(--sub)", fontWeight: 400 }}>(tap any)</span></label>
+                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Which days work? <span style={{ color: "var(--sub)", fontWeight: 400 }}>(up to 3)</span></label>
                     <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 16 }}>
-                      {dateOptions.slice(0, 14).map((d, i) => { const lbl = relativeDate(d).includes(",") ? relativeDate(d) : `${relativeDate(d)}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; const on = wlDays.includes(lbl); return (
-                        <button key={i} onClick={() => setWlDays((prev) => { if (prev.includes(lbl)) { setWlDayTimes((t) => { const n = { ...t }; delete n[lbl]; return n; }); return prev.filter((x) => x !== lbl); } setWlDayTimes((t) => ({ ...t, [lbl]: "any" })); return [...prev, lbl]; })} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+                      {dateOptions.slice(0, 14).map((d, i) => { const lbl = relativeDate(d).includes(",") ? relativeDate(d) : `${relativeDate(d)}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; const on = wlDays.includes(lbl); const atMax = !on && wlDays.length >= 3; return (
+                        <button key={i} disabled={atMax} onClick={() => setWlDays((prev) => { if (prev.includes(lbl)) { setWlDayTimes((t) => { const n = { ...t }; delete n[lbl]; return n; }); return prev.filter((x) => x !== lbl); } if (prev.length >= 3) return prev; setWlDayTimes((t) => ({ ...t, [lbl]: "any" })); return [...prev, lbl]; })} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", opacity: atMax ? 0.4 : 1 }}>
                           <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
                           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{d.getDate()}</div>
                         </button>
@@ -4570,7 +4583,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                           <button className="lift" disabled={!ready} onClick={() => {
                             if (!ready) return;
                             const dayTimes = {}; wlDays.forEach((l) => { dayTimes[l] = wlDayTimes[l] === "custom" ? `custom:${(wlDayCustom[l] || "").trim()}` : (wlDayTimes[l] || "any"); });
-                            const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: wlName, phone, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", dayTimes, when: dayTimes[wlDays[0]] || "any", service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() };
+                            const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: wlName, phone, forWho: wlFor, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", dayTimes, when: dayTimes[wlDays[0]] || "any", service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() };
                             setWaitlist((cur) => [...cur, wlEntry]);
                             if (!isStaff) { try { supabase.rpc('join_waitlist', { p_shop: shopId, p_entry: wlEntry }); } catch (e) {} }
                             setWaitlistDone(true); setShowWaitlist(false);
