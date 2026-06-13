@@ -79,6 +79,38 @@ const STAFF_PORTRAITS = [
 // otherwise a stable portrait derived from their id (never blank).
 const hashStr = (str) => { let h = 0; const s = String(str || ""); for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; } return Math.abs(h); };
 const staffPhoto = (p) => (p && p.photo) ? p.photo : STAFF_PORTRAITS[hashStr(p && p.id) % STAFF_PORTRAITS.length];
+// Providers persist their display order in an `order` field. Postgres returns rows
+// unordered, so we always re-sort on load — otherwise a reorder reverts on the next
+// session/focus reload. "anyone" stays pinned first; missing order falls back to
+// current array position so legacy data (no order yet) keeps its existing sequence.
+// As-you-type US phone formatting: (503) 555-0142. Keeps only digits, caps at 10
+// (drops a leading 1), and formats progressively so the field reads right while typing.
+const formatPhone = (raw) => {
+  let d = String(raw || "").replace(/\D/g, "");
+  if (d.length === 11 && d[0] === "1") d = d.slice(1);
+  d = d.slice(0, 10);
+  if (d.length === 0) return "";
+  if (d.length < 4) return "(" + d;
+  if (d.length < 7) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+};
+// Keep only digits (optionally one decimal point) for numeric fields.
+const onlyDigits = (raw, decimal = false) => {
+  const s = String(raw || "");
+  return decimal ? s.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1") : s.replace(/\D/g, "");
+};
+const sortProviders = (list) => {
+  const arr = Array.isArray(list) ? list : [];
+  return arr
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => {
+      if (a.p.id === "anyone") return -1;
+      if (b.p.id === "anyone") return 1;
+      const ao = a.p.order ?? (1000 + a.i), bo = b.p.order ?? (1000 + b.i);
+      return ao === bo ? a.i - b.i : ao - bo;
+    })
+    .map(({ p }) => p);
+};
 // Clients keep their colored initial unless a photo has been set explicitly.
 const clientPhoto = (c) => (c && c.photo) ? c.photo : null;
 // Reusable circular avatar — edge-to-edge photo or centered initial.
@@ -145,6 +177,7 @@ const DEFAULT_BUSINESS = {
   website: {
     enabled: false,           // off by default — the branded storefront is an opt-in option in settings
     logo: "",                 // optional logo image (photo id / url); blank = show the business name as text
+    logoFit: "contain",       // "contain" (Fit — whole logo shows) | "cover" (Fill — edge to edge)
     tagline: "True to the craft.", // short line under the name
     intro: "",                // optional longer welcome paragraph
     instagram: "",            // handle without the @ (blank = hide the button)
@@ -299,6 +332,12 @@ function hoursForDate(prov, date) {
   if (ov) return ov;
   return (prov.hours || {})[date.getDay()] || null;
 }
+// Canonical per-date key (matches hoursForDate / applyHours: Y-M-D, no zero-pad).
+const dateKey = (d) => { const x = new Date(d); return x.getFullYear() + "-" + x.getMonth() + "-" + x.getDate(); };
+// effectiveHours is the shared reader: a one-off date override wins over the weekly
+// shift. Delegates to hoursForDate so the staff editor, booking availability, and the
+// calendar all read the same source.
+const effectiveHours = (p, date) => hoursForDate(p, new Date(date));
 const defaultStaffNotifications = () => ({ smsOnlineBooking: true, smsOtherBooking: true, emailOnlineBooking: false, appNewText: true, appNewChat: true, appMissedCall: true });
 const defaultComp = () => ({
   service: { on: false, type: "basic", basicPct: 0, tiers: [{ upTo: 500, pct: 30 }, { upTo: null, pct: 40 }] },
@@ -1287,6 +1326,7 @@ function App() {
   const loadedRef = useRef(false); // blocks saves until the first load finishes (so seed data can't overwrite real data)
   const [dataLoaded, setDataLoaded] = useState(false); // true once the first load finishes — used to avoid flashing placeholder names
   const savingRef = useRef({});    // per-table { running, queued } — guarantees in-order saves
+  const providersDirtyRef = useRef(false); // true between a local provider edit and its successful sync — blocks focus-reload clobber
   const [saveFailed, setSaveFailed] = useState(false); // drives a banner if a save to the server errors out
 
   // Save a whole in-memory list to its shop-scoped table.
@@ -1391,6 +1431,7 @@ function App() {
       let pr = null;
       try { const rp = await supabase.rpc('get_public_providers', { p_shop: SHOP_ID }); if (!rp.error && Array.isArray(rp.data)) pr = rp.data; } catch (e) {}
       if (pr === null) pr = await loadList('providers');
+      if (pr) pr = sortProviders(pr);
       if (pr && pr.length) setProviders(pr);
       const sv = await loadList('services');     if (sv) sv.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9)); if (sv && sv.length) setServices(sv);
 
@@ -1478,8 +1519,9 @@ function App() {
     if (!session) { lastRemoteRef.current.waitlist = []; setWaitlist([]); return; }
     let alive = true;
     (async () => {
+      const provBusy = () => { const s = savingRef.current.providers; return providersDirtyRef.current || (s && (s.running || s.queued)); };
       const pr = await supabase.from('providers').select('data').eq('shop_id', SHOP_ID);
-      if (alive && !pr.error && Array.isArray(pr.data)) { const list = pr.data.map((r) => r.data); lastRemoteRef.current.providers = list; if (list.length) setProviders(list); }
+      if (alive && !pr.error && Array.isArray(pr.data) && !provBusy()) { const list = sortProviders(pr.data.map((r) => r.data)); lastRemoteRef.current.providers = list; if (list.length) setProviders(list); }
       const wl = await supabase.from('waitlist').select('data').eq('shop_id', SHOP_ID);
       if (alive && !wl.error && Array.isArray(wl.data)) { const list = wl.data.map((r) => r.data); lastRemoteRef.current.waitlist = list; setWaitlist(list); }
     })();
@@ -1523,7 +1565,7 @@ function App() {
   useEffect(() => { if (!loadedRef.current || !session) return; if (appts === lastRemoteRef.current.appointments) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
   useEffect(() => { if (!loadedRef.current) return; if (services === lastRemoteRef.current.services) return; const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
-  useEffect(() => { if (!loadedRef.current) return; if (providers === lastRemoteRef.current.providers) return; const t = setTimeout(() => { syncList('providers', providers); }, 800); return () => clearTimeout(t); }, [providers]);
+  useEffect(() => { if (!loadedRef.current) return; if (providers === lastRemoteRef.current.providers) return; providersDirtyRef.current = true; const t = setTimeout(() => { syncList('providers', providers).finally(() => { providersDirtyRef.current = false; }); }, 800); return () => clearTimeout(t); }, [providers]);
 
   // Retry: re-push everything currently in memory (used by the failed-save banner's Retry button).
   const resaveAll = () => {
@@ -1829,7 +1871,7 @@ function Storefront({ business, services = [], providers = [], categories = [], 
       {/* HERO */}
       <div className="fade-up" style={{ ...section, paddingTop: "clamp(56px, 16vw, 110px)", paddingBottom: 40, textAlign: "center" }}>
         {w.logo
-          ? <img src={imgUrl(w.logo, 600)} alt={logo} style={{ maxWidth: "min(320px, 80%)", maxHeight: 140, objectFit: "contain", display: "block", margin: "0 auto" }} />
+          ? <img src={imgUrl(w.logo, 600)} alt={logo} style={{ display: "block", margin: "0 auto", width: (w.logoFit === "cover") ? "min(360px, 84%)" : "auto", maxWidth: "min(360px, 84%)", height: (w.logoFit === "cover") ? 150 : "auto", maxHeight: 150, objectFit: (w.logoFit === "cover") ? "cover" : "contain" }} />
           : <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(42px, 14vw, 68px)", fontWeight: 500, lineHeight: 0.98, letterSpacing: 1 }}>{logo}</h1>}
         <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "20px auto" }} />
         {w.tagline && <p style={{ fontSize: 17, color: "var(--sub)", fontWeight: 300, fontStyle: "italic", marginBottom: 8 }}>{w.tagline}</p>}
@@ -2119,7 +2161,7 @@ function resolveAnyone(providers, appts, dateObj, startMin, durMin, business) {
   const endMin = startMin + (durMin || 0);
   const liveOnDay = (a) => a && a.status !== "cancelled" && a.status !== "no-show" && a.bookedFor && sameDay(a.bookedFor);
   const isFree = (p) => {
-    const h = p.hours && p.hours[dow];
+    const h = effectiveHours(p, dateObj);
     if (!h || !h.on) return false;
     if (startMin < h.start || endMin > h.end) return false;
     return !(appts || []).some((a) => liveOnDay(a) && a.providerId === p.id && typeof a.start === "number" && typeof a.end === "number" && startMin < a.end && endMin > a.start);
@@ -9791,6 +9833,84 @@ function BookingWordingPreview({ bs }) {
   );
 }
 
+// Real logo upload (PNG transparency preserved) + Fit/Fill + live preview.
+// Writes business.logo (data URL) and business.logoFit ("contain" | "cover").
+function LogoEditor({ form, setForm }) {
+  const fileRef = useRef(null);
+  const fit = form.logoFit || "contain";
+  const onFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const fr = new FileReader();
+    fr.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 800; let w = img.width, h = img.height;
+        if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+        else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        // PNG keeps transparency; JPEG would add a black/white box behind a logo.
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        setForm({ ...form, logo: canvas.toDataURL("image/png") });
+      };
+      img.src = ev.target.result;
+    };
+    fr.readAsDataURL(file);
+  };
+  const hasLogo = !!(form.logo && form.logo.trim());
+  const wordmark = (form.logoText && form.logoText.trim()) || (form.name || "Your business");
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={onFile} style={{ display: "none" }} />
+      {/* live preview — exactly how the booking page hero renders it */}
+      <div style={{ border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden", background: "var(--panel)", boxShadow: "var(--shadow-sm)", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 13px", borderBottom: "1px solid var(--line)", background: "var(--panel2)" }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
+          <span style={{ fontSize: 11, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Your logo, as clients see it</span>
+        </div>
+        <div style={{ padding: "30px 20px 34px", background: "var(--bg)", textAlign: "center" }}>
+          {hasLogo
+            ? <img src={form.logo} alt={wordmark} style={{ display: "block", margin: "0 auto", width: fit === "cover" ? "min(320px, 86%)" : "auto", maxWidth: "min(320px, 86%)", height: fit === "cover" ? 120 : "auto", maxHeight: 130, objectFit: fit }} />
+            : <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(30px, 11vw, 46px)", fontWeight: 500, lineHeight: 1, letterSpacing: 1, margin: 0, color: "var(--text)", wordBreak: "break-word" }}>{wordmark}</h1>}
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 14 }}>Book an appointment</div>
+        </div>
+      </div>
+
+      {/* upload / replace */}
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: hasLogo ? 14 : 0 }}>
+        <div style={{ width: 64, height: 64, borderRadius: 14, background: "var(--panel2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
+          {hasLogo ? <img src={form.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }} /> : <ImageIcon size={22} style={{ color: "var(--faint)" }} />}
+        </div>
+        <div style={{ flex: 1 }}>
+          <button onClick={() => fileRef.current && fileRef.current.click()} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "11px 16px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}>{hasLogo ? "Replace logo" : "Upload logo"}</button>
+          <div style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 7 }}>PNG or SVG with a transparent background looks best. We resize and sharpen it so it stays crisp on your booking page, headers, and receipts.</div>
+        </div>
+      </div>
+
+      {hasLogo && (
+        <>
+          {/* Fit / Fill */}
+          <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "4px 2px 8px" }}>How it sits</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {[{ v: "contain", t: "Fit", s: "Whole logo shows" }, { v: "cover", t: "Fill", s: "Edge to edge" }].map((o) => {
+              const on = fit === o.v;
+              return (
+                <button key={o.v} onClick={() => setForm({ ...form, logoFit: o.v })} style={{ flex: 1, borderRadius: 12, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: "var(--text)", padding: "12px 10px", textAlign: "center", cursor: "pointer" }}>
+                  <span style={{ display: "block", fontSize: 14, fontWeight: on ? 600 : 500 }}>{o.t}</span>
+                  <span style={{ display: "block", fontSize: 11.5, color: "var(--sub)", marginTop: 3 }}>{o.s}</span>
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={() => setForm({ ...form, logo: "" })} style={{ background: "none", border: "none", color: "#C2563F", fontSize: 13.5, padding: "2px 2px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><Trash2 size={14} /> Remove logo</button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function BrandingPreview({ logo }) {
   const text = (logo && logo.trim()) || "Your business";
   return (
@@ -10423,7 +10543,7 @@ function PhoneNumbersEditor({ phones, onChange }) {
             <input value={p.label} onChange={(e) => setPhone(p.id, { label: e.target.value })} placeholder="Label (e.g. Main)" style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 14, letterSpacing: 1, fontFamily: FONT_BODY, fontWeight: 600 }} />
             <button onClick={() => removePhone(p.id)} style={{ background: "none", color: "var(--faint)" }}><Trash2 size={16} /></button>
           </div>
-          <input value={p.number} onChange={(e) => setPhone(p.id, { number: e.target.value })} placeholder="(555) 000-0000" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+          <input value={p.number} onChange={(e) => setPhone(p.id, { number: formatPhone(e.target.value) })} inputMode="tel" placeholder="(555) 000-0000" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
         </div>
       ))}
       <button className="lift" onClick={addPhone} style={{ width: "100%", background: "transparent", boxShadow: "none", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 12, padding: 14, fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add phone number</button>
@@ -10998,7 +11118,10 @@ function estimateEarnings(provider, appts, services, ref = new Date()) {
 // ============================================================
 // STAFF MEMBERS — Mangomint-style hub: list → member → sections
 // ============================================================
-function StaffMembersView({ providers, setProviders, services, setServices, appts, showToast, business }) {
+function StaffMembersView({ providers, setProviders, services, setServices, appts, showToast, business, shopId }) {
+  const SLUG = shopId || "sanctuary";
+  const ORIGIN = (typeof window !== "undefined" && window.location && window.location.origin && !/capacitor|ionic|localhost/.test(window.location.origin)) ? window.location.origin : "https://gotvero.com";
+  const copyText = (text, label) => { try { navigator.clipboard.writeText(text); showToast((label || "Link") + " copied."); } catch (e) { showToast("Couldn't copy — long-press to select."); } };
   const [openId, setOpenId] = useState(null);   // selected staff id (null = list)
   const [section, setSection] = useState(null); // null = hub, else section key
   const [showArchived, setShowArchived] = useState(false);
@@ -11011,7 +11134,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   const [editMode, setEditMode] = useState(false); // team list: browse vs manage (reorder/archive)
 
   const staff = providers.filter((p) => p.id !== "anyone");
-  const active = staff.filter((p) => !p.archived);
+  const active = sortProviders(staff.filter((p) => !p.archived)).filter((p) => p.id !== "anyone");
   const archived = staff.filter((p) => p.archived);
   const person = providers.find((p) => p.id === openId);
 
@@ -11019,26 +11142,42 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   const patchComp = (pid, branch, obj) => setProviders(providers.map((p) => p.id === pid ? { ...p, comp: { ...defaultComp(), ...(p.comp || {}), [branch]: { ...defaultComp()[branch], ...((p.comp || {})[branch] || {}), ...obj } } } : p));
   const patchNotif = (pid, obj) => setProviders(providers.map((p) => p.id === pid ? { ...p, notifications: { ...defaultStaffNotifications(), ...(p.notifications || {}), ...obj } } : p));
   const patchDay = (pid, dow, obj) => setProviders(providers.map((p) => p.id === pid ? { ...p, hours: { ...p.hours, [dow]: { ...p.hours[dow], ...obj } } } : p));
+  // Write a one-off override for a specific date (does NOT touch the recurring weekly shift).
+  // Uses the same hoursOverrides store the calendar reads, so exceptions are honored everywhere.
+  const patchException = (pid, date, obj) => setProviders(providers.map((p) => {
+    if (p.id !== pid) return p;
+    const key = dateKey(date);
+    const dow = new Date(date).getDay();
+    const base = (p.hoursOverrides && p.hoursOverrides[key]) || (p.hours && p.hours[dow]) || { on: false, start: 540, end: 1020 };
+    return { ...p, hoursOverrides: { ...(p.hoursOverrides || {}), [key]: { ...base, ...obj } } };
+  }));
+  const clearException = (pid, date) => setProviders(providers.map((p) => {
+    if (p.id !== pid || !p.hoursOverrides) return p;
+    const next = { ...p.hoursOverrides }; delete next[dateKey(date)];
+    return { ...p, hoursOverrides: next };
+  }));
   const patchPerm = (pid, key) => setProviders(providers.map((p) => { if (p.id !== pid) return p; const cur = { ...defaultPermissions(p.userType), ...(p.permissions || {}) }; return { ...p, permissions: { ...cur, [key]: !cur[key] } }; }));
 
   const addStaff = () => {
     const colors = ["#C2703D", "#5E8C72", "#8064B5", "#3D9BE9", "#B14A5E"];
     const id = "s" + Date.now();
-    setProviders([...providers, { id, name: "New Staff Member", role: "Stylist", color: colors[providers.length % colors.length], photo: STAFF_PORTRAITS[providers.length % STAFF_PORTRAITS.length], hours: { ...DEFAULT_HOURS }, email: "", phone: "", userType: "Staff", isProvider: true, onlineBooking: true, archived: false, notifications: defaultStaffNotifications(), comp: defaultComp(), permissions: defaultPermissions("Staff") }]);
+    const maxOrder = Math.max(-1, ...providers.filter((p) => p.id !== "anyone").map((p) => p.order ?? -1));
+    setProviders([...providers, { id, name: "New Staff Member", role: "Stylist", order: maxOrder + 1, color: colors[providers.length % colors.length], photo: STAFF_PORTRAITS[providers.length % STAFF_PORTRAITS.length], hours: { ...DEFAULT_HOURS }, email: "", phone: "", userType: "Staff", isProvider: true, onlineBooking: true, archived: false, notifications: defaultStaffNotifications(), comp: defaultComp(), permissions: defaultPermissions("Staff") }]);
     setOpenId(id); setSection("details"); setEditingDetails(true); showToast("New staff member — add their details.");
   };
   const archive = (pid) => { patch(pid, { archived: true }); setOpenId(null); showToast("Staff member archived."); };
   const restore = (pid) => { patch(pid, { archived: false }); showToast("Staff member restored."); };
-  // Reorder active members via up/down in edit mode — swaps their positions in the providers array.
+  // Reorder active members via up/down in edit mode. We write an explicit `order` onto
+  // every active provider so the new sequence survives the next server reload (Postgres
+  // returns rows unordered; sortProviders reads this field).
   const moveStaff = (pid, dir) => {
-    const ids = active.map((p) => p.id);
-    const i = ids.indexOf(pid), j = i + dir;
-    if (j < 0 || j >= ids.length) return;
-    const arr = [...providers];
-    const ai = arr.findIndex((p) => p.id === ids[i]);
-    const aj = arr.findIndex((p) => p.id === ids[j]);
-    [arr[ai], arr[aj]] = [arr[aj], arr[ai]];
-    setProviders(arr);
+    const ordered = active.slice();
+    const i = ordered.findIndex((p) => p.id === pid), j = i + dir;
+    if (i < 0 || j < 0 || j >= ordered.length) return;
+    [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+    const orderMap = {};
+    ordered.forEach((p, idx) => { orderMap[p.id] = idx; });
+    setProviders(providers.map((p) => orderMap[p.id] != null ? { ...p, order: orderMap[p.id] } : p));
   };
 
   // shared UI — Toggle now uses the global <Toggle> (50×29) for consistency.
@@ -11124,7 +11263,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                 <div><FieldLabel>Name</FieldLabel><input value={detailsDraft ? detailsDraft.name : person.name} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), name: e.target.value }))} style={inputStyle} /></div>
                 <div><FieldLabel>Role / title</FieldLabel><input value={detailsDraft ? detailsDraft.role : (person.role || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), role: e.target.value }))} style={inputStyle} /></div>
                 <div><FieldLabel>Email</FieldLabel><input value={detailsDraft ? detailsDraft.email : (person.email || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), email: e.target.value }))} inputMode="email" autoCapitalize="none" style={inputStyle} /></div>
-                <div><FieldLabel>Phone</FieldLabel><input value={detailsDraft ? detailsDraft.phone : (person.phone || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), phone: e.target.value }))} inputMode="tel" style={inputStyle} /></div>
+                <div><FieldLabel>Phone</FieldLabel><input value={detailsDraft ? detailsDraft.phone : (person.phone || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), phone: formatPhone(e.target.value) }))} inputMode="tel" placeholder="(503) 555-0142" style={inputStyle} /></div>
                 <div><FieldLabel>User type</FieldLabel><Segmented options={[{ value: "Admin", label: "Admin" }, { value: "Staff", label: "Staff" }, { value: "Front Desk", label: "Front desk" }]} value={ut} onChange={(v) => patch(person.id, { userType: v })} /></div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)", marginTop: 8 }}>
@@ -11142,15 +11281,34 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                   <div style={{ fontSize: 16, color: k === "Email" ? "var(--gold)" : "var(--text)" }}>{v}</div>
                 </div>
               ))}
-              <div style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
-                <button onClick={() => showToast("iCal calendar URL copied.")} style={{ background: "none", color: "var(--gold)", fontSize: 15 }}>View iCal Calendar URL</button>
-              </div>
-              <div style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
-                <div style={{ fontSize: 14, color: "var(--faint)", marginBottom: 6 }}>Online booking direct link</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ flex: 1, fontSize: 14, color: "var(--gold)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>booking.meridian.app/{person.id}</span>
-                  <button onClick={() => showToast("Link copied.")} style={{ background: "none", color: "var(--sub)" }}><Copy size={16} /></button>
-                </div>
+              <div style={{ padding: "16px 0 8px", borderTop: "1px solid var(--line)" }}>
+                {person.onlineBooking ? (() => {
+                  const bookUrl = `${ORIGIN}/book?shop=${SLUG}&with=${person.id}`;
+                  const icalUrl = `webcal://${ORIGIN.replace(/^https?:\/\//, "")}/api/ical/${SLUG}/${person.id}.ics`;
+                  const first = (person.name || "").split(" ")[0] || "this barber";
+                  return (
+                    <>
+                      <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 10 }}>{first}'s links</div>
+                      {/* direct booking link — real, uses the live /book path */}
+                      <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 500, marginBottom: 6 }}>Book {first} directly</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px" }}>
+                        <span style={{ flex: 1, fontSize: 13, color: "var(--sub)", fontFamily: "ui-monospace, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bookUrl.replace(/^https?:\/\//, "")}</span>
+                        <button onClick={() => copyText(bookUrl, `${first}'s booking link`)} style={{ flexShrink: 0, background: "none", border: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Copy size={15} /> Copy</button>
+                      </div>
+                      <div style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 7 }}>Opens your booking page with {first} already selected. Send it to clients who always book {first}.</div>
+
+                      {/* iCal subscription — real read-only feed endpoint */}
+                      <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 500, margin: "16px 0 6px" }}>Subscribe to {first}'s calendar</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px" }}>
+                        <span style={{ flex: 1, fontSize: 13, color: "var(--sub)", fontFamily: "ui-monospace, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{icalUrl}</span>
+                        <button onClick={() => copyText(icalUrl, "Calendar link")} style={{ flexShrink: 0, background: "none", border: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Copy size={15} /> Copy</button>
+                      </div>
+                      <div style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 7 }}>Paste into Apple or Google Calendar to see {first}'s appointments there automatically. Read-only — it never changes anything in Vero.</div>
+                    </>
+                  );
+                })() : (
+                  <div style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5 }}>Turn on “Enable in online booking” to get {(person.name || "").split(" ")[0] || "this barber"}'s direct booking link and calendar feed.</div>
+                )}
               </div>
             </div>
           )}
@@ -11186,48 +11344,95 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
 
   // ---------- SERVICES (per-staff) — reads/writes the SAME service.staff store as the service editor ----------
   if (section === "services") {
+    // Group by the categories present on the services themselves (StaffMembersView
+    // isn't passed the category list; this stays correct regardless).
+    const cats = [...new Set(services.map((s) => s.category || "Services"))];
     const entryFor = (s) => (s.staff && s.staff[person.id]) || { on: true, duration: null, price: null };
     const setSvc = (sid, obj) => setServices(services.map((s) => {
       if (s.id !== sid) return s;
       const cur = (s.staff && s.staff[person.id]) || { on: true, duration: null, price: null };
       return { ...s, staff: { ...(s.staff || {}), [person.id]: { ...cur, ...obj } } };
     }));
+    // per-cut-style duration override for this barber, stored on service.staff[pid].cutDur[ctId]
+    const cutDurFor = (s, ctId) => { const e = entryFor(s); return (e.cutDur && e.cutDur[ctId] != null) ? e.cutDur[ctId] : null; };
+    const setCutDur = (sid, ctId, val) => setServices(services.map((s) => {
+      if (s.id !== sid) return s;
+      const cur = (s.staff && s.staff[person.id]) || { on: true, duration: null, price: null };
+      const cutDur = { ...(cur.cutDur || {}) };
+      if (val == null) delete cutDur[ctId]; else cutDur[ctId] = val;
+      return { ...s, staff: { ...(s.staff || {}), [person.id]: { ...cur, cutDur } } };
+    }));
     const allOff = services.every((s) => entryFor(s).on === false);
+    const first = (person.name || "").split(" ")[0] || "this barber";
+    const usedCats = cats.filter((c) => services.some((s) => (s.category || "Services") === c));
+    const NumBox = ({ value, placeholder, onChange, width = 56 }) => (
+      <input inputMode="numeric" value={value ?? ""} placeholder={placeholder} onChange={(e) => onChange(onlyDigits(e.target.value))} style={{ width, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 7px", color: "var(--text)", fontSize: 15, fontWeight: 600, textAlign: "center", fontFamily: FONT_BODY }} />
+    );
     return (
       <div className="appt-screen" style={{ paddingBottom: 40 }}>
         <SecHeader title="Services" onBack={() => setSection(null)} right={
           <button onClick={() => { const next = !!allOff; services.forEach((s) => setSvc(s.id, { on: next })); }} style={{ background: "none", color: "var(--gold)", fontSize: 15, fontWeight: 500 }}>{allOff ? "Enable all" : "Disable all"}</button>
         } />
-        <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14, fontWeight: 400 }}>Which services {person.name.split(" ")[0]} offers, and the time or price just for them. Blank = the shop default.</p>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
-          {services.map((s, i) => {
-            const e = entryFor(s); const on = e.on !== false;
-            const overridden = (e.duration != null && e.duration !== "") || (e.price != null && e.price !== "");
-            return (
-              <div key={s.id} style={{ padding: "15px 16px", borderTop: i ? "1px solid var(--line)" : "none", opacity: on ? 1 : 0.5 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
-                  <span style={{ fontSize: 16, fontWeight: 500 }}>{s.name}</span>
-                  <Toggle on={on} onClick={() => setSvc(s.id, { on: !on })} />
-                </div>
-                {on && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <input type="number" value={e.duration ?? ""} placeholder={String(s.duration)} onChange={(ev) => setSvc(s.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ width: 52, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 8px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "center", fontFamily: FONT_BODY }} />
-                      <span style={{ fontSize: 13, color: "var(--sub)" }}>min</span>
+        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18, fontWeight: 400 }}>Turn services on or off for {first}, and set {first === "this barber" ? "their" : "their"} own time or price. Blank means the shop default.</p>
+        {usedCats.map((cat) => {
+          const inCat = services.filter((s) => (s.category || "Services") === cat);
+          if (!inCat.length) return null;
+          return (
+            <div key={cat} style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 4px 9px" }}>{cat}</div>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+                {inCat.map((s, i) => {
+                  const e = entryFor(s); const on = e.on !== false;
+                  const cutTypes = Array.isArray(s.cutTypes) ? s.cutTypes : [];
+                  return (
+                    <div key={s.id} style={{ padding: "15px 16px", borderTop: i ? "1px solid var(--line)" : "none", opacity: on ? 1 : 0.55 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 15.5, fontWeight: 500 }}>{s.name}</div>
+                          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Shop default · {s.duration} min{s.price != null ? ` · $${s.price}` : ""}</div>
+                        </div>
+                        <Toggle on={on} onClick={() => setSvc(s.id, { on: !on })} />
+                      </div>
+                      {on && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 13, background: "var(--panel2)", borderRadius: 11, padding: "10px 12px", flexWrap: "wrap" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <NumBox value={e.duration} placeholder={String(s.duration)} onChange={(v) => setSvc(s.id, { duration: v === "" ? null : Number(v) })} />
+                            <span style={{ fontSize: 12.5, color: "var(--sub)" }}>min</span>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 12.5, color: "var(--sub)" }}>$</span>
+                            <NumBox value={e.price} placeholder={s.price != null ? String(s.price) : "—"} onChange={(v) => setSvc(s.id, { price: v === "" ? null : Number(v) })} />
+                          </div>
+                          {((e.duration != null && e.duration !== "") || (e.price != null && e.price !== ""))
+                            ? <button onClick={() => setSvc(s.id, { duration: null, price: null })} style={{ marginLeft: "auto", background: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 600, padding: 0 }}>Reset</button>
+                            : <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--faint)" }}>Using defaults</span>}
+                        </div>
+                      )}
+                      {/* per-cut-style timing — only when the service has cut styles and is on */}
+                      {on && cutTypes.length > 0 && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 2px 8px" }}>{first}'s time per style</div>
+                          <div style={{ display: "grid", gap: 7 }}>
+                            {cutTypes.map((ct) => {
+                              const ov = cutDurFor(s, ct.id);
+                              return (
+                                <div key={ct.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", borderRadius: 10, padding: "9px 12px" }}>
+                                  <span style={{ flex: 1, fontSize: 14, minWidth: 0 }}>{ct.name}</span>
+                                  <NumBox value={ov} placeholder={String(ct.duration || s.duration)} onChange={(v) => setCutDur(s.id, ct.id, v === "" ? null : Number(v))} width={52} />
+                                  <span style={{ fontSize: 12.5, color: "var(--sub)" }}>min</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 13, color: "var(--sub)" }}>$</span>
-                      <input type="number" value={e.price ?? ""} placeholder={String(s.price)} onChange={(ev) => setSvc(s.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ width: 52, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 8px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "center", fontFamily: FONT_BODY }} />
-                    </div>
-                    {overridden
-                      ? <button onClick={() => setSvc(s.id, { duration: null, price: null })} style={{ marginLeft: "auto", background: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 500, padding: 0 }}>Reset</button>
-                      : <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--faint)" }}>Using defaults</span>}
-                  </div>
-                )}
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -11250,14 +11455,17 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           </div>
         </div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "10px 16px" }}>
-          {days.map((d, i) => { const dow = d.getDay(); const h = person.hours[dow] || { on: false, start: 540, end: 1020 }; return (
+          {days.map((d, i) => { const dow = d.getDay(); const eh = effectiveHours(person, d) || { on: false, start: 540, end: 1020 }; const h = eh; const hasEx = !!(person.hoursOverrides && person.hoursOverrides[dateKey(d)]); return (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
               <div style={{ width: 46, flexShrink: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: h.on ? "var(--text)" : "var(--faint)" }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</div>
                 <div style={{ fontSize: 12, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div>
               </div>
-              <button onClick={() => setDayEdit({ dow })} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: h.on ? "color-mix(in srgb, var(--gold) 9%, var(--panel2))" : "var(--panel2)", border: `1px solid ${h.on ? "color-mix(in srgb, var(--gold) 30%, var(--border))" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
-                <span style={{ fontSize: 15.5, fontWeight: h.on ? 600 : 400, color: h.on ? "var(--text)" : "var(--faint)", fontStyle: h.on ? "normal" : "italic" }}>{h.on ? `${fmtTime(h.start)} – ${fmtTime(h.end)}` : "No shifts"}</span>
+              <button onClick={() => setDayEdit({ dow, date: d })} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: h.on ? "color-mix(in srgb, var(--gold) 9%, var(--panel2))" : "var(--panel2)", border: `1px solid ${h.on ? "color-mix(in srgb, var(--gold) 30%, var(--border))" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  <span style={{ fontSize: 15.5, fontWeight: h.on ? 600 : 400, color: h.on ? "var(--text)" : "var(--faint)", fontStyle: h.on ? "normal" : "italic" }}>{h.on ? `${fmtTime(h.start)} – ${fmtTime(h.end)}` : "No shifts"}</span>
+                  {hasEx && <span style={{ fontSize: 10.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 6px", flexShrink: 0 }}>JUST THIS DAY</span>}
+                </span>
                 <Edit2 size={15} style={{ color: "var(--sub)", flexShrink: 0 }} />
               </button>
             </div>
@@ -11265,48 +11473,83 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         </div>
         <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Tap any day to set its hours.</p>
 
-        {/* Per-day edit sheet — focused, roomy: on/off, start, end, and repeat all live here */}
+        {/* Per-day edit sheet — pick hours, then choose whether it's a one-off (this date)
+            or the recurring shift (every weekday). Edits buffer locally and apply on Done. */}
         {dayEdit && (() => {
-          const dow = dayEdit.dow;
-          const h = person.hours[dow] || { on: false, start: 540, end: 1020 };
-          const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dow];
-          return (
-            <Sheet open={true} onClose={() => setDayEdit(null)} align="bottom" maxWidth={460}>
-              <div style={{ padding: "6px 2px 8px" }}>
-                <div style={{ textAlign: "center", marginBottom: 20 }}>
-                  <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>WORK HOURS</div>
-                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginTop: 6 }}>{dayName}</div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
-                  <span style={{ fontSize: 16, fontWeight: 500 }}>{h.on ? "Working this day" : "Day off"}</span>
-                  <button onClick={() => patchDay(person.id, dow, { on: !h.on })} aria-label={h.on ? "Working" : "Day off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: h.on ? "var(--gold)" : "var(--border2)", position: "relative", cursor: "pointer", transition: "background .2s" }}>
-                    <span style={{ position: "absolute", top: 3, left: h.on ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
-                  </button>
-                </div>
-
-                {h.on && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>START</div>
-                      <TimeScrollPicker value={h.start} onChange={(v) => patchDay(person.id, dow, { start: v, end: Math.max(v + 15, h.end) })} label={`${dayName} start`} full />
-                    </div>
-                    <span style={{ color: "var(--faint)", fontSize: 15, marginTop: 22 }}>–</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>END</div>
-                      <TimeScrollPicker value={h.end} onChange={(v) => patchDay(person.id, dow, { end: v })} minMin={h.start + 15} label={`${dayName} end`} full />
-                    </div>
+          const DayEditSheet = () => {
+            const dow = dayEdit.dow;
+            const theDate = dayEdit.date ? new Date(dayEdit.date) : new Date();
+            const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dow];
+            const startVal = effectiveHours(person, theDate) || { on: false, start: 540, end: 1020 };
+            const hadEx = !!(person.hoursOverrides && person.hoursOverrides[dateKey(theDate)]);
+            const [draft, setDraft] = useState({ on: !!startVal.on, start: startVal.start, end: startVal.end });
+            const [scope, setScope] = useState(hadEx ? "date" : "weekly"); // "date" = just this date · "weekly" = recurring
+            const dateLabel = `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]} ${MONTHS[theDate.getMonth()].slice(0,3)} ${theDate.getDate()}`;
+            const apply = () => {
+              if (scope === "date") patchException(person.id, theDate, draft);
+              else { patchDay(person.id, dow, draft); if (hadEx) clearException(person.id, theDate); }
+              showToast && showToast(scope === "date" ? `Saved for ${dateLabel}.` : `Saved for every ${dayName}.`);
+              setDayEdit(null);
+            };
+            return (
+              <Sheet open={true} onClose={() => setDayEdit(null)} align="bottom" maxWidth={460}>
+                <div style={{ padding: "6px 2px 8px" }}>
+                  <div style={{ textAlign: "center", marginBottom: 20 }}>
+                    <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>WORK HOURS</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginTop: 6 }}>{dayName}</div>
+                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{dateLabel}</div>
                   </div>
-                )}
 
-                {h.on && (
-                  <button onClick={() => { setRepeatFor({ dow, h }); setDayEdit(null); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--gold)", fontSize: 14.5, fontWeight: 500, marginBottom: 12, cursor: "pointer" }}><Repeat size={16} /> Repeat these hours on other days</button>
-                )}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
+                    <span style={{ fontSize: 16, fontWeight: 500 }}>{draft.on ? "Working this day" : "Day off"}</span>
+                    <button onClick={() => setDraft((d) => ({ ...d, on: !d.on }))} aria-label={draft.on ? "Working" : "Day off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: draft.on ? "var(--gold)" : "var(--border2)", position: "relative", cursor: "pointer", transition: "background .2s" }}>
+                      <span style={{ position: "absolute", top: 3, left: draft.on ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
+                    </button>
+                  </div>
 
-                <button onClick={() => setDayEdit(null)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 13.5, letterSpacing: 2, fontWeight: 600, borderRadius: 12, cursor: "pointer" }}>DONE</button>
-              </div>
-            </Sheet>
-          );
+                  {draft.on && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>START</div>
+                        <TimeScrollPicker value={draft.start} onChange={(v) => setDraft((d) => ({ ...d, start: v, end: Math.max(v + 15, d.end) }))} label={`${dayName} start`} full />
+                      </div>
+                      <span style={{ color: "var(--faint)", fontSize: 15, marginTop: 22 }}>–</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>END</div>
+                        <TimeScrollPicker value={draft.end} onChange={(v) => setDraft((d) => ({ ...d, end: v }))} minMin={draft.start + 15} label={`${dayName} end`} full />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* scope: one-off vs recurring */}
+                  <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "2px 2px 8px" }}>Apply this change to</div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                    {[{ v: "date", t: `Just ${dateLabel.split(" ").slice(0,1)[0]}`, s: `${MONTHS[theDate.getMonth()].slice(0,3)} ${theDate.getDate()} only` }, { v: "weekly", t: `Every ${dayName}`, s: "Going forward" }].map((o) => {
+                      const on = scope === o.v;
+                      return (
+                        <button key={o.v} onClick={() => setScope(o.v)} style={{ flex: 1, borderRadius: 12, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: "var(--text)", padding: "12px 10px", textAlign: "center", cursor: "pointer" }}>
+                          <span style={{ display: "block", fontSize: 14, fontWeight: on ? 600 : 500 }}>{o.t}</span>
+                          <span style={{ display: "block", fontSize: 11.5, color: "var(--sub)", marginTop: 3 }}>{o.s}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {draft.on && scope === "weekly" && (
+                    <button onClick={() => { patchDay(person.id, dow, draft); setRepeatFor({ dow, h: draft }); setDayEdit(null); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--gold)", fontSize: 14.5, fontWeight: 500, marginBottom: 12, cursor: "pointer" }}><Repeat size={16} /> Copy these hours to other days</button>
+                  )}
+
+                  {hadEx && scope === "date" && (
+                    <button onClick={() => { clearException(person.id, theDate); showToast && showToast(`${dateLabel} back to the usual ${dayName}.`); setDayEdit(null); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: "0 0 12px", cursor: "pointer" }}>Remove this one-off — use the usual {dayName}</button>
+                  )}
+
+                  <button onClick={apply} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 13.5, letterSpacing: 2, fontWeight: 600, borderRadius: 12, cursor: "pointer" }}>DONE</button>
+                  <button onClick={() => setDayEdit(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 2px", cursor: "pointer" }}>Cancel</button>
+                </div>
+              </Sheet>
+            );
+          };
+          return <DayEditSheet />;
         })()}
 
         {/* Repeat-on-days popup */}
@@ -13257,7 +13500,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     {
       id: "staff", fullBleed: true, title: "Staff Members", icon: Users, category: "Business Setup",
       status: `${providers.filter((p) => p.id !== "anyone").length} staff`, keywords: "staff team employees hours days off schedule availability who works barber stylist",
-      editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} showToast={showToast} business={form} />),
+      editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} showToast={showToast} business={form} shopId={shopId} />),
     },
     {
       id: "notifications", fullBleed: true, title: "Notifications", icon: Bell, category: "Business Setup",
@@ -13269,9 +13512,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "appearance", title: "Logo & Branding", icon: ImageIcon, category: "Business Setup",
       status: form.logoText ? form.logoText : "Business name", keywords: "logo branding wordmark business name header",
       editor: (<>
-        <BrandingPreview logo={form.logoText || form.name} />
-        {field("LOGO WORDMARK (blank = business name)", "logoText")}
-        <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: -6, marginBottom: 18 }}>Shown as your logo across the app. Leave blank to use the business name.</p>
+        <LogoEditor form={form} setForm={setForm} />
+        {field("LOGO WORDMARK (used when no logo image is set)", "logoText")}
+        <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: -6, marginBottom: 18 }}>If you don't upload a logo image, this text (or your business name) shows as your logo.</p>
       </>),
     },
     {
