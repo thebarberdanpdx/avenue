@@ -189,7 +189,7 @@ const DEFAULT_BUSINESS = {
   // Shop open hours per weekday (0=Sun … 6=Sat), times in minutes from midnight
   hours: { 0: { on: true, start: 600, end: 900 }, 1: { on: true, start: 540, end: 1020 }, 2: { on: false, start: 540, end: 1020 }, 3: { on: false, start: 540, end: 1020 }, 4: { on: true, start: 540, end: 1020 }, 5: { on: true, start: 540, end: 1020 }, 6: { on: true, start: 540, end: 1020 } },
   // Waitlist auto-notify behavior when a slot frees up
-  waitlist: { mode: "ask", order: "longest", delayMin: 30, photoNudge: true, askAnyProvider: true }, // mode: ask|silent · order: longest|all · photoNudge: prompt for a photo · askAnyProvider: ask if open to any provider
+  waitlist: { mode: "ask", order: "longest", delayMin: 30, photoMode: "required", photoNudge: true, askAnyProvider: true }, // photoMode: required|recommended|off · askAnyProvider: ask if open to any provider
   // Softened, neutral default policy — every business edits this freely
   policy: "We kindly ask for at least 24 hours' notice to cancel or reschedule so we can offer the time to someone else. A card is required to reserve your appointment; you won't be charged unless you miss it without notice. Thank you for understanding.",
   // ---- Online booking rules ----
@@ -2506,8 +2506,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [bookErr, setBookErr] = useState(false);   // true if that save failed — client is told to retry, nothing was held
   // waitlist join form
   const [wlName, setWlName] = useState("");
-  const [wlDays, setWlDays] = useState([]);        // preferred days (multi-select)
-  const [wlWhen, setWlWhen] = useState("");         // early | midday | afternoon
+  const [wlDays, setWlDays] = useState([]);        // preferred days (multi-select, label strings)
+  const [wlDayTimes, setWlDayTimes] = useState({}); // per-day time pref: { [label]: "morning"|"afternoon"|"evening"|"any" | "custom" }
+  const [wlDayCustom, setWlDayCustom] = useState({}); // per-day custom text when time === "custom"
+  const [wlWhen, setWlWhen] = useState("");         // legacy single pref (kept for old refs)
   const [wlPhotos, setWlPhotos] = useState(0);
   const [wlAnyProvider, setWlAnyProvider] = useState(false); // false = only their provider (the respectful default)
   const [wlService, setWlService] = useState("");
@@ -4495,33 +4497,36 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
                     </p>
 
-                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Preferred days <span style={{ color: "var(--sub)", fontWeight: 400 }}>(tap any that work)</span></label>
+                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Which days work? <span style={{ color: "var(--sub)", fontWeight: 400 }}>(tap any)</span></label>
                     <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 16 }}>
-                      {dateOptions.slice(0, 10).map((d, i) => { const lbl = relativeDate(d).includes(",") ? relativeDate(d) : `${relativeDate(d)}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; const on = wlDays.includes(lbl); return (
-                        <button key={i} onClick={() => setWlDays((prev) => prev.includes(lbl) ? prev.filter((x) => x !== lbl) : [...prev, lbl])} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
+                      {dateOptions.slice(0, 14).map((d, i) => { const lbl = relativeDate(d).includes(",") ? relativeDate(d) : `${relativeDate(d)}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; const on = wlDays.includes(lbl); return (
+                        <button key={i} onClick={() => setWlDays((prev) => { if (prev.includes(lbl)) { setWlDayTimes((t) => { const n = { ...t }; delete n[lbl]; return n; }); return prev.filter((x) => x !== lbl); } setWlDayTimes((t) => ({ ...t, [lbl]: "any" })); return [...prev, lbl]; })} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
                           <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
                           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{d.getDate()}</div>
                         </button>
                       ); })}
                     </div>
 
-                    <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Time of day that works</label>
-                    <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                      {(() => {
-                        const isToday = selectedDate && selectedDate.toDateString() === new Date().toDateString();
-                        const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-                        // each window: [id, label, sub, endMinute] — hide if today and the window has already ended
-                        const windows = [["early", "Early", "Open–11a", 11 * 60], ["midday", "Midday", "11a–2p", 14 * 60], ["afternoon", "Afternoon", "2p–close", 24 * 60]];
-                        const avail = windows.filter(([id, label, sub, end]) => !isToday || nowMin < end);
-                        if (avail.length === 0) return <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>Today's about wrapped up — try picking another day above.</div>;
-                        return avail.map(([id, label, sub]) => { const on = wlWhen === id; return (
-                          <button key={id} onClick={() => setWlWhen(id)} style={{ flex: 1, padding: "12px 6px", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: "var(--text)" }}>
-                            <div style={{ fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</div>
-                            <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>{sub}</div>
-                          </button>
-                        ); });
-                      })()}
-                    </div>
+                    {/* per-day time preference — each chosen day gets its own window or a custom note */}
+                    {wlDays.length > 0 && (
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>What time works each day?</label>
+                        {wlDays.map((lbl) => { const sel = wlDayTimes[lbl] || "any"; const opts = [["morning", "Morning"], ["afternoon", "Afternoon"], ["evening", "Evening"], ["any", "Any time"]]; return (
+                          <div key={lbl} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 12px", marginBottom: 8 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>{lbl}</div>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              {opts.map(([id, label]) => { const on = sel === id; return (
+                                <button key={id} onClick={() => setWlDayTimes((t) => ({ ...t, [lbl]: id }))} style={{ padding: "7px 12px", borderRadius: 9, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", color: on ? "var(--gold)" : "var(--text)", fontSize: 13, fontWeight: on ? 600 : 400 }}>{label}</button>
+                              ); })}
+                              <button onClick={() => setWlDayTimes((t) => ({ ...t, [lbl]: "custom" }))} style={{ padding: "7px 12px", borderRadius: 9, border: `1.5px solid ${sel === "custom" ? "var(--gold)" : "var(--border)"}`, background: sel === "custom" ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", color: sel === "custom" ? "var(--gold)" : "var(--text)", fontSize: 13, fontWeight: sel === "custom" ? 600 : 400 }}>Custom</button>
+                            </div>
+                            {sel === "custom" && (
+                              <input value={wlDayCustom[lbl] || ""} onChange={(e) => setWlDayCustom((c) => ({ ...c, [lbl]: e.target.value.slice(0, 40) }))} placeholder="e.g. before 12, or after 4:30" style={{ ...inputStyle, marginTop: 8, marginBottom: 0, fontSize: 14 }} />
+                            )}
+                          </div>
+                        ); })}
+                      </div>
+                    )}
 
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Service</label>
                     <div style={{ position: "relative", marginBottom: 16 }}>
@@ -4542,29 +4547,44 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       </>
                     )}
 
-                    {(business?.waitlist?.photoNudge !== false) && (<>
-                    <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid rgba(176,141,87,0.3)", borderRadius: 12, padding: "13px 15px", marginBottom: 12, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                      <Camera size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
-                      <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text2)" }}>This day's full — but add a quick photo of what you're after and {provider.name === "Anyone" ? "the team" : provider.name} can see if it's a fit to squeeze you in. A quick touch-up is easier to slot than a big change.</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 6, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: i < wlPhotos ? "rgba(176,141,87,0.12)" : "transparent" }}>{i < wlPhotos ? <Check size={18} style={{ color: "var(--gold)" }} /> : <Camera size={16} style={{ color: "var(--faint)" }} />}</div>))}</div>
-                    <button onClick={() => setWlPhotos(Math.min(3, wlPhotos + 1))} disabled={wlPhotos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: wlPhotos >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 13, letterSpacing: 1, borderRadius: 6, marginBottom: 20 }}>{wlPhotos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${wlPhotos}/3)`}</button>
-                    </>)}
+                    {(() => {
+                      const photoMode = business?.waitlist?.photoMode || (business?.waitlist?.photoNudge === false ? "off" : "required");
+                      const photoRequired = photoMode === "required";
+                      const phoneOk = phone.replace(/\D/g, "").length >= 10;
+                      const daysOk = wlDays.length > 0 && wlDays.every((l) => wlDayTimes[l] && (wlDayTimes[l] !== "custom" || (wlDayCustom[l] || "").trim()));
+                      const ready = !!(wlName && phoneOk && daysOk && (!photoRequired || wlPhotos > 0));
+                      return (
+                        <>
+                          {photoMode !== "off" && (<>
+                            <label style={{ fontSize: 13, color: "var(--faint)", display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>A quick photo
+                              <span style={{ fontSize: 9.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--on-gold)", background: photoRequired ? "var(--gold)" : "var(--border2)", borderRadius: 4, padding: "2px 6px" }}>{photoRequired ? "REQUIRED" : "RECOMMENDED"}</span>
+                            </label>
+                            <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 12, padding: "13px 15px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                              <Camera size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
+                              <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text2)" }}>Add a photo of your hair now and the cut you're after. It helps {provider.name === "Anyone" ? "the team" : provider.name} see what they're working with and judge if they can fit you in — your odds go way up.</div>
+                            </div>
+                            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 6, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: i < wlPhotos ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent" }}>{i < wlPhotos ? <Check size={18} style={{ color: "var(--gold)" }} /> : <Camera size={16} style={{ color: "var(--faint)" }} />}</div>))}</div>
+                            <button onClick={() => setWlPhotos(Math.min(3, wlPhotos + 1))} disabled={wlPhotos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: wlPhotos >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 13, letterSpacing: 1, borderRadius: 6, marginBottom: 20 }}>{wlPhotos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${wlPhotos}/3)`}</button>
+                          </>)}
 
-                    <button className="lift" disabled={!wlName || phone.replace(/\D/g, "").length < 10 || !wlWhen || wlDays.length === 0} onClick={() => {
-                      const ready = wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0;
-                      if (!ready) return;
-                      const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: wlName, phone, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", when: wlWhen, service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() };
-                      setWaitlist((cur) => [...cur, wlEntry]);
-                      if (!isStaff) { try { supabase.rpc('join_waitlist', { p_shop: shopId, p_entry: wlEntry }); } catch (e) {} }
-                      setWaitlistDone(true); setShowWaitlist(false);
-                    }} style={{ width: "100%", background: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--gold)" : "var(--border2)", color: (wlName && phone.replace(/\D/g, "").length >= 10 && wlWhen && wlDays.length > 0) ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
+                          <button className="lift" disabled={!ready} onClick={() => {
+                            if (!ready) return;
+                            const dayTimes = {}; wlDays.forEach((l) => { dayTimes[l] = wlDayTimes[l] === "custom" ? `custom:${(wlDayCustom[l] || "").trim()}` : (wlDayTimes[l] || "any"); });
+                            const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: wlName, phone, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", dayTimes, when: dayTimes[wlDays[0]] || "any", service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() };
+                            setWaitlist((cur) => [...cur, wlEntry]);
+                            if (!isStaff) { try { supabase.rpc('join_waitlist', { p_shop: shopId, p_entry: wlEntry }); } catch (e) {} }
+                            setWaitlistDone(true); setShowWaitlist(false);
+                          }} style={{ width: "100%", background: ready ? "var(--gold)" : "var(--border2)", color: ready ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
+                          {photoRequired && wlPhotos === 0 && wlName && phoneOk && daysOk && <div style={{ fontSize: 12.5, color: "var(--faint)", textAlign: "center", marginTop: 8 }}>Add at least one photo to join.</div>}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
             )}
 
-            {waitlistDone && <div style={{ background: "var(--panel)", borderRadius: 8, padding: 24, textAlign: "center" }}><CheckCircle2 size={32} style={{ color: "#7A9E9F", marginBottom: 12 }} /><div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>You're on the list</div><p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5 }}>We'll text {wlName ? wlName.split(" ")[0] : "you"} the moment a {wlWhen || ""} slot opens up. No need to check back.</p></div>}
+            {waitlistDone && <div style={{ background: "var(--panel)", borderRadius: 8, padding: 24, textAlign: "center" }}><CheckCircle2 size={32} style={{ color: "#7A9E9F", marginBottom: 12 }} /><div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>You're on the list</div><p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5 }}>We'll text {wlName ? wlName.split(" ")[0] : "you"} the moment a matching spot opens up. No need to check back.</p></div>}
 
             {!dateIsFull && !waitlistDone && (
               <div style={{ borderTop: "1px solid var(--line)", paddingTop: 22, textAlign: "center", marginTop: 8 }}>
@@ -10400,8 +10420,16 @@ function WaitlistRulesEditor({ w, onChange }) {
       )}
       <div style={{ borderTop: "1px solid var(--line)", marginTop: 22, paddingTop: 8 }}>
         <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", margin: "8px 0 4px" }}>ON THE CLIENT'S WAITLIST FORM</div>
-        <ToggleSetting label="Ask for a reference photo" desc="Warmly nudge clients to add a photo of what they want, so you can judge whether you can squeeze them in." on={w.photoNudge !== false} onToggle={(v) => set({ photoNudge: v })} />
-        <div style={{ height: 8 }} />
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 3 }}>Reference photo</div>
+        <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginBottom: 10 }}>A photo of the client's hair now and the cut they want lets you judge whether you can fit them in.</div>
+        {(() => { const mode = w.photoMode || (w.photoNudge === false ? "off" : "required"); const opts = [["required", "Required"], ["recommended", "Recommended"], ["off", "Off"]]; return (
+          <div style={{ display: "flex", gap: 8 }}>
+            {opts.map(([v, label]) => { const on = mode === v; return (
+              <button key={v} onClick={() => set({ photoMode: v, photoNudge: v !== "off" })} style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
+            ); })}
+          </div>
+        ); })()}
+        <div style={{ height: 16 }} />
         <ToggleSetting label="Ask if they'd take any barber" desc="If they picked a specific barber, ask whether they'd accept any open chair — fills cancellations faster. (Defaults to their chosen barber.)" on={w.askAnyProvider !== false} onToggle={(v) => set({ askAnyProvider: v })} />
       </div>
     </div>
