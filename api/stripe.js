@@ -7,12 +7,33 @@
 // It handles two actions the app will call:
 //   • "setup"  → start saving a client's card on file (no charge)
 //   • "charge" → charge a saved card later (e.g. a no-show fee)
+//
+// CROSS-ORIGIN ACCESS (why the headers below exist):
+// The website and this server share an address (gotvero.com), so web calls
+// just work. The iOS/Android app lives at a DIFFERENT address, so the browser
+// engine sends a quick "is it OK to call you?" check (an OPTIONS request)
+// before the real call. Without the headers below, that check fails and the
+// app sees "Load failed" — the call never reaches Stripe. These headers say
+// "yes, the app may call me" and answer the pre-check so charges go through
+// from the phone too. No credentials/cookies are used here, so allowing any
+// origin is safe — the secret key still lives only on the server.
 // ---------------------------------------------------------------------------
 import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
+  // --- Allow the app (a different address) to call this server -------------
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Max-Age", "86400"); // cache the pre-check for a day
+
+  // Answer the browser's pre-check immediately so the real POST can follow.
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
