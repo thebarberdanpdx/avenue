@@ -10022,8 +10022,36 @@ function BookingRulesEditor({ b, onChange }) {
                 <div style={{ marginTop: 13 }}><Stepper value={b.dailyCap || 0} onChange={(v) => set({ dailyCap: v })} min={0} max={200} step={1} zeroLabel="No limit" /></div>
               </div>
 
+              <div style={card}>
+                {head("How far ahead clients can book", "The furthest out a client can pick a date. Up to 90 days shows in days; beyond that, in months.")}
+                {(() => {
+                  const days = b.horizonDays === 0 ? 0 : (b.horizonDays || 60);
+                  const noCutoff = days === 0;
+                  const fmt = (d) => d >= 90 ? `${Math.round(d / 30)} months` : `${d} ${d === 1 ? "day" : "days"}`;
+                  const dec = () => { const cur = days || 60; const s = cur > 90 ? 30 : 1; set({ horizonDays: Math.max(1, cur - s) }); };
+                  const inc = () => { const cur = days || 60; const s = cur >= 90 ? 30 : 1; set({ horizonDays: cur + s }); };
+                  const pm = (label, onClick, disabled) => (
+                    <button onClick={onClick} disabled={disabled} style={{ width: 38, height: 38, borderRadius: 11, border: "1px solid var(--border)", background: "var(--panel2)", color: disabled ? "var(--faint)" : "var(--text)", fontSize: 20, fontWeight: 500, cursor: disabled ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>{label}</button>
+                  );
+                  return (
+                    <div style={{ marginTop: 13 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: noCutoff ? 0 : 14 }}>
+                        <span style={{ fontSize: 14.5 }}>No cutoff (any future date)</span>
+                        <Toggle on={noCutoff} onClick={() => set({ horizonDays: noCutoff ? 60 : 0 })} />
+                      </div>
+                      {!noCutoff && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                          <span style={{ fontSize: 15, fontWeight: 500 }}>{fmt(days || 60)}</span>
+                          <div style={{ display: "flex", gap: 8 }}>{pm("−", dec, (days || 60) <= 1)}{pm("+", inc, false)}</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
               <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 4, marginLeft: 4, fontStyle: "italic" }}>
-                Buffer, minimum notice, and booking window live in Calendar &amp; day → Scheduling. Per-barber daily caps live under each staff member.
+                Buffer and minimum notice live in Calendar &amp; day → Scheduling. Per-barber daily caps live under each staff member.
               </p>
             </div>
           </>
@@ -10520,38 +10548,7 @@ function SchedulingOptionsEditor({ b, onChange }) {
         <HourMinutePicker totalMin={b.leadTimeMin || 0} onChange={(v) => set({ leadTimeMin: v })} />
       </div>
 
-      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
-        <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Booking window</div>
-        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>How far in advance clients can book. Up to 90 days shows in days; beyond that, in months. Or pick no cutoff.</div>
-        {(() => {
-          const days = b.horizonDays === 0 ? 0 : (b.horizonDays || 60);
-          const noCutoff = days === 0;
-          const fmt = (d) => d >= 90 ? `${Math.round(d / 30)} months` : `${d} ${d === 1 ? "day" : "days"}`;
-          const step = (n) => Math.abs(n) >= 30 ? 30 : 1;
-          const dec = () => { const cur = days || 60; const s = cur > 90 ? 30 : 1; set({ horizonDays: Math.max(1, cur - s) }); };
-          const inc = () => { const cur = days || 60; const s = cur >= 90 ? 30 : 1; set({ horizonDays: cur + s }); };
-          const btn = (label, onClick, disabled) => (
-            <button onClick={onClick} disabled={disabled} style={{ width: 38, height: 38, borderRadius: 11, border: "1px solid var(--border)", background: "var(--panel)", color: disabled ? "var(--faint)" : "var(--text)", fontSize: 20, fontWeight: 500, cursor: disabled ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>{label}</button>
-          );
-          return (
-            <>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <span style={{ fontSize: 14.5 }}>No cutoff (any future date)</span>
-                <Toggle on={noCutoff} onClick={() => set({ horizonDays: noCutoff ? 60 : 0 })} />
-              </div>
-              {!noCutoff && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
-                  <span style={{ fontSize: 15, fontWeight: 500 }}>{fmt(days || 60)}</span>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {btn("−", dec, (days || 60) <= 1)}
-                    {btn("+", inc, false)}
-                  </div>
-                </div>
-              )}
-            </>
-          );
-        })()}
-      </div>
+      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 4, fontStyle: "italic" }}>How far ahead clients can book lives in Online booking → Booking page rules.</p>
     </div>
   );
 }
@@ -12359,7 +12356,7 @@ function BookingTimesEditor({ b, onChange }) {
 // Writes business.booking.anyoneMode (+ anyoneOrder for the two ordered modes).
 // Mirrors BookingTimesEditor's card/radio/example look. Powers resolveAnyone.
 function AnyoneRoutingEditor({ b, onChange, providers = [] }) {
-  const mode = b.anyoneMode || "soonest";
+  const mode = (b.anyoneMode === "topChairs" ? "soonest" : b.anyoneMode) || "soonest";
   const reals = (providers || []).filter((p) => p && p.id !== "anyone" && !p.archived);
   // Resolve the saved order to real barbers, then append any not yet listed.
   const savedOrder = (b.anyoneOrder || []).filter((id) => reals.some((r) => r.id === id));
@@ -12382,12 +12379,9 @@ function AnyoneRoutingEditor({ b, onChange, providers = [] }) {
     { v: "roundRobin", label: "Take turns, in order",
       desc: "Rotates through your barbers in the order you set.",
       example: "Dan, then Heather, then back to Dan — one after another, in turn." },
-    { v: "topChairs", label: "Fill top chairs first",
-      desc: "Loads your best earners before sending overflow elsewhere.",
-      example: "Fills Dan's day first, then spills extra bookings into Heather's." },
   ];
-  const showOrder = mode === "roundRobin" || mode === "topChairs";
-  const orderHdr = mode === "roundRobin" ? "ROTATION ORDER" : "PRIORITY ORDER";
+  const showOrder = mode === "roundRobin";
+  const orderHdr = "ROTATION ORDER";
   return (
     <div>
       <div style={{ display: "grid", gap: 9 }}>
@@ -13783,14 +13777,35 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: (
         <>
           <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>How brand-new clients pick their cut. Returning clients always skip straight to "the usual."</p>
-          <button onClick={() => setForm({ ...form, booking: { ...form.booking, guidedConsult: true } })} style={{ width: "100%", textAlign: "left", background: (form.booking?.guidedConsult !== false) ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1.5px solid ${(form.booking?.guidedConsult !== false) ? "var(--gold)" : "var(--border2)"}`, borderRadius: 16, padding: "18px 20px", marginBottom: 12, color: "var(--text)" }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, marginBottom: 4 }}>Guided consultation</div>
-            <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45 }}>A few simple questions walk them to the right cut. Feels personal, teaches them, prevents wrong picks.</div>
-          </button>
-          <button onClick={() => setForm({ ...form, booking: { ...form.booking, guidedConsult: false } })} style={{ width: "100%", textAlign: "left", background: (form.booking?.guidedConsult === false) ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1.5px solid ${(form.booking?.guidedConsult === false) ? "var(--gold)" : "var(--border2)"}`, borderRadius: 16, padding: "18px 20px", color: "var(--text)" }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, marginBottom: 4 }}>Simple list</div>
-            <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45 }}>Show all the cuts in a clean list. Fastest for clients who already know what they want.</div>
-          </button>
+          {(() => {
+            const guided = form.booking?.guidedConsult !== false;
+            const ex = { background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px", marginTop: 13 };
+            const exHdr = { fontSize: 11, letterSpacing: 0.3, color: "var(--gold)", fontWeight: 600, marginBottom: 6 };
+            return (
+              <>
+                <button onClick={() => setForm({ ...form, booking: { ...form.booking, guidedConsult: true } })} style={{ width: "100%", textAlign: "left", background: guided ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1.5px solid ${guided ? "var(--gold)" : "var(--border2)"}`, borderRadius: 16, padding: "18px 20px", marginBottom: 12, color: "var(--text)" }}>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, marginBottom: 4 }}>Guided consultation</div>
+                  <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45 }}>A few simple questions walk them to the right cut. Feels personal, teaches them, prevents wrong picks.</div>
+                  {guided && (
+                    <div style={ex}>
+                      <div style={exHdr}>What the client sees</div>
+                      <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>“How short on the sides?” → <b>Skin · Low · Medium</b><br/>“How much off the top?” → <b>Trim · Shorter · A change</b><br/>→ Vero suggests the matching cut from your menu and books it. A few taps, no guessing.</div>
+                    </div>
+                  )}
+                </button>
+                <button onClick={() => setForm({ ...form, booking: { ...form.booking, guidedConsult: false } })} style={{ width: "100%", textAlign: "left", background: !guided ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1.5px solid ${!guided ? "var(--gold)" : "var(--border2)"}`, borderRadius: 16, padding: "18px 20px", color: "var(--text)" }}>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, marginBottom: 4 }}>Simple list</div>
+                  <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45 }}>Show all the cuts in a clean list. Fastest for clients who already know what they want.</div>
+                  {!guided && (
+                    <div style={ex}>
+                      <div style={exHdr}>What the client sees</div>
+                      <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>Your full menu at once — <b>Skin Fade · Scissor Cut · Cut + Beard…</b> — and they tap the one they want. No questions, straight to a time.</div>
+                    </div>
+                  )}
+                </button>
+              </>
+            );
+          })()}
         </>
       ),
     },
@@ -14050,7 +14065,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     const Icon = active.icon;
     return (
       <div className="appt-screen" style={{ width: "100%", padding: "16px 6px 40px" }}>
-        <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 500, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> All settings</button>
+        <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 500, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> {(() => { const c = CATS.find((x) => x.id === openCat); return c ? c.label : "All settings"; })()}</button>
         <div style={{ marginBottom: 22 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 29, fontWeight: 500, lineHeight: 1.1, letterSpacing: "-0.3px" }}>{active.title}</h2>
