@@ -5756,34 +5756,41 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         </div>
       </div>
 
-      {/* TILES — wrap up (lights when cuts are waiting) + how you're growing; owners also get Reports */}
+      {/* Quick actions — wrap up (lights when cuts are waiting), growth, reports, team — as clean rows */}
       <div style={{ marginBottom: 26 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
           {(() => {
             const n = wrapUpList.length;
             const lit = n > 0;
             return (
-              <button onClick={() => (lit ? setWrapOpen(true) : (showToast && showToast("All caught up — nothing to log.")))} style={{ textAlign: "left", font: "inherit", cursor: "pointer", position: "relative", background: lit ? "linear-gradient(160deg, color-mix(in srgb, var(--gold) 13%, var(--panel)), var(--panel))" : "var(--panel)", border: lit ? "1px solid color-mix(in srgb, var(--gold) 42%, var(--border))" : "1px solid var(--border)", borderRadius: 18, boxShadow: lit ? "0 2px 12px color-mix(in srgb, var(--gold) 20%, transparent)" : "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 116, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                {lit && <span style={{ position: "absolute", top: 13, right: 13, minWidth: 23, height: 23, padding: "0 6px", borderRadius: 23, background: "var(--gold)", color: "var(--on-gold)", fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{n}</span>}
-                <Camera size={26} style={{ color: lit ? "var(--gold)" : "var(--faint)" }} />
-                <div><div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}>Wrap up</div><div style={{ fontSize: 12, color: lit ? "var(--gold)" : "var(--sub)", fontWeight: lit ? 600 : 400, marginTop: 3 }}>{lit ? (n + (n === 1 ? " cut to log" : " cuts to log")) : "All caught up"}</div></div>
+              <button onClick={() => (lit ? setWrapOpen(true) : (showToast && showToast("All caught up — nothing to log.")))} style={{ width: "100%", background: lit ? "color-mix(in srgb, var(--gold) 7%, var(--panel))" : "none", border: "none", display: "flex", alignItems: "center", gap: 13, padding: "15px 15px", minHeight: 64, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                <span style={{ width: 34, height: 34, borderRadius: 9, background: "color-mix(in srgb, var(--gold) 13%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Camera size={18} style={{ color: lit ? "var(--gold)" : "var(--faint)" }} /></span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 16, fontWeight: 500 }}>Wrap up</span>
+                  <span style={{ display: "block", fontSize: 12.5, color: lit ? "var(--gold)" : "var(--sub)", fontWeight: lit ? 600 : 400, marginTop: 2 }}>{lit ? (n + (n === 1 ? " cut to log" : " cuts to log")) : "All caught up"}</span>
+                </span>
+                {lit && <span style={{ minWidth: 22, height: 22, borderRadius: 11, padding: "0 7px", background: "var(--gold)", color: "var(--on-gold)", fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{n}</span>}
+                <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
               </button>
             );
           })()}
-          <button onClick={() => setGrowthOpen(true)} style={{ textAlign: "left", font: "inherit", cursor: "pointer", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 116, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-            <TrendingUp size={26} style={{ color: "var(--gold)" }} />
-            <div><div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}>How you're growing</div><div style={{ fontSize: 12, color: "var(--sub)", marginTop: 3 }}>People keep coming back</div></div>
+          <button onClick={() => setGrowthOpen(true)} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 13, padding: "15px 15px", minHeight: 64, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+            <span style={{ width: 34, height: 34, borderRadius: 9, background: "color-mix(in srgb, var(--gold) 13%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><TrendingUp size={18} style={{ color: "var(--gold)" }} /></span>
+            <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 16, fontWeight: 500 }}>How you're growing</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>People keep coming back</span></span>
+            <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
           </button>
           {(isOwner && onOpenRevenue) && (
-            <button onClick={onOpenRevenue} style={{ gridColumn: (isOwner && onOpenBarbers && realProviders.length > 1) ? "auto" : "1 / -1", textAlign: "left", font: "inherit", cursor: "pointer", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 116, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <BarChart3 size={26} style={{ color: "var(--text)" }} />
-              <div><div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}>Reports</div><div style={{ fontSize: 12, color: "var(--sub)", marginTop: 3 }}>The full numbers</div></div>
+            <button onClick={onOpenRevenue} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 13, padding: "15px 15px", minHeight: 64, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+              <span style={{ width: 34, height: 34, borderRadius: 9, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><BarChart3 size={18} style={{ color: "var(--text)" }} /></span>
+              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 16, fontWeight: 500 }}>Reports</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>The full numbers</span></span>
+              <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </button>
           )}
           {(isOwner && onOpenBarbers && realProviders.length > 1) && (
-            <button onClick={onOpenBarbers} style={{ textAlign: "left", font: "inherit", cursor: "pointer", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "16px 15px 15px", minHeight: 116, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <Users size={26} style={{ color: "var(--text)" }} />
-              <div><div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}>Team</div><div style={{ fontSize: 12, color: "var(--sub)", marginTop: 3 }}>Compare each barber</div></div>
+            <button onClick={onOpenBarbers} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 13, padding: "15px 15px", minHeight: 64, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+              <span style={{ width: 34, height: 34, borderRadius: 9, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Users size={18} style={{ color: "var(--text)" }} /></span>
+              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 16, fontWeight: 500 }}>Team</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>Compare each barber</span></span>
+              <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </button>
           )}
         </div>
@@ -13722,12 +13729,6 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       ),
     },
     {
-      id: "scheduling", title: "Scheduling Options", icon: Clock, category: "Calendar & Appointments",
-      status: (() => { const bk = form.booking || {}; const parts = []; if (bk.bufferBefore || bk.bufferAfter) parts.push(`${bk.bufferBefore || 0}/${bk.bufferAfter || 0}m buffer`); const hd = bk.horizonDays; const winLabel = hd === 0 ? "no cutoff" : (hd >= 90 ? `${Math.round(hd / 30)}mo window` : `${hd || 60}d window`); parts.push(winLabel); return parts.join(" · "); })(),
-      keywords: "scheduling buffer before after turnover cleanup gap minimum notice lead time booking window advance ahead days how far",
-      editor: <SchedulingOptionsEditor b={form.booking || DEFAULT_BOOKING} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
-    },
-    {
       id: "avoidgaps", title: "Booking Times", smart: true, subtitle: "How clients get offered times", icon: Clock, category: "Online Booking",
       explain: <>This is the brain behind which times a client sees when they book online. Pick one way of working and Vero handles the rest: a clean clock grid, times shaped around how long each service actually takes (Smart Timing), times packed tight against your existing appointments so you have no dead gaps, or every possible opening for maximum choice. Most shops want Smart Timing — it quietly keeps your day full without you thinking about it.</>,
       status: (() => { const bk = form.booking || {}; const norm = (x) => (x === "smart" ? "openTight" : x === "all" ? "grid" : x); const m = norm(bk.timeMode) || (bk.avoidGaps === false ? "grid" : "openTight"); const base = { openTight: "Open & tight", grid: `Clean grid · ${bk.gridMin || 30}m`, pack: "Packed" }[m] || "Open & tight"; return bk.curated ? `${base} · curated` : base; })(),
@@ -14042,7 +14043,6 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     ] },
     { id: "dayof", label: "My calendar & day", icon: Clock, desc: "Running your day", groups: [
       { label: "Scheduling", items: [
-        { k: "day_sched", label: "Scheduling options set", card: "scheduling" },
         { k: "day_cal", label: "Calendar settings (progress card, etc.)", card: "calendarsettings" },
         { k: "day_waitlist", label: "Waitlist on/off as you want", card: "waitlist" },
         { k: "day_photos", label: "Display preferences set", card: "photos" },
