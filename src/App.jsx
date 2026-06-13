@@ -2243,8 +2243,8 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
   const bk = business?.booking || {};
   const leadMin = bk.leadTimeMin || 0;
   const earliest = isToday ? (new Date().getHours() * 60 + new Date().getMinutes() + leadMin) : 0;
-  const bufBefore = Math.max(0, Number(bk.bufferBefore) || 0);
-  const bufAfter = Math.max(0, Number(bk.bufferAfter) || 0);
+  const bufBefore = Math.max(0, Number(prov.bufferBefore ?? bk.bufferBefore) || 0);
+  const bufAfter = Math.max(0, Number(prov.bufferAfter ?? bk.bufferAfter) || 0);
   const overrunMin = Math.max(0, Number(prov.overrunMin) || 0);
   const dayEnd = h.end + overrunMin;
   const noClash = (t) => !busy.some(([bs, be]) => t < (be + bufAfter) && (t + durMin) > (bs - bufBefore));
@@ -11452,6 +11452,39 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   }
 
   // ---------- WORK HOURS ----------
+  if (section === "buffer") {
+    const before = Math.max(0, Number(person.bufferBefore) || 0);
+    const after = Math.max(0, Number(person.bufferAfter ?? 5) || 0);
+    const setBuf = (patch) => setProviders(providers.map((p) => p.id === person.id ? { ...p, ...patch } : p));
+    const first = (person.name || "").split(" ")[0] || "this barber";
+    const Step = ({ label, desc, val, onChange }) => (
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", boxShadow: "var(--shadow-sm)" }}>
+        <div style={{ fontSize: 16, fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 4, lineHeight: 1.45 }}>{desc}</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "6px 8px", marginTop: 13 }}>
+          <button onClick={() => onChange(Math.max(0, val - 5))} style={{ width: 38, height: 38, borderRadius: 9, background: "var(--panel)", border: "1px solid var(--border)", fontSize: 20, color: "var(--text)", cursor: "pointer" }}>−</button>
+          <span style={{ fontSize: 16, fontWeight: 600 }}>{val === 0 ? "None" : `${val} min`}</span>
+          <button onClick={() => onChange(Math.min(60, val + 5))} style={{ width: 38, height: 38, borderRadius: 9, background: "var(--panel)", border: "1px solid var(--border)", fontSize: 20, color: "var(--text)", cursor: "pointer" }}>+</button>
+        </div>
+      </div>
+    );
+    return (
+      <div className="appt-screen" style={{ paddingBottom: 40 }}>
+        <SecHeader title="Turnaround" onBack={() => setSection(null)} />
+        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18 }}>Extra time padded around each of {first}'s appointments, so their day never runs tight. Applies to everything {first} books.</p>
+        <div style={{ display: "grid", gap: 12 }}>
+          <Step label="Before each appointment" desc="Setup, greeting, settling in." val={before} onChange={(v) => setBuf({ bufferBefore: v })} />
+          <Step label="After each appointment" desc="Cleanup and reset before the next client." val={after} onChange={(v) => setBuf({ bufferAfter: v })} />
+        </div>
+        {(before + after) > 0 && (
+          <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))", borderRadius: 13, padding: "13px 15px", marginTop: 14, fontSize: 13.5, lineHeight: 1.55, color: "var(--text2)" }}>
+            A 45-min cut quietly books as <strong>{45 + before + after} min</strong> on the calendar ({before} before + 45 + {after} after). Clients still just see “45 min” — the spacing happens behind the scenes.
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (section === "hours") {
     const { start } = weekRange(workWeekRef);
     const days = [...Array(7)].map((_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; });
@@ -11884,6 +11917,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
       </div>
       <HubCard label="Details" sec="details" rows={[{ l: "Email", r: person.email || "—" }, { l: "Phone", r: person.phone || "—" }, { l: "User type", r: person.userType || "Staff" }]} />
       <HubCard label="Work hours" sec="hours" rows={hoursRows} />
+      <HubCard label="Turnaround" sec="buffer" rows={[{ l: "Around each appointment", r: (() => { const b = Math.max(0, Number(person.bufferBefore) || 0), a = Math.max(0, Number(person.bufferAfter ?? 5) || 0); return (b + a) === 0 ? "None" : `${b}m before · ${a}m after`; })() }]} />
       <HubCard label="Services" sec="services" rows={[{ l: "Offering", r: `${hubSvcOn} of ${services.length}` }]} />
       {/* Booking + calendar links — visible right on the profile, no drill-in needed */}
       {bookable && person.id !== "anyone" && (() => {
