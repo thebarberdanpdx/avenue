@@ -1224,8 +1224,8 @@ function App() {
     return Array.from(byKey.values());
   };
   const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
-  // Theme: stored on business.theme so it syncs across devices via Supabase. Falls back to "electric" — Vero's identity theme — until loaded/set or if an old/unknown id is stored.
-  const theme = (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "electric";
+  // Theme: stored on business.theme so it syncs across devices. Falls back to "studio" — Vero's clean light default — until loaded/set or if an old/unknown id is stored.
+  const theme = (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "studio";
   const setTheme = (newTheme) => setBusiness((b) => ({ ...(b || {}), theme: newTheme }));
 
   // ---- Supabase load + save (debounced) — shop-scoped tables (multi-tenant ready) ----
@@ -1649,7 +1649,7 @@ function App() {
         @keyframes dropDown { from { opacity: 0; transform: translateY(-24px);} to {opacity:1; transform:none;} }
         .appt-drop { animation: dropDown .32s var(--ease) both; }
         @keyframes fadeIn { from { opacity: 0;} to {opacity:1;} }
-        @keyframes slideInRight { from { opacity:0; transform: translateX(28px);} to {opacity:1; transform:none;} }
+        @keyframes slideInRight { from { opacity:0; transform: translateX(34%);} to {opacity:1; transform:none;} }
         /* Screen container eases in as a whole (move-through-space feel) */
         .fade-up { animation: screenIn .42s var(--ease) both; }
         .fade-in { animation: fadeIn .4s var(--ease) both; }
@@ -1675,7 +1675,7 @@ function App() {
         html { overscroll-behavior: none; }
         html, body { overscroll-behavior-y: contain; -webkit-overflow-scrolling: auto; }
         body { position: relative; min-height: 100dvh; }
-        .appt-screen { animation: slideInRight .3s var(--ease) both; }
+        .appt-screen { animation: slideInRight .34s cubic-bezier(.32,.72,0,1) both; }
         @keyframes fadeInFixed { from { opacity:0; } to { opacity:1; } }
         .appt-screen-fixed { animation: fadeInFixed .25s var(--ease) both; }
         /* Desktop dialog layout is handled inline via the JS wide state in AppointmentSheet
@@ -9973,41 +9973,62 @@ function BookingRulesEditor({ b, onChange }) {
   };
 
   return (
-    <div>
-      <Row title="Online booking" desc="Let clients book themselves through your page.">
-        <Toggle on={b.enabled} onClick={() => set({ enabled: !b.enabled })} />
-      </Row>
-
-      <div style={{ opacity: b.enabled ? 1 : 0.4, pointerEvents: b.enabled ? "auto" : "none" }}>
-        <Row title="Multiple services per booking" desc="More than one service in a single appointment.">
-          <Toggle on={b.allowMultiple !== false} onClick={() => set({ allowMultiple: b.allowMultiple === false ? true : false })} />
-        </Row>
-
-        <Row stack title="Who can book" desc="Limit online booking by client type.">
-          <Segmented inline options={[{ value: "all", label: "All" }, { value: "returning", label: "Returning" }, { value: "new", label: "New" }]} value={b.clientType || "all"} onChange={(v) => set({ clientType: v })} />
-        </Row>
-
-        <Row title="Require a card" desc="Hold a card to reserve — your no-show protection.">
-          <Toggle on={b.requireCard} onClick={() => set({ requireCard: !b.requireCard })} />
-        </Row>
-
-        <Row stack title="Deposit" desc="Take a deposit at the time of booking.">
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
-            <Segmented inline options={[{ value: "none", label: "None" }, { value: "fixed", label: "$ Fixed" }, { value: "percent", label: "%" }]} value={b.deposit?.mode || "none"} onChange={(v) => setDep({ mode: v })} />
-            {b.deposit?.mode && b.deposit.mode !== "none" && (
-              <Stepper value={b.deposit.amount} onChange={(v) => setDep({ amount: v })} min={0} max={b.deposit.mode === "percent" ? 100 : 500} step={5} suffix={b.deposit.mode === "percent" ? "%" : "$"} />
-            )}
+    <div style={{ display: "grid", gap: 12 }}>
+      {(() => {
+        const card = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", boxShadow: "var(--shadow-sm)" };
+        const head = (title, desc) => (
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.1px" }}>{title}</div>
+            {desc && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 4, lineHeight: 1.45 }}>{desc}</div>}
           </div>
-        </Row>
+        );
+        return (
+          <>
+            <div style={{ ...card, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+              {head("Online booking", "Let clients book themselves through your page.")}
+              <Toggle on={b.enabled} onClick={() => set({ enabled: !b.enabled })} />
+            </div>
 
-        <Row stack title="Max bookings per day" desc="Cap total online bookings across the whole shop. You can still add one manually.">
-          <Stepper value={b.dailyCap || 0} onChange={(v) => set({ dailyCap: v })} min={0} max={200} step={1} zeroLabel="No limit" />
-        </Row>
+            <div style={{ opacity: b.enabled ? 1 : 0.4, pointerEvents: b.enabled ? "auto" : "none", display: "grid", gap: 12 }}>
+              <div style={{ marginTop: 4, fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginLeft: 4 }}>When it's on</div>
 
-        <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 16, fontStyle: "italic" }}>
-          Buffer, minimum notice, and booking window live in Calendar &amp; day → Scheduling. Per-barber daily caps live under each staff member.
-        </p>
-      </div>
+              <div style={{ ...card, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+                {head("Multiple services per booking", "More than one service in a single appointment.")}
+                <Toggle on={b.allowMultiple !== false} onClick={() => set({ allowMultiple: b.allowMultiple === false ? true : false })} />
+              </div>
+
+              <div style={card}>
+                {head("Who can book", "Limit online booking by client type.")}
+                <div style={{ marginTop: 13 }}><Segmented inline options={[{ value: "all", label: "All" }, { value: "returning", label: "Returning" }, { value: "new", label: "New" }]} value={b.clientType || "all"} onChange={(v) => set({ clientType: v })} /></div>
+              </div>
+
+              <div style={{ ...card, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+                {head("Require a card", "Hold a card to reserve — your no-show protection.")}
+                <Toggle on={b.requireCard} onClick={() => set({ requireCard: !b.requireCard })} />
+              </div>
+
+              <div style={card}>
+                {head("Deposit", "Take a deposit at the time of booking.")}
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", marginTop: 13 }}>
+                  <Segmented inline options={[{ value: "none", label: "None" }, { value: "fixed", label: "$ Fixed" }, { value: "percent", label: "%" }]} value={b.deposit?.mode || "none"} onChange={(v) => setDep({ mode: v })} />
+                  {b.deposit?.mode && b.deposit.mode !== "none" && (
+                    <Stepper value={b.deposit.amount} onChange={(v) => setDep({ amount: v })} min={0} max={b.deposit.mode === "percent" ? 100 : 500} step={5} suffix={b.deposit.mode === "percent" ? "%" : "$"} />
+                  )}
+                </div>
+              </div>
+
+              <div style={card}>
+                {head("Max bookings per day", "Cap total online bookings across the whole shop. You can still add one manually.")}
+                <div style={{ marginTop: 13 }}><Stepper value={b.dailyCap || 0} onChange={(v) => set({ dailyCap: v })} min={0} max={200} step={1} zeroLabel="No limit" /></div>
+              </div>
+
+              <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 4, marginLeft: 4, fontStyle: "italic" }}>
+                Buffer, minimum notice, and booking window live in Calendar &amp; day → Scheduling. Per-barber daily caps live under each staff member.
+              </p>
+            </div>
+          </>
+        );
+      })()}
 
       <div style={{ marginTop: 18, background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 22%, transparent)", borderRadius: 14, padding: "14px 16px" }}>
         <div style={{ fontSize: 10.5, letterSpacing: 1.4, color: "var(--gold)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>How this reads to clients</div>
@@ -13743,7 +13764,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <RebookCheckoutEditor r={form.rebook || { enabled: true, discountEnabled: true, discountType: "amount", discount: 5, weeks: [2,3,4,6,8] }} onChange={(rb) => setForm({ ...form, rebook: { ...(form.rebook || {}), ...rb } })} />,
     },
     {
-      id: "booking", title: "Booking page rules", subtitle: "Lead time, deposit & card requirements", icon: Calendar, category: "Online Booking",
+      id: "booking", title: "Booking page rules", fullBleed: true, subtitle: "Lead time, deposit & card requirements", icon: Calendar, category: "Online Booking",
       explain: <>This is the heart of how clients book themselves online — the rules behind your booking link. How far ahead they can book, how much notice you need, whether a card's required, and the times they're offered. Set it once and clients can book around the clock without calling you.</>,
       status: bookingStatus(form.booking), keywords: "online booking link card required deposit lead time buffer cap gaps rebook setup how early advance days ahead far minimum notice times slots increments what clients see",
       editor: <BookingRulesEditor b={form.booking} onChange={(bk) => setForm({ ...form, booking: bk })} />,
@@ -14213,7 +14234,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           const cat = CATS.find((c) => c.id === openCat);
           const catCards = cat.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
           return (
-            <div className="screen-swap">
+            <div className="appt-screen">
               <button onClick={() => setOpenCat(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 500, marginBottom: 20, padding: 0, border: "none" }}><ArrowLeft size={16} /> All settings</button>
               <div style={{ marginBottom: 22 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
@@ -14226,12 +14247,21 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                 cat.groups.map((g) => {
                   const groupCards = g.ids.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
                   if (!groupCards.length) return null;
+                  // Booking + booking-page categories read cleanest as a row list (Booksy-style):
+                  // title, subtitle, current value, chevron — drilling into each setting's screen.
+                  const asRows = cat.id === "book";
                   return (
                     <div key={g.label} style={{ marginBottom: 24 }}>
                       <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 4px 11px" }}>{g.label}</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        {groupCards.map((c) => <SettingTile key={c.id} c={c} />)}
-                      </div>
+                      {asRows ? (
+                        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+                          {groupCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
+                        </div>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                          {groupCards.map((c) => <SettingTile key={c.id} c={c} />)}
+                        </div>
+                      )}
                     </div>
                   );
                 })
