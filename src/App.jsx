@@ -19204,7 +19204,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {pfTab === "times" && <div style={{ marginBottom: 28 }}>
         <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>REMEMBERED TIMING</div>
-        <p style={{ fontSize: 15, color: "var(--sub)", marginBottom: 16, fontWeight: 300, lineHeight: 1.5 }}>Set how long this client actually takes for a service. It overrides the default and tightens their future booking slots.</p>
+        <p style={{ fontSize: 15, color: "var(--sub)", marginBottom: 16, fontWeight: 300, lineHeight: 1.5 }}>Some clients need less time, some need more. Set how long {live.name.split(" ")[0]} actually takes for a service — it overrides the default and shapes their future booking slots.</p>
 
         {/* service dropdown */}
         <label style={{ fontSize: 14, color: "var(--faint)", display: "block", marginBottom: 6 }}>Service</label>
@@ -19215,8 +19215,23 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           <ChevronRight size={16} style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%) rotate(90deg)", color: "var(--faint)", pointerEvents: "none" }} />
         </div>
 
-        {/* time dropdowns: hours + minutes (5-min steps) */}
-        <label style={{ fontSize: 14, color: "var(--faint)", display: "block", marginBottom: 6 }}>Duration</label>
+        {/* quick "need less / need more" relative to this service's default */}
+        {sel && (() => {
+          const base = sel.duration || 30;
+          const cur = selH * 60 + selM;
+          const quick = [["Less", Math.max(5, base - 15)], ["Default", base], ["More", base + 15], ["Even more", base + 30]];
+          return (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12.5, color: "var(--faint)", marginBottom: 8 }}>Default for this service is {fmtDur(base)}.</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {quick.map(([label, v]) => { const on = cur === v; return (
+                  <button key={label} onClick={() => { setSelH(Math.floor(v / 60)); setSelM(v % 60); }} style={{ padding: "9px 14px", borderRadius: 10, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", color: on ? "var(--gold)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{label} <span style={{ opacity: 0.7 }}>· {fmtDur(v)}</span></button>
+                ); })}
+              </div>
+            </div>
+          );
+        })()}
+        <label style={{ fontSize: 14, color: "var(--faint)", display: "block", marginBottom: 6 }}>Or set it exactly</label>
         <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
           <div style={{ position: "relative", flex: 1 }}>
             <select value={selH} onChange={(e) => setSelH(parseInt(e.target.value))} style={{ ...selectStyle, width: "100%", paddingRight: 38 }}>
