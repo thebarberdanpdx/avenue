@@ -13585,36 +13585,189 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const [openCat, setOpenCat] = useState(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [cockpitHidden, setCockpitHidden] = useState(false);
-  const [cockpitOpen, setCockpitOpen] = useState(false);
+  const [openSection, setOpenSection] = useState(null); // which checklist section is expanded
 
-  // ---- Go-live cockpit: live setup checklist (auto-detected) + a manual "test before launch"
-  // checklist you tick off as you verify each flow. Both feed one "get ready to launch" panel
-  // that disappears once everything's done.
-  const setupItems = [
-    { k: "name",     label: "Add your business name", done: !!(form.name && form.name.trim()), card: "business" },
-    { k: "hours",    label: "Set your hours",          done: !!(form.hours && Object.values(form.hours).some((h) => h && h.on)), card: "hours" },
-    { k: "staff",    label: "Add your team",           done: providers.filter((p) => p.id !== "anyone").length > 0, card: "staff" },
-    { k: "services", label: "Build your menu",         done: (services || []).length > 0, card: "servicesmenu" },
-    { k: "pay",      label: "Connect payments",        done: !!form.paymentsConnected, card: "checkout" },
-    { k: "sms",      label: "Turn on text messaging",  done: !!form.smsApproved, card: "notifications" },
+  // ============================================================
+  // LAUNCH CHECKLIST — every setting & toggle, box by box, in the
+  // same 9 sections (and order) as Settings itself. You tick each
+  // one off as you verify it; state saves to your shop so it's here
+  // every time you come back. A few items auto-detect (auto:true) —
+  // those tick themselves when the underlying value is set, but you
+  // can still confirm them. "card" jumps straight to that setting.
+  // ============================================================
+  const checked = business.launchChecklist || {};
+  const toggleCheck = (k) => setBusiness({ ...business, launchChecklist: { ...(business.launchChecklist || {}), [k]: !checked[k] } });
+  const setManyChecked = (keys, val) => {
+    const next = { ...(business.launchChecklist || {}) };
+    keys.forEach((k) => { next[k] = val; });
+    setBusiness({ ...business, launchChecklist: next });
+  };
+  const A = (cond) => !!cond; // auto-detect helper
+  const CHECKLIST = [
+    { id: "shop", label: "My shop", icon: User, desc: "Name, hours, locations, phones, branding, theme", groups: [
+      { label: "Business details", items: [
+        { k: "shop_name", label: "Business name is set", card: "business", auto: A(form.name && form.name.trim()) },
+        { k: "shop_contact", label: "Address & contact info filled in", card: "business" },
+        { k: "shop_words", label: "Booking wording reads the way you want", card: "bookingwords" },
+      ] },
+      { label: "Hours", items: [
+        { k: "shop_hours_open", label: "Each open day's hours are correct", card: "hours", auto: A(form.hours && Object.values(form.hours).some((h) => h && h.on)) },
+        { k: "shop_hours_closed", label: "Closed days are marked closed", card: "hours" },
+        { k: "shop_hours_breaks", label: "Lunch / breaks blocked where needed", card: "hours" },
+      ] },
+      { label: "Locations & phones", items: [
+        { k: "shop_loc", label: "Location(s) entered correctly", card: "locations" },
+        { k: "shop_phone", label: "Shop phone number is right", card: "phones" },
+      ] },
+      { label: "Branding & theme", items: [
+        { k: "shop_logo", label: "Logo uploaded", card: "appearance" },
+        { k: "shop_theme", label: "Theme picked", card: "theme" },
+        { k: "shop_theme_book", label: "Theme looks right on the live /book page", card: "theme" },
+      ] },
+    ] },
+    { id: "staff", label: "My team", icon: Users, desc: "Barbers, access & pay", groups: [
+      { label: "Your barbers", items: [
+        { k: "team_added", label: "Every barber added", card: "staff", auto: A(providers.filter((p) => p.id !== "anyone").length > 0) },
+        { k: "team_photo", label: "Each barber has a name & photo", card: "staff" },
+        { k: "team_bookable", label: "Bookable-online is on for who should show", card: "staff" },
+        { k: "team_hours", label: "Each barber's own hours are set", card: "staff" },
+        { k: "team_services", label: "Each barber's services / durations correct", card: "staff" },
+      ] },
+      { label: "Access", items: [
+        { k: "team_login", label: "Each barber can sign in on their device", card: "staff" },
+        { k: "team_pin", label: "Staff PIN decided (on or off)", card: "staffpin" },
+      ] },
+    ] },
+    { id: "menu", label: "Services & menu", icon: Scissors, desc: "What you offer & pricing", groups: [
+      { label: "Your menu", items: [
+        { k: "menu_built", label: "Menu has every service you offer", card: "servicesmenu", auto: A((services || []).length > 0) },
+        { k: "menu_price", label: "Every price is correct", card: "servicesmenu" },
+        { k: "menu_dur", label: "Every duration is correct", card: "servicesmenu" },
+        { k: "menu_cat", label: "Services grouped into the right categories", card: "servicesmenu" },
+        { k: "menu_desc", label: "Descriptions read well on /book", card: "servicesmenu" },
+        { k: "menu_deposit", label: "Deposit-required services set (e.g. tattoo)", card: "servicesmenu" },
+      ] },
+      { label: "Add-ons & helpers", items: [
+        { k: "menu_addons", label: "Add-ons / finishing touches priced right", card: "addons" },
+        { k: "menu_ai", label: "AI Cut Helper on/off as you want", card: "aicuthelper" },
+      ] },
+    ] },
+    { id: "book", label: "Online booking", icon: Calendar, desc: "How clients book you online", groups: [
+      { label: "The times they see", items: [
+        { k: "book_gaps", label: "Avoid-small-gaps setting is how you want it", card: "avoidgaps" },
+        { k: "book_gapmin", label: "Minimum gap size is correct", card: "avoidgaps" },
+        { k: "book_anyone", label: "\u201CAnyone\u201D routing picks the right barber", card: "anyonerouting" },
+      ] },
+      { label: "Your booking page", items: [
+        { k: "book_incr", label: "Booking increment set (5 / 10 / 15 min)", card: "booking" },
+        { k: "book_window", label: "How far ahead clients can book", card: "booking" },
+        { k: "book_lead", label: "Lead time before the first bookable slot", card: "booking" },
+        { k: "book_newclient", label: "New-client booking allowed / gated correctly", card: "newclient" },
+        { k: "book_prices", label: "Show-prices on booking page is right", card: "showprices" },
+        { k: "book_rebook", label: "\u201CRebook your usual\u201D toggle", card: "rebook_usual" },
+        { k: "book_refphotos", label: "Reference photos: off / optional / required", card: "refphotos" },
+        { k: "book_note", label: "Appointment-note prompt shows on booking", card: "booking" },
+        { k: "book_family", label: "Family / group booking toggle", card: "family" },
+      ] },
+      { label: "Try it yourself", items: [
+        { k: "book_test_specific", label: "Booked a test appt for a specific barber", card: null },
+        { k: "book_test_anyone", label: "Booked a test appt with \u201CAnyone\u201D", card: null },
+        { k: "book_test_returning", label: "Returning-client email code flow works", card: null },
+      ] },
+    ] },
+    { id: "dayof", label: "My calendar & day", icon: Clock, desc: "Running your day", groups: [
+      { label: "Scheduling", items: [
+        { k: "day_sched", label: "Scheduling options set", card: "scheduling" },
+        { k: "day_cal", label: "Calendar settings (progress card, etc.)", card: "calendarsettings" },
+        { k: "day_waitlist", label: "Waitlist on/off as you want", card: "waitlist" },
+        { k: "day_photos", label: "Display preferences set", card: "photos" },
+      ] },
+      { label: "During the day", items: [
+        { k: "day_waiting", label: "Waiting room behaviour", card: "waitingroom" },
+        { k: "day_late", label: "Running-late alerts", card: "runninglate" },
+        { k: "day_overdue", label: "\u201CIt's been a while\u201D buffer", card: "overduebuffer" },
+      ] },
+      { label: "Smart timing", items: [
+        { k: "day_autotiming", label: "Auto-timing on/off as you want", card: "autotiming" },
+      ] },
+      { label: "Try it yourself", items: [
+        { k: "day_test_book", label: "Booked an appt from the calendar", card: null },
+        { k: "day_test_move", label: "Dragged an appt to a new time", card: null },
+        { k: "day_test_block", label: "Added a time block", card: null },
+        { k: "day_test_walkin", label: "Added a walk-in", card: null },
+        { k: "day_test_cancel", label: "Cancelled an appt \u2014 shows in feed", card: null },
+        { k: "day_test_lifecycle", label: "Ran check-in \u2192 in-service \u2192 done", card: null },
+      ] },
+    ] },
+    { id: "pay", label: "Checkout & money", icon: CreditCard, desc: "Payments, tips & no-shows", groups: [
+      { label: "Setup", items: [
+        { k: "pay_connected", label: "Stripe connected & payouts set up", card: "payments", auto: A(form.paymentsConnected) },
+        { k: "pay_livekey", label: "Live key confirmed (not test) before launch", card: "payments" },
+        { k: "pay_checkout", label: "Checkout options set", card: "checkout" },
+        { k: "pay_tips", label: "Tipping set (presets, on/off)", card: "tipping" },
+        { k: "pay_rebookco", label: "Rebook-at-checkout toggle", card: "rebookco" },
+        { k: "pay_policy", label: "No-show / cancellation policy set", card: "policy" },
+      ] },
+      { label: "Try it yourself", items: [
+        { k: "pay_test_cash", label: "Cash checkout closes the ticket", card: null },
+        { k: "pay_test_product", label: "Added a product to a ticket", card: null },
+        { k: "pay_test_balance", label: "Charged the balance", card: null },
+        { k: "pay_test_refund", label: "Ran a partial refund", card: null },
+        { k: "pay_test_card", label: "Card-on-file checkout with a real card", card: null },
+        { k: "pay_test_cardrefund", label: "Refunded that real-card charge", card: null },
+        { k: "pay_test_deposit", label: "Deposit collected at booking", card: null },
+      ] },
+    ] },
+    { id: "msg", label: "Messages", icon: Bell, desc: "Texts & emails", groups: [
+      { label: "Client templates", items: [
+        { k: "msg_booked", label: "Booked confirmation reads right", card: "messages" },
+        { k: "msg_reminder", label: "Reminder template", card: "messages" },
+        { k: "msg_checkin", label: "Check-in template", card: "messages" },
+        { k: "msg_canceled", label: "Canceled template", card: "messages" },
+        { k: "msg_resched", label: "Rescheduled template", card: "messages" },
+        { k: "msg_waitlist", label: "Waitlist template", card: "messages" },
+        { k: "msg_deposit", label: "Deposit template", card: "messages" },
+        { k: "msg_noshow", label: "No-show template", card: "messages" },
+        { k: "msg_words", label: "Booking wording matches your voice", card: "bookingwords" },
+      ] },
+      { label: "Your team's alerts", items: [
+        { k: "msg_staff_push", label: "Staff notifications on for new bookings", card: "notifications" },
+        { k: "msg_sms_status", label: "Text messaging status checked (10DLC)", card: "notifications", auto: A(form.smsApproved) },
+      ] },
+      { label: "Try it yourself", items: [
+        { k: "msg_test_push", label: "New booking pushed to your phone", card: null },
+        { k: "msg_test_note", label: "A booking with a note showed the \uD83D\uDCDD note", card: null },
+      ] },
+    ] },
+    { id: "web", label: "Website", icon: Globe, desc: "Your booking page", groups: [
+      { label: "Your page", items: [
+        { k: "web_on", label: "Website / storefront turned on", card: "website" },
+        { k: "web_intro", label: "Intro / tagline reads well", card: "website" },
+        { k: "web_social", label: "Instagram / social links correct", card: "website" },
+        { k: "web_link", label: "Booking link works & is shareable", card: "website" },
+      ] },
+      { label: "Try it yourself", items: [
+        { k: "web_test_phone", label: "Opened the page on your phone \u2014 looks right", card: null },
+        { k: "web_test_book", label: "Booked through the public page end to end", card: null },
+      ] },
+    ] },
+    { id: "data", label: "Reports & data", icon: BarChart3, desc: "Your numbers & tools", groups: [
+      { label: "Data", items: [
+        { k: "data_import", label: "Existing clients imported (if migrating)", card: "import" },
+        { k: "data_dupes", label: "Duplicate clients merged", card: "mergedupes" },
+        { k: "data_testwipe", label: "Test data wiped before launch", card: "testdata" },
+        { k: "data_reports", label: "Reports show real numbers", card: "reports" },
+      ] },
+    ] },
   ];
-  const setupLeft = setupItems.filter((s) => !s.done);
-
-  // Manual checks — you tick these off after trying each flow yourself. Saved to your shop.
-  const launchTests = business.launchTests || {};
-  const toggleTest = (k) => setBusiness({ ...business, launchTests: { ...(business.launchTests || {}), [k]: !launchTests[k] } });
-  const testItems = [
-    { k: "book",       label: "Book a test appointment from your calendar" },
-    { k: "online",     label: "Book a test appointment from your online link" },
-    { k: "checkout",   label: "Run a full checkout — tip and payment (simulated until Helcim is live)" },
-    { k: "reschedule", label: "Drag an appointment to a new time" },
-    { k: "cancel",     label: "Cancel an appointment" },
-    { k: "walkin",     label: "Add a walk-in" },
-    { k: "menu",       label: "Open your booking link on your phone — check services, prices & hours look right" },
-  ].map((t) => ({ ...t, done: !!launchTests[t.k] }));
-  const testLeft = testItems.filter((t) => !t.done);
-
-  const showCockpit = (setupLeft.length + testLeft.length) > 0 && !cockpitHidden && !query.trim();
+  // tally
+  const allItems = CHECKLIST.flatMap((s) => s.groups.flatMap((g) => g.items));
+  const isDone = (it) => checked[it.k] || (it.auto && checked[it.k] !== false);
+  const totalCount = allItems.length;
+  const doneCount = allItems.filter(isDone).length;
+  const sectionTally = (s) => { const its = s.groups.flatMap((g) => g.items); return { done: its.filter(isDone).length, total: its.length }; };
+  const allDone = doneCount >= totalCount;
+  const showCockpit = !cockpitHidden && !query.trim();
 
   const q = query.trim().toLowerCase();
   // Smart search: match a card on its title, plain-English subtitle, keyword synonyms,
@@ -13719,46 +13872,81 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <Settings size={20} style={{ position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)", color: "var(--gold)", pointerEvents: "none" }} />
       </div>
 
-      {/* SLIM COCKPIT — quiet line under search; expands to a launch checklist; gone once done */}
+      {/* LAUNCH CHECKLIST — replaces the old cockpit. Progress + the 9 sections,
+          each expandable to box-by-box checks. Collapses to a green line once done. */}
       {showCockpit && !openCat && !q && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
-            <button onClick={() => setCockpitOpen((v) => !v)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 13, background: "linear-gradient(135deg, var(--gold), #5C7763)", border: "none", borderRadius: 20, padding: "16px 17px", color: "#fff", boxShadow: "0 8px 22px rgba(94,120,99,0.28)", textAlign: "left", cursor: "pointer" }}>
-              <span style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(255,255,255,0.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Sparkles size={19} style={{ color: "#fff" }} /></span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 16.5, display: "block", lineHeight: 1.15 }}>Finish setting up</span>
-                <span style={{ fontSize: 12.5, opacity: 0.9 }}>{setupItems.filter((s) => s.done).length} of {setupItems.length} done — almost ready to launch</span>
-              </span>
-              <span style={{ fontSize: 12.5, fontWeight: 600, background: "rgba(255,255,255,0.18)", padding: "5px 10px", borderRadius: 20, flexShrink: 0 }}>{setupLeft.length + testLeft.length} left</span>
-              <ChevronDown size={16} style={{ color: "rgba(255,255,255,0.85)", transform: cockpitOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .2s", flexShrink: 0 }} />
-            </button>
+        allDone ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 13, background: "color-mix(in srgb, var(--live, var(--gold)) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--live, var(--gold)) 35%, var(--border))", borderRadius: 16, padding: "15px 17px" }}>
+              <span style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--live, var(--gold))", color: "#16181C", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Check size={18} strokeWidth={3} /></span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500 }}>Ready to launch</div>
+                <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>All {totalCount} checks complete.</div>
+              </div>
+            </div>
             <button onClick={() => setCockpitHidden(true)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 6, display: "flex", alignItems: "center" }}><X size={16} /></button>
           </div>
-          {cockpitOpen && (
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, marginTop: 6, padding: "12px 14px" }}>
-              {setupLeft.length > 0 && (
-                <>
-                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 2 }}>FINISH SETUP</div>
-                  {[...setupItems].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1)).map((s, i) => (
-                    <button key={s.k} onClick={() => setOpenCard(s.card)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 0", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left" }}>
-                      <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: s.done ? "var(--gold)" : "transparent", border: s.done ? "none" : "1.5px solid var(--border2)" }}>{s.done && <Check size={12} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
-                      <span style={{ flex: 1, fontSize: 14.5, color: s.done ? "var(--faint)" : "var(--text)", textDecoration: s.done ? "line-through" : "none" }}>{s.label}</span>
-                      {!s.done && <ChevronRight size={16} style={{ color: "var(--faint)" }} />}
-                    </button>
-                  ))}
-                </>
-              )}
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, margin: `${setupLeft.length > 0 ? 14 : 0}px 0 2px` }}>TEST BEFORE LAUNCH</div>
-              {[...testItems].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1)).map((t, i) => (
-                <button key={t.k} onClick={() => toggleTest(t.k)} style={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 12, padding: "11px 0", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left" }}>
-                  <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", background: t.done ? "var(--gold)" : "transparent", border: t.done ? "none" : "1.5px solid var(--border2)" }}>{t.done && <Check size={12} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
-                  <span style={{ flex: 1, fontSize: 14.5, lineHeight: 1.4, color: t.done ? "var(--faint)" : "var(--text)", textDecoration: t.done ? "line-through" : "none" }}>{t.label}</span>
-                </button>
-              ))}
+        ) : (
+        <div style={{ marginBottom: 24 }}>
+          {/* progress header */}
+          <div style={{ display: "flex", alignItems: "stretch", gap: 8, marginBottom: 12 }}>
+            <div style={{ flex: 1, background: "linear-gradient(135deg, var(--panel2), var(--panel))", border: "1px solid var(--border)", borderRadius: 20, padding: "18px 18px 16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 14 }}>
+                <span style={{ width: 40, height: 40, borderRadius: 12, background: "color-mix(in srgb, var(--live, var(--gold)) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Sparkles size={19} style={{ color: "var(--live, var(--gold))" }} /></span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 18, lineHeight: 1.1 }}>Launch checklist</div>
+                  <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>Work through every setting before you go live</div>
+                </div>
+              </div>
+              <div style={{ height: 8, borderRadius: 8, background: "var(--panel2)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((doneCount / totalCount) * 100)}%`, background: "var(--live, var(--gold))", borderRadius: 8, transition: "width .3s" }} /></div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 9, fontSize: 12, color: "var(--faint)" }}><span>{doneCount} of {totalCount} checked</span><span>{totalCount - doneCount} left</span></div>
             </div>
-          )}
+            <button onClick={() => setCockpitHidden(true)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 6, display: "flex", alignItems: "flex-start" }}><X size={16} /></button>
+          </div>
+
+          {/* the 9 sections */}
+          {CHECKLIST.map((s) => {
+            const { done, total } = sectionTally(s);
+            const open = openSection === s.id;
+            const SIcon = s.icon;
+            const complete = done >= total;
+            return (
+              <div key={s.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, marginBottom: 11, overflow: "hidden" }}>
+                <button onClick={() => setOpenSection(open ? null : s.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "15px 16px", background: "none", border: "none", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
+                  <span style={{ width: 34, height: 34, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 13%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><SIcon size={16} /></span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 600, letterSpacing: -0.1 }}>{s.label}</span>
+                    <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 1 }}>{s.desc}</span>
+                  </span>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, padding: "4px 9px", borderRadius: 20, flexShrink: 0, background: complete ? "color-mix(in srgb, var(--live, var(--gold)) 18%, transparent)" : "var(--panel2)", color: complete ? "var(--live, var(--gold))" : "var(--sub)" }}>{complete ? "\u2713 Done" : `${done}/${total}`}</span>
+                  <ChevronRight size={16} style={{ color: "var(--faint)", flexShrink: 0, transform: open ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+                </button>
+                {open && (
+                  <div style={{ borderTop: "1px solid var(--line)", padding: "6px 16px 12px" }}>
+                    {s.groups.map((g) => (
+                      <div key={g.label}>
+                        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "14px 2px 4px" }}>{g.label}</div>
+                        {g.items.map((it, i) => {
+                          const on = isDone(it);
+                          return (
+                            <div key={it.k} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "11px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                              <button onClick={() => toggleCheck(it.k)} aria-pressed={on} style={{ width: 21, height: 21, borderRadius: 6, flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", background: on ? "var(--live, var(--gold))" : "transparent", border: on ? "1.5px solid var(--live, var(--gold))" : "1.5px solid var(--border2)", cursor: "pointer", padding: 0 }}>{on && <Check size={12} style={{ color: "#16181C" }} strokeWidth={3} />}</button>
+                              <button onClick={() => toggleCheck(it.k)} style={{ flex: 1, background: "none", border: "none", color: on ? "var(--faint)" : "var(--text)", textAlign: "left", fontSize: 14.5, lineHeight: 1.4, padding: 0, cursor: "pointer", textDecoration: on ? "line-through" : "none" }}>{it.label}</button>
+                              {it.card && <button onClick={() => setOpenCard(it.card)} style={{ fontSize: 12, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, background: "none", border: "none", flexShrink: 0, marginTop: 2, cursor: "pointer" }}>Open</button>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
+        )
       )}
+
 
       {!showCockpit && !openCat && !q && (
         <p style={{ fontSize: 12.5, color: "var(--faint)", margin: "0 4px 24px", lineHeight: 1.5 }}>Type what you're after in plain words — or jump to a common one below.</p>
