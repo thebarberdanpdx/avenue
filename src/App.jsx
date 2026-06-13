@@ -4624,13 +4624,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             </div>
 
             {/* note for the barber — optional, lands on the appointment + the staff push */}
+            {business?.booking?.askNote !== false && (
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginBottom: 18 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>NOTE · OPTIONAL</div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 4 }}>Anything {provider.name === "Anyone" ? "your barber" : provider.name} should know?</div>
-              <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12 }}>What you're going for, anything different this time — it lands right on {provider.name === "Anyone" ? "their" : `${provider.name}'s`} phone.</p>
-              <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keeping the top" rows={3} style={{ ...inputStyle, marginBottom: 0, resize: "none", minHeight: 72, lineHeight: 1.5, fontFamily: FONT_BODY }} />
+              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>A QUICK NOTE · OPTIONAL</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 4 }}>Anything that'll help?</div>
+              <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12 }}>Let us know anything you think might help — what you're going for, something different this time, or how you like it. The more we know, the better we get it right.</p>
+              <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keeping length on top" rows={3} style={{ ...inputStyle, marginBottom: 0, resize: "none", minHeight: 72, lineHeight: 1.5, fontFamily: FONT_BODY }} />
               {clientNote.length > 0 && <div style={{ fontSize: 12, color: "var(--faint)", textAlign: "right", marginTop: 6 }}>{clientNote.length} / 200</div>}
             </div>
+            )}
 
             {/* photo upload — controlled by business.bookingPhotos.mode (off/optional/required) */}
             {business?.bookingPhotos?.mode !== "off" && (
@@ -5769,16 +5771,18 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         return (
           <div style={{ marginBottom: 26 }}>
             <div style={{ fontSize: 11.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 12px" }}>Insights</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
               {insights.map((it, i) => {
                 const Ic = it.Icon;
                 return (
-                  <button key={i} onClick={it.onClick} className="lift" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 15, minHeight: 104, display: "flex", flexDirection: "column", boxShadow: "var(--shadow-sm)", textAlign: "left", color: "var(--text)", cursor: "pointer", position: "relative" }}>
-                    {it.badge > 0 && <span style={{ position: "absolute", top: 13, right: 13, minWidth: 22, height: 22, borderRadius: 11, padding: "0 7px", background: "var(--live, var(--gold))", color: "#0F1115", fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{it.badge > 9 ? "9+" : it.badge}</span>}
-                    <span style={{ width: 38, height: 38, borderRadius: 11, background: "color-mix(in srgb, var(--gold) 13%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Ic size={20} /></span>
-                    <span style={{ flex: 1 }} />
-                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15.5, fontWeight: 500, letterSpacing: "-0.2px", lineHeight: 1.1 }}>{it.label}</span>
-                    <span style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.3 }}>{it.desc}</span>
+                  <button key={i} onClick={it.onClick} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "center", gap: 13, padding: "15px 15px", minHeight: 64, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                    <span style={{ width: 34, height: 34, borderRadius: 9, background: "color-mix(in srgb, var(--gold) 13%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Ic size={18} /></span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "block", fontSize: 16, fontWeight: 500, letterSpacing: "-0.1px" }}>{it.label}</span>
+                      {it.desc && <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>}
+                    </span>
+                    {it.badge > 0 && <span style={{ minWidth: 22, height: 22, borderRadius: 11, padding: "0 7px", background: "var(--live, var(--gold))", color: "#0F1115", fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{it.badge > 9 ? "9+" : it.badge}</span>}
+                    <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
                   </button>
                 );
               })}
@@ -10019,6 +10023,11 @@ function BookingRulesEditor({ b, onChange }) {
                 <div style={{ marginTop: 13 }}><Stepper value={b.dailyCap || 0} onChange={(v) => set({ dailyCap: v })} min={0} max={200} step={1} zeroLabel="No limit" /></div>
               </div>
 
+              <div style={{ ...card, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+                {head("Ask for an appointment note", "Clients get an optional “Anything we should know?” box at booking — e.g. tighter on the sides.")}
+                <Toggle on={b.askNote !== false} onClick={() => set({ askNote: b.askNote === false ? true : false })} />
+              </div>
+
               <div style={card}>
                 {head("Lead time before the first bookable spot", "The least notice a client must give. At 2 hours, the soonest they can grab is 2 hours from now.")}
                 <div style={{ marginTop: 13 }}><HourMinutePicker totalMin={b.leadTimeMin || 0} onChange={(v) => set({ leadTimeMin: v })} /></div>
@@ -13604,18 +13613,14 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "calendarsettings", title: "Calendar Settings", icon: Calendar, category: "Calendar & Appointments",
-      status: (() => { const c = form.calendar || {}; const fmtHr = (h) => { const am = h < 12; const hr = h % 12 === 0 ? 12 : h % 12; return `${hr}${am ? "a" : "p"}`; }; const on = []; if (c.progressCard !== false) on.push("progress card"); if (c.nowLine !== false) on.push("now line"); return `${fmtHr(c.dayStartHr ?? 7)}–${fmtHr(c.dayEndHr ?? 22)}${on.length ? " · " + on.join(" · ") : ""}`; })(),
-      keywords: "calendar progress card timer ring now line current time marker chair in service running late wrapping up live hours visible",
+      status: (() => { const c = form.calendar || {}; const fmtHr = (h) => { const am = h < 12; const hr = h % 12 === 0 ? 12 : h % 12; return `${hr}${am ? "a" : "p"}`; }; const on = []; if (c.progressCard !== false) on.push("progress card"); return `${fmtHr(c.dayStartHr ?? 7)}–${fmtHr(c.dayEndHr ?? 22)}${on.length ? " · " + on.join(" · ") : ""}`; })(),
+      keywords: "calendar progress card timer ring chair in service running late wrapping up live hours visible",
       editor: (
         <>
         <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 16, lineHeight: 1.5 }}>Control the live elements on your calendar and chair view.</div>
         <button onClick={() => setForm({ ...form, calendar: { ...(form.calendar || {}), progressCard: (form.calendar || {}).progressCard === false ? true : false } })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, color: "var(--text)", marginBottom: 12, textAlign: "left" }}>
           <div style={{ textAlign: "left", paddingRight: 14 }}><div style={{ fontSize: 15, marginBottom: 2 }}>Appointment progress card</div><div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>Show a live timer on in-service appointments, with a gentle heads-up when you're running close.</div></div>
           <span style={{ width: 44, height: 26, borderRadius: 13, background: (form.calendar || {}).progressCard !== false ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: (form.calendar || {}).progressCard !== false ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-        </button>
-        <button onClick={() => setForm({ ...form, calendar: { ...(form.calendar || {}), nowLine: (form.calendar || {}).nowLine === false ? true : false } })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, color: "var(--text)", textAlign: "left" }}>
-          <div style={{ textAlign: "left", paddingRight: 14 }}><div style={{ fontSize: 15, marginBottom: 2 }}>"Now" line on calendar</div><div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>A marker showing the current time across today's schedule.</div></div>
-          <span style={{ width: 44, height: 26, borderRadius: 13, background: (form.calendar || {}).nowLine !== false ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: (form.calendar || {}).nowLine !== false ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
         </button>
 
         {(() => {
@@ -13861,8 +13866,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       { label: "The times they see", ids: ["avoidgaps", "anyonerouting"] },
       { label: "Your booking page", ids: ["booking", "newclient", "showprices", "rebook_usual", "refphotos", "family"] },
     ] },
-    { id: "dayof", label: "My calendar & day", icon: Clock, desc: "Running your day", settings: ["scheduling", "calendarsettings", "waitlist", "photos", "waitingroom", "runninglate", "overduebuffer", "autotiming"], groups: [
-      { label: "Scheduling", ids: ["scheduling", "calendarsettings", "waitlist", "photos"] },
+    { id: "dayof", label: "My calendar & day", icon: Clock, desc: "Running your day", settings: ["calendarsettings", "waitlist", "photos", "waitingroom", "runninglate", "overduebuffer", "autotiming"], groups: [
+      { label: "Scheduling", ids: ["calendarsettings", "waitlist", "photos"] },
       { label: "During the day", ids: ["waitingroom", "runninglate", "overduebuffer"] },
       { label: "Smart timing", ids: ["autotiming"] },
     ] },
@@ -13876,7 +13881,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   ];
   // Safety net: any card not placed above still appears (appended to Reports & Insights) so nothing is ever lost.
   // RETIRED cards are intentionally left out of the list (their function moved elsewhere).
-  const RETIRED = new Set(["staffselection"]); // bookable-online now lives inside each staff member
+  const RETIRED = new Set(["staffselection", "scheduling"]); // bookable-online lives per staff; buffers moved to each service
   const placed = new Set(CATS.flatMap((c) => c.settings));
   const orphans = cards.filter((c) => !placed.has(c.id) && !RETIRED.has(c.id)).map((c) => c.id);
   if (orphans.length) CATS[CATS.length - 1].settings.push(...orphans);
@@ -14282,47 +14287,41 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                 cat.groups.map((g) => {
                   const groupCards = g.ids.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
                   if (!groupCards.length) return null;
-                  // Booking + booking-page categories read cleanest as a row list (Booksy-style):
-                  // title, subtitle, current value, chevron — drilling into each setting's screen.
-                  const asRows = cat.id === "book";
                   return (
                     <div key={g.label} style={{ marginBottom: 24 }}>
                       <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 4px 11px" }}>{g.label}</div>
-                      {asRows ? (
-                        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
-                          {groupCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
-                        </div>
-                      ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                          {groupCards.map((c) => <SettingTile key={c.id} c={c} />)}
-                        </div>
-                      )}
+                      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+                        {groupCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
+                      </div>
                     </div>
                   );
                 })
               ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  {catCards.map((c) => <SettingTile key={c.id} c={c} />)}
+                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+                  {catCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
                 </div>
               )}
             </div>
           );
         })()
       ) : (
-        // EMPTY STATE — the nine sections as a soft two-up grid
+        // HOME — the sections as one clean row list (icon · name · description · chevron)
         <div>
           <div style={{ fontSize: 11.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 12px" }}>All settings</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {CATS.map((cat) => {
+          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+            {CATS.map((cat, i) => {
               const Ic = cat.icon;
               return (
-                <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 17, minHeight: 104, display: "flex", flexDirection: "column", boxShadow: "var(--shadow-sm)", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                    {Ic && <Ic size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />}
-                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16.5, fontWeight: 500, letterSpacing: "-0.2px", lineHeight: 1.1 }}>{cat.label}</span>
-                    {cat.smart && <span style={{ fontSize: 8.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 5px" }}>SMART</span>}
+                <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "center", gap: 13, padding: "15px 15px", minHeight: 64, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                  <span style={{ width: 34, height: 34, borderRadius: 9, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{Ic && <Ic size={18} style={{ color: "var(--gold)" }} />}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 16, fontWeight: 500, letterSpacing: "-0.1px" }}>{cat.label}</span>
+                      {cat.smart && <span style={{ fontSize: 8.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 5px" }}>SMART</span>}
+                    </span>
+                    <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.desc}</span>
                   </span>
-                  <span style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 11, lineHeight: 1.3 }}>{cat.desc}</span>
+                  <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
                 </button>
               );
             })}
@@ -15882,7 +15881,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 </div>
               ))}
               {/* live "now" line — only on today, only within the visible grid window */}
-              {((business && business.calendar) ? business.calendar.nowLine !== false : true) && sameDay(selectedDate.toISOString(), today) && (() => {
+              {sameDay(selectedDate.toISOString(), today) && (() => {
                 const nowM = today.getHours() * 60 + today.getMinutes();
                 if (nowM < DAY_START || nowM > DAY_END) return null;
                 return (
