@@ -4034,12 +4034,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               )}
               {dayFull && (
                 <div style={{ margin: "6px 0 24px" }}>
-                  <div style={{ fontSize: 15.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Fully booked that day — try another, or another barber.</div>
+                  <div style={{ fontSize: 15.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Fully booked that day — try another day, or someone else.</div>
                   <button onClick={toWaitlist} style={{ background: "none", border: "none", padding: 0, color: "var(--text)", fontSize: 13.5, fontWeight: 500, letterSpacing: 0.5, textDecoration: "underline", textUnderlineOffset: 4, cursor: "pointer" }}>Join the waitlist</button>
                 </div>
               )}
               {!selectedDate && (
-                <div style={{ fontSize: 15.5, color: "var(--sub)", lineHeight: 1.5, margin: "6px 0 24px" }}>No openings ahead{prov ? ` with ${prov.name}` : ""} — try another barber.</div>
+                <div style={{ fontSize: 15.5, color: "var(--sub)", lineHeight: 1.5, margin: "6px 0 24px" }}>No openings ahead{prov ? ` with ${prov.name}` : ""} — try someone else.</div>
               )}
 
               <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
@@ -4552,7 +4552,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
                     {(business?.waitlist?.askAnyProvider !== false) && provider.name !== "Anyone" && (
                       <>
-                        <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>If a spot opens with another barber, want it?</label>
+                        <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>If a spot opens with someone else, want it?</label>
                         <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
                           <button onClick={() => setWlAnyProvider(false)} style={{ flex: 1, padding: "13px 8px", borderRadius: 10, border: `1.5px solid ${!wlAnyProvider ? "var(--gold)" : "var(--border2)"}`, background: !wlAnyProvider ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "transparent", color: "var(--text)", fontSize: 14, fontWeight: !wlAnyProvider ? 600 : 400 }}>Only {provider.name}</button>
                           <button onClick={() => setWlAnyProvider(true)} style={{ flex: 1, padding: "13px 8px", borderRadius: 10, border: `1.5px solid ${wlAnyProvider ? "var(--gold)" : "var(--border2)"}`, background: wlAnyProvider ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "transparent", color: "var(--text)", fontSize: 14, fontWeight: wlAnyProvider ? 600 : 400 }}>Anyone available</button>
@@ -10450,7 +10450,7 @@ function WaitlistRulesEditor({ w, onChange }) {
           </div>
         ); })()}
         <div style={{ height: 16 }} />
-        <ToggleSetting label="Ask if they'd take any barber" desc="If they picked a specific barber, ask whether they'd accept any open chair — fills cancellations faster. (Defaults to their chosen barber.)" on={w.askAnyProvider !== false} onToggle={(v) => set({ askAnyProvider: v })} />
+        <ToggleSetting label="Ask if they'd take anyone available" desc="If they picked a specific person, ask whether they'd accept any open spot — fills cancellations faster. (Defaults to their chosen person.)" on={w.askAnyProvider !== false} onToggle={(v) => set({ askAnyProvider: v })} />
       </div>
     </div>
   );
@@ -13780,7 +13780,30 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       explain: <>Most booking apps make you guess how long a service takes, then lock that guess in forever. Smart Timing watches how long each service <em>actually</em> takes you and quietly tightens future bookings to match. The payoff: your day packs efficiently — no wasted gaps, no rushing — so you can fit more clients or give each one the full time they need. Turn it on and forget it; it learns in the background.</>,
       status: (form.autoTiming?.enabled === false) ? "Off" : "On — learns each service's real time",
       keywords: "auto timing smart duration clock service time measure suggest save remembered learn how long takes efficient fit more clients accurate",
-      editor: <ToggleSetting label="Suggest saving service times" desc="After checkout, offer to save how long the service actually took as that client's time, so future bookings get more accurate." on={form.autoTiming?.enabled !== false} onToggle={(v) => setForm({ ...form, autoTiming: { ...(form.autoTiming || {}), enabled: v } })} />,
+      editor: (
+        <div>
+          <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18 }}>Most apps lock every service to one fixed length forever. Vero remembers how long a service really takes <em>for each client</em> — so their next booking reserves exactly the right amount of time.</p>
+
+          <div style={{ background: "var(--gold)", color: "var(--on-gold)", borderRadius: 18, padding: "18px 18px 20px", marginBottom: 20 }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, marginBottom: 10 }}>Here's the idea</div>
+            <div style={{ background: "rgba(255,255,255,.15)", borderRadius: 12, padding: "12px 14px", fontSize: 14, lineHeight: 1.5 }}>A regular's cut that's booked as <span style={{ opacity: .7, textDecoration: "line-through" }}>30 min</span> <strong>35 min</strong> — because that's how long it actually takes. So their next booking holds 35, and the client behind them isn't left waiting.</div>
+          </div>
+
+          <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 2px 8px" }}>How it works</div>
+          <div style={{ marginBottom: 22 }}>
+            {[["1", "You finish the appointment", "At checkout, Vero shows how long it really took."], ["2", "Save it as their time — one tap", "Need more time for a detailed client? Less for a quick regular? Save the real number."], ["3", "Next time, it just fits", "Their future bookings reserve that exact length automatically. No guessing, no rushing, no dead gaps."]].map(([n, b, d], i) => (
+              <div key={n} style={{ display: "flex", gap: 13, alignItems: "flex-start", padding: "13px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                <span style={{ width: 26, height: 26, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, var(--panel2))", color: "var(--gold)", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>{n}</span>
+                <span><span style={{ display: "block", fontSize: 15, fontWeight: 600, marginBottom: 2 }}>{b}</span><span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>{d}</span></span>
+              </div>
+            ))}
+          </div>
+
+          <ToggleSetting label="Suggest saving times at checkout" desc="After each appointment, offer to save how long it really took as that client's time, so future bookings get more accurate." on={form.autoTiming?.enabled !== false} onToggle={(v) => setForm({ ...form, autoTiming: { ...(form.autoTiming || {}), enabled: v } })} />
+
+          <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.55, background: "var(--panel2)", borderRadius: 12, padding: "13px 15px", marginTop: 14 }}>You can also set or adjust any client's time by hand — open their profile, tap a service, and choose <strong style={{ color: "var(--text)" }}>need less time</strong> or <strong style={{ color: "var(--text)" }}>need more time</strong>. Smart Timing just makes it automatic.</div>
+        </div>
+      ),
     },
     {
       id: "rebook_usual", title: "Book the Usual", icon: Repeat, category: "Online Booking",
@@ -14934,7 +14957,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
               </div>
             )}
             {timeOptions.length === 0 ? (
-              <div style={{ maxWidth: 460, margin: "0 auto", color: "var(--sub)", fontSize: 14.5, textAlign: "center", padding: "30px 0", lineHeight: 1.5 }}>No openings that fit this service{provObj ? ` in ${provObj.name.split(" ")[0]}'s day` : ""}. Try another barber or day.</div>
+              <div style={{ maxWidth: 460, margin: "0 auto", color: "var(--sub)", fontSize: 14.5, textAlign: "center", padding: "30px 0", lineHeight: 1.5 }}>No openings that fit this service{provObj ? ` in ${provObj.name.split(" ")[0]}'s day` : ""}. Try someone else or another day.</div>
             ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxWidth: 460, margin: "0 auto" }}>
               {timeOptions.map((s) => { const on = s.start === startMin; return (
