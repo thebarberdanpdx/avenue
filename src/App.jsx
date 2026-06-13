@@ -8648,13 +8648,22 @@ function CategorySheet({ open, onClose, categories, setCategories, services, set
   );
 }
 
-function MenuEditor({ services, setServices, categories, setCategories, providers, business, showToast, cutLibrary, setCutLibrary }) {
+function MenuEditor({ services, setServices, categories, setCategories, providers, business, showToast, cutLibrary, setCutLibrary, onBackRef }) {
   const [editing, setEditing] = useState(null); // service id or "new"
   const [section, setSection] = useState(null); // null = hub, else "details"|"staff"|"customizations"|"booking"
   const [picker, setPicker] = useState(null); // {target}
   const [editMode, setEditMode] = useState(false); // list view: browse vs manage (reorder/delete/rename)
   const [catSheet, setCatSheet] = useState(false); // category manager sheet (add / rename / reorder / delete)
   const [showArchived, setShowArchived] = useState(false); // list view: archived services collapse
+  useEffect(() => {
+    if (!onBackRef) return;
+    let pop = null;
+    if (catSheet) pop = () => { setCatSheet(false); return true; };
+    else if (editing && section) pop = () => { setSection(null); return true; };
+    else if (editing) pop = () => { setEditing(null); return true; };
+    onBackRef.current = pop;
+    return () => { if (onBackRef) onBackRef.current = null; };
+  }, [editing, section, catSheet]);
   const cats = (categories && categories.length) ? categories : ["Services"];
   const staffList = (providers || []).filter((p) => p.id !== "anyone");
   // build a default staff map: everyone ON, no overrides (null = use service default)
@@ -10069,8 +10078,13 @@ function BookingRulesEditor({ b, onChange }) {
 // ============================================================
 // LOCATIONS EDITOR — optional; off by default for solo shops
 // ============================================================
-function LocationsEditor({ business, setForm }) {
+function LocationsEditor({ business, setForm, onBackRef }) {
   const [openId, setOpenId] = useState(null); // location id whose screen is open (null = list)
+  useEffect(() => {
+    if (!onBackRef) return;
+    onBackRef.current = openId ? () => { setOpenId(null); return true; } : null;
+    return () => { if (onBackRef) onBackRef.current = null; };
+  }, [openId]);
   const locations = business.locations || [];
   const setLoc = (id, patch) => setForm({ ...business, locations: locations.map((l) => l.id === id ? { ...l, ...patch } : l) });
   const addLoc = () => { const id = "loc" + Date.now(); setForm({ ...business, locations: [...locations, { id, name: "New Location", address: "", cityZip: "", phone: "", hours: "Mon–Fri · 9–5" }] }); setOpenId(id); };
@@ -10229,9 +10243,14 @@ function EmailPreview({ body, business }) {
   );
 }
 
-function MessagesEditor({ messages, onChange, business }) {
+function MessagesEditor({ messages, onChange, business, onBackRef }) {
   const [openId, setOpenId] = useState(null);   // message id whose screen is open (null = list)
   const [preview, setPreview] = useState(false); // detail screen: editing vs preview
+  useEffect(() => {
+    if (!onBackRef) return;
+    onBackRef.current = openId ? () => { setPreview(false); setOpenId(null); return true; } : null;
+    return () => { if (onBackRef) onBackRef.current = null; };
+  }, [openId]);
   const update = (id, patch) => onChange(messages.map((m) => m.id === id ? { ...m, ...patch } : m));
   const insertTag = (m, tag) => update(m.id, { body: (m.body || "") + (m.body && !m.body.endsWith(" ") ? " " : "") + tag });
   const restoreDefault = (m) => { const def = DEFAULT_MESSAGE_BODIES[m.id]; if (def != null) update(m.id, { body: def }); };
@@ -10877,8 +10896,14 @@ function impStatus(txt, isPast) {
 // come in, then writes clients + appointments to the database (deduping clients by
 // phone against who's already in the book). Every import is tagged with a batch id
 // so a bad one can be undone in one tap.
-function ImportDataEditor({ shopId, services = [], providers = [], clients = [], setClients, appts = [], setAppts, showToast }) {
+function ImportDataEditor({ shopId, services = [], providers = [], clients = [], setClients, appts = [], setAppts, showToast, onBackRef }) {
   const [stage, setStage] = useState("upload"); // upload | map | preview | running | done
+  useEffect(() => {
+    if (!onBackRef) return;
+    const prev = { map: "upload", preview: "map" }; // running/done aren't user-backable
+    onBackRef.current = prev[stage] ? () => { setStage(prev[stage]); return true; } : null;
+    return () => { if (onBackRef) onBackRef.current = null; };
+  }, [stage]);
   const [fileName, setFileName] = useState("");
   const [parsed, setParsed] = useState({ headers: [], rows: [] });
   const [map, setMap] = useState({});
@@ -11143,7 +11168,7 @@ function estimateEarnings(provider, appts, services, ref = new Date()) {
 // ============================================================
 // STAFF MEMBERS — Mangomint-style hub: list → member → sections
 // ============================================================
-function StaffMembersView({ providers, setProviders, services, setServices, appts, showToast, business, shopId }) {
+function StaffMembersView({ providers, setProviders, services, setServices, appts, showToast, business, shopId, onBackRef }) {
   const SLUG = shopId || "sanctuary";
   const ORIGIN = (typeof window !== "undefined" && window.location && window.location.origin && !/capacitor|ionic|localhost/.test(window.location.origin)) ? window.location.origin : "https://gotvero.com";
   const copyText = (text, label) => { try { navigator.clipboard.writeText(text); showToast((label || "Link") + " copied."); } catch (e) { showToast("Couldn't copy — long-press to select."); } };
@@ -11153,6 +11178,15 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   const [picker, setPicker] = useState(false);  // photo picker open
   const [editingDetails, setEditingDetails] = useState(false);
   const [detailsDraft, setDetailsDraft] = useState(null); // local buffer while editing — commits once on Done (typing into global state races the server echo)
+  useEffect(() => {
+    if (!onBackRef) return;
+    let pop = null;
+    if (picker) pop = () => { setPicker(false); return true; };
+    else if (openId && section) pop = () => { setSection(null); return true; };
+    else if (openId) pop = () => { setOpenId(null); return true; };
+    onBackRef.current = pop;
+    return () => { if (onBackRef) onBackRef.current = null; };
+  }, [openId, section, picker]);
   const [workWeekRef, setWorkWeekRef] = useState(new Date());
   const [repeatFor, setRepeatFor] = useState(null); // { dow, h } when the "repeat on days" popup is open
   const [dayEdit, setDayEdit] = useState(null); // { dow } when editing one day's shift in a focused sheet
@@ -12458,11 +12492,16 @@ function PhotoModeSetting({ mode, onChange }) {
 }
 
 // ---- Your Website: branded storefront controls + custom-domain (wired, off until hosting set up) ----
-function WebsiteEditor({ w, onChange, business, theme, setTheme }) {
+function WebsiteEditor({ w, onChange, business, theme, setTheme, onBackRef }) {
   const set = (k, v) => onChange({ [k]: v });
   const [logoPicker, setLogoPicker] = useState(false);
   const [igOpen, setIgOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!onBackRef) return;
+    onBackRef.current = (logoPicker || igOpen) ? () => { setLogoPicker(false); setIgOpen(false); return true; } : null;
+    return () => { if (onBackRef) onBackRef.current = null; };
+  }, [logoPicker, igOpen]);
   const ig = (w.instagram || "").replace(/^@/, "");
   const slug = (business?.name || "yourshop").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const veroUrl = `gotvero.com/${slug}`;
@@ -13431,7 +13470,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const hasChanges = JSON.stringify(form) !== JSON.stringify(baseBiz);
 
   const save = (msg) => { setBusiness(form); showToast(msg || "Settings saved."); setOpenCard(null); };
-  const cancel = () => { setForm(business); setOpenCard(null); };
+  // Multi-screen editors (Messages, Menu, Staff, Locations, Website, Import) register a
+  // popper here. Back tries the editor's internal screen first; only when the editor is at
+  // its own root does back actually leave the editor. This makes every back go exactly one
+  // screen, instead of jumping straight out to the settings home.
+  const editorBack = useRef(null);
+  const cancel = () => { editorBack.current = null; setForm(business); setOpenCard(null); };
+  const goBack = () => { if (editorBack.current && editorBack.current()) return; cancel(); };
 
   const field = (label, key, multiline) => (
     <div style={{ marginBottom: 16 }}>
@@ -13499,7 +13544,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     {
       id: "locations", fullBleed: true, title: "Locations", icon: MapPinIcon, category: "Business Setup",
       status: form.multiLocation ? `${(form.locations || []).length} locations` : "Single location", keywords: "location locations multi multiple branch shop store address chain franchise",
-      editor: <LocationsEditor business={form} setForm={setForm} />,
+      editor: <LocationsEditor business={form} setForm={setForm} onBackRef={editorBack} />,
     },
     {
       id: "phones", title: "Phone Numbers", icon: Phone, category: "Business Setup",
@@ -13511,12 +13556,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "import", fullBleed: true, title: "Import Data", icon: Upload, category: "Business Setup",
       status: "Bring clients & history over",
       keywords: "import data migrate transfer clients appointments notes history switch from square glossgenius vagaro boulevard booksy csv export upload move",
-      editor: <ImportDataEditor shopId={shopId} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} showToast={showToast} />,
+      editor: <ImportDataEditor shopId={shopId} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} showToast={showToast} onBackRef={editorBack} />,
     },
     {
       id: "staff", fullBleed: true, title: "Staff Members", icon: Users, category: "Business Setup",
       status: `${providers.filter((p) => p.id !== "anyone").length} staff`, keywords: "staff team employees hours days off schedule availability who works barber stylist",
-      editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} showToast={showToast} business={form} shopId={shopId} />),
+      editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} showToast={showToast} business={form} shopId={shopId} onBackRef={editorBack} />),
     },
     {
       id: "notifications", fullBleed: true, title: "Notifications", icon: Bell, category: "Business Setup",
@@ -13743,7 +13788,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "servicesmenu", fullBleed: true, title: "Services & Menu", icon: ImageIcon, category: "Services & Menu",
       status: `${(services || []).length} services`,
       keywords: "menu services service list edit add price duration photo category haircut beard add-ons addons cut types",
-      editor: <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />,
+      editor: <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} onBackRef={editorBack} />,
     },
     {
       id: "addons", fullBleed: true, title: "Add-ons", icon: Plus, category: "Services & Menu",
@@ -13813,14 +13858,14 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "messages", fullBleed: true, title: "Automated Messages", icon: MessageSquare, category: "Automated Messages",
       explain: <>Every automatic text and email your clients get — booking confirmation, reminders, "we're ready for you," cancellations, deposit receipts — laid out so you can read the exact words and change any of them. Tap a message to edit it, pick whether it goes by text, email, or both, and use tags like {"{client}"} that fill in automatically. Turn off any you don't want sent.</>,
       status: `${(form.messages || []).filter((m) => m.enabled).length} active`, keywords: "automated messages reminders texts email confirmation check-in waitlist booked canceled rescheduled wording edit deposit no-show",
-      editor: <MessagesEditor messages={form.messages || []} onChange={(msgs) => setForm({ ...form, messages: msgs })} business={form} />,
+      editor: <MessagesEditor messages={form.messages || []} onChange={(msgs) => setForm({ ...form, messages: msgs })} business={form} onBackRef={editorBack} />,
     },
     {
       id: "website", fullBleed: true, title: "Your Website", subtitle: "Your branded booking page", icon: Globe, category: "Your Website",
       explain: <>Turn this on and your booking link becomes a clean, branded web page — your name, logo, services, hours, and a Book button — styled to your theme. It's a simple website for your shop without building one. Off by default; flip it on when you're ready and preview it before it goes live.</>,
       status: (form.website?.enabled === true) ? ((form.website?.customDomain) ? form.website.customDomain : "On · Vero-hosted page") : "Off",
       keywords: "website web site storefront landing page online presence branded booking link domain custom url instagram social about tagline intro public page",
-      editor: <WebsiteEditor w={form.website || {}} onChange={(wx) => setForm({ ...form, website: { ...(form.website || {}), ...wx } })} business={form} theme={(form?.theme && THEME_IDS.includes(form.theme)) ? form.theme : theme} setTheme={(id) => setForm({ ...form, theme: id })} />,
+      editor: <WebsiteEditor w={form.website || {}} onChange={(wx) => setForm({ ...form, website: { ...(form.website || {}), ...wx } })} business={form} theme={(form?.theme && THEME_IDS.includes(form.theme)) ? form.theme : theme} setTheme={(id) => setForm({ ...form, theme: id })} onBackRef={editorBack} />,
     },
     {
       id: "reports", fullBleed: true, title: "Reports & Insights", icon: BarChart3, category: "Reporting",
@@ -14065,7 +14110,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     const Icon = active.icon;
     return (
       <div className="appt-screen" style={{ width: "100%", padding: "16px 6px 40px" }}>
-        <button onClick={cancel} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 500, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> {(() => { const c = CATS.find((x) => x.id === openCat); return c ? c.label : "All settings"; })()}</button>
+        <button onClick={goBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 500, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> {(() => { const c = CATS.find((x) => x.id === openCat); return c ? c.label : "All settings"; })()}</button>
         <div style={{ marginBottom: 22 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 29, fontWeight: 500, lineHeight: 1.1, letterSpacing: "-0.3px" }}>{active.title}</h2>
