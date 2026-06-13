@@ -546,10 +546,10 @@ const THEMES = [
     disp: "'Fraunces', serif", body: "'Hanken Grotesk', sans-serif", grain: 0.045,
     canvas: "linear-gradient(176deg,#FBFAF6 0%,#F2ECE1 70%,#EFE7D8 100%)",
     t: { bg:"#FAF8F3", panel:"#FFFFFF", panel2:"#F4EFE4", line:"#ECE4D5", border:"#E0D8C7", border2:"#CFC6B7", text:"#232221", text2:"#3A382F", sub:"#6F685D", faint:"#A39C8A", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(60,55,45,.10)", overlay:"rgba(35,34,33,0.34)" } },
-  { id: "studio", name: "Studio", tagline: "White paper, black ink", cat: "Light", dark: false,
+  { id: "studio", name: "Studio", tagline: "White paper, sage accent", cat: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.03,
     canvas: "linear-gradient(176deg,#FFFFFF,#F5F5F3)",
-    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F4F4F4", line:"#ECECEC", border:"#DCDCDC", border2:"#C2C2C2", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#A6A6A6", gold:"#0A0A0A", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.06)", overlay:"rgba(0,0,0,0.3)" } },
+    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F4F4F4", line:"#ECECEC", border:"#DCDCDC", border2:"#C2C2C2", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#A6A6A6", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.06)", overlay:"rgba(0,0,0,0.3)" } },
   { id: "mist", name: "Mist", tagline: "Cool porcelain & slate", cat: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Inter', sans-serif", grain: 0.04,
     canvas: "linear-gradient(176deg,#F1F4F6,#E6ECEF)",
@@ -712,7 +712,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
       if (dead) return;
       if (!stripe || !cardBox.current) { setErr("Couldn't load the secure card field. Refresh and try again."); return; }
       const elements = stripe.elements();
-      const card = elements.create("card", { style: { base: { fontSize: "16px", color: "#232221", fontFamily: "'Hanken Grotesk', sans-serif", "::placeholder": { color: "#A39C8A" } }, invalid: { color: "#B5564B" } } });
+      const card = elements.create("card", { style: { base: { fontSize: "16px", color: "#232221", fontFamily: "'Jost', sans-serif", "::placeholder": { color: "#A39C8A" } }, invalid: { color: "#B5564B" } } });
       card.mount(cardBox.current);
       card.on("change", (ev) => setErr(ev.error ? ev.error.message : ""));
       els.current = { stripe, card };
