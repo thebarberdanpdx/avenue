@@ -1391,8 +1391,15 @@ function App() {
       }
       const { data, error } = await supabase.from(table).select('data').eq('shop_id', SHOP_ID);
       if (error) { console.error(`[vero] live-sync refetch '${table}' failed:`, error); return; }
-      const list = data ? data.map((r) => r.data) : [];
+      let list = data ? data.map((r) => r.data) : [];
       if (table === 'services') list.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
+      if (table === 'providers') {
+        // Don't clobber an in-flight local edit (title/role/reorder) with a realtime echo,
+        // and always re-sort so saved order survives. Mirrors the [session] reload guard.
+        const s = savingRef.current.providers;
+        if (providersDirtyRef.current || (s && (s.running || s.queued))) return;
+        list = sortProviders(list);
+      }
       lastRemoteRef.current[table] = list;
       const set = tableSetters[table]; if (set) set(list);
     } catch (e) { console.error('[vero] live-sync refetch error:', e); }
@@ -11275,41 +11282,12 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             </div>
           ) : (
             <div>
-              {[["Email", person.email || "—"], ["Phone", person.phone || "—"], ["User type", ut], ["Is service provider", person.isProvider !== false ? "Yes" : "No"], ["Enable in online booking", person.onlineBooking ? "Yes" : "No"]].map(([k, v], i) => (
+              {[["Role / title", person.role || "—"], ["Email", person.email || "—"], ["Phone", person.phone || "—"], ["User type", ut], ["Is service provider", person.isProvider !== false ? "Yes" : "No"], ["Enable in online booking", person.onlineBooking ? "Yes" : "No"]].map(([k, v], i) => (
                 <div key={k} style={{ padding: "16px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
                   <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 3 }}>{k}</div>
                   <div style={{ fontSize: 16, color: k === "Email" ? "var(--gold)" : "var(--text)" }}>{v}</div>
                 </div>
               ))}
-              <div style={{ padding: "16px 0 8px", borderTop: "1px solid var(--line)" }}>
-                {person.onlineBooking ? (() => {
-                  const bookUrl = `${ORIGIN}/book?shop=${SLUG}&with=${person.id}`;
-                  const icalUrl = `webcal://${ORIGIN.replace(/^https?:\/\//, "")}/api/ical/${SLUG}/${person.id}.ics`;
-                  const first = (person.name || "").split(" ")[0] || "this barber";
-                  return (
-                    <>
-                      <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 10 }}>{first}'s links</div>
-                      {/* direct booking link — real, uses the live /book path */}
-                      <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 500, marginBottom: 6 }}>Book {first} directly</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px" }}>
-                        <span style={{ flex: 1, fontSize: 13, color: "var(--sub)", fontFamily: "ui-monospace, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bookUrl.replace(/^https?:\/\//, "")}</span>
-                        <button onClick={() => copyText(bookUrl, `${first}'s booking link`)} style={{ flexShrink: 0, background: "none", border: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Copy size={15} /> Copy</button>
-                      </div>
-                      <div style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 7 }}>Opens your booking page with {first} already selected. Send it to clients who always book {first}.</div>
-
-                      {/* iCal subscription — real read-only feed endpoint */}
-                      <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 500, margin: "16px 0 6px" }}>Subscribe to {first}'s calendar</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px" }}>
-                        <span style={{ flex: 1, fontSize: 13, color: "var(--sub)", fontFamily: "ui-monospace, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{icalUrl}</span>
-                        <button onClick={() => copyText(icalUrl, "Calendar link")} style={{ flexShrink: 0, background: "none", border: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Copy size={15} /> Copy</button>
-                      </div>
-                      <div style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 7 }}>Paste into Apple or Google Calendar to see {first}'s appointments there automatically. Read-only — it never changes anything in Vero.</div>
-                    </>
-                  );
-                })() : (
-                  <div style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5 }}>Turn on “Enable in online booking” to get {(person.name || "").split(" ")[0] || "this barber"}'s direct booking link and calendar feed.</div>
-                )}
-              </div>
             </div>
           )}
         </div>
@@ -11871,6 +11849,29 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
       <HubCard label="Details" sec="details" rows={[{ l: "Email", r: person.email || "—" }, { l: "Phone", r: person.phone || "—" }, { l: "User type", r: person.userType || "Staff" }]} />
       <HubCard label="Work hours" sec="hours" rows={hoursRows} />
       <HubCard label="Services" sec="services" rows={[{ l: "Offering", r: `${hubSvcOn} of ${services.length}` }]} />
+      {/* Booking + calendar links — visible right on the profile, no drill-in needed */}
+      {bookable && person.id !== "anyone" && (() => {
+        const first = (person.name || "").split(" ")[0] || "this barber";
+        const bookUrl = `${ORIGIN}/book?shop=${SLUG}&with=${person.id}`;
+        const icalUrl = `webcal://${ORIGIN.replace(/^https?:\/\//, "")}/api/ical/${SLUG}/${person.id}.ics`;
+        const LinkRow = ({ title, sub, url, label }) => (
+          <div style={{ padding: "12px 0", borderTop: "1px solid var(--line)" }}>
+            <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 500, marginBottom: 6 }}>{title}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px" }}>
+              <span style={{ flex: 1, fontSize: 12.5, color: "var(--sub)", fontFamily: "ui-monospace, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{url.replace(/^https?:\/\//, "")}</span>
+              <button onClick={() => copyText(url, label)} style={{ flexShrink: 0, background: "none", border: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}><Copy size={14} /> Copy</button>
+            </div>
+            {sub && <div style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, marginTop: 6 }}>{sub}</div>}
+          </div>
+        );
+        return (
+          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px 14px", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
+            <span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Booking &amp; calendar links</span>
+            <LinkRow title={`Book ${first} directly`} url={bookUrl} label={`${first}'s booking link`} sub={`Opens your booking page with ${first} already selected.`} />
+            <LinkRow title={`Subscribe to ${first}'s calendar`} url={icalUrl} label="Calendar link" sub="Paste into Apple or Google Calendar — read-only." />
+          </div>
+        );
+      })()}
       <HubCard label="Compensation" sec="comp" rows={[{ l: "Service commission", r: hubSc.on ? (hubSc.type === "basic" ? `${hubSc.basicPct}%` : "Sliding scale") : "Not set", muted: !hubSc.on }, { l: "Hourly", r: (hubComp.hourly && hubComp.hourly.on) ? `$${hubComp.hourly.rate}/hr` : "Off", muted: !(hubComp.hourly && hubComp.hourly.on) }]} />
       <HubCard label="Sign-in & access" sec="access" rows={[{ l: "App access", r: person.pulseRole === "owner" ? "Owner" : "Barber" }, { l: "Notifications", r: Object.values(hubNotif).some(Boolean) ? "On" : "Off", sec: "notifications" }, { l: "Permissions", r: person.userType === "Admin" ? "Admin defaults" : "Staff defaults", sec: "permissions" }]} />
       <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
