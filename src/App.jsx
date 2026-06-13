@@ -10003,21 +10003,6 @@ function BookingRulesEditor({ b, onChange }) {
                 <div style={{ marginTop: 13 }}><Segmented inline options={[{ value: "all", label: "All" }, { value: "returning", label: "Returning" }, { value: "new", label: "New" }]} value={b.clientType || "all"} onChange={(v) => set({ clientType: v })} /></div>
               </div>
 
-              <div style={{ ...card, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-                {head("Require a card", "Hold a card to reserve — your no-show protection.")}
-                <Toggle on={b.requireCard} onClick={() => set({ requireCard: !b.requireCard })} />
-              </div>
-
-              <div style={card}>
-                {head("Deposit", "Take a deposit at the time of booking.")}
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", marginTop: 13 }}>
-                  <Segmented inline options={[{ value: "none", label: "None" }, { value: "fixed", label: "$ Fixed" }, { value: "percent", label: "%" }]} value={b.deposit?.mode || "none"} onChange={(v) => setDep({ mode: v })} />
-                  {b.deposit?.mode && b.deposit.mode !== "none" && (
-                    <Stepper value={b.deposit.amount} onChange={(v) => setDep({ amount: v })} min={0} max={b.deposit.mode === "percent" ? 100 : 500} step={5} suffix={b.deposit.mode === "percent" ? "%" : "$"} />
-                  )}
-                </div>
-              </div>
-
               <div style={card}>
                 {head("Max bookings per day", "Cap total online bookings across the whole shop. You can still add one manually.")}
                 <div style={{ marginTop: 13 }}><Stepper value={b.dailyCap || 0} onChange={(v) => set({ dailyCap: v })} min={0} max={200} step={1} zeroLabel="No limit" /></div>
@@ -13893,24 +13878,24 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   // ---- Category grid: concrete, plain-named buckets. Every setting lives in exactly one,
   // so nothing falls through to search-only. Tap a tile → that category's list. ----
   const CATS = [
-    { id: "shop",  label: "My shop", icon: User, desc: "Name, hours & look", settings: ["business", "hours", "locations", "phones", "appearance", "theme"] },
-    { id: "staff", label: "My team", icon: Users, desc: "Barbers, access & pay", settings: ["staff", "staffpin"] },
-    { id: "menu",  label: "Services & menu", icon: Scissors, desc: "What you offer & pricing", settings: ["servicesmenu", "addons", "aicuthelper"] },
-    { id: "book",  label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "How clients book you", settings: ["avoidgaps", "anyonerouting", "booking", "newclient", "showprices", "rebook_usual", "refphotos", "family"], groups: [
+    { id: "shop",  label: "Your shop", icon: User, desc: "Name, hours & branding", settings: ["business", "hours", "locations", "phones", "appearance", "theme"] },
+    { id: "staff", label: "Your team", icon: Users, desc: "Barbers, access & pay", settings: ["staff", "staffpin"] },
+    { id: "menu",  label: "Services & pricing", icon: Scissors, desc: "What you offer", settings: ["servicesmenu", "addons", "aicuthelper"] },
+    { id: "book",  label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "How clients book you", settings: ["avoidgaps", "anyonerouting", "booking", "newclient", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"], groups: [
       { label: "The times they see", ids: ["avoidgaps", "anyonerouting"] },
-      { label: "Your booking page", ids: ["booking", "newclient", "showprices", "rebook_usual", "refphotos", "family"] },
+      { label: "Your booking page", ids: ["booking", "newclient", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"] },
     ] },
-    { id: "dayof", label: "My calendar & day", icon: Clock, desc: "Running your day", settings: ["calendarsettings", "waitlist", "photos", "waitingroom", "runninglate", "overduebuffer", "autotiming"], groups: [
-      { label: "Scheduling", ids: ["calendarsettings", "waitlist", "photos"] },
-      { label: "During the day", ids: ["waitingroom", "runninglate", "overduebuffer"] },
+    { id: "noshow", label: "Deposits & no-shows", icon: AlertCircle, desc: "Protect your time", settings: ["policy"] },
+    { id: "dayof", label: "Your day", icon: Clock, desc: "Calendar & running your day", settings: ["calendarsettings", "waitlist", "photos", "waitingroom", "runninglate", "overduebuffer", "autotiming"], groups: [
+      { label: "Calendar", ids: ["calendarsettings", "photos"] },
+      { label: "During the day", ids: ["waitlist", "waitingroom", "runninglate", "overduebuffer"] },
       { label: "Smart timing", ids: ["autotiming"] },
     ] },
-    { id: "pay",   label: "Checkout & money", icon: CreditCard, desc: "Payments, tips & no-shows", settings: ["payments", "checkout", "tipping", "rebookco", "policy"] },
-    { id: "msg",   label: "Messages", icon: Bell, desc: "Texts & emails", settings: ["messages", "notifications", "bookingwords"], groups: [
-      { label: "Clients", ids: ["messages", "bookingwords"] },
+    { id: "pay",   label: "Checkout & payments", icon: CreditCard, desc: "Pay, tips & rebooking", settings: ["payments", "checkout", "tipping", "rebookco"] },
+    { id: "msg",   label: "Messages", icon: Bell, desc: "Texts & emails", settings: ["messages", "notifications"], groups: [
+      { label: "Clients", ids: ["messages"] },
       { label: "My team", ids: ["notifications"] },
     ] },
-    { id: "web",   label: "Website", icon: Globe, desc: "Your booking page", settings: ["website"] },
     { id: "data",  label: "Reports & data", icon: BarChart3, desc: "Your numbers & tools", settings: ["reports", "import", "mergedupes", "testdata"] },
   ];
   // Safety net: any card not placed above still appears (appended to Reports & Insights) so nothing is ever lost.
