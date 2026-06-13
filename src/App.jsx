@@ -2174,7 +2174,7 @@ function resolveAnyone(providers, appts, dateObj, startMin, durMin, business) {
     return !(appts || []).some((a) => liveOnDay(a) && a.providerId === p.id && typeof a.start === "number" && typeof a.end === "number" && startMin < a.end && endMin > a.start);
   };
   const free = reals.filter(isFree);
-  const mode = business?.booking?.anyoneMode || "soonest";
+  const mode = (business?.booking?.anyoneMode === "topChairs" ? "soonest" : business?.booking?.anyoneMode) || "soonest";
   // Day load per provider (used by share + round-robin turn calc).
   const loadOf = (pid) => (appts || []).filter((a) => liveOnDay(a) && a.providerId === pid).length;
   // Owner-defined order (rotation / priority), filtered to current real barbers.
@@ -9969,18 +9969,6 @@ function BookingRulesEditor({ b, onChange }) {
   const set = (patch) => onChange({ ...b, ...patch });
   const setDep = (patch) => onChange({ ...b, deposit: { ...b.deposit, ...patch } });
 
-  const preview = () => {
-    if (!b.enabled) return "Online booking is currently turned off — clients can't book themselves.";
-    const horizonLabel = b.horizonDays === 0 ? "no cutoff" : (b.horizonDays >= 90 ? `${Math.round(b.horizonDays / 30)} months` : `${b.horizonDays || 60} days`);
-    let s = `Clients can book online (${horizonLabel} ahead)`;
-    s += `. ${b.clientType === "all" ? "Open to everyone" : b.clientType === "returning" ? "Returning clients only" : "New clients only"}.`;
-    if (b.allowMultiple === false) s += " One service per booking.";
-    if (b.requireCard) s += " A card is required.";
-    if (b.deposit?.mode === "fixed") s += ` $${b.deposit.amount} deposit taken at booking.`;
-    if (b.deposit?.mode === "percent") s += ` ${b.deposit.amount}% deposit taken at booking.`;
-    return s;
-  };
-
   return (
     <div style={{ display: "grid", gap: 12 }}>
       {(() => {
@@ -10032,28 +10020,21 @@ function BookingRulesEditor({ b, onChange }) {
               </div>
 
               <div style={card}>
-                {head("How far ahead clients can book", "The furthest out a client can pick a date. Up to 90 days shows in days; beyond that, in months.")}
+                {head("How far ahead clients can book", "The furthest out a client can pick a date.")}
                 {(() => {
-                  const days = b.horizonDays === 0 ? 0 : (b.horizonDays || 60);
-                  const noCutoff = days === 0;
-                  const fmt = (d) => d >= 90 ? `${Math.round(d / 30)} months` : `${d} ${d === 1 ? "day" : "days"}`;
-                  const dec = () => { const cur = days || 60; const s = cur > 90 ? 30 : 1; set({ horizonDays: Math.max(1, cur - s) }); };
-                  const inc = () => { const cur = days || 60; const s = cur >= 90 ? 30 : 1; set({ horizonDays: cur + s }); };
-                  const pm = (label, onClick, disabled) => (
-                    <button onClick={onClick} disabled={disabled} style={{ width: 38, height: 38, borderRadius: 11, border: "1px solid var(--border)", background: "var(--panel2)", color: disabled ? "var(--faint)" : "var(--text)", fontSize: 20, fontWeight: 500, cursor: disabled ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>{label}</button>
-                  );
+                  const months = Math.min(12, Math.max(1, Math.round((b.horizonDays || 60) / 30)));
                   return (
-                    <div style={{ marginTop: 13 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: noCutoff ? 0 : 14 }}>
-                        <span style={{ fontSize: 14.5 }}>No cutoff (any future date)</span>
-                        <Toggle on={noCutoff} onClick={() => set({ horizonDays: noCutoff ? 60 : 0 })} />
-                      </div>
-                      {!noCutoff && (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
-                          <span style={{ fontSize: 15, fontWeight: 500 }}>{fmt(days || 60)}</span>
-                          <div style={{ display: "flex", gap: 8 }}>{pm("−", dec, (days || 60) <= 1)}{pm("+", inc, false)}</div>
-                        </div>
-                      )}
+                    <div style={{ position: "relative", marginTop: 13 }}>
+                      <select
+                        value={months}
+                        onChange={(e) => set({ horizonDays: Number(e.target.value) * 30 })}
+                        style={{ width: "100%", appearance: "none", WebkitAppearance: "none", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 44px 14px 16px", color: "var(--text)", fontSize: 16, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" }}
+                      >
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                          <option key={m} value={m}>{m === 12 ? "1 year" : `${m} month${m > 1 ? "s" : ""}`}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={18} style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
                     </div>
                   );
                 })()}
@@ -10066,11 +10047,6 @@ function BookingRulesEditor({ b, onChange }) {
           </>
         );
       })()}
-
-      <div style={{ marginTop: 18, background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 22%, transparent)", borderRadius: 14, padding: "14px 16px" }}>
-        <div style={{ fontSize: 10.5, letterSpacing: 1.4, color: "var(--gold)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>How this reads to clients</div>
-        <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.55 }}>{preview()}</div>
-      </div>
     </div>
   );
 }
@@ -13696,9 +13672,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "anyonerouting", title: "When a client picks \u201cAnyone\u201d", subtitle: "Which barber gets the booking", icon: Users, category: "Online Booking",
-      explain: <>When a client books without picking a specific barber, this decides who gets the appointment. <b>Whoever's available first</b> books the barber who can take them soonest. <b>Share the work</b> spreads bookings to whoever's lightest that day. <b>Take turns</b> rotates through your barbers in an order you set. <b>Fill top chairs first</b> loads your best earners before overflow. A client who picks a specific barber is never affected — this only applies to &ldquo;Anyone.&rdquo;</>,
-      status: (() => { const m = (form.booking || {}).anyoneMode || "soonest"; return { soonest: "Whoever's first", share: "Share the work", roundRobin: "Take turns", topChairs: "Top chairs first" }[m] || "Whoever's first"; })(),
-      keywords: "anyone first available routing which barber assign distribute share work round robin take turns rotation top chairs priority overflow no preference whoever soonest balance load",
+      explain: <>When a client books without picking a specific barber, this decides who gets the appointment. <b>Whoever's available first</b> books the barber who can take them soonest. <b>Share the work</b> spreads bookings to whoever's lightest that day. <b>Take turns</b> rotates through your barbers in an order you set. A client who picks a specific barber is never affected — this only applies to &ldquo;Anyone.&rdquo;</>,
+      status: (() => { const m = (form.booking || {}).anyoneMode || "soonest"; return { soonest: "Whoever's first", share: "Share the work", roundRobin: "Take turns" }[m] || "Whoever's first"; })(),
+      keywords: "anyone first available routing which barber assign distribute share work round robin take turns rotation no preference whoever soonest balance load",
       editor: <AnyoneRoutingEditor b={form.booking || DEFAULT_BOOKING} providers={providers} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
     },
     {
