@@ -10020,6 +10020,11 @@ function BookingRulesEditor({ b, onChange }) {
               </div>
 
               <div style={card}>
+                {head("Lead time before the first bookable spot", "The least notice a client must give. At 2 hours, the soonest they can grab is 2 hours from now.")}
+                <div style={{ marginTop: 13 }}><HourMinutePicker totalMin={b.leadTimeMin || 0} onChange={(v) => set({ leadTimeMin: v })} /></div>
+              </div>
+
+              <div style={card}>
                 {head("How far ahead clients can book", "The furthest out a client can pick a date.")}
                 {(() => {
                   const months = Math.min(12, Math.max(1, Math.round((b.horizonDays || 60) / 30)));
@@ -10537,13 +10542,7 @@ function SchedulingOptionsEditor({ b, onChange }) {
         <Stepper value={b.bufferAfter || 0} onChange={(v) => set({ bufferAfter: v })} min={0} max={60} step={5} suffix="min" />
       </div>
 
-      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-        <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Minimum notice</div>
-        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>How far ahead a client must book. Set to any hours and minutes.</div>
-        <HourMinutePicker totalMin={b.leadTimeMin || 0} onChange={(v) => set({ leadTimeMin: v })} />
-      </div>
-
-      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 4, fontStyle: "italic" }}>How far ahead clients can book lives in Online booking → Booking page rules.</p>
+      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 4, fontStyle: "italic" }}>Lead time (minimum notice) and how far ahead clients can book live in Online booking → Booking page rules.</p>
     </div>
   );
 }
