@@ -1416,6 +1416,7 @@ function App() {
       }
       // Success: this list is now exactly what's on the server, so it becomes our known baseline.
       lastRemoteRef.current[table] = list;
+      lastSaveAt.current[table] = Date.now();
       setSaveFailed(false);
     } catch (err) {
       console.error(`[vero] save '${table}' failed (data on server unchanged):`, err);
@@ -1435,6 +1436,7 @@ function App() {
   // don't bounce it back as my own save" with a simple reference check — which also prevents
   // any save loop between two devices.
   const lastRemoteRef = useRef({});
+  const lastSaveAt = useRef({}); // when this device last saved each table — used to ignore the echo of our own write
   const tableSetters = { clients: setClients, appointments: setAppts, waitlist: setWaitlist, services: setServices, providers: setProviders };
   const refetchTable = async (table) => {
     try {
@@ -1448,6 +1450,10 @@ function App() {
       const { data, error } = await supabase.from(table).select('data').eq('shop_id', SHOP_ID);
       if (error) { console.error(`[vero] live-sync refetch '${table}' failed:`, error); return; }
       let list = data ? data.map((r) => r.data) : [];
+      // Ignore the realtime echo of our OWN recent save: a read right after a write can come back
+      // stale and stomp the very edit we just made (this was the email/phone "disappears" bug).
+      const sv = savingRef.current[table];
+      if ((sv && (sv.running || sv.queued)) || (lastSaveAt.current[table] && Date.now() - lastSaveAt.current[table] < 2500)) return;
       if (table === 'services') list.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
       if (table === 'providers') {
         // Don't clobber an in-flight local edit (title/role/reorder) with a realtime echo,
