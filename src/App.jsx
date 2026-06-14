@@ -2561,6 +2561,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [photos, setPhotos] = useState(0);       // 0–3 uploaded at booking
   const [clientNote, setClientNote] = useState(""); // optional note for the barber — rides the appt, the push, and the feed
   const [confirmDetails, setConfirmDetails] = useState(false); // receipt: "details & policies" collapse
+  const [personalizeOpen, setPersonalizeOpen] = useState(business?.bookingPhotos?.mode === "required"); // combined note+photo card; open by default only when photos are required
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
   const [waProvId, setWaProvId] = useState(null); // Who & When merged screen: selected barber tab ("anyone" = First free)
@@ -4678,29 +4679,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const hasFull = lbl.includes(",");
               const dateFull = `${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
               return (
-                <div style={{ textAlign: "center", margin: "10px 0 26px" }}>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, lineHeight: 1.15, color: "var(--text)" }}>{lbl}</div>
-                  {!hasFull && <div style={{ fontSize: 14, color: nextWeek ? "var(--gold)" : "var(--sub)", marginTop: 5, fontStyle: "italic", fontWeight: nextWeek ? 500 : 400 }}>{dateFull}{nextWeek ? " — not today" : ""}</div>}
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 48, fontWeight: 500, lineHeight: 1, marginTop: 14, color: "var(--text)" }}>{fmtTime(slot)}</div>
-                  <div style={{ fontSize: 14.5, color: "var(--text2)", marginTop: 12, lineHeight: 1.5, padding: "0 8px" }}>{cart.map((e) => describeEntry(e)).join(" · ")} · with {provider.name}</div>
-                  <div style={{ width: 30, height: 1, background: "var(--border2)", margin: "18px auto" }} />
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, color: "var(--text)" }}>${cartAdjTotal}</div>
-                  <button onClick={() => setConfirmDetails(!confirmDetails)} style={{ background: "none", color: "var(--sub)", fontSize: 13.5, marginTop: 14, textDecoration: "underline", padding: 4 }}>{confirmDetails ? "hide details" : "details & policies"}</button>
-                  {confirmDetails && (
-                    <div style={{ textAlign: "left", border: "1px solid var(--line)", borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
-                      {cart.map((e, i) => (
-                        <div key={i} style={{ fontSize: 13.5, color: "var(--text)", padding: "7px 0", borderBottom: "1px solid var(--line)", lineHeight: 1.4 }}>{describeEntry(e)}</div>
-                      ))}
-                      {cartTimeDelta !== 0 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid var(--line)" }}>
-                          <span style={{ fontSize: 13, color: "var(--sub)" }}>{cartTimeDelta > 0 ? "Peak time" : "Off-peak discount"}</span>
-                          <span style={{ fontSize: 13.5, color: "var(--text)" }}>{cartTimeDelta > 0 ? "+" : "−"}${Math.abs(cartTimeDelta)}</span>
-                        </div>
-                      )}
-                      <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, margin: "12px 0 6px" }}>CANCELLATION POLICY</div>
-                      <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.55 }}>{business.policy}</p>
-                    </div>
-                  )}
+                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", textAlign: "center", margin: "10px 0 24px" }}>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, lineHeight: 1.2, color: "var(--text)" }}>{lbl} · {fmtTime(slot)}</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.45 }}>{!hasFull ? `${dateFull} · ` : ""}{cart.map((e) => describeEntry(e)).join(" · ")} · with {provider.name}</div>
+                  <div style={{ height: 1, background: "var(--line)", margin: "13px 0" }} />
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, color: "var(--text)" }}>${cartAdjTotal}</div>
                 </div>
               );
             })()}
@@ -4718,33 +4701,52 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               </p>
             </div>
 
-            {/* note for the barber — optional, lands on the appointment + the staff push */}
-            {business?.booking?.askNote !== false && (
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginBottom: 18 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>A QUICK NOTE · OPTIONAL</div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 4 }}>Anything that'll help?</div>
-              <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12 }}>Let us know anything you think might help — what you're going for, something different this time, or how you like it. The more we know, the better we get it right.</p>
-              <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keeping length on top" rows={3} style={{ ...inputStyle, marginBottom: 0, resize: "none", minHeight: 72, lineHeight: 1.5, fontFamily: FONT_BODY }} />
-              {clientNote.length > 0 && <div style={{ fontSize: 12, color: "var(--faint)", textAlign: "right", marginTop: 6 }}>{clientNote.length} / 200</div>}
-            </div>
-            )}
+            {/* note + photo — combined into one collapsible card; opens to the note box and photo slots */}
+            {(business?.booking?.askNote !== false || business?.bookingPhotos?.mode !== "off") && (() => {
+              const noteOn = business?.booking?.askNote !== false;
+              const photoOn = business?.bookingPhotos?.mode !== "off";
+              const photoReq = business?.bookingPhotos?.mode === "required";
+              const ttl = noteOn && photoOn ? "Add a note or photo" : photoOn ? "Add a photo" : "Add a note";
+              return (
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginBottom: 18 }}>
+                <button onClick={() => setPersonalizeOpen((o) => !o)} style={{ width: "100%", background: "none", border: "none", padding: 0, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer", color: "var(--text)" }}>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{ttl}</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                    <span style={{ fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: photoReq ? "var(--gold)" : "var(--faint)", fontWeight: 600 }}>{photoReq ? "Required" : "Optional"}</span>
+                    <ChevronDown size={18} style={{ color: "var(--gold)", transform: personalizeOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+                  </span>
+                </button>
+                {!personalizeOpen && <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginTop: 5 }}>A reference or a quick note gets your cut exactly right.</p>}
+                {personalizeOpen && (
+                  <div style={{ marginTop: 14 }}>
+                    {noteOn && (
+                      <>
+                        <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keeping length on top" rows={3} style={{ ...inputStyle, marginBottom: 0, resize: "none", minHeight: 72, lineHeight: 1.5, fontFamily: FONT_BODY }} />
+                        {clientNote.length > 0 && <div style={{ fontSize: 12, color: "var(--faint)", textAlign: "right", marginTop: 6 }}>{clientNote.length} / 200</div>}
+                      </>
+                    )}
+                    {photoOn && (
+                      <div style={{ marginTop: noteOn ? 16 : 0 }}>
+                        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12 }}>Up to 3 photos — a style you want, how your hair looks now, or anything that helps {provider.name === "Anyone" ? "your barber" : provider.name}.</p>
+                        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 14, border: `1px dashed ${i < photos ? "var(--gold)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: i < photos ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent" }}>{i < photos ? <Check size={20} style={{ color: "var(--gold)" }} /> : <Camera size={18} style={{ color: "var(--faint)" }} />}</div>))}</div>
+                        <button onClick={() => setPhotos(Math.min(3, photos + 1))} disabled={photos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: photos >= 3 ? "var(--faint)" : "var(--text)", padding: 12, fontSize: 13.5, letterSpacing: 1.5, fontWeight: 500, borderRadius: 11 }}>{photos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${photos}/3)`}</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              );
+            })()}
 
-            {/* photo upload — controlled by business.bookingPhotos.mode (off/optional/required) */}
-            {business?.bookingPhotos?.mode !== "off" && (
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginBottom: 18 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>PHOTOS {business?.bookingPhotos?.mode === "required" ? "· REQUIRED" : "· OPTIONAL"}</div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 4 }}>Help us nail it</div>
-              <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Up to 3 — a style you want, how your hair looks now, or anything that helps {provider.name === "Anyone" ? "your barber" : provider.name}.</p>
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 14, border: `1px dashed ${i < photos ? "var(--gold)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: i < photos ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent" }}>{i < photos ? <Check size={20} style={{ color: "var(--gold)" }} /> : <Camera size={18} style={{ color: "var(--faint)" }} />}</div>))}</div>
-              <button onClick={() => setPhotos(Math.min(3, photos + 1))} disabled={photos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: photos >= 3 ? "var(--faint)" : "var(--text)", padding: 12, fontSize: 13.5, letterSpacing: 1.5, fontWeight: 500, borderRadius: 11 }}>{photos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${photos}/3)`}</button>
+            {/* Cancellation policy now shown with its consent toggle, pulled from business.policy */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px 4px", marginBottom: 18 }}>
+              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>CANCELLATION POLICY</div>
+              {business.policy && <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55 }}>{business.policy}</p>}
+              <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", color: "var(--text)", fontSize: 14.5, padding: "15px 0", width: "100%", textAlign: "left", border: "none", borderTop: "1px solid var(--line)", marginTop: business.policy ? 14 : 8, cursor: "pointer" }}>
+                <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+                <span>I agree to the cancellation policy</span>
+              </button>
             </div>
-            )}
-
-            {/* Policy text now lives behind "details & policies" on the receipt; consent toggle stays. */}
-            <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", color: "var(--text)", marginBottom: 16, fontSize: 14.5, padding: "4px 2px", width: "100%", textAlign: "left" }}>
-              <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-              <span>I agree to the cancellation policy</span>
-            </button>
 
             {/* Card on file / deposit — real Stripe in Live, safe simulation in Test */}
             {(() => {
