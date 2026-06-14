@@ -1623,12 +1623,12 @@ function App() {
     return () => { alive = false; };
   }, [session]);
 
-  useEffect(() => { if (!loadedRef.current) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories, _cutLibrary: cutLibrary } }).then(({ error }) => { if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false); }); }, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
+  useEffect(() => { if (!loadedRef.current || !session) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories, _cutLibrary: cutLibrary } }).then(({ error }) => { if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false); }); }, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (clients === lastRemoteRef.current.clients) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (appts === lastRemoteRef.current.appointments) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
-  useEffect(() => { if (!loadedRef.current) return; if (services === lastRemoteRef.current.services) return; const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
-  useEffect(() => { if (!loadedRef.current) return; if (providers === lastRemoteRef.current.providers) return; providersDirtyRef.current = true; const t = setTimeout(() => { syncList('providers', providers).finally(() => { providersDirtyRef.current = false; }); }, 800); return () => clearTimeout(t); }, [providers]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (services === lastRemoteRef.current.services) return; const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (providers === lastRemoteRef.current.providers) return; providersDirtyRef.current = true; const t = setTimeout(() => { syncList('providers', providers).finally(() => { providersDirtyRef.current = false; }); }, 800); return () => clearTimeout(t); }, [providers]);
 
   // Retry: re-push everything currently in memory (used by the failed-save banner's Retry button).
   const resaveAll = () => {
@@ -1768,7 +1768,7 @@ function App() {
         .vslot-sel::after { content:""; position:absolute; inset:0; background:linear-gradient(115deg, transparent 32%, rgba(255,255,255,.6) 50%, transparent 68%); transform:translateX(-130%); animation:slotSweep 3s ease-in-out infinite; pointer-events:none; }
       `}</style>
 
-      {saveFailed && (
+      {saveFailed && session && (
         <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#C2563F", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
           <span>Couldn't save your last change to the server. It's still safe on this device — check your connection.</span>
           <button onClick={resaveAll} style={{ flexShrink: 0, background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600, letterSpacing: 0.5 }}>Retry</button>
