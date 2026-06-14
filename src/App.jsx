@@ -913,6 +913,13 @@ function TimeScrollPicker({ value, onChange, step = 15, minMin = 0, maxMin = 24 
     </>
   );
 }
+// Compact digits-only field. Defined at module scope so its identity is stable —
+// typing never remounts the input, so the keyboard stays open between keystrokes.
+function NumBox({ value, placeholder, onChange, width = 56 }) {
+  return (
+    <input inputMode="numeric" value={value ?? ""} placeholder={placeholder} onChange={(e) => onChange(onlyDigits(e.target.value))} style={{ width, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 7px", color: "var(--text)", fontSize: 15, fontWeight: 600, textAlign: "center", fontFamily: FONT_BODY }} />
+  );
+}
 // Tap-to-open length picker. Mirrors TimeScrollPicker, but lists durations in
 // `step`-minute increments with a "shop default" option at top to clear the override.
 function DurPick({ value, defaultMin, onChange, step = 5, maxMin = 240 }) {
@@ -11417,9 +11424,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
     const allOff = services.every((s) => entryFor(s).on === false);
     const first = (person.name || "").split(" ")[0] || "this barber";
     const usedCats = cats.filter((c) => services.some((s) => (s.category || "Services") === c));
-    const NumBox = ({ value, placeholder, onChange, width = 56 }) => (
-      <input inputMode="numeric" value={value ?? ""} placeholder={placeholder} onChange={(e) => onChange(onlyDigits(e.target.value))} style={{ width, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 7px", color: "var(--text)", fontSize: 15, fontWeight: 600, textAlign: "center", fontFamily: FONT_BODY }} />
-    );
+    // NumBox is defined at module scope so typing never remounts the input (keyboard stays open).
     return (
       <div className="appt-screen" style={{ paddingBottom: 40 }}>
         <SecHeader title="Services" onBack={() => setSection(null)} right={
