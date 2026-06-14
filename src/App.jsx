@@ -2560,7 +2560,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [waitlistDone, setWaitlistDone] = useState(false);
   const [photos, setPhotos] = useState(0);       // 0–3 uploaded at booking
   const [clientNote, setClientNote] = useState(""); // optional note for the barber — rides the appt, the push, and the feed
-  const [confirmDetails, setConfirmDetails] = useState(false); // receipt: "details & policies" collapse
   const [personalizeOpen, setPersonalizeOpen] = useState(business?.bookingPhotos?.mode === "required"); // combined note+photo card; open by default only when photos are required
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
