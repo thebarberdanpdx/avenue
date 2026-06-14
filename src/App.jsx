@@ -526,9 +526,6 @@ const TODAY_APPTS = [
 ];
 
 const FONT_DISPLAY = "var(--font-disp, 'Fraunces', Georgia, serif)";
-// Pulse cockpit numbers always use this elegant serif (matches the approved mockup),
-// independent of the active theme's display font (some themes use condensed sans).
-const FONT_NUMERAL = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";
 const FONT_BODY = "var(--font-body, 'Inter', -apple-system, sans-serif)";
 
 // ============================================================
@@ -667,7 +664,7 @@ function fmtPhone(number) {
 // ---- Stripe (client side) ----
 // The publishable key is meant to be public and safe to ship in the app bundle.
 // The SECRET key lives only in Vercel (env var) and is used by /api/stripe — never here.
-const STRIPE_PUBLISHABLE_KEY = "pk_test_51TdVev0XV9TtWHCq8s4dGMpa6zLDn4otUSTcFNtlrRIPJGedN9dEKPeSQMZxFxJgEXW4cW2n1JjAT7p6MPS5Rdxe00bogFrsmR";
+const STRIPE_PUBLISHABLE_KEY = "pk_live_51TdVev0XV9TtWHCqYNf2SU6kjZXGqGXGp2hSyjKzpbPWFgboCljXllRK9nJ4tESrSnhe6Rp82iGzyPyk7FxVzZCY00sZKQupPQ";
 let _stripePromise = null;
 function getStripe() {
   if (_stripePromise) return _stripePromise;
@@ -10536,59 +10533,6 @@ function weekRange(ref = new Date()) {
   return { start, end };
 }
 
-// Scheduling Options — buffers, booking window, and minimum notice. These read
-// and write the same settings as Online Booking, so the two stay in sync.
-function AvoidGapsEditor({ b, onChange }) {
-  const set = (patch) => onChange({ ...b, ...patch });
-  const enabled = b.avoidGaps !== false;
-  return (
-    <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>Vero packs your day for you. No gaps, no fragmented time, no babysitting your calendar.</p>
-
-      {/* Master toggle */}
-      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-        <button onClick={() => set({ avoidGaps: !enabled })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", color: "var(--text)", textAlign: "left" }}>
-          <div>
-            <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Pack the day</div>
-            <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>Clients only see times that fill your day end-to-end. Empty days show a few smart anchor times so your calendar fills from multiple points at once.</div>
-          </div>
-          <span style={{ width: 44, height: 26, borderRadius: 13, background: enabled ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0, marginLeft: 14 }}><span style={{ position: "absolute", top: 3, left: enabled ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-        </button>
-      </div>
-
-      {enabled && (
-        <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 14, padding: "14px 16px", fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>
-          <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>HOW IT WORKS</div>
-          On empty days, Vero shows clients a morning, midday, and end-of-day slot so the day fills from multiple points. After that, every new opening sits flush against an existing booking. No dead time, ever.
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SchedulingOptionsEditor({ b, onChange }) {
-  const set = (patch) => onChange({ ...b, ...patch });
-  return (
-    <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>Control the spacing and timing of appointments. Every value here is adjustable.</p>
-
-      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-        <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Buffer before each appointment</div>
-        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>Padding held open before a visit — for setup or greeting.</div>
-        <Stepper value={b.bufferBefore || 0} onChange={(v) => set({ bufferBefore: v })} min={0} max={60} step={5} suffix="min" />
-      </div>
-
-      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-        <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Buffer after each appointment</div>
-        <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>Cleanup / turnover time before the next client.</div>
-        <Stepper value={b.bufferAfter || 0} onChange={(v) => set({ bufferAfter: v })} min={0} max={60} step={5} suffix="min" />
-      </div>
-
-      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 4, fontStyle: "italic" }}>Lead time (minimum notice) and how far ahead clients can book live in Online booking → Booking page rules.</p>
-    </div>
-  );
-}
-
 // Phone Numbers — add, label, edit, and remove the shop's numbers.
 function PhoneNumbersEditor({ phones, onChange }) {
   const list = phones || [];
@@ -11464,7 +11408,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                               const ov = cutDurFor(s, ct.id);
                               return (
                                 <div key={ct.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", borderRadius: 10, padding: "9px 12px" }}>
-                                  <span style={{ flex: 1, fontSize: 14, minWidth: 0 }}>{ct.name}</span>
+                                  <span style={{ flex: 1, fontSize: 14, minWidth: 0 }}>{ct.label}</span>
                                   <NumBox value={ov} placeholder={String(ct.duration || s.duration)} onChange={(v) => setCutDur(s.id, ct.id, v === "" ? null : Number(v))} width={52} />
                                   <span style={{ fontSize: 12.5, color: "var(--sub)" }}>min</span>
                                 </div>
@@ -13764,9 +13708,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "policy", title: "No-show Protection", subtitle: "Cancellation, deposits & card-on-file", icon: AlertCircle, category: "Calendar & Appointments",
-      explain: <>This is how you protect your time and money from no-shows and last-minute cancellations — the same tools Booksy, GlossGenius and Square charge for. Require a card to book, take a deposit, and set how much notice a client must give. You write the rules they agree to when they book. <b>Heads up:</b> the card and deposit steps run in preview mode until your payment processor (Helcim) is approved — clients see and agree to everything, but no money moves until you flip it live.</>,
+      explain: <>This is how you protect your time and money from no-shows and last-minute cancellations — the same tools Booksy, GlossGenius and Square charge for. Require a card to book, take a deposit, and set how much notice a client must give. You write the rules they agree to when they book. <b>Heads up:</b> until you turn on live payments, the card and deposit steps run in preview — clients see and agree to everything, but no money moves until you flip it live.</>,
       status: (() => { const bk = form.booking || {}; const bits = []; if (bk.requireCard) bits.push("Card required"); if (bk.deposit?.mode && bk.deposit.mode !== "none") bits.push("Deposit on"); bits.push(`${Math.round((bk.leadTimeMin || 0) / 60)}h notice`); return bits.join(" · "); })(),
-      keywords: "cancellation no-show no show policy refund rules deposit charge fee reschedule late cancel card on file protect revenue window cutoff notice hold helcim payment",
+      keywords: "cancellation no-show no show policy refund rules deposit charge fee reschedule late cancel card on file protect revenue window cutoff notice hold stripe payment",
       editor: <NoShowEditor b={form.booking || {}} policy={form.policy} onBooking={(patch) => setForm({ ...form, booking: { ...(form.booking || {}), ...patch } })} onPolicy={(v) => setForm({ ...form, policy: v })} />,
     },
     {
