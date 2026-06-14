@@ -913,6 +913,42 @@ function TimeScrollPicker({ value, onChange, step = 15, minMin = 0, maxMin = 24 
     </>
   );
 }
+// Tap-to-open length picker. Mirrors TimeScrollPicker, but lists durations in
+// `step`-minute increments with a "shop default" option at top to clear the override.
+function DurPick({ value, defaultMin, onChange, step = 5, maxMin = 240 }) {
+  const [open, setOpen] = useState(false);
+  const listRef = useRef(null);
+  const eff = value != null ? value : (defaultMin || step);
+  const opts = [];
+  for (let t = step; t <= maxMin; t += step) opts.push(t);
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    const el = listRef.current.querySelector('[data-current="1"]');
+    if (el) el.scrollIntoView({ block: "center" });
+  }, [open]);
+  return (
+    <>
+      <button onClick={() => setOpen(true)} style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 11px", color: value != null ? "var(--text)" : "var(--sub)", fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" }}>{eff} min</button>
+      <Sheet open={open} onClose={() => setOpen(false)} align="center" maxWidth={300}>
+        <div style={{ padding: "4px 0 6px" }}>
+          <div style={{ textAlign: "center", marginBottom: 14 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>LENGTH</div>
+          </div>
+          <div ref={listRef} style={{ maxHeight: "52vh", overflowY: "auto", WebkitOverflowScrolling: "touch", display: "grid", gap: 5 }}>
+            <button onClick={() => { onChange(null); setOpen(false); }} style={{ width: "100%", textAlign: "center", padding: "13px 0", borderRadius: 11, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--sub)", fontSize: 14.5, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" }}>Shop default · {defaultMin || step} min</button>
+            {opts.map((t) => {
+              const on = value != null && t === value;
+              return (
+                <button key={t} data-current={on ? "1" : undefined} onClick={() => { onChange(t); setOpen(false); }} style={{ width: "100%", textAlign: "center", padding: "13px 0", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--text)", fontSize: 16, fontWeight: on ? 700 : 500, fontFamily: FONT_BODY, cursor: "pointer" }}>{t} min</button>
+              );
+            })}
+          </div>
+          <button onClick={() => setOpen(false)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "14px 0 4px" }}>Cancel</button>
+        </div>
+      </Sheet>
+    </>
+  );
+}
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const relativeDate = (date) => { const today = new Date(); today.setHours(0,0,0,0); const d = new Date(date); d.setHours(0,0,0,0); const diff = Math.round((d - today) / 86400000); if (diff === 0) return "Today"; if (diff === 1) return "Tomorrow"; if (diff > 1 && diff < 7) return DAYS[d.getDay()]; if (diff >= 7 && diff < 14) return `Next ${DAYS[d.getDay()]}`; return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
@@ -11353,6 +11389,15 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
       if (val == null) delete cutDur[ctId]; else cutDur[ctId] = val;
       return { ...s, staff: { ...(s.staff || {}), [person.id]: { ...cur, cutDur } } };
     }));
+    // per-cut-style PRICE override for this barber, stored on service.staff[pid].cutPrice[ctId]
+    const cutPriceFor = (s, ctId) => { const e = entryFor(s); return (e.cutPrice && e.cutPrice[ctId] != null) ? e.cutPrice[ctId] : null; };
+    const setCutPrice = (sid, ctId, val) => setServices(services.map((s) => {
+      if (s.id !== sid) return s;
+      const cur = (s.staff && s.staff[person.id]) || { on: true, duration: null, price: null };
+      const cutPrice = { ...(cur.cutPrice || {}) };
+      if (val == null) delete cutPrice[ctId]; else cutPrice[ctId] = val;
+      return { ...s, staff: { ...(s.staff || {}), [person.id]: { ...cur, cutPrice } } };
+    }));
     const allOff = services.every((s) => entryFor(s).on === false);
     const first = (person.name || "").split(" ")[0] || "this barber";
     const usedCats = cats.filter((c) => services.some((s) => (s.category || "Services") === c));
@@ -11402,15 +11447,17 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                       {/* per-cut-style timing — only when the service has cut styles and is on */}
                       {on && cutTypes.length > 0 && (
                         <div style={{ marginTop: 12 }}>
-                          <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 2px 8px" }}>{first}'s time per style</div>
+                          <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 2px 8px" }}>{first}'s time &amp; price per style</div>
                           <div style={{ display: "grid", gap: 7 }}>
                             {cutTypes.map((ct) => {
                               const ov = cutDurFor(s, ct.id);
+                              const pv = cutPriceFor(s, ct.id);
                               return (
-                                <div key={ct.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", borderRadius: 10, padding: "9px 12px" }}>
+                                <div key={ct.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", borderRadius: 10, padding: "9px 12px" }}>
                                   <span style={{ flex: 1, fontSize: 14, minWidth: 0 }}>{ct.label}</span>
-                                  <NumBox value={ov} placeholder={String(ct.duration || s.duration)} onChange={(v) => setCutDur(s.id, ct.id, v === "" ? null : Number(v))} width={52} />
-                                  <span style={{ fontSize: 12.5, color: "var(--sub)" }}>min</span>
+                                  <span style={{ fontSize: 13, color: "var(--faint)" }}>$</span>
+                                  <NumBox value={pv} placeholder={String(ct.price ?? s.price ?? "")} onChange={(v) => setCutPrice(s.id, ct.id, v === "" ? null : Number(v))} width={48} />
+                                  <DurPick value={ov} defaultMin={ct.duration || s.duration} onChange={(v) => setCutDur(s.id, ct.id, v)} />
                                 </div>
                               );
                             })}
