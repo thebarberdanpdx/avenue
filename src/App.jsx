@@ -2558,7 +2558,26 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [cardInfo, setCardInfo] = useState(null); // { last4, paid, saved } once captured
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [waitlistDone, setWaitlistDone] = useState(false);
-  const [photos, setPhotos] = useState(0);       // 0–3 uploaded at booking
+  const [photos, setPhotos] = useState([]);      // booking reference photos — compressed image dataURLs (max 3)
+  const clientPhotoRef = useRef(null);            // hidden file/camera input for booking photos
+  const onPhotoPick = (e) => {
+    const file = e.target.files && e.target.files[0]; if (e.target) e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1200; let w = img.width, h = img.height;
+        if (w > h && w > max) { h = Math.round(h * max / w); w = max; } else if (h > max) { w = Math.round(w * max / h); h = max; }
+        const c = document.createElement("canvas"); c.width = w; c.height = h;
+        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        const url = c.toDataURL("image/jpeg", 0.6);
+        setPhotos((cur) => cur.length >= 3 ? cur : [...cur, url]);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
   const [clientNote, setClientNote] = useState(""); // optional note for the barber — rides the appt, the push, and the feed
   const [personalizeOpen, setPersonalizeOpen] = useState(business?.bookingPhotos?.mode === "required"); // combined note+photo card; open by default only when photos are required
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
@@ -2969,8 +2988,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         addonLabels,
         bookedFor: bookedFor.toISOString(),
         note: pi === 0 ? clientNote.trim() : "",
-        photos: pi === 0 ? photos : 0,
-        hasPhotos: pi === 0 && photos > 0,
+        photos: pi === 0 ? photos.length : 0,
+        hasPhotos: pi === 0 && photos.length > 0,
+        photoData: pi === 0 ? photos : [],
         bigChange: (simpleChange === "fresh" && people.length === 1) ? true : undefined,
         phone: finalPhone,
         groupId: isMultiPerson ? baseId : null,
@@ -4727,8 +4747,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     {photoOn && (
                       <div style={{ marginTop: noteOn ? 16 : 0 }}>
                         <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12 }}>Up to 3 photos — a style you want, how your hair looks now, or anything that helps {provider.name === "Anyone" ? "your barber" : provider.name}.</p>
-                        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 14, border: `1px dashed ${i < photos ? "var(--gold)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: i < photos ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent" }}>{i < photos ? <Check size={20} style={{ color: "var(--gold)" }} /> : <Camera size={18} style={{ color: "var(--faint)" }} />}</div>))}</div>
-                        <button onClick={() => setPhotos(Math.min(3, photos + 1))} disabled={photos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: photos >= 3 ? "var(--faint)" : "var(--text)", padding: 12, fontSize: 13.5, letterSpacing: 1.5, fontWeight: 500, borderRadius: 11 }}>{photos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${photos}/3)`}</button>
+                        <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
+                        <div style={{ display: "flex", gap: 8 }}>{[0, 1, 2].map((i) => { const src = photos[i]; return (
+                          <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 14, overflow: "hidden", border: `1px dashed ${src ? "var(--gold)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: src ? "var(--panel2)" : "transparent", cursor: src ? "default" : "pointer" }}>
+                            {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={18} style={{ color: "var(--faint)" }} />}
+                          </div>
+                        ); })}</div>
+                        <p style={{ fontSize: 12, color: "var(--faint)", textAlign: "center", marginTop: 10 }}>Tap a square to take a photo or choose from your library.</p>
                       </div>
                     )}
                   </div>
@@ -4884,7 +4909,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           </div>
         )}
 
-        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} provider={provider} selectedDate={selectedDate} slot={slot} photos={photos} onManage={() => setStep(9)} onExit={onExit} />}
+        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} provider={provider} selectedDate={selectedDate} slot={slot} photos={photos.length} onManage={() => setStep(9)} onExit={onExit} />}
 
         {step === 9 && <ManageAppointment business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} initialPhone={phone} dateOptions={dateOptions} onExit={onExit} showToast={(m) => {}} />}
         </div>
@@ -18183,19 +18208,24 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               </div>
 
               {/* client-uploaded photos */}
-              {appt.photos > 0 && (
+              {(() => {
+                const pd = Array.isArray(appt.photoData) ? appt.photoData : [];
+                const count = pd.length || (typeof appt.photos === "number" ? appt.photos : 0);
+                if (count <= 0) return null;
+                return (
                 <div style={{ padding: "20px 18px", borderBottom: `1px solid ${T.line}` }}>
                   <div style={{ fontSize: 15, color: T.sub, marginBottom: 12 }}>Client Photos</div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    {Array.from({ length: Math.min(3, appt.photos) }).map((_, i) => (
-                      <div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: T.chip, border: `1px solid ${T.line}` }}>
-                        <img src={imgUrl(ALL_LIBRARY[(appt.id + i) % ALL_LIBRARY.length].id)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                      </div>
+                    {(pd.length ? pd : Array.from({ length: Math.min(3, count) })).map((src, i) => (
+                      <a key={i} href={pd.length ? src : undefined} target="_blank" rel="noreferrer" style={{ flex: 1, aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: T.chip, border: `1px solid ${T.line}`, display: "block" }}>
+                        <img src={pd.length ? src : imgUrl(ALL_LIBRARY[(appt.id + i) % ALL_LIBRARY.length].id)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      </a>
                     ))}
                   </div>
-                  <p style={{ fontSize: 14, color: T.faint, marginTop: 8 }}>Uploaded by the client when booking.</p>
+                  <p style={{ fontSize: 14, color: T.faint, marginTop: 8 }}>Uploaded by the client when booking. Tap to enlarge.</p>
                 </div>
-              )}
+                );
+              })()}
 
               </div>
               {/* WRAP UP — service time, photos, note — auto-saved to the client profile */}
