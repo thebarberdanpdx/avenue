@@ -983,6 +983,22 @@ const getPrice = (service, providerId) => {
   if (se && se.price != null) return se.price;
   return service.price;
 };
+// Per-cut-style cascades — used when a client picks a specific style at booking.
+// price:  per-barber override (staff.cutPrice[ctId]) → the style's own price → service/staff default
+// length: per-barber override (staff.cutDur[ctId], absolute) → service/staff length + the style's extra minutes
+const cutStylePrice = (service, providerId, ctId) => {
+  const se = getStaffEntry(service, providerId);
+  if (se && se.cutPrice && se.cutPrice[ctId] != null) return se.cutPrice[ctId];
+  const ct = ((service && service.cutTypes) || []).find((c) => c.id === ctId);
+  if (ct && ct.price != null) return ct.price;
+  return getPrice(service, providerId);
+};
+const cutStyleDuration = (client, service, providerId, ctId) => {
+  const se = getStaffEntry(service, providerId);
+  if (se && se.cutDur && se.cutDur[ctId] != null) return se.cutDur[ctId];
+  const ct = ((service && service.cutTypes) || []).find((c) => c.id === ctId);
+  return getDuration(client, service, providerId) + ((ct && ct.min) ? ct.min : 0);
+};
 // Time-of-day pricing: apply the first matching priced rule for a service at a given
 // provider / day-of-week / start-minute. Falls back to the normal price when nothing matches.
 const priceWithTimeRules = (service, providerId, dateObj, startMin) => {
@@ -2554,8 +2570,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     let p = entry.service.price, m = getDuration(dc, entry.service, provId);
     // cut type overrides the base price/time when present
     if (entry.service.cutTypes && entry.cutType) {
-      const ct = entry.service.cutTypes.find((c) => c.id === entry.cutType);
-      if (ct) { p = ct.price; m = getDuration(dc, entry.service, provId) + (ct.min || 0); }
+      p = cutStylePrice(entry.service, provId, entry.cutType);
+      m = cutStyleDuration(dc, entry.service, provId, entry.cutType);
     }
     if (entry.service.beardTypes && entry.beardType) {
       const bt = entry.service.beardTypes.find((b) => b.id === entry.beardType);
