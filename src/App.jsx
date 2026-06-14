@@ -2578,6 +2578,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     };
     reader.readAsDataURL(file);
   };
+  const [descConfirmed, setDescConfirmed] = useState(false); // service-description read-confirm (per-service booking.requireConfirm)
   const [clientNote, setClientNote] = useState(""); // optional note for the barber — rides the appt, the push, and the feed
   const [personalizeOpen, setPersonalizeOpen] = useState(business?.bookingPhotos?.mode === "required"); // combined note+photo card; open by default only when photos are required
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
@@ -3172,10 +3173,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const timeAnswered = !asksChange || !!simpleChange;
           const showAddon = picked && offerFinish && timeAnswered;
           const finDecided = !offerFinish || !!finAns;
-          const canContinue = picked && timeAnswered && finDecided;
+          const _cDesc = chosenCt && (chosenCt.desc || friendly[chosenCt.id]);
+          const needConfirm = !!(draft?.booking?.requireConfirm && _cDesc);
+          const canContinue = picked && timeAnswered && finDecided && (!needConfirm || descConfirmed);
 
-          const pickCut = (ct) => { setSimpleChange(null); setCart((c) => c.map((e, i) => i === 0 ? { ...e, cutType: ct.id, addons: {}, finishAns: undefined } : e)); };
-          const changeCut = () => { setSimpleChange(null); setCart((c) => c.map((e, i) => i === 0 ? { ...e, cutType: undefined, addons: {}, finishAns: undefined } : e)); };
+          const pickCut = (ct) => { setSimpleChange(null); setDescConfirmed(false); setCart((c) => c.map((e, i) => i === 0 ? { ...e, cutType: ct.id, addons: {}, finishAns: undefined } : e)); };
+          const changeCut = () => { setSimpleChange(null); setDescConfirmed(false); setCart((c) => c.map((e, i) => i === 0 ? { ...e, cutType: undefined, addons: {}, finishAns: undefined } : e)); };
           const chooseTime = (val) => setSimpleChange(val);
           const addYes = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: true }, finishAns: "yes" } : e));
           const addNo = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: undefined }, finishAns: "no" } : e));
@@ -3220,13 +3223,24 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 const cDur = (chosenCt && chosenCt.duration) || draft.duration;
                 return (
                 <div style={{ marginTop: 28, paddingTop: 26, borderTop: "1px solid var(--line)", textAlign: "center" }}>
-                  <div style={{ ...EYE, color: "var(--gold)", marginBottom: 14, textAlign: "center" }}>Your style</div>
+                  <div style={{ ...EYE, color: "var(--gold)", marginBottom: 14, textAlign: "center" }}>Selected service</div>
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 21, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.25, color: "var(--text)" }}>{cName}</div>
                   {(cPrice != null && cPrice !== "") ? <div style={{ marginTop: 9, display: "flex", justifyContent: "center", alignItems: "baseline", gap: 9 }}>
                     <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: "var(--text)" }}>${cPrice}</span>
                     {cDur ? <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}>· {cDur} min</span> : null}
                   </div> : null}
-                  {cDesc ? <div style={{ background: "var(--text)", color: "var(--bg)", borderRadius: 12, padding: "16px 18px", marginTop: 18, fontFamily: "'Jost', sans-serif", fontSize: 14, lineHeight: 1.55, textAlign: "center" }}>{cDesc}</div> : null}
+                  {cDesc ? (
+                    <div style={{ marginTop: 18, borderLeft: "3px solid var(--text)", padding: "2px 0 2px 16px", textAlign: "left" }}>
+                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 2.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>Make sure this is you</div>
+                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 15, lineHeight: 1.55, color: "var(--text)" }}>{cDesc}</div>
+                    </div>
+                  ) : null}
+                  {draft?.booking?.requireConfirm && cDesc ? (
+                    <button onClick={() => setDescConfirmed((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", marginTop: 14, width: "100%", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                      <span style={{ width: 44, height: 26, borderRadius: 13, background: descConfirmed ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: descConfirmed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+                      <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, lineHeight: 1.35 }}>I've read this — it's the cut I want.</span>
+                    </button>
+                  ) : null}
                   <button onClick={changeCut} style={{ marginTop: 16, background: "none", border: "none", color: "var(--gold)", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 600, letterSpacing: 0.3, padding: 0, cursor: "pointer" }}>‹ Choose a different style</button>
                 </div>
                 );
@@ -3279,7 +3293,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   })()}
 
                   <button disabled={!canContinue} onClick={() => { if (canContinue) goWhoWhen(); }} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", cursor: canContinue ? "pointer" : "default", opacity: canContinue ? 1 : 0.3 }}>Continue</button>
-                  {!canContinue && <p style={{ marginTop: 10, textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--faint)" }}>{asksChange && !simpleChange ? "Pick how much we're taking off" : (showAddon && !finAns ? "Add the finishing touch, or tap No thanks" : "")}</p>}
+                  {!canContinue && <p style={{ marginTop: 10, textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--faint)" }}>{asksChange && !simpleChange ? "Pick how much we're taking off" : (showAddon && !finAns ? "Add the finishing touch, or tap No thanks" : (needConfirm && !descConfirmed ? "Confirm you've read the description to continue" : ""))}</p>}
                 </div>
               )}
             </div>
@@ -9160,6 +9174,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           {bookingRow("Require home address", "requireAddress", "For in-home or mobile services.")}
           {bookingRow("Require a card", "requireCard", "Hold a card on file to book — your no-show protection.")}
           {bookingRow("Require payment at booking", "requirePayment", "Charge the full amount when booking online.")}
+          {bookingRow("Require read & confirm", "requireConfirm", "Make clients confirm they've read this service's description before they can continue — cuts down on wrong-service bookings.")}
         </div>
       </div>
 
