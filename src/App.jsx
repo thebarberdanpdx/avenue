@@ -545,7 +545,7 @@ const THEMES = [
     t: { bg:"#FAF8F3", panel:"#FFFFFF", panel2:"#F4EFE4", line:"#ECE4D5", border:"#E0D8C7", border2:"#CFC6B7", text:"#232221", text2:"#3A382F", sub:"#6F685D", faint:"#A39C8A", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(60,55,45,.10)", overlay:"rgba(35,34,33,0.34)" } },
   { id: "studio", name: "Studio", tagline: "White paper, sage accent", cat: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.03,
-    canvas: "#FFFFFF",
+    canvas: "#EBEBEB",
     t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F4F4F4", line:"#ECECEC", border:"#D4D4D4", border2:"#C2C2C2", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#A6A6A6", gold:"#0A0A0A", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.06)", overlay:"rgba(0,0,0,0.3)" } },
   { id: "mist", name: "Mist", tagline: "Cool porcelain & slate", cat: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Inter', sans-serif", grain: 0.04,
@@ -1743,7 +1743,7 @@ function App() {
         .svc-tile { display:flex; align-items:center; gap:18px; width:100%; text-align:left; cursor:pointer; background:var(--panel); border:1px solid var(--border2); border-radius:14px; padding:18px 18px; -webkit-tap-highlight-color:transparent; transition:background .12s ease, border-color .12s ease; }
         .svc-tile.sel { background:var(--text); border-color:var(--text); }
         .svc-num { font-family:'Fraunces',serif; font-size:14px; color:var(--faint); width:24px; flex-shrink:0; letter-spacing:1px; }
-        .svc-name { font-family:'Fraunces',serif; font-size:20px; font-weight:500; letter-spacing:-0.2px; color:var(--text); line-height:1.12; transition:color .12s ease; }
+        .svc-name { font-family:'Fraunces',serif; font-size:22px; font-weight:500; letter-spacing:-0.2px; color:var(--text); line-height:1.12; transition:color .12s ease; }
         .svc-tile.sel .svc-name { color:var(--bg); }
         .svc-meta { font-family:'Jost',sans-serif; font-size:13px; color:var(--sub); margin-top:4px; letter-spacing:.2px; transition:color .12s ease; }
         .svc-tile.sel .svc-meta { color:#b4b4b4; }
@@ -3095,10 +3095,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   return (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
       <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
           <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
-          <div style={{ width: 50 }} />
         </div>
         {step >= 3 && step <= 5 && (wwMerged ? <Stepper active={1} /> : <Stepper active={0} />)}
         {step === 6 && <Stepper active={1} />}
@@ -3158,7 +3156,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           };
           const liveCats = cats.filter((c) => inCat(c).length > 0);
           const showCats = liveCats.length > 1 && !simpleCat;
-          const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, lineHeight: 1.12, letterSpacing: "-0.4px", color: "var(--text)", margin: 0 };
+          const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.12, letterSpacing: "-0.4px", color: "var(--text)", margin: 0 };
           const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 3.5, fontWeight: 600, textTransform: "uppercase", color: "var(--text2)" };
           const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, marginTop: 9 };
           const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" };
@@ -3197,11 +3195,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const list = activeCat ? inCat(activeCat) : services.filter(visible);
           return (
             <div className="fade-up">
-              {simpleCat
-                ? <button onClick={() => setSimpleCat(null)} style={{ background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 600, padding: 0, marginBottom: 14, cursor: "pointer", letterSpacing: 0.3 }}>‹ {simpleCat}</button>
-                : <div style={EYE}>Book an appointment</div>}
-              <h2 style={{ ...HEAD, marginTop: simpleCat ? 0 : 11 }}>{simpleCat ? "Pick your service" : (bs.whatHead || "What can we do for you?")}</h2>
-              <p style={LEAD}>{simpleCat ? ("Here's what we do in " + simpleCat + ".") : (bs.whatLead || "Start here — we'll walk you through the rest.")}</p>
+              {simpleCat && <button onClick={() => setSimpleCat(null)} style={{ background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 600, padding: 0, marginBottom: 14, cursor: "pointer", letterSpacing: 0.3 }}>‹ {simpleCat}</button>}
+              <div style={{ textAlign: "center", marginBottom: 8 }}>
+                <h2 style={{ ...HEAD, margin: 0 }}>{simpleCat ? "Pick your service" : "Book an appointment"}</h2>
+                <p style={{ ...LEAD, marginTop: 10 }}>{simpleCat ? ("Here's what we do in " + simpleCat + ".") : (bs.whatLead || "Start here — we'll walk you through the rest.")}</p>
+              </div>
               <div className="svc-menu">
                 {list.map((svc, i) => (
                   <button key={svc.id} onClick={() => { setTapSel(svc.id); setTimeout(() => selectService(svc), 165); }} className={"svc-tile" + (tapSel === svc.id ? " sel" : "")}>
