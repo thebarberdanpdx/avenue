@@ -2910,11 +2910,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // (inviting question = group.label, price/desc from group.item). "No thanks" is a
   // valid answer even when required; required only blocks scrim-dismiss. After the
   // last sheet (or when there are none) we hand off to who+time via goWhoWhen.
-  const addonsFor = (svc) => (svc?.addonGroups || []).filter((g) => g.type === "addon");
+  // ALL add-on groups (choice + addon). The sheet renders every one — add-ons are ALWAYS a sheet.
+  const addonsFor = (svc) => (svc?.addonGroups || []);
   const startAddons = (entry) => {
     const list = addonsFor(entry?.service);
     if (list.length) { setCart((c) => c.map((e, i) => i === 0 ? entry : e)); setAddonFlow({ idx: 0 }); }
     else { goWhoWhen(entry); }
+  };
+  // advance to the next group in the sheet sequence, or finish → who/when
+  const advanceAddon = (updated) => {
+    const list = addonsFor(updated.service);
+    const nextIdx = (addonFlow ? addonFlow.idx : 0) + 1;
+    if (nextIdx < list.length) { setAddonFlow({ idx: nextIdx }); }
+    else { setAddonFlow(null); goWhoWhen(updated); }
   };
   const answerAddon = (group, yes) => {
     const cur = cart[0] || {};
@@ -2922,10 +2930,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (yes) newAddons[group.id] = true; else delete newAddons[group.id];
     const updated = { ...cur, addons: newAddons };
     setCart((c) => c.map((e, i) => i === 0 ? updated : e));
-    const list = addonsFor(updated.service);
-    const nextIdx = (addonFlow ? addonFlow.idx : 0) + 1;
-    if (nextIdx < list.length) { setAddonFlow({ idx: nextIdx }); }
-    else { setAddonFlow(null); goWhoWhen(updated); }
+    advanceAddon(updated);
+  };
+  // choice-group selection (e.g. fade length) — store the chosen option id, then advance
+  const chooseAddon = (group, optionId) => {
+    const cur = cart[0] || {};
+    const newAddons = { ...(cur.addons || {}), [group.id]: optionId };
+    const updated = { ...cur, addons: newAddons };
+    setCart((c) => c.map((e, i) => i === 0 ? updated : e));
+    advanceAddon(updated);
   };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
@@ -3091,7 +3104,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
+    <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: "var(--bg)" }}>
       <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
           <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button>
@@ -3384,8 +3397,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const pickGuidedService = (svc) => {
             if (!svc) return;
             if (svc.firstTime && svc.intake) { setIntakeFor(svc); return; }
-            setDraft(svc); setDraftAddons({}); setCutType(null); setCutPhase("type");
-            setStep(2);
+            setDraft(svc); setDraftAddons({}); setCutType(null); setBeardType(null);
+            const anyoneProv = providers.find((p) => p.id === "anyone") || providers[0];
+            if (svc.cutTypes && svc.cutTypes.length > 0) { setCutPhase("type"); setStep(2); }
+            else { setCart((c) => (c.length ? c.map((e, i) => i === 0 ? { service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} } : e) : [{ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }])); startAddons({ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }); }
           };
           const metaFor = (svc) => {
             const cts = (svc.cutTypes || []).map((c) => Number(c.price)).filter((n) => !isNaN(n) && n > 0);
@@ -3434,27 +3449,47 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
         {addonFlow && (() => {
           const entry = cart[0];
-          const list = (entry?.service?.addonGroups || []).filter((g) => g.type === "addon");
+          const list = (entry?.service?.addonGroups || []);
           const group = list[addonFlow.idx];
           if (!entry || !group) return null;
+          const req = !!group.required;
+          const isChoice = group.type === "choice";
           const item = group.item || {};
           const price = Number(item.price) || 0;
           const addsMoney = item.addsPrice !== false && price > 0;
           const priceLabel = addsMoney ? `+ $${price}` : (group.required ? "Required" : "Included");
           const heading = group.label || (item.name ? `Want ${item.name}?` : "One more thing?");
           const desc = item.desc || "";
-          const req = !!group.required;
           return (
-            <div onClick={() => { if (!req) answerAddon(group, false); }} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            <div onClick={() => { if (!req && !isChoice) answerAddon(group, false); }} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
               <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 480, borderRadius: "22px 22px 0 0", padding: "24px 26px calc(30px + env(safe-area-inset-bottom))", boxShadow: "0 -12px 40px rgba(0,0,0,0.18)", maxHeight: "88vh", overflowY: "auto" }}>
                 <div style={{ width: 38, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 22px" }} />
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1.2, textAlign: "center", color: "var(--text)" }}>{heading}</div>
-                <div style={{ textAlign: "center", fontSize: 13.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text2)", fontWeight: 600, marginTop: 12 }}>{priceLabel}</div>
-                {desc ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 15, lineHeight: 1.55, color: "var(--sub)", fontWeight: 400, textAlign: "center", maxWidth: 300, margin: "16px auto 0" }}>{desc}</div> : null}
-                <div style={{ display: "flex", gap: 10, marginTop: 26 }}>
-                  <button onClick={() => answerAddon(group, false)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>No thanks</button>
-                  <button onClick={() => answerAddon(group, true)} style={{ flex: 1.2, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Yes, please</button>
-                </div>
+                {isChoice ? (
+                  <div style={{ marginTop: 22 }}>
+                    {(group.options || []).map((o) => {
+                      const on = (entry.addons || {})[group.id] === o.id;
+                      return (
+                        <button key={o.id} onClick={() => chooseAddon(group, o.id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--text) 8%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--text)" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", marginBottom: 10, color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 13 }}>
+                            <span style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${on ? "var(--text)" : "var(--faint)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--text)" }} />}</span>
+                            <span style={{ fontSize: 15.5 }}>{o.label}</span>
+                          </span>
+                          <span style={{ color: "var(--sub)", fontSize: 14, textAlign: "right" }}>{o.price > 0 ? `+ $${o.price}` : ""}{o.min > 0 ? <span style={{ display: "block", fontSize: 13, color: "var(--faint)" }}>+ {o.min} min</span> : null}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ textAlign: "center", fontSize: 13.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text2)", fontWeight: 600, marginTop: 12 }}>{priceLabel}</div>
+                    {desc ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 15, lineHeight: 1.55, color: "var(--sub)", fontWeight: 400, textAlign: "center", maxWidth: 300, margin: "16px auto 0" }}>{desc}</div> : null}
+                    <div style={{ display: "flex", gap: 10, marginTop: 26 }}>
+                      <button onClick={() => answerAddon(group, false)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>No thanks</button>
+                      <button onClick={() => answerAddon(group, true)} style={{ flex: 1.2, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Yes, please</button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           );
@@ -3488,7 +3523,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     {draft.cutTypes.map((ct) => {
                       const img = ct.images && ct.images[0];
                       return (
-                        <button key={ct.id} onClick={() => { setCutType(ct.id); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "18px 2px", display: "flex", gap: 15, alignItems: "center", color: "var(--text)", cursor: "pointer" }}>
+                        <button key={ct.id} onClick={() => { setCutType(ct.id); if (draft.beardTypes && draft.beardTypes.length) { setCutPhase("beard"); } else { startAddons({ ...(cart[0] || {}), service: draft, cutType: ct.id, addons: {} }); } }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "18px 2px", display: "flex", gap: 15, alignItems: "center", color: "var(--text)", cursor: "pointer" }}>
                           {img ? <span style={{ width: 60, height: 60, borderRadius: 8, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}><img src={imgUrl(img, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></span> : null}
                           <span style={{ flex: 1, minWidth: 0 }}>
                             <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -3779,7 +3814,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               {draft.beardTypes.map((bt) => {
                 const img = (bt.images || [])[0];
                 return (
-                  <button key={bt.id} className="lift" onClick={() => { setBeardType(bt.id); setCutPhase("addons"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 0, overflow: "hidden", display: "flex", alignItems: "stretch", color: "var(--text)", textAlign: "left", height: 92, boxShadow: "var(--shadow-sm)" }}>
+                  <button key={bt.id} className="lift" onClick={() => { setBeardType(bt.id); startAddons({ ...(cart[0] || {}), service: draft, beardType: bt.id, addons: {} }); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 0, overflow: "hidden", display: "flex", alignItems: "stretch", color: "var(--text)", textAlign: "left", height: 92, boxShadow: "var(--shadow-sm)" }}>
                     <div style={{ width: 92, height: 92, flexShrink: 0, overflow: "hidden", background: "var(--panel2)", position: "relative" }}>
                       {img && <img src={imgUrl(img, 280)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
                     </div>
@@ -3798,9 +3833,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         )}
 
         {/* STEP 2 — add-ons screen (after cut type, or directly if no cut types) */}
-        {step === 2 && draft && (!draft.cutTypes || draft.cutTypes.length === 0 || cutPhase === "addons") && (
+        {false && step === 2 && draft && (!draft.cutTypes || draft.cutTypes.length === 0 || cutPhase === "addons") && (
           <div className="fade-up">
-            <div style={{ background: "var(--panel)", borderRadius: 12, padding: "14px 18px", marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "14px 18px", marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 16 }}>{draft.name}{draft.cutTypes && cutType ? ` · ${draft.cutTypes.find((c) => c.id === cutType)?.label}` : ""}</div>
                 <button onClick={() => { if (draft.beardTypes && draft.beardTypes.length) { setCutPhase("beard"); setBeardType(null); } else if (draft.cutTypes && draft.cutTypes.length) { setCutPhase("type"); setCutType(null); } else { setDraft(null); setStep(1); } }} style={{ background: "none", color: "var(--sub)", fontSize: 15, textDecoration: "underline", padding: 0, marginTop: 2 }}>Change</button>
@@ -4331,10 +4366,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             advanceAfterAdd();
           };
           const tweakUsual = () => {
-            // Load the usual into the editor so they can drop/change add-ons, then land on the add-on step
+            // Load the usual, then open the add-on SHEET pre-seeded with their usual choices.
             if (person.id) { setBookingFor("member"); setActiveMember(fm); } else { setBookingFor("self"); setActiveMember(null); }
             setDraft(usualSvc); setDraftAddons({ ...usualAddons }); setCutType(usualCutType); setBeardType(usualBeardType);
-            setCutPhase("addons"); setShowWizardIntro(false); setExpandUsual(false); setStep(2);
+            setShowWizardIntro(false); setExpandUsual(false);
+            const anyoneProv = providers.find((p) => p.id === "anyone") || providers[0];
+            const entry = { service: usualSvc, provider: anyoneProv, cutType: usualCutType, beardType: usualBeardType, addons: { ...usualAddons }, forMemberId: person.id || null, forName: person.id ? person.name : (matched?.name || "Me") };
+            setCart((c) => (c.length ? c.map((e, i) => i === 0 ? entry : e) : [entry]));
+            startAddons(entry);
           };
           return (
             <div className="fade-up">
@@ -4459,7 +4498,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 {!showWaitlist ? (
                   <button className="lift" onClick={() => { setShowWaitlist(true); setWlName(matched ? matched.name : ""); setWlDays([relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate) : `${relativeDate(selectedDate)}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`]); setWlService(cart.map(describeEntry).join(", ")); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Join the waitlist →</button>
                 ) : (
-                  <div style={{ background: "var(--panel)", borderRadius: 8, padding: 20, textAlign: "left" }}>
+                  <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8, padding: 20, textAlign: "left" }}>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 16 }}>Join the waitlist</div>
 
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Your name</label>
@@ -4566,7 +4605,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               </div>
             )}
 
-            {waitlistDone && <div style={{ background: "var(--panel)", borderRadius: 8, padding: 24, textAlign: "center" }}><CheckCircle2 size={32} style={{ color: "#7A9E9F", marginBottom: 12 }} /><div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>You're on the list</div><p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5 }}>We'll text {wlName ? wlName.split(" ")[0] : "you"} the moment a matching spot opens up. No need to check back.</p></div>}
+            {waitlistDone && <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8, padding: 24, textAlign: "center" }}><CheckCircle2 size={32} style={{ color: "#7A9E9F", marginBottom: 12 }} /><div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>You're on the list</div><p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5 }}>We'll text {wlName ? wlName.split(" ")[0] : "you"} the moment a matching spot opens up. No need to check back.</p></div>}
 
             {!dateIsFull && !waitlistDone && (
               <div style={{ borderTop: "1px solid var(--line)", paddingTop: 22, textAlign: "center", marginTop: 8 }}>
