@@ -4660,7 +4660,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <div style={{ fontSize: 13.5, color: "var(--text2)", marginTop: 4, lineHeight: 1.45 }}>{!hasFull ? `${dateFull} · ` : ""}{cart.map((e) => describeEntry(e)).join(" · ")} · ${cartAdjTotal} · with {provider.name}</div>
                   <div style={{ height: 1, background: "var(--line)", margin: "13px 0" }} />
                   <button onClick={() => setWantEarlier(!wantEarlier)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, width: "100%", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-                    <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+                    <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
                     <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>Notify me if an earlier spot opens up</span>
                   </button>
                 </div>
@@ -4725,7 +4725,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "6px 18px", marginBottom: 18 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
                 <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, color: "var(--text)", cursor: "pointer", flex: 1, textAlign: "left" }}>
-                  <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+                  <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
                   <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>I agree to the cancellation policy</span>
                 </button>
                 {business.policy && <button onClick={() => setPolicyOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 600, padding: "6px 2px", flexShrink: 0, cursor: "pointer" }}>{policyOpen ? "Hide" : "Read it ›"}</button>}
