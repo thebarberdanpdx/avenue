@@ -15655,8 +15655,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg)", borderBottomLeftRadius: 22, borderBottomRightRadius: 22, maxHeight: "85vh", overflowY: "auto", padding: "calc(20px + env(safe-area-inset-top)) 22px 30px", boxShadow: "0 20px 40px rgba(0,0,0,0.4)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div>
-                <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 10 }} />
-                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>Waitlist</h2>
+                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 400, letterSpacing: "-0.4px", lineHeight: 1.05 }}>Waitlist</h2>
               </div>
               <button onClick={() => setShowWaitlistPanel(false)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: "50%", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={18} /></button>
             </div>
@@ -15669,8 +15668,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg)", borderBottomLeftRadius: 22, borderBottomRightRadius: 22, maxHeight: "85vh", overflowY: "auto", padding: "calc(20px + env(safe-area-inset-top)) 22px 30px", boxShadow: "0 20px 40px rgba(0,0,0,0.4)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <div>
-                <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 10 }} />
-                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>Calendar view</h2>
+                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 400, letterSpacing: "-0.4px", lineHeight: 1.05 }}>Calendar view</h2>
               </div>
               <button onClick={() => setShowCalendarOptions(false)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: "50%", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={18} /></button>
             </div>
@@ -15737,12 +15735,12 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       <RegisterView open={registerOpen} onClose={() => setRegisterOpen(false)} services={services} business={business} setBusiness={setBusiness} clients={clients} setClients={setClients} providers={providers} me={me} showToast={showToast} />
       {/* Calendar header — date headline + a clean action row. VISUAL ONLY; all handlers unchanged. */}
       <div style={{ marginTop: 10, marginBottom: 20 }}>
-        <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, margin: "0 0 14px", textAlign: "left", color: "inherit", cursor: "pointer", display: "block", width: "auto" }}>
-          <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", marginBottom: 5, fontWeight: 600, textTransform: "uppercase" }}>{`${DAYS[selectedDate.getDay()]} · ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
-          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.5, lineHeight: 1, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+        <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, margin: "8px 0 14px", textAlign: "left", color: "inherit", cursor: "pointer", display: "block", width: "auto" }}>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
             <span>{relativeDate(selectedDate)}</span>
             <ChevronDown size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
           </h2>
+          <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginTop: 12, fontWeight: 500, textTransform: "uppercase" }}>{`${DAYS[selectedDate.getDay()]} · ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
         </button>
         {(() => {
           const isToday = sameDay(selectedDate.toISOString(), today);
@@ -15752,9 +15750,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const next = isToday ? dayList.find((a) => a.start >= nowMin) : dayList[0];
           const gapCount = orderedStaff.reduce((n, p) => n + gapsForProvider(p).length, 0);
           const chip = (v, k, accent) => (
-            <div style={{ flex: 1, background: accent ? "color-mix(in srgb, var(--amber) 9%, var(--panel))" : "var(--panel)", border: `1px solid ${accent ? "color-mix(in srgb, var(--amber) 32%, var(--border))" : "var(--line)"}`, borderRadius: 13, padding: "10px 12px", boxShadow: "var(--shadow-sm)", minWidth: 0 }}>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1, color: accent ? "var(--amber)" : "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v}</div>
-              <div style={{ fontSize: 10, color: "var(--sub)", marginTop: 5, letterSpacing: 0.3, textTransform: "uppercase" }}>{k}</div>
+            <div style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 13, padding: "11px 13px", minWidth: 0 }}>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 400, lineHeight: 1, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v}</div>
+              <div style={{ fontSize: 9.5, color: "var(--faint)", marginTop: 6, letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: 500 }}>{k}</div>
             </div>
           );
           return (
@@ -15766,11 +15764,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           );
         })()}
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 16 }}>
-          <button className="lift" onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--gold)", color: "var(--on-gold)", padding: "0 18px", height: 42, borderRadius: 13, fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 7 }}><Plus size={16} strokeWidth={2.4} /> New</button>
-          <button className="lift" onClick={() => setRegisterOpen(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 16px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 6, boxShadow: "var(--shadow-sm)" }}><DollarSign size={15} style={{ color: "var(--gold)" }} /> Sale</button>
+          <button onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--text)", color: "var(--bg)", padding: "0 18px", height: 42, borderRadius: 13, fontSize: 13, fontWeight: 500, letterSpacing: 1.2, textTransform: "uppercase", fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 7 }}><Plus size={16} strokeWidth={2} /> New</button>
+          <button onClick={() => setRegisterOpen(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 16px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 400, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 6 }}><DollarSign size={15} style={{ color: "var(--text2)" }} /> Sale</button>
           <div style={{ flex: 1, minWidth: 8 }} />
-          <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 7, position: "relative", boxShadow: "var(--shadow-sm)" }}><Clock size={14} style={{ color: "var(--gold)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 18, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
-          <button onClick={() => setShowCalendarOptions(true)} title="Calendar view" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 42, height: 42, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow-sm)" }}><Settings size={16} /></button>
+          <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 400, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 7, position: "relative" }}><Clock size={14} style={{ color: "var(--text2)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--text)", color: "var(--bg)", fontSize: 11, fontWeight: 500, borderRadius: 18, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
+          <button onClick={() => setShowCalendarOptions(true)} title="Calendar view" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 42, height: 42, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center" }}><Settings size={16} /></button>
         </div>
       </div>
 
@@ -15782,10 +15780,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const isSelected = d.toDateString() === selectedDate.toDateString();
           const isToday = offset === 0;
           return (
-            <button key={offset} data-today={isToday ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: "start", textAlign: "center", padding: "12px 4px 14px", borderRadius: 14, background: isSelected ? "var(--gold)" : "transparent", color: isSelected ? "var(--bg)" : "var(--sub)", border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
+            <button key={offset} data-today={isToday ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: "start", textAlign: "center", padding: "12px 4px 14px", borderRadius: 14, background: isSelected ? "var(--text)" : "transparent", color: isSelected ? "var(--bg)" : "var(--sub)", border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.8 : 0.55 }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1 }}>{d.getDate()}</div>
-              {!isSelected && isToday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "var(--gold)" }} />}
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 400, lineHeight: 1 }}>{d.getDate()}</div>
+              {!isSelected && isToday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "var(--text)" }} />}
             </button>
           );
         })}
@@ -18614,17 +18612,18 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
     <>
     <div className="fade-up">
       {/* Editorial masthead */}
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 8, fontWeight: 600, textTransform: "uppercase" }}>{clients.length} {clients.length === 1 ? "PERSON" : "PEOPLE"}</div>
+      <div style={{ marginBottom: 22, paddingTop: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
-          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1, color: "var(--text)" }}>Clients</h2>
+          <div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, color: "var(--text)" }}>Clients</h2>
+            <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{clients.length} {clients.length === 1 ? "person" : "people"}</div>
+          </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "stretch" }}>
             <button onClick={() => setShowNudgeFolder(true)} aria-label="Rebooking nudges" style={{ position: "relative", background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", height: 42, width: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-              <Bell size={17} style={{ color: overdue.length > 0 ? "var(--gold)" : "var(--sub)" }} />
-              {overdue.length > 0 && <span style={{ position: "absolute", top: -5, right: -5, background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 10, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", lineHeight: 1 }}>{overdue.length}</span>}
+              <Bell size={17} style={{ color: overdue.length > 0 ? "var(--text)" : "var(--sub)" }} />
+              {overdue.length > 0 && <span style={{ position: "absolute", top: -5, right: -5, background: "var(--text)", color: "var(--bg)", fontSize: 11, fontWeight: 500, borderRadius: 10, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", lineHeight: 1 }}>{overdue.length}</span>}
             </button>
-            <button className="lift" onClick={() => { setDraft(blank); setAdding(true); }} aria-label="Add client" style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", height: 42, padding: "0 16px", borderRadius: 12, display: "flex", alignItems: "center", gap: 7, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 1.5 }}><Plus size={16} strokeWidth={2.5} /> ADD</button>
+            <button onClick={() => { setDraft(blank); setAdding(true); }} aria-label="Add client" style={{ background: "var(--text)", color: "var(--bg)", border: "none", height: 42, padding: "0 18px", borderRadius: 12, display: "flex", alignItems: "center", gap: 7, fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase" }}><Plus size={16} strokeWidth={2} /> Add</button>
           </div>
         </div>
       </div>
@@ -18634,7 +18633,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
         <User size={17} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "14px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500 }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)" }} /></button>); })}</div>
+      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{c.visits} visits · {provider.name}</div></div></div><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span></button>); })}</div>
       {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : "No clients yet — tap + to add your first one."}</p>}
     </div>
 
@@ -19282,11 +19281,9 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
     const totalUnread = clients.filter((c) => { const m = (c.messages || []); return m.length && m[m.length - 1].from === "client"; }).length;
     return (
       <div className="fade-up">
-        <div style={{ marginBottom: 22 }}>
-          <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 8, fontWeight: 600, textTransform: "uppercase" }}>{totalUnread > 0 ? `${totalUnread} UNREAD` : "ALL CAUGHT UP"}</div>
-          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1, marginBottom: 8 }}>Messages</h2>
-          <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.5 }}>Your studio line. Tap a client to open the conversation.</p>
+        <div style={{ marginBottom: 22, paddingTop: 8 }}>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, marginBottom: 12 }}>Messages</h2>
+          <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500 }}>{totalUnread > 0 ? `${totalUnread} unread` : "All caught up"}</div>
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           {clients.map((c) => {
@@ -19300,12 +19297,12 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: unread ? 600 : 500 }}>{c.name}</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: unread ? 500 : 400, letterSpacing: "-0.2px" }}>{c.name}</span>
                     {last && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", flexShrink: 0 }}>{last.time}</span>}
                   </div>
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: unread ? "var(--text2)" : "var(--sub)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: unread ? 500 : 300, marginTop: 2 }}>{last ? (last.from === "shop" ? "You: " : "") + last.text : "No messages yet"}</div>
                 </div>
-                {unread && <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />}
+                {unread && <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />}
               </button>
             );
           })}
