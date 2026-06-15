@@ -3477,32 +3477,36 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* STEP 2 — cut type: clean, minimal cards. Tap the whole card to select. */}
         {step === 2 && !consult && draft && draft.cutTypes && draft.cutTypes.length > 0 && cutPhase === "type" && (
           <div className="fade-up">
-            {/* Editorial masthead — matches screen 1 (centered, no photo) */}
-            <div style={{ padding: "8px 4px 26px", textAlign: "center", marginBottom: 8 }}>
-              <div style={{ width: 36, height: 1.5, background: "var(--text)", margin: "0 auto 18px" }} />
-              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 12 }}>Pick your cut</h2>
-              <p style={{ color: "var(--text)", fontSize: 16, lineHeight: 1.5, fontWeight: 400, maxWidth: 320, margin: "0 auto" }}>Tap whichever's closest — your barber dials it in in the chair.</p>
-            </div>
-            {/* Cut cards — equal-height, photo forced to consistent ratio */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 26 }}>
-              {draft.cutTypes.map((ct) => {
-                const img = (ct.images || [])[0];
-                return (
-                  <button key={ct.id} className="lift" onClick={() => { setCutType(ct.id); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 0, overflow: "hidden", display: "flex", alignItems: "stretch", color: "var(--text)", textAlign: "left", height: 92, boxShadow: "var(--shadow-sm)" }}>
-                    <div style={{ width: 92, height: 92, flexShrink: 0, overflow: "hidden", background: "var(--panel2)", position: "relative" }}>
-                      {img && <img src={imgUrl(img, 280)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
-                    </div>
-                    <div style={{ flex: 1, padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, minWidth: 0 }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 3 }}>{ct.label}</div>
-                        <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>${ct.price}</div>
-                      </div>
-                      <ChevronRight size={20} style={{ color: "var(--text)", flexShrink: 0 }} />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            {(() => {
+              const bs = (business && business.bookingStep) || {};
+              const showPrices = bs.showPrices === true;
+              const niceName = { standard: "Haircut", skinfade: "Skin Fade", scissor: "Scissor Only" };
+              return (
+                <>
+                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Choose your style</div>
+                  <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Pick your cut</h2>
+                  <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, marginTop: 9 }}>Tap whichever's closest — your barber dials it in in the chair.</p>
+                  <div style={{ marginTop: 26, marginBottom: 26, borderBottom: "1px solid var(--line)" }}>
+                    {draft.cutTypes.map((ct) => {
+                      const img = ct.images && ct.images[0];
+                      return (
+                        <button key={ct.id} onClick={() => { setCutType(ct.id); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "18px 2px", display: "flex", gap: 15, alignItems: "center", color: "var(--text)", cursor: "pointer" }}>
+                          {img ? <span style={{ width: 60, height: 60, borderRadius: 8, background: "var(--panel2)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}><img src={imgUrl(img, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></span> : null}
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{ct.label || niceName[ct.id]}</span>
+                              {ct.popular && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text)", fontWeight: 600 }}>Most common</span>}
+                            </span>
+                            {showPrices && <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, color: "var(--text)", marginTop: 6 }}>${ct.price}</span>}
+                          </span>
+                          <ChevronRight size={18} style={{ color: "var(--text)", flexShrink: 0 }} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              );
+            })()}
             {/* Helper options — only render when AI cut helper is enabled in shop settings */}
             {business.aiCutHelper && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
