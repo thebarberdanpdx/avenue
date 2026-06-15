@@ -809,7 +809,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
                 {err && <div style={{ color: "#B5564B", fontSize: 12.5, marginTop: 8, paddingLeft: 2 }}>{err}</div>}
               </div>
 
-              <button disabled={busy} onClick={submit} style={{ width: "100%", marginTop: 18, background: busy ? "var(--border2)" : A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 16, fontSize: 15.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: busy ? "default" : "pointer", boxShadow: busy ? "none" : "0 10px 22px -10px rgba(110,139,116,.65)" }}>{busy ? "Processing…" : (isPay ? `Pay $${amount}` : "Save card")}</button>
+              <button disabled={busy} onClick={submit} style={{ width: "100%", marginTop: 18, background: busy ? "var(--border2)" : A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 16, fontSize: 15.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: busy ? "default" : "pointer", boxShadow: busy ? "none" : "0 10px 22px -10px rgba(0,0,0,.4)" }}>{busy ? "Processing…" : (isPay ? `Pay $${amount}` : "Save card")}</button>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14, fontSize: 11.5, color: "var(--faint)" }}><Lock size={13} /> Encrypted &amp; secure · Powered by Stripe</div>
               <button onClick={close} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, marginTop: 12, cursor: "pointer", fontFamily: FONT_BODY, textDecoration: "underline", textUnderlineOffset: 3 }}>Cancel</button>
             </>
@@ -1706,7 +1706,7 @@ function App() {
         @keyframes screenIn { from { opacity: 0; transform: translateY(10px) scale(0.992);} to {opacity:1; transform:none;} }
         @keyframes pulse { 0% { transform: scale(0.92); opacity: 0.7; } 50% { transform: scale(1.06); opacity: 0.3; } 100% { transform: scale(0.92); opacity: 0.7; } }
         @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes lobbyStart { 0%,100% { box-shadow: 0 8px 20px -8px rgba(110,139,116,.5), 0 0 0 0 rgba(110,139,116,0); } 50% { box-shadow: 0 8px 20px -8px rgba(110,139,116,.6), 0 0 0 5px rgba(110,139,116,.18); } }
+        @keyframes lobbyStart { 0%,100% { box-shadow: 0 8px 20px -8px rgba(0,0,0,.5), 0 0 0 0 rgba(0,0,0,0); } 50% { box-shadow: 0 8px 20px -8px rgba(0,0,0,.6), 0 0 0 5px rgba(0,0,0,.18); } }
         @keyframes popIn { 0% { transform: scale(0); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
         @keyframes dropDown { from { opacity: 0; transform: translateY(-24px);} to {opacity:1; transform:none;} }
         .appt-drop { animation: dropDown .32s var(--ease) both; }
@@ -1738,6 +1738,18 @@ function App() {
         html, body { overscroll-behavior-y: contain; -webkit-overflow-scrolling: auto; }
         body { position: relative; min-height: 100dvh; }
         .appt-screen { animation: slideInRight .34s cubic-bezier(.32,.72,0,1) both; }
+        /* Service menu — bordered tiles with press/hover invert (booking flow) */
+        .svc-menu { display:flex; flex-direction:column; gap:11px; margin-top:26px; }
+        .svc-tile { display:flex; align-items:center; gap:18px; width:100%; text-align:left; cursor:pointer; background:var(--panel); border:1px solid var(--border2); border-radius:14px; padding:18px 18px; transition:background .18s ease,color .18s ease,border-color .18s ease,transform .18s ease; }
+        .svc-tile:hover, .svc-tile:active { background:var(--text); border-color:var(--text); transform:translateY(-1px); }
+        .svc-num { font-family:'Fraunces',serif; font-size:14px; color:var(--faint); width:24px; flex-shrink:0; letter-spacing:1px; }
+        .svc-tile:hover .svc-num, .svc-tile:active .svc-num { color:#8a8a8a; }
+        .svc-name { font-family:'Fraunces',serif; font-size:20px; font-weight:500; letter-spacing:-0.2px; color:var(--text); line-height:1.12; }
+        .svc-tile:hover .svc-name, .svc-tile:active .svc-name { color:var(--bg); }
+        .svc-meta { font-family:'Jost',sans-serif; font-size:13px; color:var(--sub); margin-top:4px; letter-spacing:.2px; }
+        .svc-tile:hover .svc-meta, .svc-tile:active .svc-meta { color:#b4b4b4; }
+        .svc-ar { font-size:19px; color:var(--text); flex-shrink:0; line-height:1; transition:transform .2s ease,color .18s ease; }
+        .svc-tile:hover .svc-ar, .svc-tile:active .svc-ar { color:var(--bg); transform:translateX(5px); }
         @keyframes fadeInFixed { from { opacity:0; } to { opacity:1; } }
         .appt-screen-fixed { animation: fadeInFixed .25s var(--ease) both; }
         /* Desktop dialog layout is handled inline via the JS wide state in AppointmentSheet
@@ -3125,11 +3137,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           };
           const liveCats = cats.filter((c) => inCat(c).length > 0);
           const showCats = liveCats.length > 1 && !simpleCat;
-          const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)", margin: 0 };
-          const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
+          const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, lineHeight: 1.12, letterSpacing: "-0.4px", color: "var(--text)", margin: 0 };
+          const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 3.5, fontWeight: 600, textTransform: "uppercase", color: "var(--text2)" };
           const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, marginTop: 9 };
           const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" };
           const rowBtn = { width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "19px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" };
+          const metaFor = (svc) => {
+            const cts = (svc.cutTypes || []).map((c) => Number(c.price)).filter((n) => !isNaN(n) && n > 0);
+            let priceStr = "";
+            if (cts.length) priceStr = "from $" + Math.min(...cts);
+            else if (svc.price !== "" && svc.price != null && !isNaN(Number(svc.price)) && Number(svc.price) > 0) priceStr = "$" + Number(svc.price);
+            const durStr = (svc.duration != null && !isNaN(Number(svc.duration)) && Number(svc.duration) > 0) ? Number(svc.duration) + " min" : "";
+            return [durStr, priceStr].filter(Boolean).join(" · ");
+          };
 
           if (showCats) {
             return (
@@ -3137,13 +3157,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <div style={EYE}>Book an appointment</div>
                 <h2 style={{ ...HEAD, marginTop: 11 }}>{bs.catHead || "What are you here for today?"}</h2>
                 <p style={LEAD}>{bs.catLead || "Tell us the vibe — we'll take it from there."}</p>
-                <div style={{ marginTop: 28, borderBottom: "1px solid var(--line)" }}>
-                  {liveCats.map((cat) => {
+                <div className="svc-menu">
+                  {liveCats.map((cat, i) => {
                     const list = inCat(cat);
                     return (
-                      <button key={cat} onClick={() => { if (list.length === 1) selectService(list[0]); else setSimpleCat(cat); }} style={rowBtn}>
-                        <span style={NAME}>{cat}</span>
-                        <ChevronRight size={20} style={{ color: "var(--text)", flexShrink: 0 }} />
+                      <button key={cat} onClick={() => { if (list.length === 1) selectService(list[0]); else setSimpleCat(cat); }} className="svc-tile">
+                        <span className="svc-num">{String(i + 1).padStart(2, "0")}</span>
+                        <span style={{ flex: 1, minWidth: 0 }}><span className="svc-name" style={{ display: "block" }}>{cat}</span></span>
+                        <span className="svc-ar">&#8594;</span>
                       </button>
                     );
                   })}
@@ -3161,14 +3182,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 : <div style={EYE}>Book an appointment</div>}
               <h2 style={{ ...HEAD, marginTop: simpleCat ? 0 : 11 }}>{simpleCat ? "Pick your service" : (bs.whatHead || "What can we do for you?")}</h2>
               <p style={LEAD}>{simpleCat ? ("Here's what we do in " + simpleCat + ".") : (bs.whatLead || "Start here — we'll walk you through the rest.")}</p>
-              <div style={{ marginTop: 28, borderBottom: "1px solid var(--line)" }}>
-                {list.map((svc) => (
-                  <button key={svc.id} onClick={() => selectService(svc)} style={rowBtn}>
-                    <span style={{ minWidth: 0 }}>
-                      <span style={{ ...NAME, display: "block" }}>{svc.name}</span>
-                      {svc.comboOf && svc.comboOf.length > 0 ? (() => { const incl = svc.comboOf.map((id) => { const x = services.find((y) => y.id === id); return x && x.name; }).filter(Boolean); return incl.length ? <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--text)", fontWeight: 500, marginTop: 8 }}>Includes {incl.join(" + ")}</span> : null; })() : null}
+              <div className="svc-menu">
+                {list.map((svc, i) => (
+                  <button key={svc.id} onClick={() => selectService(svc)} className="svc-tile">
+                    <span className="svc-num">{String(i + 1).padStart(2, "0")}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span className="svc-name" style={{ display: "block" }}>{svc.name}</span>
+                      {metaFor(svc) ? <span className="svc-meta" style={{ display: "block" }}>{metaFor(svc)}</span> : null}
                     </span>
-                    <ChevronRight size={20} style={{ color: "var(--text)", flexShrink: 0 }} />
+                    <span className="svc-ar">&#8594;</span>
                   </button>
                 ))}
               </div>
