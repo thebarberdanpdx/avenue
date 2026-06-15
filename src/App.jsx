@@ -545,7 +545,7 @@ const THEMES = [
     t: { bg:"#FAF8F3", panel:"#FFFFFF", panel2:"#F4EFE4", line:"#ECE4D5", border:"#E0D8C7", border2:"#CFC6B7", text:"#232221", text2:"#3A382F", sub:"#6F685D", faint:"#A39C8A", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(60,55,45,.10)", overlay:"rgba(35,34,33,0.34)" } },
   { id: "studio", name: "Studio", tagline: "White paper, sage accent", cat: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.03,
-    canvas: "linear-gradient(176deg,#FFFFFF,#F5F5F3)",
+    canvas: "linear-gradient(176deg,#EDEDED,#E8E8E8)",
     t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F4F4F4", line:"#ECECEC", border:"#DCDCDC", border2:"#C2C2C2", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#A6A6A6", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.06)", overlay:"rgba(0,0,0,0.3)" } },
   { id: "mist", name: "Mist", tagline: "Cool porcelain & slate", cat: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Inter', sans-serif", grain: 0.04,
@@ -1027,7 +1027,7 @@ const priceWithTimeRules = (service, providerId, dateObj, startMin) => {
 };
 // The price locked onto an appointment at booking. Existing appts without one fall back to normal pricing.
 const lockedApptPrice = (appt, service) => (appt && appt.price != null) ? appt.price : (service ? getPrice(service, appt && appt.providerId) : 0);
-const inputStyle = { width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY };
+const inputStyle = { width: "100%", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY };
 
 // ============================================================
 // ============================================================================
