@@ -1753,16 +1753,19 @@ function App() {
         /* Welcome chooser — solid-black primary + outlined secondary that inverts */
         .wel-card { display:flex; align-items:center; gap:18px; width:100%; text-align:left; cursor:pointer; border:none; border-radius:16px; padding:22px 22px; transition:background .18s ease,color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .25s ease; }
         .wel-card .wel-idx { font-family:'Fraunces',serif; font-size:20px; width:28px; flex-shrink:0; line-height:1; }
-        .wel-card .wel-h { font-family:'Jost',sans-serif; font-size:16px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; line-height:1.25; color:inherit; }
+        .wel-card .wel-h { font-family:'Jost',sans-serif; font-size:16px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; line-height:1.25; }
         .wel-card .wel-s { font-family:'Jost',sans-serif; font-size:13px; margin-top:6px; }
-        .wel-card .wel-ar { font-size:21px; flex-shrink:0; line-height:1; color:inherit; transition:transform .2s ease; }
+        .wel-card .wel-ar { font-size:21px; flex-shrink:0; line-height:1; transition:transform .2s ease; }
         .wel-prime { background:var(--text); color:var(--bg); box-shadow:0 16px 36px rgba(0,0,0,.18); }
         .wel-prime .wel-idx { color:#5a5a5a; } .wel-prime .wel-s { color:#b4b4b4; }
+        .wel-prime .wel-h, .wel-prime .wel-ar { color:#FFFFFF; }
         .wel-prime:hover, .wel-prime:active { transform:translateY(-2px); box-shadow:0 22px 46px rgba(0,0,0,.26); }
         .wel-prime:hover .wel-ar, .wel-prime:active .wel-ar { transform:translateX(5px); }
         .wel-sec { background:var(--panel); color:var(--text); border:1px solid var(--text); }
         .wel-sec .wel-idx { color:var(--faint); } .wel-sec .wel-s { color:var(--sub); }
+        .wel-sec .wel-h, .wel-sec .wel-ar { color:var(--text); }
         .wel-sec:hover, .wel-sec:active { background:var(--text); color:var(--bg); }
+        .wel-sec:hover .wel-h, .wel-sec:active .wel-h, .wel-sec:hover .wel-ar, .wel-sec:active .wel-ar { color:#FFFFFF; }
         .wel-sec:hover .wel-idx, .wel-sec:active .wel-idx { color:#8a8a8a; }
         .wel-sec:hover .wel-s, .wel-sec:active .wel-s { color:#b4b4b4; }
         .wel-sec:hover .wel-ar, .wel-sec:active .wel-ar { transform:translateX(5px); }
