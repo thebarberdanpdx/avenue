@@ -9027,7 +9027,9 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         const addsPrice = it.addsPrice !== false;
         const addsTime = it.addsTime !== false;
         return (
-          <div key={i} style={{ background: "var(--panel)", borderRadius: 16, padding: 16, marginBottom: 12, border: g.featured ? "1.5px solid var(--gold)" : "1px solid var(--border)" }}>
+          <div key={i} style={{ background: "var(--panel)", borderRadius: 16, padding: 16, marginBottom: 12, border: g.required ? "1.5px solid var(--gold)" : "1px solid var(--border)" }}>
+            <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 7 }}>Question clients see</div>
+            <input value={g.label || ""} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="e.g. Want to finish with a hot towel?" style={{ ...inputStyle, padding: "10px 12px", fontWeight: 500, marginBottom: 14 }} />
             <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 14 }}>
               <button onClick={() => setPicker({ target: i })} style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", color: "var(--faint)", flexShrink: 0, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{g.photo ? <img src={imgUrl(g.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={18} />}</button>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -9066,10 +9068,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               </div>
             </div>
 
-            {/* Feature in the first-timer booking flow */}
+            {/* Optional vs required — required means clients must answer (No thanks still works) */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0" }}>
-              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Feature for new clients</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Show this one in the first-time booking flow.</span></span>
-              <Toggle on={!!g.featured} onClick={() => featureOnly(i)} />
+              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>When booking</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Required just means they must answer — "No thanks" still works.</span></span>
+              <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 9, overflow: "hidden", flexShrink: 0 }}>
+                {[{ v: false, l: "Optional" }, { v: true, l: "Required" }].map((o) => {
+                  const on = !!g.required === o.v;
+                  return <button key={o.l} onClick={() => setGroup(i, { required: o.v })} style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: 0.5, padding: "8px 13px", border: "none", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--sub)", cursor: "pointer" }}>{o.l}</button>;
+                })}
+              </div>
             </div>
           </div>
         );
