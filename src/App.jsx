@@ -1066,7 +1066,6 @@ function StaffLogin({ authReady, onBack }) {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "var(--bg, #f6f3ec)" }}>
       <div className="fade-up" style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-          <span style={{ width: 28, height: 1.5, background: "var(--gold)" }} />
           <span style={{ fontSize: 12, letterSpacing: 3, color: "var(--faint)", textTransform: "uppercase" }}>Staff sign-in</span>
         </div>
         {!sent ? (
@@ -2403,7 +2402,6 @@ function LocationChooser({ shopId, locations, business }) {
   return (
     <div style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", display: "flex", flexDirection: "column", alignItems: "center", padding: "0 18px 60px" }}>
       <div style={{ width: "100%", maxWidth: 460, paddingTop: 64 }}>
-        <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 16 }} />
         <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.08, letterSpacing: "-0.4px", marginBottom: 6 }}>Choose a location</h1>
         <div style={{ fontSize: 15, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 26 }}>{(business && business.name) ? `Where would you like to book with ${business.name}?` : "Where would you like to book?"}</div>
         <div style={{ display: "grid", gap: 12 }}>
@@ -5639,7 +5637,6 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   if (!dataLoaded) return (
     <div className="fade-up">
       <div style={{ marginBottom: 24 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 18 }} />
         <div className="skeleton" style={{ width: 96, height: 12, marginBottom: 12 }} />
         <div className="skeleton" style={{ width: "68%", height: 38, borderRadius: 12 }} />
       </div>
@@ -6595,8 +6592,7 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
 
       {/* Masthead */}
       <div style={{ marginBottom: 22 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>REVENUE</div>
+        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>REVENUE</div>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{period === "week" ? "This week" : period === "month" ? "This month" : period === "year" ? "This year" : "Custom range"}</h2>
       </div>
 
@@ -6834,8 +6830,7 @@ function AppointmentsView({ appts, providers, services, onBack }) {
       <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> Back to Pulse</button>
 
       <div style={{ marginBottom: 18 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>APPOINTMENTS &middot; CAPACITY</div>
+        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>APPOINTMENTS &middot; CAPACITY</div>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1, margin: 0 }}>{periodLabel}</h2>
         <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10 }}><b style={{ color: "var(--text)", fontWeight: 600 }}>{booked}</b> booked &middot; <b style={{ color: "var(--text)", fontWeight: 600 }}>{occupancy}%</b> of chair time filled</div>
       </div>
@@ -7016,8 +7011,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
 
       {/* Masthead */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>CLIENTS · RETENTION</div>
+        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>CLIENTS · RETENTION</div>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{periodLabel}</h2>
         <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10, lineHeight: 1.5 }}>
           <span style={{ fontWeight: 600, color: "var(--text)" }}>{totalClients}</span> active{rebookPct !== null ? <> · <span style={{ fontWeight: 600, color: "var(--text)" }}>{rebookPct}%</span> rebooked</> : null}
@@ -7297,8 +7291,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
 
       {/* Masthead */}
       <div style={{ marginBottom: 22 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>SERVICE MIX</div>
+        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>SERVICE MIX</div>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
       </div>
 
@@ -7607,8 +7600,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
 
       {/* Masthead */}
       <div style={{ marginBottom: 22 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>PER BARBER</div>
+        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>PER BARBER</div>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
       </div>
 
@@ -8207,7 +8199,6 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
         <button onClick={() => onSignOutAccount && onSignOutAccount()} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, fontFamily: FONT_BODY, cursor: "pointer" }}>Sign out</button>
       </div>
       <div style={{ maxWidth: 560, margin: "0 auto", padding: "26px 16px 120px" }}>
-        <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
         <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.4px", marginBottom: 6 }}>{accountName}</h1>
         <div style={{ fontSize: 14.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 18 }}>{loading ? "Loading your shops\u2026" : (shops.length + " " + (shops.length === 1 ? "location" : "locations"))}</div>
         <div style={{ display: "flex", gap: 6, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: 4, marginBottom: 20 }}>
@@ -8430,7 +8421,6 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     return (
       <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 22px", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY }}>
         <div style={{ width: "100%", maxWidth: 340, textAlign: "center" }}>
-          <div style={{ width: 28, height: 1.5, background: "var(--gold)", margin: "0 auto 16px" }} />
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, marginBottom: 8 }}>{business?.name || "Vero"}</div>
           <p style={{ color: "var(--sub)", fontSize: 14.5, marginBottom: 22 }}>Enter your PIN to open the dashboard.</p>
           <input autoFocus type="password" inputMode="numeric" value={lockPin} onChange={(e) => { setLockPin(e.target.value.replace(/\D/g, "").slice(0, 8)); setLockErr(false); }} onKeyDown={(e) => { if (e.key === "Enter") submitLock(); }} placeholder="••••" style={{ width: "100%", boxSizing: "border-box", textAlign: "center", letterSpacing: 10, background: "var(--panel2)", border: `1px solid ${lockErr ? "#c0392b" : "var(--border)"}`, borderRadius: 14, padding: "16px", color: "var(--text)", fontSize: 24, fontFamily: FONT_BODY, marginBottom: lockErr ? 8 : 18 }} />
@@ -8483,7 +8473,6 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       {showSignInPicker && (
         <div onClick={() => signedInAs && !pinFor && setShowSignInPicker(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "26px 22px", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
-            <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
             {pinFor ? (() => {
               const p = realProviders.find((x) => x.id === pinFor);
               const submit = () => { if (pinEntry === (p.pin || "")) { setSignedInAs(p.id); setShowSignInPicker(false); setPinFor(null); setPinEntry(""); setPinErr(false); } else { setPinErr(true); } };
@@ -12965,7 +12954,6 @@ function HelpCenter({ business, onBack }) {
     <div className="appt-screen fade-up" style={{ paddingBottom: 48 }}>
       <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "4px 0 16px", cursor: "pointer" }}><ArrowLeft size={17} /> Settings</button>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <span style={{ width: 28, height: 1.5, background: "var(--gold)" }} />
         <span style={{ fontSize: 12, letterSpacing: 3, color: "var(--faint)", textTransform: "uppercase" }}>Help Center</span>
       </div>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1.05, margin: "0 0 18px", color: "var(--text)" }}>How can we help?</h1>
@@ -14070,22 +14058,21 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     const Icon = active.icon;
     return (
       <div className="appt-screen" style={{ width: "100%", padding: "16px 6px 40px" }}>
-        <button onClick={goBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 500, marginBottom: 20, padding: 0 }}><ArrowLeft size={16} /> {(() => { const c = CATS.find((x) => x.id === openCat); return c ? c.label : "All settings"; })()}</button>
-        <div style={{ marginBottom: 22 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 29, fontWeight: 500, lineHeight: 1.1, letterSpacing: "-0.3px" }}>{active.title}</h2>
-            {active.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "3px 7px" }}>SMART</span>}
+        <button onClick={goBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 400, marginBottom: 26, padding: 0, letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> {(() => { const c = CATS.find((x) => x.id === openCat); return c ? c.label : "Settings"; })()}</button>
+        <div style={{ marginBottom: 30 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.6px" }}>{active.title}</h2>
+            {active.smart && <span style={{ fontFamily: "'Fraunces', serif", fontSize: 12, fontStyle: "italic", letterSpacing: "0.2px", color: "var(--faint)" }}>learns</span>}
           </div>
-          {active.subtitle && <div style={{ fontSize: 14.5, color: "var(--gold)", marginTop: 7, fontWeight: 500 }}>{active.subtitle}</div>}
-          {active.status && <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4, marginTop: 4 }}>{active.status}</div>}
+          {(active.subtitle || active.status) && <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{active.subtitle || active.status}</div>}
         </div>
 
         {active.fullBleed
           ? <div>{active.editor}</div>
-          : <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 18px", boxShadow: "var(--shadow-sm)" }}>{active.editor}</div>}
+          : <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: "22px 18px" }}>{active.editor}</div>}
 
         {hasChanges && (
-          <button className="lift" onClick={() => save(`${active.title} saved.`)} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 15, fontWeight: 600, borderRadius: 14, border: "none" }}>Save changes</button>
+          <button onClick={() => save(`${active.title} saved.`)} style={{ width: "100%", marginTop: 30, background: "var(--text)", color: "var(--bg)", padding: 16, fontSize: 13, fontWeight: 500, letterSpacing: "1.5px", textTransform: "uppercase", borderRadius: 14, border: "none", fontFamily: FONT_BODY }}>Save changes</button>
         )}
       </div>
     );
@@ -16990,24 +16977,23 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
 
   return (
     <div className="fade-in" style={{ padding: "8px 0 40px" }}>
-      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 14 }}><ArrowLeft size={16} /> Back to Pulse</button>
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", marginBottom: 8, fontWeight: 600 }}>PAYMENTS &middot; MONEY FLOW</div>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 42, fontWeight: 500, letterSpacing: -0.6, lineHeight: 0.95 }}>{periodLabel}</div>
-        <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10 }}><b style={{ color: "var(--text)", fontWeight: 600 }}>{fmtMoney0(netIn)}</b> net &middot; {periodRows.length} charge{periodRows.length === 1 ? "" : "s"}</div>
+      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 400, marginBottom: 24, letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> Pulse</button>
+      <div style={{ marginBottom: 22, paddingTop: 6 }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 42, fontWeight: 400, letterSpacing: "-0.8px", lineHeight: 0.95 }}>{periodLabel}</div>
+        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginTop: 12, fontWeight: 500, textTransform: "uppercase" }}>Payments · money flow</div>
+        <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10 }}><b style={{ color: "var(--text)", fontWeight: 500 }}>{fmtMoney0(netIn)}</b> net &middot; {periodRows.length} charge{periodRows.length === 1 ? "" : "s"}</div>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 26 }}>
         <Pill k="week" label="Week" /><Pill k="month" label="Month" /><Pill k="year" label="Year" />
       </div>
 
-      <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "20px 18px", marginBottom: 16 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700, marginBottom: 8 }}>MONEY IN</div>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 46, fontWeight: 500, lineHeight: 1, letterSpacing: -1.3 }}>{fmtMoney0(grossIn)}</div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, paddingTop: 14, borderTop: "1px solid color-mix(in srgb, var(--gold) 18%, var(--border))" }}>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, padding: "20px 18px", marginBottom: 16 }}>
+        <div style={{ fontSize: 10.5, letterSpacing: "2.5px", color: "var(--faint)", fontWeight: 500, marginBottom: 8, textTransform: "uppercase" }}>Money in</div>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 46, fontWeight: 400, lineHeight: 1, letterSpacing: -1.3 }}>{fmtMoney0(grossIn)}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
           <span style={{ fontSize: 13.5, color: "var(--sub)" }}>&minus; Refunds</span>
-          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: refundsOut > 0 ? "var(--text)" : "var(--faint)" }}>{fmtMoney0(refundsOut)}</span>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 400, color: refundsOut > 0 ? "var(--text)" : "var(--faint)" }}>{fmtMoney0(refundsOut)}</span>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
           <span style={{ fontSize: 14, color: "var(--text)", fontWeight: 600 }}>Net in your pocket</span>
@@ -17545,8 +17531,7 @@ function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, sho
           </div>
         ) : (
           <>
-            <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 6 }}>Refund {appt.name ? appt.name.split(" ")[0] : "client"}</h2>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 400, letterSpacing: "-0.4px", marginBottom: 6 }}>Refund {appt.name ? appt.name.split(" ")[0] : "client"}</h2>
             {recs.length === 0 && <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.55 }}>No recorded payment is attached to this appointment. If it was charged before the new checkout, refund it from the Stripe dashboard.</p>}
             {recs.length > 1 && (
               <div style={{ margin: "10px 0 4px" }}>
@@ -18681,9 +18666,8 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
     {/* Rebooking nudges folder — opened by the bell button at the top of the Clients page. */}
     <Sheet open={showNudgeFolder} onClose={() => setShowNudgeFolder(false)} align="top" maxWidth={480}>
       <div style={{ padding: "18px 4px 12px" }}>
-        <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500 }}>Due to rebook</h2>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 400, letterSpacing: "-0.4px" }}>Due to rebook</h2>
           {overdue.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, padding: "3px 8px", lineHeight: 1 }}>{overdue.length}</span>}
         </div>
         <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 18, lineHeight: 1.5 }}>Clients past their usual rebooking rhythm. Send a nudge — or skip them with ×.</p>
@@ -18917,18 +18901,17 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
   return (
     <div className="fade-up">
-      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontFamily: "'Jost', sans-serif", fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> All clients</button>
+      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 400, marginBottom: 24, letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> Clients</button>
 
       {/* Editorial profile header */}
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+      <div style={{ marginBottom: 24, paddingTop: 6 }}>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
           <button onClick={() => setPicker(true)} style={{ position: "relative", width: 64, height: 64, borderRadius: "50%", background: "none", border: "none", flexShrink: 0, padding: 0 }}>
             <Avatar size={64} photo={clientPhoto(live)} initial={live.name.charAt(0)} color={provider.color} />
-            <span style={{ position: "absolute", bottom: -2, right: -2, width: 22, height: 22, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={11} /></span>
+            <span style={{ position: "absolute", bottom: -2, right: -2, width: 22, height: 22, borderRadius: "50%", background: "var(--text)", color: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={11} /></span>
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1.02, letterSpacing: "-0.3px", marginBottom: 4 }}>{live.name}</h2>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.6px", marginBottom: 6 }}>{live.name}</h2>
             <div style={{ color: "var(--sub)", fontSize: 13.5, lineHeight: 1.4 }}>
               {live.phone && <PhoneLink number={live.phone} />}
               {live.phone && live.email && " · "}
@@ -18942,7 +18925,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       {/* TAB BAR */}
       <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--line)", marginBottom: 22, overflowX: "auto" }}>
         {[["overview","Overview"],["timeline","Timeline"],["photos","Photos"],["times","Times"],["family","Family"]].map(([id, label]) => { const on = pfTab === id; return (
-          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontFamily: "'Jost', sans-serif", fontWeight: on ? 600 : 400, fontSize: 14, letterSpacing: 0.5, padding: "10px 10px" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
+          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontFamily: "'Jost', sans-serif", fontWeight: on ? 500 : 400, fontSize: 14, letterSpacing: 0.5, padding: "10px 10px" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
         ); })}
       </div>
       {picker && <StaffPhotoPicker hasPhoto={!!live.photo} onClose={() => setPicker(false)} onPick={setClientPhoto} onRemove={removeClientPhoto} />}
@@ -19125,8 +19108,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {/* Block reason prompt */}
       <Sheet open={blockPrompt} onClose={() => setBlockPrompt(false)} align="top">
-        <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Block {live.name.split(" ")[0]}?</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 400, letterSpacing: "-0.4px", marginBottom: 6 }}>Block {live.name.split(" ")[0]}?</h2>
         <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>They won't be able to book online. Add a reason for your records — only you'll see it.</p>
         <textarea value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="e.g. Repeated no-shows, payment issue…" rows={3} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, lineHeight: 1.5, resize: "none", marginBottom: 16, boxSizing: "border-box" }} />
         <button onClick={confirmBlock} disabled={!blockReason.trim()} style={{ width: "100%", background: blockReason.trim() ? "#c0392b" : "var(--border)", color: blockReason.trim() ? "#fff" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>BLOCK FROM BOOKING</button>
