@@ -214,7 +214,7 @@ const DEFAULT_BUSINESS = {
     timeMode: "smart",
     gridMin: 30,             // increment for "grid" mode
     rebookNudgeWeeks: 4,     // suggest rebooking after N weeks (0 = off)
-    guidedConsult: true,     // new-client guided consultation (true) vs. simple cut list (false)
+    guidedConsult: false,    // simple tile flow (true = legacy guided consultation, retired)
     // Gap avoidance — strict back-to-back booking to eliminate dead time
     avoidGaps: true,         // when true, only offer times flush with existing appts (or day start)
     maxGapMin: 0,            // don't offer a slot if it would leave a gap LARGER than this on either side (0 = no max)
@@ -1738,18 +1738,13 @@ function App() {
         html, body { overscroll-behavior-y: contain; -webkit-overflow-scrolling: auto; }
         body { position: relative; min-height: 100dvh; }
         .appt-screen { animation: slideInRight .34s cubic-bezier(.32,.72,0,1) both; }
-        /* Service menu — bordered tiles with press/hover invert (booking flow) */
+        /* Service menu — bordered tiles (static; no highlight until selected) */
         .svc-menu { display:flex; flex-direction:column; gap:11px; margin-top:26px; }
-        .svc-tile { display:flex; align-items:center; gap:18px; width:100%; text-align:left; cursor:pointer; background:var(--panel); border:1px solid var(--border2); border-radius:14px; padding:18px 18px; transition:background .18s ease,color .18s ease,border-color .18s ease,transform .18s ease; }
-        .svc-tile:hover, .svc-tile:active { background:var(--text); border-color:var(--text); transform:translateY(-1px); }
+        .svc-tile { display:flex; align-items:center; gap:18px; width:100%; text-align:left; cursor:pointer; background:var(--panel); border:1px solid var(--border2); border-radius:14px; padding:18px 18px; -webkit-tap-highlight-color:transparent; }
         .svc-num { font-family:'Fraunces',serif; font-size:14px; color:var(--faint); width:24px; flex-shrink:0; letter-spacing:1px; }
-        .svc-tile:hover .svc-num, .svc-tile:active .svc-num { color:#8a8a8a; }
         .svc-name { font-family:'Fraunces',serif; font-size:20px; font-weight:500; letter-spacing:-0.2px; color:var(--text); line-height:1.12; }
-        .svc-tile:hover .svc-name, .svc-tile:active .svc-name { color:var(--bg); }
         .svc-meta { font-family:'Jost',sans-serif; font-size:13px; color:var(--sub); margin-top:4px; letter-spacing:.2px; }
-        .svc-tile:hover .svc-meta, .svc-tile:active .svc-meta { color:#b4b4b4; }
-        .svc-ar { font-size:19px; color:var(--text); flex-shrink:0; line-height:1; transition:transform .2s ease,color .18s ease; }
-        .svc-tile:hover .svc-ar, .svc-tile:active .svc-ar { color:var(--bg); transform:translateX(5px); }
+        .svc-ar { font-size:19px; color:var(--text); flex-shrink:0; line-height:1; }
         /* Welcome chooser — solid-black primary + outlined secondary that inverts */
         .wel-card { display:flex; align-items:center; gap:18px; width:100%; text-align:left; cursor:pointer; border:none; border-radius:16px; padding:22px 22px; transition:background .18s ease,color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .25s ease; }
         .wel-card .wel-idx { font-family:'Fraunces',serif; font-size:20px; width:28px; flex-shrink:0; line-height:1; }
@@ -3114,7 +3109,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             </div>
             <div style={{ display: "grid", gap: 14 }}>
               <button onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} className="wel-card wel-prime">
-                <span className="wel-idx">01</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="wel-h" style={{ display: "block" }}>I've been here before</span>
                   <span className="wel-s" style={{ display: "block" }}>We'll pull up your details</span>
@@ -3122,7 +3116,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <span className="wel-ar">&#8594;</span>
               </button>
               <button onClick={() => { setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} className="wel-card wel-sec">
-                <span className="wel-idx">02</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="wel-h" style={{ display: "block" }}>It's my first time</span>
                   <span className="wel-s" style={{ display: "block" }}>Welcome — let's take a look</span>
@@ -3184,7 +3177,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     const list = inCat(cat);
                     return (
                       <button key={cat} onClick={() => { if (list.length === 1) selectService(list[0]); else setSimpleCat(cat); }} className="svc-tile">
-                        <span className="svc-num">{String(i + 1).padStart(2, "0")}</span>
                         <span style={{ flex: 1, minWidth: 0 }}><span className="svc-name" style={{ display: "block" }}>{cat}</span></span>
                         <span className="svc-ar">&#8594;</span>
                       </button>
@@ -3207,7 +3199,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <div className="svc-menu">
                 {list.map((svc, i) => (
                   <button key={svc.id} onClick={() => selectService(svc)} className="svc-tile">
-                    <span className="svc-num">{String(i + 1).padStart(2, "0")}</span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span className="svc-name" style={{ display: "block" }}>{svc.name}</span>
                       {metaFor(svc) ? <span className="svc-meta" style={{ display: "block" }}>{metaFor(svc)}</span> : null}
@@ -4237,7 +4228,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ position: "relative", marginBottom: 18 }}><Mail size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus inputMode="email" autoComplete="email" autoCapitalize="none" value={clientEmail} onChange={(e) => { setClientEmail(e.target.value); setLoginNoMatch(null); }} placeholder="you@email.com" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             {loginNoMatch === "nomatch" && (
               <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", marginBottom: 16, fontSize: 14, lineHeight: 1.5, color: "var(--text)" }}>
-                We couldn't find that email on file. Double-check it, or <button onClick={() => { setLoginNoMatch(null); setStep(1); }} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer", fontFamily: "inherit" }}>book as a new client</button>.
+                We couldn't find that email on file. Double-check it, or <button onClick={() => { setLoginNoMatch(null); setStep(0); setSimpleStep("what"); }} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer", fontFamily: "inherit" }}>book as a new client</button>.
               </div>
             )}
             {loginNoMatch === "error" && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Couldn't send the code — give it another try in a moment.</p>}
@@ -4257,7 +4248,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               setLoginBusy(false);
             }} style={{ width: "100%", background: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "transparent" : "var(--text)", color: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "var(--faint)" : "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "1px solid var(--border)" : "none", cursor: "pointer" }}>{loginBusy ? "Sending…" : "Email my code →"}</button>
             <p style={{ textAlign: "center", marginTop: 16 }}>
-              <button onClick={() => setStep(1)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>First time here? Book as a new client</button>
+              <button onClick={() => { setStep(0); setSimpleStep("what"); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>First time here? Book as a new client</button>
             </p>
           </div>
         )}
@@ -4321,7 +4312,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {!usePhone && <div style={{ marginBottom: 16 }} />}
             <input autoFocus inputMode="numeric" value={codeEntry} onChange={(e) => { setCodeEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(false); }} placeholder="• • • • • •" style={{ ...inputStyle, textAlign: "center", fontSize: 28, letterSpacing: 8, marginBottom: codeError ? 8 : 18 }} />
             {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>{usePhone ? "Enter all 6 digits." : (codeEntry.length < 6 ? "Enter all 6 digits." : "That code didn't match — check the email and try again.")}</p>}
-            <button className="lift" disabled={loginBusy} onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } let found = pendingMatch; if (!usePhone) { setLoginBusy(true); try { const { data, error } = await supabase.rpc("verify_client_code", { p_shop: shopId, p_email: clientEmail.trim().toLowerCase(), p_code: codeEntry }); setLoginBusy(false); if (error || !data) { setCodeError(true); return; } found = data; } catch (e) { setLoginBusy(false); setCodeError(true); return; } } const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = list.filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
+            <button className="lift" disabled={loginBusy} onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } let found = pendingMatch; if (!usePhone) { setLoginBusy(true); try { const { data, error } = await supabase.rpc("verify_client_code", { p_shop: shopId, p_email: clientEmail.trim().toLowerCase(), p_code: codeEntry }); setLoginBusy(false); if (error || !data) { setCodeError(true); return; } found = data; } catch (e) { setLoginBusy(false); setCodeError(true); return; } } const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = list.filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { if (cart.length === 0) { setStep(0); setSimpleStep("what"); } else { setStep(6); } } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
             <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6 }}>{usePhone ? "Use a different number" : "Use a different email"}</button>
           </div>
         )}
