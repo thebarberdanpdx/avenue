@@ -752,7 +752,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
     } catch (ex) { setErr(ex.message || "Something went wrong. Please try again."); setBusy(false); }
   };
 
-  const A = "var(--gold)";
+  const A = "var(--text)";
   const field = { border: "1px solid var(--border)", borderRadius: 12, background: "var(--panel)", padding: "0 13px", height: 50, display: "flex", alignItems: "center", gap: 10 };
 
   return (
@@ -762,14 +762,14 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
           <div style={{ width: 38, height: 4, borderRadius: 3, background: "var(--border)", margin: "4px auto 14px" }} />
           {phase === "done" ? (
             <div style={{ textAlign: "center", padding: "20px 4px 10px" }}>
-              <div style={{ width: 60, height: 60, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", color: A, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Check size={30} /></div>
+              <div style={{ width: 60, height: 60, borderRadius: "50%", background: "color-mix(in srgb, var(--text) 14%, transparent)", color: A, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Check size={30} /></div>
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, marginBottom: 8 }}>{isPay ? "Deposit paid — you're reserved" : "Card saved — you're reserved"}</div>
               <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>
                 {isPay
                   ? (live ? <>${amount} was charged and goes toward your total. A receipt is on its way.</> : <>${amount} went toward your total (test — no real charge). A confirmation is on its way.</>)
                   : (live ? <>Your card is securely on file. You won't be charged unless you no-show or cancel late.</> : <>Your card is on file (test — nothing was sent to a processor).</>)}
               </div>
-              <button onClick={() => onDone && onDone(result || { simulated: true, last4: "4242", paid: isPay })} style={{ width: "100%", background: A, color: "var(--on-gold)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Done</button>
+              <button onClick={() => onDone && onDone(result || { simulated: true, last4: "4242", paid: isPay })} style={{ width: "100%", background: A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Done</button>
             </div>
           ) : (
             <>
@@ -784,7 +784,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
               )}
 
               {!live && (
-                <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "11px 13px", margin: "16px 0 4px" }}>
+                <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "color-mix(in srgb, var(--text) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--text) 30%, var(--border))", borderRadius: 12, padding: "11px 13px", margin: "16px 0 4px" }}>
                   <AlertCircle size={16} style={{ color: A, flexShrink: 0, marginTop: 1 }} />
                   <div style={{ fontSize: 12.5, color: A, lineHeight: 1.45 }}><b>Test mode.</b> Enter any details — nothing will be charged. Use card 4242 4242 4242 4242 to try it.</div>
                 </div>
@@ -809,7 +809,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
                 {err && <div style={{ color: "#B5564B", fontSize: 12.5, marginTop: 8, paddingLeft: 2 }}>{err}</div>}
               </div>
 
-              <button disabled={busy} onClick={submit} style={{ width: "100%", marginTop: 18, background: busy ? "var(--border2)" : A, color: "var(--on-gold)", border: "none", borderRadius: 13, padding: 16, fontSize: 15.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: busy ? "default" : "pointer", boxShadow: busy ? "none" : "0 10px 22px -10px rgba(110,139,116,.65)" }}>{busy ? "Processing…" : (isPay ? `Pay $${amount}` : "Save card")}</button>
+              <button disabled={busy} onClick={submit} style={{ width: "100%", marginTop: 18, background: busy ? "var(--border2)" : A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 16, fontSize: 15.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: busy ? "default" : "pointer", boxShadow: busy ? "none" : "0 10px 22px -10px rgba(110,139,116,.65)" }}>{busy ? "Processing…" : (isPay ? `Pay $${amount}` : "Save card")}</button>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14, fontSize: 11.5, color: "var(--faint)" }}><Lock size={13} /> Encrypted &amp; secure · Powered by Stripe</div>
               <button onClick={close} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, marginTop: 12, cursor: "pointer", fontFamily: FONT_BODY, textDecoration: "underline", textUnderlineOffset: 3 }}>Cancel</button>
             </>
@@ -3081,19 +3081,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.08, letterSpacing: "-0.4px", margin: "0 0 12px", color: "var(--text)" }}>{business.name}</h1>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14, fontWeight: 400, lineHeight: 1.55, margin: "0 0 32px", maxWidth: 320 }}>Glad you're here. Let's find you a time.</p>
             <div style={{ display: "grid", gap: 12 }}>
-              <button onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ width: "100%", textAlign: "left", background: "var(--gold)", border: "none", borderRadius: 12, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--on-gold)", cursor: "pointer" }}>
+              <button onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ width: "100%", textAlign: "left", background: "var(--text)", border: "none", borderRadius: 12, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--bg)", cursor: "pointer" }}>
                 <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--on-gold)" }}>I've been here before</span>
-                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 400, marginTop: 5, color: "var(--on-gold)", opacity: 0.8 }}>We'll pull up your details</span>
+                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--bg)" }}>I've been here before</span>
+                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 400, marginTop: 5, color: "var(--bg)", opacity: 0.8 }}>We'll pull up your details</span>
                 </span>
-                <ChevronRight size={20} style={{ color: "var(--on-gold)", flexShrink: 0, opacity: 0.9 }} />
+                <ChevronRight size={20} style={{ color: "var(--bg)", flexShrink: 0, opacity: 0.9 }} />
               </button>
               <button onClick={() => { setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "1px solid var(--border)", borderRadius: 12, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" }}>
                 <span style={{ minWidth: 0 }}>
                   <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" }}>It's my first time</span>
                   <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", fontWeight: 400, marginTop: 5 }}>Welcome — let's take a look</span>
                 </span>
-                <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                <ChevronRight size={20} style={{ color: "var(--text)", flexShrink: 0 }} />
               </button>
             </div>
             {onManage && (
@@ -3143,7 +3143,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     return (
                       <button key={cat} onClick={() => { if (list.length === 1) selectService(list[0]); else setSimpleCat(cat); }} style={rowBtn}>
                         <span style={NAME}>{cat}</span>
-                        <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                        <ChevronRight size={20} style={{ color: "var(--text)", flexShrink: 0 }} />
                       </button>
                     );
                   })}
@@ -3166,9 +3166,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <button key={svc.id} onClick={() => selectService(svc)} style={rowBtn}>
                     <span style={{ minWidth: 0 }}>
                       <span style={{ ...NAME, display: "block" }}>{svc.name}</span>
-                      {svc.comboOf && svc.comboOf.length > 0 ? (() => { const incl = svc.comboOf.map((id) => { const x = services.find((y) => y.id === id); return x && x.name; }).filter(Boolean); return incl.length ? <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--gold)", fontWeight: 500, marginTop: 8 }}>Includes {incl.join(" + ")}</span> : null; })() : null}
+                      {svc.comboOf && svc.comboOf.length > 0 ? (() => { const incl = svc.comboOf.map((id) => { const x = services.find((y) => y.id === id); return x && x.name; }).filter(Boolean); return incl.length ? <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--text)", fontWeight: 500, marginTop: 8 }}>Includes {incl.join(" + ")}</span> : null; })() : null}
                     </span>
-                    <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                    <ChevronRight size={20} style={{ color: "var(--text)", flexShrink: 0 }} />
                   </button>
                 ))}
               </div>
@@ -3236,11 +3236,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{ct.label || niceName[ct.id]}</span>
-                    {ct.popular && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--gold)", fontWeight: 600 }}>Most common</span>}
+                    {ct.popular && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text)", fontWeight: 600 }}>Most common</span>}
                   </span>
-                  {showPrices && <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, color: "var(--gold)", marginTop: 6 }}>${ct.price}</span>}
+                  {showPrices && <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, color: "var(--text)", marginTop: 6 }}>${ct.price}</span>}
                 </span>
-                <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                <ChevronRight size={18} style={{ color: "var(--text)", flexShrink: 0 }} />
               </button>
             );
           };
@@ -3252,7 +3252,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, marginTop: 9 }}>{T.lead}</p>
               {draft.comboOf && draft.comboOf.length > 0 && (() => {
                 const incl = draft.comboOf.map((id) => { const s = services.find((x) => x.id === id); return s && s.name; }).filter(Boolean);
-                return incl.length ? <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--gold)", fontWeight: 500, margin: "10px 0 0" }}>Includes {incl.join(" + ")}</p> : null;
+                return incl.length ? <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--text)", fontWeight: 500, margin: "10px 0 0" }}>Includes {incl.join(" + ")}</p> : null;
               })()}
 
               {!picked ? (
@@ -3266,13 +3266,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 const cDur = (chosenCt && chosenCt.duration) || draft.duration;
                 return (
                 <div style={{ marginTop: 28, paddingTop: 26, borderTop: "1px solid var(--line)", textAlign: "center" }}>
-                  <div style={{ ...EYE, color: "var(--gold)", marginBottom: 14, textAlign: "center" }}>Selected service</div>
+                  <div style={{ ...EYE, color: "var(--text)", marginBottom: 14, textAlign: "center" }}>Selected service</div>
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 21, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.25, color: "var(--text)" }}>{cName}</div>
                   {(cPrice != null && cPrice !== "") ? <div style={{ marginTop: 9, display: "flex", justifyContent: "center", alignItems: "baseline", gap: 9 }}>
                     <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: "var(--text)" }}>${cPrice}</span>
                     {cDur ? <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}>· {cDur} min</span> : null}
                   </div> : null}
-                  <button onClick={changeCut} style={{ marginTop: 16, background: "none", border: "none", color: "var(--gold)", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 600, letterSpacing: 0.3, padding: 0, cursor: "pointer" }}>‹ Choose a different style</button>
+                  <button onClick={changeCut} style={{ marginTop: 16, background: "none", border: "none", color: "var(--text)", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 600, letterSpacing: 0.3, padding: 0, cursor: "pointer" }}>‹ Choose a different style</button>
                 </div>
                 );
               })()}
@@ -3356,7 +3356,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const card = (key, photo, label, sub, onClick) => (
             <button key={key} className="lift" onClick={onClick} style={{ position: "relative", height: 130, width: "100%", border: "none", borderRadius: 16, padding: 0, overflow: "hidden", color: "#fff", textAlign: "left", boxShadow: "var(--shadow-md)", background: "var(--panel2)" }}>
               {photo ? <img src={imgUrl(photo, 700)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
-              <div style={{ position: "absolute", inset: 0, background: photo ? "linear-gradient(90deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.20) 100%)" : "linear-gradient(120deg, color-mix(in srgb, var(--gold) 78%, #000) 0%, var(--gold) 100%)" }} />
+              <div style={{ position: "absolute", inset: 0, background: photo ? "linear-gradient(90deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.20) 100%)" : "linear-gradient(120deg, color-mix(in srgb, var(--text) 78%, #000) 0%, var(--text) 100%)" }} />
               <div style={{ position: "absolute", left: 22, top: 0, bottom: 0, right: 56, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                 <div style={{ width: 22, height: 1.5, background: "#fff", opacity: 0.9, marginBottom: 10 }} />
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1.05 }}>{label}</div>
@@ -3373,7 +3373,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           return (
             <div className="fade-up" style={{ margin: "0 -22px" }}>
               <div style={{ padding: "36px 24px 28px", textAlign: "center", marginBottom: 8 }}>
-                <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 22px" }} />
+                <div style={{ width: 36, height: 1.5, background: "var(--text)", margin: "0 auto 22px" }} />
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 42, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 14 }}>{guidedCat ? guidedCat : "Welcome in."}</div>
                 <div style={{ fontSize: 17, color: "var(--text)", lineHeight: 1.5, fontWeight: 400, maxWidth: 320, margin: "0 auto" }}>{showCats ? "Glad you're here. What are you here for today?" : (guidedCat ? "Pick your service." : "Glad you're here. What are we doing today?")}</div>
               </div>
@@ -3436,8 +3436,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           // Reusable header: gold rule + step label + big question + readable sub
           const Head = ({ step: s, q, sub }) => (
             <div style={{ padding: "8px 2px 30px" }}>
-              <div style={{ width: 34, height: 1.5, background: "var(--gold)", marginBottom: 18 }} />
-              <div style={{ fontSize: 12, letterSpacing: 3, color: "var(--gold)", fontWeight: 700, marginBottom: 18 }}>{s}</div>
+              <div style={{ width: 34, height: 1.5, background: "var(--text)", marginBottom: 18 }} />
+              <div style={{ fontSize: 12, letterSpacing: 3, color: "var(--text)", fontWeight: 700, marginBottom: 18 }}>{s}</div>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 40, fontWeight: 500, color: "var(--text)", lineHeight: 1.04, letterSpacing: "-0.5px", marginBottom: sub ? 16 : 0 }}>{q}</h2>
               {sub && <p style={{ color: "var(--text)", fontSize: 18, lineHeight: 1.45, fontWeight: 400, opacity: 0.78 }}>{sub}</p>}
             </div>
@@ -3448,10 +3448,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               {items.map((it, i) => (
                 <button key={i} className="lift-row" onClick={it.onTap} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, background: "none", border: "none", borderBottom: "1px solid var(--line)", padding: "22px 4px", textAlign: "left", color: "var(--text)" }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, lineHeight: 1.1, marginBottom: it.sub ? 6 : 0, color: it.gold ? "var(--gold)" : "var(--text)" }}>{it.title}</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, lineHeight: 1.1, marginBottom: it.sub ? 6 : 0, color: it.gold ? "var(--text)" : "var(--text)" }}>{it.title}</div>
                     {it.sub && <div style={{ fontSize: 17, color: "var(--sub)", lineHeight: 1.45 }}>{it.sub}</div>}
                   </div>
-                  <ChevronRight size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                  <ChevronRight size={22} style={{ color: "var(--text)", flexShrink: 0 }} />
                 </button>
               ))}
             </div>
@@ -3502,8 +3502,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             return (
               <div className="fade-up">
                 <div style={{ textAlign: "center", paddingTop: 6, marginBottom: 22 }}>
-                  <div className="success-bloom" style={{ width: 46, height: 46, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Check size={22} style={{ color: "var(--gold)" }} strokeWidth={2.5} /></div>
-                  <div style={{ fontSize: 12, letterSpacing: 3, color: "var(--gold)", fontWeight: 700 }}>YOUR MATCH</div>
+                  <div className="success-bloom" style={{ width: 46, height: 46, borderRadius: "50%", background: "color-mix(in srgb, var(--text) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Check size={22} style={{ color: "var(--text)" }} strokeWidth={2.5} /></div>
+                  <div style={{ fontSize: 12, letterSpacing: 3, color: "var(--text)", fontWeight: 700 }}>YOUR MATCH</div>
                 </div>
 
                 {/* Hero card — image if available, gorgeous typographic fallback if not */}
@@ -3516,12 +3516,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   ) : (
                     // Fallback: layered warm gradient with a giant ghosted serif initial
                     <div style={{ position: "absolute", inset: 0, background: "linear-gradient(145deg, #1a1714 0%, #2a2420 55%, #0f0d0b 100%)" }}>
-                      <div style={{ position: "absolute", top: -40, right: -20, fontFamily: "'Fraunces', serif", fontSize: 320, lineHeight: 1, color: "color-mix(in srgb, var(--gold) 14%, transparent)", fontWeight: 500, userSelect: "none" }}>{ct?.label?.charAt(0)}</div>
-                      <div style={{ position: "absolute", top: 22, left: 24, width: 40, height: 1.5, background: "var(--gold)" }} />
+                      <div style={{ position: "absolute", top: -40, right: -20, fontFamily: "'Fraunces', serif", fontSize: 320, lineHeight: 1, color: "color-mix(in srgb, var(--text) 14%, transparent)", fontWeight: 500, userSelect: "none" }}>{ct?.label?.charAt(0)}</div>
+                      <div style={{ position: "absolute", top: 22, left: 24, width: 40, height: 1.5, background: "var(--text)" }} />
                     </div>
                   )}
                   <div style={{ position: "absolute", left: 24, right: 24, bottom: 24, color: "#fff" }}>
-                    <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 700, marginBottom: 10 }}>WE'D SET YOU UP WITH</div>
+                    <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--text)", fontWeight: 700, marginBottom: 10 }}>WE'D SET YOU UP WITH</div>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 42, fontWeight: 500, lineHeight: 1.0, letterSpacing: "-0.5px", marginBottom: 14 }}>{ct?.label}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <span style={{ fontFamily: "'Fraunces', serif", fontSize: 26, color: "#fff" }}>${ct?.price}</span>
@@ -3533,12 +3533,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
                 {extra > 0 && (
                   <div style={{ borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "18px 2px", marginBottom: 24 }}>
-                    <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 700, marginBottom: 8 }}>A LITTLE EXTRA TIME</div>
+                    <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--text)", fontWeight: 700, marginBottom: 8 }}>A LITTLE EXTRA TIME</div>
                     <p style={{ fontSize: 16, color: "var(--text)", lineHeight: 1.5 }}>We'll set aside 10 more minutes to do it right. No extra charge — it's part of the cut.</p>
                   </div>
                 )}
 
-                <button className="lift" onClick={() => { setConsult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 18, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, marginBottom: 12, boxShadow: "var(--glow)" }}>BOOK IT</button>
+                <button className="lift" onClick={() => { setConsult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 18, fontSize: 14, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, marginBottom: 12, boxShadow: "var(--glow)" }}>BOOK IT</button>
                 <button onClick={() => { setConsult(null); setCutType(null); setCutPhase("type"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 12, fontSize: 14.5, fontWeight: 500, borderRadius: 12 }}>Let me choose myself</button>
               </div>
             );
@@ -3551,7 +3551,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           <div className="fade-up">
             {/* Editorial masthead — matches screen 1 (centered, no photo) */}
             <div style={{ padding: "8px 4px 26px", textAlign: "center", marginBottom: 8 }}>
-              <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 18px" }} />
+              <div style={{ width: 36, height: 1.5, background: "var(--text)", margin: "0 auto 18px" }} />
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 12 }}>Pick your cut</h2>
               <p style={{ color: "var(--text)", fontSize: 16, lineHeight: 1.5, fontWeight: 400, maxWidth: 320, margin: "0 auto" }}>Tap whichever's closest — your barber dials it in in the chair.</p>
             </div>
@@ -3567,9 +3567,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <div style={{ flex: 1, padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, minWidth: 0 }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.15, marginBottom: 3 }}>{ct.label}</div>
-                        <div style={{ fontSize: 13, color: "var(--gold)", fontWeight: 500 }}>${ct.price}</div>
+                        <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>${ct.price}</div>
                       </div>
-                      <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                      <ChevronRight size={20} style={{ color: "var(--text)", flexShrink: 0 }} />
                     </div>
                   </button>
                 );
@@ -3644,8 +3644,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 });
               }} />
               <button onClick={() => helperPhotoInputRef.current && helperPhotoInputRef.current.click()} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 13, color: "var(--text)", textAlign: "left", fontSize: 14 }}>
-                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <Camera size={17} style={{ color: "var(--gold)" }} />
+                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "color-mix(in srgb, var(--text) 14%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Camera size={17} style={{ color: "var(--text)" }} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
                   <span style={{ fontWeight: 500, fontSize: 15 }}>Show us a photo</span>
@@ -3654,8 +3654,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
               </button>
               <button onClick={() => setCutHelperOpen("notSure")} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 13, color: "var(--text)", textAlign: "left", fontSize: 14 }}>
-                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 19, color: "var(--gold)", fontWeight: 500 }}>?</span>
+                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "color-mix(in srgb, var(--text) 14%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 19, color: "var(--text)", fontWeight: 500 }}>?</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
                   <span style={{ fontWeight: 500, fontSize: 15 }}>I'm not sure</span>
@@ -3672,7 +3672,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <div style={{ width: 36, height: 4, background: "var(--border2)", borderRadius: 2, margin: "0 auto 18px" }} />
                   {cutHelperOpen === "photo" && (
                     <>
-                      <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+                      <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
                       <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1.1, marginBottom: 10 }}>Here's the look</h3>
                       <p style={{ color: "var(--text)", fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>We'll save this photo to your appointment so your barber sees it before you sit down.</p>
                       {helperPhotoUrl && (
@@ -3682,7 +3682,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       )}
                       {photoLoading && (
                         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", marginBottom: 14, fontSize: 14, color: "var(--sub)", display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid var(--line)", borderTopColor: "var(--gold)", animation: "spin .8s linear infinite", flexShrink: 0 }} />
+                          <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid var(--line)", borderTopColor: "var(--text)", animation: "spin .8s linear infinite", flexShrink: 0 }} />
                           <span>Finding your match…</span>
                         </div>
                       )}
@@ -3694,21 +3694,21 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         if (!match) return null;
                         return (
                           <div style={{ marginBottom: 14 }}>
-                            <div style={{ background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1.5px solid var(--gold)", borderRadius: 16, overflow: "hidden", marginBottom: 12 }}>
+                            <div style={{ background: "color-mix(in srgb, var(--text) 10%, var(--panel))", border: "1.5px solid var(--text)", borderRadius: 16, overflow: "hidden", marginBottom: 12 }}>
                               <div style={{ display: "flex", alignItems: "stretch", height: 90 }}>
                                 <div style={{ width: 90, height: 90, flexShrink: 0, background: "var(--panel2)", position: "relative", overflow: "hidden" }}>
                                   {match.images && match.images[0] && <img src={imgUrl(match.images[0], 240)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
                                 </div>
                                 <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                                  <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 4 }}>YOUR MATCH</div>
+                                  <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--text)", fontWeight: 600, marginBottom: 4 }}>YOUR MATCH</div>
                                   <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>{photoResult.matchLabel}</div>
                                 </div>
                               </div>
                               {photoResult.reason && (
-                                <div style={{ padding: "12px 16px", borderTop: "1px solid color-mix(in srgb, var(--gold) 25%, transparent)", fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{photoResult.reason}</div>
+                                <div style={{ padding: "12px 16px", borderTop: "1px solid color-mix(in srgb, var(--text) 25%, transparent)", fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{photoResult.reason}</div>
                               )}
                             </div>
-                            <button className="lift" onClick={() => { setCutType(match.id); setCutHelperOpen(null); setPhotoResult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 9 }}>Sounds right — book this</button>
+                            <button className="lift" onClick={() => { setCutType(match.id); setCutHelperOpen(null); setPhotoResult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 9 }}>Sounds right — book this</button>
                             <button onClick={() => helperPhotoInputRef.current && helperPhotoInputRef.current.click()} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", borderRadius: 12, padding: "12px", color: "var(--sub)", fontSize: 14 }}>Try a different photo</button>
                           </div>
                         );
@@ -3720,7 +3720,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                             {draft.cutTypes.map((ct) => (
                               <button key={ct.id} className="lift" onClick={() => { setCutType(ct.id); setCutHelperOpen(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", color: "var(--text)", textAlign: "left" }}>
                                 <span style={{ fontSize: 15, fontWeight: 500 }}>{ct.label}</span>
-                                <ChevronRight size={18} style={{ color: "var(--gold)" }} />
+                                <ChevronRight size={18} style={{ color: "var(--text)" }} />
                               </button>
                             ))}
                           </div>
@@ -3731,7 +3731,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   )}
                   {cutHelperOpen === "notSure" && (
                     <>
-                      <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+                      <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
                       <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1.1, marginBottom: 10 }}>No worries — describe what you want</h3>
                       <p style={{ color: "var(--text)", fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>Just type it in your own words. We'll match it to the right cut.</p>
                       <textarea
@@ -3773,7 +3773,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                               setNotSureLoading(false);
                             }
                           }}
-                          style={{ width: "100%", background: (notSureText.trim() && !notSureLoading) ? "var(--gold)" : "var(--border2)", color: (notSureText.trim() && !notSureLoading) ? "var(--on-gold)" : "var(--faint)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 16 }}
+                          style={{ width: "100%", background: (notSureText.trim() && !notSureLoading) ? "var(--text)" : "var(--border2)", color: (notSureText.trim() && !notSureLoading) ? "var(--bg)" : "var(--faint)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 16 }}
                         >
                           {notSureLoading ? "One sec…" : "Find my match"}
                         </button>
@@ -3786,21 +3786,21 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         if (!match) return null;
                         return (
                           <div style={{ marginBottom: 14 }}>
-                            <div style={{ background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1.5px solid var(--gold)", borderRadius: 16, overflow: "hidden", marginBottom: 12 }}>
+                            <div style={{ background: "color-mix(in srgb, var(--text) 10%, var(--panel))", border: "1.5px solid var(--text)", borderRadius: 16, overflow: "hidden", marginBottom: 12 }}>
                               <div style={{ display: "flex", alignItems: "stretch", height: 90 }}>
                                 <div style={{ width: 90, height: 90, flexShrink: 0, background: "var(--panel2)", position: "relative", overflow: "hidden" }}>
                                   {match.images && match.images[0] && <img src={imgUrl(match.images[0], 240)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
                                 </div>
                                 <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                                  <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 4 }}>BEST MATCH</div>
+                                  <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--text)", fontWeight: 600, marginBottom: 4 }}>BEST MATCH</div>
                                   <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>{notSureResult.matchLabel}</div>
                                 </div>
                               </div>
                               {notSureResult.reason && (
-                                <div style={{ padding: "12px 16px", borderTop: "1px solid color-mix(in srgb, var(--gold) 25%, transparent)", fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{notSureResult.reason}</div>
+                                <div style={{ padding: "12px 16px", borderTop: "1px solid color-mix(in srgb, var(--text) 25%, transparent)", fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{notSureResult.reason}</div>
                               )}
                             </div>
-                            <button className="lift" onClick={() => { setCutType(match.id); setCutHelperOpen(null); setNotSureText(""); setNotSureResult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 9 }}>Sounds right — book this</button>
+                            <button className="lift" onClick={() => { setCutType(match.id); setCutHelperOpen(null); setNotSureText(""); setNotSureResult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 9 }}>Sounds right — book this</button>
                             <button onClick={() => { setNotSureResult(null); setNotSureText(""); }} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", borderRadius: 12, padding: "12px", color: "var(--sub)", fontSize: 14 }}>Try a different description</button>
                           </div>
                         );
@@ -3840,7 +3840,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           <div className="fade-up">
             {/* Editorial masthead matches Pick Your Cut */}
             <div style={{ padding: "8px 4px 26px", textAlign: "center", marginBottom: 8 }}>
-              <div style={{ width: 36, height: 1.5, background: "var(--gold)", margin: "0 auto 18px" }} />
+              <div style={{ width: 36, height: 1.5, background: "var(--text)", margin: "0 auto 18px" }} />
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, color: "var(--text)", lineHeight: 1.02, letterSpacing: "-0.5px", marginBottom: 12 }}>Now the beard</h2>
               <p style={{ color: "var(--text)", fontSize: 16, lineHeight: 1.5, fontWeight: 400, maxWidth: 320, margin: "0 auto" }}>Tap the one that's closest — we'll set aside the right amount of time.</p>
             </div>
@@ -3858,7 +3858,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       {bt.desc && <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{bt.desc}</div>}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", padding: "0 16px" }}>
-                      <ChevronRight size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                      <ChevronRight size={20} style={{ color: "var(--text)", flexShrink: 0 }} />
                     </div>
                   </button>
                 );
@@ -3875,7 +3875,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <div style={{ fontSize: 16 }}>{draft.name}{draft.cutTypes && cutType ? ` · ${draft.cutTypes.find((c) => c.id === cutType)?.label}` : ""}</div>
                 <button onClick={() => { if (draft.beardTypes && draft.beardTypes.length) { setCutPhase("beard"); setBeardType(null); } else if (draft.cutTypes && draft.cutTypes.length) { setCutPhase("type"); setCutType(null); } else { setDraft(null); setStep(1); } }} style={{ background: "none", color: "var(--sub)", fontSize: 15, textDecoration: "underline", padding: 0, marginTop: 2 }}>Change</button>
               </div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, color: "var(--gold)" }}>${draft.cutTypes && cutType ? draft.cutTypes.find((c) => c.id === cutType)?.price : draft.price}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, color: "var(--text)" }}>${draft.cutTypes && cutType ? draft.cutTypes.find((c) => c.id === cutType)?.price : draft.price}</div>
             </div>
             {draft.addonGroups.length > 0 && <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 18 }}>Any add-ons?</h2>}
             {draft.addonGroups.length === 0 && <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300 }}>No add-ons for this service. Continue when ready.</p>}
@@ -3887,17 +3887,17 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </div>
                 {g.type === "choice" && g.options.map((o) => { const on = draftAddons[g.id] === o.id; return (
                   <button key={o.id} onClick={() => setDraftAddons({ ...draftAddons, [g.id]: o.id })} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", padding: "14px 0", borderBottom: "1px solid var(--line)", color: "var(--text)", textAlign: "left" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}><span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--faint)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--gold)" }} />}</span><span style={{ fontSize: 15 }}>{o.label}</span></div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}><span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--text)" : "var(--faint)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--text)" }} />}</span><span style={{ fontSize: 15 }}>{o.label}</span></div>
                     <span style={{ color: "var(--sub)", fontSize: 14, textAlign: "right" }}>{o.price > 0 ? `+ $${o.price}` : ""}{o.min > 0 ? <div style={{ fontSize: 14, color: "var(--faint)" }}>+ {o.min}min</div> : null}</span>
                   </button>); })}
                 {g.type === "addon" && g.required && (
                   <div>
                     <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 10 }}>{g.item.desc}</div>
-                    <button onClick={() => setDraftAddons({ ...draftAddons, [g.id]: true })} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: draftAddons[g.id] === true ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${draftAddons[g.id] === true ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: "var(--text)", textAlign: "left", marginBottom: 8 }}>
+                    <button onClick={() => setDraftAddons({ ...draftAddons, [g.id]: true })} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: draftAddons[g.id] === true ? "color-mix(in srgb, var(--text) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${draftAddons[g.id] === true ? "var(--text)" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: "var(--text)", textAlign: "left", marginBottom: 8 }}>
                       <span style={{ fontSize: 15.5 }}>Yes, add it</span>
-                      <span style={{ fontSize: 14.5, color: draftAddons[g.id] === true ? "var(--gold)" : "var(--sub)" }}>+ ${g.item.price}</span>
+                      <span style={{ fontSize: 14.5, color: draftAddons[g.id] === true ? "var(--text)" : "var(--sub)" }}>+ ${g.item.price}</span>
                     </button>
-                    <button onClick={() => setDraftAddons({ ...draftAddons, [g.id]: false })} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: draftAddons[g.id] === false ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${draftAddons[g.id] === false ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: draftAddons[g.id] === false ? "var(--text)" : "var(--sub)", textAlign: "left" }}>
+                    <button onClick={() => setDraftAddons({ ...draftAddons, [g.id]: false })} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: draftAddons[g.id] === false ? "color-mix(in srgb, var(--text) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${draftAddons[g.id] === false ? "var(--text)" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: draftAddons[g.id] === false ? "var(--text)" : "var(--sub)", textAlign: "left" }}>
                       <span style={{ fontSize: 15.5 }}>No, thank you</span>
                     </button>
                   </div>
@@ -3906,12 +3906,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <button onClick={() => setDraftAddons({ ...draftAddons, [g.id]: draftAddons[g.id] ? false : true })} style={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 14, background: draftAddons[g.id] ? "rgba(176,141,87,0.08)" : "none", border: `1px solid ${draftAddons[g.id] ? "rgba(176,141,87,0.3)" : "var(--border)"}`, borderRadius: 6, padding: 14, color: "var(--text)", textAlign: "left", overflow: "hidden" }}>
                     {business.showAddonPhotos && g.photo && <img src={imgUrl(g.photo, 360)} alt="" style={{ width: 128, height: 128, borderRadius: 16, objectFit: "cover", flexShrink: 0 }} />}
                     <div style={{ flex: 1 }}><div style={{ fontSize: 15, marginBottom: 4 }}>{g.item.name}</div><div style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.5, fontWeight: 300 }}>{g.item.desc}</div></div>
-                    <span style={{ color: "var(--sub)", fontSize: 14, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>+ ${g.item.price} {draftAddons[g.id] ? <Check size={16} style={{ color: "var(--gold)" }} /> : <Plus size={16} />}</span>
+                    <span style={{ color: "var(--sub)", fontSize: 14, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>+ ${g.item.price} {draftAddons[g.id] ? <Check size={16} style={{ color: "var(--text)" }} /> : <Plus size={16} />}</span>
                   </button>
                 )}
               </div>
             ))}
-            <button className="lift" disabled={draft.addonGroups.some((g) => (g.type === "choice" && !draftAddons[g.id]) || (g.type === "addon" && g.required && draftAddons[g.id] === undefined))} onClick={() => setStep(3)} style={{ width: "100%", marginTop: 8, background: draft.addonGroups.some((g) => (g.type === "choice" && !draftAddons[g.id]) || (g.type === "addon" && g.required && draftAddons[g.id] === undefined)) ? "var(--border)" : "var(--gold)", color: draft.addonGroups.some((g) => (g.type === "choice" && !draftAddons[g.id]) || (g.type === "addon" && g.required && draftAddons[g.id] === undefined)) ? "var(--faint)" : "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Continue</button>
+            <button className="lift" disabled={draft.addonGroups.some((g) => (g.type === "choice" && !draftAddons[g.id]) || (g.type === "addon" && g.required && draftAddons[g.id] === undefined))} onClick={() => setStep(3)} style={{ width: "100%", marginTop: 8, background: draft.addonGroups.some((g) => (g.type === "choice" && !draftAddons[g.id]) || (g.type === "addon" && g.required && draftAddons[g.id] === undefined)) ? "var(--border)" : "var(--text)", color: draft.addonGroups.some((g) => (g.type === "choice" && !draftAddons[g.id]) || (g.type === "addon" && g.required && draftAddons[g.id] === undefined)) ? "var(--faint)" : "var(--bg)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Continue</button>
           </div>
         )}
 
@@ -3957,7 +3957,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           };
           return (
             <div className="fade-up">
-              <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+              <div style={{ width: 32, height: 1.5, background: "var(--text)", marginBottom: 14 }} />
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Who and when</h2>
               <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 26, fontWeight: 400, lineHeight: 1.5 }}>Tap a barber to lock in their next opening.</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -3973,11 +3973,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{p.name}</div>
                             {p.role && <div style={{ fontSize: 12, color: "var(--faint)", letterSpacing: 1.5, marginTop: 3, textTransform: "uppercase" }}>{p.role}</div>}
                           </div>
-                          <ChevronRight size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                          <ChevronRight size={22} style={{ color: "var(--text)", flexShrink: 0 }} />
                         </div>
                         {next ? (
                           <div style={{ fontSize: 14, color: "var(--text)", marginTop: 4, display: "flex", alignItems: "center", gap: 7 }}>
-                            <Clock size={14} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                            <Clock size={14} style={{ color: "var(--text)", flexShrink: 0 }} />
                             <span style={{ fontWeight: 500 }}>{fmtNext(next)}</span>
                           </div>
                         ) : (
@@ -3988,7 +3988,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     {next && (
                       <button onClick={() => openCalendarWith(p)} style={{ width: "100%", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "12px 18px", textAlign: "left", color: "var(--sub)", fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span>See other times</span>
-                        <span style={{ color: "var(--gold)" }}>→</span>
+                        <span style={{ color: "var(--text)" }}>→</span>
                       </button>
                     )}
                   </div>
@@ -4000,12 +4000,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <div>
                         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>Anyone</div>
                         <div style={{ fontSize: 13.5, color: "var(--text)", marginTop: 5, display: "flex", alignItems: "center", gap: 6 }}>
-                          <Clock size={13} style={{ color: "var(--gold)" }} />
+                          <Clock size={13} style={{ color: "var(--text)" }} />
                           <span style={{ fontWeight: 500 }}>{fmtNext(anyoneNext.next)}</span>
                         </div>
                       </div>
                     </div>
-                    <ChevronRight size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                    <ChevronRight size={22} style={{ color: "var(--text)", flexShrink: 0 }} />
                   </button>
                 )}
               </div>
@@ -4041,8 +4041,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             setSlot(null); setStep(6);
           };
           const ready = selectedDate && slot != null;
-          const tabStyle = (on) => ({ background: "none", border: "none", padding: "0 1px 12px", marginBottom: -1, fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: on ? "var(--text)" : "var(--sub)", borderBottom: on ? "2px solid var(--gold)" : "2px solid transparent", cursor: "pointer" });
-          const cell = (on) => ({ textAlign: "center", padding: "15px 4px", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", borderRadius: 2, fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" });
+          const tabStyle = (on) => ({ background: "none", border: "none", padding: "0 1px 12px", marginBottom: -1, fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: on ? "var(--text)" : "var(--sub)", borderBottom: on ? "2px solid var(--text)" : "2px solid transparent", cursor: "pointer" });
+          const cell = (on) => ({ textAlign: "center", padding: "15px 4px", border: `1px solid ${on ? "var(--text)" : "var(--border)"}`, background: on ? "var(--text)" : "var(--panel)", color: on ? "var(--bg)" : "var(--text)", borderRadius: 2, fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" });
           return (
             <div className="fade-up" style={{ color: "var(--text)", paddingTop: 4 }}>
               <div style={{ fontSize: 12.5, letterSpacing: 0.5, color: "var(--sub)", marginBottom: 10 }}>{describeEntry({ service: draft, addons: draftAddons, cutType, beardType })} · {svcMin} min</div>
@@ -4059,9 +4059,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
               <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 6, marginBottom: 22 }}>
                 {dateOptions.slice(0, 21).map((d, i) => { const on = selectedDate && d.toDateString() === selectedDate.toDateString(); return (
-                  <button key={i} onClick={() => { const sl = waSlotsFor(pid, d); setSelectedDate(d); setSlot(sl.length ? sl[0] : null); setSlotConflict(false); }} style={{ flexShrink: 0, minWidth: 62, textAlign: "center", padding: "12px 6px 10px", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel)", borderRadius: 2, cursor: "pointer" }}>
-                    <div style={{ fontSize: 11, letterSpacing: 2, fontWeight: 500, color: on ? "var(--on-gold)" : (dayDiff(d) === 0 ? "var(--sub)" : "var(--faint)"), whiteSpace: "nowrap" }}>{stripLbl(d)}</div>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, lineHeight: "26px", color: on ? "var(--on-gold)" : "var(--text)" }}>{d.getDate()}</div>
+                  <button key={i} onClick={() => { const sl = waSlotsFor(pid, d); setSelectedDate(d); setSlot(sl.length ? sl[0] : null); setSlotConflict(false); }} style={{ flexShrink: 0, minWidth: 62, textAlign: "center", padding: "12px 6px 10px", border: `1px solid ${on ? "var(--text)" : "var(--border)"}`, background: on ? "var(--text)" : "var(--panel)", borderRadius: 2, cursor: "pointer" }}>
+                    <div style={{ fontSize: 11, letterSpacing: 2, fontWeight: 500, color: on ? "var(--bg)" : (dayDiff(d) === 0 ? "var(--sub)" : "var(--faint)"), whiteSpace: "nowrap" }}>{stripLbl(d)}</div>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, lineHeight: "26px", color: on ? "var(--bg)" : "var(--text)" }}>{d.getDate()}</div>
                   </button>
                 ); })}
               </div>
@@ -4085,7 +4085,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 {ready && (
                   <div style={{ fontSize: 15.5, color: "var(--text)", marginBottom: 14 }}><span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{dayLbl}</span> · {fmtTime(slot)}{withName ? ` with ${withName}` : ""}</div>
                 )}
-                <button disabled={!ready} onClick={commit} style={{ width: "100%", background: ready ? "var(--gold)" : "var(--panel2)", color: ready ? "var(--on-gold)" : "var(--faint)", border: "none", textAlign: "center", padding: 15, borderRadius: 2, fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", cursor: ready ? "pointer" : "default" }}>Continue</button>
+                <button disabled={!ready} onClick={commit} style={{ width: "100%", background: ready ? "var(--text)" : "var(--panel2)", color: ready ? "var(--bg)" : "var(--faint)", border: "none", textAlign: "center", padding: 15, borderRadius: 2, fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", cursor: ready ? "pointer" : "default" }}>Continue</button>
               </div>
             </div>
           );
@@ -4094,14 +4094,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* STEP 4 — add another */}
         {step === 4 && (
           <div className="fade-up">
-            <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginBottom: 14 }} />
+            <div style={{ width: 32, height: 1.5, background: "var(--text)", marginBottom: 14 }} />
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Your visit so far</h2>
             <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 400, marginBottom: 24, lineHeight: 1.5 }}>Add anything else, or carry on to pick a time.</p>
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "8px 18px", marginBottom: 24 }}>
               {cart.map((e, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 0", borderBottom: i < cart.length - 1 ? "1px solid var(--line)" : "none", gap: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Check size={18} style={{ color: "var(--gold)" }} /></div>
+                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: "color-mix(in srgb, var(--text) 14%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Check size={18} style={{ color: "var(--text)" }} /></div>
                     <div><div style={{ fontSize: 15.5, fontWeight: 500 }}>{describeEntry(e)}</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>{e.forName ? `for ${e.forName.split(" ")[0]} · ` : ""}with {e.provider.name}</div></div>
                   </div>
                   <button onClick={() => setCart(cart.filter((_, idx) => idx !== i))} style={{ background: "none", color: "var(--faint)", fontSize: 13.5 }}>Remove</button>
@@ -4109,9 +4109,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               ))}
             </div>
             {(business?.booking?.allowMultiple !== false || (matched && (matched.family || []).length > 0)) && (
-              <button className="lift" onClick={() => { if (matched && (matched.family || []).length > 0) { setShowWhoFor(true); } else { setStep(1); } }} style={{ width: "100%", background: "var(--panel)", border: "1px dashed var(--border2)", color: "var(--gold)", padding: 16, fontSize: 15, fontWeight: 500, borderRadius: 14, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}><Plus size={18} /> Add another{matched && (matched.family || []).length > 0 ? " (you or someone else)" : " service"}</button>
+              <button className="lift" onClick={() => { if (matched && (matched.family || []).length > 0) { setShowWhoFor(true); } else { setStep(1); } }} style={{ width: "100%", background: "var(--panel)", border: "1px dashed var(--border2)", color: "var(--text)", padding: 16, fontSize: 15, fontWeight: 500, borderRadius: 14, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}><Plus size={18} /> Add another{matched && (matched.family || []).length > 0 ? " (you or someone else)" : " service"}</button>
             )}
-            <button className="lift" onClick={() => setStep(6)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 14 }}>That's everything — pick a time →</button>
+            <button className="lift" onClick={() => setStep(6)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 17, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 14 }}>That's everything — pick a time →</button>
           </div>
         )}
 
@@ -4159,14 +4159,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </div>
                 )}
                 <div style={{ padding: "22px 20px", textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your usual</div>
+                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 2, color: "var(--text)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your usual</div>
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.2, lineHeight: 1.2, color: "var(--text)" }}>{usualSvc.name}</div>
                   {usualProv && usualProv.id !== "anyone" ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginTop: 8 }}>with {usualProv.name}</div> : null}
                 </div>
               </div>
 
               {nextAvail ? (
-                <button onClick={() => { setCart([usualEntry]); setSelectedDate(nextAvail.date); setSlot(nextAvail.slot); setCameFromUsual(true); setShowUsual(false); setStep(7); }} style={{ width: "100%", textAlign: "left", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "16px 18px", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
+                <button onClick={() => { setCart([usualEntry]); setSelectedDate(nextAvail.date); setSlot(nextAvail.slot); setCameFromUsual(true); setShowUsual(false); setStep(7); }} style={{ width: "100%", textAlign: "left", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: "16px 18px", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
                   <span style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, fontWeight: 600, opacity: 0.85, letterSpacing: 1.5, textTransform: "uppercase" }}>Book next available{usualProv && usualProv.id !== "anyone" ? ` with ${usualProv.name}` : ""}</span>
                     <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, lineHeight: 1.2 }}>{nextLabel}</span>
@@ -4193,7 +4193,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ position: "relative", marginBottom: 18 }}><Mail size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus inputMode="email" autoComplete="email" autoCapitalize="none" value={clientEmail} onChange={(e) => { setClientEmail(e.target.value); setLoginNoMatch(null); }} placeholder="you@email.com" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             {loginNoMatch === "nomatch" && (
               <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", marginBottom: 16, fontSize: 14, lineHeight: 1.5, color: "var(--text)" }}>
-                We couldn't find that email on file. Double-check it, or <button onClick={() => { setLoginNoMatch(null); setStep(1); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer", fontFamily: "inherit" }}>book as a new client</button>.
+                We couldn't find that email on file. Double-check it, or <button onClick={() => { setLoginNoMatch(null); setStep(1); }} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer", fontFamily: "inherit" }}>book as a new client</button>.
               </div>
             )}
             {loginNoMatch === "error" && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Couldn't send the code — give it another try in a moment.</p>}
@@ -4211,7 +4211,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 } else { setLoginNoMatch("error"); }
               } catch (e) { setLoginNoMatch("error"); }
               setLoginBusy(false);
-            }} style={{ width: "100%", background: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "transparent" : "var(--gold)", color: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "var(--faint)" : "var(--on-gold)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "1px solid var(--border)" : "none", cursor: "pointer" }}>{loginBusy ? "Sending…" : "Email my code →"}</button>
+            }} style={{ width: "100%", background: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "transparent" : "var(--text)", color: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "var(--faint)" : "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "1px solid var(--border)" : "none", cursor: "pointer" }}>{loginBusy ? "Sending…" : "Email my code →"}</button>
             <p style={{ textAlign: "center", marginTop: 16 }}>
               <button onClick={() => setStep(1)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>First time here? Book as a new client</button>
             </p>
@@ -4226,10 +4226,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             {/* SMS opt-in disclosure — required by carriers (A2P 10DLC) so Twilio's reviewer can verify on the public booking page. */}
             <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
-              By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
+              By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text)", textDecoration: "underline" }}>terms</a>.
             </p>
-            <p style={{ color: "var(--faint)", fontSize: 14, marginBottom: 22 }}>Try <span style={{ color: "var(--gold)", cursor: "pointer" }} onClick={() => setPhone("503-555-0142")}>503-555-0142</span> (returning client Marcus).</p>
-            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={async () => { const digits = phone.replace(/\D/g, ""); let found = null; try { const { data, error } = await supabase.rpc("lookup_client_by_phone", { p_shop: SHOP_ID, p_phone: phone }); if (!error && data) found = data; } catch (e) {} if (!found) found = clients.find((c) => (c.phone || "").replace(/\D/g, "") === digits) || null; if (found && found.blocked) { setBlockedNotice(true); return; } setPendingMatch(found); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "transparent" : "var(--gold)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: phone.replace(/\D/g, "").length < 10 ? "1px solid var(--border)" : "none", cursor: "pointer" }}>Text me a code →</button>
+            <p style={{ color: "var(--faint)", fontSize: 14, marginBottom: 22 }}>Try <span style={{ color: "var(--text)", cursor: "pointer" }} onClick={() => setPhone("503-555-0142")}>503-555-0142</span> (returning client Marcus).</p>
+            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={async () => { const digits = phone.replace(/\D/g, ""); let found = null; try { const { data, error } = await supabase.rpc("lookup_client_by_phone", { p_shop: SHOP_ID, p_phone: phone }); if (!error && data) found = data; } catch (e) {} if (!found) found = clients.find((c) => (c.phone || "").replace(/\D/g, "") === digits) || null; if (found && found.blocked) { setBlockedNotice(true); return; } setPendingMatch(found); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "transparent" : "var(--text)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: phone.replace(/\D/g, "").length < 10 ? "1px solid var(--border)" : "none", cursor: "pointer" }}>Text me a code →</button>
             <p style={{ textAlign: "center", marginTop: 14 }}>
               <button onClick={() => setUsePhone(false)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>Use my email instead</button>
             </p>
@@ -4238,10 +4238,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
         {/* CODE VERIFICATION — confirms the texted code (accepts any 6 digits until Twilio is live) */}
         <Sheet open={blockedNotice} onClose={() => setBlockedNotice(false)} align="top">
-          <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+          <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
           <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Online booking unavailable</h2>
           <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>We're not able to accept new appointments online at this time. Please check back later.</p>
-          <button onClick={() => setBlockedNotice(false)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>OK</button>
+          <button onClick={() => setBlockedNotice(false)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>OK</button>
         </Sheet>
         {/* Duplicate-appointment reminder — the client already has one within 10 days of this booking. */}
         <Sheet open={!!dupWarn} onClose={() => setDupWarn(null)} align="top">
@@ -4252,10 +4252,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             const prov = providers.find((p) => p.id === dupWarn.existing.providerId);
             return (
               <>
-                <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+                <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
                 <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>You already have an appointment</h2>
                 <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>You're booked for <strong style={{ color: "var(--text)" }}>{dupWarn.existing.title || "an appointment"}</strong> on <strong style={{ color: "var(--text)" }}>{dayTxt}</strong> at <strong style={{ color: "var(--text)" }}>{timeTxt}</strong>{prov ? ` with ${prov.name}` : ""} — that's close to the one you're booking now. Want to keep both, or cancel the earlier one?</p>
-                <button className="lift" onClick={() => { const ph = dupWarn.phone, em = dupWarn.email; setDupWarn(null); doCommitBooking(ph, em); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>Keep both</button>
+                <button className="lift" onClick={() => { const ph = dupWarn.phone, em = dupWarn.email; setDupWarn(null); doCommitBooking(ph, em); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>Keep both</button>
                 <button onClick={() => { const ex = dupWarn.existing, ph = dupWarn.phone, em = dupWarn.email; try { supabase.rpc('cancel_my_appointment', { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(ex.id) }); } catch (e) {} setMyAppts((cur) => cur.map((a) => a.id === ex.id ? { ...a, status: "cancelled" } : a)); setDupWarn(null); doCommitBooking(ph, em); }} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 14.5, fontWeight: 500, borderRadius: 12 }}>Cancel the {dayTxt} one</button>
               </>
             );
@@ -4263,10 +4263,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         </Sheet>
         {/* Client-type gate — fires when the shop's "Who can book" setting blocks this client type. */}
         <Sheet open={!!clientTypeBlock} onClose={() => setClientTypeBlock(null)} align="top">
-          <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+          <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
           <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>{clientTypeBlock === "returning_only" ? "Returning clients only" : "New clients only"}</h2>
           <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>{clientTypeBlock === "returning_only" ? "Online booking at this shop is currently open to returning clients only. Please give us a call to book your first visit." : "Online booking at this shop is currently for new clients only. Please give us a call to book your next visit."}{business?.phones?.[0]?.number ? ` Phone: ${business.phones[0].number}.` : ""}</p>
-          <button onClick={() => setClientTypeBlock(null)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>OK</button>
+          <button onClick={() => setClientTypeBlock(null)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>OK</button>
         </Sheet>
         {step === 5 && showCodeEntry && (
           <div className="fade-up">
@@ -4277,7 +4277,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {!usePhone && <div style={{ marginBottom: 16 }} />}
             <input autoFocus inputMode="numeric" value={codeEntry} onChange={(e) => { setCodeEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(false); }} placeholder="• • • • • •" style={{ ...inputStyle, textAlign: "center", fontSize: 28, letterSpacing: 8, marginBottom: codeError ? 8 : 18 }} />
             {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>{usePhone ? "Enter all 6 digits." : (codeEntry.length < 6 ? "Enter all 6 digits." : "That code didn't match — check the email and try again.")}</p>}
-            <button className="lift" disabled={loginBusy} onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } let found = pendingMatch; if (!usePhone) { setLoginBusy(true); try { const { data, error } = await supabase.rpc("verify_client_code", { p_shop: shopId, p_email: clientEmail.trim().toLowerCase(), p_code: codeEntry }); setLoginBusy(false); if (error || !data) { setCodeError(true); return; } found = data; } catch (e) { setLoginBusy(false); setCodeError(true); return; } } const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = list.filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
+            <button className="lift" disabled={loginBusy} onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } let found = pendingMatch; if (!usePhone) { setLoginBusy(true); try { const { data, error } = await supabase.rpc("verify_client_code", { p_shop: shopId, p_email: clientEmail.trim().toLowerCase(), p_code: codeEntry }); setLoginBusy(false); if (error || !data) { setCodeError(true); return; } found = data; } catch (e) { setLoginBusy(false); setCodeError(true); return; } } const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = list.filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { setStep(cart.length === 0 ? 1 : 6); } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
             <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6 }}>{usePhone ? "Use a different number" : "Use a different email"}</button>
           </div>
         )}
@@ -4311,19 +4311,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               {[selfPerson, ...(matched.family || []).map((m) => ({ id: m.id, name: m.name, note: m.note, isMember: true }))].map((person) => {
                 const key = person.id || "self"; const on = isSel(key);
                 return (
-                  <button key={key} onClick={() => toggle(person)} style={{ width: "100%", background: "transparent", color: "var(--text)", padding: "16px 16px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, marginBottom: 11, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer" }}>
+                  <button key={key} onClick={() => toggle(person)} style={{ width: "100%", background: "transparent", color: "var(--text)", padding: "16px 16px", borderRadius: 10, border: `1px solid ${on ? "var(--text)" : "var(--border)"}`, marginBottom: 11, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer" }}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                       <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500 }}>{person.id ? person.name : "Myself"}</span>
                       <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", fontWeight: 400 }}>{person.id ? (person.note || "") : matched.name}</span>
                     </span>
-                    <span style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={14} style={{ color: "var(--on-gold)" }} />}</span>
+                    <span style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, border: `1.5px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={14} style={{ color: "var(--bg)" }} />}</span>
                   </button>
                 );
               })}
-              <button onClick={() => { setNewMemberName(""); setNewMemberNote(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", color: "var(--gold)", padding: "16px", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, borderRadius: 10, border: "1px dashed var(--border2)", textAlign: "left", display: "flex", alignItems: "center", gap: 10, marginBottom: 22, cursor: "pointer" }}>
+              <button onClick={() => { setNewMemberName(""); setNewMemberNote(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", color: "var(--text)", padding: "16px", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, borderRadius: 10, border: "1px dashed var(--border2)", textAlign: "left", display: "flex", alignItems: "center", gap: 10, marginBottom: 22, cursor: "pointer" }}>
                 <Plus size={18} /> <span>Someone new</span>
               </button>
-              <button disabled={groupPeople.length === 0} onClick={continueGroup} style={{ width: "100%", background: groupPeople.length ? "var(--gold)" : "transparent", color: groupPeople.length ? "var(--on-gold)" : "var(--faint)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: groupPeople.length ? "none" : "1px solid var(--border)", cursor: groupPeople.length ? "pointer" : "default" }}>
+              <button disabled={groupPeople.length === 0} onClick={continueGroup} style={{ width: "100%", background: groupPeople.length ? "var(--text)" : "transparent", color: groupPeople.length ? "var(--bg)" : "var(--faint)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: groupPeople.length ? "none" : "1px solid var(--border)", cursor: groupPeople.length ? "pointer" : "default" }}>
                 {groupPeople.length > 1 ? `Continue — ${groupPeople.length} people →` : "Continue →"}
               </button>
             </div>
@@ -4333,7 +4333,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* ADD A FAMILY MEMBER */}
         {showWhoFor && matched && addingMember && (
           <div className="fade-up">
-            <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>NEW PERSON</div>
+            <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--text)", fontWeight: 600, marginBottom: 14 }}>NEW PERSON</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Who are we adding?</h2>
             <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 22, fontWeight: 400, lineHeight: 1.5 }}>They'll be saved under your account for next time.</p>
             <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>First name</label>
@@ -4346,14 +4346,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               setMatched({ ...matched, family: [...(matched.family || []), member] });
               setGroupPeople((cur) => [...cur, { id: member.id, name: member.name, note: member.note, isMember: true }]);
               setAddingMember(false); // back to the multi-select, now with this person added & selected
-            }} style={{ width: "100%", background: newMemberName.trim() ? "var(--gold)" : "var(--border2)", color: newMemberName.trim() ? "var(--on-gold)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, border: "none" }}>ADD &amp; CONTINUE →</button>
+            }} style={{ width: "100%", background: newMemberName.trim() ? "var(--text)" : "var(--border2)", color: newMemberName.trim() ? "var(--bg)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, border: "none" }}>ADD &amp; CONTINUE →</button>
           </div>
         )}
 
         {/* TOGETHER vs SEPARATE — only for multiple people */}
         {showSchedChoice && (
           <div className="fade-up">
-            <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>{groupPeople.map((p) => (p.id ? p.name : "You")).map((n) => n.split(" ")[0]).join(" & ").toUpperCase()}</div>
+            <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--text)", fontWeight: 600, marginBottom: 14 }}>{groupPeople.map((p) => (p.id ? p.name : "You")).map((n) => n.split(" ")[0]).join(" & ").toUpperCase()}</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>How do you want to book?</h2>
             <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>We can get everyone in on the same visit, or just find the soonest opening for each.</p>
             <button className="lift" onClick={() => { setGroupMode("together"); setShowSchedChoice(false); setShowWizardIntro(true); setWizardIdx(0); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", marginBottom: 13, textAlign: "left", display: "flex", flexDirection: "column", gap: 4 }}>
@@ -4408,17 +4408,17 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           };
           return (
             <div className="fade-up">
-              <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>{isFirst ? "LET'S START WITH" : "NEXT UP"} · {first.toUpperCase()}</div>
+              <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--text)", fontWeight: 600, marginBottom: 14 }}>{isFirst ? "LET'S START WITH" : "NEXT UP"} · {first.toUpperCase()}</div>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{isFirst ? `Let's start with ${first}` : `Now let's get ${first} taken care of`}</h2>
               <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>Person {wizardIdx + 1} of {groupPeople.length}.</p>
               {usualSvc && (
-                <div style={{ border: "1.5px solid var(--gold)", borderRadius: 16, overflow: "hidden", marginBottom: 13 }}>
-                  <button onClick={() => setExpandUsual(!expandUsual)} style={{ width: "100%", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", color: "var(--text)", padding: "16px 18px", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, border: "none" }}>
+                <div style={{ border: "1.5px solid var(--text)", borderRadius: 16, overflow: "hidden", marginBottom: 13 }}>
+                  <button onClick={() => setExpandUsual(!expandUsual)} style={{ width: "100%", background: "color-mix(in srgb, var(--text) 10%, var(--panel))", color: "var(--text)", padding: "16px 18px", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, border: "none" }}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                       <span style={{ fontSize: 17, fontWeight: 500 }}>{first}'s usual</span>
                       <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300 }}>{usualSvc.name} · {getDuration(who, usualSvc, usualProv && usualProv.id !== "anyone" ? usualProv.id : "dan")} min{usualProv && usualProv.id !== "anyone" ? ` · with ${usualProv.name}` : ""}</span>
                     </span>
-                    <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0, transform: expandUsual ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
+                    <ChevronRight size={18} style={{ color: "var(--text)", flexShrink: 0, transform: expandUsual ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
                   </button>
                   {expandUsual && (
                     <div style={{ padding: "4px 18px 16px", background: "var(--panel)" }}>
@@ -4426,7 +4426,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         <div style={{ display: "grid", gap: 10, margin: "12px 0 16px" }}>
                           {usualDetails.map((d, i) => (
                             <div key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
-                              <Check size={15} style={{ color: "var(--gold)", marginTop: 3, flexShrink: 0 }} />
+                              <Check size={15} style={{ color: "var(--text)", marginTop: 3, flexShrink: 0 }} />
                               <div><div style={{ fontSize: 14.5 }}>{d.label}</div>{d.desc && <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.45 }}>{d.desc}</div>}</div>
                             </div>
                           ))}
@@ -4434,8 +4434,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       ) : (
                         <p style={{ fontSize: 13.5, color: "var(--sub)", margin: "12px 0 16px", lineHeight: 1.5 }}>Just the {usualSvc.name.toLowerCase()} — no extras last time.</p>
                       )}
-                      <button className="lift" onClick={bookUsual} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none", marginBottom: 9 }}>Book this →</button>
-                      <button onClick={tweakUsual} style={{ width: "100%", background: "transparent", color: "var(--gold)", padding: 12, fontSize: 14.5, border: "1px solid var(--border2)", borderRadius: 10 }}>Tweak it — change add-ons</button>
+                      <button className="lift" onClick={bookUsual} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 14, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none", marginBottom: 9 }}>Book this →</button>
+                      <button onClick={tweakUsual} style={{ width: "100%", background: "transparent", color: "var(--text)", padding: 12, fontSize: 14.5, border: "1px solid var(--border2)", borderRadius: 10 }}>Tweak it — change add-ons</button>
                     </div>
                   )}
                 </div>
@@ -4453,7 +4453,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           <div className="fade-up">
             {slotConflict && (
               <div style={{ background: "rgba(176,141,87,0.10)", border: "1px solid rgba(176,141,87,0.30)", borderRadius: 12, padding: "13px 16px", marginBottom: 18, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <AlertCircle size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+                <AlertCircle size={17} style={{ color: "var(--text)", flexShrink: 0, marginTop: 1 }} />
                 <div style={{ fontSize: 14, lineHeight: 1.5 }}>That time was just taken — pick another opening below.</div>
               </div>
             )}
@@ -4482,13 +4482,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const isFirstToday = firstOpen.toDateString() === new Date().toDateString();
               const already = selectedDate && firstOpen.toDateString() === selectedDate.toDateString();
               return (
-                <button onClick={() => { setSelectedDate(firstOpen); setSlot(null); setSlotConflict(false); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: `1px solid ${already ? "var(--gold)" : "var(--border)"}`, borderRadius: 10, padding: "15px 17px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
+                <button onClick={() => { setSelectedDate(firstOpen); setSlot(null); setSlotConflict(false); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: `1px solid ${already ? "var(--text)" : "var(--border)"}`, borderRadius: 10, padding: "15px 17px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
                   <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase" }}>Soonest opening</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 2, color: "var(--text)", fontWeight: 600, textTransform: "uppercase" }}>Soonest opening</span>
                     <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: "var(--text)" }}>{DAYS[firstOpen.getDay()]}, {MONTHS[firstOpen.getMonth()]} {firstOpen.getDate()}</span>
                     <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}>{isFirstToday ? "Today" : daysFromNow(firstOpen)}</span>
                   </span>
-                  <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                  <ChevronRight size={18} style={{ color: "var(--text)", flexShrink: 0 }} />
                 </button>
               );
             })()}
@@ -4498,10 +4498,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 const on = selectedDate && d.toDateString() === selectedDate.toDateString();
                 const isToday = d.toDateString() === new Date().toDateString();
                 return (
-                  <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} style={{ flexShrink: 0, width: 58, padding: "10px 0", borderRadius: 10, background: on ? "var(--gold)" : "transparent", border: "1px solid", borderColor: on ? "var(--gold)" : (isToday ? "var(--gold)" : "var(--line)"), color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", cursor: "pointer" }}>
+                  <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} style={{ flexShrink: 0, width: 58, padding: "10px 0", borderRadius: 10, background: on ? "var(--text)" : "transparent", border: "1px solid", borderColor: on ? "var(--text)" : (isToday ? "var(--text)" : "var(--line)"), color: on ? "var(--bg)" : "var(--text)", textAlign: "center", cursor: "pointer" }}>
                     <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{DAYS[d.getDay()].slice(0, 3).toUpperCase()}</div>
                     {isToday
-                      ? <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 600, color: on ? "var(--on-gold)" : "var(--gold)", lineHeight: "24px" }}>Today</div>
+                      ? <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 600, color: on ? "var(--bg)" : "var(--text)", lineHeight: "24px" }}>Today</div>
                       : <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, lineHeight: "24px" }}>{d.getDate()}</div>}
                     <div style={{ fontSize: 10.5, letterSpacing: 0.5, opacity: 0.6, marginTop: 1 }}>{MONTHS[d.getMonth()].slice(0, 3)}</div>
                   </button>
@@ -4511,23 +4511,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {selectedDate && !dateIsFull && (<>
               {/* Selected day as a clean heading — keeps day-of-week + date + days-away phrasing for clarity */}
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--text)", marginBottom: 3 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--gold)", fontWeight: 500, marginBottom: 16 }}>{daysFromNow(selectedDate)}</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--text)", fontWeight: 500, marginBottom: 16 }}>{daysFromNow(selectedDate)}</div>
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
-              {!isMultiPerson && bestSet.size > 0 && openSlots.length > bestSet.size && (<div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--sub)", marginBottom: 11 }}><span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />Highlighted times have no wait — you're seen right away</div>)}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{slotsReady ? openSlots.map((t) => { const on = slot === t; const isBest = bestSet.has(t); return (<button key={t} onClick={() => { setSlot(t); setSlotConflict(false); }} style={{ background: on ? "var(--gold)" : isBest ? "color-mix(in srgb, var(--gold) 13%, transparent)" : "transparent", border: `${on || isBest ? "1.5px" : "1px"} solid ${on || isBest ? "var(--gold)" : "var(--border)"}`, borderRadius: 8, padding: "14px 4px", color: on ? "var(--on-gold)" : isBest ? "var(--gold)" : "var(--text)", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: on || isBest ? 600 : 500, cursor: "pointer" }}>{fmtTime(t)}</button>); }) : [0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 8 }} />))}</div>
-              {slot != null && <button onClick={() => setStep(7)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 24, border: "none", cursor: "pointer" }}>Continue →</button>}
+              {!isMultiPerson && bestSet.size > 0 && openSlots.length > bestSet.size && (<div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--sub)", marginBottom: 11 }}><span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />Highlighted times have no wait — you're seen right away</div>)}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{slotsReady ? openSlots.map((t) => { const on = slot === t; const isBest = bestSet.has(t); return (<button key={t} onClick={() => { setSlot(t); setSlotConflict(false); }} style={{ background: on ? "var(--text)" : isBest ? "color-mix(in srgb, var(--text) 13%, transparent)" : "transparent", border: `${on || isBest ? "1.5px" : "1px"} solid ${on || isBest ? "var(--text)" : "var(--border)"}`, borderRadius: 8, padding: "14px 4px", color: on ? "var(--bg)" : isBest ? "var(--text)" : "var(--text)", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: on || isBest ? 600 : 500, cursor: "pointer" }}>{fmtTime(t)}</button>); }) : [0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 8 }} />))}</div>
+              {slot != null && <button onClick={() => setStep(7)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 24, border: "none", cursor: "pointer" }}>Continue →</button>}
             </>)}
 
             {/* date is fully booked → waitlist path */}
             {dateIsFull && !waitlistDone && (
               <div className="fade-up" style={{ marginBottom: 8 }}>
                 <div style={{ background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 6, padding: "16px 18px", marginBottom: 20, display: "flex", gap: 12, alignItems: "flex-start" }}>
-                  <AlertCircle size={18} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+                  <AlertCircle size={18} style={{ color: "var(--text)", flexShrink: 0, marginTop: 1 }} />
                   <div style={{ fontSize: 14, lineHeight: 1.5 }}><strong>{relativeDate(selectedDate)}</strong> is fully booked. Join the waitlist and we'll text you the moment something opens.</div>
                 </div>
 
                 {!showWaitlist ? (
-                  <button className="lift" onClick={() => { setShowWaitlist(true); setWlName(matched ? matched.name : ""); setWlDays([relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate) : `${relativeDate(selectedDate)}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`]); setWlService(cart.map(describeEntry).join(", ")); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Join the waitlist →</button>
+                  <button className="lift" onClick={() => { setShowWaitlist(true); setWlName(matched ? matched.name : ""); setWlDays([relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate) : `${relativeDate(selectedDate)}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`]); setWlService(cart.map(describeEntry).join(", ")); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Join the waitlist →</button>
                 ) : (
                   <div style={{ background: "var(--panel)", borderRadius: 8, padding: 20, textAlign: "left" }}>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 16 }}>Join the waitlist</div>
@@ -4538,7 +4538,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Who's this for?</label>
                     <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                       {[["self", "Just me"], ["other", "Someone else"], ["group", "More than one"]].map(([v, label]) => { const on = wlFor === v; return (
-                        <button key={v} onClick={() => setWlFor(v)} style={{ flex: 1, padding: "12px 6px", borderRadius: 10, border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{label}</button>
+                        <button key={v} onClick={() => setWlFor(v)} style={{ flex: 1, padding: "12px 6px", borderRadius: 10, border: `1.5px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--text) 12%, var(--panel))" : "transparent", color: on ? "var(--text)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{label}</button>
                       ); })}
                     </div>
                     {wlFor === "group" && <p style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5, margin: "-4px 0 16px" }}>Great — note who's coming and what each person wants in the photo step or service notes (e.g. you + your son). We'll look for room for everyone together.</p>}
@@ -4546,13 +4546,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Phone</label>
                     <input inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 16 }} />
                     <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
-                      By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
+                      By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text)", textDecoration: "underline" }}>terms</a>.
                     </p>
 
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Which days work? <span style={{ color: "var(--sub)", fontWeight: 400 }}>(up to 3)</span></label>
                     <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 16 }}>
                       {dateOptions.slice(0, 14).map((d, i) => { const lbl = relativeDate(d).includes(",") ? relativeDate(d) : `${relativeDate(d)}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; const on = wlDays.includes(lbl); const atMax = !on && wlDays.length >= 3; return (
-                        <button key={i} disabled={atMax} onClick={() => setWlDays((prev) => { if (prev.includes(lbl)) { setWlDayTimes((t) => { const n = { ...t }; delete n[lbl]; return n; }); return prev.filter((x) => x !== lbl); } if (prev.length >= 3) return prev; setWlDayTimes((t) => ({ ...t, [lbl]: "any" })); return [...prev, lbl]; })} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", opacity: atMax ? 0.4 : 1 }}>
+                        <button key={i} disabled={atMax} onClick={() => setWlDays((prev) => { if (prev.includes(lbl)) { setWlDayTimes((t) => { const n = { ...t }; delete n[lbl]; return n; }); return prev.filter((x) => x !== lbl); } if (prev.length >= 3) return prev; setWlDayTimes((t) => ({ ...t, [lbl]: "any" })); return [...prev, lbl]; })} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", textAlign: "center", opacity: atMax ? 0.4 : 1 }}>
                           <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
                           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{d.getDate()}</div>
                         </button>
@@ -4568,9 +4568,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                             <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>{lbl}</div>
                             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                               {opts.map(([id, label]) => { const on = sel === id; return (
-                                <button key={id} onClick={() => setWlDayTimes((t) => ({ ...t, [lbl]: id }))} style={{ padding: "7px 12px", borderRadius: 9, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", color: on ? "var(--gold)" : "var(--text)", fontSize: 13, fontWeight: on ? 600 : 400 }}>{label}</button>
+                                <button key={id} onClick={() => setWlDayTimes((t) => ({ ...t, [lbl]: id }))} style={{ padding: "7px 12px", borderRadius: 9, border: `1.5px solid ${on ? "var(--text)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--text) 12%, var(--panel))" : "var(--panel)", color: on ? "var(--text)" : "var(--text)", fontSize: 13, fontWeight: on ? 600 : 400 }}>{label}</button>
                               ); })}
-                              <button onClick={() => setWlDayTimes((t) => ({ ...t, [lbl]: "custom" }))} style={{ padding: "7px 12px", borderRadius: 9, border: `1.5px solid ${sel === "custom" ? "var(--gold)" : "var(--border)"}`, background: sel === "custom" ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", color: sel === "custom" ? "var(--gold)" : "var(--text)", fontSize: 13, fontWeight: sel === "custom" ? 600 : 400 }}>Custom</button>
+                              <button onClick={() => setWlDayTimes((t) => ({ ...t, [lbl]: "custom" }))} style={{ padding: "7px 12px", borderRadius: 9, border: `1.5px solid ${sel === "custom" ? "var(--text)" : "var(--border)"}`, background: sel === "custom" ? "color-mix(in srgb, var(--text) 12%, var(--panel))" : "var(--panel)", color: sel === "custom" ? "var(--text)" : "var(--text)", fontSize: 13, fontWeight: sel === "custom" ? 600 : 400 }}>Custom</button>
                             </div>
                             {sel === "custom" && (
                               <input value={wlDayCustom[lbl] || ""} onChange={(e) => setWlDayCustom((c) => ({ ...c, [lbl]: e.target.value.slice(0, 40) }))} placeholder="e.g. before 12, or after 4:30" style={{ ...inputStyle, marginTop: 8, marginBottom: 0, fontSize: 14 }} />
@@ -4593,8 +4593,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <>
                         <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>If a spot opens with someone else, want it?</label>
                         <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-                          <button onClick={() => setWlAnyProvider(false)} style={{ flex: 1, padding: "13px 8px", borderRadius: 10, border: `1.5px solid ${!wlAnyProvider ? "var(--gold)" : "var(--border2)"}`, background: !wlAnyProvider ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "transparent", color: "var(--text)", fontSize: 14, fontWeight: !wlAnyProvider ? 600 : 400 }}>Only {provider.name}</button>
-                          <button onClick={() => setWlAnyProvider(true)} style={{ flex: 1, padding: "13px 8px", borderRadius: 10, border: `1.5px solid ${wlAnyProvider ? "var(--gold)" : "var(--border2)"}`, background: wlAnyProvider ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "transparent", color: "var(--text)", fontSize: 14, fontWeight: wlAnyProvider ? 600 : 400 }}>Anyone available</button>
+                          <button onClick={() => setWlAnyProvider(false)} style={{ flex: 1, padding: "13px 8px", borderRadius: 10, border: `1.5px solid ${!wlAnyProvider ? "var(--text)" : "var(--border2)"}`, background: !wlAnyProvider ? "color-mix(in srgb, var(--text) 10%, var(--panel))" : "transparent", color: "var(--text)", fontSize: 14, fontWeight: !wlAnyProvider ? 600 : 400 }}>Only {provider.name}</button>
+                          <button onClick={() => setWlAnyProvider(true)} style={{ flex: 1, padding: "13px 8px", borderRadius: 10, border: `1.5px solid ${wlAnyProvider ? "var(--text)" : "var(--border2)"}`, background: wlAnyProvider ? "color-mix(in srgb, var(--text) 10%, var(--panel))" : "transparent", color: "var(--text)", fontSize: 14, fontWeight: wlAnyProvider ? 600 : 400 }}>Anyone available</button>
                         </div>
                       </>
                     )}
@@ -4609,13 +4609,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         <>
                           {photoMode !== "off" && (<>
                             <label style={{ fontSize: 13, color: "var(--faint)", display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>A quick photo
-                              <span style={{ fontSize: 9.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--on-gold)", background: photoRequired ? "var(--gold)" : "var(--border2)", borderRadius: 4, padding: "2px 6px" }}>{photoRequired ? "REQUIRED" : "RECOMMENDED"}</span>
+                              <span style={{ fontSize: 9.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--bg)", background: photoRequired ? "var(--text)" : "var(--border2)", borderRadius: 4, padding: "2px 6px" }}>{photoRequired ? "REQUIRED" : "RECOMMENDED"}</span>
                             </label>
-                            <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 12, padding: "13px 15px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                              <Camera size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
+                            <div style={{ background: "color-mix(in srgb, var(--text) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--text) 28%, var(--border))", borderRadius: 12, padding: "13px 15px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                              <Camera size={17} style={{ color: "var(--text)", flexShrink: 0, marginTop: 2 }} />
                               <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text2)" }}>Add a photo of your hair now and the cut you're after. It helps {provider.name === "Anyone" ? "the team" : provider.name} see what they're working with and judge if they can fit you in — your odds go way up.</div>
                             </div>
-                            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 6, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: i < wlPhotos ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent" }}>{i < wlPhotos ? <Check size={18} style={{ color: "var(--gold)" }} /> : <Camera size={16} style={{ color: "var(--faint)" }} />}</div>))}</div>
+                            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 6, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: i < wlPhotos ? "color-mix(in srgb, var(--text) 12%, transparent)" : "transparent" }}>{i < wlPhotos ? <Check size={18} style={{ color: "var(--text)" }} /> : <Camera size={16} style={{ color: "var(--faint)" }} />}</div>))}</div>
                             <button onClick={() => setWlPhotos(Math.min(3, wlPhotos + 1))} disabled={wlPhotos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: wlPhotos >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 13, letterSpacing: 1, borderRadius: 6, marginBottom: 20 }}>{wlPhotos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${wlPhotos}/3)`}</button>
                           </>)}
 
@@ -4626,7 +4626,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                             setWaitlist((cur) => [...cur, wlEntry]);
                             if (!isStaff) { try { supabase.rpc('join_waitlist', { p_shop: shopId, p_entry: wlEntry }); } catch (e) {} }
                             setWaitlistDone(true); setShowWaitlist(false);
-                          }} style={{ width: "100%", background: ready ? "var(--gold)" : "var(--border2)", color: ready ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
+                          }} style={{ width: "100%", background: ready ? "var(--text)" : "var(--border2)", color: ready ? "var(--bg)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
                           {photoRequired && wlPhotos === 0 && wlName && phoneOk && daysOk && <div style={{ fontSize: 12.5, color: "var(--faint)", textAlign: "center", marginTop: 8 }}>Add at least one photo to join.</div>}
                         </>
                       );
@@ -4675,7 +4675,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <input placeholder="Email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" style={inputStyle} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
               <input placeholder="Phone number" type="tel" inputMode="tel" autoComplete="tel" style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
               <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
-                By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
+                By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text)", textDecoration: "underline" }}>terms</a>.
               </p>
             </div>
 
@@ -4690,8 +4690,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <button onClick={() => setPersonalizeOpen((o) => !o)} style={{ width: "100%", background: "none", border: "none", padding: 0, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer", color: "var(--text)" }}>
                   <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{ttl}</span>
                   <span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                    <span style={{ fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: photoReq ? "var(--gold)" : "var(--faint)", fontWeight: 600 }}>{photoReq ? "Required" : "Optional"}</span>
-                    <ChevronDown size={18} style={{ color: "var(--gold)", transform: personalizeOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+                    <span style={{ fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: photoReq ? "var(--text)" : "var(--faint)", fontWeight: 600 }}>{photoReq ? "Required" : "Optional"}</span>
+                    <ChevronDown size={18} style={{ color: "var(--text)", transform: personalizeOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
                   </span>
                 </button>
                 {!personalizeOpen && <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginTop: 5 }}>A reference or a quick note gets your cut exactly right.</p>}
@@ -4708,7 +4708,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12 }}>Up to 3 photos — a style you want, how your hair looks now, or anything that helps {provider.name === "Anyone" ? "your barber" : provider.name}.</p>
                         <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
                         <div style={{ display: "flex", gap: 8 }}>{[0, 1, 2].map((i) => { const src = photos[i]; return (
-                          <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 14, overflow: "hidden", border: `1px dashed ${src ? "var(--gold)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: src ? "var(--panel2)" : "transparent", cursor: src ? "default" : "pointer" }}>
+                          <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 14, overflow: "hidden", border: `1px dashed ${src ? "var(--text)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: src ? "var(--panel2)" : "transparent", cursor: src ? "default" : "pointer" }}>
                             {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={18} style={{ color: "var(--faint)" }} />}
                           </div>
                         ); })}</div>
@@ -4728,7 +4728,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
                   <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>I agree to the cancellation policy</span>
                 </button>
-                {business.policy && <button onClick={() => setPolicyOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 600, padding: "6px 2px", flexShrink: 0, cursor: "pointer" }}>{policyOpen ? "Hide" : "Read it ›"}</button>}
+                {business.policy && <button onClick={() => setPolicyOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, fontWeight: 600, padding: "6px 2px", flexShrink: 0, cursor: "pointer" }}>{policyOpen ? "Hide" : "Read it ›"}</button>}
               </div>
               {policyOpen && business.policy && <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 14px" }}>{business.policy}</p>}
             </div>
@@ -4743,8 +4743,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const livePay = business.payments?.live === true;
               const last4 = (cardInfo && cardInfo.last4) || "••••";
               return (
-                <div style={{ background: "var(--panel)", border: `1px solid ${cardOnFile ? "color-mix(in srgb, var(--gold) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16 }}>
-                  <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>{depositAmt > 0 ? "DEPOSIT TO RESERVE" : "CARD TO RESERVE"}</div>
+                <div style={{ background: "var(--panel)", border: `1px solid ${cardOnFile ? "color-mix(in srgb, var(--text) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--text)", fontWeight: 600, marginBottom: 6 }}>{depositAmt > 0 ? "DEPOSIT TO RESERVE" : "CARD TO RESERVE"}</div>
                   <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>
                     {depositAmt > 0
                       ? <>A <b style={{ color: "var(--text)" }}>${depositAmt}</b> deposit holds your spot and goes toward your total. The rest (${Math.max(0, cartAdjTotal - depositAmt)}) is due at your visit.</>
@@ -4752,12 +4752,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </p>
                   {cardOnFile ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px" }}>
-                      <Check size={18} style={{ color: "var(--gold)" }} />
+                      <Check size={18} style={{ color: "var(--text)" }} />
                       <span style={{ fontSize: 14.5, color: "var(--text)" }}>{(cardInfo && cardInfo.paid) ? `Deposit paid · ${last4}` : `Card added · ${last4}`}</span>
                       <button onClick={() => { setCardOnFile(false); setCardInfo(null); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Change</button>
                     </div>
                   ) : (
-                    <button onClick={() => setCardSheetOpen(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}><CreditCard size={17} style={{ color: "var(--gold)" }} /> {depositAmt > 0 ? `Pay $${depositAmt} deposit` : "Add a card"}</button>
+                    <button onClick={() => setCardSheetOpen(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}><CreditCard size={17} style={{ color: "var(--text)" }} /> {depositAmt > 0 ? `Pay $${depositAmt} deposit` : "Add a card"}</button>
                   )}
                   {!livePay && <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Secure card entry · test mode — no real charge yet.</p>}
                   {cardSheetOpen && <StripeCardSheet
@@ -4793,7 +4793,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 return;
               }
               commitBooking(phone, newEmail);
-            }} style={{ width: "100%", background: canLock ? "var(--gold)" : "transparent", color: canLock ? "var(--on-gold)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : `BOOK FOR ${relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate).split(",")[0].toUpperCase() + " " + MONTHS[selectedDate.getMonth()].toUpperCase() + " " + selectedDate.getDate() : relativeDate(selectedDate).toUpperCase()}`)}</button>
+            }} style={{ width: "100%", background: canLock ? "var(--text)" : "transparent", color: canLock ? "var(--bg)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : `BOOK FOR ${relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate).split(",")[0].toUpperCase() + " " + MONTHS[selectedDate.getMonth()].toUpperCase() + " " + selectedDate.getDate() : relativeDate(selectedDate).toUpperCase()}`)}</button>
             {bookErr && <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "color-mix(in srgb, #c0392b 14%, var(--panel))", color: "var(--text)", fontSize: 13.5, lineHeight: 1.45, textAlign: "center" }}>Couldn't confirm your booking — check your connection and tap again. Your time wasn't held, so nothing's lost.</div>}
             </>
               );
@@ -4802,7 +4802,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {/* Contact-info conflict — only opens when matched and the user changed an existing phone or email. */}
             <Sheet open={!!contactConfirm && !!matched} onClose={() => setContactConfirm(null)} align="top" maxWidth={460}>
               <div style={{ padding: "20px 4px 12px" }}>
-                <div style={{ width: 28, height: 1.5, background: "var(--gold)", marginBottom: 12 }} />
+                <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
                 <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 6 }}>Confirm your info</h2>
                 <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5, marginBottom: 22 }}>
                   Reminders go to whatever you keep on file. Pick which to save.
@@ -4814,16 +4814,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <div style={{ display: "grid", gap: 8 }}>
                       {[
                         { id: "file", topLabel: "ON FILE", topColor: "var(--faint)", value: matched.phone },
-                        { id: "new", topLabel: "NEW", topColor: "var(--gold)", value: phone },
+                        { id: "new", topLabel: "NEW", topColor: "var(--text)", value: phone },
                       ].map((opt) => {
                         const on = keepPhone === opt.id;
                         return (
-                          <button key={opt.id} onClick={() => setKeepPhone(opt.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer", width: "100%" }}>
+                          <button key={opt.id} onClick={() => setKeepPhone(opt.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--text) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer", width: "100%" }}>
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <div style={{ fontSize: 11, letterSpacing: 1.5, color: opt.topColor, fontWeight: 600, marginBottom: 4 }}>{opt.topLabel}</div>
                               <div style={{ fontSize: 16 }}>{opt.value}</div>
                             </div>
-                            {on && <Check size={18} style={{ color: "var(--gold)", flexShrink: 0, marginLeft: 8 }} />}
+                            {on && <Check size={18} style={{ color: "var(--text)", flexShrink: 0, marginLeft: 8 }} />}
                           </button>
                         );
                       })}
@@ -4837,16 +4837,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <div style={{ display: "grid", gap: 8 }}>
                       {[
                         { id: "file", topLabel: "ON FILE", topColor: "var(--faint)", value: matched.email },
-                        { id: "new", topLabel: "NEW", topColor: "var(--gold)", value: newEmail.trim() },
+                        { id: "new", topLabel: "NEW", topColor: "var(--text)", value: newEmail.trim() },
                       ].map((opt) => {
                         const on = keepEmail === opt.id;
                         return (
-                          <button key={opt.id} onClick={() => setKeepEmail(opt.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer", width: "100%" }}>
+                          <button key={opt.id} onClick={() => setKeepEmail(opt.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--text) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer", width: "100%" }}>
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <div style={{ fontSize: 11, letterSpacing: 1.5, color: opt.topColor, fontWeight: 600, marginBottom: 4 }}>{opt.topLabel}</div>
                               <div style={{ fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.value}</div>
                             </div>
-                            {on && <Check size={18} style={{ color: "var(--gold)", flexShrink: 0, marginLeft: 8 }} />}
+                            {on && <Check size={18} style={{ color: "var(--text)", flexShrink: 0, marginLeft: 8 }} />}
                           </button>
                         );
                       })}
@@ -4859,7 +4859,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   const finalEmail = (contactConfirm?.email && keepEmail === "file") ? matched.email : newEmail.trim();
                   setContactConfirm(null);
                   commitBooking(finalPhone, finalEmail);
-                }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 13.5, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, border: "none", marginTop: 6 }}>SAVE & BOOK</button>
+                }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontSize: 13.5, letterSpacing: 2.5, fontWeight: 600, borderRadius: 14, border: "none", marginTop: 6 }}>SAVE & BOOK</button>
                 <button onClick={() => setContactConfirm(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px" }}>Cancel</button>
               </div>
             </Sheet>
@@ -4900,7 +4900,7 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
   return (
     <div className="fade-up">
       <button onClick={back} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", color: "var(--sub)", fontSize: 15, marginBottom: 18 }}><ArrowLeft size={18} /> Back</button>
-      <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>FIRST VISIT · STEP {i + 1} OF {steps.length}</div>
+      <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--text)", fontWeight: 600, marginBottom: 10 }}>FIRST VISIT · STEP {i + 1} OF {steps.length}</div>
       <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>{cur.label}</h2>
       <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>Pick the look closest to what you want — it helps us reserve exactly the right time for you.</p>
 
@@ -4944,7 +4944,7 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
                   <div style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.2 }}>{o.label}</div>
                   {o.desc && <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
                 </div>
-                <button className="lift" onClick={() => choose(o.id)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none" }}>Choose this</button>
+                <button className="lift" onClick={() => choose(o.id)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 14, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 10, border: "none" }}>Choose this</button>
               </div>
             );
           })}
@@ -4968,8 +4968,8 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
   return (
     <div className="fade-up" style={{ paddingTop: 8 }}>
       <div style={{ textAlign: "center", marginBottom: 30 }}>
-        <div className="success-bloom" style={{ width: 52, height: 52, borderRadius: "50%", border: "1.5px solid var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
-          <Check size={24} style={{ color: "var(--gold)" }} strokeWidth={2.5} />
+        <div className="success-bloom" style={{ width: 52, height: 52, borderRadius: "50%", border: "1.5px solid var(--text)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+          <Check size={24} style={{ color: "var(--text)" }} strokeWidth={2.5} />
         </div>
         <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 10 }}>Booked</div>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, lineHeight: 1.1, letterSpacing: "-0.4px", marginBottom: 10, color: "var(--text)" }}>You're in.</h2>
@@ -4977,7 +4977,7 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
       </div>
 
       <div className="drift-in" style={{ border: "1px solid var(--line)", borderRadius: 12, padding: "20px 20px", marginBottom: 16 }}>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>Your appointment</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--text)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>Your appointment</div>
         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.15, marginBottom: 5, color: "var(--text)" }}>{relPlus}</div>
         <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, color: "var(--sub)", marginBottom: 16 }}>{fmtTime(slot)} · with {provider.name}</div>
         <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
@@ -4990,7 +4990,7 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
           </div>
           {photos > 0 && (
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", display: "flex", alignItems: "center", gap: 8 }}>
-              <ImageIcon size={14} style={{ color: "var(--gold)" }} />
+              <ImageIcon size={14} style={{ color: "var(--text)" }} />
               <span>{photos} photo{photos > 1 ? "s" : ""} attached for your barber</span>
             </div>
           )}
@@ -5005,7 +5005,7 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
       </div>
 
       <button onClick={onManage} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 11, cursor: "pointer" }}>Manage my appointment</button>
-      <button onClick={onExit} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 28, border: "none", cursor: "pointer" }}>Book another</button>
+      <button onClick={onExit} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 28, border: "none", cursor: "pointer" }}>Book another</button>
 
       <div style={{ textAlign: "center", color: "var(--faint)", fontFamily: "'Jost', sans-serif", fontSize: 13, lineHeight: 1.7, paddingBottom: 8 }}>
         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: "var(--sub)", marginBottom: 4, letterSpacing: 0.3 }}>{business.legalName}</div>
