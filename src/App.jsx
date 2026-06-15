@@ -9006,15 +9006,22 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const setGroup = (i, patch) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => idx === i ? { ...x, ...patch } : x) }));
   const setItem = (i, patch) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => idx === i ? { ...x, item: { ...(x.item || {}), ...patch } } : x) }));
   const featureOnly = (i) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => ({ ...x, featured: idx === i ? !x.featured : false })) }));
+  const moveGroup = (i, dir) => setForm((f) => { const arr = [...f.addonGroups]; const j = i + dir; if (j < 0 || j >= arr.length) return f; const t = arr[i]; arr[i] = arr[j]; arr[j] = t; return { ...f, addonGroups: arr }; });
   const customizationsSection = (
     <>
       <SectionHeader title="Add-ons" />
-      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Extras a client can add when booking — a hot towel, a wash, a facial. Choose whether each one adds price, time, or both.</p>
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Extras and questions clients see while booking, shown in the order below — use the arrows to reorder. Each one can add price, time, or both.</p>
       {form.addonGroups.map((g, i) => {
         if (g.type !== "addon") {
           // Yes/No choice — kept simple
           return (
             <div key={i} style={{ background: "var(--panel)", borderRadius: 14, padding: 14, marginBottom: 10, border: "1px solid var(--border)" }}>
+              {form.addonGroups.length > 1 && (
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 2, marginBottom: 4 }}>
+                  <button onClick={() => moveGroup(i, -1)} disabled={i === 0} style={{ background: "none", border: "none", color: i === 0 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: i === 0 ? "default" : "pointer", opacity: i === 0 ? 0.35 : 1 }}><ChevronUp size={18} /></button>
+                  <button onClick={() => moveGroup(i, 1)} disabled={i === form.addonGroups.length - 1} style={{ background: "none", border: "none", color: i === form.addonGroups.length - 1 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: i === form.addonGroups.length - 1 ? "default" : "pointer", opacity: i === form.addonGroups.length - 1 ? 0.35 : 1 }}><ChevronDown size={18} /></button>
+                </div>
+              )}
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <input value={g.label} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="Yes/No question (e.g. Skin fade?)" style={{ ...inputStyle, padding: "10px 12px" }} />
                 <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", color: "#C2703D", flexShrink: 0 }}><Trash2 size={16} /></button>
@@ -9028,6 +9035,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         const addsTime = it.addsTime !== false;
         return (
           <div key={i} style={{ background: "var(--panel)", borderRadius: 16, padding: 16, marginBottom: 12, border: g.required ? "1.5px solid var(--gold)" : "1px solid var(--border)" }}>
+            {form.addonGroups.length > 1 && (
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 2, marginBottom: 4 }}>
+                <button onClick={() => moveGroup(i, -1)} disabled={i === 0} style={{ background: "none", border: "none", color: i === 0 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: i === 0 ? "default" : "pointer", opacity: i === 0 ? 0.35 : 1 }}><ChevronUp size={18} /></button>
+                <button onClick={() => moveGroup(i, 1)} disabled={i === form.addonGroups.length - 1} style={{ background: "none", border: "none", color: i === form.addonGroups.length - 1 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: i === form.addonGroups.length - 1 ? "default" : "pointer", opacity: i === form.addonGroups.length - 1 ? 0.35 : 1 }}><ChevronDown size={18} /></button>
+              </div>
+            )}
             <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 7 }}>Question clients see</div>
             <input value={g.label || ""} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="e.g. Want to finish with a hot towel?" style={{ ...inputStyle, padding: "10px 12px", fontWeight: 500, marginBottom: 14 }} />
             <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 14 }}>
