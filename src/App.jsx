@@ -2854,7 +2854,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (slot == null || !slots.includes(slot)) setSlot(slots.length ? slots[0] : null);
   }, [wwMerged, waProvId]);
 
-  const back = () => { setShowWaitlist(false); if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "change") { setSimpleStep((draft && draft.cutTypes && draft.cutTypes.length) ? "cut" : "what"); return; } if (simpleStep === "finish") { setSimpleStep("change"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 3 && simpleChange !== null && draft) { const anyone = providers.find((p) => p.id === "anyone") || providers[0]; const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: anyone, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }; setCart([entry]); const hasFinish = (draft.addonGroups || []).some((g) => g.type === "addon"); setStep(0); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setCutPhase("addons"); setStep(3); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "finish") { setSimpleStep("what"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (consult) { if (consult.step === "sides") { setConsult(null); setDraft(null); setCutType(null); setCutPhase("type"); setStep(1); return; } if (consult.step === "sidesHelp") { setConsult({ ...consult, step: "sides" }); return; } if (consult.step === "bottom") { setConsult({ ...consult, step: "sides", sides: null }); return; } if (consult.step === "condition") { setConsult({ ...consult, step: "bottom", bottom: null }); return; } if (consult.step === "reveal") { setConsult({ ...consult, step: "condition" }); setConsultResult(null); return; } } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 3 && simpleChange !== null && draft) { const anyone = providers.find((p) => p.id === "anyone") || providers[0]; const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: anyone, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }; setCart([entry]); const hasFinish = (draft.addonGroups || []).some((g) => g.type === "addon"); setStep(0); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setCutPhase("addons"); setStep(3); return; } setStep(step - 1); };
 
   // Simple/quick flow hand-off: instead of the old "Anyone in particular?" + time picker,
   // pop the quick-flow entry back into draft state and land on the merged Who & When.
@@ -3087,7 +3087,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             setSimpleChange(null);
             setCart([{ service: svc, provider: providers.find((p) => p.id === "anyone") || providers[0], cutType: null, beardType: null, addons: {} }]);
             const hasCuts = svc.cutTypes && svc.cutTypes.length > 0;
-            setSimpleStep(hasCuts ? "cut" : "change");
+            if (hasCuts) { setSimpleStep("cut"); }
+            else { const hasFinish = (svc.addonGroups || []).some((g) => g.type === "addon"); if (hasFinish) setSimpleStep("finish"); else goWhoWhen(); }
           };
           const liveCats = cats.filter((c) => inCat(c).length > 0);
           const showCats = liveCats.length > 1 && !simpleCat;
@@ -3170,7 +3171,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const chosenCt = picked ? draft.cutTypes.find((c) => c.id === cart[0].cutType) : null;
           const finOn = !!(cart[0] && cart[0].addons && fin && cart[0].addons[fin.id]);
           const finAns = cart[0] && cart[0].finishAns;
-          const timeAnswered = !asksChange || !!simpleChange;
+          const timeAnswered = true; // amount-off question removed
           const showAddon = picked && offerFinish && timeAnswered;
           const finDecided = !offerFinish || !!finAns;
           const _cDesc = chosenCt && (chosenCt.desc || friendly[chosenCt.id]);
@@ -3248,24 +3249,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
               {picked && (
                 <div style={{ marginTop: 40, paddingTop: 32, borderTop: "1px solid var(--line)" }}>
-                  {asksChange && (
-                    <div>
-                      <p style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 500, lineHeight: 1.25, margin: "0 0 10px", color: "var(--text)" }}>{T.changeQ}</p>
-                      <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 22px", maxWidth: 380 }}>{T.priceLine}</p>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        {[{ label: T.opt1, sub: T.opt1sub, val: "trim" }, { label: T.opt2, sub: T.opt2sub, val: "fresh" }].map((o) => {
-                          const on = simpleChange === o.val;
-                          return (
-                            <button key={o.val} onClick={() => chooseTime(o.val)} style={{ padding: "20px 14px", borderRadius: 10, border: on ? "1.5px solid var(--gold)" : "1px solid var(--border)", background: "transparent", color: on ? "var(--gold)" : "var(--text)", textAlign: "center", lineHeight: 1.2, cursor: "pointer" }}>
-                              <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1 }}>{o.label}</span>
-                              <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 400, marginTop: 6, color: on ? "var(--gold)" : "var(--sub)", lineHeight: 1.35 }}>{o.sub}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
                   {showAddon && (() => {
                     const photo = fin.photo || finItem.photo;
                     const addsMoney = finItem.addsPrice !== false && (Number(finItem.price) || 0) > 0;
@@ -3293,44 +3276,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   })()}
 
                   <button disabled={!canContinue} onClick={() => { if (canContinue) goWhoWhen(); }} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", cursor: canContinue ? "pointer" : "default", opacity: canContinue ? 1 : 0.3 }}>Continue</button>
-                  {!canContinue && <p style={{ marginTop: 10, textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--faint)" }}>{asksChange && !simpleChange ? "Pick how much we're taking off" : (showAddon && !finAns ? "Add the finishing touch, or tap No thanks" : (needConfirm && !descConfirmed ? "Confirm you've read the description to continue" : ""))}</p>}
+                  {!canContinue && <p style={{ marginTop: 10, textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--faint)" }}>{showAddon && !finAns ? "Add the finishing touch, or tap No thanks" : (needConfirm && !descConfirmed ? "Confirm you've read the description to continue" : "")}</p>}
                 </div>
               )}
             </div>
           );
         })()}
 
-        {/* SIMPLE · CHANGE — the trim-vs-going-shorter question (required, reserves extra time, free) */}
-        {simpleStep === "change" && (() => {
-          const proceedAfterChange = () => {
-            // If the service offers a hot-towel / facial finishing touch, show it; otherwise go to who.
-            const hasFinish = draft && (draft.addonGroups || []).some((g) => g.type === "addon");
-            if (hasFinish) setSimpleStep("finish"); else goWhoWhen();
-          };
-          return (
-            <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column" }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Your cut</div>
-              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>How much are we taking off today?</h2>
-              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 4px" }}>This just tells your barber how much time to set aside — pick honestly and you'll never feel rushed.</p>
-              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--faint)", fontSize: 12, fontWeight: 400, lineHeight: 1.5 }}>Same price either way — no charge for the extra time.</p>
-              <div style={{ marginTop: "auto", paddingTop: 24, borderBottom: "1px solid var(--line)" }}>
-                {[
-                  { label: "Just a tidy-up", sub: "About the same length — cleaning it up.", change: "trim" },
-                  { label: "Going shorter than usual", sub: "A noticeable change from how it looks now.", change: "fresh" },
-                  { label: "It's grown out — been a while", sub: "Lots to work through.", change: "fresh" },
-                ].map((o) => (
-                  <button key={o.label} onClick={() => { setSimpleChange(o.change); proceedAfterChange(); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "18px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" }}>
-                    <span style={{ minWidth: 0 }}>
-                      <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{o.label}</span>
-                      <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 5 }}>{o.sub}</span>
-                    </span>
-                    <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
+        {/* SIMPLE · CHANGE step removed — amount-off question retired */}
 
         {/* SIMPLE · FINISH — the tasteful hot-towel / straight-razor finishing-touch upgrade */}
         {simpleStep === "finish" && draft && (() => {
@@ -9952,7 +9905,7 @@ function BookingWordingPreview({ bs }) {
         <span style={{ fontSize: 11, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>What clients see</span>
       </div>
       <div style={{ padding: "12px 13px 0" }}>
-        <Segmented options={[{ value: "cat", label: "Category" }, { value: "cut", label: "Cut" }, { value: "time", label: "Timing" }]} value={pv} onChange={setPv} />
+        <Segmented options={[{ value: "cat", label: "Category" }, { value: "cut", label: "Cut" }]} value={pv} onChange={setPv} />
       </div>
       <div style={{ padding: "20px 18px 24px", background: "var(--bg)", marginTop: 12 }}>
         {pv === "cat" && (
@@ -9974,13 +9927,6 @@ function BookingWordingPreview({ bs }) {
             <span style={{ display: "inline-block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 40%, transparent)", borderRadius: 20, padding: "5px 13px", marginBottom: 16 }}>{bs.greeting || "First time? Welcome in"}</span>
             <div style={HEAD}>{bs.head || "What are we doing today?"}</div>
             <div style={LEAD}>{bs.lead || "Just pick your style — we'll handle the details in the chair."}</div>
-          </div>
-        )}
-        {pv === "time" && (
-          <div>
-            <div style={EYE}>Haircut</div>
-            <div style={{ ...HEAD, fontSize: 20 }}>{bs.changeQ || "Same price either way — how much are we taking off?"}</div>
-            <div style={LEAD}>{bs.priceLine || "Helps us hold the right amount of time for you."}</div>
           </div>
         )}
       </div>
@@ -13632,9 +13578,6 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         {bword("GREETING PILL", "greeting", "First time? Welcome in")}
         {bword("HEADLINE", "head", "What are we doing today?")}
         {bword("SUB-LINE", "lead", "Just pick your style — we'll handle the details in the chair.")}
-        <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, margin: "12px 0 8px" }}>TIME QUESTION</div>
-        {bword("HEADLINE", "changeQ", "Same price either way — how much are we taking off?")}
-        {bword("SMALL LINE", "priceLine", "Helps us hold the right amount of time for you.")}
       </>),
     },
     {
