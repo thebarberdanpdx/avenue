@@ -2581,6 +2581,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [descConfirmed, setDescConfirmed] = useState(false); // service-description read-confirm (per-service booking.requireConfirm)
   const [confirmSheet, setConfirmSheet] = useState(null); // cut-style confirm bottom sheet — holds the cut type being confirmed
   const [cutConfirm, setCutConfirm] = useState(null); // { at, text } logged onto the booking when the client taps "Yes, this is my cut"
+  const [addonFlow, setAddonFlow] = useState(null); // { idx } — active add-on bottom-sheet sequence (one sheet per type:"addon" group)
   const [clientNote, setClientNote] = useState(""); // optional note for the barber — rides the appt, the push, and the feed
   const [personalizeOpen, setPersonalizeOpen] = useState(business?.bookingPhotos?.mode === "required"); // combined note+photo card; open by default only when photos are required
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
@@ -2874,6 +2875,28 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setStep(3);
   };
 
+  // Add-on bottom-sheet sequence. Each type:"addon" group becomes its own sheet
+  // (inviting question = group.label, price/desc from group.item). "No thanks" is a
+  // valid answer even when required; required only blocks scrim-dismiss. After the
+  // last sheet (or when there are none) we hand off to who+time via goWhoWhen.
+  const addonsFor = (svc) => (svc?.addonGroups || []).filter((g) => g.type === "addon");
+  const startAddons = (entry) => {
+    const list = addonsFor(entry?.service);
+    if (list.length) { setCart((c) => c.map((e, i) => i === 0 ? entry : e)); setAddonFlow({ idx: 0 }); }
+    else { goWhoWhen(entry); }
+  };
+  const answerAddon = (group, yes) => {
+    const cur = cart[0] || {};
+    const newAddons = { ...(cur.addons || {}) };
+    if (yes) newAddons[group.id] = true; else delete newAddons[group.id];
+    const updated = { ...cur, addons: newAddons };
+    setCart((c) => c.map((e, i) => i === 0 ? updated : e));
+    const list = addonsFor(updated.service);
+    const nextIdx = (addonFlow ? addonFlow.idx : 0) + 1;
+    if (nextIdx < list.length) { setAddonFlow({ idx: nextIdx }); }
+    else { setAddonFlow(null); goWhoWhen(updated); }
+  };
+
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
       {labels.map((l, i) => (<React.Fragment key={l}><span style={{ fontSize: 14, padding: "6px 16px", borderRadius: 20, background: active === i ? "var(--panel2)" : "transparent", color: active === i ? "var(--text)" : "var(--faint)", border: active === i ? "1px solid var(--border)" : "1px solid transparent" }}>{l}</span>{i < labels.length - 1 && <ChevronRight size={14} style={{ color: "var(--border2)" }} />}</React.Fragment>))}
@@ -3092,10 +3115,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             setCutConfirm(null);
             setDescConfirmed(false);
             setConfirmSheet(null);
-            setCart([{ service: svc, provider: providers.find((p) => p.id === "anyone") || providers[0], cutType: null, beardType: null, addons: {} }]);
+            setAddonFlow(null);
+            const anyoneProv = providers.find((p) => p.id === "anyone") || providers[0];
+            setCart([{ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }]);
             const hasCuts = svc.cutTypes && svc.cutTypes.length > 0;
             if (hasCuts) { setSimpleStep("cut"); }
-            else { const hasFinish = (svc.addonGroups || []).some((g) => g.type === "addon"); if (hasFinish) setSimpleStep("finish"); else goWhoWhen(); }
+            else { startAddons({ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }); }
           };
           const liveCats = cats.filter((c) => inCat(c).length > 0);
           const showCats = liveCats.length > 1 && !simpleCat;
@@ -3186,15 +3211,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const canContinue = picked && timeAnswered && finDecided && (!needConfirm || descConfirmed);
 
           const pickCut = (ct) => { setSimpleChange(null); setDescConfirmed(false); setCart((c) => c.map((e, i) => i === 0 ? { ...e, cutType: ct.id, addons: {}, finishAns: undefined } : e)); };
-          const changeCut = () => { setSimpleChange(null); setDescConfirmed(false); setCutConfirm(null); setConfirmSheet(null); setCart((c) => c.map((e, i) => i === 0 ? { ...e, cutType: undefined, addons: {}, finishAns: undefined } : e)); };
+          const changeCut = () => { setSimpleChange(null); setDescConfirmed(false); setCutConfirm(null); setConfirmSheet(null); setAddonFlow(null); setCart((c) => c.map((e, i) => i === 0 ? { ...e, cutType: undefined, addons: {}, finishAns: undefined } : e)); };
           const descFor = (ct) => ct && (ct.desc || friendly[ct.id]);
           const confirmCut = (ct, desc) => {
             setDescConfirmed(true);
             setConfirmSheet(null);
             setCutConfirm(desc ? { at: new Date().toISOString(), text: desc } : null);
             const updated = { ...(cart[0] || {}), cutType: ct.id, addons: {}, finishAns: undefined };
-            if (offerFinish) { setCart((c) => c.map((e, i) => i === 0 ? updated : e)); }
-            else { goWhoWhen(updated); }
+            startAddons(updated);
           };
           const openConfirm = (ct) => { const d = descFor(ct); if (d) setConfirmSheet(ct); else confirmCut(ct, ""); };
           const chooseTime = (val) => setSimpleChange(val);
@@ -3252,39 +3276,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 );
               })()}
 
-              {picked && (
-                <div style={{ marginTop: 40, paddingTop: 32, borderTop: "1px solid var(--line)" }}>
-                  {showAddon && (() => {
-                    const photo = fin.photo || finItem.photo;
-                    const addsMoney = finItem.addsPrice !== false && (Number(finItem.price) || 0) > 0;
-                    const name = finItem.name || "Finishing touch";
-                    const desc = finItem.desc || "";
-                    return (
-                      <div style={{ marginTop: 24, border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
-                        <div style={{ ...EYE, color: "var(--gold)", padding: "14px 16px 0" }}>Make it better</div>
-                        <div style={{ display: "flex", gap: 13, alignItems: "flex-start", padding: "10px 16px 0" }}>
-                          {photo ? <img src={imgUrl(photo, 200)} alt="" style={{ width: 48, height: 48, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} /> : null}
-                          <span style={{ flex: 1, minWidth: 0 }}>
-                            <span style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                              <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1, lineHeight: 1.2 }}>{name}</span>
-                              {showPrices && <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 500, color: "var(--gold)", whiteSpace: "nowrap" }}>{addsMoney ? `+$${Number(finItem.price) || 0}` : "Free"}</span>}
-                            </span>
-                            {desc && <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{desc}</span>}
-                          </span>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 10, padding: "14px 16px 16px" }}>
-                          <button onClick={addYes} style={{ padding: 13, borderRadius: 8, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", border: "none", background: "var(--gold)", color: "var(--on-gold)" }}>{finOn ? "Added" : "Add it"}</button>
-                          <button onClick={addNo} style={{ padding: 13, borderRadius: 8, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", border: finAns === "no" ? "1.5px solid var(--gold)" : "1px solid var(--border)", background: "transparent", color: "var(--text)" }}>No thanks</button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  <button disabled={!canContinue} onClick={() => { if (canContinue) goWhoWhen(); }} style={{ width: "100%", marginTop: 24, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", cursor: canContinue ? "pointer" : "default", opacity: canContinue ? 1 : 0.3 }}>Continue</button>
-                  {!canContinue && <p style={{ marginTop: 10, textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--faint)" }}>{showAddon && !finAns ? "Add the finishing touch, or tap No thanks" : (needConfirm && !descConfirmed ? "Confirm you've read the description to continue" : "")}</p>}
-                </div>
-              )}
-
               {confirmSheet && (() => {
                 const ct = confirmSheet;
                 const d = descFor(ct);
@@ -3312,56 +3303,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
         {/* SIMPLE · CHANGE step removed — amount-off question retired */}
 
-        {/* SIMPLE · FINISH — the tasteful hot-towel / straight-razor finishing-touch upgrade */}
-        {simpleStep === "finish" && draft && (() => {
-          const addons = (draft.addonGroups || []).filter((g) => g.type === "addon");
-          // Show the owner-featured add-on; fall back to the first one if none is featured.
-          const fin = addons.find((g) => g.featured) || addons.find((g) => g.required) || addons[0];
-          if (!fin) { goWhoWhen(); return null; }
-          const item = fin.item || {};
-          const isOn = !!(cart[0] && cart[0].addons && cart[0].addons[fin.id]);
-          const toggle = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...e.addons, [fin.id]: e.addons && e.addons[fin.id] ? undefined : true } } : e));
-          const photo = fin.photo || item.photo;
-          const addsMoney = item.addsPrice !== false && (Number(item.price) || 0) > 0;
-          const priceLabel = addsMoney ? `+$${Number(item.price) || 0}` : "Free";
-          const name = item.name || "Finishing touch";
-          const desc = item.desc || "";
-          // Running total: the chosen style's price plus any add-ons actually selected. Real items only.
-          // Shown only when the owner has turned prices on (business.bookingStep.showPrices).
-          const showPrices = ((business && business.bookingStep) || {}).showPrices === true;
-          const chosenCt = (cart[0] && cart[0].cutType) ? (draft.cutTypes || []).find((c) => c.id === cart[0].cutType) : null;
-          const stylePrice = Number((chosenCt && chosenCt.price != null && chosenCt.price !== "") ? chosenCt.price : draft.price) || 0;
-          const addonsTotal = addons.reduce((sum, g) => { const sel = cart[0] && cart[0].addons && cart[0].addons[g.id]; const it = g.item || {}; const adds = it.addsPrice !== false && (Number(it.price) || 0) > 0; return sum + ((sel && adds) ? (Number(it.price) || 0) : 0); }, 0);
-          const runningTotal = stylePrice + addonsTotal;
-          return (
-            <div className="fade-up">
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>One more thing</div>
-              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Add the finishing touch?</h2>
-              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 22px" }}>Optional — the classic way to round out your visit.</p>
-              {showPrices && runningTotal > 0 && (
-                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "baseline", gap: 9, marginBottom: 18 }}>
-                  <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Total</span>
-                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, color: "var(--text)" }}>${runningTotal}</span>
-                </div>
-              )}
-              <button onClick={toggle} style={{ width: "100%", textAlign: "left", background: "transparent", border: isOn ? "1.5px solid var(--gold)" : "1px solid var(--line)", borderRadius: 10, overflow: "hidden", color: "var(--text)", padding: 0, display: "block", cursor: "pointer" }}>
-                {photo ? <span style={{ display: "block", height: 130, background: "var(--panel2)", position: "relative" }}>
-                  <img src={imgUrl(photo, 700)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  {isOn && <span style={{ position: "absolute", top: 10, right: 10, width: 26, height: 26, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={15} style={{ color: "var(--on-gold)" }} strokeWidth={3} /></span>}
-                </span> : null}
-                <span style={{ display: "block", padding: "15px 17px" }}>
-                  <span style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.2, lineHeight: 1.2 }}>{name}</span>
-                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, color: "var(--gold)", whiteSpace: "nowrap" }}>{priceLabel}</span>
-                  </span>
-                  {desc && <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 6 }}>{desc}</span>}
-                  <span style={{ display: "block", marginTop: 14, background: isOn ? "var(--gold)" : "transparent", color: isOn ? "var(--on-gold)" : "var(--text)", textAlign: "center", padding: 12, borderRadius: 8, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", border: isOn ? "none" : "1px solid var(--border)" }}>{isOn ? "Added to your visit" : "Add it"}</span>
-                </span>
-              </button>
-              <button onClick={goWhoWhen} style={{ width: "100%", marginTop: 16, background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 0.3, padding: "10px 0", textAlign: "center", cursor: "pointer" }}>{isOn ? "Continue" : "No thanks, skip this"} →</button>
-            </div>
-          );
-        })()}
+        {/* SIMPLE · FINISH step removed — finishing-touch is now part of the add-on bottom-sheet sequence */}
 
         {/* SIMPLE · WHO — anyone, or a specific person? Defaults make this a one-tap step. */}
         {simpleStep === "who" && (
@@ -3438,6 +3380,34 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 {showCats
                   ? liveCats.map((cat) => { const l = inCat(cat); const photo = (l.find((s) => s.photo) || {}).photo; return card(cat, photo, cat, l.length === 1 ? l[0].name : (l.length + " options"), () => { if (l.length === 1) pickGuidedService(l[0]); else setGuidedCat(cat); }); })
                   : list.map((svc) => card(svc.id, svc.photo, svc.name, svc.duration ? (svc.duration + " min" + (svc.price ? " · $" + svc.price : "")) : null, () => pickGuidedService(svc)))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {addonFlow && (() => {
+          const entry = cart[0];
+          const list = (entry?.service?.addonGroups || []).filter((g) => g.type === "addon");
+          const group = list[addonFlow.idx];
+          if (!entry || !group) return null;
+          const item = group.item || {};
+          const price = Number(item.price) || 0;
+          const addsMoney = item.addsPrice !== false && price > 0;
+          const priceLabel = addsMoney ? `+ $${price}` : (group.required ? "Required" : "Included");
+          const heading = group.label || (item.name ? `Want ${item.name}?` : "One more thing?");
+          const desc = item.desc || "";
+          const req = !!group.required;
+          return (
+            <div onClick={() => { if (!req) answerAddon(group, false); }} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 480, borderRadius: "22px 22px 0 0", padding: "24px 26px calc(30px + env(safe-area-inset-bottom))", boxShadow: "0 -12px 40px rgba(0,0,0,0.18)", maxHeight: "88vh", overflowY: "auto" }}>
+                <div style={{ width: 38, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 22px" }} />
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1.2, textAlign: "center", color: "var(--text)" }}>{heading}</div>
+                <div style={{ textAlign: "center", fontSize: 13, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, marginTop: 12 }}>{priceLabel}</div>
+                {desc ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 15, lineHeight: 1.55, color: "var(--sub)", fontWeight: 300, textAlign: "center", maxWidth: 300, margin: "16px auto 0" }}>{desc}</div> : null}
+                <div style={{ display: "flex", gap: 10, marginTop: 26 }}>
+                  <button onClick={() => answerAddon(group, false)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>No thanks</button>
+                  <button onClick={() => answerAddon(group, true)} style={{ flex: 1.2, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Yes, please</button>
+                </div>
               </div>
             </div>
           );
