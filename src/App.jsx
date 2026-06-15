@@ -1740,11 +1740,15 @@ function App() {
         .appt-screen { animation: slideInRight .34s cubic-bezier(.32,.72,0,1) both; }
         /* Service menu — bordered tiles (static; no highlight until selected) */
         .svc-menu { display:flex; flex-direction:column; gap:11px; margin-top:26px; }
-        .svc-tile { display:flex; align-items:center; gap:18px; width:100%; text-align:left; cursor:pointer; background:var(--panel); border:1px solid var(--border2); border-radius:14px; padding:18px 18px; -webkit-tap-highlight-color:transparent; }
+        .svc-tile { display:flex; align-items:center; gap:18px; width:100%; text-align:left; cursor:pointer; background:var(--panel); border:1px solid var(--border2); border-radius:14px; padding:18px 18px; -webkit-tap-highlight-color:transparent; transition:background .12s ease, border-color .12s ease; }
+        .svc-tile.sel { background:var(--text); border-color:var(--text); }
         .svc-num { font-family:'Fraunces',serif; font-size:14px; color:var(--faint); width:24px; flex-shrink:0; letter-spacing:1px; }
-        .svc-name { font-family:'Fraunces',serif; font-size:20px; font-weight:500; letter-spacing:-0.2px; color:var(--text); line-height:1.12; }
-        .svc-meta { font-family:'Jost',sans-serif; font-size:13px; color:var(--sub); margin-top:4px; letter-spacing:.2px; }
-        .svc-ar { font-size:19px; color:var(--text); flex-shrink:0; line-height:1; }
+        .svc-name { font-family:'Fraunces',serif; font-size:20px; font-weight:500; letter-spacing:-0.2px; color:var(--text); line-height:1.12; transition:color .12s ease; }
+        .svc-tile.sel .svc-name { color:var(--bg); }
+        .svc-meta { font-family:'Jost',sans-serif; font-size:13px; color:var(--sub); margin-top:4px; letter-spacing:.2px; transition:color .12s ease; }
+        .svc-tile.sel .svc-meta { color:#b4b4b4; }
+        .svc-ar { font-size:19px; color:var(--text); flex-shrink:0; line-height:1; transition:color .12s ease; }
+        .svc-tile.sel .svc-ar { color:var(--bg); }
         /* Welcome chooser — solid-black primary + outlined secondary that inverts */
         .wel-card { display:flex; align-items:center; gap:18px; width:100%; text-align:left; cursor:pointer; border:none; border-radius:16px; padding:22px 22px; transition:background .18s ease,color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .25s ease; }
         .wel-card .wel-idx { font-family:'Fraunces',serif; font-size:20px; width:28px; flex-shrink:0; line-height:1; }
@@ -2512,6 +2516,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
   // ---- Guided consultation (auto-launches for brand-new clients) ----
   const [consult, setConsult] = useState(null); // null = off; otherwise { step, sides, bottom, condition } answers
+  const [tapSel, setTapSel] = useState(null); // id of the service tile being tapped — turns it black briefly before advancing
+  useEffect(() => { setTapSel(null); }, [simpleStep, step, simpleCat]);
   const [consultResult, setConsultResult] = useState(null); // resolved cut type id once finished
   const [cutHelperOpen, setCutHelperOpen] = useState(null); // "photo" | "notSure" | null — opens the helper sheet on Pick Your Cut
   const [helperPhotoUrl, setHelperPhotoUrl] = useState(null); // data URL of uploaded photo (held for later attaching to booking)
@@ -3176,7 +3182,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   {liveCats.map((cat, i) => {
                     const list = inCat(cat);
                     return (
-                      <button key={cat} onClick={() => { if (list.length === 1) selectService(list[0]); else setSimpleCat(cat); }} className="svc-tile">
+                      <button key={cat} onClick={() => { setTapSel(cat); setTimeout(() => { if (list.length === 1) selectService(list[0]); else setSimpleCat(cat); }, 165); }} className={"svc-tile" + (tapSel === cat ? " sel" : "")}>
                         <span style={{ flex: 1, minWidth: 0 }}><span className="svc-name" style={{ display: "block" }}>{cat}</span></span>
                         <span className="svc-ar">&#8594;</span>
                       </button>
@@ -3198,7 +3204,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <p style={LEAD}>{simpleCat ? ("Here's what we do in " + simpleCat + ".") : (bs.whatLead || "Start here — we'll walk you through the rest.")}</p>
               <div className="svc-menu">
                 {list.map((svc, i) => (
-                  <button key={svc.id} onClick={() => selectService(svc)} className="svc-tile">
+                  <button key={svc.id} onClick={() => { setTapSel(svc.id); setTimeout(() => selectService(svc), 165); }} className={"svc-tile" + (tapSel === svc.id ? " sel" : "")}>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span className="svc-name" style={{ display: "block" }}>{svc.name}</span>
                       {metaFor(svc) ? <span className="svc-meta" style={{ display: "block" }}>{metaFor(svc)}</span> : null}
