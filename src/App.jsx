@@ -545,8 +545,8 @@ const THEMES = [
     t: { bg:"#FAF8F3", panel:"#FFFFFF", panel2:"#F4EFE4", line:"#ECE4D5", border:"#E0D8C7", border2:"#CFC6B7", text:"#232221", text2:"#3A382F", sub:"#6F685D", faint:"#A39C8A", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(60,55,45,.10)", overlay:"rgba(35,34,33,0.34)" } },
   { id: "studio", name: "Studio", tagline: "White paper, sage accent", cat: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.03,
-    canvas: "linear-gradient(176deg,#EDEDED,#E8E8E8)",
-    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F4F4F4", line:"#ECECEC", border:"#DCDCDC", border2:"#C2C2C2", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#A6A6A6", gold:"#0A0A0A", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.06)", overlay:"rgba(0,0,0,0.3)" } },
+    canvas: "#FFFFFF",
+    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F4F4F4", line:"#ECECEC", border:"#D4D4D4", border2:"#C2C2C2", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#A6A6A6", gold:"#0A0A0A", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.06)", overlay:"rgba(0,0,0,0.3)" } },
   { id: "mist", name: "Mist", tagline: "Cool porcelain & slate", cat: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Inter', sans-serif", grain: 0.04,
     canvas: "linear-gradient(176deg,#F1F4F6,#E6ECEF)",
@@ -1750,6 +1750,22 @@ function App() {
         .svc-tile:hover .svc-meta, .svc-tile:active .svc-meta { color:#b4b4b4; }
         .svc-ar { font-size:19px; color:var(--text); flex-shrink:0; line-height:1; transition:transform .2s ease,color .18s ease; }
         .svc-tile:hover .svc-ar, .svc-tile:active .svc-ar { color:var(--bg); transform:translateX(5px); }
+        /* Welcome chooser — solid-black primary + outlined secondary that inverts */
+        .wel-card { display:flex; align-items:center; gap:18px; width:100%; text-align:left; cursor:pointer; border:none; border-radius:16px; padding:22px 22px; transition:background .18s ease,color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .25s ease; }
+        .wel-card .wel-idx { font-family:'Fraunces',serif; font-size:20px; width:28px; flex-shrink:0; line-height:1; }
+        .wel-card .wel-h { font-family:'Jost',sans-serif; font-size:16px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; line-height:1.25; color:inherit; }
+        .wel-card .wel-s { font-family:'Jost',sans-serif; font-size:13px; margin-top:6px; }
+        .wel-card .wel-ar { font-size:21px; flex-shrink:0; line-height:1; color:inherit; transition:transform .2s ease; }
+        .wel-prime { background:var(--text); color:var(--bg); box-shadow:0 16px 36px rgba(0,0,0,.18); }
+        .wel-prime .wel-idx { color:#5a5a5a; } .wel-prime .wel-s { color:#b4b4b4; }
+        .wel-prime:hover, .wel-prime:active { transform:translateY(-2px); box-shadow:0 22px 46px rgba(0,0,0,.26); }
+        .wel-prime:hover .wel-ar, .wel-prime:active .wel-ar { transform:translateX(5px); }
+        .wel-sec { background:var(--panel); color:var(--text); border:1px solid var(--text); }
+        .wel-sec .wel-idx { color:var(--faint); } .wel-sec .wel-s { color:var(--sub); }
+        .wel-sec:hover, .wel-sec:active { background:var(--text); color:var(--bg); }
+        .wel-sec:hover .wel-idx, .wel-sec:active .wel-idx { color:#8a8a8a; }
+        .wel-sec:hover .wel-s, .wel-sec:active .wel-s { color:#b4b4b4; }
+        .wel-sec:hover .wel-ar, .wel-sec:active .wel-ar { transform:translateX(5px); }
         @keyframes fadeInFixed { from { opacity:0; } to { opacity:1; } }
         .appt-screen-fixed { animation: fadeInFixed .25s var(--ease) both; }
         /* Desktop dialog layout is handled inline via the JS wide state in AppointmentSheet
@@ -3088,28 +3104,31 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* STEP 0 — WELCOME / front door */}
         {step === 0 && !simpleStep && (
           <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "10px 4px 0" }}>
-            {/* booking-ui-rev5 */}
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", marginBottom: 14 }}>Welcome to</div>
-            <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.08, letterSpacing: "-0.4px", margin: "0 0 12px", color: "var(--text)" }}>{business.name}</h1>
-            <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14, fontWeight: 400, lineHeight: 1.55, margin: "0 0 32px", maxWidth: 320 }}>Glad you're here. Let's find you a time.</p>
-            <div style={{ display: "grid", gap: 12 }}>
-              <button onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ width: "100%", textAlign: "left", background: "var(--text)", border: "none", borderRadius: 12, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--bg)", cursor: "pointer" }}>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--bg)" }}>I've been here before</span>
-                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 400, marginTop: 5, color: "var(--bg)", opacity: 0.8 }}>We'll pull up your details</span>
+            <div style={{ textAlign: "center", marginBottom: 36 }}>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 4, fontWeight: 600, color: "var(--text2)", textTransform: "uppercase", marginBottom: 16 }}>Welcome to</div>
+              <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 40, fontWeight: 500, lineHeight: 1.06, letterSpacing: "-0.5px", margin: "0 0 14px", color: "var(--text)" }}>{business.name}</h1>
+              <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 16.5, fontWeight: 400, lineHeight: 1.5, margin: "0 auto", maxWidth: 340 }}>Glad you're here. Let's find you a time.</p>
+            </div>
+            <div style={{ display: "grid", gap: 14 }}>
+              <button onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} className="wel-card wel-prime">
+                <span className="wel-idx">01</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span className="wel-h" style={{ display: "block" }}>I've been here before</span>
+                  <span className="wel-s" style={{ display: "block" }}>We'll pull up your details</span>
                 </span>
-                <ChevronRight size={20} style={{ color: "var(--bg)", flexShrink: 0, opacity: 0.9 }} />
+                <span className="wel-ar">&#8594;</span>
               </button>
-              <button onClick={() => { setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "1px solid var(--border)", borderRadius: 12, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" }}>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" }}>It's my first time</span>
-                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", fontWeight: 400, marginTop: 5 }}>Welcome — let's take a look</span>
+              <button onClick={() => { setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} className="wel-card wel-sec">
+                <span className="wel-idx">02</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span className="wel-h" style={{ display: "block" }}>It's my first time</span>
+                  <span className="wel-s" style={{ display: "block" }}>Welcome — let's take a look</span>
                 </span>
-                <ChevronRight size={20} style={{ color: "var(--text)", flexShrink: 0 }} />
+                <span className="wel-ar">&#8594;</span>
               </button>
             </div>
             {onManage && (
-              <button onClick={() => onManage()} style={{ width: "100%", background: "transparent", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 0.3, textAlign: "center", padding: "22px 0 2px", marginTop: 6, cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 4 }}>Manage my appointment</button>
+              <button onClick={() => onManage()} style={{ width: "100%", background: "transparent", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13.5, letterSpacing: 0.3, textAlign: "center", padding: "26px 0 2px", marginTop: 8, cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 4 }}>Manage my appointment</button>
             )}
           </div>
         )}
