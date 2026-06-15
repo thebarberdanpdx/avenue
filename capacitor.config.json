@@ -1,5 +1,6 @@
 {
   "appId": "com.gotvero.app",
   "appName": "Vero",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": { "url": "https://gotvero.com" }
 }

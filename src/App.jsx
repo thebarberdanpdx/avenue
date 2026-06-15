@@ -14335,38 +14335,6 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           </button>
         </div>
       )}
-      <NativeDiagnostics />
-    </div>
-  );
-}
-
-function NativeDiagnostics() {
-  const cap = typeof window !== "undefined" ? window.Capacitor : null;
-  const isNative = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
-  const [info, setInfo] = useState({ uid: "checking…", push: "", err: "", claims: "" });
-  const run = async () => {
-    let push = "";
-    try { push = window.localStorage.getItem("vero_push_status") || "(none captured yet)"; } catch (e) {}
-    let uid = "—", claims = "", err = "";
-    try {
-      await ensureFreshSession();
-      const { data, error } = await supabase.rpc("whoami");
-      if (error) { err = error.message || String(error); }
-      else if (data) { uid = data.uid || "NULL (not authenticated)"; claims = data.claims || ""; }
-    } catch (e) { err = (e && e.message) ? e.message : String(e); }
-    setInfo({ uid, push, err, claims });
-  };
-  useEffect(() => { run(); }, []);
-  return (
-    <div style={{ marginTop: 18, padding: "14px 16px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--panel2)" }}>
-      <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-2</div>
-      <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: "var(--text2)", lineHeight: 1.75, wordBreak: "break-all" }}>
-        <div>auth.uid(): <b style={{ color: "var(--text)" }}>{info.uid}</b></div>
-        {info.push ? <div>push: {info.push}</div> : null}
-        {info.err ? <div style={{ color: "var(--text)" }}>error: {info.err}</div> : null}
-        {info.claims ? <div style={{ color: "var(--sub)", fontSize: 11 }}>claims: {info.claims}</div> : null}
-      </div>
-      <button onClick={run} style={{ marginTop: 11, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY }}>Re-check</button>
     </div>
   );
 }
