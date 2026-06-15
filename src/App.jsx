@@ -2553,6 +2553,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [slot, setSlot] = useState(null);
   const [slotsReady, setSlotsReady] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false); // cancellation policy text collapsed by default on confirm
   const [cardOnFile, setCardOnFile] = useState(false); // card-on-file / deposit captured for this booking
   const [cardSheetOpen, setCardSheetOpen] = useState(false); // real Stripe card-entry sheet open
   const [cardInfo, setCardInfo] = useState(null); // { last4, paid, saved } once captured
@@ -4654,16 +4655,18 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const hasFull = lbl.includes(",");
               const dateFull = `${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
               return (
-                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", textAlign: "center", margin: "10px 0 24px" }}>
+                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", textAlign: "center", margin: "10px 0 20px" }}>
                   <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, lineHeight: 1.2, color: "var(--text)" }}>{lbl} · {fmtTime(slot)}</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.45 }}>{!hasFull ? `${dateFull} · ` : ""}{cart.map((e) => describeEntry(e)).join(" · ")} · with {provider.name}</div>
+                  <div style={{ fontSize: 13.5, color: "var(--text2)", marginTop: 4, lineHeight: 1.45 }}>{!hasFull ? `${dateFull} · ` : ""}{cart.map((e) => describeEntry(e)).join(" · ")} · ${cartAdjTotal} · with {provider.name}</div>
                   <div style={{ height: 1, background: "var(--line)", margin: "13px 0" }} />
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, color: "var(--text)" }}>${cartAdjTotal}</div>
+                  <button onClick={() => setWantEarlier(!wantEarlier)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, width: "100%", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                    <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+                    <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>Notify me if an earlier spot opens up</span>
+                  </button>
                 </div>
               );
             })()}
 
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>{matched ? "Confirm your info" : "Your details"}</div>
             <div style={{ display: "grid", gap: 11, marginBottom: 20 }}>
               <div style={{ display: "flex", gap: 11 }}>
                 <input placeholder="First name" autoComplete="given-name" style={{ ...inputStyle, flex: 1 }} value={newFirst} onChange={(e) => setNewFirst(e.target.value)} />
@@ -4718,14 +4721,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               );
             })()}
 
-            {/* Cancellation policy now shown with its consent toggle, pulled from business.policy */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px 4px", marginBottom: 18 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>CANCELLATION POLICY</div>
-              {business.policy && <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55 }}>{business.policy}</p>}
-              <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", color: "var(--text)", fontSize: 14.5, padding: "15px 0", width: "100%", textAlign: "left", border: "none", borderTop: "1px solid var(--line)", marginTop: business.policy ? 14 : 8, cursor: "pointer" }}>
-                <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-                <span>I agree to the cancellation policy</span>
-              </button>
+            {/* Cancellation policy — collapsed to an agree row with an expandable "Read it" */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "6px 18px", marginBottom: 18 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
+                <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, color: "var(--text)", cursor: "pointer", flex: 1, textAlign: "left" }}>
+                  <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+                  <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>I agree to the cancellation policy</span>
+                </button>
+                {business.policy && <button onClick={() => setPolicyOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 600, padding: "6px 2px", flexShrink: 0, cursor: "pointer" }}>{policyOpen ? "Hide" : "Read it ›"}</button>}
+              </div>
+              {policyOpen && business.policy && <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 14px" }}>{business.policy}</p>}
             </div>
 
             {/* Card on file / deposit — real Stripe in Live, safe simulation in Test */}
@@ -4769,10 +4774,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </div>
               );
             })()}
-            <button onClick={() => setWantEarlier(!wantEarlier)} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", color: "var(--text)", marginBottom: 26, fontSize: 14.5, padding: "4px 2px", width: "100%", textAlign: "left" }}>
-              <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-              <span>Notify me if an earlier spot opens up</span>
-            </button>
 
             {(() => {
               const bk = business.booking || {};
