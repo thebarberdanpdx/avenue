@@ -3389,36 +3389,28 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Your barber</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Anyone in particular?</h2>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 0" }}>No wrong answer — if you're not sure, we'll match you with whoever's free soonest.</p>
-            <div style={{ marginTop: 26, borderBottom: "1px solid var(--line)" }}>
-              <button onClick={() => {
-                const anyone = providers.find((p) => p.id === "anyone") || providers[0];
-                setSimplePref("anyone");
-                setCart((c) => c.map((e, i) => i === 0 ? { ...e, provider: anyone } : e));
-                setSelectedDate(null); setSlot(null);
-                setSimpleStep(null); setStep(6);
-              }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "16px 2px", display: "flex", alignItems: "center", gap: 14, color: "var(--text)", cursor: "pointer" }}>
-                <span style={{ width: 42, height: 42, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Users size={18} style={{ color: "var(--gold)" }} /></span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3 }}>No preference</span>
-                  <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 4 }}>First available — usually the soonest opening</span>
-                </span>
-                <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
-              </button>
+            <div style={{ marginTop: 24, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
               {providers.filter((p) => p.id !== "anyone" && p.isProvider !== false && !p.archived && p.onlineBooking !== false).map((p) => (
                 <button key={p.id} onClick={() => {
                   setSimplePref(p.id);
                   setCart((c) => c.map((e, i) => i === 0 ? { ...e, provider: p } : e));
                   setSelectedDate(null); setSlot(null);
                   setSimpleStep(null); setStep(6);
-                }} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "16px 2px", display: "flex", alignItems: "center", gap: 14, color: "var(--text)", cursor: "pointer" }}>
-                  <Avatar size={42} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3 }}>{p.name}</span>
-                    <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 4 }}>{p.role}</span>
-                  </span>
-                  <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                }} style={{ border: "1px solid var(--border)", borderRadius: 13, minHeight: 104, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--panel)", padding: "10px 6px", color: "var(--text)", cursor: "pointer" }}>
+                  <Avatar size={46} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
+                  <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, textAlign: "center", lineHeight: 1.2 }}>{p.name}</span>
                 </button>
               ))}
+              <button onClick={() => {
+                const anyone = providers.find((p) => p.id === "anyone") || providers[0];
+                setSimplePref("anyone");
+                setCart((c) => c.map((e, i) => i === 0 ? { ...e, provider: anyone } : e));
+                setSelectedDate(null); setSlot(null);
+                setSimpleStep(null); setStep(6);
+              }} style={{ border: "1px solid var(--border)", borderRadius: 13, minHeight: 104, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 0, background: "var(--panel)", padding: "10px 6px", color: "var(--text)", cursor: "pointer" }}>
+                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, lineHeight: 1.15, textAlign: "center", color: "var(--text)" }}>First<br />available</span>
+                <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 6 }}>Soonest open</span>
+              </button>
             </div>
           </div>
         )}
