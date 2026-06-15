@@ -546,7 +546,7 @@ const THEMES = [
   { id: "studio", name: "Studio", tagline: "White paper, sage accent", cat: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.03,
     canvas: "linear-gradient(176deg,#EDEDED,#E8E8E8)",
-    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F4F4F4", line:"#ECECEC", border:"#DCDCDC", border2:"#C2C2C2", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#A6A6A6", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.06)", overlay:"rgba(0,0,0,0.3)" } },
+    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F4F4F4", line:"#ECECEC", border:"#DCDCDC", border2:"#C2C2C2", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#A6A6A6", gold:"#0A0A0A", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.06)", overlay:"rgba(0,0,0,0.3)" } },
   { id: "mist", name: "Mist", tagline: "Cool porcelain & slate", cat: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Inter', sans-serif", grain: 0.04,
     canvas: "linear-gradient(176deg,#F1F4F6,#E6ECEF)",
@@ -1120,7 +1120,7 @@ class ErrorBoundary extends React.Component {
           <div style={{ fontFamily: "var(--font-disp, Georgia, serif)", fontSize: 24, fontWeight: 600, marginBottom: 10, color: "var(--text, #232221)" }}>Something went wrong{this.props.label ? ` on ${this.props.label}` : ""}.</div>
           <p style={{ fontSize: 15, color: "var(--sub, #6F685D)", lineHeight: 1.5, marginBottom: 16 }}>The rest of the app still works — head back and try again. If this keeps happening, send a screenshot of the text below:</p>
           <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", background: "var(--panel2, #F4EFE4)", border: "1px solid var(--border, #E0D8C7)", borderRadius: 12, padding: 14, fontSize: 12.5, color: "var(--text, #232221)" }}>{String((e && (e.stack || e.message)) || e)}</pre>
-          <button onClick={() => { try { window.location.reload(); } catch (x) {} }} style={{ marginTop: 16, background: "var(--gold, #6E8B74)", color: "var(--on-gold, #fff)", border: "none", borderRadius: 12, padding: "12px 18px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Reload</button>
+          <button onClick={() => { try { window.location.reload(); } catch (x) {} }} style={{ marginTop: 16, background: "var(--gold, #0A0A0A)", color: "var(--on-gold, #fff)", border: "none", borderRadius: 12, padding: "12px 18px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Reload</button>
         </div>
       );
     }
@@ -17991,7 +17991,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ background: "var(--gold)", border: "none", color: "var(--on-gold)", padding: "11px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700, boxShadow: "var(--shadow)" }}>CHECKOUT</button>}
                 </div>
                 {appt.status === "checked-in" && (
-                  <button onClick={() => onSetStatus(appt.id, "in-service", `${appt.name} is in the chair.`)} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", border: "none", background: "#6E8B74", color: "#fff", fontWeight: 700, fontSize: 15, padding: "15px", borderRadius: 14, marginTop: 16, cursor: "pointer", animation: "lobbyStart 2.4s ease-in-out infinite" }}>Start service</button>
+                  <button onClick={() => onSetStatus(appt.id, "in-service", `${appt.name} is in the chair.`)} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", border: "none", background: "var(--text)", color: "var(--bg)", fontWeight: 700, fontSize: 15, padding: "15px", borderRadius: 14, marginTop: 16, cursor: "pointer", animation: "lobbyStart 2.4s ease-in-out infinite" }}>Start service</button>
                 )}
               </div>
 
