@@ -5658,15 +5658,14 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   return (
     <div className="fade-up">
       {/* MASTHEAD — greeting + owner view picker */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
-          <div style={{ width: 32, height: 1.5, background: "var(--gold)", marginTop: 12 }} />
+      <div style={{ marginBottom: 26, paddingTop: 8 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "flex-end", gap: 12, marginBottom: 16 }}>
           {/* Owner-only "viewing as" picker. Barbers see only their avatar + name (no toggle). */}
           {isOwner && realProviders.length > 1 ? (
             <div>
               <button onClick={() => setPickerOpen(true)} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 24, padding: "6px 12px 6px 6px", cursor: "pointer" }}>
                 {isShopView ? (
-                  <div style={{ width: 26, height: 26, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 20%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={13} style={{ color: "var(--gold)" }} /></div>
+                  <div style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={13} style={{ color: "var(--text2)" }} /></div>
                 ) : (
                   <Avatar size={26} initial={viewedProvider?.name?.charAt(0)} color={viewedProvider?.color} photo={viewedProvider?.photo} />
                 )}
@@ -5682,23 +5681,23 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             </div>
           )}
         </div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 29, fontWeight: 500, letterSpacing: -0.3, lineHeight: 1.05, color: "var(--text)" }}>{headerName}</h2>
-        <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 6 }}>{todayLabel}</div>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, color: "var(--text)" }}>{headerName}</h2>
+        <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{todayLabel}</div>
       </div>
 
       {/* TODAY — hero card: money + goal ring */}
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, boxShadow: "var(--shadow)", padding: "18px 19px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 13 }}>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 11 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, color: "var(--sub)", fontWeight: 500, marginBottom: 4 }}>{isShopView ? "Today · shop" : "Today"}</div>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 46, fontWeight: 500, color: "var(--text)", lineHeight: 0.95, letterSpacing: -1 }}>
+          <div style={{ fontSize: 10.5, letterSpacing: "2.5px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginBottom: 8 }}>{isShopView ? "Today · shop" : "Today"}</div>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 46, fontWeight: 400, color: "var(--text)", lineHeight: 0.95, letterSpacing: -1 }}>
             {fmtMoney(todayMoney)}
           </div>
           {todayVsYesterday ? (
-            <div style={{ fontSize: 13.5, color: todayVsYesterday.up ? "var(--gold)" : "var(--sub)", lineHeight: 1.4, marginTop: 7 }}>
+            <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4, marginTop: 8 }}>
               {todayVsYesterday.up ? "+" : "−"}{fmtMoney(todayVsYesterday.abs)} vs {fmtMoney(yesterdayMoney)} yesterday
             </div>
           ) : (
-            <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4, marginTop: 7 }}>
+            <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4, marginTop: 8 }}>
               {todayApptsAll.length === 0 ? "Nothing booked today yet." : `${todayApptsAll.length} ${todayApptsAll.length === 1 ? "visit" : "visits"} booked`}
             </div>
           )}
@@ -5708,66 +5707,62 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           <button onClick={() => openGoalEditor("daily")} style={{ textAlign: "center", flexShrink: 0, background: "none", border: "none", padding: 0, cursor: "pointer" }}>
             <svg width="92" height="92" viewBox="0 0 96 96">
               <circle cx="48" cy="48" r="34" fill="none" stroke="var(--panel2)" strokeWidth="8" />
-              <circle cx="48" cy="48" r="34" fill="none" stroke="var(--gold)" strokeWidth="8" strokeLinecap="round" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} transform="rotate(-90 48 48)" style={{ transition: "stroke-dashoffset .4s ease" }} />
-              <text x="48" y="53" textAnchor="middle" fill="var(--text)" fontSize="23" fontFamily="'Fraunces', serif" fontWeight="600">{dailyPct}%</text>
+              <circle cx="48" cy="48" r="34" fill="none" stroke="var(--text)" strokeWidth="8" strokeLinecap="round" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} transform="rotate(-90 48 48)" style={{ transition: "stroke-dashoffset .4s ease" }} />
+              <text x="48" y="53" textAnchor="middle" fill="var(--text)" fontSize="23" fontFamily="'Fraunces', serif" fontWeight="500">{dailyPct}%</text>
             </svg>
             <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 1 }}>{fmtMoney(todayMoney)} / {fmtMoney(dailyGoal)}</div>
-            <div style={{ fontSize: 10.5, color: "var(--gold)", marginTop: 3, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> {goalIsDefault ? "Set goal" : "Edit goal"}</div>
+            <div style={{ fontSize: 11, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> {goalIsDefault ? "Set goal" : "Edit goal"}</div>
           </button>
         )}
       </div>
 
       {/* STAT TILES — cuts, chair occupancy, avg ticket */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 11, marginBottom: 26 }}>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 10px", textAlign: "center", boxShadow: "var(--shadow-sm)" }}>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{cutsToday}</div>
-          <div style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 6 }}>Cuts</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 30 }}>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "16px 10px", textAlign: "center" }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 400, color: "var(--text)", lineHeight: 1 }}>{cutsToday}</div>
+          <div style={{ fontSize: 10.5, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--faint)", marginTop: 8, fontWeight: 500 }}>Cuts</div>
         </div>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 10px", textAlign: "center", boxShadow: "var(--shadow-sm)" }}>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{occupancyToday}%</div>
-          <div style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 6 }}>Chair full</div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "16px 10px", textAlign: "center" }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 400, color: "var(--text)", lineHeight: 1 }}>{occupancyToday}%</div>
+          <div style={{ fontSize: 10.5, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--faint)", marginTop: 8, fontWeight: 500 }}>Chair full</div>
         </div>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 10px", textAlign: "center", boxShadow: "var(--shadow-sm)" }}>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>{fmtMoney(avgTicket)}</div>
-          <div style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 6 }}>Avg ticket</div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "16px 10px", textAlign: "center" }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 400, color: "var(--text)", lineHeight: 1 }}>{fmtMoney(avgTicket)}</div>
+          <div style={{ fontSize: 10.5, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--faint)", marginTop: 8, fontWeight: 500 }}>Avg ticket</div>
         </div>
       </div>
 
-      {/* Quick actions — wrap up (lights when cuts are waiting), growth, reports, team — as clean rows */}
-      <div style={{ marginBottom: 26 }}>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+      {/* Quick actions — wrap up (lights when cuts are waiting), growth, reports, team — Atelier hairline rows */}
+      <div style={{ marginBottom: 30 }}>
+        <div>
           {(() => {
             const n = wrapUpList.length;
             const lit = n > 0;
             return (
-              <button onClick={() => (lit ? setWrapOpen(true) : (showToast && showToast("All caught up — nothing to log.")))} style={{ width: "100%", background: lit ? "color-mix(in srgb, var(--gold) 7%, var(--panel))" : "none", border: "none", display: "flex", alignItems: "center", gap: 13, padding: "15px 15px", minHeight: 64, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-                <span style={{ width: 34, height: 34, borderRadius: 9, background: "color-mix(in srgb, var(--gold) 13%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Camera size={18} style={{ color: lit ? "var(--gold)" : "var(--faint)" }} /></span>
+              <button onClick={() => (lit ? setWrapOpen(true) : (showToast && showToast("All caught up — nothing to log.")))} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 16, fontWeight: 500 }}>Wrap up</span>
-                  <span style={{ display: "block", fontSize: 12.5, color: lit ? "var(--gold)" : "var(--sub)", fontWeight: lit ? 600 : 400, marginTop: 2 }}>{lit ? (n + (n === 1 ? " cut to log" : " cuts to log")) : "All caught up"}</span>
+                  <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Wrap up</span>
+                  <span style={{ display: "block", fontSize: 12.5, color: lit ? "var(--text2)" : "var(--faint)", marginTop: 3 }}>{lit ? (n + (n === 1 ? " cut to log" : " cuts to log")) : "All caught up"}</span>
                 </span>
-                {lit && <span style={{ minWidth: 22, height: 22, borderRadius: 11, padding: "0 7px", background: "var(--gold)", color: "var(--on-gold)", fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{n}</span>}
-                <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                {lit && <span style={{ minWidth: 22, height: 22, borderRadius: 11, padding: "0 7px", background: "var(--text)", color: "var(--bg)", fontSize: 12, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, alignSelf: "center" }}>{n}</span>}
+                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
               </button>
             );
           })()}
-          <button onClick={() => setGrowthOpen(true)} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 13, padding: "15px 15px", minHeight: 64, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-            <span style={{ width: 34, height: 34, borderRadius: 9, background: "color-mix(in srgb, var(--gold) 13%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><TrendingUp size={18} style={{ color: "var(--gold)" }} /></span>
-            <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 16, fontWeight: 500 }}>How you're growing</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>People keep coming back</span></span>
-            <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+          <button onClick={() => setGrowthOpen(true)} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+            <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>How you're growing</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>People keep coming back</span></span>
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
           </button>
           {(isOwner && onOpenRevenue) && (
-            <button onClick={onOpenRevenue} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 13, padding: "15px 15px", minHeight: 64, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 9, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><BarChart3 size={18} style={{ color: "var(--text)" }} /></span>
-              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 16, fontWeight: 500 }}>Reports</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>The full numbers</span></span>
-              <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+            <button onClick={onOpenRevenue} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Reports</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>The full numbers</span></span>
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
             </button>
           )}
           {(isOwner && onOpenBarbers && realProviders.length > 1) && (
-            <button onClick={onOpenBarbers} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 13, padding: "15px 15px", minHeight: 64, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 9, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Users size={18} style={{ color: "var(--text)" }} /></span>
-              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 16, fontWeight: 500 }}>Team</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>Compare each barber</span></span>
-              <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+            <button onClick={onOpenBarbers} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Team</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Compare each barber</span></span>
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
             </button>
           )}
         </div>
@@ -5786,20 +5781,18 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         ].filter(Boolean);
         if (!insights.length) return null;
         return (
-          <div style={{ marginBottom: 26 }}>
-            <div style={{ fontSize: 11.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 12px" }}>Insights</div>
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 2px" }}>Insights</div>
+            <div>
               {insights.map((it, i) => {
-                const Ic = it.Icon;
                 return (
-                  <button key={i} onClick={it.onClick} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "center", gap: 13, padding: "15px 15px", minHeight: 64, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-                    <span style={{ width: 34, height: 34, borderRadius: 9, background: "color-mix(in srgb, var(--gold) 13%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Ic size={18} /></span>
+                  <button key={i} onClick={it.onClick} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
                     <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: "block", fontSize: 16, fontWeight: 500, letterSpacing: "-0.1px" }}>{it.label}</span>
-                      {it.desc && <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>}
+                      <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>{it.label}</span>
+                      {it.desc && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>}
                     </span>
-                    {it.badge > 0 && <span style={{ minWidth: 22, height: 22, borderRadius: 11, padding: "0 7px", background: "var(--live, var(--gold))", color: "#0F1115", fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{it.badge > 9 ? "9+" : it.badge}</span>}
-                    <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                    {it.badge > 0 && <span style={{ minWidth: 22, height: 22, borderRadius: 11, padding: "0 7px", background: "var(--text)", color: "var(--bg)", fontSize: 12, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, alignSelf: "center" }}>{it.badge > 9 ? "9+" : it.badge}</span>}
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
                   </button>
                 );
               })}
@@ -13848,25 +13841,24 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   // ---- Category grid: concrete, plain-named buckets. Every setting lives in exactly one,
   // so nothing falls through to search-only. Tap a tile → that category's list. ----
   const CATS = [
-    { id: "shop",  label: "Your shop", icon: User, desc: "Name, hours & branding", settings: ["business", "hours", "locations", "phones", "appearance", "theme"] },
-    { id: "staff", label: "Your team", icon: Users, desc: "Barbers, access & pay", settings: ["staff", "staffpin"] },
-    { id: "menu",  label: "Services & pricing", icon: Scissors, desc: "What you offer", settings: ["servicesmenu", "addons", "aicuthelper"] },
-    { id: "book",  label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "How clients book you", settings: ["avoidgaps", "anyonerouting", "booking", "newclient", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"], groups: [
-      { label: "The times they see", ids: ["avoidgaps", "anyonerouting"] },
+    { id: "shop",  section: "Set up your shop", label: "Your shop", icon: User, desc: "Name, hours & branding", settings: ["business", "hours", "locations", "phones", "appearance", "theme"] },
+    { id: "staff", section: "Set up your shop", label: "Your team", icon: Users, desc: "Barbers, access & pay", settings: ["staff", "staffpin"] },
+    { id: "menu",  section: "Set up your shop", label: "Services & pricing", icon: Scissors, desc: "What you offer", settings: ["servicesmenu", "addons", "aicuthelper"] },
+    { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "How clients book you", settings: ["avoidgaps", "autotiming", "anyonerouting", "booking", "newclient", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"], groups: [
+      { label: "The times they see", ids: ["avoidgaps", "autotiming", "anyonerouting"] },
       { label: "Your booking page", ids: ["booking", "newclient", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"] },
     ] },
-    { id: "noshow", label: "Deposits & no-shows", icon: AlertCircle, desc: "Protect your time", settings: ["policy"] },
-    { id: "dayof", label: "Your day", icon: Clock, desc: "Calendar & running your day", settings: ["calendarsettings", "waitlist", "photos", "waitingroom", "runninglate", "overduebuffer", "autotiming"], groups: [
+    { id: "noshow", section: "Booking & money", label: "Deposits & no-shows", icon: AlertCircle, desc: "Protect your time", settings: ["policy"] },
+    { id: "pay",   section: "Booking & money", label: "Checkout & payments", icon: CreditCard, desc: "Pay, tips & rebooking", settings: ["payments", "checkout", "tipping", "rebookco"] },
+    { id: "dayof", section: "Running your day", label: "Your day", icon: Clock, desc: "Calendar & running your day", settings: ["calendarsettings", "waitlist", "photos", "waitingroom", "runninglate", "overduebuffer"], groups: [
       { label: "Calendar", ids: ["calendarsettings", "photos"] },
       { label: "During the day", ids: ["waitlist", "waitingroom", "runninglate", "overduebuffer"] },
-      { label: "Smart timing", ids: ["autotiming"] },
     ] },
-    { id: "pay",   label: "Checkout & payments", icon: CreditCard, desc: "Pay, tips & rebooking", settings: ["payments", "checkout", "tipping", "rebookco"] },
-    { id: "msg",   label: "Messages", icon: Bell, desc: "Texts & emails", settings: ["messages", "notifications"], groups: [
+    { id: "msg",   section: "Running your day", label: "Messages", icon: Bell, desc: "Texts & emails", settings: ["messages", "notifications"], groups: [
       { label: "Clients", ids: ["messages"] },
       { label: "My team", ids: ["notifications"] },
     ] },
-    { id: "data",  label: "Reports & data", icon: BarChart3, desc: "Your numbers & tools", settings: ["reports", "import", "mergedupes", "testdata"] },
+    { id: "data",  section: "Business & account", label: "Reports & data", icon: BarChart3, desc: "Your numbers & tools", settings: ["reports", "import", "mergedupes", "testdata"] },
   ];
   // Safety net: any card not placed above still appears (appended to Reports & Insights) so nothing is ever lost.
   // RETIRED cards are intentionally left out of the list (their function moved elsewhere).
@@ -14105,25 +14097,24 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     const hasToggle = refreshed && !!c.toggle;
     return (
       <div style={{ position: "relative", background: "var(--panel)", borderTop: first ? "none" : "1px solid var(--line)" }}>
-        <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 12, padding: refreshed ? "18px 17px" : "17px 17px", minHeight: refreshed ? 64 : "auto", textAlign: "left", cursor: "pointer" }}>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 16.5, fontWeight: 500, letterSpacing: "-0.1px", whiteSpace: refreshed ? "nowrap" : "normal", overflow: refreshed ? "hidden" : "visible", textOverflow: "ellipsis" }}>{c.title}</span>
-              {c.smart && <span style={{ fontSize: 8.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", background: "color-mix(in srgb, var(--gold) 12%, transparent)", borderRadius: 5, padding: "3px 6px", flexShrink: 0 }}>SMART</span>}
+        <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 12, padding: refreshed ? "17px 4px" : "16px 4px", minHeight: refreshed ? 60 : "auto", textAlign: "left", cursor: "pointer" }}>
+          <div style={{ minWidth: 0, flexShrink: 0, maxWidth: hasToggle ? "82%" : "52%" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+              <span style={{ fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px", whiteSpace: refreshed ? "normal" : "normal" }}>{c.title}</span>
+              {c.smart && <span style={{ fontFamily: "'Fraunces', serif", fontSize: 11, fontStyle: "italic", letterSpacing: "0.2px", color: "var(--faint)", flexShrink: 0 }}>learns</span>}
             </div>
-            {refreshed
-              ? (c.subtitle && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 4, lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle}</div>)
-              : ((c.subtitle || c.status) && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>)}
+            {!refreshed && (c.subtitle || c.status) && <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>}
           </div>
           {!refreshed && <span onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, display: "flex", alignItems: "center" }}><Explain title={c.title}>{explainText}</Explain></span>}
           {hasToggle ? (
-            <span onClick={(e) => { e.stopPropagation(); c.toggle.set(!c.toggle.on); }} role="switch" aria-checked={c.toggle.on} aria-label={c.title} style={{ width: 48, height: 29, borderRadius: 30, flexShrink: 0, background: c.toggle.on ? "var(--gold)" : "var(--border2)", position: "relative", transition: "background .2s", cursor: "pointer" }}>
-              <span style={{ position: "absolute", top: 3, left: c.toggle.on ? 22 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
+            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 13, flexShrink: 0 }}>
+              <span style={{ fontSize: 14, fontWeight: 400, color: c.toggle.on ? "var(--text)" : "var(--faint)" }}>{c.toggle.on ? "On" : "Off"}</span>
+              <span onClick={(e) => { e.stopPropagation(); c.toggle.set(!c.toggle.on); }} role="switch" aria-checked={c.toggle.on} aria-label={c.title} style={{ width: 9, height: 9, borderRadius: "50%", flexShrink: 0, background: c.toggle.on ? "var(--text)" : "none", border: c.toggle.on ? "none" : "1px solid var(--border2)", cursor: "pointer" }} />
             </span>
           ) : (
-            <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-              {refreshed && c.status && <span style={{ fontSize: 15, color: "var(--gold)", fontWeight: 500, textAlign: "right", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</span>}
-              <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12, flexShrink: 1, minWidth: 0, justifyContent: "flex-end" }}>
+              {refreshed && c.status && <span style={{ fontSize: 14, color: "var(--sub)", fontWeight: 400, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</span>}
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
             </span>
           )}
         </button>
@@ -14153,10 +14144,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   return (
     <div className="fade-up" style={{ width: "100%", padding: "12px 6px" }}>
       {/* Masthead */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ width: 30, height: 2, background: "var(--gold)", borderRadius: 2, marginBottom: 13 }} />
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1, letterSpacing: "-0.5px" }}>Settings</h2>
-        <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 7 }}>Your shop, your booking, your day.</div>
+      <div style={{ marginBottom: 22, paddingTop: 8 }}>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 40, fontWeight: 400, lineHeight: 0.98, letterSpacing: "-0.8px" }}>Settings</h2>
+        <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 13 }}>Your shop, your booking, your day</div>
       </div>
 
       {/* HERO SEARCH */}
@@ -14263,29 +14253,26 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           const catCards = cat.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
           return (
             <div className="appt-screen">
-              <button onClick={() => setOpenCat(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 500, marginBottom: 20, padding: 0, border: "none" }}><ArrowLeft size={16} /> All settings</button>
-              <div style={{ marginBottom: 22 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                  <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, letterSpacing: "-0.4px" }}>{cat.label}</h2>
-                  {cat.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "3px 7px" }}>SMART</span>}
-                </div>
-                <p style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300, lineHeight: 1.45 }}>{cat.desc}</p>
+              <button onClick={() => setOpenCat(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 400, marginBottom: 26, padding: 0, border: "none", letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> Settings</button>
+              <div style={{ marginBottom: 30 }}>
+                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 0.98 }}>{cat.label}</h2>
+                <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{cat.desc}</div>
               </div>
               {cat.groups ? (
                 cat.groups.map((g) => {
                   const groupCards = g.ids.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
                   if (!groupCards.length) return null;
                   return (
-                    <div key={g.label} style={{ marginBottom: 24 }}>
-                      <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 4px 11px" }}>{g.label}</div>
-                      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+                    <div key={g.label} style={{ marginBottom: 30 }}>
+                      <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 6px" }}>{g.label}</div>
+                      <div>
                         {groupCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+                <div>
                   {catCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
                 </div>
               )}
@@ -14293,48 +14280,83 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           );
         })()
       ) : (
-        // HOME — the sections as one clean row list (icon · name · description · chevron)
+        // HOME — sections grouped under Atelier section labels, hairline rows, no icon tiles
         <div>
-          <div style={{ fontSize: 11.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 12px" }}>All settings</div>
-          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
-            {CATS.map((cat, i) => {
-              const Ic = cat.icon;
-              return (
-                <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "center", gap: 13, padding: "15px 15px", minHeight: 64, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-                  <span style={{ width: 34, height: 34, borderRadius: 9, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{Ic && <Ic size={18} style={{ color: "var(--gold)" }} />}</span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 16, fontWeight: 500, letterSpacing: "-0.1px" }}>{cat.label}</span>
-                      {cat.smart && <span style={{ fontSize: 8.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 5px" }}>SMART</span>}
-                    </span>
-                    <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.desc}</span>
-                  </span>
-                  <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
-                </button>
-              );
-            })}
-          </div>
+          {["Set up your shop", "Booking & money", "Running your day", "Business & account"].map((sectionName) => {
+            const inSection = CATS.filter((cat) => cat.section === sectionName);
+            if (!inSection.length) return null;
+            return (
+              <div key={sectionName} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "18px 4px 2px" }}>{sectionName}</div>
+                <div>
+                  {inSection.map((cat, i) => (
+                    <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>{cat.label}</span>
+                        <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.desc}</span>
+                      </span>
+                      <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Help & Support entry — pinned at the bottom of Settings */}
-      <button onClick={() => setHelpOpen(true)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, padding: "15px 16px", marginTop: 28, textAlign: "left", cursor: "pointer" }}>
-        <HelpCircle size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
-        <span style={{ flex: 1 }}>
-          <span style={{ display: "block", fontSize: 15.5, fontWeight: 600, color: "var(--text)" }}>Help & Support</span>
-          <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 1 }}>Guides, answers, and how-tos</span>
-        </span>
-        <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
-      </button>
-
-      {onSignOutAccount && (
-        <div style={{ marginTop: 14 }}>
-          {authEmail && <div style={{ fontSize: 12.5, color: "var(--faint)", textAlign: "center", marginBottom: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Signed in as {authEmail}</div>}
-          <button onClick={() => { if (typeof window !== "undefined" && window.confirm("Log out of this account?")) onSignOutAccount(); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "none", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 16px", color: "var(--sub)", fontSize: 14.5, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" }}>
-            <Lock size={16} style={{ color: "var(--sub)" }} /> Log out
+      {/* Help & account — Atelier hairline footer, landing only */}
+      {!openCat && !q && (
+        <div style={{ marginTop: 4 }}>
+          <button onClick={() => setHelpOpen(true)} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Help &amp; support</span>
+              <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Guides, answers &amp; how-tos</span>
+            </span>
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
           </button>
+
+          {onSignOutAccount && (
+            <div style={{ marginTop: 40, paddingTop: 4, textAlign: "center" }}>
+              {authEmail && <div style={{ fontSize: 12, color: "var(--faint)", marginBottom: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Signed in as {authEmail}</div>}
+              <button onClick={() => { if (typeof window !== "undefined" && window.confirm("Log out of this account?")) onSignOutAccount(); }} style={{ background: "none", border: "none", borderBottom: "1px solid var(--border)", borderRadius: 0, padding: "0 0 3px", color: "var(--sub)", fontSize: 14, fontWeight: 400, fontFamily: FONT_BODY, letterSpacing: "0.3px", cursor: "pointer" }}>
+                Log out
+              </button>
+            </div>
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+function NativeDiagnostics() {
+  const cap = typeof window !== "undefined" ? window.Capacitor : null;
+  const isNative = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
+  const [info, setInfo] = useState({ uid: "checking…", push: "", err: "", claims: "" });
+  const run = async () => {
+    let push = "";
+    try { push = window.localStorage.getItem("vero_push_status") || "(none captured yet)"; } catch (e) {}
+    let uid = "—", claims = "", err = "";
+    try {
+      await ensureFreshSession();
+      const { data, error } = await supabase.rpc("whoami");
+      if (error) { err = error.message || String(error); }
+      else if (data) { uid = data.uid || "NULL (not authenticated)"; claims = data.claims || ""; }
+    } catch (e) { err = (e && e.message) ? e.message : String(e); }
+    setInfo({ uid, push, err, claims });
+  };
+  useEffect(() => { run(); }, []);
+  return (
+    <div style={{ marginTop: 18, padding: "14px 16px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--panel2)" }}>
+      <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-2</div>
+      <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: "var(--text2)", lineHeight: 1.75, wordBreak: "break-all" }}>
+        <div>auth.uid(): <b style={{ color: "var(--text)" }}>{info.uid}</b></div>
+        {info.push ? <div>push: {info.push}</div> : null}
+        {info.err ? <div style={{ color: "var(--text)" }}>error: {info.err}</div> : null}
+        {info.claims ? <div style={{ color: "var(--sub)", fontSize: 11 }}>claims: {info.claims}</div> : null}
+      </div>
+      <button onClick={run} style={{ marginTop: 11, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY }}>Re-check</button>
     </div>
   );
 }
