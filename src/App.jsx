@@ -14356,11 +14356,10 @@ function NativeDiagnostics() {
     } catch (e) { err = (e && e.message) ? e.message : String(e); }
     setInfo({ uid, push, err, claims });
   };
-  useEffect(() => { if (isNative) run(); }, []);
-  if (!isNative) return null;
+  useEffect(() => { run(); }, []);
   return (
     <div style={{ marginTop: 18, padding: "14px 16px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--panel2)" }}>
-      <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics</div>
+      <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-2</div>
       <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: "var(--text2)", lineHeight: 1.75, wordBreak: "break-all" }}>
         <div>auth.uid(): <b style={{ color: "var(--text)" }}>{info.uid}</b></div>
         {info.push ? <div>push: {info.push}</div> : null}
