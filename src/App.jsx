@@ -5731,12 +5731,12 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
 
       {/* Quick actions — wrap up (lights when cuts are waiting), growth, reports, team — Atelier hairline rows */}
       <div style={{ marginBottom: 30 }}>
-        <div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
           {(() => {
             const n = wrapUpList.length;
             const lit = n > 0;
             return (
-              <button onClick={() => (lit ? setWrapOpen(true) : (showToast && showToast("All caught up — nothing to log.")))} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+              <button onClick={() => (lit ? setWrapOpen(true) : (showToast && showToast("All caught up — nothing to log.")))} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Wrap up</span>
                   <span style={{ display: "block", fontSize: 12.5, color: lit ? "var(--text2)" : "var(--faint)", marginTop: 3 }}>{lit ? (n + (n === 1 ? " cut to log" : " cuts to log")) : "All caught up"}</span>
@@ -5746,18 +5746,18 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               </button>
             );
           })()}
-          <button onClick={() => setGrowthOpen(true)} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+          <button onClick={() => setGrowthOpen(true)} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
             <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>How you're growing</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>People keep coming back</span></span>
             <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
           </button>
           {(isOwner && onOpenRevenue) && (
-            <button onClick={onOpenRevenue} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+            <button onClick={onOpenRevenue} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
               <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Reports</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>The full numbers</span></span>
               <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
             </button>
           )}
           {(isOwner && onOpenBarbers && realProviders.length > 1) && (
-            <button onClick={onOpenBarbers} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+            <button onClick={onOpenBarbers} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
               <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Team</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Compare each barber</span></span>
               <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
             </button>
@@ -5779,11 +5779,11 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         if (!insights.length) return null;
         return (
           <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 2px" }}>Insights</div>
-            <div>
+            <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 9px" }}>Insights</div>
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
               {insights.map((it, i) => {
                 return (
-                  <button key={i} onClick={it.onClick} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                  <button key={i} onClick={it.onClick} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>{it.label}</span>
                       {it.desc && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>}
@@ -14084,7 +14084,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     const hasToggle = refreshed && !!c.toggle;
     return (
       <div style={{ position: "relative", background: "var(--panel)", borderTop: first ? "none" : "1px solid var(--line)" }}>
-        <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 12, padding: refreshed ? "17px 4px" : "16px 4px", minHeight: refreshed ? 60 : "auto", textAlign: "left", cursor: "pointer" }}>
+        <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 12, padding: refreshed ? "17px 17px" : "16px 17px", minHeight: refreshed ? 60 : "auto", textAlign: "left", cursor: "pointer" }}>
           <div style={{ minWidth: 0, flexShrink: 0, maxWidth: hasToggle ? "82%" : "52%" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
               <span style={{ fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px", whiteSpace: refreshed ? "normal" : "normal" }}>{c.title}</span>
@@ -14250,16 +14250,16 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                   const groupCards = g.ids.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
                   if (!groupCards.length) return null;
                   return (
-                    <div key={g.label} style={{ marginBottom: 30 }}>
-                      <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 6px" }}>{g.label}</div>
-                      <div>
+                    <div key={g.label} style={{ marginBottom: 22 }}>
+                      <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 9px" }}>{g.label}</div>
+                      <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
                         {groupCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <div>
+                <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
                   {catCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
                 </div>
               )}
@@ -14273,11 +14273,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             const inSection = CATS.filter((cat) => cat.section === sectionName);
             if (!inSection.length) return null;
             return (
-              <div key={sectionName} style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "18px 4px 2px" }}>{sectionName}</div>
-                <div>
+              <div key={sectionName} style={{ marginBottom: 22 }}>
+                <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 9px" }}>{sectionName}</div>
+                <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
                   {inSection.map((cat, i) => (
-                    <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                    <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>{cat.label}</span>
                         <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.desc}</span>
@@ -14292,16 +14292,18 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         </div>
       )}
 
-      {/* Help & account — Atelier hairline footer, landing only */}
+      {/* Help & account — Atelier footer, landing only */}
       {!openCat && !q && (
         <div style={{ marginTop: 4 }}>
-          <button onClick={() => setHelpOpen(true)} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 4px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Help &amp; support</span>
-              <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Guides, answers &amp; how-tos</span>
-            </span>
-            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
-          </button>
+          <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
+            <button onClick={() => setHelpOpen(true)} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Help &amp; support</span>
+                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Guides, answers &amp; how-tos</span>
+              </span>
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
+            </button>
+          </div>
 
           {onSignOutAccount && (
             <div style={{ marginTop: 40, paddingTop: 4, textAlign: "center" }}>
