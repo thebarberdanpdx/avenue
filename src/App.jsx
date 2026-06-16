@@ -272,7 +272,7 @@ const DEFAULT_BUSINESS = {
   // ---- Payments master mode (Checkout & money → Payments) ----
   // live:false = Test mode — cards entered, full flow, but NOTHING is charged.
   // live:true  = real Stripe charges at every charge point (deposit, checkout, no-show).
-  payments: { live: false },
+  payments: { live: true },
   // ---- Rebooking offer at end of checkout (customizable) ----
   rebook: {
     enabled: true,               // show the rebook screen at checkout at all
@@ -703,7 +703,6 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
   const els = useRef(null);
 
   useEffect(() => {
-    if (!live) { setReady(true); return; }
     setReady(false);
     let dead = false;
     (async () => {
@@ -720,19 +719,13 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
       setTimeout(() => { if (!dead) setReady(true); }, 1200);
     })();
     return () => { dead = true; try { els.current && els.current.card.unmount(); } catch (e) {} };
-  }, [live]);
+  }, []);
 
   const close = () => { setBusy(false); onClose && onClose(); };
 
   const submit = async () => {
     if (busy) return;
     setErr(""); setBusy(true);
-    // ---- TEST mode: no Stripe, no charge ----
-    if (!live) {
-      setTimeout(() => { const r = { simulated: true, last4: "4242", paid: isPay }; setResult(r); setBusy(false); setPhase("done"); }, 600);
-      return;
-    }
-    // ---- LIVE mode: real Stripe, via the app's existing /api/stripe contract ----
     try {
       const e = els.current;
       if (!e) { setErr("The card field isn't ready yet — give it a second."); setBusy(false); return; }
@@ -772,10 +765,10 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, marginBottom: 8 }}>{isPay ? "Deposit paid" : "Card saved"}</div>
               <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>
                 {isPay
-                  ? (live ? <>${amount} was charged and goes toward your total. <b style={{ color: "var(--text)" }}>One more step</b> — finish booking to lock in your time.</> : <>${amount} went toward your total (test — no real charge). <b style={{ color: "var(--text)" }}>One more step</b> — finish booking to lock in your time.</>)
-                  : (live ? <>Your card is securely on file — you won't be charged unless you no-show or cancel late. <b style={{ color: "var(--text)" }}>One more step</b> — finish booking to lock in your time.</> : <>Your card is on file (test — nothing was sent to a processor). <b style={{ color: "var(--text)" }}>One more step</b> — finish booking to lock in your time.</>)}
+                  ? <>${amount} was charged and goes toward your total. <b style={{ color: "var(--text)" }}>One more step</b> — finish booking to lock in your time.</>
+                  : <>Your card is securely on file — you won't be charged unless you no-show or cancel late. <b style={{ color: "var(--text)" }}>One more step</b> — finish booking to lock in your time.</>}
               </div>
-              <button disabled={busy} onClick={() => { if (busy) return; setBusy(true); onDone && onDone(result || { simulated: true, last4: "4242", paid: isPay }); }} style={{ width: "100%", background: busy ? "var(--border2)" : A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: busy ? "default" : "pointer" }}>{busy ? "Finishing…" : "Finish booking"}</button>
+              <button disabled={busy} onClick={() => { if (busy) return; setBusy(true); onDone && onDone(result || { saved: true, paid: isPay }); }} style={{ width: "100%", background: busy ? "var(--border2)" : A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: busy ? "default" : "pointer" }}>{busy ? "Finishing…" : "Finish booking"}</button>
             </div>
           ) : (
             <>
@@ -789,29 +782,8 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
                 <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>We keep a card on file to hold your spot. You won't be charged unless you no-show or cancel late.</div>
               )}
 
-              {!live && (
-                <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "color-mix(in srgb, var(--text) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--text) 30%, var(--border))", borderRadius: 12, padding: "11px 13px", margin: "16px 0 4px" }}>
-                  <AlertCircle size={16} style={{ color: A, flexShrink: 0, marginTop: 1 }} />
-                  <div style={{ fontSize: 12.5, color: A, lineHeight: 1.45 }}><b>Test mode.</b> Enter any details — nothing will be charged. Use card 4242 4242 4242 4242 to try it.</div>
-                </div>
-              )}
-
               <div style={{ marginTop: 18 }}>
-                {live ? (
-                  <div ref={cardBox} style={{ ...field, display: "block", paddingTop: 15 }} />
-                ) : (
-                  <>
-                    <div style={field}>
-                      <CreditCard size={20} style={{ color: "var(--faint)" }} />
-                      <span style={{ fontSize: 15.5, color: "var(--text)", letterSpacing: ".4px" }}>4242 4242 4242 4242</span>
-                      <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, color: "var(--faint)", background: "var(--panel2)", padding: "3px 7px", borderRadius: 5 }}>TEST</span>
-                    </div>
-                    <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-                      <div style={{ ...field, flex: 1 }}><span style={{ fontSize: 15.5, color: "var(--text)" }}>04 / 28</span></div>
-                      <div style={{ ...field, flex: 1 }}><span style={{ fontSize: 15.5, color: "var(--text)" }}>123</span></div>
-                    </div>
-                  </>
-                )}
+                <div ref={cardBox} style={{ ...field, display: "block", paddingTop: 15 }} />
                 {err && <div style={{ color: "#B5564B", fontSize: 12.5, marginTop: 8, paddingLeft: 2 }}>{err}</div>}
               </div>
 
@@ -12176,85 +12148,38 @@ function AppearancePicker({ theme, setTheme }) {
 // Payments master mode — Test (simulate, no real charges) vs Live (real Stripe).
 // One switch governs every charge point: deposits, checkout, no-show fees.
 function PaymentsEditor({ p, onChange }) {
-  const live = p?.live === true;
-  const [confirm, setConfirm] = useState(false);
-  const [chk, setChk] = useState({ a: false, b: false, c: false });
-  const [toast, setToast] = useState(false);
-  const allChecked = chk.a && chk.b && chk.c;
-  const A = "var(--gold)", ON = "var(--on-gold)";
-
-  const goTest = () => { onChange({ live: false }); setToast(true); setTimeout(() => setToast(false), 1900); };
-  const openConfirm = () => { setChk({ a: false, b: false, c: false }); setConfirm(true); };
-  const goLive = () => { onChange({ live: true }); setConfirm(false); };
-
-  const cps = [["Deposits"], ["Checkout"], ["No-show fee"]];
-  const checks = [
-    ["a", "My Stripe account is connected and payouts are set up"],
-    ["b", "I ran a test deposit and it worked end to end"],
-    ["c", "My prices and deposit amounts are correct"],
-  ];
-
+  // Vero runs live payments only. Ensure the flag is set so every charge point is active.
+  useEffect(() => { if (p?.live !== true) onChange({ live: true }); }, []);
+  const A = "var(--gold)";
+  const cps = ["Deposits", "Checkout", "No-show fee"];
   return (
     <>
       <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 18px" }}>
-        One switch controls real money everywhere in Vero. Keep it on <b style={{ color: "var(--text)" }}>Test</b> while you set up and practice — cards can be entered, but nothing is charged.
+        Payments are <b style={{ color: "var(--text)" }}>live</b>. Real cards are charged across deposits, checkout, and no-show fees, and payouts go to your connected Stripe account.
       </p>
 
-      <div style={{ background: "var(--panel)", border: `1px solid ${live ? "color-mix(in srgb, var(--gold) 55%, var(--border))" : "var(--border)"}`, borderRadius: 20, padding: 22, boxShadow: live ? "0 18px 44px -24px color-mix(in srgb, var(--gold) 60%, transparent)" : "0 18px 40px -30px var(--shadow)", transition: "border-color .3s, box-shadow .3s" }}>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1, marginBottom: 6 }}>{live ? "Live mode" : "Test mode"}</div>
-        <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, minHeight: 42 }}>
-          {live
-            ? <>Real cards are being charged for real money across your shop. Switch back to Test anytime — it takes one tap.</>
-            : <>Cards can be entered and the whole flow works, but <b style={{ color: "var(--text)" }}>nothing is ever charged</b>. Use this freely while you set up.</>}
+      <div style={{ background: "var(--panel)", border: "1px solid color-mix(in srgb, var(--gold) 55%, var(--border))", borderRadius: 20, padding: 22, boxShadow: "0 18px 44px -24px color-mix(in srgb, var(--gold) 60%, transparent)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 6 }}>
+          <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--gold)", boxShadow: "0 0 12px color-mix(in srgb, var(--gold) 80%, transparent)" }} />
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1 }}>Live mode</div>
         </div>
-
-        <div onClick={() => { live ? goTest() : openConfirm(); }} role="switch" aria-checked={live} style={{ marginTop: 20, height: 54, borderRadius: 16, background: live ? "color-mix(in srgb, var(--gold) 16%, var(--panel))" : "var(--panel2)", border: `1px solid ${live ? "color-mix(in srgb, var(--gold) 45%, var(--border))" : "var(--border)"}`, position: "relative", display: "flex", alignItems: "center", cursor: "pointer", userSelect: "none", transition: "background .3s, border-color .3s" }}>
-          <div style={{ flex: 1, textAlign: "center", fontSize: 13, fontWeight: 700, letterSpacing: 1, zIndex: 1, color: live ? "var(--faint)" : "var(--gold)", transition: "color .3s" }}>TEST</div>
-          <div style={{ flex: 1, textAlign: "center", fontSize: 13, fontWeight: 700, letterSpacing: 1, zIndex: 1, color: live ? ON : "var(--faint)", transition: "color .3s" }}>LIVE</div>
-          <div style={{ position: "absolute", top: 4, left: 4, width: "calc(50% - 4px)", height: 44, borderRadius: 12, background: live ? A : "var(--panel)", boxShadow: "0 4px 12px -3px rgba(0,0,0,.22)", transform: live ? "translateX(100%)" : "translateX(0)", transition: "transform .32s cubic-bezier(.4,1.3,.5,1), background .3s" }} />
+        <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>
+          Real cards are being charged for real money across your shop.
         </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-          {cps.map(([lbl]) => (
-            <div key={lbl} style={{ flex: 1, textAlign: "center", border: `1px ${live ? "solid" : "dashed"} ${live ? "color-mix(in srgb, var(--gold) 40%, var(--border))" : "var(--border)"}`, background: live ? "color-mix(in srgb, var(--gold) 7%, transparent)" : "transparent", borderRadius: 12, padding: "11px 4px", transition: ".3s" }}>
+          {cps.map((lbl) => (
+            <div key={lbl} style={{ flex: 1, textAlign: "center", border: "1px solid color-mix(in srgb, var(--gold) 40%, var(--border))", background: "color-mix(in srgb, var(--gold) 7%, transparent)", borderRadius: 12, padding: "11px 4px" }}>
               <div style={{ fontSize: 12, color: "var(--sub)", fontWeight: 500 }}>{lbl}</div>
-              <div style={{ fontSize: 9.5, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 3, fontWeight: 700, color: live ? "var(--gold)" : "var(--faint)" }}>{live ? "Live" : "Simulated"}</div>
+              <div style={{ fontSize: 9.5, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 3, fontWeight: 700, color: "var(--gold)" }}>Live</div>
             </div>
           ))}
         </div>
 
         <div style={{ fontSize: 12.5, color: "var(--sub)", textAlign: "center", marginTop: 18, lineHeight: 1.5 }}>
-          {live ? "Live now. One tap returns you to Test." : "Real cards stay untouched until you turn this on."}
+          Powered by Stripe · cards are encrypted and never stored by Vero.
         </div>
       </div>
-
-      {confirm && <Portal>
-        <div onClick={() => setConfirm(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay, rgba(35,34,33,.45))", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)", zIndex: 4000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 460, borderRadius: "24px 24px 0 0", padding: "24px 22px 28px", boxShadow: "0 -10px 40px rgba(40,34,22,.25)" }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, marginBottom: 6 }}>Go live with payments?</div>
-            <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18 }}>From here on, real cards get charged for real money. Quick check before you flip the switch:</div>
-            {checks.map(([k, label], i) => {
-              const on = chk[k];
-              return (
-                <div key={k} onClick={() => setChk((s) => ({ ...s, [k]: !s[k] }))} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "13px 0", borderTop: "1px solid var(--line)", borderBottom: i === checks.length - 1 ? "1px solid var(--line)" : "none", cursor: "pointer" }}>
-                  <div style={{ width: 24, height: 24, borderRadius: 7, border: `2px solid ${on ? A : "var(--border)"}`, background: on ? A : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1, transition: ".15s" }}>
-                    {on && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ON} strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
-                  </div>
-                  <div style={{ fontSize: 14, lineHeight: 1.4 }}>{label}</div>
-                </div>
-              );
-            })}
-            <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
-              <button disabled={!allChecked} onClick={goLive} style={{ border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: allChecked ? "pointer" : "not-allowed", background: allChecked ? A : "var(--border)", color: allChecked ? ON : "var(--faint)", transition: ".2s" }}>Turn on live payments</button>
-              <button onClick={() => setConfirm(false)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, padding: 4, fontFamily: FONT_BODY }}>Not yet</button>
-            </div>
-          </div>
-        </div>
-      </Portal>}
-
-      {toast && <Portal>
-        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "var(--text)", color: "var(--bg)", fontSize: 13, padding: "10px 16px", borderRadius: 20, zIndex: 4000, boxShadow: "0 8px 24px -8px rgba(0,0,0,.4)" }}>Back in Test mode — cards are safe</div>
-      </Portal>}
     </>
   );
 }
@@ -16884,7 +16809,6 @@ function CardOnFileSheet({ open, onClose, client, onSaved, showToast, live }) {
   const [err, setErr] = useState("");
   useEffect(() => {
     if (!open) return;
-    if (!live) { setReady(true); setErr(""); return; }
     let dead = false;
     setReady(false); setErr("");
     getStripe().then((stripe) => {
@@ -16900,10 +16824,6 @@ function CardOnFileSheet({ open, onClose, client, onSaved, showToast, live }) {
   }, [open]);
   const save = async () => {
     setBusy(true); setErr("");
-    if (!live) {
-      setTimeout(() => { onSaved && onSaved({ stripeCustomerId: "cus_test", paymentMethodId: "pm_test", brand: "visa", last4: "4242", simulated: true }); showToast && showToast("Card saved on file (test mode)."); setBusy(false); onClose && onClose(); }, 500);
-      return;
-    }
     const stripe = stripeRef.current, card = elRef.current;
     if (!stripe || !card) { setBusy(false); return; }
     try {
@@ -16925,22 +16845,10 @@ function CardOnFileSheet({ open, onClose, client, onSaved, showToast, live }) {
           <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD ON FILE</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
         </div>
-        {live ? (
-          <>
-            <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
-            {!ready && !err && <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", marginBottom: 12 }}>Loading secure card field…</div>}
-          </>
-        ) : (
-          <>
-            <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "11px 13px", marginBottom: 12 }}>
-              <AlertCircle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
-              <div style={{ fontSize: 12.5, color: "var(--gold)", lineHeight: 1.45 }}><b>Test mode.</b> No card is saved and nothing is charged. Turn on Live in Settings → Payments when you're ready.</div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px", marginBottom: 12 }}><CreditCard size={18} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 15, color: "var(--text)" }}>Test card · 4242</span></div>
-          </>
-        )}
+        <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
+        {!ready && !err && <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", marginBottom: 12 }}>Loading secure card field…</div>}
         {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
-        <button onClick={save} disabled={busy || (live && !ready)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: (busy || (live && !ready)) ? 0.55 : 1 }}><Check size={17} /> {busy ? "SAVING…" : (live ? "SAVE CARD" : "SAVE TEST CARD")}</button>
+        <button onClick={save} disabled={busy || !ready} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: (busy || !ready) ? 0.55 : 1 }}><Check size={17} /> {busy ? "SAVING…" : "SAVE CARD"}</button>
         <button onClick={onClose} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 6 }}>Cancel</button>
       </div>
     </Sheet>
@@ -17209,7 +17117,6 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
   const [err, setErr] = useState("");
   useEffect(() => {
     if (!open) return;
-    if (!live) { setReady(true); setErr(""); setBusy(false); return; }
     let dead = false;
     setReady(false); setErr(""); setBusy(false);
     getStripe().then((stripe) => {
@@ -17225,10 +17132,6 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
   }, [open]);
   const pay = async () => {
     setBusy(true); setErr("");
-    if (!live) {
-      setTimeout(() => { onPaid && onPaid({ paymentIntentId: null, brand: "visa", last4: "4242", simulated: true }); setBusy(false); }, 600);
-      return;
-    }
     const stripe = stripeRef.current, card = elRef.current;
     if (!stripe || !card) { setBusy(false); return; }
     try {
@@ -17251,22 +17154,10 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
           <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD PAYMENT</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500 }}>${(Math.round((amount || 0) * 100) / 100).toFixed(2)}</div>
         </div>
-        {live ? (
-          <>
-            <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
-            {!ready && !err && <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", marginBottom: 12 }}>Loading secure card field…</div>}
-          </>
-        ) : (
-          <>
-            <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "11px 13px", marginBottom: 12 }}>
-              <AlertCircle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
-              <div style={{ fontSize: 12.5, color: "var(--gold)", lineHeight: 1.45 }}><b>Test mode.</b> No card is charged. Turn on Live in Settings → Payments when you're ready to take real payments.</div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px", marginBottom: 12 }}><CreditCard size={18} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 15, color: "var(--text)" }}>Test card · 4242</span></div>
-          </>
-        )}
+        <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
+        {!ready && !err && <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", marginBottom: 12 }}>Loading secure card field…</div>}
         {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
-        <button onClick={pay} disabled={busy || (live && !ready)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: (busy || (live && !ready)) ? 0.55 : 1 }}><CreditCard size={16} /> {busy ? "CHARGING…" : (live ? "CHARGE CARD" : "RECORD TEST CHARGE")}</button>
+        <button onClick={pay} disabled={busy || !ready} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: (busy || !ready) ? 0.55 : 1 }}><CreditCard size={16} /> {busy ? "CHARGING…" : "CHARGE CARD"}</button>
         <button onClick={onClose} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 6 }}>Cancel</button>
       </div>
     </Sheet>
@@ -17287,8 +17178,10 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
   const [clientPick, setClientPick] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
   const [done, setDone] = useState(null); // { amount, method, change }
+  const [onfileBusy, setOnfileBusy] = useState(false);
+  const [onfileErr, setOnfileErr] = useState("");
 
-  useEffect(() => { if (open) { setItems([]); setDiscount(""); setCustomOpen(false); setCName(""); setCPrice(""); setPayMode(null); setTendered(""); setClient(null); setClientPick(false); setClientQuery(""); setDone(null); } }, [open]);
+  useEffect(() => { if (open) { setItems([]); setDiscount(""); setCustomOpen(false); setCName(""); setCPrice(""); setPayMode(null); setTendered(""); setClient(null); setClientPick(false); setClientQuery(""); setDone(null); setOnfileBusy(false); setOnfileErr(""); } }, [open]);
 
   const fm = (n) => "$" + (Math.round((n || 0) * 100) / 100).toFixed(2);
   const addItem = (name, price) => setItems((it) => [...it, { id: "li_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, price: Number(price) || 0, qty: 1 }]);
@@ -17403,9 +17296,18 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
                 <span style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500 }}>{fm(total)}</span>
               </div>
 
+              {(() => {
+                const oc = client && (client.card || client.savedCard);
+                const ocPm = oc && (oc.paymentMethodId || oc.pmId);
+                const ocCust = oc && oc.stripeCustomerId;
+                if (!oc || !ocPm || !ocCust) return null;
+                return (
+                  <button onClick={() => setPayMode("onfile")} disabled={total <= 0} style={{ width: "100%", marginBottom: 10, background: "var(--panel)", border: "1px solid var(--text)", color: "var(--text)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: total <= 0 ? 0.5 : 1 }}><CreditCard size={16} /> {(oc.brand ? oc.brand.charAt(0).toUpperCase() + oc.brand.slice(1) : "Card")} ···· {oc.last4 || "••••"} ON FILE</button>
+                );
+              })()}
               <div style={{ display: "flex", gap: 10 }}>
                 <button onClick={() => { setTendered(String(total)); setPayMode("cash"); }} disabled={total <= 0} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border2)", color: "var(--text)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: total <= 0 ? 0.5 : 1 }}><DollarSign size={16} style={{ color: "var(--gold)" }} /> CASH</button>
-                <button onClick={() => setPayMode("card")} disabled={total <= 0} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: total <= 0 ? 0.5 : 1 }}><CreditCard size={16} /> CARD</button>
+                <button onClick={() => setPayMode("card")} disabled={total <= 0} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: total <= 0 ? 0.5 : 1 }}><CreditCard size={16} /> {(client && (client.card || client.savedCard)) ? "NEW CARD" : "CARD"}</button>
               </div>
             </>
           )}
@@ -17426,7 +17328,38 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
             </div>
           </Sheet>
 
-          {/* card sheet */}
+          {/* charge card on file */}
+          <Sheet open={payMode === "onfile"} onClose={() => { if (!onfileBusy) setPayMode(null); }} align="center" maxWidth={380}>
+            {(() => {
+              const oc = client && (client.card || client.savedCard);
+              const ocPm = oc && (oc.paymentMethodId || oc.pmId);
+              const ocCust = oc && oc.stripeCustomerId;
+              const brand = oc && oc.brand ? oc.brand.charAt(0).toUpperCase() + oc.brand.slice(1) : "Card";
+              const chargeOnFile = async () => {
+                if (onfileBusy) return;
+                if (!ocPm || !ocCust) { setOnfileErr("No card on file for this client."); return; }
+                setOnfileBusy(true); setOnfileErr("");
+                try {
+                  const res = await stripeApi({ action: "charge", customerId: ocCust, paymentMethodId: ocPm, amount: total, description: `Vero sale — ${client?.name || "client"}` });
+                  if (res && res.status === "succeeded") {
+                    recordSale({ method: "card", onFile: true, brand: oc.brand || null, last4: oc.last4 || null, paymentIntentId: res.id || null });
+                    setOnfileBusy(false); setPayMode(null); setDone({ amount: total, method: "card", change: 0 });
+                    showToast(`Charged ${fm(total)} to ${brand} ···· ${oc.last4}.`);
+                  } else { setOnfileBusy(false); setOnfileErr((res && res.error) || "The charge didn't go through. Try another card."); }
+                } catch (e) { setOnfileBusy(false); setOnfileErr("Couldn't reach the card processor. Try again."); }
+              };
+              return (
+                <div style={{ padding: "6px 4px 8px", textAlign: "center" }}>
+                  <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD ON FILE</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 6 }}>{fm(total)}</div>
+                  <div style={{ fontSize: 14, color: "var(--sub)", marginBottom: 18 }}>{brand} ···· {oc ? oc.last4 : "••••"} · {client?.name}</div>
+                  {onfileErr && <div style={{ color: "#B5564B", fontSize: 13, marginBottom: 12 }}>{onfileErr}</div>}
+                  <button disabled={onfileBusy} onClick={chargeOnFile} style={{ width: "100%", background: onfileBusy ? "var(--border2)" : "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", cursor: onfileBusy ? "default" : "pointer" }}>{onfileBusy ? "CHARGING…" : `CHARGE ${fm(total)}`}</button>
+                  <button disabled={onfileBusy} onClick={() => setPayMode(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", cursor: onfileBusy ? "default" : "pointer" }}>Back</button>
+                </div>
+              );
+            })()}
+          </Sheet>
           <CardSaleSheet open={payMode === "card"} onClose={() => setPayMode(null)} amount={total} description={`Vero sale — ${client?.name || "walk-in"}`} onPaid={(info) => { recordSale({ method: "card", ...info }); setPayMode(null); setDone({ amount: total, method: "card", change: 0 }); showToast(`Charged ${fm(total)} to card.`); }} showToast={showToast} live={business.payments?.live === true} />
 
           {/* client picker */}
@@ -17461,10 +17394,6 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
     if (isNaN(n) || n <= 0) { setErr("Enter a valid amount."); return; }
     if (!card || !card.paymentMethodId || !card.stripeCustomerId) { setErr("No card on file for this client."); return; }
     setBusy(true); setErr("");
-    if (!live) {
-      setTimeout(() => { const amt = Math.round(n * 100) / 100; setDone(amt); if (onCharged) onCharged({ id: "pay_" + Date.now().toString(36), ts: Date.now(), amount: amt, type: "no-show", status: "paid", paymentIntentId: null, brand: card.brand || null, last4: card.last4 || null, note: "No-show fee (test)", refunded: 0, simulated: true }); showToast && showToast(`Charged $${amt} to ${client.name} (test mode).`); setBusy(false); }, 500);
-      return;
-    }
     try {
       const res = await stripeApi({ action: "charge", customerId: card.stripeCustomerId, paymentMethodId: card.paymentMethodId, amount: n, description: `No-show fee — ${client.name}` });
       if (res.status === "succeeded") { const amt = Math.round(n * 100) / 100; setDone(amt); if (onCharged) onCharged({ id: "pay_" + Date.now().toString(36), ts: Date.now(), amount: amt, type: "no-show", status: "paid", paymentIntentId: res.id || null, brand: card.brand || null, last4: card.last4 || null, note: "No-show fee", refunded: 0 }); showToast(`Charged $${amt} to ${client.name}.`); }
@@ -17490,16 +17419,12 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
           {card && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 4 }}>{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : "Card"} ···· {card.last4}</div>}
         </div>
-        {!live && <div style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "11px 13px", marginBottom: 12 }}>
-          <AlertCircle size={16} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
-          <div style={{ fontSize: 12.5, color: "var(--gold)", lineHeight: 1.45 }}><b>Test mode.</b> No real charge — this records a test no-show fee only.</div>
-        </div>}
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 12 }}>
           <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, color: "var(--sub)" }}>$</span>
           <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: "'Fraunces', serif", fontSize: 28, color: "var(--text)", width: "100%", padding: 0 }} />
         </div>
         {err && <div style={{ fontSize: 13.5, color: "#C2563F", marginBottom: 12, lineHeight: 1.4 }}>{err}</div>}
-        <button onClick={charge} disabled={busy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: busy ? 0.6 : 1 }}><DollarSign size={16} /> {busy ? "CHARGING…" : (live ? "CHARGE CARD" : "RECORD TEST FEE")}</button>
+        <button onClick={charge} disabled={busy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", opacity: busy ? 0.6 : 1 }}><DollarSign size={16} /> {busy ? "CHARGING…" : "CHARGE CARD"}</button>
         <button onClick={onClose} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 6 }}>Cancel</button>
           </>
         )}
