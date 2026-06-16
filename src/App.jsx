@@ -2631,7 +2631,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
   const [waProvId, setWaProvId] = useState(null); // Who & When merged screen: selected barber tab ("anyone" = First free)
   const [booking, setBooking] = useState(false);   // true while the confirmed booking is being saved to the server
-  const bookingInFlight = useRef(false);           // synchronous guard — blocks repeat taps before `booking` state flushes
+  const [pendingFinish, setPendingFinish] = useState(false); // set when card is saved → effect commits the booking once
   const [bookErr, setBookErr] = useState(false);   // true if that save failed — client is told to retry, nothing was held
   // waitlist join form
   const [wlName, setWlName] = useState("");
@@ -2983,8 +2983,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // Commits the booking with the resolved phone and email. Called either directly from LOCK IT IN
   // (no conflict) or from the conflict-confirmation sheet (after the user picks which to keep).
   const commitBooking = (finalPhone, finalEmail) => {
-    if (bookingInFlight.current) return;            // already committing — ignore extra taps
-    bookingInFlight.current = true;
     // Heads-up guard: if this returning client already has an upcoming appointment within 10 days
     // of the one they're booking, remind them and let them cancel the earlier one first.
     if (matched) {
@@ -2999,7 +2997,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         const days = Math.abs((d0 - newDay) / 86400000);
         return days <= 10;                                                // within 10 days of the new one
       });
-      if (existing) { bookingInFlight.current = false; setDupWarn({ existing, phone: finalPhone, email: finalEmail }); return; }
+      if (existing) { setDupWarn({ existing, phone: finalPhone, email: finalEmail }); return; }
     }
     doCommitBooking(finalPhone, finalEmail);
   };
@@ -3020,7 +3018,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         const pid = person.prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, sMin, person.durMin, business) : person.prov.id;
         return appts.some((a) => occupies(a) && a.providerId === pid && a.bookedFor && sameDay(a.bookedFor) && typeof a.start === "number" && typeof a.end === "number" && sMin < a.end && eMin > a.start);
       });
-      if (clash) { bookingInFlight.current = false; setSlot(null); setStep(6); setSlotConflict(true); return; }
+      if (clash) { setSlot(null); setStep(6); setSlotConflict(true); return; }
     }
     const baseId = Date.now();
     let clientId = matched?.id || null;
@@ -3092,14 +3090,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     const _bphone = (finalPhone || "").replace(/\D/g, "");
     const dropFromWaitlist = () => { if (!setWaitlist || !_bphone) return; setWaitlist((cur) => (cur || []).filter((w) => (w.phone || "").replace(/\D/g, "") !== _bphone)); };
     // Staff/preview bookings persist through the dashboard's own save path — show success immediately.
-    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); bookingInFlight.current = false; setBookedId(baseId); setStep(8); return; }
+    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); setBookedId(baseId); setStep(8); return; }
     // Public booking: the slot is never held while saving, and the client is only told they're booked
     // once the server actually has it — so a failed save can never become a ghost booking.
     setBooking(true); setBookErr(false);
     supabase.rpc('book_public', { p_shop: shopId, p_client: newClientRow ? newClientRow.data : null, p_appts: newAppts })
       .then(({ error }) => {
         setBooking(false);
-        if (error) { bookingInFlight.current = false; setBookErr(true); return; } // nothing was held, nothing lost — they can just tap again
+        if (error) { setBookErr(true); return; } // nothing was held, nothing lost — they can just tap again
         setAppts((cur) => [...cur, ...newAppts]);
         dropFromWaitlist();
         // Fire the booking confirmation (event-driven). Fire-and-forget — the booking already
@@ -3116,9 +3114,21 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             body: JSON.stringify({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : "") }),
           }).catch(() => {});
         } catch (e) {}
-        setBookedId(baseId); setStep(8); bookingInFlight.current = false;
-      }).catch(() => { bookingInFlight.current = false; setBooking(false); setBookErr(true); });
+        setBookedId(baseId); setStep(8);
+      }).catch(() => { setBooking(false); setBookErr(true); });
   };
+
+  // After the card is saved, finish the booking exactly once. Driven by state (not a cross-component
+  // call) so it always runs with fresh cardOnFile and can't double-fire.
+  useEffect(() => {
+    if (!pendingFinish || !cardOnFile || booking) return;
+    setPendingFinish(false);
+    const digits = (s) => (s || "").replace(/\D/g, "");
+    const phoneChanged = !!matched && digits(phone) !== digits(matched.phone);
+    const emailChanged = !!matched && !!(matched.email && matched.email.trim()) && newEmail.trim() !== matched.email.trim();
+    if (phoneChanged || emailChanged) { setKeepPhone("new"); setKeepEmail("new"); setContactConfirm({ phone: phoneChanged, email: emailChanged }); return; }
+    commitBooking(phone, newEmail);
+  }, [pendingFinish, cardOnFile, booking]);
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: "var(--bg)" }}>
@@ -4786,14 +4796,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     clientEmail={newEmail}
                     clientPhone={phone}
                     onClose={() => setCardSheetOpen(false)}
-                    onDone={(res) => {
-                      setCardInfo(res || {}); setCardOnFile(true); setCardSheetOpen(false);
-                      const digits = (s) => (s || "").replace(/\D/g, "");
-                      const phoneChanged = !!matched && digits(phone) !== digits(matched.phone);
-                      const emailChanged = !!matched && !!(matched.email && matched.email.trim()) && newEmail.trim() !== matched.email.trim();
-                      if (phoneChanged || emailChanged) { setKeepPhone("new"); setKeepEmail("new"); setContactConfirm({ phone: phoneChanged, email: emailChanged }); return; }
-                      setTimeout(() => commitBooking(phone, newEmail), 60);
-                    }}
+                    onDone={(res) => { setCardInfo(res || {}); setCardOnFile(true); setCardSheetOpen(false); setPendingFinish(true); }}
                   />}
                 </div>
               );
