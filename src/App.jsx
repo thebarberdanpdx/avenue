@@ -3296,7 +3296,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             const updated = { ...(cart[0] || {}), cutType: ct.id, addons: {}, finishAns: undefined };
             startAddons(updated);
           };
-          const openConfirm = (ct) => { const d = descFor(ct); if (d) setConfirmSheet(ct); else confirmCut(ct, ""); };
+          const sheetOn = (ct) => (draft?.booking?.confirmSheet === true) || (draft?.booking?.confirmSheet == null && !!descFor(ct));
+          const openConfirm = (ct) => { const d = descFor(ct); if (d && sheetOn(ct)) setConfirmSheet(ct); else confirmCut(ct, ""); };
           const chooseTime = (val) => setSimpleChange(val);
           const addYes = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: true }, finishAns: "yes" } : e));
           const addNo = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: undefined }, finishAns: "no" } : e));
@@ -3361,8 +3362,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 return (
                   <div onClick={() => setConfirmSheet(null)} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
                     <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 400, borderRadius: 22, padding: "30px 28px", boxShadow: "0 20px 60px rgba(0,0,0,0.3)", maxHeight: "88vh", overflowY: "auto" }}>
-                      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.4px", color: "var(--text)" }}>One quick check</div>
-                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, lineHeight: 1.45, color: "var(--text2)", textAlign: "center", fontWeight: 500, marginTop: 14, padding: "0 4px" }}>So we set aside the <b style={{ color: "var(--text)", fontWeight: 600 }}>right amount of time</b>.</div>
+                      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.4px", color: "var(--text)" }}>{(draft?.booking?.confirmHeading && draft.booking.confirmHeading.trim()) || "One quick check"}</div>
+                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, lineHeight: 1.45, color: "var(--text2)", textAlign: "center", fontWeight: 500, marginTop: 14, padding: "0 4px" }}>{(draft?.booking?.confirmSubtext != null && draft.booking.confirmSubtext.trim()) ? draft.booking.confirmSubtext : <>So we set aside the <b style={{ color: "var(--text)", fontWeight: 600 }}>right amount of time</b>.</>}</div>
                       <div style={{ maxHeight: confirmReveal ? 640 : 0, opacity: confirmReveal ? 1 : 0, overflow: "hidden", transition: "max-height .55s cubic-bezier(.22,1,.36,1), opacity .45s ease .15s" }}>
                         <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
                         <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, textAlign: "center" }}>You picked</div>
@@ -3837,8 +3838,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               return (
                 <div onClick={() => setConfirmSheet(null)} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
                   <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 400, borderRadius: 22, padding: "30px 28px", boxShadow: "0 20px 60px rgba(0,0,0,0.3)", maxHeight: "88vh", overflowY: "auto" }}>
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.4px", color: "var(--text)" }}>One quick check</div>
-                    <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, lineHeight: 1.45, color: "var(--text2)", textAlign: "center", fontWeight: 500, marginTop: 14, padding: "0 4px" }}>So we set aside the <b style={{ color: "var(--text)", fontWeight: 600 }}>right amount of time</b>.</div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.4px", color: "var(--text)" }}>{(draft?.booking?.confirmHeading && draft.booking.confirmHeading.trim()) || "One quick check"}</div>
+                    <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, lineHeight: 1.45, color: "var(--text2)", textAlign: "center", fontWeight: 500, marginTop: 14, padding: "0 4px" }}>{(draft?.booking?.confirmSubtext != null && draft.booking.confirmSubtext.trim()) ? draft.booking.confirmSubtext : <>So we set aside the <b style={{ color: "var(--text)", fontWeight: 600 }}>right amount of time</b>.</>}</div>
                     <div style={{ maxHeight: confirmReveal ? 640 : 0, opacity: confirmReveal ? 1 : 0, overflow: "hidden", transition: "max-height .55s cubic-bezier(.22,1,.36,1), opacity .45s ease .15s" }}>
                       <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
                       <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, textAlign: "center" }}>You picked</div>
@@ -9147,6 +9148,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           {bookingRow("Require a card", "requireCard", "Hold a card on file to book — your no-show protection.")}
           {bookingRow("Require payment at booking", "requirePayment", "Charge the full amount when booking online.")}
           {bookingRow("Require read & confirm", "requireConfirm", "Make clients confirm they've read this service's description before they can continue — cuts down on wrong-service bookings.")}
+          {bookingRow("Quick confirmation sheet", "confirmSheet", "Pop a centered “one quick check” with this service’s details so clients confirm the right pick before continuing.")}
         </div>
       </div>
 
@@ -9161,6 +9163,23 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         <FieldLabel>Booking page description</FieldLabel>
         <textarea value={b.description} onChange={(e) => setBooking({ description: e.target.value })} rows={4} placeholder="Describe this service for clients booking online…" style={{ ...inputStyle, resize: "vertical", lineHeight: 1.55 }} />
       </div>
+
+      {b.confirmSheet && (
+        <>
+          <div style={{ marginTop: 18 }}>
+            <FieldLabel>Confirmation sheet question</FieldLabel>
+            <input type="text" value={b.confirmHeading != null ? b.confirmHeading : "One quick check"} onChange={(e) => setBooking({ confirmHeading: e.target.value })} placeholder="One quick check" style={{ ...inputStyle }} />
+            <div style={{ height: 9 }} />
+            <textarea value={b.confirmSubtext != null ? b.confirmSubtext : "So we set aside the right amount of time."} onChange={(e) => setBooking({ confirmSubtext: e.target.value })} rows={2} placeholder="So we set aside the right amount of time." style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
+            <div style={{ fontSize: 12, color: "var(--faint)", margin: "7px 2px 0", lineHeight: 1.45 }}>Shown big at the top of the sheet. The service name, price, and description appear below it.</div>
+          </div>
+          <div style={{ marginTop: 18 }}>
+            <FieldLabel>When it appears</FieldLabel>
+            <Segmented options={[{ value: "pick", label: "When they pick it" }]} value="pick" onChange={() => {}} />
+            <div style={{ fontSize: 12, color: "var(--faint)", margin: "7px 2px 0", lineHeight: 1.45 }}>The check shows the moment a client chooses this service. (A “before checkout” option is coming soon.)</div>
+          </div>
+        </>
+      )}
 
       <div style={{ marginTop: 18, background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 22%, transparent)", borderRadius: 14, padding: "14px 16px" }}>
         <div style={{ fontSize: 10.5, letterSpacing: 1.4, color: "var(--gold)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>How this reads to clients</div>
