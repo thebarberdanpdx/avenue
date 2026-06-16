@@ -3016,7 +3016,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         clientId = "c" + baseId + Math.floor(Math.random() * 1000);
         const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30), business) : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile) ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } : undefined };
         setClients((cur) => [newClient, ...cur]);
-        if (!isStaff) newClientRow = { id: String(clientId), shop_id: shopId, data: newClient };
+        newClientRow = { id: String(clientId), shop_id: shopId, data: newClient };
       }
     } else if (matched) {
       // Returning client confirmed/updated their info — write the chosen values to their profile
@@ -3093,21 +3093,37 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           }).catch(() => {});
         } catch (e) {}
         setBookedId(baseId); setStep(8);
-        // ---- Authoritative card-on-file persistence (single source of truth) ----
-        // Runs once, after the client row is guaranteed to exist on the server (new client
-        // just created by book_public, or returning client already present). Writing here —
-        // not in the per-branch logic above — means a saved card persists the same way for
-        // everyone, independent of how the client was matched. Verified, with a clear log on failure.
-        if (cardInfo && cardInfo.pmId && !cardInfo.onFile) {
-          const cardClientId = matched?.id || clientId;
-          const cardPayload = { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() };
-          supabase.rpc("save_client_card", { p_shop: shopId, p_client_id: cardClientId, p_card: cardPayload })
-            .then(({ error }) => {
-              if (error) { console.error("[vero] card-on-file save failed:", error.message || error); }
-              else { setClients((cur) => cur.map((c) => c.id === cardClientId ? { ...c, savedCard: cardPayload } : c)); }
-            })
-            .catch((e) => console.error("[vero] card-on-file save threw:", e));
-        }
+        // ---- Unconditional client persistence (the rule: a booker is ALWAYS saved) ----
+        // Regardless of how the client was matched, reused, or whether newClientRow was built,
+        // we write the client to the server every single booking, keyed by email. This is the
+        // single guarantee that anyone who books — new, returning, after a cancel or reschedule —
+        // sticks in the shop's client list. Fire-and-forget; never affects the booking itself.
+        (() => {
+          const persistId = matched?.id || clientId || ("c" + baseId + Math.floor(Math.random() * 1000));
+          const record = {
+            id: persistId,
+            name: (matched?.name || newName || "").trim() || (newFirst + " " + newLast).trim(),
+            firstName: (matched?.firstName || newFirst || "").trim(),
+            lastName: (matched?.lastName || newLast || "").trim(),
+            email: (finalEmail || matched?.email || "").trim(),
+            phone: (finalPhone || matched?.phone || "").trim(),
+            provider: matched?.provider || (newAppts[0] && newAppts[0].providerId) || "dan",
+            visits: matched?.visits || 0,
+            lastActivity: new Date().toISOString(),
+            customDurations: matched?.customDurations || {},
+            notes: matched?.notes || "",
+            messages: matched?.messages || [],
+            gallery: matched?.gallery || [],
+            timeline: matched?.timeline || [],
+            family: matched?.family || [],
+            savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile)
+              ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() }
+              : (matched?.savedCard || undefined),
+          };
+          supabase.rpc("save_booking_client", { p_shop: shopId, p_client: record })
+            .then(({ error }) => { if (error) console.error("[vero] save_booking_client failed:", error.message || error); })
+            .catch((e) => console.error("[vero] save_booking_client threw:", e));
+        })();
       }).catch(() => { setBooking(false); setBookErr(true); });
   };
 
