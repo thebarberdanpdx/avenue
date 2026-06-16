@@ -3065,6 +3065,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         bigChange: (simpleChange === "fresh" && people.length === 1) ? true : undefined,
         cutConfirmedAt: (pi === 0 && cutConfirm) ? cutConfirm.at : undefined,
         cutDescShown: (pi === 0 && cutConfirm) ? cutConfirm.text : undefined,
+        deposit: (pi === 0 && cardInfo && cardInfo.paid && typeof cardInfo.amount === "number") ? cardInfo.amount : (pi === 0 && cardInfo && cardInfo.paid) ? (() => { const dep = (business.booking || {}).deposit || {}; return dep.mode === "fixed" ? Number(dep.amount || 0) : dep.mode === "percent" ? Math.round(cartAdjTotal * (Number(dep.amount || 0) / 100)) : 0; })() : 0,
         phone: finalPhone,
         groupId: isMultiPerson ? baseId : null,
         manageToken: makeManageToken(),
@@ -18597,6 +18598,8 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
     { id: "pay_detail", group: "Payments", name: "Payment detail" },
     { id: "refunds", group: "Payments", name: "Refunds" },
     { id: "tips", group: "Payments", name: "Tips" },
+    { id: "deposits", group: "Payments", name: "Deposits" },
+    { id: "discounts", group: "Payments", name: "Discounts" },
     { id: "new_clients", group: "Clients & taxes", name: "New clients" },
     { id: "taxes", group: "Clients & taxes", name: "Estimated taxes" },
   ];
@@ -18738,6 +18741,21 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
       return (<><SectionLabel>Tips by staff</SectionLabel><div style={card}>
         {(list.length || unassigned > 0) ? <>{list.map((s, i) => <Row key={i} left={s.name} right={money(s.tip)} />)}{unassigned > 0 && <Row left="Unassigned" right={money(unassigned)} />}<TotalRow left="Total tips" right={money(total)} /></> : <Empty />}
       </div></>);
+    }
+    if (id === "deposits") {
+      const list = scoped.filter((a) => Number(a.deposit || 0) > 0).sort((a, b) => new Date(b.bookedFor) - new Date(a.bookedFor));
+      const total = list.reduce((s, a) => s + Number(a.deposit || 0), 0);
+      return (<><SectionLabel>Deposits taken</SectionLabel><div style={card}>
+        {list.length ? <>{list.map((a, i) => { const d = new Date(a.bookedFor); return <Row key={i} left={`${a.name || "Client"} · ${MONTHS[d.getMonth()]} ${d.getDate()}`} right={money(Number(a.deposit || 0))} />; })}<TotalRow left="Total deposits" right={money(total)} /></> : <Empty />}
+      </div><div style={{ fontSize: 13, color: "var(--faint)", fontFamily: FB, margin: "12px 4px 0" }}>Deposits collected at booking that go toward the client's total.</div></>);
+    }
+    if (id === "discounts") {
+      const list = scoped.filter((a) => Number(a.rebookDiscount || 0) > 0).sort((a, b) => new Date(b.bookedFor) - new Date(a.bookedFor));
+      const fmtDisc = (a) => a.rebookDiscountType === "percent" ? `${a.rebookDiscount}%` : money(Number(a.rebookDiscount || 0));
+      const total = list.reduce((s, a) => { if (a.rebookDiscountType === "percent") return s + Math.round(Number(a.price || 0) * (Number(a.rebookDiscount || 0) / 100)); return s + Number(a.rebookDiscount || 0); }, 0);
+      return (<><SectionLabel>Discounts applied</SectionLabel><div style={card}>
+        {list.length ? <>{list.map((a, i) => { const d = new Date(a.bookedFor); return <Row key={i} left={`${a.name || "Client"} · ${MONTHS[d.getMonth()]} ${d.getDate()}`} right={fmtDisc(a)} />; })}<TotalRow left="Est. total off" right={money(total)} /></> : <Empty />}
+      </div><div style={{ fontSize: 13, color: "var(--faint)", fontFamily: FB, margin: "12px 4px 0" }}>Rebooking discounts attached to upcoming visits.</div></>);
     }
     if (id === "taxes") {
       const taxRates = business?.taxSetAside || {};
