@@ -1688,6 +1688,12 @@ function App() {
         @keyframes dropDown { from { opacity: 0; transform: translateY(-24px);} to {opacity:1; transform:none;} }
         .appt-drop { animation: dropDown .32s var(--ease) both; }
         @keyframes fadeIn { from { opacity: 0;} to {opacity:1;} }
+        @media print {
+          body * { visibility: hidden !important; }
+          #vero-print-area, #vero-print-area * { visibility: visible !important; }
+          #vero-print-area { position: absolute !important; left: 0; top: 0; width: 100%; padding: 24px 28px !important; background: #fff !important; color: #000 !important; }
+          #vero-print-area .no-print { display: none !important; }
+        }
         @keyframes slideInRight { from { opacity:0; transform: translateX(34%);} to {opacity:1; transform:none;} }
         /* Screen container eases in as a whole (move-through-space feel) */
         .fade-up { animation: screenIn .42s var(--ease) both; }
@@ -13931,16 +13937,10 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <WebsiteEditor w={form.website || {}} onChange={(wx) => setForm({ ...form, website: { ...(form.website || {}), ...wx } })} business={form} theme={(form?.theme && THEME_IDS.includes(form.theme)) ? form.theme : theme} setTheme={(id) => setForm({ ...form, theme: id })} onBackRef={editorBack} />,
     },
     {
-      id: "reports", fullBleed: true, title: "Reports & Insights", icon: BarChart3, category: "Reporting",
-      status: "Revenue, staff, retention",
-      keywords: "reports reporting analytics revenue sales staff performance retention average ticket dashboard insights numbers trends",
-      editor: <ReportsView appts={appts} clients={clients} providers={providers} services={services} business={form} setBusiness={setBusiness} me={me} />,
-    },
-    {
-      id: "taxreport", fullBleed: true, title: "Estimated taxes", icon: DollarSign, category: "Reporting",
-      status: "Per-staff set-aside estimate",
-      keywords: "tax taxes estimated set aside irs quarterly self employed 1099 withholding owe estimate disclaimer staff barber income",
-      editor: <TaxReportView appts={appts} providers={providers} services={services} business={form} setBusiness={setBusiness} me={me} />,
+      id: "reports", fullBleed: true, title: "Reports", icon: BarChart3, category: "Reporting",
+      status: "Filter, view & export",
+      keywords: "reports reporting analytics revenue sales staff service performance retention average ticket dashboard insights numbers trends export pdf print filter date range cancellations no shows new clients tax taxes estimated",
+      editor: <ReportsHub appts={appts} clients={clients} providers={providers} services={services} business={form} setBusiness={setBusiness} me={me} />,
     },
   ];
   const CATEGORY_ORDER = ["Business Setup", "Services & Menu", "Calendar & Appointments", "Payments & Checkout", "Online Booking", "Automated Messages", "Reporting"];
@@ -18547,6 +18547,243 @@ function StatusBadge({ status }) {
   return <span style={{ color, background: bg, padding: "5px 12px", borderRadius: 20, fontSize: 14, whiteSpace: "nowrap" }}>{label}</span>;
 }
 function ActionBtn({ children, onClick, primary }) { return <button className="lift" onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 7, background: primary ? "var(--gold)" : "transparent", color: primary ? "var(--on-gold)" : "var(--text)", border: primary ? "none" : "1px solid var(--border)", padding: "9px 14px", borderRadius: 12, fontSize: 15, fontWeight: primary ? 500 : 400 }}>{children}</button>; }
+
+// Reports hub — unified reporting. Filter bar (date range + staff + service),
+// a grouped list of reports, each opening to a filtered view with PDF export.
+// All figures compute live from real appointment + service data.
+function ReportsHub({ appts, clients, providers, services, business, setBusiness, me }) {
+  const FB = "'Jost', sans-serif";
+  const FD = "'Fraunces', serif";
+  const staff = providers.filter((p) => p.id !== "anyone");
+  const money = (n) => "$" + Math.round(n).toLocaleString();
+  const priceOf = (a) => { const s = services.find((x) => x.id === a.serviceId); return s ? s.price : 45; };
+  const svcName = (id) => { const s = services.find((x) => x.id === id); return s ? s.name : "Service"; };
+  const provName = (id) => { const p = providers.find((x) => x.id === id); return p ? p.name : "—"; };
+
+  const [openReport, setOpenReport] = useState(null); // report id or null (hub)
+
+  // ---- filters ----
+  const todayISO = () => { const d = new Date(); return d.toISOString().slice(0, 10); };
+  const ago = (days) => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); };
+  const [from, setFrom] = useState(ago(30));
+  const [to, setTo] = useState(todayISO());
+  const [staffId, setStaffId] = useState("all");
+  const [serviceId, setServiceId] = useState("all");
+  const [pickerOpen, setPickerOpen] = useState(null); // 'dates' | 'staff' | 'service' | null
+
+  const fromD = new Date(from + "T00:00:00");
+  const toD = new Date(to + "T23:59:59");
+  const fmtShort = (iso) => { const d = new Date(iso + "T00:00:00"); return `${MONTHS[d.getMonth()]} ${d.getDate()}`; };
+  const rangeLabel = `${fmtShort(from)} – ${fmtShort(to)}`;
+  const staffLabel = staffId === "all" ? "All barbers" : provName(staffId);
+  const serviceLabel = serviceId === "all" ? "All services" : svcName(serviceId);
+
+  // base filtered set (date + staff + service), excluding blocks
+  const inRange = (a) => { const d = new Date(a.bookedFor); return !isNaN(d) && d >= fromD && d <= toD; };
+  const matchStaff = (a) => staffId === "all" || a.providerId === staffId;
+  const matchSvc = (a) => serviceId === "all" || a.serviceId === serviceId || (Array.isArray(a.lineItems) && a.lineItems.some((li) => li.serviceId === serviceId));
+  const scoped = (appts || []).filter((a) => a.status !== "block" && a.bookedFor && inRange(a) && matchStaff(a) && matchSvc(a));
+  const sales = scoped.filter((a) => a.status !== "cancelled" && a.status !== "no-show");
+
+  // ---- report catalog ----
+  const REPORTS = [
+    { id: "sales_summary", group: "Sales", name: "Sales summary" },
+    { id: "sales_service", group: "Sales", name: "Sales by service" },
+    { id: "sales_staff", group: "Sales", name: "Sales by staff" },
+    { id: "appts", group: "Appointments", name: "Appointments" },
+    { id: "cancellations", group: "Appointments", name: "Cancellations" },
+    { id: "noshows", group: "Appointments", name: "No-shows" },
+    { id: "new_clients", group: "Clients & taxes", name: "New clients" },
+    { id: "taxes", group: "Clients & taxes", name: "Estimated taxes" },
+  ];
+  const GROUPS = ["Sales", "Appointments", "Clients & taxes"];
+
+  const exportPDF = () => { if (typeof window !== "undefined") window.print(); };
+
+  // shared bits
+  const SectionLabel = ({ children }) => (
+    <div style={{ textAlign: "right", fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: "var(--border2)", fontWeight: 400, fontFamily: FB, margin: "26px 2px 10px" }}>{children}</div>
+  );
+  const Masthead = ({ title, sub }) => (
+    <div style={{ paddingTop: 8, marginBottom: 6 }}>
+      <h2 style={{ fontFamily: FD, fontSize: 38, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.8px", color: "var(--text)", margin: 0 }}>{title}</h2>
+      {sub && <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12, fontFamily: FB }}>{sub}</div>}
+    </div>
+  );
+  const Row = ({ left, right, last }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, padding: "16px 0", borderBottom: last ? "none" : "1px solid var(--line)" }}>
+      <span style={{ fontSize: 15.5, color: "var(--text)", fontFamily: FB }}>{left}</span>
+      <span style={{ fontSize: 14.5, color: "var(--sub)", fontFamily: FB, textAlign: "right" }}>{right}</span>
+    </div>
+  );
+  const TotalRow = ({ left, right }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, padding: "16px 0 0", borderTop: "1px solid var(--text)", marginTop: 2 }}>
+      <span style={{ fontFamily: FD, fontSize: 20, color: "var(--text)" }}>{left}</span>
+      <span style={{ fontFamily: FD, fontSize: 20, color: "var(--text)" }}>{right}</span>
+    </div>
+  );
+  const Empty = () => <div style={{ fontSize: 14, color: "var(--faint)", fontFamily: FB, padding: "20px 0", textAlign: "center" }}>No data for these filters.</div>;
+  const card = { background: "var(--panel)", margin: 0, borderRadius: 14, padding: "0 20px", border: "1px solid var(--border)" };
+
+  // ---- per-report content ----
+  const renderReport = (id) => {
+    if (id === "sales_summary") {
+      const rev = sales.reduce((s, a) => s + priceOf(a), 0);
+      const cnt = sales.length;
+      const avg = cnt ? rev / cnt : 0;
+      return (<><SectionLabel>Totals</SectionLabel><div style={card}>
+        <Row left="Revenue" right={money(rev)} />
+        <Row left="Appointments" right={cnt} />
+        <Row left="Average ticket" right={money(avg)} last />
+      </div></>);
+    }
+    if (id === "sales_service") {
+      const map = {};
+      sales.forEach((a) => { const k = a.serviceId || "other"; (map[k] = map[k] || { rev: 0, n: 0 }); map[k].rev += priceOf(a); map[k].n += 1; });
+      const list = Object.entries(map).map(([k, v]) => ({ name: svcName(k), ...v })).sort((a, b) => b.rev - a.rev);
+      const total = list.reduce((s, x) => s + x.rev, 0);
+      return (<><SectionLabel>By service</SectionLabel><div style={card}>
+        {list.length ? <>{list.map((s, i) => <Row key={i} left={s.name} right={`${money(s.rev)} · ${s.n}`} />)}<TotalRow left="Total" right={money(total)} /></> : <Empty />}
+      </div></>);
+    }
+    if (id === "sales_staff") {
+      const list = staff.map((p) => { const mine = sales.filter((a) => a.providerId === p.id); return { name: p.name, rev: mine.reduce((s, a) => s + priceOf(a), 0), n: mine.length }; }).filter((x) => x.n > 0).sort((a, b) => b.rev - a.rev);
+      const total = list.reduce((s, x) => s + x.rev, 0);
+      return (<><SectionLabel>By staff</SectionLabel><div style={card}>
+        {list.length ? <>{list.map((s, i) => <Row key={i} left={s.name} right={`${money(s.rev)} · ${s.n} appts`} />)}<TotalRow left="Total" right={money(total)} /></> : <Empty />}
+      </div></>);
+    }
+    if (id === "appts") {
+      const byDay = {};
+      scoped.filter((a) => a.status !== "cancelled" && a.status !== "no-show").forEach((a) => { const d = new Date(a.bookedFor); const k = `${MONTHS[d.getMonth()]} ${d.getDate()}`; byDay[k] = (byDay[k] || 0) + 1; });
+      const list = Object.entries(byDay);
+      const total = list.reduce((s, [, n]) => s + n, 0);
+      return (<><SectionLabel>Booked appointments</SectionLabel><div style={card}>
+        {list.length ? <>{list.map(([d, n], i) => <Row key={i} left={d} right={`${n} appt${n === 1 ? "" : "s"}`} />)}<TotalRow left="Total" right={total} /></> : <Empty />}
+      </div></>);
+    }
+    if (id === "cancellations") {
+      const list = scoped.filter((a) => a.status === "cancelled");
+      return (<><SectionLabel>Cancelled</SectionLabel><div style={card}>
+        {list.length ? <>{list.map((a, i) => { const d = new Date(a.bookedFor); return <Row key={i} left={a.name || "Client"} right={`${MONTHS[d.getMonth()]} ${d.getDate()} · ${provName(a.providerId)}`} last={i === list.length - 1} />; })}</> : <Empty />}
+      </div><div style={{ fontSize: 13, color: "var(--faint)", fontFamily: FB, margin: "12px 4px 0" }}>{list.length} cancelled in range.</div></>);
+    }
+    if (id === "noshows") {
+      const list = scoped.filter((a) => a.status === "no-show");
+      return (<><SectionLabel>No-shows</SectionLabel><div style={card}>
+        {list.length ? <>{list.map((a, i) => { const d = new Date(a.bookedFor); return <Row key={i} left={a.name || "Client"} right={`${MONTHS[d.getMonth()]} ${d.getDate()} · ${provName(a.providerId)}`} last={i === list.length - 1} />; })}</> : <Empty />}
+      </div><div style={{ fontSize: 13, color: "var(--faint)", fontFamily: FB, margin: "12px 4px 0" }}>{list.length} no-show{list.length === 1 ? "" : "s"} in range.</div></>);
+    }
+    if (id === "new_clients") {
+      // clients whose first activity / creation falls in range
+      const list = (clients || []).filter((c) => { const t = c.lastVisit || c.lastActivity; if (!t) return false; const d = new Date(t); return d >= fromD && d <= toD && (c.visits || 0) <= 1; });
+      return (<><SectionLabel>New clients</SectionLabel><div style={card}>
+        {list.length ? list.map((c, i) => <Row key={i} left={c.name || "Client"} right={c.email || c.phone || ""} last={i === list.length - 1} />) : <Empty />}
+      </div><div style={{ fontSize: 13, color: "var(--faint)", fontFamily: FB, margin: "12px 4px 0" }}>{list.length} new in range.</div></>);
+    }
+    if (id === "taxes") {
+      const taxRates = business?.taxSetAside || {};
+      const rateFor = (pid) => { const r = taxRates[pid]; return (typeof r === "number" && r >= 0 && r <= 100) ? r : 25; };
+      const rows = staff.map((p) => { const mine = sales.filter((a) => a.providerId === p.id); const rev = mine.reduce((s, a) => s + priceOf(a), 0); return { name: p.name, rev, rate: rateFor(p.id), aside: rev * (rateFor(p.id) / 100) }; });
+      return (<><SectionLabel>Set aside</SectionLabel><div style={card}>
+        {rows.map((s, i) => <Row key={i} left={`${s.name} · ${s.rate}%`} right={`${money(s.rev)} → ${money(s.aside)}`} last={i === rows.length - 1} />)}
+      </div>
+      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", marginTop: 16 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 8, fontFamily: FB }}>Important — please read</div>
+        <p style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.6, margin: 0, fontFamily: FB }}>These figures are a rough estimate only and are <b style={{ color: "var(--text)", fontWeight: 600 }}>not tax advice</b>. They apply a flat percentage to gross booking revenue shown in Vero and do not account for tips, cash payments, business expenses, deductions, credits, your filing status, or your federal, state, and local tax obligations. Your actual tax owed may be significantly higher or lower. Vero is not a tax preparer, accountant, or financial advisor. Consult a qualified tax professional before making financial or tax decisions.</p>
+      </div></>);
+    }
+    return null;
+  };
+
+  // ---- open report view ----
+  if (openReport) {
+    const meta = REPORTS.find((r) => r.id === openReport);
+    return (
+      <div className="fade-up" style={{ paddingBottom: 28 }}>
+        <button onClick={() => setOpenReport(null)} className="no-print" style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontFamily: FB, marginBottom: 22, padding: 0, cursor: "pointer" }}><span style={{ fontFamily: FD, fontSize: 16, fontWeight: 300 }}>‹</span> Reports</button>
+        <div id="vero-print-area">
+          <Masthead title={meta ? meta.name : "Report"} sub={`${rangeLabel} · ${staffLabel} · ${serviceLabel}`} />
+          <div style={{ height: 8 }} />
+          {renderReport(openReport)}
+          <button onClick={exportPDF} className="no-print" style={{ width: "100%", marginTop: 24, background: "transparent", border: "1px solid var(--text)", color: "var(--text)", borderRadius: 10, padding: 15, fontFamily: FB, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Export PDF</button>
+          <div style={{ fontSize: 11, color: "var(--faint)", fontFamily: FB, textAlign: "center", marginTop: 10 }} className="no-print">On iPhone: tap Export, then pinch the preview to save as PDF.</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- hub ----
+  const FilterRow = ({ label, value, onClick, last }) => (
+    <button onClick={onClick} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "18px 0", borderBottom: last ? "none" : "1px solid var(--line)", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+      <span style={{ fontSize: 16, color: "var(--text)", fontFamily: FB }}>{label}</span>
+      <span style={{ fontSize: 14.5, color: "var(--sub)", fontFamily: FB }}>{value}</span>
+    </button>
+  );
+
+  return (
+    <div className="fade-up" style={{ paddingBottom: 28 }}>
+      <Masthead title="Reports" sub="Filter, view & export your numbers" />
+
+      <SectionLabel>Filters</SectionLabel>
+      <div style={card}>
+        <FilterRow label="Dates" value={rangeLabel} onClick={() => setPickerOpen("dates")} />
+        <FilterRow label="Staff" value={staffLabel} onClick={() => setPickerOpen("staff")} />
+        <FilterRow label="Service" value={serviceLabel} onClick={() => setPickerOpen("service")} last />
+      </div>
+
+      {GROUPS.map((g) => (
+        <React.Fragment key={g}>
+          <SectionLabel>{g}</SectionLabel>
+          <div style={card}>
+            {REPORTS.filter((r) => r.group === g).map((r, i, arr) => (
+              <button key={r.id} onClick={() => setOpenReport(r.id)} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "18px 0", borderBottom: i === arr.length - 1 ? "none" : "1px solid var(--line)", fontSize: 17, color: "var(--text)", fontFamily: FB, cursor: "pointer" }}>{r.name}</button>
+            ))}
+          </div>
+        </React.Fragment>
+      ))}
+
+      {/* date picker */}
+      <Sheet open={pickerOpen === "dates"} onClose={() => setPickerOpen(null)} align="bottom" maxWidth={460}>
+        <div style={{ padding: "8px 4px 12px" }}>
+          <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 500, marginBottom: 18 }}>Date range</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+            {[["7 days", 7], ["30 days", 30], ["90 days", 90], ["This year", 365]].map(([lbl, d]) => (
+              <button key={lbl} onClick={() => { setFrom(ago(d)); setTo(todayISO()); }} style={{ flex: "1 0 40%", padding: "11px 0", borderRadius: 10, border: "1px solid var(--border2)", background: "transparent", color: "var(--text)", fontSize: 13.5, fontFamily: FB, cursor: "pointer" }}>{lbl}</button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ flex: 1 }}><div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontFamily: FB, marginBottom: 6 }}>From</div><input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FB, boxSizing: "border-box" }} /></div>
+            <div style={{ flex: 1 }}><div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontFamily: FB, marginBottom: 6 }}>To</div><input type="date" value={to} min={from} max={todayISO()} onChange={(e) => setTo(e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FB, boxSizing: "border-box" }} /></div>
+          </div>
+          <button onClick={() => setPickerOpen(null)} style={{ width: "100%", marginTop: 18, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: 15, fontFamily: FB, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Apply</button>
+        </div>
+      </Sheet>
+
+      {/* staff picker */}
+      <Sheet open={pickerOpen === "staff"} onClose={() => setPickerOpen(null)} align="bottom" maxWidth={460}>
+        <div style={{ padding: "8px 4px 12px" }}>
+          <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 500, marginBottom: 14 }}>Staff</div>
+          {[{ id: "all", name: "All barbers" }, ...staff].map((p, i, arr) => (
+            <button key={p.id} onClick={() => { setStaffId(p.id); setPickerOpen(null); }} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 0", borderBottom: i === arr.length - 1 ? "none" : "1px solid var(--line)", background: "none", border: "none", fontSize: 16, color: "var(--text)", fontFamily: FB, cursor: "pointer", textAlign: "left" }}>{p.name}{staffId === p.id && <Check size={17} style={{ color: "var(--text)" }} />}</button>
+          ))}
+        </div>
+      </Sheet>
+
+      {/* service picker */}
+      <Sheet open={pickerOpen === "service"} onClose={() => setPickerOpen(null)} align="bottom" maxWidth={460}>
+        <div style={{ padding: "8px 4px 12px" }}>
+          <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 500, marginBottom: 14 }}>Service</div>
+          <div style={{ maxHeight: "50vh", overflowY: "auto" }}>
+          {[{ id: "all", name: "All services" }, ...services].map((s, i, arr) => (
+            <button key={s.id} onClick={() => { setServiceId(s.id); setPickerOpen(null); }} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 0", borderBottom: i === arr.length - 1 ? "none" : "1px solid var(--line)", background: "none", border: "none", fontSize: 16, color: "var(--text)", fontFamily: FB, cursor: "pointer", textAlign: "left" }}>{s.name}{serviceId === s.id && <Check size={17} style={{ color: "var(--text)" }} />}</button>
+          ))}
+          </div>
+        </div>
+      </Sheet>
+    </div>
+  );
+}
 
 // Estimated taxes — a standalone, dedicated report. Per-staff set-aside estimate
 // from real appointment revenue, with an editable rate per barber and a firm
