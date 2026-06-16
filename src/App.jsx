@@ -14425,6 +14425,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             </button>
           </div>
 
+          <NativeDiagnostics />
+
           {onSignOutAccount && (
             <div style={{ marginTop: 40, paddingTop: 4, textAlign: "center" }}>
               {authEmail && <div style={{ fontSize: 12, color: "var(--faint)", marginBottom: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Signed in as {authEmail}</div>}
