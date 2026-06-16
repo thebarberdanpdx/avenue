@@ -2534,6 +2534,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [newFirst, setNewFirst] = useState("");  // first-timer first name collected at the end
   const [newLast, setNewLast] = useState("");    // first-timer last name collected at the end
   const [newEmail, setNewEmail] = useState(""); // first-timer email collected at the end (optional)
+  const [emailConflict, setEmailConflict] = useState(false); // true when a first-timer's email already exists on file
+  const [emailChecking, setEmailChecking] = useState(false);  // true while the inline email check is running
   // Derived full name — keeps older call sites that read `newName` working without rewrites.
   const newName = `${newFirst.trim()} ${newLast.trim()}`.trim();
   const [matched, setMatched] = useState(null);
@@ -4724,7 +4726,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <input placeholder="First name" autoComplete="given-name" style={{ ...inputStyle, flex: 1 }} value={newFirst} onChange={(e) => setNewFirst(e.target.value)} />
                 <input placeholder="Last name" autoComplete="family-name" style={{ ...inputStyle, flex: 1 }} value={newLast} onChange={(e) => setNewLast(e.target.value)} />
               </div>
-              <input placeholder="Email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" style={inputStyle} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+              <input placeholder="Email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" style={{ ...inputStyle, ...(emailConflict ? { borderColor: "#C0392B", borderWidth: 1.5 } : {}) }} value={newEmail} onChange={(e) => { setNewEmail(e.target.value); if (emailConflict) setEmailConflict(false); }} onBlur={async () => {
+                const em = newEmail.trim().toLowerCase();
+                if (!/^\S+@\S+\.\S+$/.test(em) || matched) { setEmailConflict(false); return; }
+                setEmailChecking(true);
+                try { const { data } = await supabase.rpc("lookup_client_by_email", { p_shop: shopId, p_email: em }); setEmailConflict(!!(data && data.id)); }
+                catch (e) { setEmailConflict(false); }
+                setEmailChecking(false);
+              }} />
+              {emailConflict && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 9, background: "color-mix(in srgb, #C0392B 9%, var(--panel))", border: "1px solid color-mix(in srgb, #C0392B 30%, var(--border))", borderRadius: 12, padding: "12px 14px" }}>
+                  <AlertCircle size={17} style={{ color: "#C0392B", marginTop: 1, flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 9 }}>You've booked with us before with this email. Sign in to keep your history and saved card.</div>
+                    <button onClick={() => { setClientEmail(newEmail.trim()); setEmailConflict(false); setShowWhoFor(false); setShowUsual(false); setShowSchedChoice(false); setShowWizardIntro(false); setShowCodeEntry(false); setUsePhone(false); setLoginNoMatch(null); setStep(5); }} style={{ display: "inline-block", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 9, padding: "9px 16px", fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 0.8, fontWeight: 600, cursor: "pointer" }}>Sign in instead →</button>
+                  </div>
+                </div>
+              )}
               <input placeholder="Phone number" type="tel" inputMode="tel" autoComplete="tel" style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
               <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
                 By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text)", textDecoration: "underline" }}>terms</a>.
