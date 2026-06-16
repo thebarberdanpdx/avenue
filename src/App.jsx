@@ -3138,6 +3138,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           }).catch(() => {});
         } catch (e) {}
         setBookedId(baseId); setStep(8);
+        // ---- Authoritative card-on-file persistence (single source of truth) ----
+        // Runs after book_public so the client row exists, and re-applies the card LAST so
+        // book_public's delete-then-insert can't clobber it. Works for new + returning clients.
+        if (cardInfo && cardInfo.pmId && !cardInfo.onFile) {
+          const cardClientId = matched?.id || clientId;
+          const cardPayload = { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() };
+          supabase.rpc("save_client_card", { p_shop: shopId, p_client_id: cardClientId, p_card: cardPayload })
+            .then(({ error }) => {
+              if (error) { console.error("[vero] card-on-file save failed:", error.message || error); }
+              else { setClients((cur) => cur.map((c) => c.id === cardClientId ? { ...c, savedCard: cardPayload } : c)); }
+            })
+            .catch((e) => console.error("[vero] card-on-file save threw:", e));
+        }
       }).catch(() => { setBooking(false); setBookErr(true); });
   };
 
