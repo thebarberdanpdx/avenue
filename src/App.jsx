@@ -3037,14 +3037,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         clientId = existing.id; // reuse the existing profile
       } else {
         clientId = "c" + baseId + Math.floor(Math.random() * 1000);
-        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30), business) : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [] };
+        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30), business) : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile) ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } : undefined };
         setClients((cur) => [newClient, ...cur]);
         if (!isStaff) newClientRow = { id: String(clientId), shop_id: shopId, data: newClient };
       }
     } else if (matched) {
       // Returning client confirmed/updated their info — write the chosen values to their profile
       // so a barber-added record gets an email, a corrected name persists, etc.
-      setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), lastActivity: new Date().toISOString() } : c));
+      setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), lastActivity: new Date().toISOString(), savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile) ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } : c.savedCard } : c));
     }
     const newAppts = [];
     const isSame = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
@@ -3118,6 +3118,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         setBookedId(baseId); setStep(8);
       }).catch(() => { setBooking(false); setBookErr(true); });
   };
+
+  // Returning client with a card already on file → prefill so they don't re-enter it.
+  useEffect(() => {
+    if (matched && matched.savedCard && matched.savedCard.pmId) {
+      setCardInfo({ last4: matched.savedCard.last4, brand: matched.savedCard.brand, pmId: matched.savedCard.pmId, stripeCustomerId: matched.savedCard.stripeCustomerId, onFile: true });
+      setCardOnFile(true);
+    }
+  }, [matched]);
 
   // After the card is saved, finish the booking exactly once. Driven by state (not a cross-component
   // call) so it always runs with fresh cardOnFile and can't double-fire.
@@ -4781,7 +4789,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   {cardOnFile ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px" }}>
                       <Check size={18} style={{ color: "var(--text)" }} />
-                      <span style={{ fontSize: 14.5, color: "var(--text)" }}>{(cardInfo && cardInfo.paid) ? `Deposit paid · ${last4}` : `Card added · ${last4}`}</span>
+                      <span style={{ fontSize: 14.5, color: "var(--text)" }}>{(() => { const brand = cardInfo && cardInfo.brand ? cardInfo.brand.charAt(0).toUpperCase() + cardInfo.brand.slice(1) : "Card"; if (cardInfo && cardInfo.paid) return `Deposit paid · ${last4}`; if (cardInfo && cardInfo.onFile) return `${brand} ···· ${last4} · on file`; return `${brand} ···· ${last4} · added`; })()}</span>
                       <button onClick={() => { setCardOnFile(false); setCardInfo(null); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Change</button>
                     </div>
                   ) : (
