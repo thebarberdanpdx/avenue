@@ -14445,6 +14445,7 @@ function NativeDiagnostics() {
   const cap = typeof window !== "undefined" ? window.Capacitor : null;
   const isNative = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
   const [info, setInfo] = useState({ uid: "checking…", push: "", err: "", claims: "" });
+  const [pushBusy, setPushBusy] = useState(false);
   const run = async () => {
     let push = "";
     try { push = window.localStorage.getItem("vero_push_status") || "(none captured yet)"; } catch (e) {}
@@ -14457,17 +14458,44 @@ function NativeDiagnostics() {
     } catch (e) { err = (e && e.message) ? e.message : String(e); }
     setInfo({ uid, push, err, claims });
   };
+  // Force a fresh push registration and report exactly what happens at each step.
+  const forcePush = async () => {
+    if (pushBusy) return; setPushBusy(true);
+    const setStatus = (s) => { try { window.localStorage.setItem("vero_push_status", s); } catch (e) {} };
+    try {
+      const { PushNotifications } = await import("@capacitor/push-notifications");
+      let perm = await PushNotifications.checkPermissions();
+      if (perm.receive === "prompt" || perm.receive === "prompt-with-rationale") perm = await PushNotifications.requestPermissions();
+      if (perm.receive !== "granted") { setStatus("Phone alerts: permission is " + perm.receive); await run(); setPushBusy(false); return; }
+      try { await PushNotifications.removeAllListeners(); } catch (e) {}
+      await PushNotifications.addListener("registration", async (token) => {
+        try {
+          await ensureFreshSession();
+          const { error } = await supabase.rpc("save_device_token", { p_token: token.value, p_shop: SHOP_ID, p_platform: "ios" });
+          setStatus(error ? ("Phone alerts: save error — " + (error.message || "unknown")) : "Phone alerts: ON \u2705 (token saved)");
+        } catch (e) { setStatus("Phone alerts: save threw — " + (e && e.message ? e.message : String(e))); }
+        await run();
+      });
+      await PushNotifications.addListener("registrationError", async (e) => { setStatus("Phone alerts: Apple error — " + (e && e.error ? e.error : "registration error")); await run(); });
+      setStatus("Phone alerts: registering with Apple…");
+      await PushNotifications.register();
+    } catch (e) { setStatus("Phone alerts: setup failed — " + (e && e.message ? e.message : String(e))); }
+    setTimeout(() => { run(); setPushBusy(false); }, 2500);
+  };
   useEffect(() => { run(); }, []);
   return (
     <div style={{ marginTop: 18, padding: "14px 16px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--panel2)" }}>
-      <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-2</div>
+      <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-3</div>
       <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: "var(--text2)", lineHeight: 1.75, wordBreak: "break-all" }}>
         <div>auth.uid(): <b style={{ color: "var(--text)" }}>{info.uid}</b></div>
         {info.push ? <div>push: {info.push}</div> : null}
         {info.err ? <div style={{ color: "var(--text)" }}>error: {info.err}</div> : null}
         {info.claims ? <div style={{ color: "var(--sub)", fontSize: 11 }}>claims: {info.claims}</div> : null}
       </div>
-      <button onClick={run} style={{ marginTop: 11, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY }}>Re-check</button>
+      <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
+        <button onClick={run} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY }}>Re-check</button>
+        <button onClick={forcePush} disabled={pushBusy} style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--text)", borderRadius: 10, padding: "9px 16px", fontSize: 12.5, fontWeight: 600, cursor: pushBusy ? "default" : "pointer", fontFamily: FONT_BODY }}>{pushBusy ? "Registering…" : "Register push"}</button>
+      </div>
     </div>
   );
 }
