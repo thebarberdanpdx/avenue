@@ -13936,6 +13936,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       keywords: "reports reporting analytics revenue sales staff performance retention average ticket dashboard insights numbers trends",
       editor: <ReportsView appts={appts} clients={clients} providers={providers} services={services} business={form} setBusiness={setBusiness} me={me} />,
     },
+    {
+      id: "taxreport", fullBleed: true, title: "Estimated taxes", icon: DollarSign, category: "Reporting",
+      status: "Per-staff set-aside estimate",
+      keywords: "tax taxes estimated set aside irs quarterly self employed 1099 withholding owe estimate disclaimer staff barber income",
+      editor: <TaxReportView appts={appts} providers={providers} services={services} business={form} setBusiness={setBusiness} me={me} />,
+    },
   ];
   const CATEGORY_ORDER = ["Business Setup", "Services & Menu", "Calendar & Appointments", "Payments & Checkout", "Online Booking", "Automated Messages", "Reporting"];
 
@@ -18541,6 +18547,130 @@ function StatusBadge({ status }) {
   return <span style={{ color, background: bg, padding: "5px 12px", borderRadius: 20, fontSize: 14, whiteSpace: "nowrap" }}>{label}</span>;
 }
 function ActionBtn({ children, onClick, primary }) { return <button className="lift" onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 7, background: primary ? "var(--gold)" : "transparent", color: primary ? "var(--on-gold)" : "var(--text)", border: primary ? "none" : "1px solid var(--border)", padding: "9px 14px", borderRadius: 12, fontSize: 15, fontWeight: primary ? 500 : 400 }}>{children}</button>; }
+
+// Estimated taxes — a standalone, dedicated report. Per-staff set-aside estimate
+// from real appointment revenue, with an editable rate per barber and a firm
+// disclaimer that this is only an estimate, not tax advice.
+function TaxReportView({ appts, providers, services, business, setBusiness, me }) {
+  const [range, setRange] = useState("week"); // today | week | month | year
+  const staff = providers.filter((p) => p.id !== "anyone");
+  const money = (n) => "$" + Math.round(n).toLocaleString();
+  const priceOf = (a) => { const s = services.find((x) => x.id === a.serviceId); return s ? s.price : 45; };
+
+  // Real revenue per staff over the chosen window.
+  const now = new Date();
+  const start = new Date(now);
+  if (range === "today") start.setHours(0, 0, 0, 0);
+  else if (range === "week") start.setDate(now.getDate() - 7);
+  else if (range === "month") start.setMonth(now.getMonth() - 1);
+  else start.setFullYear(now.getFullYear() - 1);
+  const inWindow = (a) => { const d = new Date(a.bookedFor); return !isNaN(d) && d >= start && d <= now; };
+  const counts = (a) => a.status !== "block" && a.status !== "cancelled" && a.status !== "no-show";
+
+  const rows = staff.map((p) => {
+    const mine = appts.filter((a) => a.providerId === p.id && counts(a) && inWindow(a));
+    return { id: p.id, name: p.name, revenue: mine.reduce((s, a) => s + priceOf(a), 0), count: mine.length };
+  });
+
+  const taxRates = business?.taxSetAside || {};
+  const rateFor = (pid) => { const r = taxRates[pid]; return (typeof r === "number" && r >= 0 && r <= 100) ? r : 25; };
+  const [rateEdit, setRateEdit] = useState(null);
+  const [rateDraft, setRateDraft] = useState("");
+  const saveRate = (pid) => {
+    const v = Math.max(0, Math.min(100, Math.round(Number(rateDraft) || 0)));
+    if (setBusiness) setBusiness({ taxSetAside: { ...(business?.taxSetAside || {}), [pid]: v } });
+    setRateEdit(null); setRateDraft("");
+  };
+
+  const rangeLabel = range === "today" ? "Today" : range === "week" ? "This week" : range === "month" ? "This month" : "This year";
+  const earnedSub = range === "today" ? "Earned today" : range === "week" ? "Earned this week" : range === "month" ? "Earned this month" : "Earned this year";
+  const meRow = rows.find((r) => r.id === (me?.id)) || rows[0] || { id: staff[0]?.id || "dan", name: me?.name || "You", revenue: 0 };
+  const meRate = rateFor(meRow.id);
+  const meAside = meRow.revenue * (meRate / 100);
+  const isEditingMe = rateEdit === meRow.id;
+  const FONT_BODY = "'Jost', sans-serif";
+
+  return (
+    <div className="fade-up" style={{ paddingBottom: 24 }}>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 4 }}>Estimated taxes</h2>
+      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 16, fontWeight: 300 }}>A simple set-aside guide so you're not caught short at tax time.</p>
+
+      {/* range */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([v, label]) => { const on = range === v; return (
+          <button key={v} onClick={() => setRange(v)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{label}</button>
+        ); })}
+      </div>
+
+      <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 10px" }}>{rangeLabel}</div>
+
+      {/* hero — logged-in staff */}
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 20px", marginBottom: 22 }}>
+        <div style={{ fontSize: 11.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 12 }}>{(meRow.name || "You").split(" ")[0]} · set aside for taxes</div>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: "-1px", color: "var(--text)" }}>{money(meRow.revenue)}</div>
+        <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 8 }}>{earnedSub}</div>
+        <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ fontSize: 16, color: "var(--text)" }}>Suggested set-aside</span>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, lineHeight: 1, letterSpacing: "-0.5px", color: "var(--text)" }}>{money(meAside)}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 16 }}>
+          {isEditingMe ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input autoFocus type="number" inputMode="numeric" value={rateDraft} onChange={(e) => setRateDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveRate(meRow.id); }} placeholder={String(meRate)} style={{ width: 64, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "9px 11px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, textAlign: "center", boxSizing: "border-box" }} />
+              <span style={{ fontSize: 15, color: "var(--sub)" }}>%</span>
+              <button onClick={() => saveRate(meRow.id)} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 9, padding: "9px 15px", fontSize: 13, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Save</button>
+              <button onClick={() => { setRateEdit(null); setRateDraft(""); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+            </div>
+          ) : (
+            <>
+              <span style={{ display: "inline-block", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 20, padding: "8px 16px", fontSize: 14, color: "var(--text)" }}>{meRate}%{taxRates[meRow.id] == null ? " · default" : ""}</span>
+              <button onClick={() => { setRateEdit(meRow.id); setRateDraft(String(meRate)); }} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 14.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 3, padding: "6px 2px", cursor: "pointer", fontFamily: FONT_BODY }}>Change %</button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* per barber */}
+      <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 10px" }}>Per barber</div>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "6px 20px", marginBottom: 22 }}>
+        {rows.map((s, i) => {
+          const r = rateFor(s.id);
+          const aside = s.revenue * (r / 100);
+          const editing = rateEdit === s.id;
+          return (
+            <div key={s.id} style={{ padding: "16px 0", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <span style={{ fontSize: 15.5, color: "var(--text)" }}>{s.name}</span>
+                <span style={{ fontSize: 14.5, color: "var(--sub)" }}>{money(s.revenue)} <span style={{ color: "var(--faint)" }}>→</span> set aside <b style={{ color: "var(--text)", fontWeight: 600 }}>{money(aside)}</b></span>
+              </div>
+              <div style={{ marginTop: 9 }}>
+                {editing ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input autoFocus type="number" inputMode="numeric" value={rateDraft} onChange={(e) => setRateDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveRate(s.id); }} placeholder={String(r)} style={{ width: 60, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 9, padding: "7px 9px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, textAlign: "center", boxSizing: "border-box" }} />
+                    <span style={{ fontSize: 14, color: "var(--sub)" }}>%</span>
+                    <button onClick={() => saveRate(s.id)} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 8, padding: "7px 13px", fontSize: 12.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Save</button>
+                    <button onClick={() => { setRateEdit(null); setRateDraft(""); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                  </div>
+                ) : (
+                  <button onClick={() => { setRateEdit(s.id); setRateDraft(String(r)); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, padding: 0, cursor: "pointer", fontFamily: FONT_BODY }}>{r}% rate · <span style={{ color: "var(--text)", textDecoration: "underline", textUnderlineOffset: 2 }}>change</span></button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* disclaimer */}
+      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px" }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>Important — please read</div>
+        <p style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.6, margin: 0 }}>
+          These figures are a rough estimate only and are <b style={{ color: "var(--text)", fontWeight: 600 }}>not tax advice</b>. They apply a flat percentage to gross booking revenue shown in Vero and do not account for tips, cash payments, business expenses, deductions, credits, your filing status, or your federal, state, and local tax obligations. Your actual tax owed may be significantly higher or lower. Vero is not a tax preparer, accountant, or financial advisor, and is not responsible for amounts you set aside or owe. Consult a qualified tax professional before making financial or tax decisions.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 // Reports — owner dashboard. Computes live from real appointments + service
 // prices where possible; trend/retention use representative sample data until
