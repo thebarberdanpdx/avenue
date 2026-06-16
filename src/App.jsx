@@ -2621,7 +2621,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   useEffect(() => {
     if (!confirmSheet) { setConfirmReveal(false); return; }
     setConfirmReveal(false);
-    const t = setTimeout(() => setConfirmReveal(true), 1000);
+    const t = setTimeout(() => setConfirmReveal(true), 1300);
     return () => clearTimeout(t);
   }, [confirmSheet]);
   const [cutConfirm, setCutConfirm] = useState(null); // { at, text } logged onto the booking when the client taps "Yes, this is my cut"
