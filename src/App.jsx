@@ -3040,7 +3040,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         start: startMin,
         end: startMin + person.durMin,
         status: "confirmed",
-        name: person.name,
+        name: person.key === "self" ? ((matched && matched.name) || newName.trim() || person.name) : person.name,
         title,
         serviceName,
         addonLabels,
