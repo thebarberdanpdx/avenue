@@ -3016,11 +3016,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     } else if (matched) {
       // Returning client confirmed/updated their info — write the chosen values to their profile
       // so a barber-added record gets an email, a corrected name persists, etc.
-      setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), lastActivity: new Date().toISOString(), savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile) ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } : c.savedCard } : c));
-      // If a NEW card was just entered, persist it to the profile server-side so it's there next visit.
-      if (cardInfo && cardInfo.pmId && !cardInfo.onFile) {
-        try { supabase.rpc("save_client_card", { p_shop: shopId, p_client_id: matched.id, p_card: { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } }).then(({ error }) => { if (error) console.error("[vero] save_client_card failed:", error); }).catch(() => {}); } catch (e) {}
-      }
+      setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), lastActivity: new Date().toISOString() } : c));
     }
     const newAppts = [];
     const isSame = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
@@ -3092,11 +3088,28 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           }).catch(() => {});
         } catch (e) {}
         setBookedId(baseId); setStep(8);
+        // ---- Authoritative card-on-file persistence (single source of truth) ----
+        // Runs once, after the client row is guaranteed to exist on the server (new client
+        // just created by book_public, or returning client already present). Writing here —
+        // not in the per-branch logic above — means a saved card persists the same way for
+        // everyone, independent of how the client was matched. Verified, with a clear log on failure.
+        if (cardInfo && cardInfo.pmId && !cardInfo.onFile) {
+          const cardClientId = matched?.id || clientId;
+          const cardPayload = { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() };
+          supabase.rpc("save_client_card", { p_shop: shopId, p_client_id: cardClientId, p_card: cardPayload })
+            .then(({ error }) => {
+              if (error) { console.error("[vero] card-on-file save failed:", error.message || error); }
+              else { setClients((cur) => cur.map((c) => c.id === cardClientId ? { ...c, savedCard: cardPayload } : c)); }
+            })
+            .catch((e) => console.error("[vero] card-on-file save threw:", e));
+        }
       }).catch(() => { setBooking(false); setBookErr(true); });
   };
 
   // Returning client with a card already on file → prefill so they don't re-enter it.
   useEffect(() => {
+    if (!matched) return;
+    console.log("[vero] matched client on rebook:", matched.id, "savedCard present?", !!(matched.savedCard && matched.savedCard.pmId), matched.savedCard || "(none returned by lookup)");
     if (matched && matched.savedCard && matched.savedCard.pmId) {
       setCardInfo({ last4: matched.savedCard.last4, brand: matched.savedCard.brand, pmId: matched.savedCard.pmId, stripeCustomerId: matched.savedCard.stripeCustomerId, onFile: true });
       setCardOnFile(true);
@@ -17388,7 +17401,13 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
   const [err, setErr] = useState("");
   const [done, setDone] = useState(null);
   useEffect(() => { if (open) { setAmount(defaultAmount ? String(defaultAmount) : ""); setErr(""); setBusy(false); setDone(null); } }, [open, defaultAmount]);
-  const card = client && client.card;
+  const card = (() => {
+    const c = client && (client.card || client.savedCard);
+    if (!c) return null;
+    const pm = c.paymentMethodId || c.pmId;
+    if (!pm || !c.stripeCustomerId) return null;
+    return { paymentMethodId: pm, stripeCustomerId: c.stripeCustomerId, brand: c.brand || null, last4: c.last4 || null };
+  })();
   const charge = async () => {
     const n = parseFloat(String(amount).replace(/[^0-9.]/g, ""));
     if (isNaN(n) || n <= 0) { setErr("Enter a valid amount."); return; }
@@ -17791,7 +17810,13 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   // ---- card on file (admin) ----
   const [cardOpen, setCardOpen] = useState(false);
   const [chargeOpen, setChargeOpen] = useState(false);
-  const savedCard = (client && client.card && client.card.last4) ? client.card : null;
+  const savedCard = (() => {
+    const c = client && (client.card || client.savedCard);
+    if (!c) return null;
+    const pm = c.paymentMethodId || c.pmId;
+    if (!pm || !c.stripeCustomerId) return null;
+    return { paymentMethodId: pm, stripeCustomerId: c.stripeCustomerId, brand: c.brand || null, last4: c.last4 || null };
+  })();
   const saveCardToClient = (info) => {
     if (!client || !setClients) { showToast("Couldn't attach the card to this client."); return; }
     setClients((prev) => prev.map((c) => c.id === client.id ? { ...c, card: info } : c));
