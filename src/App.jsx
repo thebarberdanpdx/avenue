@@ -2611,6 +2611,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   };
   const [descConfirmed, setDescConfirmed] = useState(false); // service-description read-confirm (per-service booking.requireConfirm)
   const [confirmSheet, setConfirmSheet] = useState(null); // cut-style confirm bottom sheet — holds the cut type being confirmed
+  const [confirmReveal, setConfirmReveal] = useState(false); // two-beat reveal: heading holds alone, then body appears
+  useEffect(() => {
+    if (!confirmSheet) { setConfirmReveal(false); return; }
+    setConfirmReveal(false);
+    const t = setTimeout(() => setConfirmReveal(true), 1000);
+    return () => clearTimeout(t);
+  }, [confirmSheet]);
   const [cutConfirm, setCutConfirm] = useState(null); // { at, text } logged onto the booking when the client taps "Yes, this is my cut"
   const [addonFlow, setAddonFlow] = useState(null); // { idx } — active add-on bottom-sheet sequence (one sheet per type:"addon" group)
   const [clientNote, setClientNote] = useState(""); // optional note for the barber — rides the appt, the push, and the feed
@@ -3336,12 +3343,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 const pr = (ct.price != null && ct.price !== "") ? ct.price : draft.price;
                 const du = ct.duration || draft.duration;
                 return (
-                  <div onClick={() => setConfirmSheet(null)} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                    <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 480, borderRadius: "22px 22px 0 0", padding: "22px 26px calc(30px + env(safe-area-inset-bottom))", boxShadow: "0 -12px 40px rgba(0,0,0,0.18)", maxHeight: "88vh", overflowY: "auto" }}>
-                      <div style={{ width: 38, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 20px" }} />
-                      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, textAlign: "center", lineHeight: 1.12, letterSpacing: "-0.3px", color: "var(--text)" }}>One quick check</div>
-                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, lineHeight: 1.45, color: "var(--text2)", textAlign: "center", fontWeight: 500, marginTop: 11, padding: "0 6px" }}>So we set aside the <b style={{ color: "var(--text)", fontWeight: 600 }}>right amount of time</b>.</div>
-                      <div className="fade-up" key={ct.id}>
+                  <div onClick={() => setConfirmSheet(null)} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 400, borderRadius: 22, padding: "30px 28px", boxShadow: "0 20px 60px rgba(0,0,0,0.3)", maxHeight: "88vh", overflowY: "auto" }}>
+                      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.4px", color: "var(--text)" }}>One quick check</div>
+                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, lineHeight: 1.45, color: "var(--text2)", textAlign: "center", fontWeight: 500, marginTop: 14, padding: "0 4px" }}>So we set aside the <b style={{ color: "var(--text)", fontWeight: 600 }}>right amount of time</b>.</div>
+                      <div style={{ maxHeight: confirmReveal ? 640 : 0, opacity: confirmReveal ? 1 : 0, overflow: "hidden", transition: "max-height .55s cubic-bezier(.22,1,.36,1), opacity .45s ease .15s" }}>
                         <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
                         <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, textAlign: "center" }}>You picked</div>
                         <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 20, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, textAlign: "center", lineHeight: 1.1, color: "var(--text)", marginTop: 7 }}>{nm}</div>
@@ -3813,12 +3819,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const du = ct.duration || draft.duration;
               const proceed = () => { setConfirmSheet(null); setCutType(ct.id); if (draft.beardTypes && draft.beardTypes.length) { setCutPhase("beard"); } else { startAddons({ ...(cart[0] || {}), service: draft, cutType: ct.id, addons: {} }); } };
               return (
-                <div onClick={() => setConfirmSheet(null)} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                  <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 480, borderRadius: "22px 22px 0 0", padding: "22px 26px calc(30px + env(safe-area-inset-bottom))", boxShadow: "0 -12px 40px rgba(0,0,0,0.18)", maxHeight: "88vh", overflowY: "auto" }}>
-                    <div style={{ width: 38, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 20px" }} />
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, textAlign: "center", lineHeight: 1.12, letterSpacing: "-0.3px", color: "var(--text)" }}>One quick check</div>
-                    <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, lineHeight: 1.45, color: "var(--text2)", textAlign: "center", fontWeight: 500, marginTop: 11, padding: "0 6px" }}>So we set aside the <b style={{ color: "var(--text)", fontWeight: 600 }}>right amount of time</b>.</div>
-                    <div className="fade-up" key={ct.id}>
+                <div onClick={() => setConfirmSheet(null)} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+                  <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 400, borderRadius: 22, padding: "30px 28px", boxShadow: "0 20px 60px rgba(0,0,0,0.3)", maxHeight: "88vh", overflowY: "auto" }}>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.4px", color: "var(--text)" }}>One quick check</div>
+                    <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, lineHeight: 1.45, color: "var(--text2)", textAlign: "center", fontWeight: 500, marginTop: 14, padding: "0 4px" }}>So we set aside the <b style={{ color: "var(--text)", fontWeight: 600 }}>right amount of time</b>.</div>
+                    <div style={{ maxHeight: confirmReveal ? 640 : 0, opacity: confirmReveal ? 1 : 0, overflow: "hidden", transition: "max-height .55s cubic-bezier(.22,1,.36,1), opacity .45s ease .15s" }}>
                       <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
                       <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, textAlign: "center" }}>You picked</div>
                       <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 20, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, textAlign: "center", lineHeight: 1.1, color: "var(--text)", marginTop: 7 }}>{nm}</div>
