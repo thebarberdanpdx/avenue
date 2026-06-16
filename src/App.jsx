@@ -4247,6 +4247,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               </div>
             )}
             {loginNoMatch === "error" && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Couldn't send the code — give it another try in a moment.</p>}
+            {loginNoMatch === "throttled" && (
+              <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", marginBottom: 16, fontSize: 14, lineHeight: 1.5, color: "var(--text)" }}>
+                Too many code requests just now. Please wait a few minutes and try again.
+              </div>
+            )}
             <button className="lift" disabled={loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim())} onClick={async () => {
               const em = clientEmail.trim().toLowerCase();
               setLoginBusy(true); setLoginNoMatch(null);
@@ -4258,6 +4263,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   setPendingMatch(null); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true);
                 } else if (res.ok && out && out.found === false) {
                   setLoginNoMatch("nomatch");
+                } else if (res.status === 429) {
+                  setLoginNoMatch("throttled");
                 } else { setLoginNoMatch("error"); }
               } catch (e) { setLoginNoMatch("error"); }
               setLoginBusy(false);
