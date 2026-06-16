@@ -698,11 +698,13 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [result, setResult] = useState(null);
+  const [ready, setReady] = useState(false); // true once the secure card field is mounted & tappable
   const cardBox = useRef(null);
   const els = useRef(null);
 
   useEffect(() => {
-    if (!live) return;
+    if (!live) { setReady(true); return; }
+    setReady(false);
     let dead = false;
     (async () => {
       const stripe = await getStripe();
@@ -711,8 +713,11 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
       const elements = stripe.elements();
       const card = elements.create("card", { style: { base: { fontSize: "16px", color: "#232221", fontFamily: "'Jost', sans-serif", "::placeholder": { color: "#A39C8A" } }, invalid: { color: "#B5564B" } } });
       card.mount(cardBox.current);
+      card.on("ready", () => { if (!dead) setReady(true); });
       card.on("change", (ev) => setErr(ev.error ? ev.error.message : ""));
       els.current = { stripe, card };
+      // Fallback: if the 'ready' event is ever missed, enable the button shortly after mount.
+      setTimeout(() => { if (!dead) setReady(true); }, 1200);
     })();
     return () => { dead = true; try { els.current && els.current.card.unmount(); } catch (e) {} };
   }, [live]);
@@ -763,13 +768,13 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
           {phase === "done" ? (
             <div style={{ textAlign: "center", padding: "20px 4px 10px" }}>
               <div style={{ width: 60, height: 60, borderRadius: "50%", background: "color-mix(in srgb, var(--text) 14%, transparent)", color: A, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Check size={30} /></div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, marginBottom: 8 }}>{isPay ? "Deposit paid — you're reserved" : "Card saved — you're reserved"}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, marginBottom: 8 }}>{isPay ? "Deposit paid" : "Card saved"}</div>
               <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>
                 {isPay
-                  ? (live ? <>${amount} was charged and goes toward your total. A receipt is on its way.</> : <>${amount} went toward your total (test — no real charge). A confirmation is on its way.</>)
-                  : (live ? <>Your card is securely on file. You won't be charged unless you no-show or cancel late.</> : <>Your card is on file (test — nothing was sent to a processor).</>)}
+                  ? (live ? <>${amount} was charged and goes toward your total. <b style={{ color: "var(--text)" }}>One more step</b> — finish booking to lock in your time.</> : <>${amount} went toward your total (test — no real charge). <b style={{ color: "var(--text)" }}>One more step</b> — finish booking to lock in your time.</>)
+                  : (live ? <>Your card is securely on file — you won't be charged unless you no-show or cancel late. <b style={{ color: "var(--text)" }}>One more step</b> — finish booking to lock in your time.</> : <>Your card is on file (test — nothing was sent to a processor). <b style={{ color: "var(--text)" }}>One more step</b> — finish booking to lock in your time.</>)}
               </div>
-              <button onClick={() => onDone && onDone(result || { simulated: true, last4: "4242", paid: isPay })} style={{ width: "100%", background: A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Done</button>
+              <button onClick={() => onDone && onDone(result || { simulated: true, last4: "4242", paid: isPay })} style={{ width: "100%", background: A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Finish booking</button>
             </div>
           ) : (
             <>
@@ -809,7 +814,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
                 {err && <div style={{ color: "#B5564B", fontSize: 12.5, marginTop: 8, paddingLeft: 2 }}>{err}</div>}
               </div>
 
-              <button disabled={busy} onClick={submit} style={{ width: "100%", marginTop: 18, background: busy ? "var(--border2)" : A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 16, fontSize: 15.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: busy ? "default" : "pointer", boxShadow: busy ? "none" : "0 10px 22px -10px rgba(0,0,0,.4)" }}>{busy ? "Processing…" : (isPay ? `Pay $${amount}` : "Save card")}</button>
+              <button disabled={busy || !ready} onClick={submit} style={{ width: "100%", marginTop: 18, background: (busy || !ready) ? "var(--border2)" : A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 16, fontSize: 15.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: (busy || !ready) ? "default" : "pointer", boxShadow: (busy || !ready) ? "none" : "0 10px 22px -10px rgba(0,0,0,.4)" }}>{busy ? "Processing…" : (!ready ? "Loading…" : (isPay ? `Pay $${amount}` : "Save card"))}</button>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14, fontSize: 11.5, color: "var(--faint)" }}><Lock size={13} /> Encrypted &amp; secure · Powered by Stripe</div>
               <button onClick={close} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, marginTop: 12, cursor: "pointer", fontFamily: FONT_BODY, textDecoration: "underline", textUnderlineOffset: 3 }}>Cancel</button>
             </>
