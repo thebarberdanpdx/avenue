@@ -765,10 +765,10 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, marginBottom: 8 }}>{isPay ? "Deposit paid" : "Card saved"}</div>
               <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>
                 {isPay
-                  ? <>${amount} was charged and goes toward your total. <b style={{ color: "var(--text)" }}>One more step</b> — finish booking to lock in your time.</>
-                  : <>Your card is securely on file — you won't be charged unless you no-show or cancel late. <b style={{ color: "var(--text)" }}>One more step</b> — finish booking to lock in your time.</>}
+                  ? <>${amount} was charged and goes toward your total. Tap below to save and finish your booking.</>
+                  : <>Your card is securely on file — you won't be charged unless you no-show or cancel late. Tap below to save and finish your booking.</>}
               </div>
-              <button disabled={busy} onClick={() => { if (busy) return; setBusy(true); onDone && onDone(result || { saved: true, paid: isPay }); }} style={{ width: "100%", background: busy ? "var(--border2)" : A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: busy ? "default" : "pointer" }}>{busy ? "Finishing…" : "Finish booking"}</button>
+              <button disabled={busy} onClick={() => { if (busy) return; setBusy(true); onDone && onDone(result || { saved: true, paid: isPay }); }} style={{ width: "100%", background: busy ? "var(--border2)" : A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: busy ? "default" : "pointer" }}>{busy ? "Finishing…" : "Save and finish booking"}</button>
             </div>
           ) : (
             <>
