@@ -3045,6 +3045,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       // Returning client confirmed/updated their info — write the chosen values to their profile
       // so a barber-added record gets an email, a corrected name persists, etc.
       setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), lastActivity: new Date().toISOString(), savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile) ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } : c.savedCard } : c));
+      // If a NEW card was just entered, persist it to the profile server-side so it's there next visit.
+      if (cardInfo && cardInfo.pmId && !cardInfo.onFile) {
+        try { supabase.rpc("save_client_card", { p_shop: shopId, p_client_id: matched.id, p_card: { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } }).then(({ error }) => { if (error) console.error("[vero] save_client_card failed:", error); }).catch(() => {}); } catch (e) {}
+      }
     }
     const newAppts = [];
     const isSame = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
