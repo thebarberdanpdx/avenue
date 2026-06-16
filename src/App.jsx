@@ -4783,7 +4783,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     clientEmail={newEmail}
                     clientPhone={phone}
                     onClose={() => setCardSheetOpen(false)}
-                    onDone={(res) => { setCardInfo(res || {}); setCardOnFile(true); setCardSheetOpen(false); }}
+                    onDone={(res) => {
+                      setCardInfo(res || {}); setCardOnFile(true); setCardSheetOpen(false);
+                      const digits = (s) => (s || "").replace(/\D/g, "");
+                      const phoneChanged = !!matched && digits(phone) !== digits(matched.phone);
+                      const emailChanged = !!matched && !!(matched.email && matched.email.trim()) && newEmail.trim() !== matched.email.trim();
+                      if (phoneChanged || emailChanged) { setKeepPhone("new"); setKeepEmail("new"); setContactConfirm({ phone: phoneChanged, email: emailChanged }); return; }
+                      setTimeout(() => commitBooking(phone, newEmail), 60);
+                    }}
                   />}
                 </div>
               );
