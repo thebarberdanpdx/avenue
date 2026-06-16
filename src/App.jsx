@@ -2912,9 +2912,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // last sheet (or when there are none) we hand off to who+time via goWhoWhen.
   // ALL add-on groups (choice + addon). The sheet renders every one — add-ons are ALWAYS a sheet.
   const addonsFor = (svc) => (svc?.addonGroups || []);
+  // Write `entry` as cart[0], inserting it if the cart is empty (c.map no-ops on []).
+  const putEntry = (entry) => setCart((c) => (c.length ? c.map((e, i) => i === 0 ? entry : e) : [entry]));
   const startAddons = (entry) => {
     const list = addonsFor(entry?.service);
-    if (list.length) { setCart((c) => c.map((e, i) => i === 0 ? entry : e)); setAddonFlow({ idx: 0 }); }
+    if (list.length) { putEntry(entry); setAddonFlow({ idx: 0 }); }
     else { goWhoWhen(entry); }
   };
   // advance to the next group in the sheet sequence, or finish → who/when
@@ -2929,7 +2931,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     const newAddons = { ...(cur.addons || {}) };
     if (yes) newAddons[group.id] = true; else delete newAddons[group.id];
     const updated = { ...cur, addons: newAddons };
-    setCart((c) => c.map((e, i) => i === 0 ? updated : e));
+    putEntry(updated);
     advanceAddon(updated);
   };
   // choice-group selection (e.g. fade length) — store the chosen option id, then advance
@@ -2937,7 +2939,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     const cur = cart[0] || {};
     const newAddons = { ...(cur.addons || {}), [group.id]: optionId };
     const updated = { ...cur, addons: newAddons };
-    setCart((c) => c.map((e, i) => i === 0 ? updated : e));
+    putEntry(updated);
     advanceAddon(updated);
   };
 
