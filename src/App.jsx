@@ -18593,10 +18593,28 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
     { id: "appts", group: "Appointments", name: "Appointments" },
     { id: "cancellations", group: "Appointments", name: "Cancellations" },
     { id: "noshows", group: "Appointments", name: "No-shows" },
+    { id: "pay_summary", group: "Payments", name: "Payment summary" },
+    { id: "pay_detail", group: "Payments", name: "Payment detail" },
+    { id: "refunds", group: "Payments", name: "Refunds" },
+    { id: "tips", group: "Payments", name: "Tips" },
     { id: "new_clients", group: "Clients & taxes", name: "New clients" },
     { id: "taxes", group: "Clients & taxes", name: "Estimated taxes" },
   ];
-  const GROUPS = ["Sales", "Appointments", "Clients & taxes"];
+  const GROUPS = ["Sales", "Appointments", "Payments", "Clients & taxes"];
+
+  // ---- all sale/payment records (real data: client payments + walk-in sales) ----
+  const allPays = [];
+  (clients || []).forEach((c) => (c.payments || []).forEach((p) => allPays.push({ ...p, clientName: c.name })));
+  ((business && business.sales) || []).forEach((p) => allPays.push({ ...p }));
+  // scope payments by the active date range + (when set) the appt's staff
+  const apptById = {};
+  (appts || []).forEach((a) => { apptById[a.id] = a; });
+  const paysScoped = allPays.filter((p) => {
+    const t = p.ts ? new Date(p.ts) : (p.apptId && apptById[p.apptId] ? new Date(apptById[p.apptId].bookedFor) : null);
+    if (!t || isNaN(t) || t < fromD || t > toD) return false;
+    if (staffId !== "all") { const ap = p.apptId && apptById[p.apptId]; if (!ap || ap.providerId !== staffId) return false; }
+    return true;
+  });
 
   const exportPDF = () => { if (typeof window !== "undefined") window.print(); };
 
@@ -18680,6 +18698,46 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
       return (<><SectionLabel>New clients</SectionLabel><div style={card}>
         {list.length ? list.map((c, i) => <Row key={i} left={c.name || "Client"} right={c.email || c.phone || ""} last={i === list.length - 1} />) : <Empty />}
       </div><div style={{ fontSize: 13, color: "var(--faint)", fontFamily: FB, margin: "12px 4px 0" }}>{list.length} new in range.</div></>);
+    }
+    if (id === "pay_summary") {
+      const methodLabel = { cash: "Cash", card: "Card", "card-on-file": "Card on file" };
+      const byMethod = {};
+      let gross = 0, tips = 0, refunded = 0;
+      paysScoped.forEach((p) => { const m = p.method || "other"; const amt = Number(p.amount || 0); byMethod[m] = (byMethod[m] || 0) + amt; gross += amt; tips += Number(p.tip || 0); refunded += Number(p.refunded || 0); });
+      const list = Object.entries(byMethod).sort((a, b) => b[1] - a[1]);
+      return (<><SectionLabel>By method</SectionLabel><div style={card}>
+        {list.length ? list.map(([m, v], i) => <Row key={i} left={methodLabel[m] || m} right={money(v)} last={i === list.length - 1} />) : <Empty />}
+      </div>
+      <SectionLabel>Totals</SectionLabel><div style={card}>
+        <Row left="Gross collected" right={money(gross)} />
+        <Row left="Tips (incl. above)" right={money(tips)} />
+        <Row left="Refunded" right={refunded ? "-" + money(refunded) : money(0)} />
+        <Row left="Net" right={money(gross - refunded)} last />
+      </div></>);
+    }
+    if (id === "pay_detail") {
+      const list = paysScoped.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+      return (<><SectionLabel>Transactions</SectionLabel><div style={card}>
+        {list.length ? list.map((p, i) => { const d = p.ts ? new Date(p.ts) : null; const when = d ? `${MONTHS[d.getMonth()]} ${d.getDate()}` : ""; return <Row key={i} left={`${p.clientName || "Client"} · ${when}`} right={`${money(Number(p.amount || 0))}${p.refunded ? " · refunded " + money(p.refunded) : ""}`} last={i === list.length - 1} />; }) : <Empty />}
+      </div><div style={{ fontSize: 13, color: "var(--faint)", fontFamily: FB, margin: "12px 4px 0" }}>{list.length} transaction{list.length === 1 ? "" : "s"} in range.</div></>);
+    }
+    if (id === "refunds") {
+      const list = paysScoped.filter((p) => Number(p.refunded || 0) > 0).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+      const total = list.reduce((s, p) => s + Number(p.refunded || 0), 0);
+      return (<><SectionLabel>Refunds</SectionLabel><div style={card}>
+        {list.length ? <>{list.map((p, i) => { const d = p.ts ? new Date(p.ts) : null; const when = d ? `${MONTHS[d.getMonth()]} ${d.getDate()}` : ""; return <Row key={i} left={`${p.clientName || "Client"} · ${when}`} right={money(Number(p.refunded || 0))} />; })}<TotalRow left="Total refunded" right={money(total)} /></> : <Empty />}
+      </div></>);
+    }
+    if (id === "tips") {
+      const list = staff.map((p) => {
+        const mine = paysScoped.filter((x) => { const ap = x.apptId && apptById[x.apptId]; return ap && ap.providerId === p.id; });
+        return { name: p.name, tip: mine.reduce((s, x) => s + Number(x.tip || 0), 0) };
+      }).filter((x) => x.tip > 0).sort((a, b) => b.tip - a.tip);
+      const total = paysScoped.reduce((s, p) => s + Number(p.tip || 0), 0);
+      const unassigned = total - list.reduce((s, x) => s + x.tip, 0);
+      return (<><SectionLabel>Tips by staff</SectionLabel><div style={card}>
+        {(list.length || unassigned > 0) ? <>{list.map((s, i) => <Row key={i} left={s.name} right={money(s.tip)} />)}{unassigned > 0 && <Row left="Unassigned" right={money(unassigned)} />}<TotalRow left="Total tips" right={money(total)} /></> : <Empty />}
+      </div></>);
     }
     if (id === "taxes") {
       const taxRates = business?.taxSetAside || {};
