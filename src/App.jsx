@@ -13927,7 +13927,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "reports", fullBleed: true, title: "Reports & Insights", icon: BarChart3, category: "Reporting",
       status: "Revenue, staff, retention",
       keywords: "reports reporting analytics revenue sales staff performance retention average ticket dashboard insights numbers trends",
-      editor: <ReportsView appts={appts} clients={clients} providers={providers} services={services} business={form} />,
+      editor: <ReportsView appts={appts} clients={clients} providers={providers} services={services} business={form} setBusiness={setBusiness} me={me} />,
     },
   ];
   const CATEGORY_ORDER = ["Business Setup", "Services & Menu", "Calendar & Appointments", "Payments & Checkout", "Online Booking", "Automated Messages", "Reporting"];
@@ -18538,11 +18538,24 @@ function ActionBtn({ children, onClick, primary }) { return <button className="l
 // Reports — owner dashboard. Computes live from real appointments + service
 // prices where possible; trend/retention use representative sample data until
 // the backend stores real sales history.
-function ReportsView({ appts, clients, providers, services, business }) {
+function ReportsView({ appts, clients, providers, services, business, setBusiness, me }) {
   const [range, setRange] = useState("week"); // today | week | month
   const staff = providers.filter((p) => p.id !== "anyone");
   const money = (n) => "$" + Math.round(n).toLocaleString();
   const priceOf = (a) => { const s = services.find((x) => x.id === a.serviceId); return s ? s.price : 45; };
+
+  // ---- Tax set-aside ----
+  // Per-barber rate overrides live on business.taxSetAside ({ providerId: percent }).
+  // Default 25%. Reads the real per-staff revenue (byStaff), never the sample trend.
+  const taxRates = business?.taxSetAside || {};
+  const rateFor = (pid) => { const r = taxRates[pid]; return (typeof r === "number" && r >= 0 && r <= 100) ? r : 25; };
+  const [rateEdit, setRateEdit] = useState(null); // providerId currently editing, or null
+  const [rateDraft, setRateDraft] = useState("");
+  const saveRate = (pid) => {
+    const v = Math.max(0, Math.min(100, Math.round(Number(rateDraft) || 0)));
+    if (setBusiness) setBusiness({ taxSetAside: { ...(business?.taxSetAside || {}), [pid]: v } });
+    setRateEdit(null); setRateDraft("");
+  };
 
   // ---- live figures from current appointments ----
   const active = appts.filter((a) => a.status !== "block" && a.status !== "cancelled");
@@ -18554,7 +18567,7 @@ function ReportsView({ appts, clients, providers, services, business }) {
   // per-staff (live)
   const byStaff = staff.map((p) => {
     const mine = active.filter((a) => a.providerId === p.id);
-    return { name: p.name, color: p.color, count: mine.length, revenue: mine.reduce((s, a) => s + priceOf(a), 0) };
+    return { id: p.id, name: p.name, color: p.color, count: mine.length, revenue: mine.reduce((s, a) => s + priceOf(a), 0) };
   }).sort((a, b) => b.revenue - a.revenue);
 
   // ---- representative trend (sample — real history needs the backend) ----
@@ -18623,7 +18636,78 @@ function ReportsView({ appts, clients, providers, services, business }) {
         ); })}
       </div>
 
-      {/* top services */}
+      {/* tax set-aside */}
+      {(() => {
+        const rangeLabel = range === "today" ? "Today" : range === "week" ? "This week" : "This month";
+        const earnedSub = range === "today" ? "Earned today" : range === "week" ? "Earned this week" : "Earned this month";
+        const meRow = byStaff.find((s) => s.id === (me?.id)) || byStaff[0] || { id: staff[0]?.id || "dan", name: me?.name || staff[0]?.name || "You", revenue: 0 };
+        const meRate = rateFor(meRow.id);
+        const meEarned = meRow.revenue;
+        const meAside = meEarned * (meRate / 100);
+        const isEditingMe = rateEdit === meRow.id;
+        return (
+        <>
+          <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "4px 2px 10px" }}>Reports · {rangeLabel}</div>
+          {/* hero — logged-in staff's own set-aside */}
+          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 20px", marginBottom: 22 }}>
+            <div style={{ fontSize: 11.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 12 }}>{(meRow.name || "You").split(" ")[0]} · set aside for taxes</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: "-1px", color: "var(--text)" }}>{money(meEarned)}</div>
+            <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 8 }}>{earnedSub}</div>
+            <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+              <span style={{ fontSize: 16, color: "var(--text)" }}>Suggested set-aside</span>
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, lineHeight: 1, letterSpacing: "-0.5px", color: "var(--text)" }}>{money(meAside)}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 16 }}>
+              {isEditingMe ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input autoFocus type="number" inputMode="numeric" value={rateDraft} onChange={(e) => setRateDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveRate(meRow.id); }} placeholder={String(meRate)} style={{ width: 64, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "9px 11px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, textAlign: "center", boxSizing: "border-box" }} />
+                  <span style={{ fontSize: 15, color: "var(--sub)" }}>%</span>
+                  <button onClick={() => saveRate(meRow.id)} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 9, padding: "9px 15px", fontSize: 13, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Save</button>
+                  <button onClick={() => { setRateEdit(null); setRateDraft(""); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
+                </div>
+              ) : (
+                <>
+                  <span style={{ display: "inline-block", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 20, padding: "8px 16px", fontSize: 14, color: "var(--text)" }}>{meRate}%{taxRates[meRow.id] == null ? " · default" : ""}</span>
+                  <button onClick={() => { setRateEdit(meRow.id); setRateDraft(String(meRate)); }} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 14.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 3, padding: "6px 2px", cursor: "pointer", fontFamily: FONT_BODY }}>Change %</button>
+                </>
+              )}
+            </div>
+            <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.55, margin: "18px 0 0" }}>Estimate only — a simple guide so you're not caught short. Your real tax depends on expenses, deductions, and filing status. Check with a tax professional.</p>
+          </div>
+
+          {/* per barber */}
+          <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 10px" }}>Per barber</div>
+          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "6px 20px", marginBottom: 22 }}>
+            {byStaff.map((s, i) => {
+              const r = rateFor(s.id);
+              const aside = s.revenue * (r / 100);
+              const editing = rateEdit === s.id;
+              return (
+                <div key={s.id} style={{ padding: "16px 0", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                    <span style={{ fontSize: 15.5, color: "var(--text)" }}>{s.name}</span>
+                    <span style={{ fontSize: 14.5, color: "var(--sub)" }}>{money(s.revenue)} <span style={{ color: "var(--faint)" }}>→</span> set aside <b style={{ color: "var(--text)", fontWeight: 600 }}>{money(aside)}</b></span>
+                  </div>
+                  <div style={{ marginTop: 9 }}>
+                    {editing ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <input autoFocus type="number" inputMode="numeric" value={rateDraft} onChange={(e) => setRateDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveRate(s.id); }} placeholder={String(r)} style={{ width: 60, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 9, padding: "7px 9px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, textAlign: "center", boxSizing: "border-box" }} />
+                        <span style={{ fontSize: 14, color: "var(--sub)" }}>%</span>
+                        <button onClick={() => saveRate(s.id)} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 8, padding: "7px 13px", fontSize: 12.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Save</button>
+                        <button onClick={() => { setRateEdit(null); setRateDraft(""); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setRateEdit(s.id); setRateDraft(String(r)); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, padding: 0, cursor: "pointer", fontFamily: FONT_BODY }}>{r}% rate · <span style={{ color: "var(--text)", textDecoration: "underline", textUnderlineOffset: 2 }}>change</span></button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+        );
+      })()}
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}><BarChart3 size={17} style={{ color: "var(--gold)" }} /><span style={{ fontSize: 15.5, fontWeight: 600 }}>Top services</span></div>
         {topServices.map((s) => (
