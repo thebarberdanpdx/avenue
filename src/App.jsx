@@ -9217,11 +9217,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <textarea value={b.confirmSubtext != null ? b.confirmSubtext : "So we set aside the right amount of time."} onChange={(e) => setBooking({ confirmSubtext: e.target.value })} rows={2} placeholder="So we set aside the right amount of time." style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
             <div style={{ fontSize: 12, color: "var(--faint)", margin: "7px 2px 0", lineHeight: 1.45 }}>Shown big at the top of the sheet. The service name, price, and description appear below it.</div>
           </div>
-          <div style={{ marginTop: 18 }}>
-            <FieldLabel>When it appears</FieldLabel>
-            <Segmented options={[{ value: "pick", label: "When they pick it" }]} value="pick" onChange={() => {}} />
-            <div style={{ fontSize: 12, color: "var(--faint)", margin: "7px 2px 0", lineHeight: 1.45 }}>The check shows the moment a client chooses this service. (A “before checkout” option is coming soon.)</div>
-          </div>
         </>
       )}
 
