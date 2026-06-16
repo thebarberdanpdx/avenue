@@ -14462,6 +14462,7 @@ function NativeDiagnostics() {
   const forcePush = async () => {
     if (pushBusy) return; setPushBusy(true);
     const setStatus = (s) => { try { window.localStorage.setItem("vero_push_status", s); } catch (e) {} };
+    let got = false;
     try {
       const { PushNotifications } = await import("@capacitor/push-notifications");
       let perm = await PushNotifications.checkPermissions();
@@ -14469,18 +14470,20 @@ function NativeDiagnostics() {
       if (perm.receive !== "granted") { setStatus("Phone alerts: permission is " + perm.receive); await run(); setPushBusy(false); return; }
       try { await PushNotifications.removeAllListeners(); } catch (e) {}
       await PushNotifications.addListener("registration", async (token) => {
+        got = true;
         try {
           await ensureFreshSession();
           const { error } = await supabase.rpc("save_device_token", { p_token: token.value, p_shop: SHOP_ID, p_platform: "ios" });
           setStatus(error ? ("Phone alerts: save error — " + (error.message || "unknown")) : "Phone alerts: ON \u2705 (token saved)");
         } catch (e) { setStatus("Phone alerts: save threw — " + (e && e.message ? e.message : String(e))); }
-        await run();
+        await run(); setPushBusy(false);
       });
-      await PushNotifications.addListener("registrationError", async (e) => { setStatus("Phone alerts: Apple error — " + (e && e.error ? e.error : "registration error")); await run(); });
+      await PushNotifications.addListener("registrationError", async (e) => { got = true; setStatus("Phone alerts: Apple error — " + (e && e.error ? e.error : "registration error")); await run(); setPushBusy(false); });
       setStatus("Phone alerts: registering with Apple…");
       await PushNotifications.register();
-    } catch (e) { setStatus("Phone alerts: setup failed — " + (e && e.message ? e.message : String(e))); }
-    setTimeout(() => { run(); setPushBusy(false); }, 2500);
+      // If Apple emits nothing within 6s, stop hanging and report it plainly.
+      setTimeout(() => { if (!got) { setStatus("Phone alerts: Apple returned no token in 6s — force-quit the app and reopen, then tap Register push again."); run(); setPushBusy(false); } }, 6000);
+    } catch (e) { setStatus("Phone alerts: setup failed — " + (e && e.message ? e.message : String(e))); run(); setPushBusy(false); }
   };
   useEffect(() => { run(); }, []);
   return (
