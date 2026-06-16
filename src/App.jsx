@@ -722,7 +722,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
     return () => { dead = true; try { els.current && els.current.card.unmount(); } catch (e) {} };
   }, [live]);
 
-  const close = () => { if (busy) return; onClose && onClose(); };
+  const close = () => { setBusy(false); onClose && onClose(); };
 
   const submit = async () => {
     if (busy) return;
@@ -763,7 +763,8 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
   return (
     <Portal>
       <div onClick={close} style={{ position: "fixed", inset: 0, background: "var(--overlay, rgba(35,34,33,.45))", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)", zIndex: 4000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-        <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 460, borderRadius: "24px 24px 0 0", boxShadow: "0 -10px 40px rgba(40,34,22,.25)", padding: "8px 22px 26px", maxHeight: "92vh", overflowY: "auto" }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 460, borderRadius: "24px 24px 0 0", boxShadow: "0 -10px 40px rgba(40,34,22,.25)", padding: "8px 22px 26px", maxHeight: "92vh", overflowY: "auto", position: "relative" }}>
+          <button onClick={close} aria-label="Close" style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: "50%", background: "var(--panel2)", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 2 }}><X size={18} /></button>
           <div style={{ width: 38, height: 4, borderRadius: 3, background: "var(--border)", margin: "4px auto 14px" }} />
           {phase === "done" ? (
             <div style={{ textAlign: "center", padding: "20px 4px 10px" }}>
