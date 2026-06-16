@@ -3337,15 +3337,20 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 const du = ct.duration || draft.duration;
                 return (
                   <div onClick={() => setConfirmSheet(null)} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                    <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 480, borderRadius: "22px 22px 0 0", padding: "22px 24px calc(28px + env(safe-area-inset-bottom))", boxShadow: "0 -12px 40px rgba(0,0,0,0.18)", maxHeight: "88vh", overflowY: "auto" }}>
-                      <div style={{ width: 38, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 18px" }} />
-                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 15, color: "var(--text2)", fontWeight: 500, textAlign: "center", lineHeight: 1.5 }}>Let's make sure we're on the same page.</div>
-                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text2)", fontWeight: 600, textAlign: "center", marginTop: 8 }}>{nm}{(pr != null && pr !== "") ? ` · $${pr}` : ""}{du ? ` · ${du} min` : ""}</div>
-                      <div style={{ height: 1, background: "var(--line)", margin: "22px 0" }} />
-                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 19, lineHeight: 1.5, color: "var(--text)", textAlign: "center", fontWeight: 400, padding: "0 2px" }}>{d}</div>
-                      <div style={{ height: 1, background: "var(--line)", margin: "22px 0" }} />
-                      <button onClick={() => confirmCut(ct, d)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Yes — this is my cut</button>
-                      <button onClick={() => setConfirmSheet(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13.5, fontWeight: 500, padding: 14, marginTop: 2, cursor: "pointer" }}>‹ Pick a different style</button>
+                    <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 480, borderRadius: "22px 22px 0 0", padding: "22px 26px calc(30px + env(safe-area-inset-bottom))", boxShadow: "0 -12px 40px rgba(0,0,0,0.18)", maxHeight: "88vh", overflowY: "auto" }}>
+                      <div style={{ width: 38, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 20px" }} />
+                      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, textAlign: "center", lineHeight: 1.12, letterSpacing: "-0.3px", color: "var(--text)" }}>One quick check</div>
+                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, lineHeight: 1.45, color: "var(--text2)", textAlign: "center", fontWeight: 500, marginTop: 11, padding: "0 6px" }}>So we set aside the <b style={{ color: "var(--text)", fontWeight: 600 }}>right amount of time</b>.</div>
+                      <div className="fade-up" key={ct.id}>
+                        <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
+                        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, textAlign: "center" }}>You picked</div>
+                        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 20, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, textAlign: "center", lineHeight: 1.1, color: "var(--text)", marginTop: 7 }}>{nm}</div>
+                        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 1, color: "var(--sub)", textAlign: "center", marginTop: 7 }}>{(pr != null && pr !== "") ? `$${pr}` : ""}{(pr != null && pr !== "") && du ? " · " : ""}{du ? `${du} min` : ""}</div>
+                        {d ? <><div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} /><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, lineHeight: 1.55, color: "var(--text)", textAlign: "center", fontWeight: 400, padding: "0 2px" }}>{d}</div></> : null}
+                        <div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} />
+                        <button onClick={() => confirmCut(ct, d)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 13, padding: 18, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer", marginTop: 2 }}>Yes — that's my cut</button>
+                        <button onClick={() => setConfirmSheet(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13.5, fontWeight: 500, padding: "15px 0 2px", marginTop: 0, cursor: "pointer" }}>‹ Pick a different style</button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -3809,14 +3814,20 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const proceed = () => { setConfirmSheet(null); setCutType(ct.id); if (draft.beardTypes && draft.beardTypes.length) { setCutPhase("beard"); } else { startAddons({ ...(cart[0] || {}), service: draft, cutType: ct.id, addons: {} }); } };
               return (
                 <div onClick={() => setConfirmSheet(null)} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                  <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 480, borderRadius: "22px 22px 0 0", padding: "22px 24px calc(28px + env(safe-area-inset-bottom))", boxShadow: "0 -12px 40px rgba(0,0,0,0.18)", maxHeight: "88vh", overflowY: "auto" }}>
-                    <div style={{ width: 38, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 18px" }} />
-                    <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 15, color: "var(--text2)", fontWeight: 500, textAlign: "center", lineHeight: 1.5 }}>Let's make sure we're on the same page.</div>
-                    <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text2)", fontWeight: 600, textAlign: "center", marginTop: 8 }}>{nm}{(pr != null && pr !== "") ? ` · $${pr}` : ""}{du ? ` · ${du} min` : ""}</div>
-                    {d ? <><div style={{ height: 1, background: "var(--line)", margin: "22px 0" }} /><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 19, lineHeight: 1.5, color: "var(--text)", textAlign: "center", fontWeight: 400, padding: "0 2px" }}>{d}</div></> : null}
-                    <div style={{ height: 1, background: "var(--line)", margin: "22px 0" }} />
-                    <button onClick={proceed} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Yes — this is my cut</button>
-                    <button onClick={() => setConfirmSheet(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13.5, fontWeight: 500, padding: 14, marginTop: 2, cursor: "pointer" }}>‹ Pick a different style</button>
+                  <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 480, borderRadius: "22px 22px 0 0", padding: "22px 26px calc(30px + env(safe-area-inset-bottom))", boxShadow: "0 -12px 40px rgba(0,0,0,0.18)", maxHeight: "88vh", overflowY: "auto" }}>
+                    <div style={{ width: 38, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 20px" }} />
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, textAlign: "center", lineHeight: 1.12, letterSpacing: "-0.3px", color: "var(--text)" }}>One quick check</div>
+                    <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, lineHeight: 1.45, color: "var(--text2)", textAlign: "center", fontWeight: 500, marginTop: 11, padding: "0 6px" }}>So we set aside the <b style={{ color: "var(--text)", fontWeight: 600 }}>right amount of time</b>.</div>
+                    <div className="fade-up" key={ct.id}>
+                      <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
+                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, textAlign: "center" }}>You picked</div>
+                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 20, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, textAlign: "center", lineHeight: 1.1, color: "var(--text)", marginTop: 7 }}>{nm}</div>
+                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 1, color: "var(--sub)", textAlign: "center", marginTop: 7 }}>{(pr != null && pr !== "") ? `$${pr}` : ""}{(pr != null && pr !== "") && du ? " · " : ""}{du ? `${du} min` : ""}</div>
+                      {d ? <><div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} /><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, lineHeight: 1.55, color: "var(--text)", textAlign: "center", fontWeight: 400, padding: "0 2px" }}>{d}</div></> : null}
+                      <div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} />
+                      <button onClick={proceed} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 13, padding: 18, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer", marginTop: 2 }}>Yes — that's my cut</button>
+                      <button onClick={() => setConfirmSheet(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13.5, fontWeight: 500, padding: "15px 0 2px", cursor: "pointer" }}>‹ Pick a different style</button>
+                    </div>
                   </div>
                 </div>
               );
