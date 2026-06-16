@@ -2997,13 +2997,18 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     let clientId = matched?.id || null;
     let newClientRow = null;
     if (!matched && !activeMember) {
-      // Don't create a second profile for a phone that already exists — reuse it.
+      // Don't create a second profile for a phone or email that already exists — reuse it.
       // (The public app has no client list, so we ask the server.)
       let existing = null;
       try { const { data } = await supabase.rpc("lookup_client_by_phone", { p_shop: shopId, p_phone: finalPhone }); if (data && data.id) existing = data; } catch (e) {}
+      if (!existing && (finalEmail || "").trim()) {
+        try { const { data } = await supabase.rpc("lookup_client_by_email", { p_shop: shopId, p_email: finalEmail.trim().toLowerCase() }); if (data && data.id) existing = data; } catch (e) {}
+      }
       if (!existing && Array.isArray(clients)) {
         const dg = (finalPhone || "").replace(/\D/g, "");
-        existing = dg.length >= 10 ? clients.find((c) => (c.phone || "").replace(/\D/g, "") === dg) || null : null;
+        const eg = (finalEmail || "").trim().toLowerCase();
+        existing = (dg.length >= 10 ? clients.find((c) => (c.phone || "").replace(/\D/g, "") === dg) : null)
+                || (eg ? clients.find((c) => (c.email || "").trim().toLowerCase() === eg) : null) || null;
       }
       if (existing && existing.id) {
         clientId = existing.id; // reuse the existing profile
