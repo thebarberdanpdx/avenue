@@ -3067,6 +3067,42 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     // If this person was sitting on the waitlist, a real booking takes them off it (matched by phone).
     const _bphone = (finalPhone || "").replace(/\D/g, "");
     const dropFromWaitlist = () => { if (!setWaitlist || !_bphone) return; setWaitlist((cur) => (cur || []).filter((w) => (w.phone || "").replace(/\D/g, "") !== _bphone)); };
+
+    // ---- SAVE THE CLIENT FIRST, ALWAYS, INDEPENDENT OF THE APPOINTMENT ----
+    // The rule: the moment someone books, they are saved to this shop's client list.
+    // This runs before the appointment is created and is completely separate from it.
+    // Cancelling or finishing an appointment can never undo this — only the owner can
+    // delete a client. Keyed by email so the same person never duplicates.
+    {
+      const persistId = matched?.id || clientId || ("c" + baseId + Math.floor(Math.random() * 1000));
+      if (!clientId) clientId = persistId;
+      const clientRecord = {
+        id: persistId,
+        name: (matched?.name || newName || "").trim() || (newFirst + " " + newLast).trim(),
+        firstName: (matched?.firstName || newFirst || "").trim(),
+        lastName: (matched?.lastName || newLast || "").trim(),
+        email: (finalEmail || matched?.email || "").trim(),
+        phone: (finalPhone || matched?.phone || "").trim(),
+        provider: matched?.provider || (newAppts[0] && newAppts[0].providerId) || "dan",
+        visits: matched?.visits || 0,
+        lastActivity: new Date().toISOString(),
+        customDurations: matched?.customDurations || {},
+        notes: matched?.notes || "",
+        messages: matched?.messages || [],
+        gallery: matched?.gallery || [],
+        timeline: matched?.timeline || [],
+        family: matched?.family || [],
+        savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile)
+          ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() }
+          : (matched?.savedCard || undefined),
+      };
+      try {
+        const { error: cErr } = await supabase.rpc("save_booking_client", { p_shop: shopId, p_client: clientRecord });
+        if (cErr) console.error("[vero] save_booking_client failed:", cErr.message || cErr);
+      } catch (e) { console.error("[vero] save_booking_client threw:", e); }
+      setClients((cur) => { const exists = (cur || []).some((c) => c.id === persistId); return exists ? cur.map((c) => c.id === persistId ? { ...c, ...clientRecord } : c) : [clientRecord, ...(cur || [])]; });
+    }
+
     // Staff/preview bookings persist through the dashboard's own save path — show success immediately.
     if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); setBookedId(baseId); setStep(8); return; }
     // Public booking: the slot is never held while saving, and the client is only told they're booked
@@ -3093,37 +3129,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           }).catch(() => {});
         } catch (e) {}
         setBookedId(baseId); setStep(8);
-        // ---- Unconditional client persistence (the rule: a booker is ALWAYS saved) ----
-        // Regardless of how the client was matched, reused, or whether newClientRow was built,
-        // we write the client to the server every single booking, keyed by email. This is the
-        // single guarantee that anyone who books — new, returning, after a cancel or reschedule —
-        // sticks in the shop's client list. Fire-and-forget; never affects the booking itself.
-        (() => {
-          const persistId = matched?.id || clientId || ("c" + baseId + Math.floor(Math.random() * 1000));
-          const record = {
-            id: persistId,
-            name: (matched?.name || newName || "").trim() || (newFirst + " " + newLast).trim(),
-            firstName: (matched?.firstName || newFirst || "").trim(),
-            lastName: (matched?.lastName || newLast || "").trim(),
-            email: (finalEmail || matched?.email || "").trim(),
-            phone: (finalPhone || matched?.phone || "").trim(),
-            provider: matched?.provider || (newAppts[0] && newAppts[0].providerId) || "dan",
-            visits: matched?.visits || 0,
-            lastActivity: new Date().toISOString(),
-            customDurations: matched?.customDurations || {},
-            notes: matched?.notes || "",
-            messages: matched?.messages || [],
-            gallery: matched?.gallery || [],
-            timeline: matched?.timeline || [],
-            family: matched?.family || [],
-            savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile)
-              ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() }
-              : (matched?.savedCard || undefined),
-          };
-          supabase.rpc("save_booking_client", { p_shop: shopId, p_client: record })
-            .then(({ error }) => { if (error) console.error("[vero] save_booking_client failed:", error.message || error); })
-            .catch((e) => console.error("[vero] save_booking_client threw:", e));
-        })();
       }).catch(() => { setBooking(false); setBookErr(true); });
   };
 
