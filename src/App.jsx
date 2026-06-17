@@ -2649,7 +2649,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const lineTotal = (entry) => {
     const dc = activeMember || matched; // duration/notes come from the person being booked for
     const provId = entry.provider && entry.provider.id !== "anyone" ? entry.provider.id : "dan"; // barber decides the per-service length; "anyone" books as Dan (matches the commit)
-    let p = entry.service.price, m = getDuration(dc, entry.service, provId);
+    let p = (dc && dc.customPrices && dc.customPrices[entry.service.id] != null) ? dc.customPrices[entry.service.id] : entry.service.price, m = getDuration(dc, entry.service, provId);
     // cut type overrides the base price/time when present
     if (entry.service.cutTypes && entry.cutType) {
       p = cutStylePrice(entry.service, provId, entry.cutType);
@@ -19695,23 +19695,28 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const curMin = (live.customDurations[selService] != null) ? live.customDurations[selService] : (sel?.duration || 30);
   const [selH, setSelH] = useState(Math.floor(curMin / 60));
   const [selM, setSelM] = useState(curMin % 60);
+  const curPrice = ((live.customPrices || {})[selService] != null) ? live.customPrices[selService] : (sel?.price ?? 0);
+  const [selPrice, setSelPrice] = useState(curPrice);
   // when the chosen service changes, reset the time dropdowns to that service's stored/default time
   useEffect(() => {
     const m = (live.customDurations[selService] != null) ? live.customDurations[selService] : (services.find((s) => s.id === selService)?.duration || 30);
     setSelH(Math.floor(m / 60)); setSelM(m % 60);
+    const pr = ((live.customPrices || {})[selService] != null) ? live.customPrices[selService] : (services.find((s) => s.id === selService)?.price ?? 0);
+    setSelPrice(pr);
   }, [selService]);
 
   const saveDuration = () => {
     const val = selH * 60 + selM;
     if (val < 5) { showToast("Pick at least 5 minutes."); return; }
-    setClients(clients.map((c) => c.id === client.id ? { ...c, customDurations: { ...c.customDurations, [selService]: val } } : c));
-    showToast(`Saved — ${sel.name} now books at ${fmtDur(val)} for ${live.name.split(" ")[0]}.`);
+    const pr = Math.max(0, Math.round((Number(selPrice) || 0) * 100) / 100);
+    setClients(clients.map((c) => c.id === client.id ? { ...c, customDurations: { ...c.customDurations, [selService]: val }, customPrices: { ...(c.customPrices || {}), [selService]: pr } } : c));
+    showToast(`Saved — ${sel.name} now books at ${fmtDur(val)} · $${pr} for ${live.name.split(" ")[0]}.`);
   };
   const clearDuration = (sid) => {
-    setClients(clients.map((c) => { if (c.id !== client.id) return c; const cd = { ...c.customDurations }; delete cd[sid]; return { ...c, customDurations: cd }; }));
-    showToast("Reverted to the default time.");
+    setClients(clients.map((c) => { if (c.id !== client.id) return c; const cd = { ...c.customDurations }; delete cd[sid]; const cp = { ...(c.customPrices || {}) }; delete cp[sid]; return { ...c, customDurations: cd, customPrices: cp }; }));
+    showToast("Reverted to the default time and price.");
   };
-  const customList = services.filter((s) => live.customDurations[s.id] != null);
+  const customList = services.filter((s) => live.customDurations[s.id] != null || (live.customPrices || {})[s.id] != null);
   const selectStyle = { flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 40px 13px 15px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 15px center" };
 
   // ---- editable client note (Mangomint-style persistent profile note) ----
@@ -19852,7 +19857,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {/* TAB BAR */}
       <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--line)", marginBottom: 22, overflowX: "auto" }}>
-        {[["overview","Overview"],["timeline","Timeline"],["photos","Photos"],["times","Times"],["family","Family"]].map(([id, label]) => { const on = pfTab === id; return (
+        {[["overview","Overview"],["timeline","Timeline"],["photos","Photos"],["times","Booking"],["family","Family"]].map(([id, label]) => { const on = pfTab === id; return (
           <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontFamily: "'Jost', sans-serif", fontWeight: on ? 500 : 400, fontSize: 14, letterSpacing: 0.5, padding: "10px 10px" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
         ); })}
       </div>
@@ -20044,8 +20049,8 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       </Sheet>
 
       {pfTab === "times" && <div style={{ marginBottom: 28 }}>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>REMEMBERED TIMING</div>
-        <p style={{ fontSize: 15, color: "var(--sub)", marginBottom: 16, fontWeight: 300, lineHeight: 1.5 }}>Some clients need less time, some need more. Set how long {live.name.split(" ")[0]} actually takes for a service — it overrides the default and shapes their future booking slots.</p>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>TIME &amp; PRICE</div>
+        <p style={{ fontSize: 15, color: "var(--sub)", marginBottom: 16, fontWeight: 300, lineHeight: 1.5 }}>Set how long {live.name.split(" ")[0]} actually takes and what you charge them for a service. Both override the default and apply automatically when {live.name.split(" ")[0]} books online.</p>
 
         {/* service dropdown */}
         <label style={{ fontSize: 14, color: "var(--faint)", display: "block", marginBottom: 6 }}>Service</label>
@@ -20088,18 +20093,25 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           </div>
         </div>
 
-        <button className="lift" onClick={saveDuration} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, borderRadius: 8, fontSize: 14, fontWeight: 600, letterSpacing: 0.5, marginBottom: 18 }}>Save timing</button>
+        <label style={{ fontSize: 14, color: "var(--faint)", display: "block", marginBottom: 6 }}>Price for {live.name.split(" ")[0]}</label>
+        <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)", marginBottom: 18 }}>
+          <span style={{ padding: "0 0 0 15px", color: "var(--sub)", fontSize: 16 }}>$</span>
+          <input value={selPrice} onChange={(e) => setSelPrice(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "13px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
+          <span style={{ padding: "0 15px 0 0", color: "var(--faint)", fontSize: 12.5, whiteSpace: "nowrap" }}>default ${sel?.price ?? 0}</span>
+        </div>
+
+        <button className="lift" onClick={saveDuration} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, borderRadius: 8, fontSize: 14, fontWeight: 600, letterSpacing: 0.5, marginBottom: 18 }}>Save time and price</button>
 
         {/* what's already customized */}
         {customList.length > 0 && (
           <div>
-            <div style={{ fontSize: 13, letterSpacing: 1, color: "var(--faint)", marginBottom: 8 }}>CUSTOM TIMES SET</div>
+            <div style={{ fontSize: 13, letterSpacing: 1, color: "var(--faint)", marginBottom: 8 }}>CUSTOM TIME &amp; PRICE SET</div>
             <div style={{ display: "grid", gap: 8 }}>
               {customList.map((s) => (
                 <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "11px 14px" }}>
                   <span style={{ fontSize: 14 }}>{s.name}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ fontSize: 14, color: "var(--gold)", fontWeight: 600 }}>{fmtDur(live.customDurations[s.id])}</span>
+                    <span style={{ fontSize: 14, color: "var(--gold)", fontWeight: 600 }}>{fmtDur(live.customDurations[s.id] != null ? live.customDurations[s.id] : s.duration)}{(live.customPrices || {})[s.id] != null ? ` · $${live.customPrices[s.id]}` : ""}</span>
                     <button onClick={() => clearDuration(s.id)} style={{ background: "none", color: "var(--faint)", display: "flex", alignItems: "center" }}><X size={15} /></button>
                   </div>
                 </div>
