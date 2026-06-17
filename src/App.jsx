@@ -1005,6 +1005,21 @@ const priceWithTimeRules = (service, providerId, dateObj, startMin) => {
 };
 // The price locked onto an appointment at booking. Existing appts without one fall back to normal pricing.
 const lockedApptPrice = (appt, service) => (appt && appt.price != null) ? appt.price : (service ? getPrice(service, appt && appt.providerId) : 0);
+// Display name for an appointment. The stored `name` is denormalized and can be a
+// placeholder ("Me", from a self-booking) — always resolve through the linked client
+// (or family member) so the calendar and sheets show the real person's name.
+const apptDisplayName = (a, clients = []) => {
+  if (!a) return "";
+  const placeholder = !a.name || a.name === "Me";
+  if (!placeholder && !a.familyMemberId) return a.name;
+  const c = (clients || []).find((x) => x.id === a.clientId);
+  if (a.familyMemberId && c) {
+    const m = (c.family || []).find((f) => f.id === a.familyMemberId);
+    if (m && m.name) return m.name;
+  }
+  if (placeholder && c && c.name) return c.name;
+  return a.name || "Client";
+};
 const inputStyle = { width: "100%", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY };
 
 // ============================================================
@@ -3133,8 +3148,17 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       setClients((cur) => { const exists = (cur || []).some((c) => c.id === persistId); return exists ? cur.map((c) => c.id === persistId ? { ...c, ...clientRecord } : c) : [clientRecord, ...(cur || [])]; });
     }
 
+    // Auto-capture: any reference photos the client attached at booking land on their
+    // profile gallery, tagged source "client" so the card can label them "From client".
+    const captureClientPhotos = () => {
+      if (!photos.length || !clientId) return;
+      const baseTs = Date.now();
+      const entries = photos.map((p, i) => ({ id: "g" + baseTs + "_" + i, photo: p, note: "", date: new Date().toISOString(), source: "client" }));
+      setClients((cur) => (cur || []).map((c) => c.id === clientId ? { ...c, gallery: [...entries, ...(c.gallery || [])] } : c));
+    };
+
     // Staff/preview bookings persist through the dashboard's own save path — show success immediately.
-    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); setBookedId(baseId); setStep(8); return; }
+    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); captureClientPhotos(); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); setBookedId(baseId); setStep(8); return; }
     // Public booking: the slot is never held while saving, and the client is only told they're booked
     // once the server actually has it — so a failed save can never become a ghost booking.
     setBooking(true); setBookErr(false);
@@ -3143,6 +3167,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         setBooking(false);
         if (error) { setBookErr(true); return; } // nothing was held, nothing lost — they can just tap again
         setAppts((cur) => [...cur, ...newAppts]);
+        captureClientPhotos();
         dropFromWaitlist();
         // Fire the booking confirmation (event-driven). Fire-and-forget — the booking already
         // succeeded on the server, so a send failure must never affect it.
@@ -8796,7 +8821,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId} onDeepLinkHandled={onDeepLinkHandled} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
-        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
+        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={() => setActiveClient(null)} showToast={showToast} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
@@ -16314,7 +16339,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     className={isDragging ? "" : "lift"}
                     style={{ position: "absolute", top, ...lanePos, height, background: isBlock ? blockBg : (isDone ? "var(--panel2)" : tint), opacity: isDone ? 0.7 : 1, border: `1px solid ${isBlock ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`}`, borderLeft: `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : accent)}`, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "var(--shadow-sm)", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
                     {/* name — always one line, never wraps or collides */}
-                    <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{a.name}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{apptDisplayName(a, clients)}</span>
                     {/* time range — shown once room exists */}
                     {height > 34 && <span style={{ fontSize: 12, color: "var(--sub)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fmtTime(liveStart)} – {fmtTime(liveStart + (a.end - a.start))}</span>}
                     {/* service name */}
@@ -18110,7 +18135,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   };
 
   const status = APPT_STATUSES.find((s) => s.id === appt.status) || APPT_STATUSES[0];
-  const initials = appt.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  const initials = apptDisplayName(appt, clients).split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   const fmtBookDate = "Booked online · confirmed by text";
 
   // edit-mode local draft
@@ -18308,7 +18333,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   minutesLeft={minutesLeftLive}
                   minutesInto={minutesIntoService}
                   secondsInto={secondsIntoService}
-                  name={appt.name}
+                  name={apptDisplayName(appt, clients)}
                   title={appt.title}
                   dur={dur}
                   nextClient={(business && business.runningLate ? business.runningLate.enabled !== false : true) ? nextClient : null}
@@ -18419,7 +18444,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                         <button onClick={openProfile} disabled={!canOpen} style={{ width: 48, height: 48, borderRadius: "50%", background: client?.avatarColor || "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 600, flexShrink: 0, border: "none", padding: 0, cursor: canOpen ? "pointer" : "default" }}>{initials}</button>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <button onClick={openProfile} disabled={!canOpen} style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: canOpen ? "pointer" : "default", color: "inherit", display: "flex", alignItems: "center", gap: 5 }}>
-                            <span style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.1, color: T.text }}>{appt.name}</span>
+                            <span style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.1, color: T.text }}>{apptDisplayName(appt, clients)}</span>
                             {canOpen && <ChevronRight size={17} style={{ color: T.faint, flexShrink: 0 }} />}
                           </button>
                           <div style={{ fontSize: 13, color: T.sub, marginTop: 2 }}>{client && client.since ? `Client since ${client.since}` : (client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client")}</div>
@@ -19655,18 +19680,69 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
   );
 }
 
-function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, onBack, showToast }) {
-  const live = clients.find((c) => c.id === client.id);
-  const provider = providers.find((p) => p.id === live.provider) || providers[1];
-  const [pfTab, setPfTab] = useState("overview"); // overview | timeline | photos | times | family
-  const [openMember, setOpenMember] = useState(null); // family member mini-profile being viewed
+// Shared styles for the redesigned (Studio b/w) client card.
+const sheetGhost = { flex: 1, textAlign: "center", padding: 14, borderRadius: 12, fontSize: 12.5, letterSpacing: 1.2, textTransform: "uppercase", fontWeight: 600, border: "1px solid var(--border2)", background: "none", color: "var(--text)", cursor: "pointer", fontFamily: FONT_BODY };
+const sheetPrimary = { flex: 1, textAlign: "center", padding: 14, borderRadius: 12, fontSize: 12.5, letterSpacing: 1.2, textTransform: "uppercase", fontWeight: 600, border: "none", background: "var(--text)", color: "var(--bg)", cursor: "pointer", fontFamily: FONT_BODY, width: "100%" };
+
+// Per-service Booking row: inline Time + Price overrides for this client. Module-scope
+// so typing never remounts the inputs (keyboard stays open). Empty field = revert that field.
+function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPrice, onSave, onClear }) {
+  const [t, setT] = useState(curDur != null ? String(curDur) : "");
+  const [p, setP] = useState(curPrice != null ? String(curPrice) : "");
+  useEffect(() => { setT(curDur != null ? String(curDur) : ""); setP(curPrice != null ? String(curPrice) : ""); }, [curDur, curPrice]);
+  const hasOverride = curDur != null || curPrice != null;
+  const effDur = curDur != null ? curDur : baseDur;
+  const effPrice = curPrice != null ? curPrice : basePrice;
+  const commitT = () => { const v = t.trim() === "" ? null : Math.max(0, parseInt(t, 10) || 0); onSave({ dur: v }); };
+  const commitP = () => { const v = p.trim() === "" ? null : Math.max(0, Math.round((parseFloat(p) || 0) * 100) / 100); onSave({ price: v }); };
+  const fl = { fontSize: 9.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 5 };
+  const ipt = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--bg)" };
+  const inp = { width: "100%", border: "none", outline: "none", background: "transparent", padding: "11px 12px", fontFamily: FONT_BODY, fontSize: 15, color: "var(--text)" };
+  return (
+    <div style={{ padding: "16px 18px", borderTop: "1px solid var(--line)" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+        <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500 }}>{service.name}</span>
+        <span style={{ fontSize: 11.5, color: "var(--faint)", flexShrink: 0 }}>Default {fmtDur(baseDur)} · ${basePrice}</span>
+      </div>
+      <div style={{ display: "flex", gap: 10, marginTop: 13 }}>
+        <div style={{ flex: 1 }}>
+          <div style={fl}>Time for {firstName}</div>
+          <div style={ipt}><input value={t} onChange={(e) => setT(e.target.value.replace(/[^0-9]/g, ""))} onBlur={commitT} placeholder={String(baseDur)} inputMode="numeric" style={inp} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 12.5 }}>min</span></div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={fl}>Price for {firstName}</div>
+          <div style={ipt}><span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span><input value={p} onChange={(e) => setP(e.target.value.replace(/[^0-9.]/g, ""))} onBlur={commitP} placeholder={String(basePrice)} inputMode="decimal" style={inp} /></div>
+        </div>
+      </div>
+      {hasOverride ? (
+        <div style={{ marginTop: 11 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--text)", fontWeight: 500 }}>
+            <span style={{ background: "var(--text)", color: "var(--bg)", borderRadius: 20, padding: "3px 9px", fontSize: 10, letterSpacing: 0.5 }}>CUSTOM</span>
+            Books at {fmtDur(effDur)} · ${effPrice}
+          </span>
+          <div><button onClick={onClear} style={{ background: "none", border: "none", padding: 0, fontSize: 11.5, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, marginTop: 10, cursor: "pointer" }}>Revert to default</button></div>
+        </div>
+      ) : (
+        <div style={{ marginTop: 11, fontSize: 11.5, color: "var(--faint)" }}>Using the default — type above to customize</div>
+      )}
+    </div>
+  );
+}
+
+function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, setAppts, business, setBusiness, me, shopId, onBack, showToast }) {
+  const live = clients.find((c) => c.id === client.id) || client;
+  const provider = providers.find((p) => p.id === live.provider) || providers[1] || providers[0] || {};
+  const firstName = (live.name || "").split(" ")[0] || "this client";
+  const [pfTab, setPfTab] = useState("overview"); // overview | visits | booking | notes | family
+  const [openMember, setOpenMember] = useState(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [mName, setMName] = useState("");
   const [mNote, setMNote] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false); // kebab menu (block / unblock)
   const family = live.family || [];
   const addFamilyMember = () => {
     if (!mName.trim()) return;
-    const member = { id: "fm" + Date.now(), name: mName.trim(), note: mNote.trim(), customDurations: {}, gallery: [], timeline: [] };
+    const member = { id: "fm" + Date.now(), name: mName.trim(), note: mNote.trim(), customDurations: {}, customPrices: {}, gallery: [], timeline: [] };
     setClients(clients.map((c) => c.id === live.id ? { ...c, family: [...(c.family || []), member] } : c));
     setMName(""); setMNote(""); setAddMemberOpen(false);
     showToast(`${member.name} added.`);
@@ -19675,7 +19751,6 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
     setClients(clients.map((c) => c.id === live.id ? { ...c, family: (c.family || []).filter((m) => m.id !== id) } : c));
     setOpenMember(null);
   };
-  const [selService, setSelService] = useState(services[0]?.id || "");
 
   // ---- Block from booking ----
   const [blockPrompt, setBlockPrompt] = useState(false);
@@ -19684,505 +19759,550 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const confirmBlock = () => {
     setClients(clients.map((c) => c.id === live.id ? { ...c, blocked: true, blockReason: blockReason.trim(), blockedAt: new Date().toISOString() } : c));
     setBlockPrompt(false); setBlockReason("");
-    showToast(`${live.name.split(" ")[0]} is blocked from booking.`);
+    showToast(`${firstName} is blocked from booking.`);
   };
   const unblock = () => {
     setClients(clients.map((c) => c.id === live.id ? { ...c, blocked: false, blockReason: "", blockedAt: null } : c));
-    showToast(`${live.name.split(" ")[0]} can book again.`);
+    showToast(`${firstName} can book again.`);
   };
-  const sel = services.find((s) => s.id === selService);
-  // current value to prefill the time dropdowns: custom if set, else service default
-  const curMin = (live.customDurations[selService] != null) ? live.customDurations[selService] : (sel?.duration || 30);
-  const [selH, setSelH] = useState(Math.floor(curMin / 60));
-  const [selM, setSelM] = useState(curMin % 60);
-  const curPrice = ((live.customPrices || {})[selService] != null) ? live.customPrices[selService] : (sel?.price ?? 0);
-  const [selPrice, setSelPrice] = useState(curPrice);
-  // when the chosen service changes, reset the time dropdowns to that service's stored/default time
-  useEffect(() => {
-    const m = (live.customDurations[selService] != null) ? live.customDurations[selService] : (services.find((s) => s.id === selService)?.duration || 30);
-    setSelH(Math.floor(m / 60)); setSelM(m % 60);
-    const pr = ((live.customPrices || {})[selService] != null) ? live.customPrices[selService] : (services.find((s) => s.id === selService)?.price ?? 0);
-    setSelPrice(pr);
-  }, [selService]);
 
-  const saveDuration = () => {
-    const val = selH * 60 + selM;
-    if (val < 5) { showToast("Pick at least 5 minutes."); return; }
-    const pr = Math.max(0, Math.round((Number(selPrice) || 0) * 100) / 100);
-    setClients(clients.map((c) => c.id === client.id ? { ...c, customDurations: { ...c.customDurations, [selService]: val }, customPrices: { ...(c.customPrices || {}), [selService]: pr } } : c));
-    showToast(`Saved — ${sel.name} now books at ${fmtDur(val)} · $${pr} for ${live.name.split(" ")[0]}.`);
-  };
-  const clearDuration = (sid) => {
-    setClients(clients.map((c) => { if (c.id !== client.id) return c; const cd = { ...c.customDurations }; delete cd[sid]; const cp = { ...(c.customPrices || {}) }; delete cp[sid]; return { ...c, customDurations: cd, customPrices: cp }; }));
-    showToast("Reverted to the default time and price.");
-  };
-  const customList = services.filter((s) => live.customDurations[s.id] != null || (live.customPrices || {})[s.id] != null);
-  const selectStyle = { flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 40px 13px 15px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 15px center" };
+  // ---- per-client time + price overrides (mirror each other; applied at booking) ----
+  const saveOverride = (sid, patch) => setClients(clients.map((c) => {
+    if (c.id !== client.id) return c;
+    const cd = { ...(c.customDurations || {}) };
+    const cp = { ...(c.customPrices || {}) };
+    if ("dur" in patch) { if (patch.dur == null) delete cd[sid]; else cd[sid] = patch.dur; }
+    if ("price" in patch) { if (patch.price == null) delete cp[sid]; else cp[sid] = patch.price; }
+    return { ...c, customDurations: cd, customPrices: cp };
+  }));
+  const clearOverride = (sid) => saveOverride(sid, { dur: null, price: null });
+  const baseDurFor = (s) => (s.staff && s.staff[live.provider] && s.staff[live.provider].duration != null) ? s.staff[live.provider].duration : s.duration;
 
-  // ---- editable client note (Mangomint-style persistent profile note) ----
+  // ---- editable owner note ----
   const [noteDraft, setNoteDraft] = useState(live.notes || "");
   const [editingNote, setEditingNote] = useState(false);
   const noteDirty = noteDraft !== (live.notes || "");
-  const saveNote = () => {
-    setClients(clients.map((c) => c.id === client.id ? { ...c, notes: noteDraft } : c));
-    setEditingNote(false);
-    showToast("Client note saved.");
-  };
+  const saveNote = () => { setClients(clients.map((c) => c.id === client.id ? { ...c, notes: noteDraft } : c)); setEditingNote(false); showToast("Client note saved."); };
 
-  // ---- timeline notes (dated entries: color formulas, product recs, etc.) ----
+  // ---- wrap-up notes (dated, barber's post-visit notes) ----
   const [tlDraft, setTlDraft] = useState("");
   const addTimelineNote = () => {
     if (!tlDraft.trim()) return;
     const entry = { id: "tn" + Date.now(), text: tlDraft.trim(), date: new Date().toISOString() };
     setClients(clients.map((c) => c.id === client.id ? { ...c, timeline: [entry, ...(c.timeline || [])] } : c));
-    setTlDraft("");
-    showToast("Timeline note added.");
+    setTlDraft(""); showToast("Note added.");
   };
-  const removeTimelineNote = (id) => {
-    setClients(clients.map((c) => c.id === client.id ? { ...c, timeline: (c.timeline || []).filter((t) => t.id !== id) } : c));
-  };
-  const [tlFilter, setTlFilter] = useState("all"); // all | appointments | notes
+  const removeTimelineNote = (id) => setClients(clients.map((c) => c.id === client.id ? { ...c, timeline: (c.timeline || []).filter((t) => t.id !== id) } : c));
 
   // ---- profile photo + work gallery ----
   const [picker, setPicker] = useState(false);
   const setClientPhoto = (id) => { setClients(clients.map((c) => c.id === client.id ? { ...c, photo: id } : c)); setPicker(false); };
   const removeClientPhoto = () => { setClients(clients.map((c) => c.id === client.id ? { ...c, photo: null } : c)); setPicker(false); };
   const [galPicker, setGalPicker] = useState(false);
-  const [lightbox, setLightbox] = useState(null); // gallery entry being viewed full-size
+  const [lightbox, setLightbox] = useState(null);
   const addGalleryPhoto = (id) => {
     const entry = { id: "g" + Date.now(), photo: id, note: "", date: new Date().toISOString() };
     setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: [entry, ...(c.gallery || [])] } : c));
     setGalPicker(false);
-
-    // Auto-train: add this photo to the AI reference library for the matching service / cut type.
-    // We use the client's most recent confirmed appointment to figure out which service + cut type.
-    let learned = false;
-    try {
-      const myAppts = (appts || []).filter((a) => a.clientId === client.id && a.status !== "block").sort((a, b) => (b.bookedFor || "").localeCompare(a.bookedFor || ""));
-      const lastAppt = myAppts[0];
-      const cutTypeId = lastAppt?.lineItems?.[0]?.cutType || null;
-      const serviceId = lastAppt?.serviceId;
-      if (serviceId && setServices) {
-        setServices(services.map((s) => {
-          if (s.id !== serviceId) return s;
-          // If service has cut types and we know which one, add to that cut type's referencePhotos
-          if (s.cutTypes && s.cutTypes.length && cutTypeId) {
-            const cuts = s.cutTypes.map((ct) => {
-              if (ct.id !== cutTypeId) return ct;
-              const list = ct.referencePhotos || [];
-              if (list.includes(id)) return ct;
-              learned = true;
-              return { ...ct, referencePhotos: [...list, id] };
-            });
-            return { ...s, cutTypes: cuts };
-          }
-          // Otherwise, add to the service's own referencePhotos
-          const list = s.referencePhotos || [];
-          if (list.includes(id)) return s;
-          learned = true;
-          return { ...s, referencePhotos: [...list, id] };
-        }));
-      }
-    } catch (err) { /* silent — gallery still saves */ }
-
-    showToast(learned ? "Photo saved — Vero just got a little smarter." : "Photo added to gallery.");
+    showToast("Photo added to gallery.");
   };
-  const removeGalleryPhoto = (gid) => {
-    setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: (c.gallery || []).filter((g) => g.id !== gid) } : c));
-    setLightbox(null);
-  };
-  const setGalleryNote = (gid, note) => {
-    setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: (c.gallery || []).map((g) => g.id === gid ? { ...g, note } : g) } : c));
-  };
+  const removeGalleryPhoto = (gid) => { setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: (c.gallery || []).filter((g) => g.id !== gid) } : c)); setLightbox(null); };
+  const setGalleryNote = (gid, note) => setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: (c.gallery || []).map((g) => g.id === gid ? { ...g, note } : g) } : c));
   const gallery = live.gallery || [];
 
-  // build a unified, date-sorted feed: appointments for this client + timeline notes
+  // ---- appointment history / cadence / lifetime ----
   const myAppts = (appts || []).filter((a) => a.clientId === client.id && a.status !== "block");
   const now = Date.now();
-  // Upcoming = confirmed/checked-in appointments whose date is still in the future, soonest first.
+  const isPastAppt = (a) => a.bookedFor && (new Date(a.bookedFor).getTime() < now || a.status === "done") && a.status !== "cancelled";
   const upcomingAppts = myAppts
     .filter((a) => a.bookedFor && new Date(a.bookedFor).getTime() >= now && a.status !== "cancelled" && a.status !== "done")
     .sort((a, b) => new Date(a.bookedFor) - new Date(b.bookedFor));
+  const historyAppts = myAppts.filter(isPastAppt).sort((a, b) => new Date(b.bookedFor) - new Date(a.bookedFor));
   const nextAppt = upcomingAppts[0] || null;
-  // Recent visits = past appointments (date in the past, or marked done), newest first. Used by the Overview snapshot.
-  const pastAppts = myAppts
-    .filter((a) => a.bookedFor && (new Date(a.bookedFor).getTime() < now || a.status === "done") && a.status !== "cancelled")
-    .sort((a, b) => new Date(b.bookedFor) - new Date(a.bookedFor))
-    .slice(0, 4);
-  // Booking cadence: average gap between past visits (fallback to stored rhythm). Hidden if not enough history.
   const cadenceAvg = (() => {
-    const ds = myAppts
-      .filter((a) => a.bookedFor && (new Date(a.bookedFor).getTime() < now || a.status === "done") && a.status !== "cancelled")
-      .map((a) => new Date(a.bookedFor).getTime())
-      .sort((x, y) => x - y);
+    const ds = myAppts.filter(isPastAppt).map((a) => new Date(a.bookedFor).getTime()).sort((x, y) => x - y);
     if (ds.length >= 2) { let g = 0; for (let i = 1; i < ds.length; i++) g += (ds[i] - ds[i - 1]) / 86400000; return Math.round(g / (ds.length - 1)); }
     return live.cadenceDays || null;
   })();
-  const cadencePhrase = cadenceAvg == null ? null : (cadenceAvg < 11 ? `books about every ${cadenceAvg} days` : `books about every ${Math.round(cadenceAvg / 7)} week${Math.round(cadenceAvg / 7) === 1 ? "" : "s"}`);
-  // Nudge handler for the Overview button — same persistence as the Clients-tab folder.
-  const nudgeFromProfile = () => {
-    setClients(clients.map((c) => c.id === client.id ? { ...c, nudgeDismissedAt: new Date().toISOString() } : c));
-    showToast(`Nudge sent to ${live.name.split(" ")[0]} — "time for your next visit?" with a booking link.`);
+
+  // money helpers (mirror CalendarView.paidForAppt — payment records are the source of truth)
+  const recsFor = (a) => (live.payments || []).filter((r) => r.apptId === a.id);
+  const paidForAppt = (a) => { const recs = recsFor(a); if (recs.length) return recs.reduce((s, r) => s + (r.amount || 0) - (r.refunded || 0), 0); return (a.paid && a.paid.total) || 0; };
+  const lifetime = myAppts.reduce((s, a) => s + paidForAppt(a), 0);
+  const money0 = (n) => "$" + (Math.round(n) === n ? Math.round(n) : n.toFixed(2));
+
+  // elapsed-time (reuse the in→out measurement Checkout records)
+  const elapsedMin = (a) => (a.serviceStartedAt && a.serviceEndedAt) ? Math.max(1, Math.round((a.serviceEndedAt - a.serviceStartedAt) / 60000)) : null;
+  const fmtClock = (ts) => new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const niceDate = (iso) => { const d = new Date(iso); return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
+  const niceDateFull = (iso) => { const d = new Date(iso); return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
+  const provName = (a) => (providers.find((p) => p.id === a.providerId) || {}).name || provider.name || "";
+
+  // stat strip
+  const visitCount = Math.max(live.visits || 0, historyAppts.length);
+  const datedYears = myAppts.filter((a) => a.bookedFor).map((a) => new Date(a.bookedFor).getFullYear());
+  const sinceLabel = datedYears.length ? "’" + String(Math.min(...datedYears)).slice(2) : "—";
+  const cadenceShort = cadenceAvg == null ? "—" : (cadenceAvg < 11 ? `${cadenceAvg}d` : `${Math.round(cadenceAvg / 7)} wk`);
+
+  // wrap-up + from-client note sources
+  const wrapNotes = live.timeline || [];
+  const bookingNotes = myAppts.filter((a) => (a.note || "").trim()).sort((a, b) => new Date(b.bookedFor || 0) - new Date(a.bookedFor || 0));
+
+  // ---- detail / transaction / reschedule / money sheets ----
+  const [detail, setDetail] = useState(null);   // { appt, mode: "past" | "up" }
+  const [txnAppt, setTxnAppt] = useState(null);  // transaction breakdown
+  const [checkout, setCheckout] = useState(null);
+  const [refundAppt, setRefundAppt] = useState(null);
+  const [resched, setResched] = useState(null);  // { id, date, start }
+
+  const checkInAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "in-service", serviceStartedAt: x.serviceStartedAt || Date.now() } : x)); setDetail(null); showToast(`${firstName} checked in.`); };
+  const cancelAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "cancelled" } : x)); setDetail(null); showToast("Appointment cancelled."); };
+  const finishCheckoutLite = (id, summary) => { setAppts((cur) => cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceStartedAt ? Date.now() : a.serviceEndedAt } : a)); setCheckout(null); showToast("Payment recorded."); };
+  const sameDayLocal = (iso, ref) => { if (!iso || !ref) return false; const a = new Date(iso); return a.getFullYear() === ref.getFullYear() && a.getMonth() === ref.getMonth() && a.getDate() === ref.getDate(); };
+  // Double-booking guard for inline reschedule — mirrors the online-booking guard
+  // (computeFreeSlots): any non-cancelled/non-done appt for that provider that day,
+  // INCLUDING time-blocks, with the provider's before/after buffers applied.
+  const reschedClashes = (id, dateObj, start) => {
+    const a = myAppts.find((x) => x.id === id); if (!a) return false;
+    const dur = Math.max(5, (a.end - a.start) || 30);
+    const prov = providers.find((p) => p.id === a.providerId);
+    const bk = (business && business.booking) || {};
+    const bufBefore = Math.max(0, Number((prov && prov.bufferBefore) ?? bk.bufferBefore) || 0);
+    const bufAfter = Math.max(0, Number((prov && prov.bufferAfter) ?? bk.bufferAfter) || 0);
+    return (appts || []).some((x) =>
+      x.id !== id && x.status !== "cancelled" && x.status !== "done" &&
+      x.providerId === a.providerId && x.bookedFor && sameDayLocal(x.bookedFor, dateObj) &&
+      start < ((x.end != null ? x.end : x.start + 30) + bufAfter) &&
+      (start + dur) > (x.start - bufBefore)
+    );
   };
-  const feed = [
-    ...myAppts.map((a) => ({ kind: "appt", date: a.bookedFor || new Date().toISOString(), appt: a, sortKey: a.bookedFor ? new Date(a.bookedFor).getTime() : 0 })),
-    ...(live.timeline || []).map((t) => ({ kind: "note", date: t.date, text: t.text, id: t.id, sortKey: t.date ? new Date(t.date).getTime() : 0 })),
-  ].sort((a, b) => b.sortKey - a.sortKey); // most recent / soonest-future first
-  const feedFiltered = feed.filter((f) => tlFilter === "all" || (tlFilter === "appointments" && f.kind === "appt") || (tlFilter === "notes" && f.kind === "note"));
-  const niceDate = (iso) => { const d = new Date(iso); return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; };
-  const niceDateFull = (iso) => { const d = new Date(iso); return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; };
+  const saveReschedule = () => {
+    const a = myAppts.find((x) => x.id === resched.id); if (!a) { setResched(null); return; }
+    if (reschedClashes(resched.id, resched.date, resched.start)) { showToast(`That overlaps another booking for ${provName(a)} — pick a free time.`); return; }
+    const dur = Math.max(5, (a.end - a.start) || 30);
+    const bf = new Date(resched.date); bf.setHours(Math.floor(resched.start / 60), resched.start % 60, 0, 0);
+    setAppts((cur) => cur.map((x) => x.id === resched.id ? { ...x, bookedFor: bf.toISOString(), start: resched.start, end: resched.start + dur } : x));
+    setResched(null); setDetail(null); showToast("Appointment moved.");
+  };
+
+  const tabLabel = { fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "22px 4px 10px" };
+  const cardStyle = { border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", background: "var(--bg)" };
+  const chev = <ChevronRight size={16} style={{ color: "var(--border2)", flexShrink: 0 }} />;
+
+  // a tappable appointment row (used in Overview + Visits)
+  const VisitRow = ({ a, mode, showPrice }) => {
+    const el = elapsedMin(a);
+    return (
+      <button onClick={() => setDetail({ appt: a, mode })} style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 18px", borderTop: "1px solid var(--line)", width: "100%", background: "none", border: "none", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
+        {mode === "up"
+          ? <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />
+          : <span style={{ fontFamily: "'Fraunces', serif", fontSize: 14, width: 50, flexShrink: 0, color: "var(--text2)" }}>{niceDate(a.bookedFor)}</span>}
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <b style={{ fontWeight: 500, fontSize: 14.5, display: "block" }}>{mode === "up" ? `${niceDateFull(a.bookedFor)} · ${fmtTime(a.start)}` : a.title}</b>
+          <span style={{ fontSize: 12, color: "var(--sub)" }}>{mode === "up" ? `${a.title} · ${provName(a)}` : `${showPrice ? money0(paidForAppt(a)) + " · " : ""}${provName(a)}`}</span>
+        </span>
+        {el != null && mode !== "up" && <span style={{ fontSize: 11, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 9px", whiteSpace: "nowrap", fontWeight: 500 }}>{el} min</span>}
+        {chev}
+      </button>
+    );
+  };
+
+  const drow = (k, v) => (
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "13px 2px", borderTop: "1px solid var(--line)", fontSize: 14 }}>
+      <span style={{ color: "var(--sub)" }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span>
+    </div>
+  );
 
   return (
     <div className="fade-up">
-      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 400, marginBottom: 24, letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> Clients</button>
+      {/* top bar: back · shop · kebab */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontFamily: "'Jost', sans-serif", fontSize: 14, cursor: "pointer" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16 }}>‹</span> Clients</button>
+        <button onClick={() => setMenuOpen(true)} style={{ background: "none", border: "none", color: "var(--faint)", cursor: "pointer", padding: 4 }}><MoreHorizontal size={20} /></button>
+      </div>
 
-      {/* Editorial profile header */}
-      <div style={{ marginBottom: 24, paddingTop: 6 }}>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
-          <button onClick={() => setPicker(true)} style={{ position: "relative", width: 64, height: 64, borderRadius: "50%", background: "none", border: "none", flexShrink: 0, padding: 0 }}>
-            <Avatar size={64} photo={clientPhoto(live)} initial={live.name.charAt(0)} color={provider.color} />
-            <span style={{ position: "absolute", bottom: -2, right: -2, width: 22, height: 22, borderRadius: "50%", background: "var(--text)", color: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={11} /></span>
-          </button>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.6px", marginBottom: 6 }}>{live.name}</h2>
-            <div style={{ color: "var(--sub)", fontSize: 13.5, lineHeight: 1.4 }}>
-              {live.phone && <PhoneLink number={live.phone} />}
-              {live.phone && live.email && " · "}
-              {live.email && <EmailLink email={live.email} />}
-              {!live.phone && !live.email && <span style={{ color: "var(--faint)", fontStyle: "italic" }}>No contact info on file</span>}
-            </div>
-          </div>
+      {/* header: avatar · name · contact line · action pills */}
+      <div style={{ textAlign: "center", marginBottom: 18 }}>
+        <button onClick={() => setPicker(true)} style={{ position: "relative", width: 84, height: 84, borderRadius: "50%", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+          <Avatar size={84} photo={clientPhoto(live)} initial={(live.name || "?").charAt(0)} color="var(--text)" fontSize={34} />
+          <span style={{ position: "absolute", bottom: 0, right: 0, width: 24, height: 24, borderRadius: "50%", background: "var(--text)", color: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={12} /></span>
+        </button>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 31, fontWeight: 500, letterSpacing: "-0.5px", marginTop: 14 }}>{live.name}</h2>
+        <div style={{ color: "var(--sub)", fontSize: 13, marginTop: 9 }}>
+          {live.phone && <PhoneLink number={live.phone} />}
+          {live.phone && live.email && "  ·  "}
+          {live.email && <EmailLink email={live.email} />}
+          {!live.phone && !live.email && <span style={{ color: "var(--faint)", fontStyle: "italic" }}>No contact info on file</span>}
         </div>
       </div>
 
-      {/* TAB BAR */}
-      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--line)", marginBottom: 22, overflowX: "auto" }}>
-        {[["overview","Overview"],["timeline","Timeline"],["photos","Photos"],["times","Booking"],["family","Family"]].map(([id, label]) => { const on = pfTab === id; return (
-          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontFamily: "'Jost', sans-serif", fontWeight: on ? 500 : 400, fontSize: 14, letterSpacing: 0.5, padding: "10px 10px" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
+      {/* four-stat strip */}
+      <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden", marginBottom: 6 }}>
+        {[[visitCount, "Visits"], [sinceLabel, "Since"], [cadenceShort, "Cadence"], [money0(lifetime), "Lifetime"]].map(([n, l], i) => (
+          <div key={l} style={{ flex: 1, textAlign: "center", padding: "12px 4px", borderLeft: i === 0 ? "none" : "1px solid var(--line)" }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>{n}</div>
+            <div style={{ fontSize: 9.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 3 }}>{l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* tab bar */}
+      <div style={{ display: "flex", gap: 20, borderBottom: "1px solid var(--line)", overflowX: "auto", padding: "18px 4px 0", marginBottom: 4 }}>
+        {[["overview", "Overview"], ["visits", "Visits"], ["booking", "Booking"], ["notes", "Notes & Photos"], ["family", "Family"]].map(([id, label]) => { const on = pfTab === id; return (
+          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontFamily: "'Jost', sans-serif", fontWeight: 500, fontSize: 13, paddingBottom: 12, marginBottom: -1, whiteSpace: "nowrap", cursor: "pointer" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
         ); })}
       </div>
+
       {picker && <StaffPhotoPicker hasPhoto={!!live.photo} onClose={() => setPicker(false)} onPick={setClientPhoto} onRemove={removeClientPhoto} />}
       {galPicker && <PhotoPicker onClose={() => setGalPicker(false)} onPick={addGalleryPhoto} />}
-      {lightbox && (() => { const g = gallery.find((x) => x.id === lightbox); if (!g) return null; return (
-        <Sheet open={true} onClose={() => setLightbox(null)} maxWidth={560}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22 }}>{niceDate(g.date)}</div>
-            <button onClick={() => setLightbox(null)} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
+
+      {/* ============ OVERVIEW ============ */}
+      {pfTab === "overview" && <div style={{ paddingBottom: 24 }}>
+        {nextAppt && (<>
+          <div style={tabLabel}>Next visit</div>
+          <div style={cardStyle}>
+            <button onClick={() => setDetail({ appt: nextAppt, mode: "up" })} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 18, cursor: "pointer", color: "var(--text)", position: "relative" }}>
+              <span style={{ position: "absolute", top: 16, right: 18, color: "var(--border2)", fontFamily: "'Fraunces', serif", fontSize: 18 }}>›</span>
+              <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Upcoming · {daysFromNow(nextAppt.bookedFor)}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginTop: 8, letterSpacing: "-0.3px" }}>{niceDateFull(nextAppt.bookedFor)} · {fmtTime(nextAppt.start)}</div>
+              <div style={{ fontSize: 13.5, color: "var(--text2)", marginTop: 4 }}>{nextAppt.title} · with {provName(nextAppt)}</div>
+            </button>
           </div>
-          <img src={imgUrl(g.photo, 800)} alt="" style={{ width: "100%", borderRadius: 14, marginBottom: 14, display: "block" }} />
-          <input value={g.note || ""} onChange={(e) => setGalleryNote(g.id, e.target.value)} placeholder="Add a note (e.g. skin fade #2, product used)…" style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", marginBottom: 12 }} />
-          <button onClick={() => removeGalleryPhoto(g.id)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Trash2 size={16} /> REMOVE FROM GALLERY</button>
-        </Sheet>
-      ); })()}
-
-      {/* CLIENT NOTE — always-visible, editable */}
-      {pfTab === "overview" && <div style={{ marginBottom: 28 }}>
-        {/* Visit count + provider — moved down from the masthead. Plain text, no caps treatment. */}
-        <div style={{ fontSize: 13.5, color: "var(--faint)", marginBottom: 18 }}>
-          {live.visits === 0 ? "First visit" : live.visits === 1 ? "1 visit" : `${live.visits} visits`} with {provider.name}{cadencePhrase ? ` · ${cadencePhrase}` : ""}
-        </div>
-        {/* Upcoming appointment — the key thing to see at a glance */}
-        {nextAppt && (
-          <div style={{ background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 14, padding: "16px 18px", marginBottom: 22 }}>
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>UPCOMING APPOINTMENT</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 38, height: 38, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 18%, var(--panel))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Calendar size={17} style={{ color: "var(--gold)" }} /></div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.2 }}>{niceDateFull(nextAppt.bookedFor)}</div>
-                <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{fmtTime(nextAppt.start)} · {nextAppt.title}{nextAppt.providerId ? ` · ${(providers.find((p) => p.id === nextAppt.providerId) || {}).name || ""}` : ""}</div>
-              </div>
-            </div>
-            {upcomingAppts.length > 1 && <div style={{ fontSize: 12.5, color: "var(--gold)", marginTop: 10, fontWeight: 500 }}>+{upcomingAppts.length - 1} more upcoming</div>}
-          </div>
-        )}
-
-        {/* Nudge to rebook — shown when no upcoming visit but they've been in before */}
-        {!nextAppt && pastAppts.length > 0 && (
-          <button className="lift" onClick={nudgeFromProfile} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 2, borderRadius: 12, border: "none", marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}>
-            <Bell size={15} /> NUDGE TO REBOOK
-          </button>
-        )}
-
-        {/* Recent visits — last few past appointments */}
-        {pastAppts.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>RECENT VISITS</div>
-            <div style={{ display: "grid", gap: 8 }}>
-              {pastAppts.map((a) => {
-                const apptProv = providers.find((p) => p.id === a.providerId);
-                return (
-                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px" }}>
-                    <div style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Calendar size={14} style={{ color: "var(--sub)" }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 500 }}>{niceDateFull(a.bookedFor)}</div>
-                      <div style={{ fontSize: 13, color: "var(--sub)" }}>{a.title}{apptProv ? ` · ${apptProv.name}` : ""}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Client note — preferences, allergies, formulas */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)" }}>CLIENT NOTE</div>
-          {!editingNote && <button onClick={() => setEditingNote(true)} style={{ background: "none", color: "var(--gold)", fontSize: 14, display: "flex", alignItems: "center", gap: 5 }}><Edit2 size={13} /> {live.notes ? "Edit" : "Add note"}</button>}
-        </div>
+        </>)}
+        {historyAppts.length > 0 && (<>
+          <div style={tabLabel}>Recent visits</div>
+          <div style={cardStyle}>{historyAppts.slice(0, 3).map((a) => <VisitRow key={a.id} a={a} mode="past" />)}</div>
+        </>)}
+        <div style={tabLabel}>Client note</div>
         {editingNote ? (
           <div>
-            <textarea autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Preferences, allergies, formulas, conversation topics — anything you want to remember about this client." rows={5} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", boxSizing: "border-box" }} />
+            <textarea autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Preferences, allergies, formulas, conversation topics." rows={5} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", boxSizing: "border-box" }} />
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              <button onClick={() => { setNoteDraft(live.notes || ""); setEditingNote(false); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 12, borderRadius: 10, fontSize: 14 }}>Cancel</button>
-              <button className="lift" onClick={saveNote} disabled={!noteDirty} style={{ flex: 1, background: noteDirty ? "var(--gold)" : "var(--panel2)", color: noteDirty ? "var(--on-gold)" : "var(--faint)", padding: 12, borderRadius: 10, fontSize: 14, fontWeight: 600 }}>Save note</button>
+              <button onClick={() => { setNoteDraft(live.notes || ""); setEditingNote(false); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 12, borderRadius: 12, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button onClick={saveNote} disabled={!noteDirty} style={{ flex: 1, background: noteDirty ? "var(--text)" : "var(--panel2)", color: noteDirty ? "var(--bg)" : "var(--faint)", padding: 12, borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}>Save note</button>
             </div>
           </div>
         ) : (
-          <div onClick={() => setEditingNote(true)} style={{ background: live.notes ? "color-mix(in srgb, var(--gold) 7%, var(--panel))" : "var(--panel2)", border: `1px solid ${live.notes ? "color-mix(in srgb, var(--gold) 25%, var(--border))" : "var(--border)"}`, borderRadius: 12, padding: "14px 16px", cursor: "pointer", minHeight: 20 }}>
-            {live.notes
-              ? <p style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{live.notes}</p>
-              : <p style={{ fontSize: 14.5, color: "var(--faint)", fontStyle: "italic" }}>Nothing noted yet — tap to jot down preferences, allergies, or anything worth remembering.</p>}
+          <div onClick={() => setEditingNote(true)} style={{ border: `1px ${live.notes ? "solid" : "dashed"} var(--border2)`, borderRadius: 14, padding: 16, cursor: "pointer", color: live.notes ? "var(--text2)" : "var(--sub)", fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+            {live.notes || "Nothing noted yet — tap to jot down preferences, allergies, or anything worth remembering."}
           </div>
         )}
       </div>}
 
-      {/* GALLERY — photos of previous work */}
-      {pfTab === "photos" && <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)" }}>GALLERY</div>
-          <button onClick={() => setGalPicker(true)} style={{ background: "none", color: "var(--gold)", fontSize: 14, display: "flex", alignItems: "center", gap: 5 }}><Plus size={14} /> Add photo</button>
+      {/* ============ VISITS ============ */}
+      {pfTab === "visits" && <div style={{ paddingBottom: 24 }}>
+        {upcomingAppts.length > 0 && (<>
+          <div style={tabLabel}>Upcoming</div>
+          <div style={cardStyle}>{upcomingAppts.map((a) => <VisitRow key={a.id} a={a} mode="up" />)}</div>
+        </>)}
+        <div style={tabLabel}>History</div>
+        {historyAppts.length === 0 ? (
+          <p style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", padding: "4px 4px" }}>No past visits yet.</p>
+        ) : (
+          <div style={cardStyle}>{historyAppts.map((a) => <VisitRow key={a.id} a={a} mode="past" showPrice />)}</div>
+        )}
+      </div>}
+
+      {/* ============ BOOKING ============ */}
+      {pfTab === "booking" && <div style={{ paddingBottom: 24 }}>
+        <div style={tabLabel}>What {firstName} books at</div>
+        <div style={cardStyle}>
+          {services.map((s, i) => (
+            <div key={s.id} style={i === 0 ? { borderTop: "none" } : null}>
+              <CardBookingRow
+                service={s}
+                firstName={firstName}
+                baseDur={baseDurFor(s)}
+                basePrice={getPrice(s, live.provider)}
+                curDur={(live.customDurations || {})[s.id] != null ? live.customDurations[s.id] : null}
+                curPrice={(live.customPrices || {})[s.id] != null ? live.customPrices[s.id] : null}
+                onSave={(patch) => saveOverride(s.id, patch)}
+                onClear={() => clearOverride(s.id)}
+              />
+            </div>
+          ))}
+          <div style={{ fontSize: 11.5, color: "var(--sub)", lineHeight: 1.5, padding: "14px 18px 16px" }}>These apply only to {firstName}. When {firstName} books this service online, they see this time and price automatically.</div>
+        </div>
+      </div>}
+
+      {/* ============ NOTES & PHOTOS ============ */}
+      {pfTab === "notes" && <div style={{ paddingBottom: 24 }}>
+        <div style={tabLabel}>Your note</div>
+        {editingNote ? (
+          <div>
+            <textarea autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} rows={5} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", boxSizing: "border-box" }} />
+            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+              <button onClick={() => { setNoteDraft(live.notes || ""); setEditingNote(false); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 12, borderRadius: 12, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button onClick={saveNote} disabled={!noteDirty} style={{ flex: 1, background: noteDirty ? "var(--text)" : "var(--panel2)", color: noteDirty ? "var(--bg)" : "var(--faint)", padding: 12, borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}>Save</button>
+            </div>
+          </div>
+        ) : (
+          <div onClick={() => setEditingNote(true)} style={{ border: `1px ${live.notes ? "solid" : "dashed"} var(--border2)`, borderRadius: 14, padding: 16, cursor: "pointer", color: live.notes ? "var(--text2)" : "var(--sub)", fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+            {live.notes || "Tap to add a private note."}
+          </div>
+        )}
+
+        <div style={tabLabel}>From {firstName} — at booking</div>
+        {bookingNotes.length === 0 ? (
+          <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", padding: "0 4px" }}>Nothing yet — notes {firstName} adds when booking land here.</p>
+        ) : bookingNotes.map((a) => (
+          <div key={a.id} style={{ border: "1px solid var(--border)", borderRadius: 13, padding: "13px 14px", marginBottom: 8 }}>
+            <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5 }}>“{a.note}”</div>
+            <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 7 }}>Submitted when booking · {a.bookedFor ? niceDate(a.bookedFor) : ""}</div>
+          </div>
+        ))}
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={tabLabel}>Wrap-up notes</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: wrapNotes.length ? 12 : 0 }}>
+          <input value={tlDraft} onChange={(e) => setTlDraft(e.target.value)} placeholder="Add a post-visit note…" style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "11px 13px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+          <button onClick={addTimelineNote} disabled={!tlDraft.trim()} style={{ background: tlDraft.trim() ? "var(--text)" : "var(--panel2)", color: tlDraft.trim() ? "var(--bg)" : "var(--faint)", padding: "0 16px", borderRadius: 11, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>Add</button>
+        </div>
+        {wrapNotes.map((t) => (
+          <div key={t.id} style={{ border: "1px solid var(--border)", borderRadius: 13, padding: "13px 14px", marginBottom: 8, display: "flex", gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{t.text}</div>
+              <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 7 }}>{t.date ? niceDate(t.date) : ""}</div>
+            </div>
+            <button onClick={() => removeTimelineNote(t.id)} style={{ background: "none", border: "none", color: "var(--faint)", cursor: "pointer", flexShrink: 0 }}><X size={15} /></button>
+          </div>
+        ))}
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "22px 4px 10px" }}>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Photos</div>
+          <button onClick={() => setGalPicker(true)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}><Plus size={14} /> Add</button>
         </div>
         {gallery.length === 0 ? (
-          <button onClick={() => setGalPicker(true)} className="lift" style={{ width: "100%", background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 14, padding: "26px 16px", color: "var(--sub)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-            <Camera size={22} style={{ color: "var(--faint)" }} />
-            <span style={{ fontSize: 14.5 }}>No photos yet — add a shot of your work so you can both look back next time.</span>
-          </button>
+          <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", padding: "0 4px" }}>No photos yet.</p>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7 }}>
             {gallery.map((g) => (
-              <button key={g.id} className="lift" onClick={() => setLightbox(g.id)} style={{ position: "relative", padding: 0, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", aspectRatio: "1", background: "var(--panel2)" }}>
+              <button key={g.id} onClick={() => setLightbox(g.id)} style={{ position: "relative", padding: 0, borderRadius: 11, overflow: "hidden", border: "1px solid var(--line)", aspectRatio: "1", background: "#E4E4E1", cursor: "pointer" }}>
                 <img src={imgUrl(g.photo, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "10px 6px 4px", fontSize: 10.5, color: "#fff", textAlign: "left", background: "linear-gradient(to top, rgba(0,0,0,0.55), transparent)" }}>{niceDate(g.date)}</span>
+                {g.source === "client" && <span style={{ position: "absolute", left: 6, bottom: 6, fontSize: 7.5, letterSpacing: 0.8, background: "rgba(10,10,10,0.7)", color: "#fff", padding: "2px 5px", borderRadius: 5 }}>FROM CLIENT</span>}
               </button>
             ))}
           </div>
         )}
+        <div style={{ fontSize: 11.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 14, paddingLeft: 4 }}>Notes and photos a client adds when booking, plus anything you capture at wrap-up, land here automatically.</div>
       </div>}
 
-      {/* TIMELINE — dated notes + appointment history (Mangomint-style) */}
-      {pfTab === "timeline" && <div style={{ marginBottom: 28 }}>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>TIMELINE</div>
-        {/* add a dated note */}
-        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 14 }}>
-          <textarea value={tlDraft} onChange={(e) => setTlDraft(e.target.value)} placeholder="Add an entry — color formula, product used, what you discussed…" rows={2} style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", boxSizing: "border-box" }} />
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
-            <button className="lift" onClick={addTimelineNote} disabled={!tlDraft.trim()} style={{ background: tlDraft.trim() ? "var(--gold)" : "var(--panel)", color: tlDraft.trim() ? "var(--on-gold)" : "var(--faint)", padding: "8px 18px", borderRadius: 10, fontSize: 13.5, fontWeight: 600, letterSpacing: 0.5 }}>ADD</button>
-          </div>
-        </div>
-        {/* filter chips */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-          {[["all","All"],["appointments","Appointments"],["notes","Notes"]].map(([id, label]) => { const on = tlFilter === id; return (
-            <button key={id} onClick={() => setTlFilter(id)} style={{ background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "transparent", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: on ? "var(--gold)" : "var(--sub)", padding: "6px 14px", borderRadius: 20, fontSize: 13, fontWeight: on ? 600 : 400 }}>{label}</button>
-          ); })}
-        </div>
-        {/* feed */}
-        {feedFiltered.length === 0 ? (
-          <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "8px 2px" }}>Nothing here just yet.</p>
-        ) : (
-          <div style={{ display: "grid", gap: 10 }}>
-            {feedFiltered.map((f, i) => f.kind === "appt" ? (() => {
-              const isUpcoming = f.appt.bookedFor && new Date(f.appt.bookedFor).getTime() >= now && f.appt.status !== "cancelled" && f.appt.status !== "done";
-              const isCancelled = f.appt.status === "cancelled";
-              return (
-              <div key={"a"+f.appt.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", background: isUpcoming ? "color-mix(in srgb, var(--gold) 8%, var(--panel))" : "var(--panel)", border: `1px solid ${isUpcoming ? "color-mix(in srgb, var(--gold) 28%, var(--border))" : "var(--border)"}`, borderRadius: 12, padding: "12px 14px", opacity: isCancelled ? 0.55 : 1 }}>
-                <div style={{ width: 30, height: 30, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Calendar size={14} style={{ color: "var(--gold)" }} /></div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 14.5, fontWeight: 600, textDecoration: isCancelled ? "line-through" : "none" }}>{f.appt.title}</span>
-                    {isUpcoming && <span style={{ fontSize: 10, letterSpacing: 1, color: "var(--gold)", fontWeight: 700, background: "color-mix(in srgb, var(--gold) 16%, transparent)", padding: "2px 7px", borderRadius: 10 }}>UPCOMING</span>}
-                    {isCancelled && <span style={{ fontSize: 10, letterSpacing: 1, color: "var(--sub)", fontWeight: 600 }}>CANCELLED</span>}
-                  </div>
-                  <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{f.appt.bookedFor ? `${niceDate(f.appt.bookedFor)} · ` : ""}{fmtTime(f.appt.start)} – {fmtTime(f.appt.end)}{f.appt.detail ? ` · ${f.appt.detail}` : ""}</div>
-                </div>
-              </div>
-              );
-            })() : (
-              <div key={f.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", background: "color-mix(in srgb, var(--gold) 6%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 12, padding: "12px 14px" }}>
-                <div style={{ width: 30, height: 30, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 16%, var(--panel))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Edit2 size={13} style={{ color: "var(--gold)" }} /></div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, color: "var(--faint)", marginBottom: 3 }}>{niceDate(f.date)}</div>
-                  <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{f.text}</div>
-                </div>
-                <button onClick={() => removeTimelineNote(f.id)} style={{ background: "none", color: "var(--faint)", flexShrink: 0 }}><X size={15} /></button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Block from booking */}
-        <div style={{ marginTop: 26, paddingTop: 22, borderTop: "1px solid var(--line)" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 3, color: isBlocked ? "var(--danger, #c0392b)" : "var(--text)" }}>Block from booking</div>
-              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>{isBlocked ? "This client can't book online. They can still be added manually." : "Prevent this client from booking online."}</div>
-            </div>
-            <button onClick={() => { if (isBlocked) { unblock(); } else { setBlockPrompt(true); } }} style={{ width: 44, height: 26, borderRadius: 13, background: isBlocked ? "var(--danger, #c0392b)" : "var(--border)", position: "relative", flexShrink: 0, border: "none", padding: 0, marginTop: 2 }}><span style={{ position: "absolute", top: 3, left: isBlocked ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></button>
-          </div>
-          {isBlocked && live.blockReason && (
-            <div style={{ marginTop: 12, background: "color-mix(in srgb, #c0392b 8%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 30%, var(--border))", borderRadius: 12, padding: "12px 14px" }}>
-              <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--danger, #c0392b)", fontWeight: 600, marginBottom: 4 }}>REASON</div>
-              <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.45 }}>{live.blockReason}</div>
-            </div>
-          )}
-        </div>
-      </div>}
-
-      {/* Block reason prompt */}
-      <Sheet open={blockPrompt} onClose={() => setBlockPrompt(false)} align="top">
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 400, letterSpacing: "-0.4px", marginBottom: 6 }}>Block {live.name.split(" ")[0]}?</h2>
-        <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>They won't be able to book online. Add a reason for your records — only you'll see it.</p>
-        <textarea value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="e.g. Repeated no-shows, payment issue…" rows={3} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, lineHeight: 1.5, resize: "none", marginBottom: 16, boxSizing: "border-box" }} />
-        <button onClick={confirmBlock} disabled={!blockReason.trim()} style={{ width: "100%", background: blockReason.trim() ? "#c0392b" : "var(--border)", color: blockReason.trim() ? "#fff" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>BLOCK FROM BOOKING</button>
-        <button onClick={() => setBlockPrompt(false)} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 12, fontSize: 14, fontWeight: 500, borderRadius: 12, border: "none" }}>Cancel</button>
-      </Sheet>
-
-      {pfTab === "times" && <div style={{ marginBottom: 28 }}>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 12 }}>TIME &amp; PRICE</div>
-        <p style={{ fontSize: 15, color: "var(--sub)", marginBottom: 16, fontWeight: 300, lineHeight: 1.5 }}>Set how long {live.name.split(" ")[0]} actually takes and what you charge them for a service. Both override the default and apply automatically when {live.name.split(" ")[0]} books online.</p>
-
-        {/* service dropdown */}
-        <label style={{ fontSize: 14, color: "var(--faint)", display: "block", marginBottom: 6 }}>Service</label>
-        <div style={{ position: "relative", marginBottom: 14 }}>
-          <select value={selService} onChange={(e) => setSelService(e.target.value)} style={{ ...selectStyle, width: "100%", paddingRight: 38 }}>
-            {services.map((s) => <option key={s.id} value={s.id}>{s.name}{live.customDurations[s.id] != null ? "  ✓" : ""}</option>)}
-          </select>
-          <ChevronRight size={16} style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%) rotate(90deg)", color: "var(--faint)", pointerEvents: "none" }} />
-        </div>
-
-        {/* quick "need less / need more" relative to this service's default */}
-        {sel && (() => {
-          const base = sel.duration || 30;
-          const cur = selH * 60 + selM;
-          const quick = [["Less", Math.max(5, base - 15)], ["Default", base], ["More", base + 15], ["Even more", base + 30]];
-          return (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12.5, color: "var(--faint)", marginBottom: 8 }}>Default for this service is {fmtDur(base)}.</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {quick.map(([label, v]) => { const on = cur === v; return (
-                  <button key={label} onClick={() => { setSelH(Math.floor(v / 60)); setSelM(v % 60); }} style={{ padding: "9px 14px", borderRadius: 10, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", color: on ? "var(--gold)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{label} <span style={{ opacity: 0.7 }}>· {fmtDur(v)}</span></button>
-                ); })}
-              </div>
-            </div>
-          );
-        })()}
-        <label style={{ fontSize: 14, color: "var(--faint)", display: "block", marginBottom: 6 }}>Or set it exactly</label>
-        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-          <div style={{ position: "relative", flex: 1 }}>
-            <select value={selH} onChange={(e) => setSelH(parseInt(e.target.value))} style={{ ...selectStyle, width: "100%", paddingRight: 38 }}>
-              {[0, 1, 2, 3].map((h) => <option key={h} value={h}>{h} hr</option>)}
-            </select>
-            <ChevronRight size={16} style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%) rotate(90deg)", color: "var(--faint)", pointerEvents: "none" }} />
-          </div>
-          <div style={{ position: "relative", flex: 1 }}>
-            <select value={selM} onChange={(e) => setSelM(parseInt(e.target.value))} style={{ ...selectStyle, width: "100%", paddingRight: 38 }}>
-              {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => <option key={m} value={m}>{m} min</option>)}
-            </select>
-            <ChevronRight size={16} style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%) rotate(90deg)", color: "var(--faint)", pointerEvents: "none" }} />
-          </div>
-        </div>
-
-        <label style={{ fontSize: 14, color: "var(--faint)", display: "block", marginBottom: 6 }}>Price for {live.name.split(" ")[0]}</label>
-        <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)", marginBottom: 18 }}>
-          <span style={{ padding: "0 0 0 15px", color: "var(--sub)", fontSize: 16 }}>$</span>
-          <input value={selPrice} onChange={(e) => setSelPrice(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "13px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
-          <span style={{ padding: "0 15px 0 0", color: "var(--faint)", fontSize: 12.5, whiteSpace: "nowrap" }}>default ${sel?.price ?? 0}</span>
-        </div>
-
-        <button className="lift" onClick={saveDuration} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, borderRadius: 8, fontSize: 14, fontWeight: 600, letterSpacing: 0.5, marginBottom: 18 }}>Save time and price</button>
-
-        {/* what's already customized */}
-        {customList.length > 0 && (
-          <div>
-            <div style={{ fontSize: 13, letterSpacing: 1, color: "var(--faint)", marginBottom: 8 }}>CUSTOM TIME &amp; PRICE SET</div>
-            <div style={{ display: "grid", gap: 8 }}>
-              {customList.map((s) => (
-                <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "11px 14px" }}>
-                  <span style={{ fontSize: 14 }}>{s.name}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ fontSize: 14, color: "var(--gold)", fontWeight: 600 }}>{fmtDur(live.customDurations[s.id] != null ? live.customDurations[s.id] : s.duration)}{(live.customPrices || {})[s.id] != null ? ` · $${live.customPrices[s.id]}` : ""}</span>
-                    <button onClick={() => clearDuration(s.id)} style={{ background: "none", color: "var(--faint)", display: "flex", alignItems: "center" }}><X size={15} /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p style={{ fontSize: 14, color: "var(--faint)", marginTop: 8, fontWeight: 300 }}>Everything else uses the menu default. Tap ✕ to revert one.</p>
-          </div>
-        )}
-      </div>}
-
-      {/* FAMILY TAB */}
+      {/* ============ FAMILY ============ */}
       {pfTab === "family" && !openMember && (
-        <div style={{ marginBottom: 28 }}>
-          <p style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 16, fontWeight: 300, lineHeight: 1.5 }}>People linked to {live.name.split(" ")[0]}'s account. Each keeps their own times, notes, and photos.</p>
-          {family.length === 0 && <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", marginBottom: 14 }}>No family members yet.</p>}
-          <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
-            {family.map((m) => (
-              <button key={m.id} className="lift" onClick={() => setOpenMember(m.id)} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", textAlign: "left", color: "var(--text)" }}>
-                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--panel2)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 17, flexShrink: 0 }}>{m.name.charAt(0)}</div>
-                <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15 }}>{m.name}</div>{m.note && <div style={{ fontSize: 13, color: "var(--sub)" }}>{m.note}</div>}</div>
-                <ChevronRight size={16} style={{ color: "var(--faint)" }} />
+        <div style={{ paddingBottom: 24, paddingTop: 8 }}>
+          <p style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 14, lineHeight: 1.5 }}>People linked to {firstName}'s account. Each keeps their own times, notes, and photos.</p>
+          <div style={cardStyle}>
+            {family.map((m, i) => (
+              <button key={m.id} onClick={() => setOpenMember(m.id)} style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 18px", borderTop: i === 0 ? "none" : "1px solid var(--line)", width: "100%", background: "none", border: "none", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
+                <span style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 15, flexShrink: 0 }}>{m.name.charAt(0)}</span>
+                <span style={{ flex: 1 }}><b style={{ display: "block", fontWeight: 500, fontSize: 14.5 }}>{m.name}</b>{m.note && <span style={{ fontSize: 12, color: "var(--sub)" }}>{m.note}</span>}</span>
+                {chev}
               </button>
             ))}
+            <button onClick={() => setAddMemberOpen(true)} style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 18px", borderTop: family.length ? "1px solid var(--line)" : "none", width: "100%", background: "none", border: "none", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
+              <span style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 18, color: "var(--sub)", flexShrink: 0 }}>+</span>
+              <span style={{ flex: 1 }}><b style={{ display: "block", fontWeight: 500, fontSize: 14.5 }}>Add someone</b><span style={{ fontSize: 12, color: "var(--sub)" }}>Kids, partner, siblings</span></span>
+              {chev}
+            </button>
           </div>
-          {addMemberOpen ? (
-            <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
-              <input autoFocus value={mName} onChange={(e) => setMName(e.target.value)} placeholder="First name" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", marginBottom: 10 }} />
-              <input value={mNote} onChange={(e) => setMNote(e.target.value)} placeholder="Note (e.g. son, age 8)" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", marginBottom: 12 }} />
-              <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => { setAddMemberOpen(false); setMName(""); setMNote(""); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 11, borderRadius: 10, fontSize: 14 }}>Cancel</button>
-                <button className="lift" onClick={addFamilyMember} disabled={!mName.trim()} style={{ flex: 1, background: mName.trim() ? "var(--gold)" : "var(--panel)", color: mName.trim() ? "var(--on-gold)" : "var(--faint)", padding: 11, borderRadius: 10, fontSize: 14, fontWeight: 600 }}>Add</button>
-              </div>
-            </div>
-          ) : (
-            <button onClick={() => setAddMemberOpen(true)} className="lift" style={{ width: "100%", background: "transparent", boxShadow: "none", border: "1px dashed var(--border2)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add family member</button>
-          )}
+          <Sheet open={addMemberOpen} onClose={() => setAddMemberOpen(false)} align="center" maxWidth={420}>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 14 }}>Add someone</h2>
+            <input autoFocus value={mName} onChange={(e) => setMName(e.target.value)} placeholder="First name" style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", marginBottom: 10 }} />
+            <input value={mNote} onChange={(e) => setMNote(e.target.value)} placeholder="Note (e.g. son, age 8)" style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", marginBottom: 14 }} />
+            <button onClick={addFamilyMember} disabled={!mName.trim()} style={{ width: "100%", background: mName.trim() ? "var(--text)" : "var(--panel2)", color: mName.trim() ? "var(--bg)" : "var(--faint)", padding: 14, borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}>Add</button>
+          </Sheet>
         </div>
       )}
 
-      {/* FAMILY MEMBER MINI-PROFILE */}
       {pfTab === "family" && openMember && (() => {
         const m = family.find((x) => x.id === openMember);
         if (!m) { setOpenMember(null); return null; }
         const setMember = (patch) => setClients(clients.map((c) => c.id === live.id ? { ...c, family: (c.family || []).map((fm) => fm.id === m.id ? { ...fm, ...patch } : fm) } : c));
+        const mh = (appts || []).filter((a) => a.familyMemberId === m.id && a.serviceId && a.status !== "block");
         return (
-          <div style={{ marginBottom: 28 }}>
-            <button onClick={() => setOpenMember(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={15} /> Back to family</button>
+          <div style={{ paddingBottom: 24, paddingTop: 8 }}>
+            <button onClick={() => setOpenMember(null)} style={{ background: "none", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14, marginBottom: 18, cursor: "pointer" }}><ArrowLeft size={15} /> Back to family</button>
             <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 20 }}>
-              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--panel2)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 20, flexShrink: 0 }}>{m.name.charAt(0)}</div>
+              <div style={{ width: 48, height: 48, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 20, flexShrink: 0 }}>{m.name.charAt(0)}</div>
               <div><div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{m.name}</div>{m.note && <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{m.note}</div>}</div>
             </div>
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>NOTE</div>
-            <textarea value={m.note || ""} onChange={(e) => setMember({ note: e.target.value })} placeholder="Anything to remember about this person…" rows={3} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", boxSizing: "border-box", marginBottom: 22 }} />
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 10 }}>PHOTOS</div>
-            {(m.gallery || []).length === 0 ? (
-              <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", marginBottom: 22 }}>No photos yet for {m.name}.</p>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 22 }}>
-                {(m.gallery || []).map((g) => (
-                  <div key={g.id} style={{ aspectRatio: "1", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)" }}><img src={imgUrl(g.photo, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
-                ))}
-              </div>
+            <div style={tabLabel}>Note</div>
+            <textarea value={m.note || ""} onChange={(e) => setMember({ note: e.target.value })} placeholder="Anything to remember about this person…" rows={3} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", boxSizing: "border-box" }} />
+            <div style={tabLabel}>Visit history</div>
+            {mh.length === 0 ? <p style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic" }}>No visits just yet.</p> : (
+              <div style={cardStyle}>{mh.map((a, i) => (<div key={a.id} style={{ padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}><div style={{ fontSize: 14.5 }}>{a.title}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{fmtTime(a.start)} – {fmtTime(a.end)}</div></div>))}</div>
             )}
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 8 }}>VISIT HISTORY</div>
-            {(() => { const mh = (appts || []).filter((a) => a.familyMemberId === m.id && a.serviceId && a.status !== "block"); return mh.length === 0
-              ? <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", marginBottom: 22 }}>No visits just yet — their story starts here.</p>
-              : <div style={{ display: "grid", gap: 8, marginBottom: 22 }}>{mh.map((a) => (<div key={a.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 14px" }}><div style={{ fontSize: 14.5 }}>{a.title}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{fmtTime(a.start)} – {fmtTime(a.end)}</div></div>))}</div>; })()}
-            <button onClick={() => removeFamilyMember(m.id)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Trash2 size={16} /> Remove {m.name}</button>
+            <button onClick={() => removeFamilyMember(m.id)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 22, cursor: "pointer" }}><Trash2 size={16} /> Remove {m.name}</button>
           </div>
         );
       })()}
+
+      {/* ============ LIGHTBOX ============ */}
+      {lightbox && (() => { const g = gallery.find((x) => x.id === lightbox); if (!g) return null; return (
+        <Sheet open onClose={() => setLightbox(null)} align="center" maxWidth={560}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22 }}>{niceDate(g.date)}{g.source === "client" ? " · from client" : ""}</div>
+            <button onClick={() => setLightbox(null)} style={{ background: "none", border: "none", color: "var(--sub)", cursor: "pointer" }}><X size={22} /></button>
+          </div>
+          <img src={imgUrl(g.photo, 800)} alt="" style={{ width: "100%", borderRadius: 14, marginBottom: 14, display: "block" }} />
+          <input value={g.note || ""} onChange={(e) => setGalleryNote(g.id, e.target.value)} placeholder="Add a note…" style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", marginBottom: 12 }} />
+          <button onClick={() => removeGalleryPhoto(g.id)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer" }}><Trash2 size={16} /> Remove from gallery</button>
+        </Sheet>
+      ); })()}
+
+      {/* ============ KEBAB MENU ============ */}
+      <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} align="center" maxWidth={380}>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 14 }}>{live.name}</h2>
+        <button onClick={() => { setMenuOpen(false); if (isBlocked) unblock(); else setBlockPrompt(true); }} style={{ width: "100%", textAlign: "left", background: "none", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", fontSize: 15, color: isBlocked ? "var(--text)" : "#c0392b", fontFamily: FONT_BODY, cursor: "pointer" }}>{isBlocked ? "Unblock from booking" : "Block from booking"}</button>
+        {isBlocked && live.blockReason && <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 10, lineHeight: 1.45 }}>Reason: {live.blockReason}</p>}
+      </Sheet>
+      <Sheet open={blockPrompt} onClose={() => setBlockPrompt(false)} align="center" maxWidth={420}>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Block {firstName}?</h2>
+        <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>They won't be able to book online. Add a reason for your records — only you'll see it.</p>
+        <textarea value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="e.g. Repeated no-shows, payment issue…" rows={3} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, lineHeight: 1.5, resize: "none", marginBottom: 16, boxSizing: "border-box" }} />
+        <button onClick={confirmBlock} disabled={!blockReason.trim()} style={{ width: "100%", background: blockReason.trim() ? "#c0392b" : "var(--border)", color: blockReason.trim() ? "#fff" : "var(--faint)", padding: 15, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", cursor: "pointer" }}>BLOCK FROM BOOKING</button>
+      </Sheet>
+
+      {/* ============ APPOINTMENT DETAIL ============ */}
+      {detail && (() => {
+        const a = myAppts.find((x) => x.id === detail.appt.id) || detail.appt;
+        const svc = services.find((s) => s.id === a.serviceId);
+        const el = elapsedMin(a);
+        const bookedDur = (a.end - a.start) || (svc ? svc.duration : 0);
+        const customDur = (live.customDurations || {})[a.serviceId] != null;
+        const customPrice = (live.customPrices || {})[a.serviceId] != null;
+        const apptPrice = a.price != null ? a.price : (svc ? getPrice(svc, a.providerId) : 0);
+        return (
+          <Sheet open onClose={() => setDetail(null)} align="center" maxWidth={440}>
+            <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{detail.mode === "up" ? `Upcoming · ${daysFromNow(a.bookedFor)}` : `Past visit · ${niceDateFull(a.bookedFor)}`}</div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, letterSpacing: "-0.4px", marginTop: 8 }}>{detail.mode === "up" ? `${niceDateFull(a.bookedFor)} · ${fmtTime(a.start)}` : a.title}</h2>
+            <div style={{ color: "var(--text2)", fontSize: 14, marginTop: 6 }}>{detail.mode === "up" ? `${a.title} · with ${provName(a)}` : `with ${provName(a)}`}</div>
+
+            {detail.mode === "past" && el != null && (
+              <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 16, marginTop: 18, textAlign: "center" }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500 }}>{el} <span style={{ fontStyle: "normal", fontSize: 15, color: "var(--sub)" }}>min</span></div>
+                <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 6 }}>This visit ran {el} minutes — in {fmtClock(a.serviceStartedAt)}, out {fmtClock(a.serviceEndedAt)}</div>
+              </div>
+            )}
+
+            <div style={{ marginTop: 18 }}>
+              {detail.mode === "up" ? (<>
+                {drow("Duration", <span>{fmtDur(bookedDur)}{customDur && <span style={{ color: "var(--faint)", fontWeight: 400 }}> ({firstName}'s time)</span>}</span>)}
+                {drow("Price", <span>${apptPrice}{customPrice && <span style={{ color: "var(--faint)", fontWeight: 400 }}> ({firstName}'s price)</span>}</span>)}
+                {drow("Status", a.status === "in-service" ? "In service" : a.status === "checked-in" ? "In lobby" : "Confirmed")}
+              </>) : (<>
+                {drow("Booked for", fmtDur(bookedDur))}
+                {el != null && drow("Actual time", `${el} min`)}
+                {drow("Paid", <button onClick={() => { setDetail(null); setTxnAppt(a); }} style={{ background: "none", border: "none", padding: 0, color: "var(--text)", fontWeight: 600, borderBottom: "1.5px solid var(--text)", cursor: "pointer", fontSize: 14 }}>{money0(paidForAppt(a))} ›</button>)}
+              </>)}
+            </div>
+
+            {(a.note || "").trim() && (
+              <div style={{ background: "var(--panel2)", borderRadius: 12, padding: "13px 14px", marginTop: 14 }}>
+                <div style={{ fontSize: 9.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Client's booking note</div>
+                <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, marginTop: 6 }}>“{a.note}”</div>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              {detail.mode === "up" ? (<>
+                <button onClick={() => setResched({ id: a.id, date: new Date(a.bookedFor), start: a.start })} style={sheetGhost}>Reschedule</button>
+                <button onClick={() => cancelAppt(a)} style={sheetGhost}>Cancel</button>
+                <button onClick={() => checkInAppt(a)} style={sheetPrimary}>Check in</button>
+              </>) : (
+                <button onClick={() => { setDetail(null); setGalPicker(true); }} style={sheetGhost}>Add photo</button>
+              )}
+            </div>
+          </Sheet>
+        );
+      })()}
+
+      {/* ============ RESCHEDULE ============ */}
+      {resched && (() => {
+        const a = myAppts.find((x) => x.id === resched.id); if (!a) return null;
+        const dur = Math.max(5, (a.end - a.start) || 30);
+        const stepDay = (n) => setResched((r) => { const d = new Date(r.date); d.setDate(d.getDate() + n); return { ...r, date: d }; });
+        const conflict = reschedClashes(a.id, resched.date, resched.start);
+        return (
+          <Sheet open onClose={() => setResched(null)} align="center" maxWidth={420}>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 4 }}>Reschedule</h2>
+            <p style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 16 }}>{a.title} · {firstName}</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", marginBottom: 12 }}>
+              <button onClick={() => stepDay(-1)} style={{ background: "none", border: "none", color: "var(--sub)", cursor: "pointer", padding: 6 }}><ChevronLeft size={18} /></button>
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16 }}>{niceDateFull(resched.date.toISOString())}</span>
+              <button onClick={() => stepDay(1)} style={{ background: "none", border: "none", color: "var(--sub)", cursor: "pointer", padding: 6 }}><ChevronRight size={18} /></button>
+            </div>
+            <div style={{ marginBottom: 12 }}><TimeScrollPicker value={resched.start} onChange={(v) => setResched((r) => ({ ...r, start: v }))} step={15} label="Start time" full /></div>
+            {conflict && <p style={{ fontSize: 12.5, color: "#c0392b", marginBottom: 12 }}>{provName(a)} already has a booking overlapping this time. Pick a free slot to move it.</p>}
+            <button onClick={saveReschedule} disabled={conflict} style={{ ...sheetPrimary, opacity: conflict ? 0.4 : 1, cursor: conflict ? "not-allowed" : "pointer" }}>Move appointment</button>
+            <button onClick={() => setResched(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14, padding: "12px 0 2px", marginTop: 4, cursor: "pointer" }}>Cancel</button>
+          </Sheet>
+        );
+      })()}
+
+      {/* ============ TRANSACTION ============ */}
+      {txnAppt && (() => {
+        const a = myAppts.find((x) => x.id === txnAppt.id) || txnAppt;
+        const recs = recsFor(a);
+        const rec = recs[0] || null;
+        const total = paidForAppt(a);
+        const tip = rec ? (rec.tip || 0) : ((a.paid && a.paid.tip) || 0);
+        const subtotal = Math.max(0, +(total - tip).toFixed(2));
+        const svc = services.find((s) => s.id === a.serviceId);
+        const refunded = recs.reduce((s, r) => s + (r.refunded || 0), 0);
+        const status = refunded > 0 ? (refunded >= recs.reduce((s, r) => s + (r.amount || 0), 0) ? "Refunded" : "Partial refund") : (total > 0 ? "Succeeded" : "Unpaid");
+        const pi = rec && rec.paymentIntentId;
+        const method = rec ? (rec.method === "cash" ? "Cash" : rec.last4 ? `${rec.brand || "Card"} ··${rec.last4}` : "Card") : "—";
+        return (
+          <Sheet open onClose={() => setTxnAppt(null)} align="center" maxWidth={440}>
+            <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Transaction{a.bookedFor ? ` · ${niceDate(a.bookedFor)}` : ""}</div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginTop: 8 }}>{money0(total)}</h2>
+            <div style={{ color: "var(--text2)", fontSize: 14, marginTop: 6 }}>Paid on {method}</div>
+            <div style={{ marginTop: 18 }}>
+              {drow(svc ? svc.name : "Service", money0(subtotal))}
+              {tip > 0 && drow("Tip", money0(tip))}
+              {refunded > 0 && drow("Refunded", "-" + money0(refunded))}
+              {drow("Total charged", money0(total))}
+              {drow("Status", status)}
+            </div>
+            {pi && (
+              <a href={`https://dashboard.stripe.com/payments/${pi}`} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--line)", borderRadius: 11, padding: "11px 13px", marginTop: 16, fontSize: 12.5, color: "var(--sub)", textDecoration: "none" }}>
+                <CreditCard size={14} /> Stripe · <b style={{ color: "var(--text)", fontWeight: 500 }}>{pi.length > 14 ? pi.slice(0, 11) + "…" : pi}</b> · <span style={{ textDecoration: "underline" }}>Open in Stripe</span>
+              </a>
+            )}
+            <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+              <button onClick={() => { setTxnAppt(null); setDetail({ appt: a, mode: "past" }); }} style={sheetGhost}>‹ Back</button>
+              <button onClick={() => { setTxnAppt(null); setCheckout({ ...a, __reopen: true }); }} style={sheetPrimary}>Charge more</button>
+            </div>
+            {(rec || total > 0) && <div style={{ display: "flex", marginTop: 10 }}><button onClick={() => { setTxnAppt(null); setRefundAppt(a); }} style={{ ...sheetGhost, color: "#c0392b", borderColor: "#c0392b" }}>Refund…</button></div>}
+            <div style={{ fontSize: 11.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 12 }}>"Charge more" reopens the ticket for anything not rung up. "Refund" returns the full amount or a partial — both run through Stripe.</div>
+          </Sheet>
+        );
+      })()}
+
+      {/* ============ MONEY ENGINES (reused) ============ */}
+      {refundAppt && (
+        <ApptRefundSheet appt={refundAppt} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} showToast={showToast} onClose={() => setRefundAppt(null)} />
+      )}
+      {checkout && (
+        <Checkout
+          appt={checkout}
+          service={services.find((s) => s.id === checkout.serviceId)}
+          provider={providers.find((p) => p.id === checkout.providerId)}
+          business={business}
+          setBusiness={setBusiness}
+          allServices={services}
+          reopen={!!checkout.__reopen}
+          alreadyPaid={checkout.__reopen ? +paidForAppt(checkout).toFixed(2) : 0}
+          clients={clients}
+          appts={appts}
+          setClients={setClients}
+          showToast={showToast}
+          onClose={() => setCheckout(null)}
+          onDone={finishCheckoutLite}
+        />
+      )}
     </div>
   );
 }
