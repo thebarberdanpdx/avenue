@@ -15549,7 +15549,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     }
   }, []);
 
-  const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts(appts.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } setTimeout(() => handleFreedSlot(freed), 350); } };
+  const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts((cur) => cur.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } setTimeout(() => handleFreedSlot(freed), 350); } };
   // open checkout instead of silently completing
   const startCheckout = (appt, opts) => { setOpen(null); setCheckout(opts && opts.reopen ? { ...appt, __reopen: true } : appt); };
   const [refundAppt, setRefundAppt] = useState(null); // appt whose payment is being refunded from the appointment sheet
@@ -15831,7 +15831,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const commitMove = (p) => {
     const bf = new Date(p.appt.bookedFor); bf.setHours(Math.floor(p.newStart / 60), p.newStart % 60, 0, 0);
     const moved = { ...p.appt, start: p.newStart, end: p.newEnd, bookedFor: bf.toISOString() };
-    setAppts(appts.map((a) => a.id === p.appt.id ? moved : a));
+    // Functional updater: apply the move to the CURRENT appts, not the stale closure snapshot —
+    // otherwise a concurrent live-sync refetch could land on top and make the move "not take"
+    // until a later retry. This was the drag-to-reschedule-needs-a-few-tries bug.
+    setAppts((cur) => cur.map((a) => a.id === p.appt.id ? { ...a, start: p.newStart, end: p.newEnd, bookedFor: bf.toISOString() } : a));
     if (notifyMove) { const _cl = (clients || []).find((c) => c.id === p.appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: moved, business, providers, contact: { email: _cl.email || "", phone: p.appt.phone || _cl.phone || "" } }); }
     fireStaffPush({ shopId, title: "Appointment moved", appt: moved });
     showToast(notifyMove ? `${p.appt.name} moved — client notified.` : `${p.appt.name} moved to ${fmtTime(p.newStart)}.`);
