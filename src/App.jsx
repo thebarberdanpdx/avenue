@@ -1646,11 +1646,15 @@ function App() {
   }, [session]);
 
   useEffect(() => { if (!loadedRef.current || !session) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories, _cutLibrary: cutLibrary } }).then(({ error }) => { if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false); }); }, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
-  useEffect(() => { if (!loadedRef.current || !session) return; if (clients === lastRemoteRef.current.clients) return; const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
-  useEffect(() => { if (!loadedRef.current || !session) return; if (appts === lastRemoteRef.current.appointments) return; const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
-  useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
-  useEffect(() => { if (!loadedRef.current || !session) return; if (services === lastRemoteRef.current.services) return; const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
-  useEffect(() => { if (!loadedRef.current || !session) return; if (providers === lastRemoteRef.current.providers) return; providersDirtyRef.current = true; const t = setTimeout(() => { syncList('providers', providers).finally(() => { providersDirtyRef.current = false; }); }, 800); return () => clearTimeout(t); }, [providers]);
+  // Stamp lastSaveAt the moment a LOCAL edit happens (this runs only for local changes — a
+  // live-sync refetch sets state === lastRemoteRef, so it returns above). This suppresses the
+  // realtime refetch during the ~800ms debounce BEFORE the save lands, so an incoming echo can't
+  // re-pull stale server data and stomp the optimistic edit (the drag-reschedule "didn't take" bug).
+  useEffect(() => { if (!loadedRef.current || !session) return; if (clients === lastRemoteRef.current.clients) return; lastSaveAt.current.clients = Date.now(); const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (appts === lastRemoteRef.current.appointments) return; lastSaveAt.current.appointments = Date.now(); const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; lastSaveAt.current.waitlist = Date.now(); const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (services === lastRemoteRef.current.services) return; lastSaveAt.current.services = Date.now(); const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (providers === lastRemoteRef.current.providers) return; lastSaveAt.current.providers = Date.now(); providersDirtyRef.current = true; const t = setTimeout(() => { syncList('providers', providers).finally(() => { providersDirtyRef.current = false; }); }, 800); return () => clearTimeout(t); }, [providers]);
 
   // Retry: re-push everything currently in memory (used by the failed-save banner's Retry button).
   const resaveAll = () => {
