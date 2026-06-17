@@ -2595,6 +2595,38 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [matched, setMatched] = useState(null);
   const [myAppts, setMyAppts] = useState([]); // a verified returning client's OWN bookings (via get_client_appointments) — RLS-safe; replaces reading the full appts list
   const [showHome, setShowHome] = useState(false); // logged-in returning client's home (their info, next/recent visits, family) — the landing after verify + return-to after booking
+  // ── Stay logged in ──────────────────────────────────────────────────────────
+  // Persist a verified returning client for this shop so they stay logged in across
+  // reloads AND any in-session remounts (the booking flow remounts via clientNonce).
+  // Restored on mount → lands them on their home; synced whenever `matched` changes;
+  // cleared on sign-out. Skipped for staff, who use the dashboard, not a client session.
+  const _clientKey = "vero_client_" + shopId;
+  const _didInitClient = useRef(false);
+  useEffect(() => {
+    if (isStaff) return;
+    let alive = true;
+    try {
+      const raw = localStorage.getItem(_clientKey);
+      if (raw) {
+        const c = JSON.parse(raw);
+        if (c && c.id) {
+          setMatched(c); setShowHome(true);
+          supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: c.id })
+            .then(({ data }) => { if (alive) setMyAppts(Array.isArray(data) ? data : []); })
+            .catch(() => {});
+        }
+      }
+    } catch (e) {}
+    return () => { alive = false; };
+  }, []);
+  useEffect(() => {
+    if (isStaff) return;
+    if (!_didInitClient.current) { _didInitClient.current = true; return; } // first pass is the restore above
+    try {
+      if (matched && matched.id) localStorage.setItem(_clientKey, JSON.stringify(matched));
+      else localStorage.removeItem(_clientKey);
+    } catch (e) {}
+  }, [matched]);
   const [showAllVisits, setShowAllVisits] = useState(false); // expand the recent-visits list on the home
   const [homeAction, setHomeAction] = useState(null); // { type: "cancel" | "reschedule", appt, person } — confirm sheet on the home next-visit card
   const [reschedPrev, setReschedPrev] = useState(null); // when set, the just-completed booking is a home reschedule of THIS appt → owner push shows old → new instead of "new booking"
@@ -3430,9 +3462,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <span className="wel-ar">&#8594;</span>
               </button>
             </div>
-            {onManage && (
-              <button onClick={() => onManage()} style={{ width: "100%", background: "transparent", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13.5, letterSpacing: 0.3, textAlign: "center", padding: "26px 0 2px", marginTop: 8, cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--faint)", textUnderlineOffset: 4 }}>Manage my appointment</button>
-            )}
           </div>
         )}
 
