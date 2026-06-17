@@ -8704,6 +8704,37 @@ function Toast({ msg, onDone }) {
   );
 }
 
+// Premium confirm dialog: scrim fades in, card springs up + scales in, and on close it eases
+// back out before unmounting (real enter AND exit — the old fade-in modals had neither). Keeps
+// the last content during the exit window so child data can clear without flashing/erroring.
+function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
+  const [mounted, setMounted] = useState(open);
+  const [shown, setShown] = useState(false);
+  const lastRef = useRef(children);
+  if (open) lastRef.current = children;
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      const r = requestAnimationFrame(() => setShown(true));
+      return () => cancelAnimationFrame(r);
+    }
+    if (mounted) {
+      setShown(false);
+      const t = setTimeout(() => setMounted(false), 300);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+  if (!mounted) return null;
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 900, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box", opacity: shown ? 1 : 0, transition: "opacity 0.28s ease", WebkitBackdropFilter: shown ? "blur(2px)" : "none", backdropFilter: shown ? "blur(2px)" : "none" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth, maxHeight: "85vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 24, boxShadow: "0 1px 2px rgba(0,0,0,0.06), 0 28px 64px -14px rgba(0,0,0,0.34)", transform: shown ? "translateY(0) scale(1)" : "translateY(20px) scale(0.94)", opacity: shown ? 1 : 0, transition: "transform 0.46s cubic-bezier(0.34,1.56,0.64,1), opacity 0.28s ease", willChange: "transform, opacity" }}>
+        {open ? children : lastRef.current}
+      </div>
+    </div>,
+    typeof document !== "undefined" ? document.body : null
+  );
+}
+
 function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled }) {
   const [tab, setTab] = useState("pulse");
   const [rebookSeed, setRebookSeed] = useState(null); // { clientId, serviceId, providerId } → opens the new-appointment form prefilled on the calendar
@@ -16496,111 +16527,102 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
       {/* drag-to-move confirmation — pinned so it's always visible on drop */}
       {/* WAITLIST MATCH — a freed slot matches waitlisted clients; confirm to notify */}
-      {waitlistMatch && createPortal((
-        <div className="fade-in" onClick={() => setWaitlistMatch(null)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, maxHeight: "85vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}><Bell size={20} style={{ color: "var(--gold)" }} /><div style={{ fontFamily: "'Fraunces', serif", fontSize: 22 }}>A slot just opened</div></div>
-            <div style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 18, lineHeight: 1.45 }}>{fmtTime(waitlistMatch.freed.start)} – {fmtTime(waitlistMatch.freed.end)} is now free. {wlRules.order === "longest" ? "Offer it to the longest-waiting match first?" : `These waitlisted client${waitlistMatch.matches.length > 1 ? "s" : ""} asked for this window — notify them with a link to book?`}</div>
-            <div style={{ display: "grid", gap: 8, marginBottom: 18 }}>
-              {waitlistMatch.matches.map((m, i) => {
-                const queued = wlRules.order === "longest" && i > 0;
-                return (
-                <div key={m.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: `1px solid ${queued ? "var(--border)" : "var(--gold)"}`, borderRadius: 12, padding: "11px 14px", opacity: queued ? 0.6 : 1 }}>
-                  <div><div style={{ fontSize: 15, fontWeight: 600 }}>{m.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{m.service}{m.provider ? ` · ${m.provider}` : ""}</div></div>
-                  {wlRules.order === "longest"
-                    ? (i === 0 ? <span style={{ fontSize: 12, fontWeight: 600, color: "var(--gold)" }}>FIRST UP</span> : <span style={{ fontSize: 12, color: "var(--faint)" }}>in {(wlRules.delayMin || 30) * i} min</span>)
-                    : <Check size={16} style={{ color: "var(--gold)" }} />}
-                </div>
-              ); })}
-            </div>
-            <button className="lift" onClick={() => sendWaitlistNotices(waitlistMatch.matches, waitlistMatch.freed)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Bell size={17} /> {wlRules.order === "longest" ? `Notify ${waitlistMatch.matches[0].name.split(" ")[0]}` : `Notify ${waitlistMatch.matches.length > 1 ? `all ${waitlistMatch.matches.length}` : waitlistMatch.matches[0].name.split(" ")[0]}`}</button>
-            <button onClick={() => setWaitlistMatch(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "10px 0 2px" }}>Not now</button>
+      <ConfirmModal open={!!waitlistMatch} onClose={() => setWaitlistMatch(null)} maxWidth={440}>
+        {waitlistMatch && (<>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}><Bell size={20} style={{ color: "var(--gold)" }} /><div style={{ fontFamily: "'Fraunces', serif", fontSize: 22 }}>A slot just opened</div></div>
+          <div style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 18, lineHeight: 1.45 }}>{fmtTime(waitlistMatch.freed.start)} – {fmtTime(waitlistMatch.freed.end)} is now free. {wlRules.order === "longest" ? "Offer it to the longest-waiting match first?" : `These waitlisted client${waitlistMatch.matches.length > 1 ? "s" : ""} asked for this window — notify them with a link to book?`}</div>
+          <div style={{ display: "grid", gap: 8, marginBottom: 18 }}>
+            {waitlistMatch.matches.map((m, i) => {
+              const queued = wlRules.order === "longest" && i > 0;
+              return (
+              <div key={m.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: `1px solid ${queued ? "var(--border)" : "var(--gold)"}`, borderRadius: 12, padding: "11px 14px", opacity: queued ? 0.6 : 1 }}>
+                <div><div style={{ fontSize: 15, fontWeight: 600 }}>{m.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{m.service}{m.provider ? ` · ${m.provider}` : ""}</div></div>
+                {wlRules.order === "longest"
+                  ? (i === 0 ? <span style={{ fontSize: 12, fontWeight: 600, color: "var(--gold)" }}>FIRST UP</span> : <span style={{ fontSize: 12, color: "var(--faint)" }}>in {(wlRules.delayMin || 30) * i} min</span>)
+                  : <Check size={16} style={{ color: "var(--gold)" }} />}
+              </div>
+            ); })}
           </div>
-        </div>
-      ), document.body)}
+          <button className="lift" onClick={() => sendWaitlistNotices(waitlistMatch.matches, waitlistMatch.freed)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Bell size={17} /> {wlRules.order === "longest" ? `Notify ${waitlistMatch.matches[0].name.split(" ")[0]}` : `Notify ${waitlistMatch.matches.length > 1 ? `all ${waitlistMatch.matches.length}` : waitlistMatch.matches[0].name.split(" ")[0]}`}</button>
+          <button onClick={() => setWaitlistMatch(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "10px 0 2px" }}>Not now</button>
+        </>)}
+      </ConfirmModal>
 
-      {pending && createPortal((
-        <>
-          <div className="fade-in" onClick={() => { setPending(null); setNotifyMove(false); }} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 55 }} />
-          <div className="fade-in" style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 56, boxSizing: "border-box", pointerEvents: "none" }}>
-            <div style={{ pointerEvents: "auto", width: "100%", maxWidth: 400, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, textAlign: "center", boxShadow: "0 18px 50px var(--shadow)" }}>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, marginBottom: 6 }}>Move appointment?</div>
-              <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, fontWeight: 300, marginBottom: 4 }}>{pending.appt.name} — {pending.appt.title}</div>
-              <div style={{ fontSize: 15, color: "var(--sub)", marginBottom: 18 }}>
-                <span style={{ textDecoration: "line-through", opacity: 0.6 }}>{fmtTime(pending.appt.start)}</span>
-                <span style={{ margin: "0 8px", color: "var(--gold)" }}>→</span>
-                <span style={{ color: "var(--text)", fontWeight: 600 }}>{fmtTime(pending.newStart)} – {fmtTime(pending.newEnd)}</span>
-              </div>
-              <div onClick={() => setNotifyMove((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, textAlign: "left", background: notifyMove ? "var(--tint2)" : "var(--panel2)", border: `1px solid ${notifyMove ? "color-mix(in srgb, var(--gold) 32%, var(--border))" : "var(--border)"}`, borderRadius: 13, padding: "12px 14px", marginBottom: 16, cursor: "pointer" }}>
-                <div>
-                  <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text)" }}>Notify client of the new time</div>
-                  <div style={{ fontSize: 12.5, color: notifyMove ? "var(--gold)" : "var(--sub)", marginTop: 2 }}>{notifyMove ? "We'll text them the change when you confirm" : "They won't be told unless you turn this on"}</div>
-                </div>
-                <span role="switch" aria-checked={notifyMove} style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: notifyMove ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: notifyMove ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
-              </div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => { setPending(null); setNotifyMove(false); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, letterSpacing: 1, borderRadius: 12 }}>CANCEL</button>
-                <button className="lift" onClick={confirmMove} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 12 }}>CONFIRM</button>
-              </div>
+      <ConfirmModal open={!!pending} onClose={() => { setPending(null); setNotifyMove(false); }} maxWidth={400}>
+        {pending && (<>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, marginBottom: 6 }}>Move appointment?</div>
+            <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, fontWeight: 300, marginBottom: 4 }}>{pending.appt.name} — {pending.appt.title}</div>
+            <div style={{ fontSize: 15, color: "var(--sub)", marginBottom: 18 }}>
+              <span style={{ textDecoration: "line-through", opacity: 0.6 }}>{fmtTime(pending.appt.start)}</span>
+              <span style={{ margin: "0 8px", color: "var(--gold)" }}>→</span>
+              <span style={{ color: "var(--text)", fontWeight: 600 }}>{fmtTime(pending.newStart)} – {fmtTime(pending.newEnd)}</span>
             </div>
           </div>
-        </>
-      ), document.body)}
+          <div onClick={() => setNotifyMove((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, textAlign: "left", background: notifyMove ? "var(--tint2)" : "var(--panel2)", border: `1px solid ${notifyMove ? "color-mix(in srgb, var(--gold) 32%, var(--border))" : "var(--border)"}`, borderRadius: 13, padding: "12px 14px", marginBottom: 16, cursor: "pointer" }}>
+            <div>
+              <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text)" }}>Notify client of the new time</div>
+              <div style={{ fontSize: 12.5, color: notifyMove ? "var(--gold)" : "var(--sub)", marginTop: 2 }}>{notifyMove ? "We'll text them the change when you confirm" : "They won't be told unless you turn this on"}</div>
+            </div>
+            <span role="switch" aria-checked={notifyMove} style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: notifyMove ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: notifyMove ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => { setPending(null); setNotifyMove(false); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, letterSpacing: 1, borderRadius: 12 }}>CANCEL</button>
+            <button className="lift" onClick={confirmMove} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 12 }}>CONFIRM</button>
+          </div>
+        </>)}
+      </ConfirmModal>
 
       {/* CONFLICT — eye-level popup when a manual booking or drag-move lands on top of an existing appointment.
           Two buttons: slide the new appointment to the next free slot, or keep both (the explicit override).
           Tap outside to dismiss without doing either. Client-side flow never reaches here — it filters at slot-pick time. */}
-      {conflictModal && (() => {
-        const first = conflictModal.conflicts[0];
-        const more = conflictModal.conflicts.length - 1;
-        const nextSlotTxt = conflictModal.nextSlot != null ? fmtTime(conflictModal.nextSlot) : null;
-        // Which barber are we double-booking? Pull from the booking (create) or the moving appt (move).
-        const provId = conflictModal.mode === "create" ? conflictModal.bookData.providerId : conflictModal.moveData.appt.providerId;
-        const provObj = providers.find((p) => p.id === provId);
-        const barberName = provObj ? (provObj.name || "").split(" ")[0] : "This barber";
-        const onMove = () => {
-          if (conflictModal.mode === "create") {
-            commitAppt(conflictModal.bookData, conflictModal.nextSlot);
-          } else {
-            const md = conflictModal.moveData;
-            commitMove({ appt: md.appt, newStart: conflictModal.nextSlot, newEnd: conflictModal.nextSlot + conflictModal.dur });
-          }
-        };
-        const onKeepBoth = () => {
-          if (conflictModal.mode === "create") {
-            commitAppt(conflictModal.bookData);
-          } else {
-            commitMove(conflictModal.moveData);
-          }
-        };
-        return createPortal((
-          <div className="fade-in" onClick={() => setConflictModal(null)} style={{ position: "fixed", inset: 0, zIndex: 900, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, marginBottom: 8 }}>Already booked at this time</div>
-              <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 18 }}>
-                {barberName} already has {first.name} at {fmtTime(first.start)}{more > 0 ? ` (and ${more} more)` : ""}.{nextSlotTxt ? ` Next open slot is ${nextSlotTxt}.` : ""} Book anyway?
-              </div>
-              {nextSlotTxt && (
-                <button className="lift" onClick={onMove} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", letterSpacing: 0.5, marginBottom: 9 }}>Move to {nextSlotTxt}</button>
-              )}
-              <button onClick={onKeepBoth} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, fontWeight: 500, borderRadius: 12 }}>Book anyway</button>
-            </div>
-          </div>
-        ), document.body);
-      })()}
-
-      {capWarn && createPortal((
-        <div className="fade-in" onClick={() => setCapWarn(null)} style={{ position: "fixed", inset: 0, zIndex: 900, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, marginBottom: 8 }}>Daily limit reached</div>
+      <ConfirmModal open={!!conflictModal} onClose={() => setConflictModal(null)} maxWidth={360}>
+        {conflictModal && (() => {
+          const first = conflictModal.conflicts[0];
+          const more = conflictModal.conflicts.length - 1;
+          const nextSlotTxt = conflictModal.nextSlot != null ? fmtTime(conflictModal.nextSlot) : null;
+          // Which barber are we double-booking? Pull from the booking (create) or the moving appt (move).
+          const provId = conflictModal.mode === "create" ? conflictModal.bookData.providerId : conflictModal.moveData.appt.providerId;
+          const provObj = providers.find((p) => p.id === provId);
+          const barberName = provObj ? (provObj.name || "").split(" ")[0] : "This barber";
+          const onMove = () => {
+            if (conflictModal.mode === "create") {
+              commitAppt(conflictModal.bookData, conflictModal.nextSlot);
+            } else {
+              const md = conflictModal.moveData;
+              commitMove({ appt: md.appt, newStart: conflictModal.nextSlot, newEnd: conflictModal.nextSlot + conflictModal.dur });
+            }
+          };
+          const onKeepBoth = () => {
+            if (conflictModal.mode === "create") {
+              commitAppt(conflictModal.bookData);
+            } else {
+              commitMove(conflictModal.moveData);
+            }
+          };
+          return (<>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, marginBottom: 8 }}>Already booked at this time</div>
             <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 18 }}>
-              {capWarn.scope === "shop" ? "The shop is" : `${capWarn.who} is`} already at {capWarn.limit} appointment{capWarn.limit === 1 ? "" : "s"} that day — the max you set. Clients can't book online past this, but you can squeeze one in.
+              {barberName} already has {first.name} at {fmtTime(first.start)}{more > 0 ? ` (and ${more} more)` : ""}.{nextSlotTxt ? ` Next open slot is ${nextSlotTxt}.` : ""} Book anyway?
             </div>
-            <button className="lift" onClick={() => { const d = capWarn.bookData; setCapWarn(null); commitAppt(d); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", letterSpacing: 0.5, marginBottom: 9 }}>Book anyway</button>
-            <button onClick={() => setCapWarn(null)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, fontWeight: 500, borderRadius: 12 }}>Cancel</button>
+            {nextSlotTxt && (
+              <button className="lift" onClick={onMove} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", letterSpacing: 0.5, marginBottom: 9 }}>Move to {nextSlotTxt}</button>
+            )}
+            <button onClick={onKeepBoth} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, fontWeight: 500, borderRadius: 12 }}>Book anyway</button>
+          </>);
+        })()}
+      </ConfirmModal>
+
+      <ConfirmModal open={!!capWarn} onClose={() => setCapWarn(null)} maxWidth={360}>
+        {capWarn && (<>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, marginBottom: 8 }}>Daily limit reached</div>
+          <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 18 }}>
+            {capWarn.scope === "shop" ? "The shop is" : `${capWarn.who} is`} already at {capWarn.limit} appointment{capWarn.limit === 1 ? "" : "s"} that day — the max you set. Clients can't book online past this, but you can squeeze one in.
           </div>
-        </div>
-      ), document.body)}
+          <button className="lift" onClick={() => { const d = capWarn.bookData; setCapWarn(null); commitAppt(d); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", letterSpacing: 0.5, marginBottom: 9 }}>Book anyway</button>
+          <button onClick={() => setCapWarn(null)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, fontWeight: 500, borderRadius: 12 }}>Cancel</button>
+        </>)}
+      </ConfirmModal>
 
       {/* tap-to-create: menu anchored right under the tapped time/spot */}
       {createSlot && (() => {
