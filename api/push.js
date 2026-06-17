@@ -79,7 +79,6 @@ export default async function handler(req, res) {
   const { data: rows, error } = await supa.from("device_tokens").select("token").eq("shop_id", shopId);
   if (error) return res.status(500).json({ error: "token lookup: " + error.message });
   const tokens = [...new Set((rows || []).map((r) => r.token).filter(Boolean))];
-  console.log("[pushdbg] shopId="+JSON.stringify(shopId)+" tokens="+tokens.length);
   if (!tokens.length) return res.status(200).json({ sent: 0, note: "no devices registered" });
 
   let providerToken;
