@@ -16466,7 +16466,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 const isDone = a.status === "done";
                 // soft tinted background with a colored accent bar — clean & legible
                 const tint = `color-mix(in srgb, ${accent} 62%, var(--panel))`;
-                const onColor = "var(--text)";
+                // In Studio the "in-service" accent is var(--live) = black, so its 62% tint is a dark
+                // fill — the normal dark/grey text would be unreadable. Flip ALL the block's text to
+                // light on the live (dark) in-service block.
+                const darkBlock = a.status === "in-service" && theme === "studio";
+                const onColor = darkBlock ? "#fff" : "var(--text)";
+                const subOn = darkBlock ? "rgba(255,255,255,0.72)" : "var(--sub)";
+                const text2On = darkBlock ? "rgba(255,255,255,0.88)" : "var(--text2)";
                 const blockBg = "repeating-linear-gradient(45deg, var(--panel2), var(--panel2) 7px, var(--line) 7px, var(--line) 14px)";
                 // Appointment blocks are filled with the service-assigned color in every theme
                 // (color-mix tint + accent border + accent left bar). Studio just gets the soft
@@ -16491,28 +16497,28 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     {/* name — always one line, never wraps or collides */}
                     <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{apptDisplayName(a, clients)}</span>
                     {/* time range — shown once room exists */}
-                    {height > 34 && <span style={{ fontSize: 12, color: "var(--sub)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fmtTime(liveStart)} – {fmtTime(liveStart + (a.end - a.start))}</span>}
+                    {height > 34 && <span style={{ fontSize: 12, color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fmtTime(liveStart)} – {fmtTime(liveStart + (a.end - a.start))}</span>}
                     {/* service name */}
-                    {height > 58 && <div style={{ fontSize: 12.5, color: "var(--text2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.title}</div>}
+                    {height > 58 && <div style={{ fontSize: 12.5, color: text2On, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.title}</div>}
                     {/* add-on detail only on tall blocks */}
-                    {height > 84 && a.detail && <div style={{ fontSize: 12, color: "var(--sub)", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{a.detail}</div>}
-                    <div style={{ position: "absolute", bottom: 5, right: 6, display: "flex", gap: 5, alignItems: "center", color: "var(--sub)" }}>
+                    {height > 84 && a.detail && <div style={{ fontSize: 12, color: subOn, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{a.detail}</div>}
+                    <div style={{ position: "absolute", bottom: 5, right: 6, display: "flex", gap: 5, alignItems: "center", color: subOn }}>
                       {a.hasNote && <Edit2 size={11} style={{ opacity: 0.7 }} />}
                       {a.hasPhotos && <ImageIcon size={12} style={{ opacity: 0.7 }} />}
-                      {a.vip && <span style={{ fontSize: 13, color: accent }}>★</span>}
+                      {a.vip && <span style={{ fontSize: 13, color: darkBlock ? "#fff" : accent }}>★</span>}
                     </div>
                     {/* NEW pill — top-right — fires when this is the client's first-ever visit, or it's a walk-in with no client record */}
                     {(() => {
                       const isFirstTime = !a.clientId || (() => { const c = clients.find((cl) => cl.id === a.clientId); return c && (c.visits || 0) === 0; })();
                       if (!isFirstTime || isBlock || isDone) return null;
                       return (
-                        <span style={{ position: "absolute", top: 5, right: 6, fontSize: 9.5, fontWeight: 700, letterSpacing: 1, color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 4, padding: "1px 5px", lineHeight: 1.3, background: "var(--wash)" }}>NEW</span>
+                        <span style={{ position: "absolute", top: 5, right: 6, fontSize: 9.5, fontWeight: 700, letterSpacing: 1, color: darkBlock ? "#fff" : "var(--gold)", border: `1px solid ${darkBlock ? "rgba(255,255,255,0.6)" : "var(--gold)"}`, borderRadius: 4, padding: "1px 5px", lineHeight: 1.3, background: "var(--wash)" }}>NEW</span>
                       );
                     })()}
                     {/* subtle end-of-appointment marker: hairline at the bottom edge + end time */}
                     {!isBlock && height > 28 && (
-                      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, borderBottom: `1.5px solid color-mix(in srgb, ${accent} 55%, transparent)`, pointerEvents: "none" }}>
-                        <span style={{ position: "absolute", right: 6, bottom: 2, fontSize: 9.5, fontWeight: 600, letterSpacing: 0.3, color: `color-mix(in srgb, ${accent} 75%, var(--text))`, opacity: 0.75 }}>{fmtTime(liveStart + (a.end - a.start)).replace(/\s?[AP]M/, "")}</span>
+                      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, borderBottom: `1.5px solid ${darkBlock ? "rgba(255,255,255,0.30)" : `color-mix(in srgb, ${accent} 55%, transparent)`}`, pointerEvents: "none" }}>
+                        <span style={{ position: "absolute", right: 6, bottom: 2, fontSize: 9.5, fontWeight: 600, letterSpacing: 0.3, color: darkBlock ? "rgba(255,255,255,0.80)" : `color-mix(in srgb, ${accent} 75%, var(--text))`, opacity: 0.75 }}>{fmtTime(liveStart + (a.end - a.start)).replace(/\s?[AP]M/, "")}</span>
                       </div>
                     )}
                   </div>
@@ -18462,7 +18468,18 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       )}
                     </div>
                   )}
-                  {appt.status === "checked-in" && <button className="lift" onClick={() => { const wr = (business && business.waitingRoom) || {}; const tmpl = wr.readyMessage || "{provider} will meet you at the door."; showToast(wr.autoReadyMessage === false ? `${appt.name} notified.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`); }} style={{ background: STATUS_COLORS["checked-in"], border: "none", color: "#fff", padding: "11px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700, boxShadow: "0 6px 16px -8px rgba(124,58,237,.55)" }}>NOTIFY CLIENT</button>}
+                  {appt.status === "checked-in" && (() => {
+                    const notified = !!appt.lobbyNotifiedAt;
+                    const doNotify = () => {
+                      const wr = (business && business.waitingRoom) || {};
+                      const tmpl = wr.readyMessage || "{provider} will meet you at the door.";
+                      showToast(wr.autoReadyMessage === false ? `${appt.name} notified.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`);
+                      onUpdate && onUpdate(appt.id, { lobbyNotifiedAt: Date.now() }); // persist so the button reads "Notified"
+                    };
+                    return notified
+                      ? <button className="lift" onClick={doNotify} title="Tap to re-send" style={{ display: "inline-flex", alignItems: "center", gap: 7, background: `color-mix(in srgb, ${STATUS_COLORS["checked-in"]} 13%, var(--panel))`, border: `1px solid color-mix(in srgb, ${STATUS_COLORS["checked-in"]} 40%, transparent)`, color: STATUS_COLORS["checked-in"], padding: "10px 16px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700, cursor: "pointer" }}><Check size={15} strokeWidth={3} /> NOTIFIED</button>
+                      : <button className="lift" onClick={doNotify} style={{ background: STATUS_COLORS["checked-in"], border: "none", color: "#fff", padding: "11px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700, boxShadow: "0 6px 16px -8px rgba(124,58,237,.55)" }}>NOTIFY CLIENT</button>;
+                  })()}
                   {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ background: "var(--gold)", border: "none", color: "var(--on-gold)", padding: "11px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700, boxShadow: "var(--shadow)" }}>CHECKOUT</button>}
                 </div>
                 {appt.status === "checked-in" && (
