@@ -2554,6 +2554,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const newName = `${newFirst.trim()} ${newLast.trim()}`.trim();
   const [matched, setMatched] = useState(null);
   const [myAppts, setMyAppts] = useState([]); // a verified returning client's OWN bookings (via get_client_appointments) — RLS-safe; replaces reading the full appts list
+  const [showHome, setShowHome] = useState(false); // logged-in returning client's home (their info, next/recent visits, family) — the landing after verify + return-to after booking
+  const [showAllVisits, setShowAllVisits] = useState(false); // expand the recent-visits list on the home
+  const [homeAction, setHomeAction] = useState(null); // { type: "cancel" | "reschedule", appt, person } — confirm sheet on the home next-visit card
   useEffect(() => {
     if (!matched) return;
     // Prefer the stored firstName/lastName if present; otherwise split the legacy `name` field on whitespace.
@@ -2890,7 +2893,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (slot == null || !slots.includes(slot)) setSlot(slots.length ? slots[0] : null);
   }, [wwMerged, waProvId]);
 
-  const back = () => { setShowWaitlist(false); setTapSel(null); if (confirmSheet) { setConfirmSheet(null); return; } if (addonFlow) { setAddonFlow(null); if (draft && draft.cutTypes && draft.cutTypes.length) { setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "type"); setStep(2); } else { setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setStep(1); } return; } if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "finish") { setSimpleStep("what"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); setStep(5); return; } if (step <= 0) return onExit(); if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 3) { if (simpleChange !== null && draft) { const anyone = providers.find((p) => p.id === "anyone") || providers[0]; const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: anyone, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }; setCart([entry]); const hasFinish = (draft.addonGroups || []).some((g) => g.type === "addon"); setStep(0); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (draft && draft.cutTypes && draft.cutTypes.length) { setCutType(null); setBeardType(null); setCutPhase("type"); setStep(2); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setStep(6); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); setTapSel(null); if (confirmSheet) { setConfirmSheet(null); return; } if (addonFlow) { setAddonFlow(null); if (draft && draft.cutTypes && draft.cutTypes.length) { setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "type"); setStep(2); } else { setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setStep(1); } return; } if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "finish") { setSimpleStep("what"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { if (matched) { setShowHome(true); return; } setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); if (matched) { setShowHome(true); return; } setStep(5); return; } if (step <= 0) { if (matched) { setShowHome(true); return; } return onExit(); } if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 3) { if (simpleChange !== null && draft) { const anyone = providers.find((p) => p.id === "anyone") || providers[0]; const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: anyone, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }; setCart([entry]); const hasFinish = (draft.addonGroups || []).some((g) => g.type === "addon"); setStep(0); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (draft && draft.cutTypes && draft.cutTypes.length) { setCutType(null); setBeardType(null); setCutPhase("type"); setStep(2); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setStep(6); return; } setStep(step - 1); };
 
   // Simple/quick flow hand-off: instead of the old "Anyone in particular?" + time picker,
   // pop the quick-flow entry back into draft state and land on the merged Who & When.
@@ -3183,6 +3186,158 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (phoneChanged || emailChanged) { setKeepPhone("new"); setKeepEmail("new"); setContactConfirm({ phone: phoneChanged, email: emailChanged }); return; }
     commitBooking(phone, newEmail);
   }, [pendingFinish, cardOnFile, booking]);
+
+  // ============================================================
+  // LOGGED-IN CLIENT HOME — landing after code verify, and the return-to after booking.
+  // Session stays alive (matched/myAppts preserved) so they never re-enter a code mid-session.
+  // ============================================================
+  const personLabel = (a) => {
+    if (a && a.familyMemberId) { const m = (matched?.family || []).find((f) => f.id === a.familyMemberId); return m ? m.name.split(" ")[0] : "Family"; }
+    return matched ? matched.name.split(" ")[0] : "You";
+  };
+  const apptWhen = (a) => { try { return a && a.bookedFor ? new Date(a.bookedFor) : null; } catch (e) { return null; } };
+  const provFirst = (id) => { const p = providers.find((x) => x.id === id); return p ? p.name.split(" ")[0] : "your barber"; };
+  const svcLabel = (a) => a.serviceName || (services.find((s) => s.id === a.serviceId) || {}).name || "Appointment";
+  const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const fmtHomeDate = (a) => { const d = apptWhen(a); if (!d) return ""; return `${DOW[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
+  const fmtHomeShort = (a) => { const d = apptWhen(a); if (!d) return ""; return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
+  const fmtHomeTime = (a) => { const d = apptWhen(a); if (!d) return ""; let h = d.getHours(); const m = d.getMinutes(); const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return `${h}:${String(m).padStart(2, "0")} ${ap}`; };
+  const refreshMyAppts = () => { if (!matched) return; supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: matched.id }).then(({ data }) => { if (Array.isArray(data)) setMyAppts(data); }).catch(() => {}); };
+  const goClientHome = () => {
+    setStep(0); setSimpleStep(null); setSimpleCat(null); setSimplePref(null); setSimpleChange(null);
+    setShowWhoFor(false); setShowUsual(false); setShowSchedChoice(false); setShowWizardIntro(false);
+    setShowCodeEntry(false); setAddingMember(false); setBookingFor(null); setActiveMember(null);
+    setCart([]); setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
+    setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setBookedId(null); setCameFromUsual(false);
+    setConsult(null); setShowAllVisits(false); setHomeAction(null); setShowHome(true);
+    refreshMyAppts();
+  };
+  const bookForPerson = (person) => {
+    setShowHome(false); setHomeAction(null);
+    const isMember = !!(person && person.id);
+    setGroupPeople(isMember ? [{ id: person.id, name: person.name, note: person.note, isMember: true }] : [{ id: null, name: matched.name, isMember: false }]);
+    setGroupMode(null); setWizardIdx(0);
+    if (isMember) { setBookingFor("member"); setActiveMember((matched.family || []).find((m) => m.id === person.id) || null); }
+    else { setBookingFor("self"); setActiveMember(null); }
+    const apptsFor = isMember
+      ? (myAppts || []).filter((a) => a.familyMemberId === person.id && a.serviceId && a.status !== "block" && a.status !== "cancelled")
+      : (myAppts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block" && a.status !== "cancelled");
+    if (apptsFor.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1);
+  };
+  const bookFromHome = () => {
+    setShowHome(false); setHomeAction(null);
+    setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false);
+    if (business?.familyBooking?.enabled !== false && matched) setShowWhoFor(true);
+    else bookForPerson({ id: null });
+  };
+  const signOutClient = () => {
+    setShowHome(false); setMatched(null); setMyAppts([]); setShowAllVisits(false); setHomeAction(null);
+    setBookingFor(null); setActiveMember(null); setCart([]); setShowWhoFor(false); setShowUsual(false);
+    setSimpleStep(null); setSimpleCat(null); setSimplePref(null); setStep(0);
+  };
+  const doCancelAppt = (appt) => {
+    try { supabase.rpc("cancel_my_appointment", { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(appt.id) }).catch(() => {}); } catch (e) {}
+    setMyAppts((cur) => cur.map((a) => a.id === appt.id ? { ...a, status: "cancelled" } : a));
+  };
+  const lblStyle = { fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 10px" };
+  const avStyle = { width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 14, color: "var(--text)", flexShrink: 0 };
+
+  if (showHome && matched) {
+    const firstName = (matched.name || "there").split(" ")[0];
+    const now = Date.now();
+    const live = (myAppts || []).filter((a) => a.serviceId && a.status !== "block" && a.status !== "cancelled" && a.status !== "no-show" && a.status !== "done");
+    const upcoming = live.filter((a) => { const d = apptWhen(a); return d && d.getTime() >= now - 2 * 3600 * 1000; }).sort((a, b) => (a.bookedFor || "").localeCompare(b.bookedFor || ""));
+    const nextVisit = upcoming[0] || null;
+    const past = (myAppts || []).filter((a) => a.serviceId && a.status !== "block" && a.status !== "cancelled" && (!nextVisit || a.id !== nextVisit.id) && (() => { const d = apptWhen(a); return d && d.getTime() < now - 2 * 3600 * 1000; })()).sort((a, b) => (b.bookedFor || "").localeCompare(a.bookedFor || ""));
+    const visits = showAllVisits ? past : past.slice(0, 3);
+    const family = matched.family || [];
+    const people = [{ id: null, name: matched.name, isMember: false }, ...family.map((m) => ({ id: m.id, name: m.name, note: m.note || "", isMember: true }))];
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: "var(--bg)" }}>
+        <div style={{ width: "100%", maxWidth: 480, padding: "30px 22px 60px" }}>
+          <div className="fade-up">
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{business.name}</div>
+            <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1.05, margin: "12px 0 0", color: "var(--text)" }}>Welcome back,<br />{firstName}.</h1>
+
+            <div style={lblStyle}>Your next visit</div>
+            {nextVisit ? (
+              <div style={{ border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px" }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.05, color: "var(--text)" }}>{fmtHomeDate(nextVisit)} · {fmtHomeTime(nextVisit)}</div>
+                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text2)", marginTop: 5 }}>{svcLabel(nextVisit)} · with {provFirst(nextVisit.providerId)}{nextVisit.familyMemberId ? ` · for ${personLabel(nextVisit)}` : ""}</div>
+                <div style={{ display: "flex", gap: 18, marginTop: 14, paddingTop: 13, borderTop: "1px solid var(--line)" }}>
+                  <button onClick={() => setHomeAction({ type: "reschedule", appt: nextVisit })} style={{ background: "none", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Reschedule &#8594;</button>
+                  <button onClick={() => setHomeAction({ type: "cancel", appt: nextVisit })} style={{ background: "none", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 400, color: "var(--sub)", cursor: "pointer" }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ border: "1px solid var(--line)", borderRadius: 16, padding: "18px 18px", fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>No upcoming visit yet — book your next one below.</div>
+            )}
+
+            <button className="lift" onClick={bookFromHome} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.8, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, marginTop: 18, border: "none", cursor: "pointer" }}>Book an appointment</button>
+
+            {business?.familyBooking?.enabled !== false && (
+              <>
+                <div style={lblStyle}>Your people</div>
+                <div style={{ border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+                  {people.map((p, i) => (
+                    <button key={p.id || "self"} onClick={() => bookForPerson(p)} style={{ width: "100%", background: "transparent", borderTop: i ? "1px solid var(--line)" : "none", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: "15px 18px", display: "flex", alignItems: "center", gap: 13, cursor: "pointer", textAlign: "left" }}>
+                      <span style={avStyle}>{(p.name || "?").trim().charAt(0).toUpperCase()}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{p.isMember ? p.name : firstName}</span>
+                        <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}>{p.isMember ? (p.note || "Family") : "You"}</span>
+                      </span>
+                      <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: "var(--border)" }}>&#8594;</span>
+                    </button>
+                  ))}
+                  <button onClick={() => { setShowHome(false); setHomeAction(null); setGroupPeople([]); setShowWhoFor(true); setNewMemberName(""); setNewMemberNote(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", borderTop: "1px solid var(--line)", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: "15px 18px", display: "flex", alignItems: "center", gap: 13, cursor: "pointer", textAlign: "left" }}>
+                    <span style={{ ...avStyle, color: "var(--sub)", fontSize: 16 }}>+</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>Add someone</span>
+                      <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}>Kids, partner, siblings</span>
+                    </span>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: "var(--border)" }}>&#8594;</span>
+                  </button>
+                </div>
+              </>
+            )}
+
+            {past.length > 0 && (
+              <>
+                <div style={lblStyle}>Recent visits</div>
+                <div style={{ border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+                  {visits.map((a, i) => (
+                    <div key={a.id || i} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "13px 18px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                      <span style={{ fontFamily: "'Fraunces', serif", fontSize: 14, color: "var(--text)", width: 56, flexShrink: 0 }}>{fmtHomeShort(a)}</span>
+                      <span style={{ flex: 1, fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--text2)" }}>{svcLabel(a)}{a.familyMemberId ? ` · ${personLabel(a)}` : ""}</span>
+                      <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)" }}>{provFirst(a.providerId)}</span>
+                    </div>
+                  ))}
+                  {past.length > 3 && (
+                    <button onClick={() => setShowAllVisits((v) => !v)} style={{ width: "100%", background: "transparent", borderTop: "1px solid var(--line)", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: 13, fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", letterSpacing: 0.3, cursor: "pointer" }}>{showAllVisits ? "Show less" : `See all ${past.length} visits \u2192`}</button>
+                  )}
+                </div>
+              </>
+            )}
+
+            <div style={{ textAlign: "center", marginTop: 28 }}>
+              <button onClick={signOutClient} style={{ background: "none", border: "none", fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--faint)", cursor: "pointer" }}>Not {firstName}? Sign out</button>
+            </div>
+          </div>
+        </div>
+
+        {homeAction && (
+          <div onClick={() => setHomeAction(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "var(--bg)", borderRadius: "20px 20px 0 0", padding: "26px 22px 30px" }}>
+              <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, color: "var(--text)", margin: "0 0 8px", letterSpacing: "-0.2px" }}>{homeAction.type === "cancel" ? "Cancel this appointment?" : "Pick a new time?"}</h3>
+              <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 0 22px" }}>{homeAction.type === "cancel" ? `Your ${svcLabel(homeAction.appt)} on ${fmtHomeShort(homeAction.appt)} will be released.` : `We'll release your ${fmtHomeShort(homeAction.appt)} time so you can choose a new one.`}</p>
+              <button onClick={() => { const a = homeAction.appt; if (homeAction.type === "cancel") { doCancelAppt(a); setHomeAction(null); } else { doCancelAppt(a); bookForPerson(a.familyMemberId ? { id: a.familyMemberId, name: personLabel(a) } : { id: null }); } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: "pointer", marginBottom: 11 }}>{homeAction.type === "cancel" ? "Yes, cancel it" : "Release & pick a new time"}</button>
+              <button onClick={() => setHomeAction(null)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 500, textTransform: "uppercase", borderRadius: 12, cursor: "pointer" }}>Keep it</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: "var(--bg)" }}>
@@ -4362,7 +4517,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {!usePhone && <div style={{ marginBottom: 16 }} />}
             <input autoFocus inputMode="numeric" value={codeEntry} onChange={(e) => { setCodeEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(false); }} placeholder="• • • • • •" style={{ ...inputStyle, textAlign: "center", fontSize: 28, letterSpacing: 8, marginBottom: codeError ? 8 : 18 }} />
             {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>{usePhone ? "Enter all 6 digits." : (codeEntry.length < 6 ? "Enter all 6 digits." : "That code didn't match — check the email and try again.")}</p>}
-            <button className="lift" disabled={loginBusy} onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } let found = pendingMatch; if (!usePhone) { setLoginBusy(true); try { const { data, error } = await supabase.rpc("verify_client_code", { p_shop: shopId, p_email: clientEmail.trim().toLowerCase(), p_code: codeEntry }); setLoginBusy(false); if (error || !data) { setCodeError(true); return; } found = data; } catch (e) { setLoginBusy(false); setCodeError(true); return; } } const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); if (business?.familyBooking?.enabled !== false) { setShowWhoFor(true); } else { setBookingFor("self"); setActiveMember(null); const mine = list.filter((a) => a.clientId === found.id && !a.familyMemberId && a.serviceId && a.status !== "block"); if (mine.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1); } } else { if (cart.length === 0) { setStep(0); setSimpleStep("what"); } else { setStep(6); } } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
+            <button className="lift" disabled={loginBusy} onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } let found = pendingMatch; if (!usePhone) { setLoginBusy(true); try { const { data, error } = await supabase.rpc("verify_client_code", { p_shop: shopId, p_email: clientEmail.trim().toLowerCase(), p_code: codeEntry }); setLoginBusy(false); if (error || !data) { setCodeError(true); return; } found = data; } catch (e) { setLoginBusy(false); setCodeError(true); return; } } const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); setShowAllVisits(false); setShowHome(true); } else { if (cart.length === 0) { setStep(0); setSimpleStep("what"); } else { setStep(6); } } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
             <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6 }}>{usePhone ? "Use a different number" : "Use a different email"}</button>
           </div>
         )}
@@ -4971,7 +5126,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           </div>
         )}
 
-        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} provider={provider} selectedDate={selectedDate} slot={slot} photos={photos.length} onManage={() => setStep(9)} onExit={onExit} />}
+        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} provider={provider} selectedDate={selectedDate} slot={slot} photos={photos.length} onManage={() => setStep(9)} onExit={matched ? goClientHome : onExit} />}
 
         {step === 9 && <ManageAppointment business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} initialPhone={phone} dateOptions={dateOptions} onExit={onExit} showToast={(m) => {}} />}
         </div>
