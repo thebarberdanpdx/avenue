@@ -8658,16 +8658,63 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
   );
 }
 
+// Premium toast: springs up from the bottom with a popping badge, holds, then eases back down.
+// Self-contained lifecycle (enter → hold → exit → onDone unmounts it). A dark "glass" card so it
+// reads as a deliberate surface on any theme. Heuristic icon: check for confirmations, alert for
+// the occasional validation message.
+function Toast({ msg, onDone }) {
+  const [shown, setShown] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setShown(true));   // trigger the enter transition
+    const tHold = setTimeout(() => setLeaving(true), 2800);    // begin exit
+    const tEnd = setTimeout(() => { onDone && onDone(); }, 3260); // unmount after exit finishes
+    return () => { cancelAnimationFrame(raf); clearTimeout(tHold); clearTimeout(tEnd); };
+  }, []);
+  const vis = shown && !leaving;
+  const warn = /\b(pick|enter|at least|couldn'?t|can'?t|cannot|failed|invalid|required|too (long|short|many|few)|must|minimum|max(imum)?|oops|error|unable)\b/i.test(msg || "");
+  return createPortal(
+    <div style={{ position: "fixed", left: 0, right: 0, bottom: "calc(96px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 9999, padding: "0 16px" }}>
+      <div style={{
+        pointerEvents: "auto", display: "flex", alignItems: "center", gap: 12, maxWidth: 420,
+        padding: "13px 20px 13px 13px", borderRadius: 18,
+        background: "linear-gradient(180deg, #262626 0%, #0a0a0a 100%)", color: "#fff",
+        border: "1px solid rgba(255,255,255,0.10)",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.30), 0 20px 48px -12px rgba(0,0,0,0.60)",
+        fontFamily: FONT_BODY, fontSize: 14.5, fontWeight: 500, lineHeight: 1.3, letterSpacing: 0.1,
+        transform: vis ? "translateY(0) scale(1)" : "translateY(28px) scale(0.93)",
+        opacity: vis ? 1 : 0,
+        transition: "transform 0.46s cubic-bezier(0.34,1.56,0.64,1), opacity 0.32s ease",
+        willChange: "transform, opacity",
+      }}>
+        <span style={{
+          flexShrink: 0, width: 28, height: 28, borderRadius: "50%",
+          background: warn ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.16)",
+          boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transform: vis ? "scale(1)" : "scale(0.2)", opacity: vis ? 1 : 0,
+          transition: "transform 0.5s cubic-bezier(0.34,1.7,0.5,1) 0.1s, opacity 0.3s ease 0.1s",
+        }}>
+          {warn ? <AlertCircle size={15} strokeWidth={2.5} color="#fff" /> : <Check size={15} strokeWidth={3} color="#fff" />}
+        </span>
+        <span style={{ paddingRight: 2 }}>{msg}</span>
+      </div>
+    </div>,
+    typeof document !== "undefined" ? document.body : null
+  );
+}
+
 function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled }) {
   const [tab, setTab] = useState("pulse");
   const [rebookSeed, setRebookSeed] = useState(null); // { clientId, serviceId, providerId } → opens the new-appointment form prefilled on the calendar
   const [activeClient, setActiveClient] = useState(null);
   const [pulseDetail, setPulseDetail] = useState(null); // null | "revenue" — drill-in from Pulse
-  const [toast, setToast] = useState(null);
+  const [toast, setToast] = useState(null); // { id, msg } — id re-triggers the enter animation for repeat toasts
+  const toastIdRef = useRef(0);
   // Notification deep-link: when a tapped push hands us an appointment, jump to the calendar so it can open it.
   useEffect(() => { if (deepLinkApptId) { setActiveClient(null); setPulseDetail(null); setTab("calendar"); } }, [deepLinkApptId]);
   const [msgTarget, setMsgTarget] = useState(null); // { clientId, draft } — opens a convo prefilled
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3400); };
+  const showToast = (msg) => setToast({ id: ++toastIdRef.current, msg }); // <Toast/> handles its own timed enter/exit + unmount
 
   // --- Pulse 2.0: "signed in as" picker. Until real auth, each device remembers which
   // barber is using it (localStorage). Owners can also pick "All shop" for a combined view.
@@ -8930,7 +8977,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         </div>
       )}
 
-      {toast && <div className="fade-in" style={{ position: "fixed", bottom: 92, left: "50%", transform: "translateX(-50%)", background: "var(--gold)", color: "var(--on-gold)", padding: "14px 22px", borderRadius: 12, fontSize: 14, fontWeight: 500, boxShadow: "0 8px 30px rgba(0,0,0,.5)", maxWidth: "90%", textAlign: "center", zIndex: 30 }}>{toast}</div>}
+      {toast && <Toast key={toast.id} msg={toast.msg} onDone={() => setToast(null)} />}
     </div>
   );
 }
