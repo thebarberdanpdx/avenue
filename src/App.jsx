@@ -16354,15 +16354,14 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 const tint = `color-mix(in srgb, ${accent} 62%, var(--panel))`;
                 const onColor = "var(--text)";
                 const blockBg = "repeating-linear-gradient(45deg, var(--panel2), var(--panel2) 7px, var(--line) 7px, var(--line) 14px)";
-                // Studio = clean white block + hairline + soft shadow, but the left bar keeps the
-                // service-assigned color for at-a-glance identity (grey + faded when done). Colored
-                // themes also keep the service-colored tint fill. Gated so all 12 themes still work.
+                // Appointment blocks are filled with the service-assigned color in every theme
+                // (color-mix tint + accent border + accent left bar). Studio just gets the soft
+                // shadow tier via the --shadow-sm theme override. Done = neutral + faded.
                 const mono = theme === "studio";
-                const SOFT_SHADOW = "0 1px 2px rgba(0,0,0,.06), 0 8px 22px rgba(0,0,0,.08)";
-                const blkBg = isBlock ? blockBg : (mono ? "var(--panel)" : (isDone ? "var(--panel2)" : tint));
-                const blkBorder = `1px solid ${isBlock ? "var(--border)" : (mono ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`)}`;
+                const blkBg = isBlock ? blockBg : (isDone ? "var(--panel2)" : tint);
+                const blkBorder = `1px solid ${isBlock ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`}`;
                 const blkLeft = `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : accent)}`;
-                const blkShadow = isDragging ? "var(--shadow-lg)" : (mono ? SOFT_SHADOW : "var(--shadow-sm)");
+                const blkShadow = isDragging ? "var(--shadow-lg)" : "var(--shadow-sm)";
                 // Horizontal lane positioning — full width when alone, split into N equal lanes when overlapping.
                 const laneCount = a._laneCount || 1;
                 const lane = a._lane || 0;
