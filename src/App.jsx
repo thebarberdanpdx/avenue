@@ -545,8 +545,8 @@ const THEMES = [
     t: { bg:"#FAF8F3", panel:"#FFFFFF", panel2:"#F4EFE4", line:"#ECE4D5", border:"#E0D8C7", border2:"#CFC6B7", text:"#232221", text2:"#3A382F", sub:"#6F685D", faint:"#A39C8A", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(60,55,45,.10)", overlay:"rgba(35,34,33,0.34)" } },
   { id: "studio", name: "Studio", tagline: "Editorial black & white", cat: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.03,
-    canvas: "#EBEBEB",
-    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F4F4F4", line:"#ECECEC", border:"#D4D4D4", border2:"#C2C2C2", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#A6A6A6", gold:"#0A0A0A", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.06)", overlay:"rgba(0,0,0,0.3)" } },
+    canvas: "#FFFFFF",
+    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#FFFFFF", line:"#ECECEC", border:"#DCDCDC", border2:"#CFCFCF", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#AEAEAE", gold:"#0A0A0A", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.07)", overlay:"rgba(0,0,0,0.3)" } },
   { id: "mist", name: "Mist", tagline: "Cool porcelain & slate", cat: "Light", dark: false,
     disp: "'Fraunces', serif", body: "'Inter', sans-serif", grain: 0.04,
     canvas: "linear-gradient(176deg,#F1F4F6,#E6ECEF)",
@@ -601,7 +601,19 @@ const THEME_IDS = THEMES.map((t) => t.id);
 const buildThemeCSS = () => THEMES.map((th) => {
   const v = th.t;
   const grad = th.grad || `linear-gradient(135deg,${v.gold},${v.gold})`;
-  return `.theme-${th.id}{--bg:${v.bg};--canvas:${th.canvas || v.bg};--grain:${th.grain || 0};--grain-blend:${th.dark ? "overlay" : "multiply"};--panel:${v.panel};--panel2:${v.panel2};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--gold-grad:${grad};--on-gold:${v.onGold};--live:${v.live || v.gold};--shadow:${v.shadow};--overlay:${v.overlay};--font-disp:${th.disp};--font-body:${th.body};}`;
+  // --tint / --tint2 = the subtle "highlight/selected" FILL behind accented rows & cards.
+  // In colorful themes it's a gentle gold wash; in the strict black-&-white "studio"
+  // theme it collapses to pure white so highlights never read as grey.
+  const tint = th.id === "studio" ? v.panel : `color-mix(in srgb, ${v.gold} 10%, ${v.panel})`;
+  const tint2 = th.id === "studio" ? v.panel2 : `color-mix(in srgb, ${v.gold} 14%, ${v.panel2})`;
+  // Studio (strict B&W): override the shadow tier so every card/sheet/panel that uses
+  // var(--shadow-sm/lg) lifts off the white page with one soft, consistent shadow.
+  // Set on the theme class (which sits on #app-root) so the whole subtree inherits it;
+  // the other 11 themes fall through to the default :root shadows, untouched.
+  const studioShadows = th.id === "studio"
+    ? "--shadow-sm:0 1px 2px rgba(0,0,0,.06), 0 8px 22px rgba(0,0,0,.08);--shadow-lg:0 4px 12px rgba(0,0,0,.08), 0 18px 44px rgba(0,0,0,.12);--shadow-md:0 2px 6px rgba(0,0,0,.06), 0 10px 28px rgba(0,0,0,.09);"
+    : "";
+  return `.theme-${th.id}{--bg:${v.bg};--canvas:${th.canvas || v.bg};--grain:${th.grain || 0};--grain-blend:${th.dark ? "overlay" : "multiply"};--panel:${v.panel};--panel2:${v.panel2};--tint:${tint};--tint2:${tint2};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--gold-grad:${grad};--on-gold:${v.onGold};--live:${v.live || v.gold};--shadow:${v.shadow};--overlay:${v.overlay};${studioShadows}--font-disp:${th.disp};--font-body:${th.body};}`;
 }).join("\n");
 
 // Portal: render full-screen overlays. Without react-dom we can't truly portal,
@@ -6175,7 +6187,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               <div style={{ fontSize: 15.5, fontWeight: 600 }}>{cutting.name || "In service"}</div>
               {cutSvc && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>{cutSvc}</div>}
             </div>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexShrink: 0, background: cutWrap ? "color-mix(in srgb, #C08A3E 13%, var(--panel2))" : "color-mix(in srgb, var(--gold) 12%, var(--panel2))", border: "1px solid " + (cutWrap ? "color-mix(in srgb, #C08A3E 30%, var(--border))" : "color-mix(in srgb, var(--gold) 26%, var(--border))"), color: cutWrap ? "#C08A3E" : "var(--gold)", fontSize: 12, fontWeight: 600, padding: "4px 11px 4px 9px", borderRadius: 30 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexShrink: 0, background: cutWrap ? "color-mix(in srgb, #C08A3E 13%, var(--panel2))" : "var(--tint2)", border: "1px solid " + (cutWrap ? "color-mix(in srgb, #C08A3E 30%, var(--border))" : "color-mix(in srgb, var(--gold) 26%, var(--border))"), color: cutWrap ? "#C08A3E" : "var(--gold)", fontSize: 12, fontWeight: 600, padding: "4px 11px 4px 9px", borderRadius: 30 }}>
               <span style={{ position: "relative", width: 9, height: 9 }}>
                 <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: "currentColor", opacity: 0.35, animation: "pulse 1.6s var(--ease) infinite" }} />
                 <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "currentColor" }} />
@@ -6194,7 +6206,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       )}
 
       {awkwardGap && (
-        <div style={{ position: "relative", marginBottom: 16, background: "linear-gradient(135deg, color-mix(in srgb, var(--gold) 10%, var(--panel)), var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 32%, var(--border))", borderRadius: 18, boxShadow: "var(--shadow)", padding: "15px 16px" }}>
+        <div style={{ position: "relative", marginBottom: 16, background: "linear-gradient(135deg, var(--tint), var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 32%, var(--border))", borderRadius: 18, boxShadow: "var(--shadow)", padding: "15px 16px" }}>
           <button onClick={() => setGapDismissed(true)} aria-label="Dismiss" style={{ position: "absolute", top: 11, right: 12, background: "none", border: "none", color: "var(--faint)", padding: 2, lineHeight: 0, cursor: "pointer" }}><X size={16} /></button>
           <div style={{ display: "flex", alignItems: "center", gap: 9, paddingRight: 22 }}>
             <span style={{ width: 34, height: 34, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Clock size={18} /></span>
@@ -6213,7 +6225,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       )}
 
       {needsStart && (
-        <div style={{ marginBottom: 16, background: "color-mix(in srgb, var(--gold) 11%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, padding: "15px 16px", boxShadow: "var(--shadow-sm)" }}>
+        <div style={{ marginBottom: 16, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, padding: "15px 16px", boxShadow: "var(--shadow-sm)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
             <span style={{ position: "relative", width: 9, height: 9, flexShrink: 0 }}>
               <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 40%, transparent)", animation: "pulse 1.6s var(--ease) infinite" }} />
@@ -6234,7 +6246,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       {/* RUNNING LATE — surfaces on Pulse when the in-chair appointment is within the threshold of overrunning the next one,
           so the provider can text the next client without digging through the calendar. */}
       {inChair && nextAppt && minutesLeft != null && minutesLeft <= ((business?.runningLate?.thresholdMin) || 5) && (business?.runningLate?.enabled !== false) && !nextAppt.lateNotified && (
-        <div style={{ marginBottom: 16, background: "color-mix(in srgb, var(--gold) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "14px 16px" }}>
+        <div style={{ marginBottom: 16, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "14px 16px" }}>
           <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 6, fontWeight: 600 }}>RUNNING LATE?</div>
           <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 10 }}>
             {minutesLeft} min left with {inChair.name}. {(nextAppt.name || "").split(" ")[0]} is up next at {fmtTime(nextAppt.start)}. Want to give them a heads-up?
@@ -6297,17 +6309,17 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                           <button className="lift" onClick={() => {
                             const text = noteDraft.trim();
-                            if (text) setClients((cur) => cur.map((c) => c.id === a.clientId ? { ...c, notes: (c.notes ? c.notes + "\n" : "") + text } : c));
-                            setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, hasNote: true } : x));
+                            // Per-visit: store on the appointment itself, not the client-level prefs note.
+                            setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, wrapNote: text, wrapNoteAt: text ? new Date().toISOString() : x.wrapNoteAt, hasNote: true } : x));
                             setNoteFor(null); setNoteDraft("");
-                            if (showToast && text) showToast("Note added to their profile.");
+                            if (showToast && text) showToast("Saved to this visit.");
                           }} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: "9px 12px", borderRadius: 10, fontSize: 14, fontWeight: 600 }}>Save note</button>
                           <button onClick={() => { setNoteFor(null); setNoteDraft(""); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: "9px 12px", borderRadius: 10, fontSize: 14, fontWeight: 500 }}>Cancel</button>
                         </div>
                       </div>
                     ) : (
                       <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
-                        <button className="lift" onClick={() => { setNoteFor(a); setNoteDraft(""); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px", color: "var(--text)", fontSize: 14, fontWeight: 500 }}><Edit2 size={15} style={{ color: "var(--gold)" }} /> Note</button>
+                        <button className="lift" onClick={() => { setNoteFor(a); setNoteDraft(a.wrapNote || ""); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px", color: "var(--text)", fontSize: 14, fontWeight: 500 }}><Edit2 size={15} style={{ color: "var(--gold)" }} /> {a.wrapNote ? "Edit note" : "Note"}</button>
                         <button className="lift" onClick={() => { photoTargetRef.current = a; if (photoInputRef.current) photoInputRef.current.click(); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px", color: "var(--text)", fontSize: 14, fontWeight: 500 }}><Camera size={15} style={{ color: "var(--gold)" }} /> Photo</button>
                       </div>
                     ))}
@@ -6362,7 +6374,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             {fmtMoney(thisWeekMoney)}
           </div>
           {!isShopView && (
-            <button onClick={() => openGoalEditor("weekly")} className="lift" style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "color-mix(in srgb, var(--gold) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 40%, var(--border))", color: "var(--gold)", borderRadius: 20, padding: "6px 13px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+            <button onClick={() => openGoalEditor("weekly")} className="lift" style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 40%, var(--border))", color: "var(--gold)", borderRadius: 20, padding: "6px 13px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
               <Edit2 size={12} /> {rawWeeklyGoal > 0 ? "Edit weekly goal" : "Set weekly goal"}
             </button>
           )}
@@ -6383,7 +6395,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               </div>
             </div>
             <div style={{ height: 6, background: "var(--panel2)", borderRadius: 3, overflow: "hidden" }}>
-              <div style={{ width: `${weeklyPct}%`, height: "100%", background: weeklyPct >= 100 ? "var(--gold)" : "color-mix(in srgb, var(--gold) 70%, var(--panel2))", transition: "width .3s ease" }} />
+              <div style={{ width: `${weeklyPct}%`, height: "100%", background: weeklyPct >= 100 ? "var(--gold)" : "var(--tint2)", transition: "width .3s ease" }} />
             </div>
           </div>
         )}
@@ -6457,7 +6469,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                     )}
                     <div style={{ display: "flex", gap: 9 }}>
                       <div style={{ width: 52, flexShrink: 0, fontSize: 11, color: "var(--faint)", paddingTop: 9, textAlign: "right" }}>{fmtTime(a.start)}</div>
-                      <div style={{ flex: 1, borderRadius: 10, padding: "9px 11px", marginBottom: 6, background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))" }}>
+                      <div style={{ flex: 1, borderRadius: 10, padding: "9px 11px", marginBottom: 6, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))" }}>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{a.name || "Booked"}</div>
                         <div style={{ fontSize: 11.5, color: "var(--sub)" }}>{(a.title ? a.title + " · " : "") + fmtTime(a.start) + "–" + fmtTime(a.end)}</div>
                       </div>
@@ -6499,7 +6511,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             </div>
             <div style={{ display: "grid", gap: 4 }}>
               <button onClick={() => { setPulseView("shop"); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 12px", background: pulseView === "shop" ? "var(--panel2)" : "transparent", color: "var(--text)", border: `1px solid ${pulseView === "shop" ? "var(--border2)" : "transparent"}`, borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
-                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 20%, var(--panel2))", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={15} style={{ color: "var(--gold)" }} /></div>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--tint2)", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={15} style={{ color: "var(--gold)" }} /></div>
                 <span style={{ flex: 1, fontWeight: 500 }}>Whole shop</span>
                 <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500 }}>{fmtMoney(shopToday)}</span>
                 {pulseView === "shop" && <Check size={17} style={{ color: "var(--gold)" }} />}
@@ -6575,7 +6587,7 @@ function GrowthView({ appts, scopeFilter, services, clients, onBack }) {
   const milePct = Math.min(100, Math.round((allTime / nextMark) * 100));
   const established = allTime >= 8; // enough history for the full story
 
-  const heroStyle = { background: "linear-gradient(160deg, color-mix(in srgb, var(--gold) 11%, var(--panel)), var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 24%, var(--border))", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: 18, marginTop: 14 };
+  const heroStyle = { background: "linear-gradient(160deg, var(--tint), var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 24%, var(--border))", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: 18, marginTop: 14 };
   const groupStyle = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" };
   const headLbl = { fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "20px 6px 9px" };
   const statRow = (r, i) => (
@@ -6694,7 +6706,7 @@ function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, pr
       </div>
 
       {overdueCount > 0 && (
-        <button onClick={onOpenNudge} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, padding: "15px 16px", color: "var(--text)", cursor: "pointer", marginBottom: 18, textAlign: "left" }}>
+        <button onClick={onOpenNudge} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, padding: "15px 16px", color: "var(--text)", cursor: "pointer", marginBottom: 18, textAlign: "left" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ width: 36, height: 36, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Bell size={16} /></span>
             <div>
@@ -7015,7 +7027,7 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
               const h = (v / maxValue) * chartH;
               const x = padX + i * (barWidth + gap);
               const y = chartH - h;
-              const fill = b.isCurrent ? "var(--gold)" : "color-mix(in srgb, var(--gold) 28%, var(--panel2))";
+              const fill = b.isCurrent ? "var(--gold)" : "var(--tint2)";
               return (
                 <g key={i}>
                   {h > 0 && <rect x={x} y={y} width={barWidth} height={h} rx="3" fill={fill} />}
@@ -7050,13 +7062,13 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
             <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 14, fontWeight: 600 }}>WHERE IT COMES FROM</div>
             <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: "var(--panel2)", marginBottom: 16 }}>
               <div style={{ width: mixPct(serviceRev) + "%", background: "var(--gold)" }} />
-              <div style={{ width: mixPct(posTotal) + "%", background: "color-mix(in srgb, var(--gold) 55%, var(--panel2))" }} />
-              <div style={{ width: mixPct(tipsTotal) + "%", background: "color-mix(in srgb, var(--gold) 28%, var(--panel2))" }} />
+              <div style={{ width: mixPct(posTotal) + "%", background: "var(--tint2)" }} />
+              <div style={{ width: mixPct(tipsTotal) + "%", background: "var(--tint2)" }} />
             </div>
             <div style={{ display: "grid", gap: 11 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 14.5 }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: "var(--gold)", marginRight: 9 }} />Services</span><span style={{ fontSize: 14.5, fontWeight: 500 }}>{fmtMoney(serviceRev)} <span style={{ color: "var(--faint)", fontWeight: 400 }}>{mixPct(serviceRev)}%</span></span></div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 14.5 }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: "color-mix(in srgb, var(--gold) 55%, var(--panel2))", marginRight: 9 }} />Products / POS</span><span style={{ fontSize: 14.5, fontWeight: 500 }}>{fmtMoney(posTotal)} <span style={{ color: "var(--faint)", fontWeight: 400 }}>{mixPct(posTotal)}%</span></span></div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 14.5 }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: "color-mix(in srgb, var(--gold) 28%, var(--panel2))", marginRight: 9 }} />Tips</span><span style={{ fontSize: 14.5, fontWeight: 500 }}>{fmtMoney(tipsTotal)} <span style={{ color: "var(--faint)", fontWeight: 400 }}>{mixPct(tipsTotal)}%</span></span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 14.5 }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: "var(--tint2)", marginRight: 9 }} />Products / POS</span><span style={{ fontSize: 14.5, fontWeight: 500 }}>{fmtMoney(posTotal)} <span style={{ color: "var(--faint)", fontWeight: 400 }}>{mixPct(posTotal)}%</span></span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 14.5 }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: "var(--tint2)", marginRight: 9 }} />Tips</span><span style={{ fontSize: 14.5, fontWeight: 500 }}>{fmtMoney(tipsTotal)} <span style={{ color: "var(--faint)", fontWeight: 400 }}>{mixPct(tipsTotal)}%</span></span></div>
             </div>
           </div>
         </>
@@ -7216,13 +7228,13 @@ function AppointmentsView({ appts, providers, services, onBack }) {
         </div>
       ) : (
       <>
-      <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "20px 18px 18px", marginBottom: 30 }}>
+      <div style={{ background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "20px 18px 18px", marginBottom: 30 }}>
         <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700, marginBottom: 10 }}>CHAIR OCCUPANCY</div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 14 }}>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 52, fontWeight: 500, lineHeight: 1, letterSpacing: -1.5, color: "var(--gold)" }}>{occupancy}%</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>of your open chair time is booked</div>
         </div>
-        <div style={{ height: 8, borderRadius: 4, background: "color-mix(in srgb, var(--gold) 18%, var(--panel2))", overflow: "hidden", marginBottom: 10 }}>
+        <div style={{ height: 8, borderRadius: 4, background: "var(--tint2)", overflow: "hidden", marginBottom: 10 }}>
           <div style={{ width: Math.min(100, occupancy) + "%", height: "100%", background: "var(--gold)" }} />
         </div>
         <div style={{ fontSize: 12.5, color: "var(--sub)" }}><b style={{ color: "var(--text)" }}>{bookedHrs}h</b> booked &middot; <b style={{ color: "var(--text)" }}>{openHrs}h</b> still open of {availHrs}h</div>
@@ -7400,7 +7412,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
 
       {/* WIN BACK — the hero action: lapsed clients + dollars at risk */}
       {lapsed.length > 0 && (
-        <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "18px 16px 12px", marginBottom: 30 }}>
+        <div style={{ background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "18px 16px 12px", marginBottom: 30 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
             <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700 }}>WIN BACK</div>
             <div style={{ fontSize: 12.5, color: "var(--sub)" }}>~{fmtMoney(atRisk)} at risk <span style={{ color: "var(--faint)" }}>(est.)</span></div>
@@ -7444,7 +7456,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
             <Eyebrow>NEW vs RETURNING</Eyebrow>
             <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", background: "var(--panel2)", marginBottom: 16 }}>
               {newThisPeriod > 0 && <div style={{ flex: newThisPeriod, background: "var(--gold)" }} />}
-              {returningThisPeriod > 0 && <div style={{ flex: returningThisPeriod, background: "color-mix(in srgb, var(--gold) 35%, var(--panel2))" }} />}
+              {returningThisPeriod > 0 && <div style={{ flex: returningThisPeriod, background: "var(--tint2)" }} />}
             </div>
             <div style={{ display: "grid", gap: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -7452,7 +7464,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{newThisPeriod}</span><span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((newThisPeriod / totalActive) * 100)}%</span></div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "color-mix(in srgb, var(--gold) 35%, var(--panel2))" }} /><span style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Returning</span></div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--tint2)" }} /><span style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Returning</span></div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{returningThisPeriod}</span><span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((returningThisPeriod / totalActive) * 100)}%</span></div>
               </div>
             </div>
@@ -8611,6 +8623,7 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
 
 function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled }) {
   const [tab, setTab] = useState("pulse");
+  const [rebookSeed, setRebookSeed] = useState(null); // { clientId, serviceId, providerId } → opens the new-appointment form prefilled on the calendar
   const [activeClient, setActiveClient] = useState(null);
   const [pulseDetail, setPulseDetail] = useState(null); // null | "revenue" — drill-in from Pulse
   const [toast, setToast] = useState(null);
@@ -8819,9 +8832,9 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} onOpenClient={(c) => { setPulseDetail(null); setActiveClient(c); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId} onDeepLinkHandled={onDeepLinkHandled} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId} onDeepLinkHandled={onDeepLinkHandled} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
-        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={() => setActiveClient(null)} showToast={showToast} />}
+        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={() => setActiveClient(null)} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); setActiveClient(null); setTab("calendar"); }} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
@@ -8864,7 +8877,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
                 <p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5, marginBottom: 20 }}>Tap your name. This device remembers, so you only see this once.</p>
                 <div style={{ display: "grid", gap: 8 }}>
                   {realProviders.map((p) => (
-                    <button key={p.id} onClick={() => { if (p.pin) { setPinFor(p.id); setPinEntry(""); setPinErr(false); } else { setSignedInAs(p.id); setShowSignInPicker(false); } }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: signedInAs === p.id ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1px solid ${signedInAs === p.id ? "var(--gold)" : "var(--border2)"}`, color: "var(--text)", borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
+                    <button key={p.id} onClick={() => { if (p.pin) { setPinFor(p.id); setPinEntry(""); setPinErr(false); } else { setSignedInAs(p.id); setShowSignInPicker(false); } }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: signedInAs === p.id ? "var(--tint2)" : "var(--panel2)", border: `1px solid ${signedInAs === p.id ? "var(--gold)" : "var(--border2)"}`, color: "var(--text)", borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
                       <Avatar size={36} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 15.5, fontWeight: 500 }}>{p.name}</div>
@@ -9191,7 +9204,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           <FieldLabel>Category</FieldLabel>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {cats.map((c) => { const on = (form.category || cats[0]) === c; return (
-              <button key={c} onClick={() => setForm({ ...form, category: c })} style={{ background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: on ? "var(--gold)" : "var(--text)", padding: "8px 14px", borderRadius: 20, fontSize: 14, fontWeight: on ? 600 : 400 }}>{c}</button>
+              <button key={c} onClick={() => setForm({ ...form, category: c })} style={{ background: on ? "var(--tint)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: on ? "var(--gold)" : "var(--text)", padding: "8px 14px", borderRadius: 20, fontSize: 14, fontWeight: on ? 600 : 400 }}>{c}</button>
             ); })}
           </div>
         </div>
@@ -9219,7 +9232,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   {services.filter((s) => s.id !== editing && !((s.comboOf || []).length)).map((s) => {
                     const on = (form.comboOf || []).includes(s.id);
                     return (
-                      <button key={s.id} onClick={() => setForm({ ...form, comboOf: on ? (form.comboOf || []).filter((x) => x !== s.id) : [...(form.comboOf || []), s.id] })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: "1px solid " + (on ? "var(--gold)" : "var(--border)"), borderRadius: 12, padding: "12px 14px", color: "var(--text)" }}>
+                      <button key={s.id} onClick={() => setForm({ ...form, comboOf: on ? (form.comboOf || []).filter((x) => x !== s.id) : [...(form.comboOf || []), s.id] })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, textAlign: "left", background: on ? "var(--tint)" : "var(--panel)", border: "1px solid " + (on ? "var(--gold)" : "var(--border)"), borderRadius: 12, padding: "12px 14px", color: "var(--text)" }}>
                         <span style={{ fontSize: 15 }}>{s.name}</span>
                         {on && <Check size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />}
                       </button>
@@ -9603,7 +9616,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         })()
       )}
 
-      <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 14, padding: "14px 16px", fontSize: 13, color: "var(--text)", lineHeight: 1.5, marginTop: 10 }}>
+      <div style={{ background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 14, padding: "14px 16px", fontSize: 13, color: "var(--text)", lineHeight: 1.5, marginTop: 10 }}>
         <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>HOW IT LEARNS</div>
         Every time you finish a client and add their final photo, Vero automatically adds it here too. Over time, your library grows and the AI's matches get sharper. You can remove any photo with the trash icon if it shouldn't train future matches.
       </div>
@@ -9938,7 +9951,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
       {!editMode && (
         <button className="lift" onClick={() => { setLibForm(null); setLibOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 16px", color: "var(--text)", textAlign: "left", marginBottom: 22, boxShadow: "var(--shadow-sm)", minHeight: 62 }}>
-          <span style={{ width: 38, height: 38, borderRadius: 11, background: "color-mix(in srgb, var(--gold) 16%, var(--panel))", color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Scissors size={19} /></span>
+          <span style={{ width: 38, height: 38, borderRadius: 11, background: "var(--tint)", color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Scissors size={19} /></span>
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: "block", fontSize: 16, fontWeight: 500 }}>Cut styles</span>
             <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>Edit once — updates everywhere it's used</span>
@@ -10315,7 +10328,7 @@ function LogoEditor({ form, setForm }) {
             {[{ v: "contain", t: "Fit", s: "Whole logo shows" }, { v: "cover", t: "Fill", s: "Edge to edge" }].map((o) => {
               const on = fit === o.v;
               return (
-                <button key={o.v} onClick={() => setForm({ ...form, logoFit: o.v })} style={{ flex: 1, borderRadius: 12, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: "var(--text)", padding: "12px 10px", textAlign: "center", cursor: "pointer" }}>
+                <button key={o.v} onClick={() => setForm({ ...form, logoFit: o.v })} style={{ flex: 1, borderRadius: 12, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: "var(--text)", padding: "12px 10px", textAlign: "center", cursor: "pointer" }}>
                   <span style={{ display: "block", fontSize: 14, fontWeight: on ? 600 : 500 }}>{o.t}</span>
                   <span style={{ display: "block", fontSize: 11.5, color: "var(--sub)", marginTop: 3 }}>{o.s}</span>
                 </button>
@@ -10767,7 +10780,7 @@ function TippingEditor({ t, onChange }) {
 function WaitlistRulesEditor({ w, onChange }) {
   const set = (patch) => onChange({ ...w, ...patch });
   const Opt = ({ active, title, sub, onClick }) => (
-    <button onClick={onClick} style={{ width: "100%", textAlign: "left", background: active ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", border: `1px solid ${active ? "var(--gold)" : "var(--border2)"}`, borderRadius: 14, padding: 16, marginBottom: 10, display: "flex", alignItems: "flex-start", gap: 12 }}>
+    <button onClick={onClick} style={{ width: "100%", textAlign: "left", background: active ? "var(--tint2)" : "var(--panel2)", border: `1px solid ${active ? "var(--gold)" : "var(--border2)"}`, borderRadius: 14, padding: 16, marginBottom: 10, display: "flex", alignItems: "flex-start", gap: 12 }}>
       <span style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${active ? "var(--gold)" : "var(--border2)"}`, flexShrink: 0, marginTop: 2, display: "flex", alignItems: "center", justifyContent: "center" }}>{active && <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--gold)" }} />}</span>
       <span><span style={{ fontSize: 15.5, fontWeight: 600, color: "var(--text)", display: "block" }}>{title}</span><span style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>{sub}</span></span>
     </button>
@@ -10803,7 +10816,7 @@ function WaitlistRulesEditor({ w, onChange }) {
         {(() => { const mode = w.photoMode || (w.photoNudge === false ? "off" : "required"); const opts = [["required", "Required"], ["recommended", "Recommended"], ["off", "Off"]]; return (
           <div style={{ display: "flex", gap: 8 }}>
             {opts.map(([v, label]) => { const on = mode === v; return (
-              <button key={v} onClick={() => set({ photoMode: v, photoNudge: v !== "off" })} style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
+              <button key={v} onClick={() => set({ photoMode: v, photoNudge: v !== "off" })} style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--tint)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
             ); })}
           </div>
         ); })()}
@@ -11824,7 +11837,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           <Step label="After each appointment" desc="Cleanup and reset before the next client." val={after} onChange={(v) => setBuf({ bufferAfter: v })} />
         </div>
         {(before + after) > 0 && (
-          <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))", borderRadius: 13, padding: "13px 15px", marginTop: 14, fontSize: 13.5, lineHeight: 1.55, color: "var(--text2)" }}>
+          <div style={{ background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))", borderRadius: 13, padding: "13px 15px", marginTop: 14, fontSize: 13.5, lineHeight: 1.55, color: "var(--text2)" }}>
             A 45-min cut quietly books as <strong>{45 + before + after} min</strong> on the calendar ({before} before + 45 + {after} after). Clients still just see “45 min” — the spacing happens behind the scenes.
           </div>
         )}
@@ -11855,7 +11868,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                 <div style={{ fontSize: 15, fontWeight: 700, color: h.on ? "var(--text)" : "var(--faint)" }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</div>
                 <div style={{ fontSize: 12, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div>
               </div>
-              <button onClick={() => setDayEdit({ dow, date: d })} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: h.on ? "color-mix(in srgb, var(--gold) 9%, var(--panel2))" : "var(--panel2)", border: `1px solid ${h.on ? "color-mix(in srgb, var(--gold) 30%, var(--border))" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
+              <button onClick={() => setDayEdit({ dow, date: d })} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: h.on ? "var(--tint2)" : "var(--panel2)", border: `1px solid ${h.on ? "color-mix(in srgb, var(--gold) 30%, var(--border))" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                   <span style={{ fontSize: 15.5, fontWeight: h.on ? 600 : 400, color: h.on ? "var(--text)" : "var(--faint)", fontStyle: h.on ? "normal" : "italic" }}>{h.on ? `${fmtTime(h.start)} – ${fmtTime(h.end)}` : "No shifts"}</span>
                   {hasEx && <span style={{ fontSize: 10.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 6px", flexShrink: 0 }}>JUST THIS DAY</span>}
@@ -11921,7 +11934,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                     {[{ v: "date", t: `Just ${dateLabel.split(" ").slice(0,1)[0]}`, s: `${MONTHS[theDate.getMonth()].slice(0,3)} ${theDate.getDate()} only` }, { v: "weekly", t: `Every ${dayName}`, s: "Going forward" }].map((o) => {
                       const on = scope === o.v;
                       return (
-                        <button key={o.v} onClick={() => setScope(o.v)} style={{ flex: 1, borderRadius: 12, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: "var(--text)", padding: "12px 10px", textAlign: "center", cursor: "pointer" }}>
+                        <button key={o.v} onClick={() => setScope(o.v)} style={{ flex: 1, borderRadius: 12, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: "var(--text)", padding: "12px 10px", textAlign: "center", cursor: "pointer" }}>
                           <span style={{ display: "block", fontSize: 14, fontWeight: on ? 600 : 500 }}>{o.t}</span>
                           <span style={{ display: "block", fontSize: 11.5, color: "var(--sub)", marginTop: 3 }}>{o.s}</span>
                         </button>
@@ -11968,7 +11981,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                     {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((dn, di) => {
                       const on = picked.has(di);
                       return (
-                        <button key={di} onClick={() => toggle(di)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>
+                        <button key={di} onClick={() => toggle(di)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>
                           {dn}{di === repeatFor.dow && <span style={{ fontSize: 12, color: "var(--sub)" }}>(this day)</span>}
                           <span style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
                         </button>
@@ -12013,7 +12026,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                 {opts.map((o) => {
                   const on = isOn(o.v);
                   return (
-                    <button key={o.v} onClick={() => patch(person.id, { bookingStyle: o.v === "shop" ? "" : o.v })} style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 12, background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 13, padding: "14px 15px", color: "var(--text)", cursor: "pointer" }}>
+                    <button key={o.v} onClick={() => patch(person.id, { bookingStyle: o.v === "shop" ? "" : o.v })} style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 12, background: on ? "var(--tint2)" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 13, padding: "14px 15px", color: "var(--text)", cursor: "pointer" }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 15.5, fontWeight: 500 }}>{o.label}</span>
@@ -12159,7 +12172,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         </Card>
 
         {/* Live earnings readout */}
-        <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid var(--gold)", borderRadius: 16, padding: 18, marginTop: 6 }}>
+        <div style={{ background: "var(--tint)", border: "1px solid var(--gold)", borderRadius: 16, padding: 18, marginTop: 6 }}>
           <div style={{ fontSize: 12, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>ESTIMATED EARNINGS · THIS WEEK</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 600, marginBottom: 4 }}>${est.total.toFixed(2)}</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 14 }}>{est.basis} · {est.count} completed appt{est.count !== 1 ? "s" : ""}</div>
@@ -12500,8 +12513,8 @@ function RebookCheckoutEditor({ r, onChange }) {
             <div style={{ marginTop: 16 }}>
               <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 10 }}>Discount</div>
               <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-                <button onClick={() => set({ discountType: "amount" })} style={{ flex: 1, padding: "12px", borderRadius: 12, border: `1.5px solid ${r.discountType !== "percent" ? "var(--gold)" : "var(--border2)"}`, background: r.discountType !== "percent" ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel2)", color: "var(--text)", fontSize: 15, fontWeight: 500 }}>Dollar ($)</button>
-                <button onClick={() => set({ discountType: "percent" })} style={{ flex: 1, padding: "12px", borderRadius: 12, border: `1.5px solid ${r.discountType === "percent" ? "var(--gold)" : "var(--border2)"}`, background: r.discountType === "percent" ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel2)", color: "var(--text)", fontSize: 15, fontWeight: 500 }}>Percent (%)</button>
+                <button onClick={() => set({ discountType: "amount" })} style={{ flex: 1, padding: "12px", borderRadius: 12, border: `1.5px solid ${r.discountType !== "percent" ? "var(--gold)" : "var(--border2)"}`, background: r.discountType !== "percent" ? "var(--tint)" : "var(--panel2)", color: "var(--text)", fontSize: 15, fontWeight: 500 }}>Dollar ($)</button>
+                <button onClick={() => set({ discountType: "percent" })} style={{ flex: 1, padding: "12px", borderRadius: 12, border: `1.5px solid ${r.discountType === "percent" ? "var(--gold)" : "var(--border2)"}`, background: r.discountType === "percent" ? "var(--tint)" : "var(--panel2)", color: "var(--text)", fontSize: 15, fontWeight: 500 }}>Percent (%)</button>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px" }}>
                 <span style={{ fontSize: 18, color: "var(--sub)" }}>{r.discountType === "percent" ? "%" : "$"}</span>
@@ -12551,7 +12564,7 @@ function NoShowEditor({ b, policy, onBooking, onPolicy }) {
   return (
     <div style={{ display: "grid", gap: 0 }}>
       {/* Preview-mode notice */}
-      <div style={{ background: "color-mix(in srgb, var(--gold) 9%, var(--panel2))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 18, fontSize: 13, color: "var(--text2)", lineHeight: 1.5 }}>
+      <div style={{ background: "var(--tint2)", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 18, fontSize: 13, color: "var(--text2)", lineHeight: 1.5 }}>
         <b style={{ color: "var(--gold)" }}>Preview mode.</b> Clients enter a card and agree to your terms, but no money moves until your payment processor is connected. Everything below is ready for that day.
       </div>
 
@@ -12572,7 +12585,7 @@ function NoShowEditor({ b, policy, onBooking, onPolicy }) {
           {[["none", "No deposit", "Just hold the card"], ["fixed", "Fixed amount", "A set dollar amount per booking"], ["percent", "Percent of price", "A share of the service price"]].map(([val, lbl, desc]) => {
             const on = (dep.mode || "none") === val;
             return (
-              <button key={val} onClick={() => setDep({ mode: val })} style={{ width: "100%", textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "13px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
+              <button key={val} onClick={() => setDep({ mode: val })} style={{ width: "100%", textAlign: "left", background: on ? "var(--tint2)" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, padding: "13px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
                 <span><span style={{ fontSize: 15.5, fontWeight: 500, display: "block", color: "var(--text)" }}>{lbl}</span><span style={{ fontSize: 13, color: "var(--sub)" }}>{desc}</span></span>
                 <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
               </button>
@@ -12602,7 +12615,7 @@ function NoShowEditor({ b, policy, onBooking, onPolicy }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {noticeOpts.map((o) => {
             const on = lead === o.v;
-            return <button key={o.v} onClick={() => onBooking({ leadTimeMin: o.v })} style={{ padding: "10px 15px", borderRadius: 10, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{o.label}</button>;
+            return <button key={o.v} onClick={() => onBooking({ leadTimeMin: o.v })} style={{ padding: "10px 15px", borderRadius: 10, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{o.label}</button>;
           })}
         </div>
       </div>
@@ -12638,14 +12651,14 @@ function BookingTimesEditor({ b, onChange }) {
       desc: "Back-to-back only — every booking touches another. Zero gaps, fewest options.",
       example: "With a cut ending at 11:45, the only morning time offered is 11:45 — the second one client gets up, the next sits down. Best for your busiest days when you want to cram in every cut." },
   ];
-  const chip = (sel) => ({ flex: "0 0 auto", padding: "8px 14px", borderRadius: 30, border: `1.5px solid ${sel ? "var(--gold)" : "var(--border)"}`, background: sel ? "color-mix(in srgb, var(--gold) 14%, var(--panel))" : "var(--panel)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 13, fontWeight: sel ? 600 : 500, cursor: "pointer" });
+  const chip = (sel) => ({ flex: "0 0 auto", padding: "8px 14px", borderRadius: 30, border: `1.5px solid ${sel ? "var(--gold)" : "var(--border)"}`, background: sel ? "var(--tint)" : "var(--panel)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 13, fontWeight: sel ? 600 : 500, cursor: "pointer" });
   return (
     <div>
       <div style={{ display: "grid", gap: 9 }}>
         {modes.map((m) => {
           const on = mode === m.v;
           return (
-            <button key={m.v} onClick={() => onChange({ timeMode: m.v, avoidGaps: m.v !== "grid" })} style={{ width: "100%", textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: "15px 16px", cursor: "pointer" }}>
+            <button key={m.v} onClick={() => onChange({ timeMode: m.v, avoidGaps: m.v !== "grid" })} style={{ width: "100%", textAlign: "left", background: on ? "var(--tint2)" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: "15px 16px", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{m.label}</span>
@@ -12655,7 +12668,7 @@ function BookingTimesEditor({ b, onChange }) {
               </div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 5 }}>{m.desc}</div>
               {on && (
-                <div style={{ marginTop: 12, background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
+                <div style={{ marginTop: 12, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
                   <div style={{ fontSize: 11, letterSpacing: 0.3, color: "var(--gold)", fontWeight: 600, marginBottom: 5 }}>For example</div>
                   <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55 }}>{m.example}</div>
                 </div>
@@ -12695,7 +12708,7 @@ function BookingTimesEditor({ b, onChange }) {
             <div style={{ fontSize: 11.5, letterSpacing: 1, color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>SHOW ABOUT</div>
             <div style={{ display: "flex", gap: 8 }}>
               {[3, 6, 8].map((n) => { const sel = curatedN === n; return (
-                <button key={n} onClick={() => onChange({ curatedN: n })} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: `1.5px solid ${sel ? "var(--gold)" : "var(--border)"}`, background: sel ? "color-mix(in srgb, var(--gold) 14%, var(--panel))" : "var(--panel)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: sel ? 600 : 400, cursor: "pointer" }}>{n} openings</button>
+                <button key={n} onClick={() => onChange({ curatedN: n })} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: `1.5px solid ${sel ? "var(--gold)" : "var(--border)"}`, background: sel ? "var(--tint)" : "var(--panel)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: sel ? 600 : 400, cursor: "pointer" }}>{n} openings</button>
               ); })}
             </div>
           </div>
@@ -12740,7 +12753,7 @@ function AnyoneRoutingEditor({ b, onChange, providers = [] }) {
         {modes.map((m) => {
           const on = mode === m.v;
           return (
-            <button key={m.v} onClick={() => onChange({ anyoneMode: m.v })} style={{ width: "100%", textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel2))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: "15px 16px", cursor: "pointer" }}>
+            <button key={m.v} onClick={() => onChange({ anyoneMode: m.v })} style={{ width: "100%", textAlign: "left", background: on ? "var(--tint2)" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: "15px 16px", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{m.label}</span>
@@ -12750,7 +12763,7 @@ function AnyoneRoutingEditor({ b, onChange, providers = [] }) {
               </div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 5 }}>{m.desc}</div>
               {on && (
-                <div style={{ marginTop: 12, background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
+                <div style={{ marginTop: 12, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
                   <div style={{ fontSize: 11, letterSpacing: 0.3, color: "var(--gold)", fontWeight: 600, marginBottom: 5 }}>For example</div>
                   <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55 }}>{m.example}</div>
                 </div>
@@ -12800,7 +12813,7 @@ function PhotoModeSetting({ mode, onChange }) {
   return (
     <div style={{ display: "grid", gap: 10 }}>
       {opts.map(([val, label, desc]) => { const on = mode === val; return (
-        <button key={val} onClick={() => onChange(val)} style={{ width: "100%", textAlign: "left", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <button key={val} onClick={() => onChange(val)} style={{ width: "100%", textAlign: "left", background: on ? "var(--tint)" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <span><span style={{ fontSize: 15.5, fontWeight: 500, display: "block" }}>{label}</span><span style={{ fontSize: 13.5, color: "var(--sub)" }}>{desc}</span></span>
           <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} />}</span>
         </button>
@@ -13274,7 +13287,7 @@ function HelpCenter({ business, onBack }) {
           </div>
         )}
 
-        <a href={supportHref} className="lift" style={{ display: "flex", alignItems: "center", gap: 13, textDecoration: "none", marginTop: 22, padding: 18, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16 }}>
+        <a href={supportHref} className="lift" style={{ display: "flex", alignItems: "center", gap: 13, textDecoration: "none", marginTop: 22, padding: 18, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16 }}>
           <LifeBuoy size={22} style={{ color: "var(--gold)", flexShrink: 0 }} />
           <span style={{ flex: 1 }}>
             <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Still need a hand?</span>
@@ -13301,7 +13314,7 @@ function HelpCenter({ business, onBack }) {
       </div>
 
       {HELP_AI_ENABLED && !query && (
-        <button onClick={() => setChatOpen(true)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, background: "color-mix(in srgb, var(--gold) 10%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, padding: "15px 16px", marginBottom: 24, textAlign: "left", cursor: "pointer" }}>
+        <button onClick={() => setChatOpen(true)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, padding: "15px 16px", marginBottom: 24, textAlign: "left", cursor: "pointer" }}>
           <Sparkles size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />
           <span style={{ flex: 1 }}>
             <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Ask the assistant</span>
@@ -13334,7 +13347,7 @@ function HelpCenter({ business, onBack }) {
               ))}
             </div>
           ))}
-          <a href={supportHref} className="lift" style={{ marginTop: 8, padding: 20, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, display: "flex", alignItems: "flex-start", gap: 13, textDecoration: "none" }}>
+          <a href={supportHref} className="lift" style={{ marginTop: 8, padding: 20, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, display: "flex", alignItems: "flex-start", gap: 13, textDecoration: "none" }}>
             <LifeBuoy size={22} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15.5, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>Can't find an answer?</div>
@@ -13494,7 +13507,7 @@ function TestDataTool({ shopId, services, providers, appts, setAppts, clients, s
       <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, margin: "0 0 16px" }}>Fill your calendar with a week of fake clients and appointments so you can see and test a busy shop. Everything it creates is tagged and fully removable — it can never touch real bookings.</p>
 
       {hasTest && (
-        <div style={{ background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 16, fontSize: 14, color: "var(--text)" }}>
+        <div style={{ background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 16, fontSize: 14, color: "var(--text)" }}>
           Currently loaded: <strong>{counts.appts}</strong> appointments, <strong>{counts.clients}</strong> clients{counts.waitlist ? <>, <strong>{counts.waitlist}</strong> waitlist</> : null}.
         </div>
       )}
@@ -14056,7 +14069,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           <div style={{ marginBottom: 22 }}>
             {[["1", "You finish the appointment", "At checkout, Vero shows how long it really took."], ["2", "Save it as their time — one tap", "Need more time for a detailed client? Less for a quick regular? Save the real number."], ["3", "Next time, it just fits", "Their future bookings reserve that exact length automatically. No guessing, no rushing, no dead gaps."]].map(([n, b, d], i) => (
               <div key={n} style={{ display: "flex", gap: 13, alignItems: "flex-start", padding: "13px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
-                <span style={{ width: 26, height: 26, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, var(--panel2))", color: "var(--gold)", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>{n}</span>
+                <span style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--tint2)", color: "var(--gold)", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>{n}</span>
                 <span><span style={{ display: "block", fontSize: 15, fontWeight: 600, marginBottom: 2 }}>{b}</span><span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>{d}</span></span>
               </div>
             ))}
@@ -15038,16 +15051,16 @@ function BarberMenu({ working, weekdayName, cx, top, onEditHours, onToggleDay, o
 // ============================================================
 // NEW APPOINTMENT — pick client + service, then book (full page)
 // ============================================================
-function NewAppointmentForm({ slot, providers, clients, services, appts, selectedDate, onClose, onBook, onBlock, onPickDate }) {
+function NewAppointmentForm({ slot, providers, clients, services, appts, selectedDate, onClose, onBook, onBlock, onPickDate, initialClient = null, initialService = null }) {
   const [provId, setProvId] = useState(slot.providerId);
   const staff = providers.filter((p) => p.role !== "owner-nonstaff");
-  const [client, setClient] = useState(null);
+  const [client, setClient] = useState(initialClient);
   const [walkIn, setWalkIn] = useState(false);
   const [walkInFirst, setWalkInFirst] = useState("");
   const [walkInLast, setWalkInLast] = useState("");
   const [walkInPhone, setWalkInPhone] = useState("");
   const [walkInEmail, setWalkInEmail] = useState("");
-  const [service, setService] = useState(null);
+  const [service, setService] = useState(initialService);
   const [note, setNote] = useState("");
   const [startMin, setStartMin] = useState(slot.start);
   const [q, setQ] = useState("");
@@ -15145,7 +15158,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             return offering.length > 1 && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "22px 0 0" }}>
               {offering.map((p) => { const on = p.id === provId; return (
-                <button key={p.id} onClick={() => setProvId(p.id)} style={{ display: "flex", alignItems: "center", gap: 7, background: on ? "color-mix(in srgb, var(--gold) 12%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14.5, fontWeight: on ? 600 : 400 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color || "var(--gold)" }} />{p.name}</button>
+                <button key={p.id} onClick={() => setProvId(p.id)} style={{ display: "flex", alignItems: "center", gap: 7, background: on ? "var(--tint)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14.5, fontWeight: on ? 600 : 400 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color || "var(--gold)" }} />{p.name}</button>
               ); })}
             </div>
             );
@@ -15231,7 +15244,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             {openSvc && (
               <div style={{ display: "grid", gap: 8, paddingBottom: 22 }}>
                 {services.map((s) => { const on = service && service.id === s.id; return (
-                  <button key={s.id} onClick={() => { setService(s); setOpenSvc(false); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left" }}>
+                  <button key={s.id} onClick={() => { setService(s); setOpenSvc(false); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "var(--tint)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <span style={{ width: 10, height: 10, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />
                       <div><div style={{ fontSize: 15.5, fontWeight: on ? 600 : 500 }}>{s.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>${getPrice(s, provId)} · {getDuration(client, s, provId)} min</div></div>
@@ -15440,7 +15453,7 @@ function ColumnOrderEditor({ providers, setProviders }) {
     </div>
   );
 }
-function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId, deepLinkApptId, onDeepLinkHandled }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId, deepLinkApptId, onDeepLinkHandled, rebookSeed, onRebookHandled }) {
   const sizeId = business?.calendarRowSize || "L";
   // Visible calendar window — configurable in Calendar Settings; falls back to 7 AM–10 PM.
   const DAY_START = ((business?.calendar?.dayStartHr ?? 7)) * 60;
@@ -15463,6 +15476,17 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     setOpen(ap);
     if (onDeepLinkHandled) onDeepLinkHandled();
   }, [deepLinkApptId, appts]);
+  // Rebook from the client card: open the new-appointment form prefilled with this client + service.
+  useEffect(() => {
+    if (!rebookSeed) return;
+    const c = (clients || []).find((x) => x.id === rebookSeed.clientId) || null;
+    const s = (services || []).find((x) => x.id === rebookSeed.serviceId) || null;
+    const pid = rebookSeed.providerId || (c && c.provider) || (providers[1] || providers[0] || {}).id;
+    const dur = s ? getDuration(c, s, pid) : 30;
+    const start = earliestOpenSlot(pid, selectedDate, dur);
+    setNewApptSlot({ providerId: pid, start, initialClient: c, initialService: s });
+    if (onRebookHandled) onRebookHandled();
+  }, [rebookSeed]);
   const [drag, setDrag] = useState(null);     // { id, deltaMin } while dragging
   const [pending, setPending] = useState(null); // { appt, newStart, newEnd } awaiting confirm
   const [notifyMove, setNotifyMove] = useState(false); // drag-move: text the client the new time (default off/silent)
@@ -16281,7 +16305,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               />
               {/* beige "New Appointment" block shown while long-pressing / scrubbing */}
               {pressInd && pressInd.providerId === p.id && (
-                <div style={{ position: "absolute", top: (pressInd.start - DAY_START) * PPM, left: 3, right: 3, height: NEW_DUR * PPM - 2, background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", border: "1.5px solid var(--gold)", borderRadius: 12, padding: "8px 11px", zIndex: 30, pointerEvents: "none", boxShadow: "var(--glow)" }}>
+                <div style={{ position: "absolute", top: (pressInd.start - DAY_START) * PPM, left: 3, right: 3, height: NEW_DUR * PPM - 2, background: "var(--tint)", border: "1.5px solid var(--gold)", borderRadius: 12, padding: "8px 11px", zIndex: 30, pointerEvents: "none", boxShadow: "var(--glow)" }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "var(--gold)" }}>{fmtTime(pressInd.start)}</div>
                   <div style={{ fontSize: 13, color: "var(--text2)", fontWeight: 500 }}>New Appointment</div>
                 </div>
@@ -16326,6 +16350,14 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 const tint = `color-mix(in srgb, ${accent} 62%, var(--panel))`;
                 const onColor = "var(--text)";
                 const blockBg = "repeating-linear-gradient(45deg, var(--panel2), var(--panel2) 7px, var(--line) 7px, var(--line) 14px)";
+                // Studio = strict monochrome: white block, hairline border, black left bar (grey + faded when done).
+                // Colored themes keep the service-colored tint + accent. Gated on the active theme so all 12 still work.
+                const mono = theme === "studio";
+                const SOFT_SHADOW = "0 1px 2px rgba(0,0,0,.06), 0 8px 22px rgba(0,0,0,.08)";
+                const blkBg = isBlock ? blockBg : (mono ? "var(--panel)" : (isDone ? "var(--panel2)" : tint));
+                const blkBorder = `1px solid ${isBlock ? "var(--border)" : (mono ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`)}`;
+                const blkLeft = `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : (mono ? "var(--text)" : accent))}`;
+                const blkShadow = isDragging ? "var(--shadow-lg)" : (mono ? SOFT_SHADOW : "var(--shadow-sm)");
                 // Horizontal lane positioning — full width when alone, split into N equal lanes when overlapping.
                 const laneCount = a._laneCount || 1;
                 const lane = a._lane || 0;
@@ -16337,7 +16369,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     onClick={() => { const d = dragRef.current; if (d && (d.didDrag || d.scrolled)) return; setOpen(a); }}
                     onMouseDown={(e) => startDrag(e, a)} onTouchStart={(e) => startDrag(e, a)}
                     className={isDragging ? "" : "lift"}
-                    style={{ position: "absolute", top, ...lanePos, height, background: isBlock ? blockBg : (isDone ? "var(--panel2)" : tint), opacity: isDone ? 0.7 : 1, border: `1px solid ${isBlock ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`}`, borderLeft: `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : accent)}`, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "var(--shadow-sm)", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
+                    style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: isDone ? (mono ? 0.55 : 0.7) : 1, border: blkBorder, borderLeft: blkLeft, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: blkShadow, transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
                     {/* name — always one line, never wraps or collides */}
                     <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{apptDisplayName(a, clients)}</span>
                     {/* time range — shown once room exists */}
@@ -16412,7 +16444,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 <span style={{ margin: "0 8px", color: "var(--gold)" }}>→</span>
                 <span style={{ color: "var(--text)", fontWeight: 600 }}>{fmtTime(pending.newStart)} – {fmtTime(pending.newEnd)}</span>
               </div>
-              <div onClick={() => setNotifyMove((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, textAlign: "left", background: notifyMove ? "color-mix(in srgb, var(--gold) 8%, var(--panel2))" : "var(--panel2)", border: `1px solid ${notifyMove ? "color-mix(in srgb, var(--gold) 32%, var(--border))" : "var(--border)"}`, borderRadius: 13, padding: "12px 14px", marginBottom: 16, cursor: "pointer" }}>
+              <div onClick={() => setNotifyMove((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, textAlign: "left", background: notifyMove ? "var(--tint2)" : "var(--panel2)", border: `1px solid ${notifyMove ? "color-mix(in srgb, var(--gold) 32%, var(--border))" : "var(--border)"}`, borderRadius: 13, padding: "12px 14px", marginBottom: 16, cursor: "pointer" }}>
                 <div>
                   <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text)" }}>Notify client of the new time</div>
                   <div style={{ fontSize: 12.5, color: notifyMove ? "var(--gold)" : "var(--sub)", marginTop: 2 }}>{notifyMove ? "We'll text them the change when you confirm" : "They won't be told unless you turn this on"}</div>
@@ -16515,6 +16547,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       {newApptSlot && (
         <NewAppointmentForm
           slot={newApptSlot}
+          initialClient={newApptSlot.initialClient || null}
+          initialService={newApptSlot.initialService || null}
           providers={providers}
           clients={clients}
           services={services}
@@ -17423,7 +17457,7 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
         </div>
         <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", background: "var(--panel2)", marginBottom: 10 }}>
           <div style={{ width: cashPct + "%", background: "var(--gold)" }} />
-          <div style={{ width: (100 - cashPct) + "%", background: "color-mix(in srgb, var(--gold) 35%, var(--panel2))" }} />
+          <div style={{ width: (100 - cashPct) + "%", background: "var(--tint2)" }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5 }}>
           <span style={{ color: "var(--sub)" }}>Cash <b style={{ color: "var(--text)" }}>{fmtMoney0(cashIn)}</b></span>
@@ -17963,7 +17997,7 @@ function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, sho
             {recs.length > 1 && (
               <div style={{ margin: "10px 0 4px" }}>
                 {recs.map((r) => (
-                  <button key={r.id} onClick={() => setSelId(r.id)} style={{ width: "100%", display: "flex", justifyContent: "space-between", gap: 10, padding: "12px 14px", marginBottom: 8, background: selId === r.id ? "color-mix(in srgb, var(--gold) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${selId === r.id ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, color: "var(--text)", fontSize: 14, textAlign: "left", cursor: "pointer" }}>
+                  <button key={r.id} onClick={() => setSelId(r.id)} style={{ width: "100%", display: "flex", justifyContent: "space-between", gap: 10, padding: "12px 14px", marginBottom: 8, background: selId === r.id ? "var(--tint)" : "var(--panel)", border: `1px solid ${selId === r.id ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, color: "var(--text)", fontSize: 14, textAlign: "left", cursor: "pointer" }}>
                     <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.method === "cash" ? "Cash" : r.last4 ? `Card ··${r.last4}` : "Card"} · {r.note || "Sale"}</span>
                     <span style={{ flexShrink: 0, color: "var(--sub)" }}>${(((r.amount || 0) - (r.refunded || 0))).toFixed(2)} left</span>
                   </button>
@@ -18467,7 +18501,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   } />
                 </div>
                 {client && client.notes && (
-                  <div style={{ marginTop: 16, background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 12, padding: "12px 14px", display: "flex", gap: 10 }}>
+                  <div style={{ marginTop: 16, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 12, padding: "12px 14px", display: "flex", gap: 10 }}>
                     <AlertCircle size={15} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
                     <div style={{ fontSize: 14, color: T.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{client.notes}</div>
                   </div>
@@ -19367,7 +19401,7 @@ function ReportsView({ appts, clients, providers, services, business, setBusines
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8, height: 130 }}>
           {weekTrend.map((v, i) => (
             <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, height: "100%", justifyContent: "flex-end" }}>
-              <div style={{ width: "100%", maxWidth: 30, height: `${Math.max(4, (v / maxTrend) * 100)}%`, background: i === 5 ? "var(--gold)" : "color-mix(in srgb, var(--gold) 35%, var(--panel2))", borderRadius: "6px 6px 0 0", transition: "height .3s var(--ease)" }} />
+              <div style={{ width: "100%", maxWidth: 30, height: `${Math.max(4, (v / maxTrend) * 100)}%`, background: i === 5 ? "var(--gold)" : "var(--tint2)", borderRadius: "6px 6px 0 0", transition: "height .3s var(--ease)" }} />
               <span style={{ fontSize: 11.5, color: "var(--faint)" }}>{dayLabels[i]}</span>
             </div>
           ))}
@@ -19631,7 +19665,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
             {overdue.map((o) => {
               const provider = providers.find((p) => p.id === o.c.provider) || providers[1];
               return (
-                <div key={o.c.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "color-mix(in srgb, var(--gold) 7%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, padding: "12px 14px" }}>
+                <div key={o.c.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, padding: "12px 14px" }}>
                   <Avatar size={40} photo={clientPhoto(o.c)} initial={o.c.name.charAt(0)} color={provider.color} />
                   <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => { setShowNudgeFolder(false); onOpen(o.c); }}>
                     <div style={{ fontSize: 15.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.c.name}</div>
@@ -19662,8 +19696,8 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
 
             <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 8 }}>SEND BY</label>
             <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-              <button onClick={() => hasPhone && setNudgeChannel("text")} disabled={!hasPhone} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: `1.5px solid ${nudgeChannel === "text" ? "var(--gold)" : "var(--border)"}`, background: nudgeChannel === "text" ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: hasPhone ? (nudgeChannel === "text" ? "var(--gold)" : "var(--text)") : "var(--faint)", fontSize: 14.5, fontWeight: nudgeChannel === "text" ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><MessageSquare size={16} /> Text{!hasPhone ? " (no #)" : ""}</button>
-              <button onClick={() => hasEmail && setNudgeChannel("email")} disabled={!hasEmail} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: `1.5px solid ${nudgeChannel === "email" ? "var(--gold)" : "var(--border)"}`, background: nudgeChannel === "email" ? "color-mix(in srgb, var(--gold) 12%, var(--panel2))" : "var(--panel2)", color: hasEmail ? (nudgeChannel === "email" ? "var(--gold)" : "var(--text)") : "var(--faint)", fontSize: 14.5, fontWeight: nudgeChannel === "email" ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Send size={15} /> Email{!hasEmail ? " (none)" : ""}</button>
+              <button onClick={() => hasPhone && setNudgeChannel("text")} disabled={!hasPhone} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: `1.5px solid ${nudgeChannel === "text" ? "var(--gold)" : "var(--border)"}`, background: nudgeChannel === "text" ? "var(--tint2)" : "var(--panel2)", color: hasPhone ? (nudgeChannel === "text" ? "var(--gold)" : "var(--text)") : "var(--faint)", fontSize: 14.5, fontWeight: nudgeChannel === "text" ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><MessageSquare size={16} /> Text{!hasPhone ? " (no #)" : ""}</button>
+              <button onClick={() => hasEmail && setNudgeChannel("email")} disabled={!hasEmail} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: `1.5px solid ${nudgeChannel === "email" ? "var(--gold)" : "var(--border)"}`, background: nudgeChannel === "email" ? "var(--tint2)" : "var(--panel2)", color: hasEmail ? (nudgeChannel === "email" ? "var(--gold)" : "var(--text)") : "var(--faint)", fontSize: 14.5, fontWeight: nudgeChannel === "email" ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Send size={15} /> Email{!hasEmail ? " (none)" : ""}</button>
             </div>
 
             <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 8 }}>MESSAGE</label>
@@ -19729,7 +19763,7 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
   );
 }
 
-function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, setAppts, business, setBusiness, me, shopId, onBack, showToast }) {
+function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, setAppts, business, setBusiness, me, shopId, onBack, showToast, onRebook }) {
   const live = clients.find((c) => c.id === client.id) || client;
   const provider = providers.find((p) => p.id === live.provider) || providers[1] || providers[0] || {};
   const firstName = (live.name || "").split(" ")[0] || "this client";
@@ -19784,16 +19818,6 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const noteDirty = noteDraft !== (live.notes || "");
   const saveNote = () => { setClients(clients.map((c) => c.id === client.id ? { ...c, notes: noteDraft } : c)); setEditingNote(false); showToast("Client note saved."); };
 
-  // ---- wrap-up notes (dated, barber's post-visit notes) ----
-  const [tlDraft, setTlDraft] = useState("");
-  const addTimelineNote = () => {
-    if (!tlDraft.trim()) return;
-    const entry = { id: "tn" + Date.now(), text: tlDraft.trim(), date: new Date().toISOString() };
-    setClients(clients.map((c) => c.id === client.id ? { ...c, timeline: [entry, ...(c.timeline || [])] } : c));
-    setTlDraft(""); showToast("Note added.");
-  };
-  const removeTimelineNote = (id) => setClients(clients.map((c) => c.id === client.id ? { ...c, timeline: (c.timeline || []).filter((t) => t.id !== id) } : c));
-
   // ---- profile photo + work gallery ----
   const [picker, setPicker] = useState(false);
   const setClientPhoto = (id) => { setClients(clients.map((c) => c.id === client.id ? { ...c, photo: id } : c)); setPicker(false); };
@@ -19845,7 +19869,8 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const cadenceShort = cadenceAvg == null ? "—" : (cadenceAvg < 11 ? `${cadenceAvg}d` : `${Math.round(cadenceAvg / 7)} wk`);
 
   // wrap-up + from-client note sources
-  const wrapNotes = live.timeline || [];
+  // Per-visit wrap-up notes (stored on the appointment), newest first — separate from the client-level prefs note.
+  const visitWrapNotes = myAppts.filter((a) => (a.wrapNote || "").trim()).sort((a, b) => new Date(b.bookedFor || 0) - new Date(a.bookedFor || 0));
   const bookingNotes = myAppts.filter((a) => (a.note || "").trim()).sort((a, b) => new Date(b.bookedFor || 0) - new Date(a.bookedFor || 0));
 
   // ---- detail / transaction / reschedule / money sheets ----
@@ -19854,6 +19879,14 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const [checkout, setCheckout] = useState(null);
   const [refundAppt, setRefundAppt] = useState(null);
   const [resched, setResched] = useState(null);  // { id, date, start }
+  const [wrapEdit, setWrapEdit] = useState(false); // editing this visit's wrap-up note in the past sheet
+  const [wrapDraft, setWrapDraft] = useState("");
+  const saveWrap = (id, text) => {
+    const t = (text || "").trim();
+    setAppts((cur) => cur.map((x) => x.id === id ? { ...x, wrapNote: t, wrapNoteAt: t ? new Date().toISOString() : x.wrapNoteAt, hasNote: t ? true : x.hasNote } : x));
+    setWrapEdit(false); showToast(t ? "Visit note saved." : "Visit note cleared.");
+  };
+  const rebook = (a) => { if (onRebook) onRebook({ clientId: client.id, serviceId: a.serviceId, providerId: a.providerId || live.provider }); setDetail(null); };
 
   const checkInAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "in-service", serviceStartedAt: x.serviceStartedAt || Date.now() } : x)); setDetail(null); showToast(`${firstName} checked in.`); };
   const cancelAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "cancelled" } : x)); setDetail(null); showToast("Appointment cancelled."); };
@@ -19886,7 +19919,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   };
 
   const tabLabel = { fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "22px 4px 10px" };
-  const cardStyle = { border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", background: "var(--bg)" };
+  const cardStyle = { border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", background: "var(--bg)", boxShadow: "var(--shadow-sm)" };
   const chev = <ChevronRight size={16} style={{ color: "var(--border2)", flexShrink: 0 }} />;
 
   // a tappable appointment row (used in Overview + Visits)
@@ -20052,21 +20085,14 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           </div>
         ))}
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={tabLabel}>Wrap-up notes</div>
-        </div>
-        <div style={{ display: "flex", gap: 8, marginBottom: wrapNotes.length ? 12 : 0 }}>
-          <input value={tlDraft} onChange={(e) => setTlDraft(e.target.value)} placeholder="Add a post-visit note…" style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "11px 13px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
-          <button onClick={addTimelineNote} disabled={!tlDraft.trim()} style={{ background: tlDraft.trim() ? "var(--text)" : "var(--panel2)", color: tlDraft.trim() ? "var(--bg)" : "var(--faint)", padding: "0 16px", borderRadius: 11, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>Add</button>
-        </div>
-        {wrapNotes.map((t) => (
-          <div key={t.id} style={{ border: "1px solid var(--border)", borderRadius: 13, padding: "13px 14px", marginBottom: 8, display: "flex", gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{t.text}</div>
-              <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 7 }}>{t.date ? niceDate(t.date) : ""}</div>
-            </div>
-            <button onClick={() => removeTimelineNote(t.id)} style={{ background: "none", border: "none", color: "var(--faint)", cursor: "pointer", flexShrink: 0 }}><X size={15} /></button>
-          </div>
+        <div style={tabLabel}>Wrap-up notes</div>
+        {visitWrapNotes.length === 0 ? (
+          <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", padding: "0 4px" }}>Notes you add at wrap-up — tied to each visit — show here. Tap a visit to add one.</p>
+        ) : visitWrapNotes.map((a) => (
+          <button key={a.id} onClick={() => setDetail({ appt: a, mode: "past" })} style={{ display: "block", width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 14px", marginBottom: 8, background: "none", cursor: "pointer", color: "var(--text)" }}>
+            <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{a.wrapNote}</div>
+            <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 7 }}>{a.title}{a.bookedFor ? ` · ${niceDate(a.bookedFor)}` : ""}</div>
+          </button>
         ))}
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "22px 4px 10px" }}>
@@ -20078,7 +20104,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7 }}>
             {gallery.map((g) => (
-              <button key={g.id} onClick={() => setLightbox(g.id)} style={{ position: "relative", padding: 0, borderRadius: 11, overflow: "hidden", border: "1px solid var(--line)", aspectRatio: "1", background: "#E4E4E1", cursor: "pointer" }}>
+              <button key={g.id} onClick={() => setLightbox(g.id)} style={{ position: "relative", padding: 0, borderRadius: 11, overflow: "hidden", border: "1px solid var(--border)", aspectRatio: "1", background: "var(--panel2)", cursor: "pointer" }}>
                 <img src={imgUrl(g.photo, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 {g.source === "client" && <span style={{ position: "absolute", left: 6, bottom: 6, fontSize: 7.5, letterSpacing: 0.8, background: "rgba(10,10,10,0.7)", color: "#fff", padding: "2px 5px", borderRadius: 5 }}>FROM CLIENT</span>}
               </button>
@@ -20174,7 +20200,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         const customPrice = (live.customPrices || {})[a.serviceId] != null;
         const apptPrice = a.price != null ? a.price : (svc ? getPrice(svc, a.providerId) : 0);
         return (
-          <Sheet open onClose={() => setDetail(null)} align="center" maxWidth={440}>
+          <Sheet open onClose={() => { setDetail(null); setWrapEdit(false); }} align="center" maxWidth={440}>
             <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{detail.mode === "up" ? `Upcoming · ${daysFromNow(a.bookedFor)}` : `Past visit · ${niceDateFull(a.bookedFor)}`}</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, letterSpacing: "-0.4px", marginTop: 8 }}>{detail.mode === "up" ? `${niceDateFull(a.bookedFor)} · ${fmtTime(a.start)}` : a.title}</h2>
             <div style={{ color: "var(--text2)", fontSize: 14, marginTop: 6 }}>{detail.mode === "up" ? `${a.title} · with ${provName(a)}` : `with ${provName(a)}`}</div>
@@ -20205,14 +20231,34 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
               </div>
             )}
 
+            {detail.mode === "past" && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 9.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>Wrap-up note</div>
+                {wrapEdit ? (
+                  <div>
+                    <textarea autoFocus value={wrapDraft} onChange={(e) => setWrapDraft(e.target.value)} rows={3} placeholder="Formula, what you did, how it went — notes for next time." style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", boxSizing: "border-box" }} />
+                    <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                      <button onClick={() => setWrapEdit(false)} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 11, borderRadius: 11, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+                      <button onClick={() => saveWrap(a.id, wrapDraft)} style={{ flex: 1, background: "var(--text)", color: "var(--bg)", padding: 11, borderRadius: 11, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}>Save note</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div onClick={() => { setWrapDraft(a.wrapNote || ""); setWrapEdit(true); }} style={{ border: `1px ${a.wrapNote ? "solid" : "dashed"} var(--border2)`, borderRadius: 12, padding: "12px 14px", cursor: "pointer", color: a.wrapNote ? "var(--text2)" : "var(--sub)", fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                    {a.wrapNote || "Add a note about this visit — tap to write."}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               {detail.mode === "up" ? (<>
                 <button onClick={() => setResched({ id: a.id, date: new Date(a.bookedFor), start: a.start })} style={sheetGhost}>Reschedule</button>
                 <button onClick={() => cancelAppt(a)} style={sheetGhost}>Cancel</button>
                 <button onClick={() => checkInAppt(a)} style={sheetPrimary}>Check in</button>
-              </>) : (
+              </>) : (<>
                 <button onClick={() => { setDetail(null); setGalPicker(true); }} style={sheetGhost}>Add photo</button>
-              )}
+                <button onClick={() => rebook(a)} style={sheetPrimary}>Rebook</button>
+              </>)}
             </div>
           </Sheet>
         );
