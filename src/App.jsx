@@ -13899,6 +13899,147 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast 
   );
 }
 
+// ============================================================
+// RETAIL PRODUCTS — catalog (haircare / skincare / merch) stored on business.products[].
+// Reused by the Products settings editor and the Checkout "+ Product" picker.
+// ============================================================
+const PRODUCT_CATEGORIES = ["Haircare", "Skincare", "Merchandise", "Other"];
+// Compress an uploaded image to a ~720px JPEG data URL (same approach as the photo pickers).
+function compressImageFile(file, onResult, max = 720, q = 0.72) {
+  if (!file) return;
+  const fr = new FileReader();
+  fr.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+      else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      try { c.getContext("2d").drawImage(img, 0, 0, w, h); onResult(c.toDataURL("image/jpeg", q)); }
+      catch (e) { onResult(ev.target.result); }
+    };
+    img.onerror = () => onResult(ev.target.result);
+    img.src = ev.target.result;
+  };
+  fr.readAsDataURL(file);
+}
+
+function ProductsEditor({ products = [], onChange, showToast }) {
+  const [editId, setEditId] = useState(null);   // product id | "new" | null (list)
+  const [draft, setDraft] = useState(null);
+  const fileRef = useRef(null);
+  const blank = () => ({ id: "prod_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: "", category: "Haircare", price: "", cost: "", image: "", trackStock: false, onHand: 0, active: true });
+  const startNew = () => { setDraft(blank()); setEditId("new"); };
+  const startEdit = (p) => { setDraft({ ...p, price: String(p.price ?? ""), cost: p.cost != null ? String(p.cost) : "" }); setEditId(p.id); };
+  const close = () => { setDraft(null); setEditId(null); };
+  const save = () => {
+    if (!draft.name.trim()) { showToast && showToast("Give the product a name."); return; }
+    const clean = {
+      ...draft, name: draft.name.trim(),
+      price: Math.max(0, Math.round((Number(draft.price) || 0) * 100) / 100),
+      cost: draft.cost === "" || draft.cost == null ? null : Math.max(0, Math.round((Number(draft.cost) || 0) * 100) / 100),
+      onHand: draft.trackStock ? Math.max(0, parseInt(draft.onHand, 10) || 0) : 0,
+    };
+    const exists = products.some((p) => p.id === clean.id);
+    onChange(exists ? products.map((p) => p.id === clean.id ? clean : p) : [...products, clean]);
+    close(); showToast && showToast(exists ? "Product saved." : "Product added.");
+  };
+  const remove = () => { onChange(products.filter((p) => p.id !== draft.id)); close(); showToast && showToast("Product removed."); };
+
+  const inp = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 11, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY };
+  const lbl = { fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "16px 2px 7px" };
+
+  // ---- edit / add form ----
+  if (draft) {
+    return (
+      <div>
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) compressImageFile(f, (url) => setDraft((d) => ({ ...d, image: url }))); }} />
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+          <button onClick={() => fileRef.current && fileRef.current.click()} style={{ width: 92, height: 92, flexShrink: 0, borderRadius: 14, border: "1px solid var(--border)", background: draft.image ? `center/cover no-repeat url(${draft.image})` : "var(--panel2)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, color: "var(--sub)", cursor: "pointer", overflow: "hidden" }}>
+            {!draft.image && <><Camera size={20} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 10.5 }}>Photo</span></>}
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <input autoFocus value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Product name" style={{ ...inp, marginBottom: 10 }} />
+            <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--panel2)" }}>
+              <span style={{ padding: "0 0 0 14px", color: "var(--sub)", fontSize: 16 }}>$</span>
+              <input value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" placeholder="Price" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
+            </div>
+          </div>
+        </div>
+        {draft.image && <button onClick={() => setDraft({ ...draft, image: "" })} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 2, padding: "8px 0 0 2px", cursor: "pointer" }}>Remove photo</button>}
+
+        <div style={lbl}>Category</div>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+          {PRODUCT_CATEGORIES.map((c) => { const on = draft.category === c; return (
+            <button key={c} onClick={() => setDraft({ ...draft, category: c })} style={{ padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }}>{c}</button>
+          ); })}
+        </div>
+
+        <div style={lbl}>Your cost (optional)</div>
+        <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--panel2)" }}>
+          <span style={{ padding: "0 0 0 14px", color: "var(--sub)", fontSize: 16 }}>$</span>
+          <input value={draft.cost} onChange={(e) => setDraft({ ...draft, cost: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" placeholder="What you pay — used for margin reports" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
+        </div>
+
+        <div onClick={() => setDraft({ ...draft, trackStock: !draft.trackStock })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 18, cursor: "pointer" }}>
+          <div><div style={{ fontSize: 15, fontWeight: 500 }}>Track inventory</div><div style={{ fontSize: 13, color: "var(--sub)" }}>Count down stock as it sells</div></div>
+          <span style={{ width: 46, height: 27, borderRadius: 14, background: draft.trackStock ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0, transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: draft.trackStock ? 22 : 3, width: 21, height: 21, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+        </div>
+        {draft.trackStock && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+            <span style={{ fontSize: 14, color: "var(--sub)" }}>On hand</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button onClick={() => setDraft({ ...draft, onHand: Math.max(0, (parseInt(draft.onHand, 10) || 0) - 1) })} style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 18, cursor: "pointer" }}>–</button>
+              <input value={draft.onHand} onChange={(e) => setDraft({ ...draft, onHand: e.target.value.replace(/[^0-9]/g, "") })} inputMode="numeric" style={{ width: 56, textAlign: "center", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 9, padding: "8px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY }} />
+              <button onClick={() => setDraft({ ...draft, onHand: (parseInt(draft.onHand, 10) || 0) + 1 })} style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 18, cursor: "pointer" }}>+</button>
+            </div>
+          </div>
+        )}
+
+        <div onClick={() => setDraft({ ...draft, active: !draft.active })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 18, cursor: "pointer" }}>
+          <div><div style={{ fontSize: 15, fontWeight: 500 }}>Available to sell</div><div style={{ fontSize: 13, color: "var(--sub)" }}>Shows in checkout when on</div></div>
+          <span style={{ width: 46, height: 27, borderRadius: 14, background: draft.active ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0, transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: draft.active ? 22 : 3, width: 21, height: 21, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+        </div>
+
+        <button className="lift" onClick={save} style={{ width: "100%", marginTop: 24, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>{editId === "new" ? "Add product" : "Save product"}</button>
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          <button onClick={close} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 12, padding: 13, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+          {editId !== "new" && <button onClick={remove} style={{ flex: 1, background: "transparent", border: "1px solid #c0392b", color: "#c0392b", borderRadius: 12, padding: 13, fontSize: 14, cursor: "pointer" }}>Remove</button>}
+        </div>
+      </div>
+    );
+  }
+
+  // ---- list ----
+  return (
+    <div>
+      <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Your retail menu — haircare, skincare and merch. Add a photo and price; ring them up at checkout.</p>
+      {products.length === 0 ? (
+        <button onClick={startNew} className="lift" style={{ width: "100%", background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 14, padding: "26px 16px", color: "var(--sub)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <Plus size={22} style={{ color: "var(--faint)" }} />
+          <span style={{ fontSize: 14.5 }}>Add your first product</span>
+        </button>
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {products.map((p) => (
+            <button key={p.id} onClick={() => startEdit(p)} className="lift" style={{ display: "flex", alignItems: "center", gap: 13, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "11px 13px", textAlign: "left", color: "var(--text)", cursor: "pointer", opacity: p.active === false ? 0.55 : 1 }}>
+              <span style={{ width: 48, height: 48, borderRadius: 10, flexShrink: 0, border: "1px solid var(--line)", background: p.image ? `center/cover no-repeat url(${p.image})` : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!p.image && <Sparkles size={16} style={{ color: "var(--faint)" }} />}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 15, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)" }}>{p.category}{p.trackStock ? ` · ${p.onHand} in stock` : ""}{p.active === false ? " · hidden" : ""}</span>
+              </span>
+              <span style={{ fontSize: 15, fontWeight: 600, flexShrink: 0 }}>${p.price}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {products.length > 0 && (
+        <button onClick={startNew} className="lift" style={{ width: "100%", marginTop: 12, background: "transparent", border: "1px dashed var(--border2)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer" }}><Plus size={16} /> Add product</button>
+      )}
+    </div>
+  );
+}
+
 function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary, shopId, setAppts, setClients, waitlist, setWaitlist, onSignOutAccount, authEmail }) {
   // Fill in any missing top-level settings from the defaults so a sparse/older saved blob can't
   // crash a card that reads a nested field (a single absent key used to white-screen the whole page).
@@ -14252,6 +14393,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <AddOnsEditor services={services} setServices={setServices} business={business} setBusiness={setBusiness} showToast={showToast} />,
     },
     {
+      id: "products", fullBleed: true, title: "Products", icon: Sparkles, category: "Services & Menu",
+      status: `${(form.products || []).length} product${(form.products || []).length === 1 ? "" : "s"}`,
+      keywords: "products retail haircare skincare merch merchandise sell selling inventory stock catalog square pomade shampoo",
+      editor: <ProductsEditor products={form.products || []} onChange={(next) => setForm({ ...form, products: next })} showToast={showToast} />,
+    },
+    {
       id: "rebookco", title: "Rebooking at Checkout", icon: Repeat, category: "Payments & Checkout",
       status: (form.rebook?.enabled === false) ? "Off" : ((form.rebook?.discountEnabled !== false && (form.rebook?.discount || 0) > 0) ? `On · ${form.rebook?.discountType === "percent" ? form.rebook?.discount + "% off" : "$" + form.rebook?.discount + " off"}` : "On · no discount"),
       keywords: "rebook rebooking checkout discount percent dollar amount incentive next visit prompt save offer",
@@ -14297,7 +14444,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const CATS = [
     { id: "shop",  section: "Set up your shop", label: "Your shop", icon: User, desc: "Name, hours & branding", settings: ["business", "hours", "locations", "phones", "appearance", "theme"] },
     { id: "staff", section: "Set up your shop", label: "Your team", icon: Users, desc: "Barbers, access & pay", settings: ["staff", "staffpin"] },
-    { id: "menu",  section: "Set up your shop", label: "Services & pricing", icon: Scissors, desc: "What you offer", settings: ["servicesmenu", "addons", "aicuthelper"] },
+    { id: "menu",  section: "Set up your shop", label: "Services & pricing", icon: Scissors, desc: "What you offer", settings: ["servicesmenu", "addons", "products", "aicuthelper"] },
     { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "How clients book you", settings: ["avoidgaps", "autotiming", "anyonerouting", "booking", "newclient", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"], groups: [
       { label: "The times they see", ids: ["avoidgaps", "autotiming", "anyonerouting"] },
       { label: "Your booking page", ids: ["booking", "newclient", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"] },
@@ -16895,6 +17042,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [editLineId, setEditLineId] = useState(null);
   const [prodName, setProdName] = useState("");
   const [prodPrice, setProdPrice] = useState("");
+  const [showCustomItem, setShowCustomItem] = useState(false); // reveal the one-off item entry under the product grid
   const [payBusy, setPayBusy] = useState(false);
   const [payErr, setPayErr] = useState("");
   const [pendingMethod, setPendingMethod] = useState(null); // chosen on the method screen; charged after tip
@@ -16921,6 +17069,15 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     setPaidRec(rec);
     if (liveClient) setClients(clients.map((c) => c.id === liveClient.id ? { ...c, payments: [...(c.payments || []), rec] } : c));
     else if (setBusiness) setBusiness((b) => ({ ...b, sales: [...((b && b.sales) || []), { ...rec, clientName: appt.name || "Walk-in" }] }));
+    // Count down inventory for tracked product lines. First sale only — a reopened ticket
+    // re-charges the balance and must never decrement stock again.
+    if (!reopen && setBusiness) {
+      const sold = {};
+      lines.forEach((l) => { if (l.productId) sold[l.productId] = (sold[l.productId] || 0) + 1; });
+      if (Object.keys(sold).length) {
+        setBusiness((b) => ({ ...b, products: (b.products || []).map((p) => (sold[p.id] && p.trackStock) ? { ...p, onHand: Math.max(0, (p.onHand || 0) - sold[p.id]) } : p) }));
+      }
+    }
   };
   const makeRec = (methodId, payRes, charged) => ({
     id: "pay_" + Date.now().toString(36),
@@ -16936,6 +17093,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     brand: (payRes && payRes.brand) || null,
     last4: (payRes && payRes.last4) || null,
     note: (reopen ? "Balance — " : "") + lines.map((l) => l.name).join(" · ") + (provider ? ` — with ${provider.name}` : ""),
+    // Line breakdown so reports can split service vs retail; product lines carry productId.
+    items: lines.map((l) => ({ name: l.name, price: +(Number(l.price) || 0).toFixed(2), productId: l.productId || null, qty: 1 })),
+    staffId: (provider && provider.id) || appt.providerId || null,
     refunded: 0,
   });
   const payCash = () => { recordSale(makeRec("cash", null, chargeBase)); setStage("approved"); };
@@ -17049,15 +17209,39 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           <button onClick={() => setAddSheet(null)} style={{ width: "100%", padding: "12px 16px", background: "none", border: "none", borderTop: "1px solid var(--line)", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
         </div>
       )}
-      {addSheet === "product" && (
+      {addSheet === "product" && (() => {
+        const catalog = (business?.products || []).filter((p) => p.active !== false);
+        const addCustom = () => { setLines([...lines, { id: "ln_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: prodName.trim(), price: +Number(prodPrice).toFixed(2) }]); setAddSheet(null); setShowCustomItem(false); };
+        return (
         <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", padding: "14px 16px", marginBottom: 16 }}>
-          <input autoFocus value={prodName} onChange={(e) => setProdName(e.target.value)} placeholder="Product or item name" style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, marginBottom: 10 }} />
-          <div style={{ display: "flex", gap: 10 }}>
-            <input type="number" inputMode="decimal" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} placeholder="$ price" style={{ flex: 1, minWidth: 0, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
-            <button disabled={!prodName.trim() || !(Number(prodPrice) > 0)} onClick={() => { setLines([...lines, { id: "ln_" + Date.now().toString(36), name: prodName.trim(), price: +Number(prodPrice).toFixed(2) }]); setAddSheet(null); }} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "12px 20px", fontSize: 14.5, fontWeight: 600, opacity: !prodName.trim() || !(Number(prodPrice) > 0) ? 0.5 : 1, cursor: "pointer" }}>Add</button>
-          </div>
+          {catalog.length > 0 && (<>
+            <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>Tap to add</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxHeight: "44vh", overflowY: "auto" }}>
+              {catalog.map((p) => { const out = p.trackStock && (p.onHand || 0) <= 0; return (
+                <button key={p.id} disabled={out} onClick={() => { setLines([...lines, { id: "ln_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: p.name, price: +Number(p.price || 0).toFixed(2), productId: p.id, image: p.image || "" }]); setAddSheet(null); }} style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "var(--panel)", textAlign: "left", cursor: out ? "not-allowed" : "pointer", opacity: out ? 0.5 : 1, padding: 0, display: "flex", flexDirection: "column" }}>
+                  <span style={{ width: "100%", aspectRatio: "1", background: p.image ? `center/cover no-repeat url(${p.image})` : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!p.image && <Sparkles size={18} style={{ color: "var(--faint)" }} />}</span>
+                  <span style={{ padding: "7px 8px 9px" }}>
+                    <span style={{ display: "block", fontSize: 12.5, fontWeight: 500, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                    <span style={{ display: "block", fontSize: 12, color: "var(--sub)", marginTop: 1 }}>${p.price}{out ? " · out" : (p.trackStock ? ` · ${p.onHand}` : "")}</span>
+                  </span>
+                </button>
+              ); })}
+            </div>
+            <button onClick={() => setShowCustomItem((v) => !v)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 2, padding: "10px 0 0", cursor: "pointer" }}>{showCustomItem ? "Hide custom item" : "+ One-off item"}</button>
+          </>)}
+          {catalog.length === 0 && <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12 }}>No products in your catalog yet — add them in Settings → Products. You can still add a one-off item:</div>}
+          {(catalog.length === 0 || showCustomItem) && (
+            <div style={{ marginTop: catalog.length ? 10 : 0 }}>
+              <input autoFocus={catalog.length === 0} value={prodName} onChange={(e) => setProdName(e.target.value)} placeholder="Item name" style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, marginBottom: 10 }} />
+              <div style={{ display: "flex", gap: 10 }}>
+                <input type="number" inputMode="decimal" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} placeholder="$ price" style={{ flex: 1, minWidth: 0, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
+                <button disabled={!prodName.trim() || !(Number(prodPrice) > 0)} onClick={addCustom} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "12px 20px", fontSize: 14.5, fontWeight: 600, opacity: !prodName.trim() || !(Number(prodPrice) > 0) ? 0.5 : 1, cursor: "pointer" }}>Add</button>
+              </div>
+            </div>
+          )}
+          <button onClick={() => { setAddSheet(null); setShowCustomItem(false); }} style={{ width: "100%", padding: "12px 0 2px", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
         </div>
-      )}
+      ); })()}
       <div style={{ flex: 1 }} />
       {reopen && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", padding: "14px 2px 0", fontSize: 14.5, color: "var(--sub)" }}>
@@ -19088,6 +19272,7 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
     { id: "sales_summary", group: "Sales", name: "Sales summary" },
     { id: "sales_service", group: "Sales", name: "Sales by service" },
     { id: "sales_staff", group: "Sales", name: "Sales by staff" },
+    { id: "retail", group: "Retail", name: "Retail sales" },
     { id: "appts", group: "Appointments", name: "Appointments" },
     { id: "cancellations", group: "Appointments", name: "Cancellations" },
     { id: "noshows", group: "Appointments", name: "No-shows" },
@@ -19100,7 +19285,7 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
     { id: "new_clients", group: "Clients & taxes", name: "New clients" },
     { id: "taxes", group: "Clients & taxes", name: "Estimated taxes" },
   ];
-  const GROUPS = ["Sales", "Appointments", "Payments", "Clients & taxes"];
+  const GROUPS = ["Sales", "Retail", "Appointments", "Payments", "Clients & taxes"];
 
   // ---- all sale/payment records (real data: client payments + walk-in sales) ----
   const allPays = [];
@@ -19170,6 +19355,44 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
       return (<><SectionLabel>By staff</SectionLabel><div style={card}>
         {list.length ? <>{list.map((s, i) => <Row key={i} left={s.name} right={`${money(s.rev)} · ${s.n} appts`} />)}<TotalRow left="Total" right={money(total)} /></> : <Empty />}
       </div></>);
+    }
+    if (id === "retail") {
+      const prodById = {}; (business?.products || []).forEach((p) => { prodById[p.id] = p; });
+      let rev = 0, units = 0, tx = 0;
+      const byProduct = {}, byCat = {}, byStaff = {};
+      paysScoped.forEach((pay) => {
+        let had = false;
+        (pay.items || []).forEach((it) => {
+          if (!it.productId) return;
+          had = true;
+          const q = it.qty || 1; const amt = (Number(it.price) || 0) * q;
+          rev += amt; units += q;
+          const bp = byProduct[it.productId] || (byProduct[it.productId] = { name: it.name, units: 0, rev: 0 });
+          bp.units += q; bp.rev += amt;
+          const cat = (prodById[it.productId] || {}).category || "Other";
+          byCat[cat] = (byCat[cat] || 0) + amt;
+          const sid = pay.staffId || (pay.apptId && apptById[pay.apptId] ? apptById[pay.apptId].providerId : null);
+          if (sid) byStaff[sid] = (byStaff[sid] || 0) + amt;
+        });
+        if (had) tx += 1;
+      });
+      const topP = Object.values(byProduct).sort((a, b) => b.rev - a.rev);
+      const cats = Object.entries(byCat).map(([k, v]) => ({ name: k, rev: v })).sort((a, b) => b.rev - a.rev);
+      const staffList = Object.entries(byStaff).map(([k, v]) => ({ name: provName(k), rev: v })).sort((a, b) => b.rev - a.rev);
+      return (<>
+        <SectionLabel>Totals</SectionLabel>
+        <div style={card}>
+          <Row left="Retail revenue" right={money(rev)} />
+          <Row left="Units sold" right={units} />
+          <Row left="Transactions" right={tx} last />
+        </div>
+        <SectionLabel>Top products</SectionLabel>
+        <div style={card}>{topP.length ? <>{topP.map((p, i) => <Row key={i} left={p.name} right={`${money(p.rev)} · ${p.units}`} />)}<TotalRow left="Total" right={money(rev)} /></> : <Empty />}</div>
+        <SectionLabel>By category</SectionLabel>
+        <div style={card}>{cats.length ? cats.map((c, i) => <Row key={i} left={c.name} right={money(c.rev)} last={i === cats.length - 1} />) : <Empty />}</div>
+        <SectionLabel>By staff</SectionLabel>
+        <div style={card}>{staffList.length ? staffList.map((s, i) => <Row key={i} left={s.name} right={money(s.rev)} last={i === staffList.length - 1} />) : <Empty />}</div>
+      </>);
     }
     if (id === "appts") {
       const byDay = {};
