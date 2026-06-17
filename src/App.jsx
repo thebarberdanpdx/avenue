@@ -14323,6 +14323,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
 
   const [openCat, setOpenCat] = useState(null);
+  // Open a settings page (or category) at the TOP — settings sub-pages share the window scroll,
+  // so without this you'd land wherever the previous list was scrolled (e.g. Reports opening at the bottom).
+  useEffect(() => { try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { try { window.scrollTo(0, 0); } catch (e2) {} } }, [openCard, openCat]);
   const [helpOpen, setHelpOpen] = useState(false);
   const [cockpitHidden, setCockpitHidden] = useState(false);
   const [openSection, setOpenSection] = useState(null); // which checklist section is expanded
@@ -19022,6 +19025,8 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
   const provName = (id) => { const p = providers.find((x) => x.id === id); return p ? p.name : "—"; };
 
   const [openReport, setOpenReport] = useState(null); // report id or null (hub)
+  // Land at the top when opening (or closing) a report, not wherever the list was scrolled.
+  useEffect(() => { try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { try { window.scrollTo(0, 0); } catch (e2) {} } }, [openReport]);
 
   // ---- filters ----
   const todayISO = () => { const d = new Date(); return d.toISOString().slice(0, 10); };
@@ -19337,14 +19342,7 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
 
   return (
     <div className="fade-up" style={{ paddingBottom: 28 }}>
-      <Masthead title="Reports" sub="Filter, view & export your numbers" />
-
-      <SectionLabel>Filters</SectionLabel>
-      <div style={card}>
-        <FilterRow label="Dates" value={rangeLabel} onClick={() => setPickerOpen("dates")} />
-        <FilterRow label="Staff" value={staffLabel} onClick={() => setPickerOpen("staff")} />
-        <FilterRow label="Service" value={serviceLabel} onClick={() => setPickerOpen("service")} last />
-      </div>
+      <Masthead title="Reports" sub="Choose a report — pick dates & filters inside" />
 
       {GROUPS.map((g) => (
         <React.Fragment key={g}>
