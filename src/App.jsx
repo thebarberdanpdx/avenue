@@ -606,6 +606,10 @@ const buildThemeCSS = () => THEMES.map((th) => {
   // theme it collapses to pure white so highlights never read as grey.
   const tint = th.id === "studio" ? v.panel : `color-mix(in srgb, ${v.gold} 10%, ${v.panel})`;
   const tint2 = th.id === "studio" ? v.panel2 : `color-mix(in srgb, ${v.gold} 14%, ${v.panel2})`;
+  // --wash = translucent accent behind icon circles / selected pills / badges. Studio = fully
+  // transparent (clean white, black icons/text, black-outlined selection) so nothing reads grey;
+  // colored themes keep a soft gold wash.
+  const wash = th.id === "studio" ? "transparent" : `color-mix(in srgb, ${v.gold} 13%, transparent)`;
   // Studio (strict B&W): override the shadow tier so every card/sheet/panel that uses
   // var(--shadow-sm/lg) lifts off the white page with one soft, consistent shadow.
   // Set on the theme class (which sits on #app-root) so the whole subtree inherits it;
@@ -613,7 +617,7 @@ const buildThemeCSS = () => THEMES.map((th) => {
   const studioShadows = th.id === "studio"
     ? "--shadow-sm:0 1px 2px rgba(0,0,0,.06), 0 8px 22px rgba(0,0,0,.08);--shadow-lg:0 4px 12px rgba(0,0,0,.08), 0 18px 44px rgba(0,0,0,.12);--shadow-md:0 2px 6px rgba(0,0,0,.06), 0 10px 28px rgba(0,0,0,.09);"
     : "";
-  return `.theme-${th.id}{--bg:${v.bg};--canvas:${th.canvas || v.bg};--grain:${th.grain || 0};--grain-blend:${th.dark ? "overlay" : "multiply"};--panel:${v.panel};--panel2:${v.panel2};--tint:${tint};--tint2:${tint2};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--gold-grad:${grad};--on-gold:${v.onGold};--live:${v.live || v.gold};--shadow:${v.shadow};--overlay:${v.overlay};${studioShadows}--font-disp:${th.disp};--font-body:${th.body};}`;
+  return `.theme-${th.id}{--bg:${v.bg};--canvas:${th.canvas || v.bg};--grain:${th.grain || 0};--grain-blend:${th.dark ? "overlay" : "multiply"};--panel:${v.panel};--panel2:${v.panel2};--tint:${tint};--tint2:${tint2};--wash:${wash};--line:${v.line};--border:${v.border};--border2:${v.border2};--text:${v.text};--text2:${v.text2};--sub:${v.sub};--faint:${v.faint};--gold:${v.gold};--gold-grad:${grad};--on-gold:${v.onGold};--live:${v.live || v.gold};--shadow:${v.shadow};--overlay:${v.overlay};${studioShadows}--font-disp:${th.disp};--font-body:${th.body};}`;
 }).join("\n");
 
 // Portal: render full-screen overlays. Without react-dom we can't truly portal,
@@ -1711,7 +1715,7 @@ function App() {
           --shadow-md: 0 6px 20px -6px var(--shadow), 0 2px 8px -3px var(--shadow);
           --shadow-lg: 0 24px 60px -16px var(--shadow), 0 8px 20px -8px var(--shadow);
           --float: 0 10px 28px -14px var(--shadow), 0 3px 8px -4px var(--shadow);
-          --glow: 0 10px 26px -8px color-mix(in srgb, var(--gold) 42%, transparent), 0 2px 8px -4px var(--shadow);
+          --glow: 0 10px 26px -8px var(--wash), 0 2px 8px -4px var(--shadow);
           --radius: 16px;
         }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(14px);} to {opacity:1; transform:none;} }
@@ -1794,7 +1798,7 @@ function App() {
         @keyframes successBloom { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
         .success-bloom { animation: successBloom .65s var(--spring) both; }
         /* Soft gold pulse — used on selected/active items to confirm */
-        @keyframes goldPulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 50%, transparent); } 100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--gold) 0%, transparent); } }
+        @keyframes goldPulse { 0% { box-shadow: 0 0 0 0 var(--wash); } 100% { box-shadow: 0 0 0 12px var(--wash); } }
         .gold-pulse { animation: goldPulse .8s var(--ease) both; }
         /* Subtle drift-in — for the confirmation card */
         @keyframes driftIn { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
@@ -1803,19 +1807,19 @@ function App() {
         button { font-family: ${FONT_BODY}; cursor: pointer; border: none; transition: transform .18s var(--ease), box-shadow .25s var(--ease), background .2s var(--ease), border-color .2s var(--ease), opacity .2s var(--ease); }
         button:active { transform: scale(0.96); }
         input, textarea, select { outline: none; font-family: ${FONT_BODY}; transition: border-color .2s var(--ease), box-shadow .2s var(--ease); }
-        input:focus, textarea:focus, select:focus { border-color: var(--gold) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 18%, transparent); }
+        input:focus, textarea:focus, select:focus { border-color: var(--gold) !important; box-shadow: 0 0 0 3px var(--wash); }
         .lift { transition: transform .25s var(--spring), box-shadow .25s var(--ease), border-color .2s var(--ease), background .2s var(--ease); box-shadow: var(--float); }
         .lift-row { transition: background .15s var(--ease), padding-left .15s var(--ease); }
-        .lift-row:active { background: color-mix(in srgb, var(--gold) 7%, transparent); padding-left: 12px; }
+        .lift-row:active { background: var(--wash); padding-left: 12px; }
         .lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
         .lift:active { transform: scale(0.96); box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
         .card { box-shadow: var(--shadow-sm); }
         ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 8px; } ::-webkit-scrollbar-track { background: transparent; }
         * { -webkit-tap-highlight-color: transparent; }
-        ::selection { background: color-mix(in srgb, var(--gold) 26%, transparent); }
+        ::selection { background: var(--wash); }
         #app-root h1, #app-root h2, #app-root h3 { text-wrap: balance; }
         #app-root p { text-wrap: pretty; }
-        #app-root button:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 38%, transparent); }
+        #app-root button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wash); }
         @keyframes shimmer { 0% { background-position: -480px 0; } 100% { background-position: 480px 0; } }
         .skeleton { background: linear-gradient(90deg, var(--panel2) 25%, color-mix(in srgb, var(--panel2) 55%, var(--panel)) 50%, var(--panel2) 75%); background-size: 960px 100%; animation: shimmer 1.4s linear infinite; border-radius: 10px; }
         @keyframes slotSweep { 0% { transform: translateX(-130%);} 55%,100% { transform: translateX(130%);} }
@@ -2427,7 +2431,7 @@ function LocationChooser({ shopId, locations, business }) {
           {(locations || []).map((l) => (
             <div key={l.shop_id} className="lift" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
               <button onClick={() => pick(l.shop_id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "18px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -5462,7 +5466,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
       <div style={{ position: "absolute", left: 18, right: 18, top: "50%", borderTop: "2px dashed var(--line)" }} />
     </div>
   );
-  const Tick = () => <div style={{ width: 56, height: 56, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 15%, transparent)", color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 27, margin: "6px auto 16px" }}>✓</div>;
+  const Tick = () => <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--wash)", color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 27, margin: "6px auto 16px" }}>✓</div>;
   const Title = ({ children }) => <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, textAlign: "center", margin: "8px 0 10px", lineHeight: 1.15 }}>{children}</div>;
   const Body = ({ children }) => <div style={{ fontSize: 14, color: "var(--sub)", textAlign: "center", lineHeight: 1.55, marginBottom: 22, padding: "0 8px" }}>{children}</div>;
   const goBtn = { width: "100%", background: A, color: ON, border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY, boxShadow: "0 8px 20px -10px var(--shadow)" };
@@ -5540,7 +5544,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
         <div style={{ padding: "24px 24px 20px" }}>
           <div style={{ fontSize: 10.5, letterSpacing: 2.5, color: A, fontWeight: 600, textTransform: "uppercase", marginBottom: 18, display: "flex", alignItems: "center", gap: 8 }}>
             <span>Your chair is reserved</span>
-            <span style={{ flex: 1, height: 1, background: "linear-gradient(90deg, color-mix(in srgb, var(--gold) 35%, transparent), transparent)" }} />
+            <span style={{ flex: 1, height: 1, background: "linear-gradient(90deg, var(--wash), transparent)" }} />
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 11, marginBottom: 3 }}>
             <span style={{ fontFamily: "'Fraunces', serif", fontSize: 46, fontWeight: 500, lineHeight: 0.95, letterSpacing: -1 }}>{heroHM}</span>
@@ -6209,7 +6213,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         <div style={{ position: "relative", marginBottom: 16, background: "linear-gradient(135deg, var(--tint), var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 32%, var(--border))", borderRadius: 18, boxShadow: "var(--shadow)", padding: "15px 16px" }}>
           <button onClick={() => setGapDismissed(true)} aria-label="Dismiss" style={{ position: "absolute", top: 11, right: 12, background: "none", border: "none", color: "var(--faint)", padding: 2, lineHeight: 0, cursor: "pointer" }}><X size={16} /></button>
           <div style={{ display: "flex", alignItems: "center", gap: 9, paddingRight: 22 }}>
-            <span style={{ width: 34, height: 34, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Clock size={18} /></span>
+            <span style={{ width: 34, height: 34, borderRadius: 10, background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Clock size={18} /></span>
             <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500 }}>A gap worth tightening</span>
           </div>
           <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.45, marginTop: 10 }}>{gapDayName} has a <strong style={{ fontWeight: 600 }}>{awkwardGap.gapMin}-minute gap</strong> at {fmtTime(awkwardGap.atMin)} — too short to book. Moving <strong style={{ fontWeight: 600 }}>{awkwardGap.N.name || "the next client"}</strong> up to {fmtTime(awkwardGap.moveToMin)} would open a bookable slot later in {isShopView ? `${awkwardGap.prov.name}'s` : "your"} day.</div>
@@ -6228,7 +6232,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         <div style={{ marginBottom: 16, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, padding: "15px 16px", boxShadow: "var(--shadow-sm)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
             <span style={{ position: "relative", width: 9, height: 9, flexShrink: 0 }}>
-              <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 40%, transparent)", animation: "pulse 1.6s var(--ease) infinite" }} />
+              <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: "var(--wash)", animation: "pulse 1.6s var(--ease) infinite" }} />
               <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "var(--gold)" }} />
             </span>
             <span style={{ fontSize: 15.5, fontWeight: 600 }}>{needsStart.name || "This client"} is on the chair</span>
@@ -6708,7 +6712,7 @@ function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, pr
       {overdueCount > 0 && (
         <button onClick={onOpenNudge} className="lift" style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, padding: "15px 16px", color: "var(--text)", cursor: "pointer", marginBottom: 18, textAlign: "left" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ width: 36, height: 36, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Bell size={16} /></span>
+            <span style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><Bell size={16} /></span>
             <div>
               <div style={{ fontSize: 15, fontWeight: 600 }}>{overdueCount} client{overdueCount > 1 ? "s" : ""} overdue to rebook</div>
               <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1 }}>Open the nudge folder</div>
@@ -6983,7 +6987,7 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
         {[["week", "Week"], ["month", "Month"], ["year", "Year"], ["custom", "Custom"]].map(([id, label]) => {
           const on = period === id;
           return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 6px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13, fontWeight: on ? 600 : 400, letterSpacing: 0.3, cursor: "pointer" }}>{label}</button>
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 6px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13, fontWeight: on ? 600 : 400, letterSpacing: 0.3, cursor: "pointer" }}>{label}</button>
           );
         })}
       </div>
@@ -7009,7 +7013,7 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
           {fmtMoney(periodTotal)}
         </div>
         {delta && (
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: delta.pct !== undefined ? (delta.up ? "var(--gold)" : "var(--sub)") : "var(--sub)", background: delta.pct !== undefined && delta.up ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "var(--panel2)", border: `1px solid ${delta.pct !== undefined && delta.up ? "color-mix(in srgb, var(--gold) 30%, transparent)" : "var(--border)"}`, borderRadius: 20, padding: "5px 12px", marginBottom: 10 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: delta.pct !== undefined ? (delta.up ? "var(--gold)" : "var(--sub)") : "var(--sub)", background: delta.pct !== undefined && delta.up ? "var(--wash)" : "var(--panel2)", border: `1px solid ${delta.pct !== undefined && delta.up ? "var(--wash)" : "var(--border)"}`, borderRadius: 20, padding: "5px 12px", marginBottom: 10 }}>
             {delta.pct !== undefined ? <>{delta.up ? "↑" : "↓"} {delta.pct}% vs {fmtMoney(delta.prior)} {priorLabel}</> : delta.label}
           </div>
         )}
@@ -7204,7 +7208,7 @@ function AppointmentsView({ appts, providers, services, onBack }) {
 
   const periodLabel = period === "week" ? "This week" : period === "month" ? "This month" : "This year";
   const Pill = ({ k, label }) => (
-    <button onClick={() => setPeriod(k)} style={{ flex: 1, padding: "10px 8px", borderRadius: 24, border: period === k ? "1px solid var(--gold)" : "1px solid var(--border2)", background: period === k ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: period === k ? "var(--gold)" : "var(--sub)", fontWeight: period === k ? 600 : 400, fontSize: 13.5, cursor: "pointer" }}>{label}</button>
+    <button onClick={() => setPeriod(k)} style={{ flex: 1, padding: "10px 8px", borderRadius: 24, border: period === k ? "1px solid var(--gold)" : "1px solid var(--border2)", background: period === k ? "var(--wash)" : "transparent", color: period === k ? "var(--gold)" : "var(--sub)", fontWeight: period === k ? 600 : 400, fontSize: 13.5, cursor: "pointer" }}>{label}</button>
   );
 
   return (
@@ -7405,7 +7409,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
         {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
           const on = period === id;
           return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
           );
         })}
       </div>
@@ -7682,7 +7686,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
         {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
           const on = period === id;
           return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
           );
         })}
       </div>
@@ -7758,7 +7762,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
               {[["revenue", "Revenue"], ["visits", "Visits"], ["perhour", "$ per hour"]].map(([id, label]) => {
                 const on = sortBy === id;
                 return (
-                  <button key={id} onClick={() => setSortBy(id)} style={{ flex: 1, padding: "9px 10px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 12.5, fontWeight: on ? 600 : 400, letterSpacing: 0.3, cursor: "pointer" }}>{label}</button>
+                  <button key={id} onClick={() => setSortBy(id)} style={{ flex: 1, padding: "9px 10px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 12.5, fontWeight: on ? 600 : 400, letterSpacing: 0.3, cursor: "pointer" }}>{label}</button>
                 );
               })}
             </div>
@@ -7991,7 +7995,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
         {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
           const on = period === id;
           return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
+            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
           );
         })}
       </div>
@@ -8139,7 +8143,7 @@ function LocationSwitcher({ current, fallbackName, authEmail }) {
             {shops.map((s) => {
               const on = s.shop_id === current;
               return (
-                <button key={s.shop_id} onClick={() => { if (on) { setOpen(false); } else { go(s.shop_id); } }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "none", border: "none", borderTop: "1px solid var(--line)", cursor: "pointer", textAlign: "left" }}>
+                <button key={s.shop_id} onClick={() => { if (on) { setOpen(false); } else { go(s.shop_id); } }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", background: on ? "var(--wash)" : "none", border: "none", borderTop: "1px solid var(--line)", cursor: "pointer", textAlign: "left" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.shop_name || s.shop_id}</div>
                     <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>{s.account_name}{s.role === "owner" ? " · Owner" : ""}</div>
@@ -8198,7 +8202,7 @@ function MasterTeam({ shops }) {
   const sheet = { width: "100%", maxWidth: 400, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.45)" };
   const sheetTitle = { padding: "18px 18px 14px", fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, color: "var(--text)", borderBottom: "1px solid var(--line)", marginBottom: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
   const input = { width: "100%", boxSizing: "border-box", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 13px", fontSize: 15, color: "var(--text)", fontFamily: FONT_BODY, outline: "none" };
-  const chip = (on) => ({ padding: "8px 13px", borderRadius: 9, border: "1px solid " + (on ? "var(--gold)" : "var(--border)"), background: on ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "transparent", color: on ? "var(--text)" : "var(--sub)", fontSize: 13, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" });
+  const chip = (on) => ({ padding: "8px 13px", borderRadius: 9, border: "1px solid " + (on ? "var(--gold)" : "var(--border)"), background: on ? "var(--wash)" : "transparent", color: on ? "var(--text)" : "var(--sub)", fontSize: 13, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" });
   const seg = (on) => ({ flex: 1, padding: "9px 0", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: FONT_BODY, color: on ? "var(--on-gold)" : "var(--sub)", background: on ? "var(--gold)" : "transparent" });
   const dangerBtn = { width: "100%", background: "transparent", border: "1px solid var(--border)", color: "#c0392b", borderRadius: 11, padding: "13px 0", fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" };
 
@@ -8216,7 +8220,7 @@ function MasterTeam({ shops }) {
               <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text)", fontFamily: FONT_BODY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
               <div style={{ fontSize: 12.5, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{accessLabel(m)}</div>
             </div>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, color: m.pending ? "var(--sub)" : "var(--on-gold)", background: m.pending ? "color-mix(in srgb, var(--sub) 18%, transparent)" : (m.role === "owner" ? "var(--gold)" : "color-mix(in srgb, var(--gold) 32%, transparent)"), flexShrink: 0 }}>{m.pending ? "Invited" : (m.role === "owner" ? "Owner" : "Manager")}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, color: m.pending ? "var(--sub)" : "var(--on-gold)", background: m.pending ? "color-mix(in srgb, var(--sub) 18%, transparent)" : (m.role === "owner" ? "var(--gold)" : "var(--wash)"), flexShrink: 0 }}>{m.pending ? "Invited" : (m.role === "owner" ? "Owner" : "Manager")}</span>
           </button>
         ))}
         {!loading && members.length === 0 && <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 20, color: "var(--sub)", fontSize: 14, fontFamily: FONT_BODY }}>No team members yet.</div>}
@@ -8344,7 +8348,7 @@ function MasterCalendar({ shops, onEnter }) {
             const list = forShop(s.shop_id);
             return (
               <div key={s.shop_id} style={{ flex: "0 0 auto", width: 230, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
-                <button onClick={() => onEnter && onEnter(s.shop_id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "13px 14px", background: "color-mix(in srgb, var(--gold) 10%, transparent)", border: "none", borderBottom: "1px solid var(--line)", cursor: "pointer", textAlign: "left" }}>
+                <button onClick={() => onEnter && onEnter(s.shop_id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "13px 14px", background: "var(--wash)", border: "none", borderBottom: "1px solid var(--line)", cursor: "pointer", textAlign: "left" }}>
                   <span style={{ fontFamily: "'Fraunces', serif", fontSize: 15.5, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.shop_name || s.shop_id}</span>
                   <span style={{ fontSize: 12, color: "var(--sub)", fontFamily: FONT_BODY, flexShrink: 0 }}>{list.length}</span>
                 </button>
@@ -8592,7 +8596,7 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
           <div style={{ display: "grid", gap: 12 }}>
             {shops.map((s) => (
               <button key={s.shop_id} className="lift" onClick={() => enter(s.shop_id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "18px 18px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, cursor: "pointer", textAlign: "left" }}>
-                <div style={{ width: 42, height: 42, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" /></svg>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -8606,7 +8610,7 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
               <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, color: "var(--sub)", fontSize: 14.5, fontFamily: FONT_BODY }}>No shops found for this account.</div>
             )}
             <button className="lift" onClick={() => setCreating(true)} style={{ width: "100%", marginTop: 2, background: "var(--panel)", border: "1px dashed var(--border2)", borderRadius: 16, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", textAlign: "left" }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Plus size={20} style={{ color: "var(--gold)" }} /></div>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Plus size={20} style={{ color: "var(--gold)" }} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: "var(--text)" }}>Open a new shop</div>
                 <div style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2 }}>Name it, pick a trade, light the sign</div>
@@ -8845,7 +8849,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "color-mix(in srgb, var(--bg) 82%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderTop: "1px solid var(--line)", boxShadow: "0 -8px 30px -12px var(--shadow)", display: "flex", justifyContent: "space-around", alignItems: "stretch", padding: "10px 4px calc(10px + env(safe-area-inset-bottom))", zIndex: 20, transform: "translateZ(0)", WebkitTransform: "translateZ(0)", willChange: "transform" }}>
         {[["pulse", "Pulse", TrendingUp], ["calendar", "Calendar", Calendar], ["clients", "Clients", User], ["messages", "Messages", MessageSquare], ...(isOwner ? [["settings", "Settings", Settings]] : [])].map(([id, label, Icon]) => (
           <button key={id} onClick={() => { setTab(id); setActiveClient(null); setPulseDetail(null); }} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
-            <div style={{ position: "relative", padding: "5px 16px", borderRadius: 13, background: tab === id ? "color-mix(in srgb, var(--gold) 13%, transparent)" : "transparent", boxShadow: tab === id ? "0 5px 16px -6px color-mix(in srgb, var(--gold) 55%, transparent)" : "none", transition: "background .2s var(--ease), box-shadow .2s var(--ease)" }}>
+            <div style={{ position: "relative", padding: "5px 16px", borderRadius: 13, background: tab === id ? "var(--wash)" : "transparent", boxShadow: tab === id ? "0 5px 16px -6px var(--wash)" : "none", transition: "background .2s var(--ease), box-shadow .2s var(--ease)" }}>
               <Icon size={21} />
               {id === "waitlist" && waitlist.length > 0 && <span style={{ position: "absolute", top: -5, right: -9, background: "var(--gold)", color: "var(--on-gold)", fontSize: 12, fontWeight: 600, borderRadius: 8, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{waitlist.length}</span>}
             </div>
@@ -9465,7 +9469,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         </>
       )}
 
-      <div style={{ marginTop: 18, background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 22%, transparent)", borderRadius: 14, padding: "14px 16px" }}>
+      <div style={{ marginTop: 18, background: "var(--wash)", border: "1px solid var(--wash)", borderRadius: 14, padding: "14px 16px" }}>
         <div style={{ fontSize: 10.5, letterSpacing: 1.4, color: "var(--gold)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>How this reads to clients</div>
         <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.55 }}>{bookingPreview()}</div>
       </div>
@@ -10191,7 +10195,7 @@ function NotificationsEditor({ n, onChange }) {
                   {grp.channels.map((ch) => {
                     const active = !!eff[ch];
                     return (
-                      <button key={ch} onClick={() => setEvent(ev.k, { [ch]: !active })} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, fontSize: 13.5, fontWeight: active ? 600 : 400, background: active ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "var(--panel2)", border: `1px solid ${active ? "var(--gold)" : "var(--border2)"}`, color: active ? "var(--text)" : "var(--sub)" }}>
+                      <button key={ch} onClick={() => setEvent(ev.k, { [ch]: !active })} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, fontSize: 13.5, fontWeight: active ? 600 : 400, background: active ? "var(--wash)" : "var(--panel2)", border: `1px solid ${active ? "var(--gold)" : "var(--border2)"}`, color: active ? "var(--text)" : "var(--sub)" }}>
                         {CHANNEL_LABEL[ch]}{ch === "sms" ? " *" : ""}
                       </button>
                     );
@@ -10254,7 +10258,7 @@ function BookingWordingPreview({ bs }) {
         )}
         {pv === "cut" && (
           <div>
-            <span style={{ display: "inline-block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 40%, transparent)", borderRadius: 20, padding: "5px 13px", marginBottom: 16 }}>{bs.greeting || "First time? Welcome in"}</span>
+            <span style={{ display: "inline-block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 20, padding: "5px 13px", marginBottom: 16 }}>{bs.greeting || "First time? Welcome in"}</span>
             <div style={HEAD}>{bs.head || "What are we doing today?"}</div>
             <div style={LEAD}>{bs.lead || "Just pick your style — we'll handle the details in the chair."}</div>
           </div>
@@ -10687,7 +10691,7 @@ function MessagesEditor({ messages, onChange, business, onBackRef }) {
               <div style={{ fontSize: 12, color: "var(--sub)", margin: "14px 2px 7px" }}>Or drop in a ready-made block</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {MERGE_BLOCKS.map((tag) => (
-                  <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "color-mix(in srgb, var(--gold) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 8, padding: "6px 11px", color: "var(--gold)", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>{tag}</button>
+                  <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "var(--wash)", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 8, padding: "6px 11px", color: "var(--gold)", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>{tag}</button>
                 ))}
               </div>
             </>
@@ -10743,7 +10747,7 @@ function TippingEditor({ t, onChange }) {
           <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 }}>Pre-highlighted suggestion</label>
           <div style={{ display: "flex", gap: 8 }}>
             {t.presets.map((p, i) => { const on = t.smartDefault === p; return (
-              <button key={i} onClick={() => set({ smartDefault: p })} style={{ flex: 1, padding: "11px 0", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{p}%</button>
+              <button key={i} onClick={() => set({ smartDefault: p })} style={{ flex: 1, padding: "11px 0", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{p}%</button>
             ); })}
           </div>
         </div>
@@ -11871,7 +11875,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
               <button onClick={() => setDayEdit({ dow, date: d })} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: h.on ? "var(--tint2)" : "var(--panel2)", border: `1px solid ${h.on ? "color-mix(in srgb, var(--gold) 30%, var(--border))" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                   <span style={{ fontSize: 15.5, fontWeight: h.on ? 600 : 400, color: h.on ? "var(--text)" : "var(--faint)", fontStyle: h.on ? "normal" : "italic" }}>{h.on ? `${fmtTime(h.start)} – ${fmtTime(h.end)}` : "No shifts"}</span>
-                  {hasEx && <span style={{ fontSize: 10.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 6px", flexShrink: 0 }}>JUST THIS DAY</span>}
+                  {hasEx && <span style={{ fontSize: 10.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 5, padding: "2px 6px", flexShrink: 0 }}>JUST THIS DAY</span>}
                 </span>
                 <Edit2 size={15} style={{ color: "var(--sub)", flexShrink: 0 }} />
               </button>
@@ -12030,7 +12034,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 15.5, fontWeight: 500 }}>{o.label}</span>
-                          {o.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
+                          {o.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
                         </div>
                         <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{o.cap}</div>
                       </div>
@@ -12177,7 +12181,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 600, marginBottom: 4 }}>${est.total.toFixed(2)}</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 14 }}>{est.basis} · {est.count} completed appt{est.count !== 1 ? "s" : ""}</div>
           {[["Service sales", `$${est.serviceSales.toFixed(2)}`], ["Service commission", `$${est.svcCommission.toFixed(2)}`], ["Hours scheduled", `${est.hours.toFixed(1)} h`], ["Hourly pay", `$${est.hourlyPay.toFixed(2)}`]].map(([k, v]) => (
-            <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", fontSize: 14.5, borderTop: "1px solid color-mix(in srgb, var(--gold) 20%, transparent)" }}><span style={{ color: "var(--sub)" }}>{k}</span><span style={{ fontWeight: 600 }}>{v}</span></div>
+            <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", fontSize: 14.5, borderTop: "1px solid var(--wash)" }}><span style={{ color: "var(--sub)" }}>{k}</span><span style={{ fontWeight: 600 }}>{v}</span></div>
           ))}
           <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Live estimate from completed appointments using the settings above. Real payroll (taxes, tips, time clock, pay periods) requires the backend.</p>
         </div>
@@ -12383,7 +12387,7 @@ function AppearancePicker({ theme, setTheme }) {
           <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>{cat.toUpperCase()}</div>
           <div style={{ display: "grid", gap: 16 }}>
             {THEMES.filter((t) => t.cat === cat).map((th) => { const on = theme === th.id; const v = th.t; return (
-              <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 18, border: on ? "2px solid var(--gold)" : "1px solid var(--border)", overflow: "hidden", textAlign: "left", background: v.bg, display: "block", width: "100%", position: "relative", boxShadow: on ? "0 10px 34px -14px color-mix(in srgb, var(--gold) 55%, transparent)" : "0 4px 18px -14px rgba(0,0,0,0.5)" }}>
+              <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 18, border: on ? "2px solid var(--gold)" : "1px solid var(--border)", overflow: "hidden", textAlign: "left", background: v.bg, display: "block", width: "100%", position: "relative", boxShadow: on ? "0 10px 34px -14px var(--wash)" : "0 4px 18px -14px rgba(0,0,0,0.5)" }}>
                 {on && <div style={{ position: "absolute", top: 14, right: 14, zIndex: 2, width: 26, height: 26, borderRadius: "50%", background: v.gold, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}><Check size={15} style={{ color: v.onGold }} strokeWidth={3} /></div>}
                 <Mock th={th} accentHex={null} />
                 <div style={{ padding: "12px 16px", background: "var(--panel)", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -12474,9 +12478,9 @@ function PaymentsEditor({ p, onChange }) {
         Payments are <b style={{ color: "var(--text)" }}>live</b>. Real cards are charged across deposits, checkout, and no-show fees, and payouts go to your connected Stripe account.
       </p>
 
-      <div style={{ background: "var(--panel)", border: "1px solid color-mix(in srgb, var(--gold) 55%, var(--border))", borderRadius: 20, padding: 22, boxShadow: "0 18px 44px -24px color-mix(in srgb, var(--gold) 60%, transparent)" }}>
+      <div style={{ background: "var(--panel)", border: "1px solid color-mix(in srgb, var(--gold) 55%, var(--border))", borderRadius: 20, padding: 22, boxShadow: "0 18px 44px -24px var(--wash)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 6 }}>
-          <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--gold)", boxShadow: "0 0 12px color-mix(in srgb, var(--gold) 80%, transparent)" }} />
+          <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--gold)", boxShadow: "0 0 12px var(--wash)" }} />
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1 }}>Live mode</div>
         </div>
         <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>
@@ -12485,7 +12489,7 @@ function PaymentsEditor({ p, onChange }) {
 
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
           {cps.map((lbl) => (
-            <div key={lbl} style={{ flex: 1, textAlign: "center", border: "1px solid color-mix(in srgb, var(--gold) 40%, var(--border))", background: "color-mix(in srgb, var(--gold) 7%, transparent)", borderRadius: 12, padding: "11px 4px" }}>
+            <div key={lbl} style={{ flex: 1, textAlign: "center", border: "1px solid color-mix(in srgb, var(--gold) 40%, var(--border))", background: "var(--wash)", borderRadius: 12, padding: "11px 4px" }}>
               <div style={{ fontSize: 12, color: "var(--sub)", fontWeight: 500 }}>{lbl}</div>
               <div style={{ fontSize: 9.5, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 3, fontWeight: 700, color: "var(--gold)" }}>Live</div>
             </div>
@@ -12757,7 +12761,7 @@ function AnyoneRoutingEditor({ b, onChange, providers = [] }) {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{m.label}</span>
-                  {m.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 4, padding: "1px 5px" }}>DEFAULT</span>}
+                  {m.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 4, padding: "1px 5px" }}>DEFAULT</span>}
                 </div>
                 <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
               </div>
@@ -13201,14 +13205,14 @@ function HelpAssistant({ articles, onBack, onOpenArticle, supportHref }) {
                 <ol style={{ margin: "12px 0 0", padding: 0, listStyle: "none" }}>
                   {m.steps.map((s, j) => (
                     <li key={j} style={{ display: "flex", gap: 11, marginBottom: 9, color: "var(--sub)", fontSize: 14, lineHeight: 1.45 }}>
-                      <span style={{ flexShrink: 0, width: 21, height: 21, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 18%, transparent)", color: "var(--gold)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{j + 1}</span>
+                      <span style={{ flexShrink: 0, width: 21, height: 21, borderRadius: "50%", background: "var(--wash)", color: "var(--gold)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{j + 1}</span>
                       <span>{s}</span>
                     </li>
                   ))}
                 </ol>
               )}
               {m.article && articles.some((a) => a.id === m.article) && (
-                <button onClick={() => onOpenArticle(m.article)} className="lift" style={{ marginTop: 13, display: "inline-flex", alignItems: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 14%, transparent)", color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 10, padding: "9px 14px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY }}>Open the full guide →</button>
+                <button onClick={() => onOpenArticle(m.article)} className="lift" style={{ marginTop: 13, display: "inline-flex", alignItems: "center", gap: 8, background: "var(--wash)", color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 10, padding: "9px 14px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY }}>Open the full guide →</button>
               )}
               {m.unsure && <a href={supportHref} style={{ display: "inline-block", marginTop: 12, color: "var(--gold)", fontSize: 13.5, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 2 }}>Contact support →</a>}
             </div>
@@ -13248,7 +13252,7 @@ function HelpCenter({ business, onBack }) {
       if (m.index > last) out.push(text.slice(last, m.index));
       const id = m[2], label = m[1];
       out.push(
-        <button key={`lnk${k++}`} onClick={() => goArticle(id)} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "var(--gold)", fontWeight: 600, textDecoration: "underline", textDecorationColor: "color-mix(in srgb, var(--gold) 45%, transparent)", textUnderlineOffset: 2, cursor: "pointer", display: "inline" }}>{label}</button>
+        <button key={`lnk${k++}`} onClick={() => goArticle(id)} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "var(--gold)", fontWeight: 600, textDecoration: "underline", textDecorationColor: "var(--wash)", textUnderlineOffset: 2, cursor: "pointer", display: "inline" }}>{label}</button>
       );
       last = m.index + m[0].length;
     }
@@ -14506,7 +14510,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
           {Ic && <Ic size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />}
           <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16.5, fontWeight: 500, letterSpacing: "-0.2px", lineHeight: 1.1 }}>{c.title}</span>
-          {c.smart && <span style={{ fontSize: 8.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid color-mix(in srgb, var(--gold) 45%, transparent)", borderRadius: 5, padding: "2px 5px" }}>SMART</span>}
+          {c.smart && <span style={{ fontSize: 8.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 5, padding: "2px 5px" }}>SMART</span>}
         </span>
         {meta && <span style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 11, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{meta}</span>}
       </button>
@@ -14568,7 +14572,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             return (
               <div key={s.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, marginBottom: 11, overflow: "hidden" }}>
                 <button onClick={() => setOpenSection(open ? null : s.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "15px 16px", background: "none", border: "none", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
-                  <span style={{ width: 34, height: 34, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 13%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><SIcon size={16} /></span>
+                  <span style={{ width: 34, height: 34, borderRadius: 10, background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><SIcon size={16} /></span>
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 15.5, fontWeight: 600, letterSpacing: -0.1 }}>{s.label}</span>
                     <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 1 }}>{s.desc}</span>
@@ -14899,7 +14903,7 @@ const _SHEET = {
   tog: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "19px 0 14px", borderBottom: "1px solid var(--border)", cursor: "pointer" },
   foot: { padding: "16px 22px calc(env(safe-area-inset-bottom) + 18px)" },
   cta: { width: "100%", border: "none", borderRadius: 13, padding: "16px 0", fontSize: 15, fontWeight: 600, background: "var(--gold)", color: "var(--on-gold)", fontFamily: FONT_BODY, letterSpacing: 0.2, cursor: "pointer" },
-  pickRow: (sel) => ({ display: "block", width: "100%", textAlign: "left", padding: "15px 22px", background: sel ? "color-mix(in srgb, var(--gold) 14%, transparent)" : "transparent", border: "none", borderBottom: "1px solid var(--line)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 16, fontWeight: sel ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }),
+  pickRow: (sel) => ({ display: "block", width: "100%", textAlign: "left", padding: "15px 22px", background: sel ? "var(--wash)" : "transparent", border: "none", borderBottom: "1px solid var(--line)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 16, fontWeight: sel ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }),
 };
 function Switch({ on }) {
   return (
@@ -15007,7 +15011,7 @@ function BarberHoursSheet({ providerName, dateLabel, weekdayName, initial, fmtTi
                 {[["day", "Just this day"], ["week", "Every " + weekdayName]].map(([v, lbl]) => {
                   const sel = scope === v;
                   return (
-                    <button key={v} onClick={() => setScope(v)} style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: sel ? 600 : 500, color: sel ? "var(--gold)" : "var(--sub)", padding: "13px 0", border: sel ? "1px solid var(--gold)" : "1px solid var(--border)", borderRadius: 11, background: sel ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", fontFamily: FONT_BODY, cursor: "pointer" }}>{lbl}</button>
+                    <button key={v} onClick={() => setScope(v)} style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: sel ? 600 : 500, color: sel ? "var(--gold)" : "var(--sub)", padding: "13px 0", border: sel ? "1px solid var(--gold)" : "1px solid var(--border)", borderRadius: 11, background: sel ? "var(--wash)" : "transparent", fontFamily: FONT_BODY, cursor: "pointer" }}>{lbl}</button>
                   );
                 })}
               </div>
@@ -15145,7 +15149,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             if (!outside) return null;
             const nm = provObj ? provObj.name.split(" ")[0] : "this barber";
             return (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 25%, transparent)", borderRadius: 10, padding: "9px 13px", marginTop: 14, fontSize: 13, color: "var(--text2)", lineHeight: 1.4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--wash)", border: "1px solid var(--wash)", borderRadius: 10, padding: "9px 13px", marginTop: 14, fontSize: 13, color: "var(--text2)", lineHeight: 1.4 }}>
                 <AlertCircle size={14} style={{ color: "var(--gold)", flexShrink: 0 }} />
                 This is outside {nm}'s schedule.
               </div>
@@ -15181,7 +15185,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
                 const usualTxt = client.cadenceDays ? (client.cadenceDays < 14 ? `every ${client.cadenceDays} days` : `every ${Math.round(client.cadenceDays / 7)} weeks`) : null;
                 if (!sinceTxt && !usualTxt) return null;
                 return (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 13, background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 22%, transparent)", borderRadius: 11, padding: "9px 13px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 13, background: "var(--wash)", border: "1px solid var(--wash)", borderRadius: 11, padding: "9px 13px" }}>
                     <Clock size={14} style={{ color: "var(--gold)", flexShrink: 0 }} />
                     <span style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.4 }}>
                       {sinceTxt && <>Last in <strong style={{ color: "var(--text)", fontWeight: 600 }}>{sinceTxt}</strong></>}
@@ -15286,7 +15290,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
           <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 40px" }}>
             {hasBest && (
               <div style={{ maxWidth: 460, margin: "0 auto 14px", display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4 }}>
-                <span style={{ width: 12, height: 12, borderRadius: 3, background: "color-mix(in srgb, var(--gold) 30%, transparent)", border: "1px solid var(--gold)", flexShrink: 0 }} />
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: "var(--wash)", border: "1px solid var(--gold)", flexShrink: 0 }} />
                 Gold times sit right against another appointment — no gap left behind.
               </div>
             )}
@@ -15295,7 +15299,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxWidth: 460, margin: "0 auto" }}>
               {timeOptions.map((s) => { const on = s.start === startMin; return (
-                <button key={s.start} onClick={() => { setStartMin(s.start); setShowTimePick(false); }} style={{ padding: "14px 0", borderRadius: 10, background: on ? "var(--gold)" : s.best ? "color-mix(in srgb, var(--gold) 16%, transparent)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", border: `1px solid ${on ? "var(--gold)" : s.best ? "var(--gold)" : "var(--border2)"}`, fontSize: 14.5, fontWeight: on || s.best ? 600 : 400 }}>{fmtHM(s.start)}</button>
+                <button key={s.start} onClick={() => { setStartMin(s.start); setShowTimePick(false); }} style={{ padding: "14px 0", borderRadius: 10, background: on ? "var(--gold)" : s.best ? "var(--wash)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", border: `1px solid ${on ? "var(--gold)" : s.best ? "var(--gold)" : "var(--border2)"}`, fontSize: 14.5, fontWeight: on || s.best ? 600 : 400 }}>{fmtHM(s.start)}</button>
               ); })}
             </div>
             )}
@@ -16388,7 +16392,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                       const isFirstTime = !a.clientId || (() => { const c = clients.find((cl) => cl.id === a.clientId); return c && (c.visits || 0) === 0; })();
                       if (!isFirstTime || isBlock || isDone) return null;
                       return (
-                        <span style={{ position: "absolute", top: 5, right: 6, fontSize: 9.5, fontWeight: 700, letterSpacing: 1, color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 4, padding: "1px 5px", lineHeight: 1.3, background: "color-mix(in srgb, var(--gold) 8%, transparent)" }}>NEW</span>
+                        <span style={{ position: "absolute", top: 5, right: 6, fontSize: 9.5, fontWeight: 700, letterSpacing: 1, color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 4, padding: "1px 5px", lineHeight: 1.3, background: "var(--wash)" }}>NEW</span>
                       );
                     })()}
                     {/* subtle end-of-appointment marker: hairline at the bottom edge + end time */}
@@ -17048,7 +17052,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   if (stage === "rebook") return sheet(
     <div style={{ padding: "28px 24px 32px" }}>
       <div style={{ textAlign: "center", marginBottom: 26 }}>
-        <div style={{ width: 56, height: 56, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Repeat size={26} style={{ color: "var(--gold)" }} /></div>
+        <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Repeat size={26} style={{ color: "var(--gold)" }} /></div>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, lineHeight: 1.15 }}>{discountOn ? `Save ${discLabel} by rebooking now?` : "Book the next visit?"}</h2>
         <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300 }}>{discountOn ? `Lock in ${appt.name ? appt.name.split(" ")[0] : "the next visit"}'s next ${service?.name || "appointment"} and take ${discLabel} off.` : `Lock in ${appt.name ? appt.name.split(" ")[0] : "the next visit"}'s next ${service?.name || "appointment"} before they head out.`}</p>
       </div>
@@ -17060,7 +17064,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         const usualTxt = cadenceDays ? (cadenceDays < 14 ? `every ${cadenceDays} days` : `every ${Math.round(cadenceDays / 7)} weeks`) : null;
         if (!sinceTxt && !usualTxt) return null;
         return (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap", background: "color-mix(in srgb, var(--gold) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 22%, transparent)", borderRadius: 12, padding: "11px 14px", marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap", background: "var(--wash)", border: "1px solid var(--wash)", borderRadius: 12, padding: "11px 14px", marginBottom: 18 }}>
             <Clock size={15} style={{ color: "var(--gold)", flexShrink: 0 }} />
             <span style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.4, textAlign: "center" }}>
               {sinceTxt && <>Last visit <strong style={{ color: "var(--text)", fontWeight: 600 }}>{sinceTxt}</strong></>}
@@ -17073,14 +17077,14 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WHEN?</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 12 }}>
         {rebookCfg.weeks.map((w) => { const on = rebookWeeks === w && !customDate; const isRhythm = w === rhythmWeek; return (
-          <button key={w} onClick={() => { setRebookWeeks(w); setCustomDate(null); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "var(--panel)", color: "var(--text)", textAlign: "left" }}>
+          <button key={w} onClick={() => { setRebookWeeks(w); setCustomDate(null); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "var(--panel)", color: "var(--text)", textAlign: "left" }}>
             <div><div style={{ fontSize: 16, fontWeight: 600 }}>{w} weeks</div><div style={{ fontSize: 13, color: isRhythm ? "var(--gold)" : "var(--sub)", marginTop: 2 }}>{isRhythm ? `${appt.name ? appt.name.split(" ")[0] + "'s" : "their"} usual rhythm` : fmtRebook(w)}</div></div>
             {on && <Check size={18} style={{ color: "var(--gold)" }} />}
           </button>
         ); })}
       </div>
       {/* custom date — opens the device calendar/date picker */}
-      <label style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${customDate ? "var(--gold)" : "var(--border2)"}`, background: customDate ? "color-mix(in srgb, var(--gold) 10%, transparent)" : "var(--panel)", color: "var(--text)", marginBottom: 22, cursor: "pointer" }}>
+      <label style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${customDate ? "var(--gold)" : "var(--border2)"}`, background: customDate ? "var(--wash)" : "var(--panel)", color: "var(--text)", marginBottom: 22, cursor: "pointer" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Calendar size={19} style={{ color: "var(--gold)" }} />
           <div>
@@ -17182,7 +17186,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
 
   return sheet(
     <div className="fade-in" style={{ padding: "56px 28px 64px", textAlign: "center" }}>
-      <div style={{ width: 72, height: 72, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px" }}><Check size={34} style={{ color: "var(--gold)" }} /></div>
+      <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px" }}><Check size={34} style={{ color: "var(--gold)" }} /></div>
       <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 8 }}>All done</div>
       <p style={{ color: "var(--sub)", fontSize: 15.5, fontWeight: 300 }}>{money(total)} charged for today’s visit · receipt sent to {appt.name || "the client"}.</p>
 
@@ -17381,7 +17385,7 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
   const fmtMoney0 = (n) => "$" + Math.round(n || 0).toLocaleString();
   const periodLabel = period === "week" ? "This week" : period === "month" ? "This month" : "This year";
   const Pill = ({ k, label }) => (
-    <button onClick={() => setPeriod(k)} style={{ flex: 1, padding: "9px 8px", borderRadius: 24, border: period === k ? "1px solid var(--gold)" : "1px solid var(--border2)", background: period === k ? "color-mix(in srgb, var(--gold) 12%, transparent)" : "transparent", color: period === k ? "var(--gold)" : "var(--sub)", fontWeight: period === k ? 600 : 400, fontSize: 13.5, cursor: "pointer" }}>{label}</button>
+    <button onClick={() => setPeriod(k)} style={{ flex: 1, padding: "9px 8px", borderRadius: 24, border: period === k ? "1px solid var(--gold)" : "1px solid var(--border2)", background: period === k ? "var(--wash)" : "transparent", color: period === k ? "var(--gold)" : "var(--sub)", fontWeight: period === k ? 600 : 400, fontSize: 13.5, cursor: "pointer" }}>{label}</button>
   );
 
   const openRow = rows.find((r) => r.id === openId) || null;
@@ -18294,7 +18298,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     </div>
   );
 
-  const EDIT_CHIP = { display: "inline-flex", alignItems: "center", gap: 7, border: "1.5px solid #C9A24B", background: "#FBF6EA", padding: "5px 11px", borderRadius: 9, font: "inherit", color: T.text, cursor: "pointer", verticalAlign: "middle", lineHeight: 1.25 };
+  const _studioChip = !business?.theme || business.theme === "studio" || !THEME_IDS.includes(business.theme);
+  const EDIT_CHIP = { display: "inline-flex", alignItems: "center", gap: 7, border: `1.5px solid ${_studioChip ? "var(--border)" : "#C9A24B"}`, background: _studioChip ? "var(--panel)" : "#FBF6EA", padding: "5px 11px", borderRadius: 9, font: "inherit", color: T.text, cursor: "pointer", verticalAlign: "middle", lineHeight: 1.25 };
 
   return (
     <Portal>
