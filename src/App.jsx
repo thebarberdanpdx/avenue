@@ -14165,6 +14165,40 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         { k: "data_reports", label: "Reports show real numbers", card: "reports" },
       ] },
     ] },
+    { id: "golive", label: "Going live", icon: Send, desc: "Deploy, domain & email health", groups: [
+      { label: "Deploy & domain", items: [
+        { k: "golive_https", label: "gotvero.com loads over HTTPS \u2014 no certificate warning", card: null },
+        { k: "golive_deploy", label: "Your latest App.jsx is the live production build", card: null },
+        { k: "golive_env", label: "Vercel env vars all set \u2014 Stripe live secret, Resend key + EMAIL_FROM, Supabase URL + service-role key, APNs key/ID/team", card: null },
+        { k: "golive_errors", label: "Vercel error rate looks clean (~0%)", card: null },
+      ] },
+      { label: "Email deliverability", items: [
+        { k: "golive_spf", label: "SPF record is set for gotvero.com", card: null },
+        { k: "golive_dkim", label: "DKIM (Resend) is set \u2014 your mail is signed", card: null },
+        { k: "golive_dmarc", label: "DMARC record is live (v=DMARC1)", card: null },
+        { k: "golive_inbox", label: "A fresh confirmation lands in the inbox, not spam", card: null },
+      ] },
+    ] },
+    { id: "safety", label: "Safety & data", icon: Lock, desc: "Protecting bookings & client data", groups: [
+      { label: "Booking integrity", items: [
+        { k: "safety_double", label: "Two clients can't grab the same slot \u2014 taken times vanish and the server blocks overlaps", card: null },
+        { k: "safety_cancelkeep", label: "Cancelling keeps the record \u2014 client, appointment & saved card all persist", card: null },
+      ] },
+      { label: "Client data", items: [
+        { k: "safety_dedupe", label: "Booking twice with one email reuses the profile \u2014 no duplicate rows", card: null },
+        { k: "safety_rls", label: "Logged-in owner can edit on the phone; the public can only book", card: null },
+        { k: "safety_backups", label: "Supabase automatic backups are turned on", card: null },
+      ] },
+    ] },
+    { id: "dryrun", label: "Final dry run", icon: CheckCircle2, desc: "One real run before you open the doors", groups: [
+      { label: "The real thing", items: [
+        { k: "dry_full", label: "A real booking shows up everywhere \u2014 calendar, Stripe, email, and a push to your phone", card: null },
+        { k: "dry_refund", label: "Cancel + refund it \u2014 money returns and records stay intact", card: null },
+        { k: "dry_2nd", label: "Repeat from a second device / browser", card: null },
+        { k: "dry_heather", label: "Heather runs one full booking through her account", card: null },
+        { k: "dry_friend", label: "A real friend books end-to-end \u2014 a true outside rehearsal", card: null },
+      ] },
+    ] },
   ];
   // tally
   const allItems = CHECKLIST.flatMap((s) => s.groups.flatMap((g) => g.items));
@@ -14298,7 +14332,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                 <span style={{ width: 40, height: 40, borderRadius: 12, background: "color-mix(in srgb, var(--live, var(--gold)) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Sparkles size={19} style={{ color: "var(--live, var(--gold))" }} /></span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 18, lineHeight: 1.1 }}>Launch checklist</div>
-                  <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>Work through every setting before you go live</div>
+                  <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>Work through every setting and go-live check before you open</div>
                 </div>
               </div>
               <div style={{ height: 8, borderRadius: 8, background: "var(--panel2)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((doneCount / totalCount) * 100)}%`, background: "var(--live, var(--gold))", borderRadius: 8, transition: "width .3s" }} /></div>
