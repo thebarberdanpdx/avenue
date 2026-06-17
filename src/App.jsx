@@ -1312,6 +1312,7 @@ function App() {
   };
   const SHOP_ID = resolveShopId();
 
+  const [pendingApptId, setPendingApptId] = useState(null); // notification tap → open this appointment on the calendar
   // ---- PUSH NOTIFICATIONS (native app only): register this device for booking
   // alerts and save its token against the signed-in staff user + shop. Silent in
   // the UI; each step logs to the console ("[vero push] ...") so a Mac-tethered
@@ -1342,6 +1343,13 @@ function App() {
         await PushNotifications.addListener("registrationError", (err) => {
           console.log("[vero push] Apple registration error: " + (err && err.error ? err.error : JSON.stringify(err)));
           try { window.localStorage.setItem("vero_push_status", "Phone alerts: Apple didn't return a token — " + (err && err.error ? err.error : "registration error")); } catch (e) {}
+        });
+        await PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+          try {
+            const raw = (action && action.notification && action.notification.data) || {};
+            const info = raw.data && typeof raw.data === "object" ? raw.data : raw;
+            if (info && info.t === "appt" && info.id) { setPendingApptId(String(info.id)); setView("shop"); }
+          } catch (e) {}
         });
         await PushNotifications.register();
       } catch (e) { console.log("[vero push] setup failed: " + (e && e.message ? e.message : String(e))); try { window.localStorage.setItem("vero_push_status", "Phone alerts: setup failed — " + (e && e.message ? e.message : String(e))); } catch (_) {} }
@@ -1818,7 +1826,7 @@ function App() {
       {view === "shop" && (session
         ? (masterMode
           ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} />
-          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} />)
+          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
@@ -2467,7 +2475,7 @@ function fireStaffPush({ shopId, title, appt }) {
     fetch(API_BASE + "/api/push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shopId, title, body: [appt.name, appt.title || appt.serviceName, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : "") }),
+      body: JSON.stringify({ shopId, title, body: [appt.name, appt.title || appt.serviceName, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : ""), data: { t: "appt", id: appt.id } }),
     }).catch(() => {});
   } catch (e) {}
 }
@@ -3134,7 +3142,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           fetch(API_BASE + "/api/push", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : "") }),
+            body: JSON.stringify({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : ""), data: { t: "appt", id: ap0.id } }),
           }).catch(() => {});
         } catch (e) {}
         setBookedId(baseId); setStep(8);
@@ -8406,11 +8414,13 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
   );
 }
 
-function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId }) {
+function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled }) {
   const [tab, setTab] = useState("pulse");
   const [activeClient, setActiveClient] = useState(null);
   const [pulseDetail, setPulseDetail] = useState(null); // null | "revenue" — drill-in from Pulse
   const [toast, setToast] = useState(null);
+  // Notification deep-link: when a tapped push hands us an appointment, jump to the calendar so it can open it.
+  useEffect(() => { if (deepLinkApptId) { setActiveClient(null); setPulseDetail(null); setTab("calendar"); } }, [deepLinkApptId]);
   const [msgTarget, setMsgTarget] = useState(null); // { clientId, draft } — opens a convo prefilled
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3400); };
 
@@ -8614,7 +8624,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} onOpenClient={(c) => { setPulseDetail(null); setActiveClient(c); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId} onDeepLinkHandled={onDeepLinkHandled} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} onBack={() => setActiveClient(null)} showToast={showToast} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
@@ -15235,7 +15245,7 @@ function ColumnOrderEditor({ providers, setProviders }) {
     </div>
   );
 }
-function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId }) {
+function CalendarView({ appts, setAppts, clients, setClients, providers, setProviders, services, cutLibrary = [], business, setBusiness, theme, showToast, waitlist = [], setWaitlist, me, isOwner = true, pulseView = "me", onOpenClient, shopId, deepLinkApptId, onDeepLinkHandled }) {
   const sizeId = business?.calendarRowSize || "L";
   // Visible calendar window — configurable in Calendar Settings; falls back to 7 AM–10 PM.
   const DAY_START = ((business?.calendar?.dayStartHr ?? 7)) * 60;
@@ -15244,6 +15254,20 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   const [open, setOpen] = useState(null);
   const [dayOffset, setDayOffset] = useState(0);
+  // Notification deep-link: when a tapped push hands us an appointment id, jump to its day and open its detail.
+  // Retries as appts load (the booking may not be in state yet at tap time); clears once it's found and opened.
+  useEffect(() => {
+    if (!deepLinkApptId) return;
+    const ap = (appts || []).find((a) => a.id === deepLinkApptId);
+    if (!ap) return; // not loaded yet — wait for the next appts update
+    if (ap.bookedFor) {
+      const d = new Date(ap.bookedFor); d.setHours(0, 0, 0, 0);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      setDayOffset(Math.round((d - today) / 86400000));
+    }
+    setOpen(ap);
+    if (onDeepLinkHandled) onDeepLinkHandled();
+  }, [deepLinkApptId, appts]);
   const [drag, setDrag] = useState(null);     // { id, deltaMin } while dragging
   const [pending, setPending] = useState(null); // { appt, newStart, newEnd } awaiting confirm
   const [notifyMove, setNotifyMove] = useState(false); // drag-move: text the client the new time (default off/silent)
