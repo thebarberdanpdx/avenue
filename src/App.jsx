@@ -14287,7 +14287,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "reports", fullBleed: true, title: "Reports", icon: BarChart3, category: "Reporting",
       status: "Filter, view & export",
       keywords: "reports reporting analytics revenue sales staff service performance retention average ticket dashboard insights numbers trends export pdf print filter date range cancellations no shows new clients tax taxes estimated",
-      editor: <ReportsHub appts={appts} clients={clients} providers={providers} services={services} business={form} setBusiness={setBusiness} me={me} />,
+      editor: <ReportsHub appts={appts} clients={clients} providers={providers} services={services} business={form} setBusiness={setBusiness} me={me} onOpenCard={setOpenCard} />,
     },
   ];
   const CATEGORY_ORDER = ["Business Setup", "Services & Menu", "Calendar & Appointments", "Payments & Checkout", "Online Booking", "Automated Messages", "Reporting"];
@@ -19012,7 +19012,7 @@ function ActionBtn({ children, onClick, primary }) { return <button className="l
 // Reports hub — unified reporting. Filter bar (date range + staff + service),
 // a grouped list of reports, each opening to a filtered view with PDF export.
 // All figures compute live from real appointment + service data.
-function ReportsHub({ appts, clients, providers, services, business, setBusiness, me }) {
+function ReportsHub({ appts, clients, providers, services, business, setBusiness, me, onOpenCard }) {
   const FB = "'Jost', sans-serif";
   const FD = "'Fraunces', serif";
   const staff = providers.filter((p) => p.id !== "anyone");
@@ -19356,6 +19356,28 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
           </div>
         </React.Fragment>
       ))}
+
+      {/* Data tools — open the existing Settings tools from the bottom of Reports. */}
+      {onOpenCard && (
+        <>
+          <SectionLabel>Data</SectionLabel>
+          <div style={card}>
+            {[
+              { id: "import", name: "Import data", desc: "Bring in clients & appointments from a CSV" },
+              { id: "mergedupes", name: "Merge duplicates", desc: "Combine clients that share a phone number" },
+              { id: "testdata", name: "Test data", desc: "Fill the calendar to try things, then wipe it" },
+            ].map((t, i, arr) => (
+              <button key={t.id} onClick={() => onOpenCard(t.id)} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "16px 0", borderBottom: i === arr.length - 1 ? "none" : "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 17, color: "var(--text)", fontFamily: FB }}>{t.name}</span>
+                  <span style={{ display: "block", fontSize: 13, color: "var(--sub)", fontFamily: FB, marginTop: 2 }}>{t.desc}</span>
+                </span>
+                <ChevronRight size={17} style={{ color: "var(--faint)", flexShrink: 0 }} />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* date picker (shared with the open-report view) */}
       {datePicker}
