@@ -19032,6 +19032,38 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
   const [serviceId, setServiceId] = useState("all");
   const [pickerOpen, setPickerOpen] = useState(null); // 'dates' | 'staff' | 'service' | null
 
+  // ---- date-range presets (calendar-aware) + custom ----
+  const [activePreset, setActivePreset] = useState("last30"); // null = custom
+  const isoOf = (x) => { const d = new Date(x); d.setHours(0, 0, 0, 0); return d.toISOString().slice(0, 10); };
+  const DATE_PRESETS = [
+    { id: "today", label: "Today" },
+    { id: "yesterday", label: "Yesterday" },
+    { id: "thisweek", label: "This week" },
+    { id: "last7", label: "Last 7 days" },
+    { id: "thismonth", label: "This month" },
+    { id: "lastmonth", label: "Last month" },
+    { id: "last30", label: "Last 30 days" },
+    { id: "thisquarter", label: "This quarter" },
+    { id: "ytd", label: "Year to date" },
+    { id: "lastyear", label: "Last year" },
+  ];
+  const rangeFor = (id) => {
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    const y = d.getFullYear(), m = d.getMonth();
+    let f = new Date(d), t = new Date(d);
+    if (id === "yesterday") { f.setDate(f.getDate() - 1); t = new Date(f); }
+    else if (id === "thisweek") { const day = f.getDay(); f.setDate(f.getDate() + (day === 0 ? -6 : 1 - day)); }
+    else if (id === "last7") { f.setDate(f.getDate() - 6); }
+    else if (id === "thismonth") { f = new Date(y, m, 1); }
+    else if (id === "lastmonth") { f = new Date(y, m - 1, 1); t = new Date(y, m, 0); }
+    else if (id === "last30") { f.setDate(f.getDate() - 29); }
+    else if (id === "thisquarter") { f = new Date(y, Math.floor(m / 3) * 3, 1); }
+    else if (id === "ytd") { f = new Date(y, 0, 1); }
+    else if (id === "lastyear") { f = new Date(y - 1, 0, 1); t = new Date(y - 1, 11, 31); }
+    return { from: isoOf(f), to: isoOf(t) }; // "today" falls through with f=t=today
+  };
+  const applyPreset = (id) => { const r = rangeFor(id); setFrom(r.from); setTo(r.to); setActivePreset(id); };
+
   const fromD = new Date(from + "T00:00:00");
   const toD = new Date(to + "T23:59:59");
   const fmtShort = (iso) => { const d = new Date(iso + "T00:00:00"); return `${MONTHS[d.getMonth()]} ${d.getDate()}`; };
@@ -19232,12 +19264,38 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
     return null;
   };
 
+  // Shared date-range picker (presets + custom) — rendered on the hub AND inside an open report.
+  const datePicker = (
+    <Sheet open={pickerOpen === "dates"} onClose={() => setPickerOpen(null)} align="bottom" maxWidth={460}>
+      <div style={{ padding: "8px 4px 12px" }}>
+        <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 500, marginBottom: 16 }}>Date range</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 18 }}>
+          {DATE_PRESETS.map((p) => { const on = activePreset === p.id; return (
+            <button key={p.id} onClick={() => applyPreset(p.id)} style={{ padding: "11px 0", borderRadius: 10, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400, fontFamily: FB, cursor: "pointer" }}>{p.label}</button>
+          ); })}
+        </div>
+        <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: activePreset === null ? "var(--text)" : "var(--faint)", fontFamily: FB, marginBottom: 8 }}>Custom range</div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ flex: 1 }}><div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontFamily: FB, marginBottom: 6 }}>From</div><input type="date" value={from} max={to} onChange={(e) => { setFrom(e.target.value); setActivePreset(null); }} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FB, boxSizing: "border-box" }} /></div>
+          <div style={{ flex: 1 }}><div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontFamily: FB, marginBottom: 6 }}>To</div><input type="date" value={to} min={from} max={todayISO()} onChange={(e) => { setTo(e.target.value); setActivePreset(null); }} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FB, boxSizing: "border-box" }} /></div>
+        </div>
+        <button onClick={() => setPickerOpen(null)} style={{ width: "100%", marginTop: 18, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: 15, fontFamily: FB, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Apply</button>
+      </div>
+    </Sheet>
+  );
+
   // ---- open report view ----
   if (openReport) {
     const meta = REPORTS.find((r) => r.id === openReport);
     return (
       <div className="fade-up" style={{ paddingBottom: 28 }}>
-        <button onClick={() => setOpenReport(null)} className="no-print" style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontFamily: FB, marginBottom: 22, padding: 0, cursor: "pointer" }}><span style={{ fontFamily: FD, fontSize: 16, fontWeight: 300 }}>‹</span> Reports</button>
+        <button onClick={() => setOpenReport(null)} className="no-print" style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontFamily: FB, marginBottom: 18, padding: 0, cursor: "pointer" }}><span style={{ fontFamily: FD, fontSize: 16, fontWeight: 300 }}>‹</span> Reports</button>
+        {/* Pick the date range right here, inside the report you opened. */}
+        <div className="no-print" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+          <button onClick={() => setPickerOpen("dates")} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 30, padding: "9px 16px", fontSize: 13.5, color: "var(--text)", fontFamily: FB, cursor: "pointer", boxShadow: "var(--shadow-sm)" }}><Calendar size={15} style={{ color: "var(--sub)" }} /> {rangeLabel} <ChevronDown size={14} style={{ color: "var(--sub)" }} /></button>
+          <button onClick={() => setPickerOpen("staff")} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 30, padding: "9px 16px", fontSize: 13.5, color: "var(--text)", fontFamily: FB, cursor: "pointer", boxShadow: "var(--shadow-sm)" }}>{staffLabel} <ChevronDown size={14} style={{ color: "var(--sub)" }} /></button>
+          <button onClick={() => setPickerOpen("service")} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 30, padding: "9px 16px", fontSize: 13.5, color: "var(--text)", fontFamily: FB, cursor: "pointer", boxShadow: "var(--shadow-sm)" }}>{serviceLabel} <ChevronDown size={14} style={{ color: "var(--sub)" }} /></button>
+        </div>
         <div id="vero-print-area">
           <Masthead title={meta ? meta.name : "Report"} sub={`${rangeLabel} · ${staffLabel} · ${serviceLabel}`} />
           <div style={{ height: 8 }} />
@@ -19245,6 +19303,26 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
           <button onClick={exportPDF} className="no-print" style={{ width: "100%", marginTop: 24, background: "transparent", border: "1px solid var(--text)", color: "var(--text)", borderRadius: 10, padding: 15, fontFamily: FB, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Export PDF</button>
           <div style={{ fontSize: 11, color: "var(--faint)", fontFamily: FB, textAlign: "center", marginTop: 10 }} className="no-print">On iPhone: tap Export, then pinch the preview to save as PDF.</div>
         </div>
+        {datePicker}
+        {/* staff + service pickers, available inside the open report too */}
+        <Sheet open={pickerOpen === "staff"} onClose={() => setPickerOpen(null)} align="bottom" maxWidth={460}>
+          <div style={{ padding: "8px 4px 12px" }}>
+            <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 500, marginBottom: 14 }}>Staff</div>
+            {[{ id: "all", name: "All barbers" }, ...staff].map((p, i, arr) => (
+              <button key={p.id} onClick={() => { setStaffId(p.id); setPickerOpen(null); }} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 0", borderBottom: i === arr.length - 1 ? "none" : "1px solid var(--line)", background: "none", border: "none", fontSize: 16, color: "var(--text)", fontFamily: FB, cursor: "pointer", textAlign: "left" }}>{p.name}{staffId === p.id && <Check size={17} style={{ color: "var(--text)" }} />}</button>
+            ))}
+          </div>
+        </Sheet>
+        <Sheet open={pickerOpen === "service"} onClose={() => setPickerOpen(null)} align="bottom" maxWidth={460}>
+          <div style={{ padding: "8px 4px 12px" }}>
+            <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 500, marginBottom: 14 }}>Service</div>
+            <div style={{ maxHeight: "50vh", overflowY: "auto" }}>
+            {[{ id: "all", name: "All services" }, ...services].map((s, i, arr) => (
+              <button key={s.id} onClick={() => { setServiceId(s.id); setPickerOpen(null); }} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 0", borderBottom: i === arr.length - 1 ? "none" : "1px solid var(--line)", background: "none", border: "none", fontSize: 16, color: "var(--text)", fontFamily: FB, cursor: "pointer", textAlign: "left" }}>{s.name}{serviceId === s.id && <Check size={17} style={{ color: "var(--text)" }} />}</button>
+            ))}
+            </div>
+          </div>
+        </Sheet>
       </div>
     );
   }
@@ -19279,22 +19357,8 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
         </React.Fragment>
       ))}
 
-      {/* date picker */}
-      <Sheet open={pickerOpen === "dates"} onClose={() => setPickerOpen(null)} align="bottom" maxWidth={460}>
-        <div style={{ padding: "8px 4px 12px" }}>
-          <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 500, marginBottom: 18 }}>Date range</div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-            {[["7 days", 7], ["30 days", 30], ["90 days", 90], ["This year", 365]].map(([lbl, d]) => (
-              <button key={lbl} onClick={() => { setFrom(ago(d)); setTo(todayISO()); }} style={{ flex: "1 0 40%", padding: "11px 0", borderRadius: 10, border: "1px solid var(--border2)", background: "transparent", color: "var(--text)", fontSize: 13.5, fontFamily: FB, cursor: "pointer" }}>{lbl}</button>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <div style={{ flex: 1 }}><div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontFamily: FB, marginBottom: 6 }}>From</div><input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FB, boxSizing: "border-box" }} /></div>
-            <div style={{ flex: 1 }}><div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontFamily: FB, marginBottom: 6 }}>To</div><input type="date" value={to} min={from} max={todayISO()} onChange={(e) => setTo(e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FB, boxSizing: "border-box" }} /></div>
-          </div>
-          <button onClick={() => setPickerOpen(null)} style={{ width: "100%", marginTop: 18, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: 15, fontFamily: FB, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Apply</button>
-        </div>
-      </Sheet>
+      {/* date picker (shared with the open-report view) */}
+      {datePicker}
 
       {/* staff picker */}
       <Sheet open={pickerOpen === "staff"} onClose={() => setPickerOpen(null)} align="bottom" maxWidth={460}>
