@@ -3351,7 +3351,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
         <div key={screenKey} className="screen-swap">
         {/* STEP 0 — WELCOME / front door */}
-        {step === 0 && !simpleStep && (
+        {step === 0 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && !addingMember && (
           <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "10px 4px 0" }}>
             <div style={{ textAlign: "center", marginBottom: 36 }}>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 4, fontWeight: 600, color: "var(--text2)", textTransform: "uppercase", marginBottom: 16 }}>Welcome to</div>
