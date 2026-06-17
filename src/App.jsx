@@ -14312,11 +14312,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       { label: "Clients", ids: ["messages"] },
       { label: "My team", ids: ["notifications"] },
     ] },
-    { id: "data",  section: "Business & account", label: "Reports & data", icon: BarChart3, desc: "Your numbers & tools", settings: ["reports", "import", "mergedupes", "testdata"] },
+    { id: "data",  section: "Business & account", label: "Reports & data", icon: BarChart3, desc: "Your numbers & tools", settings: ["reports"] },
   ];
   // Safety net: any card not placed above still appears (appended to Reports & Insights) so nothing is ever lost.
   // RETIRED cards are intentionally left out of the list (their function moved elsewhere).
-  const RETIRED = new Set(["staffselection", "scheduling"]); // bookable-online lives per staff; buffers moved to each service
+  const RETIRED = new Set(["staffselection", "scheduling", "import", "mergedupes", "testdata"]); // bookable-online lives per staff; buffers moved to each service; import/mergedupes/testdata now live inside the Reports hub
   const placed = new Set(CATS.flatMap((c) => c.settings));
   const orphans = cards.filter((c) => !placed.has(c.id) && !RETIRED.has(c.id)).map((c) => c.id);
   if (orphans.length) CATS[CATS.length - 1].settings.push(...orphans);
