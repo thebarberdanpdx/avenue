@@ -2467,15 +2467,24 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject }) 
 // Same server endpoint the online-booking path uses, so closed-app notifications
 // behave identically no matter where the change came from. Fire-and-forget — a
 // push failure must never affect the appointment itself.
-function fireStaffPush({ shopId, title, appt }) {
+function fireStaffPush({ shopId, title, appt, prevAppt }) {
   try {
     if (!shopId || !appt) return;
-    const whenStr = appt.bookedFor ? new Date(appt.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+    const fmtWhen = (a) => (a && a.bookedFor) ? new Date(a.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+    const whenStr = fmtWhen(appt);
     const nNote = (appt.note || "").trim();
+    let body;
+    if (prevAppt) {
+      // Reschedule: show what it was → what it's now.
+      const prevStr = fmtWhen(prevAppt);
+      body = [appt.name, appt.title || appt.serviceName].filter(Boolean).join(" · ") + ((prevStr && whenStr) ? `\n${prevStr} \u2192 ${whenStr}` : (whenStr ? `\n${whenStr}` : ""));
+    } else {
+      body = [appt.name, appt.title || appt.serviceName, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : "");
+    }
     fetch(API_BASE + "/api/push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shopId, title, body: [appt.name, appt.title || appt.serviceName, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : ""), data: { t: "appt", id: appt.id } }),
+      body: JSON.stringify({ shopId, title, body, data: { t: "appt", id: appt.id } }),
     }).catch(() => {});
   } catch (e) {}
 }
@@ -2557,6 +2566,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [showHome, setShowHome] = useState(false); // logged-in returning client's home (their info, next/recent visits, family) — the landing after verify + return-to after booking
   const [showAllVisits, setShowAllVisits] = useState(false); // expand the recent-visits list on the home
   const [homeAction, setHomeAction] = useState(null); // { type: "cancel" | "reschedule", appt, person } — confirm sheet on the home next-visit card
+  const [reschedPrev, setReschedPrev] = useState(null); // when set, the just-completed booking is a home reschedule of THIS appt → owner push shows old → new instead of "new booking"
   useEffect(() => {
     if (!matched) return;
     // Prefer the stored firstName/lastName if present; otherwise split the legacy `name` field on whitespace.
@@ -3140,13 +3150,18 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         // Alert staff devices (native app push). Fire-and-forget; never affects the booking.
         try {
           const ap0 = newAppts[0] || {};
-          const whenStr = ap0.bookedFor ? new Date(ap0.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
-          const nNote = (ap0.note || "").trim();
-          fetch(API_BASE + "/api/push", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : ""), data: { t: "appt", id: ap0.id } }),
-          }).catch(() => {});
+          if (reschedPrev) {
+            fireStaffPush({ shopId, title: "Appointment rescheduled", appt: ap0, prevAppt: reschedPrev });
+            setReschedPrev(null);
+          } else {
+            const whenStr = ap0.bookedFor ? new Date(ap0.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+            const nNote = (ap0.note || "").trim();
+            fetch(API_BASE + "/api/push", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : ""), data: { t: "appt", id: ap0.id } }),
+            }).catch(() => {});
+          }
         } catch (e) {}
         setBookedId(baseId); setStep(8);
         // ---- Authoritative card-on-file persistence (single source of truth) ----
@@ -3209,7 +3224,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setShowCodeEntry(false); setAddingMember(false); setBookingFor(null); setActiveMember(null);
     setCart([]); setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
     setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setBookedId(null); setCameFromUsual(false);
-    setConsult(null); setShowAllVisits(false); setHomeAction(null); setShowHome(true);
+    setConsult(null); setShowAllVisits(false); setHomeAction(null); setReschedPrev(null); setShowHome(true);
     refreshMyAppts();
   };
   const bookForPerson = (person) => {
@@ -3225,13 +3240,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (apptsFor.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1);
   };
   const bookFromHome = () => {
-    setShowHome(false); setHomeAction(null);
+    setShowHome(false); setHomeAction(null); setReschedPrev(null);
     setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false);
     if (business?.familyBooking?.enabled !== false && matched) setShowWhoFor(true);
     else bookForPerson({ id: null });
   };
   const signOutClient = () => {
-    setShowHome(false); setMatched(null); setMyAppts([]); setShowAllVisits(false); setHomeAction(null);
+    setShowHome(false); setMatched(null); setMyAppts([]); setShowAllVisits(false); setHomeAction(null); setReschedPrev(null);
     setBookingFor(null); setActiveMember(null); setCart([]); setShowWhoFor(false); setShowUsual(false);
     setSimpleStep(null); setSimpleCat(null); setSimplePref(null); setStep(0);
   };
@@ -3280,7 +3295,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <div style={lblStyle}>Your people</div>
                 <div style={{ border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
                   {people.map((p, i) => (
-                    <button key={p.id || "self"} onClick={() => bookForPerson(p)} style={{ width: "100%", background: "transparent", borderTop: i ? "1px solid var(--line)" : "none", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: "15px 18px", display: "flex", alignItems: "center", gap: 13, cursor: "pointer", textAlign: "left" }}>
+                    <button key={p.id || "self"} onClick={() => { setReschedPrev(null); bookForPerson(p); }} style={{ width: "100%", background: "transparent", borderTop: i ? "1px solid var(--line)" : "none", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: "15px 18px", display: "flex", alignItems: "center", gap: 13, cursor: "pointer", textAlign: "left" }}>
                       <span style={avStyle}>{(p.name || "?").trim().charAt(0).toUpperCase()}</span>
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{p.isMember ? p.name : firstName}</span>
@@ -3330,7 +3345,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "var(--bg)", borderRadius: "20px 20px 0 0", padding: "26px 22px 30px" }}>
               <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, color: "var(--text)", margin: "0 0 8px", letterSpacing: "-0.2px" }}>{homeAction.type === "cancel" ? "Cancel this appointment?" : "Pick a new time?"}</h3>
               <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 0 22px" }}>{homeAction.type === "cancel" ? `Your ${svcLabel(homeAction.appt)} on ${fmtHomeShort(homeAction.appt)} will be released.` : `We'll release your ${fmtHomeShort(homeAction.appt)} time so you can choose a new one.`}</p>
-              <button onClick={() => { const a = homeAction.appt; if (homeAction.type === "cancel") { doCancelAppt(a); setHomeAction(null); } else { doCancelAppt(a); bookForPerson(a.familyMemberId ? { id: a.familyMemberId, name: personLabel(a) } : { id: null }); } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: "pointer", marginBottom: 11 }}>{homeAction.type === "cancel" ? "Yes, cancel it" : "Release & pick a new time"}</button>
+              <button onClick={() => { const a = homeAction.appt; if (homeAction.type === "cancel") { doCancelAppt(a); setHomeAction(null); } else { setReschedPrev(a); doCancelAppt(a); bookForPerson(a.familyMemberId ? { id: a.familyMemberId, name: personLabel(a) } : { id: null }); } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: "pointer", marginBottom: 11 }}>{homeAction.type === "cancel" ? "Yes, cancel it" : "Release & pick a new time"}</button>
               <button onClick={() => setHomeAction(null)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 500, textTransform: "uppercase", borderRadius: 12, cursor: "pointer" }}>Keep it</button>
             </div>
           </div>
@@ -5388,7 +5403,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
     try {
       await supabase.rpc("manage_reschedule_by_token", { p_token: token, p_start: newSlot, p_date: when.toISOString() });
       const updated = { ...appt, start: newSlot, end: newSlot + dur, bookedFor: when.toISOString() };
-      setAppt(updated); fireNotify("rescheduled", updated); setPhase("rescheduled");
+      setAppt(updated); fireNotify("rescheduled", updated); fireStaffPush({ shopId, title: "Appointment rescheduled", appt: updated, prevAppt: appt }); setPhase("rescheduled");
     } catch (e) { setPhase("error"); } finally { setBusy(false); }
   };
 
