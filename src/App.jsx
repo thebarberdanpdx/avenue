@@ -5759,7 +5759,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 // Owners get a "viewing as" picker to flip between barbers or shop totals.
 // Barbers only see their own chair, period.
 // ============================================================
-function PulseView({ business, appts, setAppts, clients, setClients, services, providers, setProviders, me, isOwner, dataLoaded, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenPayments, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onOpenClient, onSignOut, showToast, notifCount = 0, onOpenNotifications }) {
+function PulseView({ business, appts, setAppts, clients, setClients, services, providers, setProviders, me, isOwner, dataLoaded, pulseView, setPulseView, onNavigate, onOpenRevenue, onOpenPayments, onOpenAppointments, onOpenClients, onOpenServices, onOpenBarbers, onOpenClient, onOpenAppt, onSignOut, showToast, notifCount = 0, onOpenNotifications }) {
   const now = useNow(30000);
   const realProviders = providers.filter((p) => p.id !== "anyone");
 
@@ -6218,7 +6218,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       })()}
 
       {cutting && (
-        <div style={{ marginBottom: 16, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "15px 16px" }}>
+        <button onClick={() => onOpenAppt && onOpenAppt(cutting.id)} className="lift" style={{ display: "block", width: "100%", textAlign: "left", font: "inherit", color: "var(--text)", cursor: onOpenAppt ? "pointer" : "default", marginBottom: 16, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "15px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 15.5, fontWeight: 600 }}>{cutting.name || "In service"}</div>
@@ -6239,7 +6239,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             <span style={{ fontSize: 13.5, color: "var(--sub)" }}><strong style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: "var(--text)", marginRight: 3 }}>{cutElapsed}</strong>min in</span>
             <span style={{ fontSize: 13.5, color: (cutOver || cutWrap) ? "#C08A3E" : "var(--sub)" }}><strong style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: (cutOver || cutWrap) ? "#C08A3E" : "var(--text)", marginRight: 3 }}>{Math.abs(cutLeft)}</strong>{cutOver ? "min over" : "min left"}</span>
           </div>
-        </div>
+        </button>
       )}
 
       {awkwardGap && (
@@ -8738,6 +8738,7 @@ function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
 function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled }) {
   const [tab, setTab] = useState("pulse");
   const [rebookSeed, setRebookSeed] = useState(null); // { clientId, serviceId, providerId } → opens the new-appointment form prefilled on the calendar
+  const [pulseOpenApptId, setPulseOpenApptId] = useState(null); // tapping a Pulse card → open that appt's sheet on the calendar (reuses the deep-link path)
   const [activeClient, setActiveClient] = useState(null);
   const [pulseDetail, setPulseDetail] = useState(null); // null | "revenue" — drill-in from Pulse
   const [toast, setToast] = useState(null); // { id, msg } — id re-triggers the enter animation for repeat toasts
@@ -8939,7 +8940,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         <div style={{ width: 50 }} />
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
-        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenPayments={() => setPulseDetail("payments")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} showToast={showToast} notifCount={unseenCount} onOpenNotifications={() => setPulseDetail("notifications")} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenPayments={() => setPulseDetail("payments")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} onOpenAppt={(id) => { setPulseDetail(null); setActiveClient(null); setPulseOpenApptId(id); setTab("calendar"); }} showToast={showToast} notifCount={unseenCount} onOpenNotifications={() => setPulseDetail("notifications")} />}
         {tab === "pulse" && pulseDetail === "notifications" && <NotificationsView notifs={myNotifs} notifSeenAt={notifSeenAt} markSeen={markNotifsSeen} onClear={() => setNotifs([])} clients={clients} providers={providers} isOwner={isOwner} me={me} onBack={() => setPulseDetail(null)} onOpenCalendar={() => { setPulseDetail(null); setTab("calendar"); }} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} business={business} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "payments" && <PaymentsView appts={appts} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={() => setPulseDetail(null)} showToast={showToast} />}
@@ -8947,7 +8948,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} onOpenClient={(c) => { setPulseDetail(null); setActiveClient(c); setTab("clients"); }} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId} onDeepLinkHandled={onDeepLinkHandled} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={() => setActiveClient(null)} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); setActiveClient(null); setTab("calendar"); }} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
