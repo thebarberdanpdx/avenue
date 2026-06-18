@@ -13931,6 +13931,9 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
   const [addingCat, setAddingCat] = useState(false);
   const [newCat, setNewCat] = useState("");
   const fileRef = useRef(null);
+  // Open the add/edit form at the top (the list may have been scrolled), and never auto-focus a
+  // field — so opening it doesn't yank the page around or pop the keyboard.
+  useEffect(() => { if (editId) { try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { try { window.scrollTo(0, 0); } catch (e2) {} } } }, [editId]);
   const blank = () => ({ id: "prod_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: "", category: cats[0] || "Other", price: "", cost: "", image: "", trackStock: false, onHand: 0, active: true });
   const startNew = () => { setDraft(blank()); setEditId("new"); };
   const startEdit = (p) => { setDraft({ ...p, price: String(p.price ?? ""), cost: p.cost != null ? String(p.cost) : "" }); setEditId(p.id); };
@@ -13974,13 +13977,7 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
         {draft.image && <div style={{ textAlign: "center" }}><button onClick={() => setDraft({ ...draft, image: "" })} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 2, padding: "4px 0 0", cursor: "pointer" }}>Remove photo</button></div>}
 
         <div style={sectionLbl}>Name</div>
-        <input autoFocus value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Matte Clay Pomade" style={inp} />
-
-        <div style={sectionLbl}>Price</div>
-        <div style={money$()}>
-          <span style={{ padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 }}>$</span>
-          <input value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" placeholder="0.00" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY }} />
-        </div>
+        <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Matte Clay Pomade" style={inp} />
 
         <div style={sectionLbl}>Category</div>
         <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
@@ -13995,6 +13992,12 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
           ) : (
             <button onClick={() => { setAddingCat(true); setNewCat(""); }} style={{ padding: "11px 16px", borderRadius: 22, border: "1px dashed var(--border2)", background: "transparent", color: "var(--sub)", fontSize: 14, fontFamily: FONT_BODY, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Plus size={14} /> New</button>
           )}
+        </div>
+
+        <div style={sectionLbl}>Price</div>
+        <div style={money$()}>
+          <span style={{ padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 }}>$</span>
+          <input value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" placeholder="0.00" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY }} />
         </div>
 
         <div style={sectionLbl}>Your cost <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--faint)" }}>· optional, for margin reports</span></div>
