@@ -1015,6 +1015,7 @@ const cutStyleDuration = (client, service, providerId, ctId) => {
   const se = getStaffEntry(service, providerId);
   if (se && se.cutDur && se.cutDur[ctId] != null) return se.cutDur[ctId];
   const ct = ((service && service.cutTypes) || []).find((c) => c.id === ctId);
+  if (ct && ct.duration != null && ct.duration !== "") return Number(ct.duration);
   return getDuration(client, service, providerId) + ((ct && ct.min) ? ct.min : 0);
 };
 // Time-of-day pricing: apply the first matching priced rule for a service at a given
@@ -9308,6 +9309,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // ensure the form always has an entry for every current staff member
   const ensureStaff = (s) => { const m = { ...(s.staff || {}) }; staffList.forEach((p) => { if (!m[p.id]) m[p.id] = { on: true, duration: null, price: null }; }); return m; };
   const setStaff = (pid, patch) => setForm((f) => ({ ...f, staff: { ...f.staff, [pid]: { ...f.staff[pid], ...patch } } }));
+  // per-barber cut-style override: writes staff[pid].cutPrice[ctId] / cutDur[ctId]; blank clears it (falls back to the style default)
+  const setStaffCut = (pid, ctId, field, val) => setForm((f) => {
+    const cur = f.staff[pid] || { on: true, duration: null, price: null };
+    const key = field === "price" ? "cutPrice" : "cutDur";
+    const map = { ...(cur[key] || {}) };
+    if (val === "" || val == null) delete map[ctId]; else map[ctId] = Number(val);
+    return { ...f, staff: { ...f.staff, [pid]: { ...cur, [key]: map } } };
+  });
   const setBooking = (patch) => setForm((f) => ({ ...f, booking: { ...(f.booking || defaultBooking()), ...patch } }));
 
   const openNew = () => { setForm({ ...blank, id: "svc-" + Date.now(), photos: [], staff: defaultStaffMap(), booking: defaultBooking() }); setSection(null); setEditing("new"); };
@@ -9316,12 +9325,16 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     if (!form.name || !form.price) { showToast("Name and price are required."); return; }
     // clean staff overrides: blank → null (use default), else Number
     const cleanStaff = {};
+    // drop blank/null entries from a {ctId:value} override map, coercing the rest to numbers
+    const cleanCutMap = (m) => { const o = {}; Object.keys(m || {}).forEach((k) => { const v = m[k]; if (v != null && v !== "" && !Number.isNaN(Number(v))) o[k] = Number(v); }); return o; };
     Object.keys(form.staff || {}).forEach((pid) => {
       const e = form.staff[pid];
       cleanStaff[pid] = {
         on: e.on !== false,
         duration: (e.duration === null || e.duration === "" || e.duration === undefined) ? null : Number(e.duration),
         price: (e.price === null || e.price === "" || e.price === undefined) ? null : Number(e.price),
+        cutPrice: cleanCutMap(e.cutPrice),
+        cutDur: cleanCutMap(e.cutDur),
       };
     });
     const photos = Array.isArray(form.photos) ? form.photos.filter(Boolean) : [];
@@ -9358,7 +9371,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const sectionLblStyle = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" };
   const SectionLbl = ({ children, style }) => <div style={{ ...sectionLblStyle, ...style }}>{children}</div>;
   const moneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)" };
-  const moneyInput = { flex: 1, border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+  const moneyInput = { flex: 1, minWidth: 0, width: "100%", border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
   const moneyPrefix = { padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 };
   const unitSuffix = { padding: "0 16px 0 0", color: "var(--sub)", fontSize: 14 };
   const chip = (on) => ({ background: on ? "var(--text)" : "transparent", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, color: on ? "var(--bg)" : "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" });
@@ -9410,14 +9423,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             {on && (
               <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
                 <div style={{ display: "flex", gap: 10 }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <SectionLbl style={{ margin: "0 2px 8px" }}>Price</SectionLbl>
                     <div style={moneyWrap}>
                       <span style={moneyPrefix}>$</span>
                       <input type="number" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setStyle(entry, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="35" style={moneyInput} />
                     </div>
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <SectionLbl style={{ margin: "0 2px 8px" }}>Time</SectionLbl>
                     <div style={moneyWrap}>
                       <input type="number" value={ct.duration === undefined || ct.duration === null || ct.duration === "" ? "" : ct.duration} onChange={(e) => setStyle(entry, { duration: e.target.value === "" ? "" : Number(e.target.value) })} placeholder={String(form.duration || 45)} style={{ ...moneyInput, paddingLeft: 16 }} />
@@ -9426,6 +9439,44 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   </div>
                 </div>
                 <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.4 }}>Leave time blank to use this service's default ({form.duration || 45} min).</div>
+                {staffList.length > 0 && (
+                  <div style={{ borderTop: "1px solid var(--line)", paddingTop: 16, marginTop: 16 }}>
+                    <SectionLbl style={{ margin: "0 2px 4px" }}>Per-barber price &amp; time</SectionLbl>
+                    <p style={{ fontSize: 12.5, color: "var(--sub)", margin: "0 2px 12px", lineHeight: 1.4 }}>Optional — give a barber their own price or time for this style. Blank uses the style's price &amp; time above.</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+                      {staffList.map((p) => {
+                        const sc = form.staff[p.id] || {};
+                        const offering = sc.on !== false;
+                        const pVal = (sc.cutPrice && sc.cutPrice[ct.id] != null) ? sc.cutPrice[ct.id] : "";
+                        const dVal = (sc.cutDur && sc.cutDur[ct.id] != null) ? sc.cutDur[ct.id] : "";
+                        const pOver = pVal !== "";
+                        const dOver = dVal !== "";
+                        return (
+                          <div key={p.id} style={{ opacity: offering ? 1 : 0.5 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
+                              <span style={{ width: 26, height: 26, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 12, flexShrink: 0 }}>{p.name.charAt(0)}</span>
+                              <span style={{ fontSize: 14.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{p.name}{!offering && <span style={{ color: "var(--faint)", fontWeight: 400 }}> · not offering</span>}</span>
+                            </div>
+                            <div style={{ display: "flex", gap: 10 }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ ...moneyWrap, borderColor: pOver ? "var(--text)" : "var(--border2)" }}>
+                                  <span style={{ padding: "0 0 0 14px", color: pOver ? "var(--text)" : "var(--sub)", fontSize: 16 }}>$</span>
+                                  <input type="number" inputMode="decimal" value={pVal} placeholder={String((ct.price ?? form.price) || "default")} onChange={(ev) => setStaffCut(p.id, ct.id, "price", ev.target.value)} style={{ ...moneyInput, padding: "11px 12px", fontWeight: pOver ? 600 : 400 }} />
+                                </div>
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ ...moneyWrap, borderColor: dOver ? "var(--text)" : "var(--border2)" }}>
+                                  <input type="number" inputMode="numeric" value={dVal} placeholder={String((ct.duration || form.duration) || "default")} onChange={(ev) => setStaffCut(p.id, ct.id, "duration", ev.target.value)} style={{ ...moneyInput, padding: "11px 12px", paddingLeft: 14, fontWeight: dOver ? 600 : 400 }} />
+                                  <span style={unitSuffix}>min</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div style={{ borderTop: "1px solid var(--line)", paddingTop: 16, marginTop: 16 }}>
                   <SectionLbl style={{ margin: "0 2px 8px" }}>Name</SectionLbl>
                   <input value={entry.label || ""} onChange={(e) => setLibField(entry, { label: e.target.value })} placeholder="e.g. Skin Fade" style={inpStyle} />
@@ -9551,13 +9602,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               </div>
               {on && (
                 <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ ...moneyWrap, borderColor: priceOver ? "var(--text)" : "var(--border2)" }}>
                       <span style={{ padding: "0 0 0 14px", color: priceOver ? "var(--text)" : "var(--sub)", fontSize: 16 }}>$</span>
                       <input type="number" inputMode="decimal" value={e.price ?? ""} placeholder={String(form.price || "default")} onChange={(ev) => setStaff(p.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ ...moneyInput, padding: "12px 14px", color: priceOver ? "var(--text)" : "var(--text)", fontWeight: priceOver ? 600 : 400 }} />
                     </div>
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ ...moneyWrap, borderColor: durOver ? "var(--text)" : "var(--border2)" }}>
                       <input type="number" inputMode="numeric" value={e.duration ?? ""} placeholder={String(form.duration || "default")} onChange={(ev) => setStaff(p.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ ...moneyInput, padding: "12px 14px", paddingLeft: 14, fontWeight: durOver ? 600 : 400 }} />
                       <span style={unitSuffix}>min</span>
