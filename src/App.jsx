@@ -11587,14 +11587,22 @@ function serviceCommissionFor(comp, serviceSales) {
   for (const t of tiers) { pct = Number(t.pct) || 0; if (t.upTo == null || serviceSales <= t.upTo) break; }
   return serviceSales * pct / 100;
 }
-function estimateEarnings(provider, appts, services, ref = new Date()) {
+function estimateEarnings(provider, appts, services, ref = new Date(), sales = []) {
   const comp = provider.comp || {};
   const { start, end } = weekRange(ref);
   // completed appointments for this provider this week
   const mine = (appts || []).filter((a) => a.providerId === provider.id && (a.status === "done" || a.paid));
   // Without real timestamps in the prototype, treat all completed appts as "this week" sample.
   const serviceSales = mine.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
-  const productSales = 0; // no product sales in prototype
+  // Retail attributed to this provider — sum the product lines of sales they rang up.
+  // Attribution mirrors the retail report: the sale's staffId, falling back to its appt's provider.
+  const apptById = {};
+  (appts || []).forEach((a) => { apptById[a.id] = a; });
+  const productSales = (sales || []).reduce((sum, pay) => {
+    const sid = pay.staffId || (pay.apptId && apptById[pay.apptId] ? apptById[pay.apptId].providerId : null);
+    if (sid !== provider.id) return sum;
+    return sum + (pay.items || []).reduce((s, it) => s + (it.productId ? (Number(it.price) || 0) * (it.qty || 1) : 0), 0);
+  }, 0);
   const svcCommission = serviceCommissionFor(comp, serviceSales);
   const prodCommission = (comp.product && comp.product.on) ? productSales * (Number(comp.product.defaultPct) || 0) / 100 : 0;
   // hours worked from the provider's weekly schedule
@@ -11618,7 +11626,7 @@ function estimateEarnings(provider, appts, services, ref = new Date()) {
 // ============================================================
 // STAFF MEMBERS — Mangomint-style hub: list → member → sections
 // ============================================================
-function StaffMembersView({ providers, setProviders, services, setServices, appts, showToast, business, shopId, onBackRef }) {
+function StaffMembersView({ providers, setProviders, services, setServices, appts, clients, showToast, business, shopId, onBackRef }) {
   const SLUG = shopId || "sanctuary";
   const ORIGIN = (typeof window !== "undefined" && window.location && window.location.origin && !/capacitor|ionic|localhost/.test(window.location.origin)) ? window.location.origin : "https://gotvero.com";
   const copyText = (text, label) => { try { navigator.clipboard.writeText(text); showToast((label || "Link") + " copied."); } catch (e) { showToast("Couldn't copy — long-press to select."); } };
@@ -12192,7 +12200,11 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
     const sc = { ...defaultComp().service, ...comp.service };
     const pc = { ...defaultComp().product, ...comp.product };
     const hr = { ...defaultComp().hourly, ...comp.hourly };
-    const est = estimateEarnings(person, appts, services, new Date());
+    // All sale records (client tickets + walk-in sales) so retail can be attributed to this barber.
+    const allSales = [];
+    (clients || []).forEach((c) => (c.payments || []).forEach((p) => allSales.push(p)));
+    ((business && business.sales) || []).forEach((p) => allSales.push(p));
+    const est = estimateEarnings(person, appts, services, new Date(), allSales);
     const Card = ({ title, desc, on, onToggle, children }) => (
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
@@ -12291,7 +12303,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           <div style={{ fontSize: 12, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>ESTIMATED EARNINGS · THIS WEEK</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 600, marginBottom: 4 }}>${est.total.toFixed(2)}</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 14 }}>{est.basis} · {est.count} completed appt{est.count !== 1 ? "s" : ""}</div>
-          {[["Service sales", `$${est.serviceSales.toFixed(2)}`], ["Service commission", `$${est.svcCommission.toFixed(2)}`], ["Hours scheduled", `${est.hours.toFixed(1)} h`], ["Hourly pay", `$${est.hourlyPay.toFixed(2)}`]].map(([k, v]) => (
+          {[["Service sales", `$${est.serviceSales.toFixed(2)}`], ["Service commission", `$${est.svcCommission.toFixed(2)}`], ...((pc.on || est.productSales > 0) ? [["Product sales", `$${est.productSales.toFixed(2)}`], ["Product commission", `$${est.prodCommission.toFixed(2)}`]] : []), ["Hours scheduled", `${est.hours.toFixed(1)} h`], ["Hourly pay", `$${est.hourlyPay.toFixed(2)}`]].map(([k, v]) => (
             <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", fontSize: 14.5, borderTop: "1px solid var(--wash)" }}><span style={{ color: "var(--sub)" }}>{k}</span><span style={{ fontWeight: 600 }}>{v}</span></div>
           ))}
           <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Live estimate from completed appointments using the settings above. Real payroll (taxes, tips, time clock, pay periods) requires the backend.</p>
@@ -14338,7 +14350,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     {
       id: "staff", fullBleed: true, title: "Staff Members", icon: Users, category: "Business Setup",
       status: `${providers.filter((p) => p.id !== "anyone").length} staff`, keywords: "staff team employees hours days off schedule availability who works barber stylist",
-      editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} showToast={showToast} business={form} shopId={shopId} onBackRef={editorBack} />),
+      editor: (<StaffMembersView providers={providers} setProviders={setProviders} services={services} setServices={setServices} appts={appts} clients={clients} showToast={showToast} business={form} shopId={shopId} onBackRef={editorBack} />),
     },
     {
       id: "notifications", fullBleed: true, title: "Notifications", icon: Bell, category: "Business Setup",
