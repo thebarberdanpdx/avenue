@@ -9359,7 +9359,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         return (
           <div key={entry.id} style={{ ...cardStyle, marginBottom: 14, border: on ? (ct.popular ? "1.5px solid var(--text)" : "1px solid var(--border2)") : "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <span style={{ width: 48, height: 48, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{entry.images && entry.images[0] ? <img src={imgUrl(entry.images[0], 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={18} style={{ color: "var(--faint)" }} />}</span>
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <div onClick={() => setPicker({ target: "style", entry })} title="Add or change photo" style={{ width: 48, height: 48, borderRadius: 12, overflow: "hidden", background: "var(--panel2)", border: entry.images && entry.images[0] ? "1px solid var(--border)" : "1.5px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>{entry.images && entry.images[0] ? <img src={imgUrl(entry.images[0], 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={16} style={{ color: "var(--faint)" }} />}</div>
+                {entry.images && entry.images[0] && <div onClick={(e) => { e.stopPropagation(); setLibField(entry, { images: [] }); }} title="Remove photo" style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.65)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</div>}
+              </div>
               <span style={{ minWidth: 0, flex: 1 }}>
                 <span style={{ display: "block", fontSize: 17, fontWeight: 500 }}>{entry.label}{on && ct.popular ? <span style={{ marginLeft: 8, fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 700, color: "var(--bg)", background: "var(--text)", borderRadius: 20, padding: "2px 8px", verticalAlign: "middle" }}>Most common</span> : null}</span>
                 <span style={{ display: "block", fontSize: 13, color: "var(--faint)", marginTop: 3 }}>{on ? "Offered here" : "Not offered"}</span>
@@ -9587,7 +9590,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <input value={g.label || ""} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="e.g. Want to finish with a hot towel?" style={{ ...inpStyle, fontWeight: 500 }} />
 
             <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 14 }}>
-              <button onClick={() => setPicker({ target: i })} style={{ width: 58, height: 58, borderRadius: 14, overflow: "hidden", border: g.photo ? "1px solid var(--border)" : "1.5px dashed var(--border2)", background: "var(--panel2)", color: "var(--faint)", flexShrink: 0, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>{g.photo ? <img src={imgUrl(g.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={18} />}</button>
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <div onClick={() => setPicker({ target: i })} title="Add or change photo" style={{ width: 58, height: 58, borderRadius: 14, overflow: "hidden", border: g.photo ? "1px solid var(--border)" : "1.5px dashed var(--border2)", background: "var(--panel2)", color: "var(--faint)", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>{g.photo ? <img src={imgUrl(g.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={18} />}</div>
+                {g.photo && <div onClick={(e) => { e.stopPropagation(); setGroup(i, { photo: "" }); }} title="Remove photo" style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.65)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</div>}
+              </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <input value={it.name || ""} onChange={(e) => setItem(i, { name: e.target.value })} placeholder="Add-on name (e.g. Hot Towel Shave)" style={{ ...inpStyle, fontWeight: 600 }} />
               </div>
@@ -9891,6 +9897,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const photos = Array.isArray(form.photos) ? form.photos : (form.photo ? [form.photo] : []);
   const addPhoto = (id) => { if (!id) return; setForm((f) => { const cur = Array.isArray(f.photos) ? f.photos : (f.photo ? [f.photo] : []); if (cur.includes(id)) return f; const next = [...cur, id]; return { ...f, photos: next, photo: next[0] }; }); };
   const removePhoto = (id) => setForm((f) => { const next = (Array.isArray(f.photos) ? f.photos : (f.photo ? [f.photo] : [])).filter((p) => p !== id); return { ...f, photos: next, photo: next[0] || "" }; });
+  const makeCover = (id) => setForm((f) => { const cur = Array.isArray(f.photos) ? f.photos : (f.photo ? [f.photo] : []); const next = [id, ...cur.filter((p) => p !== id)]; return { ...f, photos: next, photo: next[0] }; });
 
   // ---- shared idiom for the new sectioned form ----
   const band = (label, sub) => (
@@ -9931,17 +9938,17 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Add example photos so clients can see this service while they book. The first photo is the cover.</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
         {photos.map((pid, i) => (
-          <button key={pid} onClick={() => removePhoto(pid)} style={{ position: "relative", aspectRatio: "1/1", borderRadius: 14, overflow: "hidden", border: i === 0 ? "1.5px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel2)", padding: 0, cursor: "pointer" }}>
-            <img src={imgUrl(pid, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-            {i === 0 && <span style={{ position: "absolute", top: 6, left: 6, fontSize: 9.5, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 700, color: "var(--on-gold)", background: "var(--gold)", borderRadius: 20, padding: "2px 7px" }}>Cover</span>}
-            <span style={{ position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}><Trash2 size={12} /></span>
-          </button>
+          <div key={pid} style={{ position: "relative", aspectRatio: "1/1", borderRadius: 14, overflow: "hidden", border: i === 0 ? "1.5px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel2)" }}>
+            <div onClick={() => i !== 0 && makeCover(pid)} title={i === 0 ? "Cover photo" : "Tap to make this the cover"} style={{ width: "100%", height: "100%", cursor: i === 0 ? "default" : "pointer" }}><img src={imgUrl(pid, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
+            {i === 0 && <span style={{ position: "absolute", top: 6, left: 6, fontSize: 9.5, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 700, color: "var(--on-gold)", background: "var(--gold)", borderRadius: 20, padding: "2px 7px", pointerEvents: "none" }}>Cover</span>}
+            <div onClick={() => removePhoto(pid)} title="Remove photo" style={{ position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Trash2 size={12} /></div>
+          </div>
         ))}
         <button onClick={() => setPicker({ target: "gallery" })} style={{ aspectRatio: "1/1", borderRadius: 14, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 5, padding: 0, cursor: "pointer" }}>
           <Plus size={22} /><span style={{ fontSize: 11, fontWeight: 600 }}>Add photo</span>
         </button>
       </div>
-      <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Tap a photo to remove it.</p>
+      <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Tap a photo to make it the cover · tap the trash to remove.</p>
       <SaveBar />
     </>
   );
@@ -9994,6 +10001,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           if (picker.target === "service") setForm({ ...form, photo: id });
           else if (picker.target === "gallery") addPhoto(id);
           else if (picker.target === "cut") setCut(picker.index, { images: [id] });
+          else if (picker.target === "style") setLibField(picker.entry, { images: [id] });
           else setForm({ ...form, addonGroups: form.addonGroups.map((g, i) => i === picker.target ? { ...g, photo: id } : g) });
         }} />}
         {colorOpen && (
@@ -14054,6 +14062,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast 
         <button onClick={() => setPicker(true)} className="lift" style={{ width: "100%", height: 160, borderRadius: 18, border: form.photo ? "1px solid var(--border)" : "1.5px dashed var(--border2)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 9, padding: 0, marginBottom: 6, boxShadow: form.photo ? "var(--shadow-sm)" : "none" }}>
           {form.photo ? <img src={imgUrl(form.photo, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 14 }}>Add a photo</span></>}
         </button>
+        {form.photo && <div style={{ textAlign: "center", marginBottom: 8 }}><button onClick={() => setForm({ ...form, photo: "" })} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>Remove photo</button></div>}
 
         <div style={aoSectionLbl}>Name</div>
         <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Hot Towel Finish" style={aoInp} />

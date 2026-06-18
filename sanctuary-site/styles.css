@@ -199,6 +199,9 @@ section{scroll-margin-top:84px}
 .step .si{font-size:20px;color:var(--ink);margin-bottom:8px}
 .step h4{font-size:18px;margin:0 0 6px;font-family:var(--disp);font-weight:500}
 .step p{color:var(--sub);font-size:14.5px;margin:0}
+.how-steps{grid-template-columns:repeat(4,1fr)}
+.how-cta{display:flex;align-items:center;justify-content:center;gap:18px 24px;flex-wrap:wrap;margin-top:30px;text-align:center}
+.how-cta .btn{flex:none}
 .fv-where{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;text-align:center;color:var(--ink2);font-size:15.5px}
 .fv-where i{color:var(--ink)}
 .fv-where a{color:var(--ink);font-weight:500;text-decoration:none;border-bottom:1px solid var(--border)}
@@ -232,6 +235,7 @@ footer{background:var(--ink);color:#B5B5B5}
   .about .ph{aspect-ratio:16/10;max-height:280px}
   .reviews{grid-template-columns:1fr}
   .steps{grid-template-columns:1fr}
+  .how-steps{grid-template-columns:repeat(2,1fr)}
   .arrive{flex-direction:column;gap:12px}
   .visit{grid-template-columns:1fr}
   .gallery{grid-template-columns:repeat(2,1fr)}
@@ -244,6 +248,7 @@ footer{background:var(--ink);color:#B5B5B5}
   .nav .nav-cta{display:none}
   .builder{flex-direction:column;align-items:stretch;gap:16px}
   .builder .btn{width:100%;justify-content:center}
+  .how-steps{grid-template-columns:1fr}
   .nav-toggle{display:block}
   .mobile-menu{display:none;flex-direction:column;gap:4px;padding:8px var(--pad) 18px;border-bottom:1px solid var(--line)}
   .mobile-menu.open{display:flex}
