@@ -14449,7 +14449,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "products", fullBleed: true, title: "Products", icon: Sparkles, category: "Services & Menu",
       status: `${(form.products || []).length} product${(form.products || []).length === 1 ? "" : "s"}`,
       keywords: "products retail haircare skincare merch merchandise sell selling inventory stock catalog square pomade shampoo",
-      editor: <ProductsEditor products={form.products || []} categories={form.productCategories || PRODUCT_CATEGORIES} onChange={(next) => setForm({ ...form, products: next })} onCategoriesChange={(next) => setForm({ ...form, productCategories: next })} showToast={showToast} />,
+      editor: <ProductsEditor products={form.products || []} categories={form.productCategories || PRODUCT_CATEGORIES} onChange={(next) => { setForm((f) => ({ ...f, products: next })); setBusiness((b) => ({ ...(b || {}), products: next })); }} onCategoriesChange={(next) => { setForm((f) => ({ ...f, productCategories: next })); setBusiness((b) => ({ ...(b || {}), productCategories: next })); }} showToast={showToast} />,
     },
     {
       id: "rebookco", title: "Rebooking at Checkout", icon: Repeat, category: "Payments & Checkout",
