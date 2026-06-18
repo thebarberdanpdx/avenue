@@ -14081,6 +14081,14 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
   // Restock sheet lists every tracked product, neediest first (out → low → ok), then by name.
   const stockRank = { out: 0, low: 1, ok: 2, untracked: 3 };
   const restockList = [...tracked].sort((a, b) => (stockRank[stockState(a)] - stockRank[stockState(b)]) || a.name.localeCompare(b.name));
+  // At-a-glance inventory metrics for the summary strip.
+  const liveCount = products.filter((p) => p.active !== false).length;
+  const totalUnits = tracked.reduce((s, p) => s + (parseInt(p.onHand, 10) || 0), 0);
+  const invValue = tracked.reduce((s, p) => s + (parseInt(p.onHand, 10) || 0) * (Number(p.price) || 0), 0);
+  const money0 = (n) => "$" + Math.round(n).toLocaleString();
+  const stats = tracked.length
+    ? [{ k: "Products", v: String(products.length) }, { k: "In stock", v: totalUnits.toLocaleString() }, { k: "Value", v: money0(invValue) }]
+    : [{ k: "Products", v: String(products.length) }, { k: "Live", v: String(liveCount) }, { k: "Categories", v: String(allCats.length) }];
 
   const ProductCard = ({ p }) => {
     const st = stockState(p);
@@ -14088,24 +14096,22 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
     const low = st === "low";
     return (
       <button onClick={() => startEdit(p)} className="lift" style={{ display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", textAlign: "left", color: "var(--text)", cursor: "pointer", padding: 0, boxShadow: "var(--shadow-sm)", opacity: p.active === false ? 0.6 : 1 }}>
-        <span style={{ position: "relative", width: "100%", aspectRatio: "1", background: p.image ? `center/cover no-repeat url(${p.image})` : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {!p.image && <Sparkles size={24} style={{ color: "var(--faint)" }} />}
-          {p.trackStock && <span style={{ position: "absolute", top: 8, right: 8, fontSize: 10.5, fontWeight: 600, letterSpacing: 0.2, color: out ? "#fff" : low ? "#8A5A00" : "var(--text)", background: out ? "#c0392b" : low ? "#FBE7C9" : "rgba(255,255,255,.92)", border: (out || low) ? "none" : "1px solid var(--line)", borderRadius: 20, padding: "3px 9px" }}>{out ? "Out" : `${p.onHand} left`}</span>}
-          {p.active === false && <span style={{ position: "absolute", top: 8, left: 8, fontSize: 9.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "#fff", background: "rgba(10,10,10,.72)", borderRadius: 6, padding: "3px 7px" }}>Hidden</span>}
+        <span style={{ position: "relative", width: "100%", aspectRatio: "1", background: p.image ? `center/cover no-repeat url(${p.image})` : "linear-gradient(160deg, var(--panel2), var(--panel))", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "inset 0 -1px 0 var(--line)" }}>
+          {!p.image && <Sparkles size={26} style={{ color: "var(--faint)" }} />}
+          {p.trackStock && <span style={{ position: "absolute", top: 9, right: 9, fontSize: 10.5, fontWeight: 600, letterSpacing: 0.2, color: out ? "#fff" : low ? "#8A5A00" : "var(--text)", background: out ? "#c0392b" : low ? "#FBE7C9" : "rgba(255,255,255,.92)", border: (out || low) ? "none" : "1px solid var(--line)", borderRadius: 20, padding: "3px 9px", boxShadow: "0 1px 3px rgba(0,0,0,.08)" }}>{out ? "Out" : `${p.onHand} left`}</span>}
+          {p.active === false && <span style={{ position: "absolute", top: 9, left: 9, fontSize: 9.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "#fff", background: "rgba(10,10,10,.72)", borderRadius: 6, padding: "3px 7px" }}>Hidden</span>}
         </span>
-        <span style={{ padding: "11px 13px 13px" }}>
+        <span style={{ padding: "12px 14px 14px" }}>
+          <span style={{ display: "block", fontSize: 9.5, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.category || "—"}</span>
           <span style={{ display: "block", fontSize: 15, fontWeight: 500, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-          <span style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginTop: 5 }}>
-            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500 }}>${p.price}</span>
-            <span style={{ fontSize: 11.5, color: "var(--faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.category}</span>
-          </span>
+          <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, marginTop: 6, letterSpacing: -0.2 }}>${p.price}</span>
         </span>
       </button>
     );
   };
 
   const AddTile = ({ tall }) => (
-    <button onClick={startNew} className="lift" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: tall ? 168 : 0, background: "transparent", border: "1.5px dashed var(--border2)", borderRadius: 16, color: "var(--text)", cursor: "pointer", padding: tall ? 0 : "16px" }}>
+    <button onClick={startNew} className="lift" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: tall ? 196 : 0, background: "transparent", border: "1.5px dashed var(--border2)", borderRadius: 16, color: "var(--text)", cursor: "pointer", padding: tall ? 0 : "16px" }}>
       <span style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--panel)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}><Plus size={21} /></span>
       <span style={{ fontSize: 13.5, fontWeight: 500 }}>Add product</span>
     </button>
@@ -14113,6 +14119,18 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
 
   return (
     <div style={{ paddingBottom: 8 }}>
+      {/* inventory summary strip */}
+      {products.length > 0 && (
+        <div style={{ display: "flex", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "16px 4px", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
+          {stats.map((s, i) => (
+            <div key={s.k} style={{ flex: 1, textAlign: "center", borderLeft: i ? "1px solid var(--line)" : "none", padding: "2px 6px" }}>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, lineHeight: 1, letterSpacing: -0.3 }}>{s.v}</div>
+              <div style={{ fontSize: 10, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 7 }}>{s.k}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* category filter bar */}
       <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "2px 2px 14px", margin: "0 -2px", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
         {[{ id: null, label: "All", n: products.length }, ...allCats.map((c) => ({ id: c, label: c, n: countFor(c) }))].map((t) => {
