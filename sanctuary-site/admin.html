@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Manage announcements · Sanctuary Barber Co</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Jost:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .admin{max-width:860px;margin:0 auto;padding:40px var(--pad) 80px}
+    .admin-head{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+    .admin-head h1{font-size:34px}
+    .admin-head a{margin-left:auto;font-size:13px;letter-spacing:1px;text-transform:uppercase;text-decoration:none;color:var(--sub);display:inline-flex;align-items:center;gap:6px}
+    .admin-head a:hover{color:var(--ink)}
+    .lead{color:var(--sub);margin:0 0 32px}
+    .card{border:1px solid var(--border);border-radius:14px;padding:24px 26px;margin-bottom:24px;background:#fff}
+    .card h2{font-size:22px;margin-bottom:18px}
+    label{display:block;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--sub);margin:0 0 7px}
+    input[type=text],textarea,select{width:100%;font-family:var(--body);font-size:16px;color:var(--ink);background:#fff;border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin-bottom:18px}
+    input[type=text]:focus,textarea:focus,select:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px rgba(0,0,0,.06)}
+    textarea{min-height:96px;resize:vertical;line-height:1.6}
+    .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+    .check{display:flex;align-items:center;gap:9px;margin:0 0 18px;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--ink);font-size:15px}
+    .check input{width:18px;height:18px;accent-color:#0A0A0A;margin:0}
+    .actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .muted-btn{background:none;border:1px solid var(--border);color:var(--ink);border-radius:8px;padding:11px 18px;font:inherit;font-size:13px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+    .muted-btn:hover{border-color:var(--ink)}
+    .danger{color:#A32D2D;border:none;background:none;cursor:pointer;font:inherit;font-size:13px;text-decoration:underline;text-underline-offset:2px}
+    .plist{list-style:none;padding:0;margin:0}
+    .pitem{display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--line)}
+    .pitem:last-child{border-bottom:0}
+    .pitem .body{flex:1;min-width:0}
+    .pitem .ptag{display:inline-block;font-size:10px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;background:var(--ink);color:#fff;padding:3px 8px;border-radius:5px;margin-right:8px}
+    .pitem h3{font-size:18px;margin:0 0 4px;display:inline}
+    .pitem .pdate{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--faint)}
+    .pitem p{font-size:14px;color:var(--sub);margin:6px 0 0}
+    .pinflag{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--ink);display:inline-flex;align-items:center;gap:4px;margin-top:6px}
+    .pitem .ctl{display:flex;flex-direction:column;gap:8px;flex:none}
+    .pitem .ctl button{background:none;border:1px solid var(--border);border-radius:7px;padding:7px 9px;cursor:pointer;color:var(--ink)}
+    .pitem .ctl button:hover{border-color:var(--ink)}
+    .note{font-size:13px;color:var(--sub);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;line-height:1.6}
+    .saved{color:#0F6E56;font-size:14px;display:none}
+    .saved.show{display:inline}
+  </style>
+</head>
+<body>
+  <div class="admin">
+    <div class="admin-head">
+      <h1>Announcements</h1>
+      <a href="index.html"><i class="ti ti-external-link"></i> View site</a>
+    </div>
+    <p class="lead">Post messages and announcements to clients. Changes appear on the site instantly.</p>
+
+    <!-- top banner -->
+    <div class="card">
+      <h2>Top banner</h2>
+      <label class="check"><input type="checkbox" id="b-enabled" /> Show the banner across the top of the site</label>
+      <label for="b-text">Message</label>
+      <input type="text" id="b-text" placeholder="e.g. Closed July 4th — book early!" />
+      <div class="row">
+        <div><label for="b-linklabel">Link label (optional)</label><input type="text" id="b-linklabel" placeholder="Book now" /></div>
+        <div style="grid-column:span 2"><label for="b-link">Link (optional)</label><input type="text" id="b-link" placeholder="#book" /></div>
+      </div>
+      <div class="actions"><button class="btn btn-fill" id="save-banner">Save banner</button> <span class="saved" id="banner-saved"><i class="ti ti-check"></i> Saved</span></div>
+    </div>
+
+    <!-- new / edit post -->
+    <div class="card">
+      <h2 id="editor-title">New announcement</h2>
+      <input type="hidden" id="p-id" />
+      <label for="p-title">Title</label>
+      <input type="text" id="p-title" placeholder="e.g. Summer Saturdays are back" />
+      <label for="p-body">Message</label>
+      <textarea id="p-body" placeholder="Write your update to clients…"></textarea>
+      <div class="row">
+        <div>
+          <label for="p-tag">Tag</label>
+          <select id="p-tag">
+            <option>News</option><option>Update</option><option>Hours</option>
+            <option>Promo</option><option>Closure</option><option>Thank you</option>
+          </select>
+        </div>
+        <div><label for="p-date">Date</label><input type="text" id="p-date" placeholder="YYYY-MM-DD" /></div>
+        <div style="display:flex;align-items:flex-end"><label class="check" style="margin-bottom:11px"><input type="checkbox" id="p-pinned" /> Pin to top</label></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-fill" id="save-post">Publish</button>
+        <button class="muted-btn" id="cancel-edit" style="display:none">Cancel</button>
+        <span class="saved" id="post-saved"><i class="ti ti-check"></i> Published</span>
+      </div>
+    </div>
+
+    <!-- existing -->
+    <div class="card">
+      <h2>Published</h2>
+      <ul class="plist" id="plist"></ul>
+    </div>
+
+    <p class="note" id="storage-note"></p>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

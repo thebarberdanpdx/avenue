@@ -2549,6 +2549,32 @@ function fireStaffPush({ shopId, title, appt, prevAppt }) {
   } catch (e) {}
 }
 
+// Horizontally-scrollable example-photo strip shown under a service while booking,
+// so clients can see what the service looks like before they pick it. Tap a photo
+// to open it full-screen. Lightweight — only renders when the service has photos.
+function ServicePhotoStrip({ photos }) {
+  const list = (photos || []).filter(Boolean);
+  const [lightbox, setLightbox] = useState(null);
+  if (!list.length) return null;
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "2px 2px 4px", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
+        {list.map((pid) => (
+          <button key={pid} onClick={() => setLightbox(pid)} style={{ flexShrink: 0, width: 96, height: 96, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", padding: 0, cursor: "pointer" }}>
+            <img src={imgUrl(pid, 280)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          </button>
+        ))}
+      </div>
+      {lightbox && (
+        <div onClick={() => setLightbox(null)} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <img src={imgUrl(lightbox, 900)} alt="" style={{ maxWidth: "100%", maxHeight: "85vh", borderRadius: 14, display: "block" }} />
+          <button onClick={() => setLightbox(null)} style={{ position: "absolute", top: 20, right: 20, background: "rgba(255,255,255,0.15)", color: "#fff", width: 40, height: 40, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: "none" }}><X size={22} /></button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit, onManage }) {
   const [step, setStep] = useState(0);
   const [bookingFor, setBookingFor] = useState(null); // null until chosen: "self" or "other"
@@ -3563,13 +3589,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               </div>
               <div className="svc-menu">
                 {list.map((svc, i) => (
-                  <button key={svc.id} onClick={() => { setTapSel(svc.id); setTimeout(() => selectService(svc), 165); }} className={"svc-tile" + (tapSel === svc.id ? " sel" : "")}>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span className="svc-name" style={{ display: "block" }}>{svc.name}</span>
-                      {metaFor(svc) ? <span className="svc-meta" style={{ display: "block" }}>{metaFor(svc)}</span> : null}
-                    </span>
-                    <span className="svc-ar">&#8594;</span>
-                  </button>
+                  <div key={svc.id} style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                    <button onClick={() => { setTapSel(svc.id); setTimeout(() => selectService(svc), 165); }} className={"svc-tile" + (tapSel === svc.id ? " sel" : "")}>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span className="svc-name" style={{ display: "block" }}>{svc.name}</span>
+                        {metaFor(svc) ? <span className="svc-meta" style={{ display: "block" }}>{metaFor(svc)}</span> : null}
+                      </span>
+                      <span className="svc-ar">&#8594;</span>
+                    </button>
+                    {(svc.photos && svc.photos.length > 0) && <ServicePhotoStrip photos={svc.photos} />}
+                  </div>
                 ))}
               </div>
             </div>
@@ -3789,13 +3818,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       );
                     })
                   : list.map((svc) => (
-                      <button key={svc.id} onClick={() => { setTapSel(svc.id); setTimeout(() => pickGuidedService(svc), 165); }} className={"svc-tile" + (tapSel === svc.id ? " sel" : "")}>
-                        <span style={{ flex: 1, minWidth: 0 }}>
-                          <span className="svc-name" style={{ display: "block" }}>{svc.name}</span>
-                          {metaFor(svc) ? <span className="svc-meta" style={{ display: "block" }}>{metaFor(svc)}</span> : null}
-                        </span>
-                        <span className="svc-ar">&#8594;</span>
-                      </button>
+                      <div key={svc.id} style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                        <button onClick={() => { setTapSel(svc.id); setTimeout(() => pickGuidedService(svc), 165); }} className={"svc-tile" + (tapSel === svc.id ? " sel" : "")}>
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span className="svc-name" style={{ display: "block" }}>{svc.name}</span>
+                            {metaFor(svc) ? <span className="svc-meta" style={{ display: "block" }}>{metaFor(svc)}</span> : null}
+                          </span>
+                          <span className="svc-ar">&#8594;</span>
+                        </button>
+                        {(svc.photos && svc.photos.length > 0) && <ServicePhotoStrip photos={svc.photos} />}
+                      </div>
                     ))}
               </div>
             </div>
@@ -9206,9 +9238,12 @@ function CategorySheet({ open, onClose, categories, setCategories, services, set
   );
 }
 
-function MenuEditor({ services, setServices, categories, setCategories, providers, business, showToast, cutLibrary, setCutLibrary, onBackRef }) {
+function MenuEditor({ services, setServices, categories, setCategories, providers, business, setBusiness, showToast, cutLibrary, setCutLibrary, onBackRef }) {
+  const [menuTab, setMenuTab] = useState("services"); // hub tab: services | addons
+  const [menuSearch, setMenuSearch] = useState(""); // filters the service list by name
   const [editing, setEditing] = useState(null); // service id or "new"
-  const [section, setSection] = useState(null); // null = hub, else "details"|"staff"|"customizations"|"booking"
+  const [section, setSection] = useState(null); // legacy section nav (kept for read-only ViewCard "Edit" deep-links; main editor is single-page now)
+  const [advancedOpen, setAdvancedOpen] = useState(false); // single-page editor: Advanced expander
   const [picker, setPicker] = useState(null); // {target}
   const [editMode, setEditMode] = useState(false); // list view: browse vs manage (reorder/delete/rename)
   const [catSheet, setCatSheet] = useState(false); // category manager sheet (add / rename / reorder / delete)
@@ -9219,15 +9254,16 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     if (catSheet) pop = () => { setCatSheet(false); return true; };
     else if (editing && section) pop = () => { setSection(null); return true; };
     else if (editing) pop = () => { setEditing(null); return true; };
+    else if (menuTab !== "services") pop = () => { setMenuTab("services"); return true; };
     onBackRef.current = pop;
     return () => { if (onBackRef) onBackRef.current = null; };
-  }, [editing, section, catSheet]);
+  }, [editing, section, catSheet, menuTab]);
   const cats = (categories && categories.length) ? categories : ["Services"];
   const staffList = (providers || []).filter((p) => p.id !== "anyone");
   // build a default staff map: everyone ON, no overrides (null = use service default)
   const defaultStaffMap = () => { const m = {}; staffList.forEach((p) => { m[p.id] = { on: true, duration: null, price: null }; }); return m; };
   const defaultBooking = () => ({ available: true, description: "", customPrice: false, promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false });
-  const blank = { id: "", name: "", price: "", duration: "", color: "sage", photo: "", category: cats[0], addonGroups: [], staff: {}, booking: defaultBooking() };
+  const blank = { id: "", name: "", price: "", duration: "", color: "sage", photo: "", photos: [], category: cats[0], addonGroups: [], staff: {}, booking: defaultBooking() };
   const [form, setForm] = useState(blank);
   const dragId = useRef(null);
 
@@ -9236,8 +9272,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const setStaff = (pid, patch) => setForm((f) => ({ ...f, staff: { ...f.staff, [pid]: { ...f.staff[pid], ...patch } } }));
   const setBooking = (patch) => setForm((f) => ({ ...f, booking: { ...(f.booking || defaultBooking()), ...patch } }));
 
-  const openNew = () => { setForm({ ...blank, id: "svc-" + Date.now(), staff: defaultStaffMap(), booking: defaultBooking() }); setSection(null); setEditing("new"); };
-  const openEdit = (s) => { const copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; setForm(copy); setSection(null); setEditing(s.id); };
+  const openNew = () => { setForm({ ...blank, id: "svc-" + Date.now(), photos: [], staff: defaultStaffMap(), booking: defaultBooking() }); setSection(null); setEditing("new"); };
+  const openEdit = (s) => { const copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; copy.photos = copy.photos || (copy.photo ? [copy.photo] : []); setForm(copy); setSection(null); setEditing(s.id); };
   const save = () => {
     if (!form.name || !form.price) { showToast("Name and price are required."); return; }
     // clean staff overrides: blank → null (use default), else Number
@@ -9250,7 +9286,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         price: (e.price === null || e.price === "" || e.price === undefined) ? null : Number(e.price),
       };
     });
-    const clean = { ...form, price: Number(form.price), duration: Number(form.duration) || 30, staff: cleanStaff, booking: { ...defaultBooking(), ...(form.booking || {}) } };
+    const photos = Array.isArray(form.photos) ? form.photos.filter(Boolean) : [];
+    const clean = { ...form, price: Number(form.price), duration: Number(form.duration) || 30, staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) } };
     if (editing === "new") setServices([...services, clean]);
     else setServices(services.map((s) => (s.id === editing ? clean : s)));
     // MangoMint pattern: for an existing service, saving a section lands back on the
@@ -9278,6 +9315,21 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>{children}</div>
   );
 
+  // ---- shared premium style idiom (matches ProductsEditor) ----
+  const inpStyle = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+  const sectionLblStyle = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" };
+  const SectionLbl = ({ children, style }) => <div style={{ ...sectionLblStyle, ...style }}>{children}</div>;
+  const moneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)" };
+  const moneyInput = { flex: 1, border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+  const moneyPrefix = { padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 };
+  const unitSuffix = { padding: "0 16px 0 0", color: "var(--sub)", fontSize: 14 };
+  const chip = (on) => ({ background: on ? "var(--text)" : "transparent", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, color: on ? "var(--bg)" : "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" });
+  const cardStyle = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, boxShadow: "var(--shadow-sm)" };
+  const pillSwitch = (on) => (
+    <span style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0, transition: "background .2s", display: "inline-block" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+  );
+  const addTileStyle = { width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "transparent", border: "1.5px dashed var(--border2)", color: "var(--text)", padding: "14px 16px", fontSize: 14.5, fontWeight: 500, borderRadius: 14, cursor: "pointer" };
+
   // ---- CUT TYPES section ----
   const setCut = (i, patch) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c, idx) => idx === i ? { ...c, ...patch } : c) }));
   const setPopularCut = (i) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c, idx) => ({ ...c, popular: idx === i ? !c.popular : false })) }));
@@ -9295,134 +9347,147 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   });
   const setStyle = (entry, patch) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c) => (styleMatch(c, entry) ? { ...c, ...patch } : c)) }));
   const setStylePopular = (entry) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c) => ({ ...c, popular: styleMatch(c, entry) ? !c.popular : false })) }));
-  const cutTypesSection = (
+  const cutTypesBody = (
     <>
-      <SectionHeader title="Cut Types" />
       <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Tick the styles this service offers, then set this service's price and time for each. Editing a style's name, description or color updates it on every service that offers it.</p>
       {(cutLibrary || []).length === 0 ? (
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, color: "var(--sub)", fontSize: 15, lineHeight: 1.5, marginBottom: 14 }}>You don't have any cut styles yet. Tap "+ New style" below to create one.</div>
+        <div style={{ ...cardStyle, color: "var(--sub)", fontSize: 15, lineHeight: 1.5, marginBottom: 14 }}>You don't have any cut styles yet. Tap "+ New style" below to create one.</div>
       ) : (cutLibrary || []).map((entry) => {
         const i = (form.cutTypes || []).findIndex((c) => styleMatch(c, entry));
         const on = i >= 0;
         const ct = on ? form.cutTypes[i] : null;
         return (
-          <div key={entry.id} style={{ background: "var(--panel)", borderRadius: 16, padding: 18, marginBottom: 14, border: on ? (ct.popular ? "1.5px solid var(--gold)" : "1px solid var(--border2)") : "1px solid var(--border)" }}>
+          <div key={entry.id} style={{ ...cardStyle, marginBottom: 14, border: on ? (ct.popular ? "1.5px solid var(--text)" : "1px solid var(--border2)") : "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <span style={{ width: 48, height: 48, borderRadius: 11, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{entry.images && entry.images[0] ? <img src={imgUrl(entry.images[0], 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={18} style={{ color: "var(--faint)" }} />}</span>
-              <span style={{ minWidth: 0, flex: 1 }}><span style={{ display: "block", fontSize: 17, fontWeight: 500 }}>{entry.label}</span><span style={{ display: "block", fontSize: 13, color: "var(--faint)", marginTop: 2 }}>{on ? "Offered here" : "Not offered"}</span></span>
-              <Toggle on={on} onClick={() => toggleStyle(entry)} />
+              <span style={{ width: 48, height: 48, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{entry.images && entry.images[0] ? <img src={imgUrl(entry.images[0], 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={18} style={{ color: "var(--faint)" }} />}</span>
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span style={{ display: "block", fontSize: 17, fontWeight: 500 }}>{entry.label}{on && ct.popular ? <span style={{ marginLeft: 8, fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 700, color: "var(--bg)", background: "var(--text)", borderRadius: 20, padding: "2px 8px", verticalAlign: "middle" }}>Most common</span> : null}</span>
+                <span style={{ display: "block", fontSize: 13, color: "var(--faint)", marginTop: 3 }}>{on ? "Offered here" : "Not offered"}</span>
+              </span>
+              <span onClick={() => toggleStyle(entry)} style={{ cursor: "pointer" }}>{pillSwitch(on)}</span>
             </div>
             {on && (
               <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
-                <div style={{ display: "flex", gap: 12 }}>
+                <div style={{ display: "flex", gap: 10 }}>
                   <div style={{ flex: 1 }}>
-                    <FieldLabel>Price ($)</FieldLabel>
-                    <input type="number" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setStyle(entry, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="35" style={{ ...inputStyle, fontSize: 16, padding: "14px 16px" }} />
+                    <SectionLbl style={{ margin: "0 2px 8px" }}>Price</SectionLbl>
+                    <div style={moneyWrap}>
+                      <span style={moneyPrefix}>$</span>
+                      <input type="number" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setStyle(entry, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="35" style={moneyInput} />
+                    </div>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <FieldLabel>Time (min)</FieldLabel>
-                    <input type="number" value={ct.duration === undefined || ct.duration === null || ct.duration === "" ? "" : ct.duration} onChange={(e) => setStyle(entry, { duration: e.target.value === "" ? "" : Number(e.target.value) })} placeholder={String(form.duration || 45)} style={{ ...inputStyle, fontSize: 16, padding: "14px 16px" }} />
+                    <SectionLbl style={{ margin: "0 2px 8px" }}>Time</SectionLbl>
+                    <div style={moneyWrap}>
+                      <input type="number" value={ct.duration === undefined || ct.duration === null || ct.duration === "" ? "" : ct.duration} onChange={(e) => setStyle(entry, { duration: e.target.value === "" ? "" : Number(e.target.value) })} placeholder={String(form.duration || 45)} style={{ ...moneyInput, paddingLeft: 16 }} />
+                      <span style={unitSuffix}>min</span>
+                    </div>
                   </div>
                 </div>
                 <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.4 }}>Leave time blank to use this service's default ({form.duration || 45} min).</div>
-                <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 14 }}>
-                  <FieldLabel>Name</FieldLabel>
-                  <input value={entry.label || ""} onChange={(e) => setLibField(entry, { label: e.target.value })} placeholder="e.g. Skin Fade" style={{ ...inputStyle, fontSize: 16, padding: "13px 16px", marginBottom: 14 }} />
-                  <FieldLabel>Description</FieldLabel>
-                  <textarea value={entry.desc || ""} onChange={(e) => setLibField(entry, { desc: e.target.value })} placeholder="Shown to clients under the name" rows={4} style={{ ...inputStyle, fontSize: 15, padding: "12px 16px", resize: "vertical", minHeight: 92, lineHeight: 1.5, marginBottom: 14 }} />
-                  <FieldLabel>Calendar color</FieldLabel>
+                <div style={{ borderTop: "1px solid var(--line)", paddingTop: 16, marginTop: 16 }}>
+                  <SectionLbl style={{ margin: "0 2px 8px" }}>Name</SectionLbl>
+                  <input value={entry.label || ""} onChange={(e) => setLibField(entry, { label: e.target.value })} placeholder="e.g. Skin Fade" style={inpStyle} />
+                  <SectionLbl style={{ margin: "16px 2px 8px" }}>Description</SectionLbl>
+                  <textarea value={entry.desc || ""} onChange={(e) => setLibField(entry, { desc: e.target.value })} placeholder="Shown to clients under the name" rows={4} style={{ ...inpStyle, resize: "vertical", minHeight: 92, lineHeight: 1.5 }} />
+                  <SectionLbl style={{ margin: "16px 2px 10px" }}>Calendar color</SectionLbl>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <button onClick={() => setLibField(entry, { color: null })} title="No color — use the service's color" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--panel2)", border: !entry.color ? "2px solid var(--text)" : "2px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!entry.color && <Check size={14} style={{ color: "var(--text)" }} />}</button>
                     {SERVICE_PALETTE.map((c) => { const on = entry.color === c.id; return (
                       <button key={c.id} onClick={() => setLibField(entry, { color: c.id })} title={c.name} style={{ width: 32, height: 32, borderRadius: "50%", background: c.hex, border: on ? "2px solid var(--text)" : "2px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={14} style={{ color: "var(--on-gold)" }} />}</button>
                     ); })}
                   </div>
-                  <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.45 }}>This cut's color wins over the service color on the calendar. Leave the dashed chip selected to use the service color instead. Name, description &amp; color are shared — editing here updates this style on every service.</p>
+                  <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 10, lineHeight: 1.45 }}>This cut's color wins over the service color on the calendar. Leave the dashed chip selected to use the service color instead. Name, description &amp; color are shared — editing here updates this style on every service.</p>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, borderTop: "1px solid var(--line)", paddingTop: 16, marginTop: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, borderTop: "1px solid var(--line)", paddingTop: 16, marginTop: 16 }}>
                   <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Mark as most common</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Shows a “Most common” badge to clients.</span></span>
-                  <Toggle on={!!ct.popular} onClick={() => setStylePopular(entry)} />
+                  <span onClick={() => setStylePopular(entry)} style={{ cursor: "pointer" }}>{pillSwitch(!!ct.popular)}</span>
                 </div>
               </div>
             )}
           </div>
         );
       })}
-      <button onClick={() => { setLibForm({ id: "lib_" + Date.now(), label: "", desc: "", images: [] }); setLibOpen(true); }} style={{ width: "100%", background: "transparent", border: "1px dashed var(--border2)", color: "var(--sub)", padding: 12, fontSize: 15, borderRadius: 12 }}>+ New style</button>
+      <button onClick={() => { setLibForm({ id: "lib_" + Date.now(), label: "", desc: "", images: [] }); setLibOpen(true); }} style={addTileStyle}><Plus size={18} /> New style</button>
       <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>New styles open the Cut Styles editor. After you save one, come back here to tick it on.</p>
-      <SaveBar />
     </>
   );
   // ---- DETAILS section ----
-  const detailsSection = (
+  const detailsBody = (
     <>
-      <SectionHeader title="Details" />
-      <div style={{ marginBottom: 18 }}>
-        <FieldLabel>Service photo</FieldLabel>
-        <button onClick={() => setPicker({ target: "service" })} className="lift" style={{ width: "100%", height: 160, borderRadius: 14, border: "1px solid var(--border)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, padding: 0 }}>
-          {form.photo ? <img src={imgUrl(form.photo, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={28} /><span style={{ fontSize: 15 }}>Choose photo (library or upload)</span></>}
-        </button>
-        {form.photo && <button onClick={() => setPicker({ target: "service" })} style={{ background: "none", color: "var(--gold)", fontSize: 15, marginTop: 8 }}>Change photo</button>}
-      </div>
-      <div style={{ display: "grid", gap: 16, marginBottom: 18 }}>
-        <div><FieldLabel>Name</FieldLabel><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Signature Cut" style={inputStyle} /></div>
-        <div style={{ display: "flex", gap: 12 }}>
-          <div style={{ flex: 1 }}><FieldLabel>Price ($)</FieldLabel><input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="42" style={inputStyle} /></div>
-          <div style={{ flex: 1 }}><FieldLabel>Duration (min)</FieldLabel><input type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="45" style={inputStyle} /></div>
+      <button onClick={() => setPicker({ target: "service" })} className="lift" style={{ width: "100%", height: 168, borderRadius: 18, border: form.photo ? "1px solid var(--border)" : "1.5px dashed var(--border2)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 9, padding: 0, boxShadow: form.photo ? "var(--shadow-sm)" : "none" }}>
+        {form.photo ? <img src={imgUrl(form.photo, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 14 }}>Add a photo</span></>}
+      </button>
+      {form.photo && <div style={{ textAlign: "center", marginTop: 8 }}><button onClick={() => setPicker({ target: "service" })} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 2, padding: 0, cursor: "pointer" }}>Change photo</button></div>}
+
+      <SectionLbl style={{ marginTop: 26 }}>Name</SectionLbl>
+      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Signature Cut" style={inpStyle} />
+
+      <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+        <div style={{ flex: 1 }}>
+          <SectionLbl>Price</SectionLbl>
+          <div style={moneyWrap}>
+            <span style={moneyPrefix}>$</span>
+            <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="42" style={moneyInput} />
+          </div>
         </div>
-        <div>
-          <FieldLabel>Category</FieldLabel>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {cats.map((c) => { const on = (form.category || cats[0]) === c; return (
-              <button key={c} onClick={() => setForm({ ...form, category: c })} style={{ background: on ? "var(--tint)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: on ? "var(--gold)" : "var(--text)", padding: "8px 14px", borderRadius: 20, fontSize: 14, fontWeight: on ? 600 : 400 }}>{c}</button>
-            ); })}
+        <div style={{ flex: 1 }}>
+          <SectionLbl>Duration</SectionLbl>
+          <div style={moneyWrap}>
+            <input type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="45" style={{ ...moneyInput, paddingLeft: 16 }} />
+            <span style={unitSuffix}>min</span>
           </div>
         </div>
       </div>
-      <div style={{ marginBottom: 6 }}>
-        <FieldLabel>Calendar color</FieldLabel>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          {SERVICE_PALETTE.map((c) => { const on = (form.color || "sage") === c.id; return (
-            <button key={c.id} onClick={() => setForm({ ...form, color: c.id })} title={c.name} style={{ width: 34, height: 34, borderRadius: "50%", background: c.hex, border: on ? "2px solid var(--text)" : "2px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={15} style={{ color: "var(--on-gold)" }} />}</button>
-          ); })}
-        </div>
-        <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 10, lineHeight: 1.5, fontWeight: 400 }}>Shows on the calendar before a client checks in. Once they're checked in or in service, the block switches to the status color.</p>
+
+      <SectionLbl>Category</SectionLbl>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {cats.map((c) => { const on = (form.category || cats[0]) === c; return (
+          <button key={c} onClick={() => setForm({ ...form, category: c })} style={chip(on)}>{c}</button>
+        ); })}
       </div>
-      {(() => {
-        const isCombo = !!form.isCombo || (form.comboOf || []).length > 0;
-        return (
-          <div>
-            <Row title="This is a combo" desc="Bundles other services, at the price & duration you set above.">
-              <Toggle on={isCombo} onClick={() => setForm({ ...form, isCombo: !isCombo, comboOf: isCombo ? [] : (form.comboOf || []) })} />
-            </Row>
-            {isCombo && (
-              <div style={{ marginTop: 14 }}>
-                <FieldLabel>Includes</FieldLabel>
-                <div style={{ display: "grid", gap: 8 }}>
-                  {services.filter((s) => s.id !== editing && !((s.comboOf || []).length)).map((s) => {
-                    const on = (form.comboOf || []).includes(s.id);
-                    return (
-                      <button key={s.id} onClick={() => setForm({ ...form, comboOf: on ? (form.comboOf || []).filter((x) => x !== s.id) : [...(form.comboOf || []), s.id] })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, textAlign: "left", background: on ? "var(--tint)" : "var(--panel)", border: "1px solid " + (on ? "var(--gold)" : "var(--border)"), borderRadius: 12, padding: "12px 14px", color: "var(--text)" }}>
-                        <span style={{ fontSize: 15 }}>{s.name}</span>
-                        {on && <Check size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Clients see "Includes …" and book at this combo's price. Add haircut styles in Cut Types if you want them to pick one.</p>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-      <SaveBar />
+
+      <SectionLbl>Calendar color</SectionLbl>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {SERVICE_PALETTE.map((c) => { const on = (form.color || "sage") === c.id; return (
+          <button key={c.id} onClick={() => setForm({ ...form, color: c.id })} title={c.name} style={{ width: 34, height: 34, borderRadius: "50%", background: c.hex, border: on ? "2px solid var(--text)" : "2px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={15} style={{ color: "var(--on-gold)" }} />}</button>
+        ); })}
+      </div>
+      <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 12, lineHeight: 1.5, fontWeight: 400 }}>Shows on the calendar before a client checks in. Once they're checked in or in service, the block switches to the status color.</p>
     </>
   );
+  // Combo lives in Basics legacy view, but in the single-page layout it moves to Advanced.
+  const comboBody = (() => {
+    const isCombo = !!form.isCombo || (form.comboOf || []).length > 0;
+    return (
+      <div>
+        <Row title="This is a combo" desc="Bundles other services, at the price & duration you set above.">
+          <Toggle on={isCombo} onClick={() => setForm({ ...form, isCombo: !isCombo, comboOf: isCombo ? [] : (form.comboOf || []) })} />
+        </Row>
+        {isCombo && (
+          <div style={{ marginTop: 14 }}>
+            <SectionLbl style={{ marginTop: 6 }}>Includes</SectionLbl>
+            <div style={{ display: "grid", gap: 8 }}>
+              {services.filter((s) => s.id !== editing && !((s.comboOf || []).length)).map((s) => {
+                const on = (form.comboOf || []).includes(s.id);
+                return (
+                  <button key={s.id} onClick={() => setForm({ ...form, comboOf: on ? (form.comboOf || []).filter((x) => x !== s.id) : [...(form.comboOf || []), s.id] })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, textAlign: "left", background: on ? "var(--text)" : "var(--panel2)", border: "1px solid " + (on ? "var(--text)" : "var(--border2)"), borderRadius: 12, padding: "13px 15px", color: on ? "var(--bg)" : "var(--text)", cursor: "pointer" }}>
+                    <span style={{ fontSize: 15 }}>{s.name}</span>
+                    {on && <Check size={19} style={{ color: "var(--bg)", flexShrink: 0 }} />}
+                  </button>
+                );
+              })}
+            </div>
+            <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Clients see "Includes …" and book at this combo's price. Add haircut styles in Cut Types if you want them to pick one.</p>
+          </div>
+        )}
+      </div>
+    );
+  })();
 
   // ---- STAFF section ----
-  const staffSection = (
+  const staffBody = (
     <>
-      <SectionHeader title="Staff & pricing" />
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Everyone offers this by default. Turn someone off, or give them their own time and price. Blank = the service default ({form.duration || "—"} min · ${form.price || "—"}).</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
         {staffList.map((p) => {
@@ -9432,35 +9497,38 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           const priceOver = e.price != null && e.price !== "";
           const overridden = durOver || priceOver;
           return (
-            <div key={p.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "15px 16px", opacity: on ? 1 : 0.55, transition: "opacity .18s ease" }}>
+            <div key={p.id} style={{ ...cardStyle, padding: "16px 18px", opacity: on ? 1 : 0.55, transition: "opacity .18s ease" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
-                  <span style={{ width: 34, height: 34, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 15, flexShrink: 0 }}>{p.name.charAt(0)}</span>
-                  <span style={{ fontSize: 16, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                  <span style={{ width: 38, height: 38, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 16, flexShrink: 0 }}>{p.name.charAt(0)}</span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 16, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                    <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 1 }}>{on ? (overridden ? "Custom price · time" : "Service default") : "Not offering"}</span>
+                  </span>
                 </div>
-                <Toggle on={on} onClick={() => setStaff(p.id, { on: !on })} />
+                <span onClick={() => setStaff(p.id, { on: !on })} style={{ cursor: "pointer" }}>{pillSwitch(on)}</span>
               </div>
               {on && (
-                <div style={{ marginTop: 13 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderTop: "1px solid var(--line)" }}>
-                    <span style={{ fontSize: 14, color: "var(--sub)" }}>Duration</span>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-                      <input type="number" inputMode="numeric" value={e.duration ?? ""} placeholder={String(form.duration || "—")} onChange={(ev) => setStaff(p.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ width: 48, background: "transparent", border: "none", borderBottom: "1px solid var(--border2)", padding: "2px 0", color: durOver ? "var(--live)" : "var(--text)", fontSize: 16, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
-                      <span style={{ fontSize: 14, color: "var(--sub)" }}>min</span>
+                <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ ...moneyWrap, borderColor: priceOver ? "var(--text)" : "var(--border2)" }}>
+                      <span style={{ padding: "0 0 0 14px", color: priceOver ? "var(--text)" : "var(--sub)", fontSize: 16 }}>$</span>
+                      <input type="number" inputMode="decimal" value={e.price ?? ""} placeholder={String(form.price || "default")} onChange={(ev) => setStaff(p.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ ...moneyInput, padding: "12px 14px", color: priceOver ? "var(--text)" : "var(--text)", fontWeight: priceOver ? 600 : 400 }} />
                     </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderTop: "1px solid var(--line)" }}>
-                    <span style={{ fontSize: 14, color: "var(--sub)" }}>Price</span>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
-                      <span style={{ fontSize: 16, fontWeight: 500, color: priceOver ? "var(--live)" : "var(--text)" }}>$</span>
-                      <input type="number" inputMode="decimal" value={e.price ?? ""} placeholder={String(form.price || "—")} onChange={(ev) => setStaff(p.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ width: 62, background: "transparent", border: "none", borderBottom: "1px solid var(--border2)", padding: "2px 0", color: priceOver ? "var(--live)" : "var(--text)", fontSize: 16, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ ...moneyWrap, borderColor: durOver ? "var(--text)" : "var(--border2)" }}>
+                      <input type="number" inputMode="numeric" value={e.duration ?? ""} placeholder={String(form.duration || "default")} onChange={(ev) => setStaff(p.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ ...moneyInput, padding: "12px 14px", paddingLeft: 14, fontWeight: durOver ? 600 : 400 }} />
+                      <span style={unitSuffix}>min</span>
                     </div>
                   </div>
-                  <div style={{ paddingTop: 11, borderTop: "1px solid var(--line)", textAlign: "right" }}>
-                    {overridden
-                      ? <button onClick={() => setStaff(p.id, { duration: null, price: null })} style={{ background: "none", color: "var(--gold)", fontSize: 13, fontWeight: 500, padding: 0 }}>Reset to default</button>
-                      : <span style={{ fontSize: 13, color: "var(--faint)" }}>Using service default</span>}
-                  </div>
+                </div>
+              )}
+              {on && (
+                <div style={{ marginTop: 10, textAlign: "right", minHeight: 18 }}>
+                  {overridden
+                    ? <button onClick={() => setStaff(p.id, { duration: null, price: null })} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 500, padding: 0, cursor: "pointer" }}>Reset to default</button>
+                    : <span style={{ fontSize: 12.5, color: "var(--faint)" }}>Blank uses the service default</span>}
                 </div>
               )}
             </div>
@@ -9468,7 +9536,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         })}
       </div>
       <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 16, lineHeight: 1.5 }}>To add a barber, go to My team in Settings.</p>
-      <SaveBar />
     </>
   );
 
@@ -9477,26 +9544,29 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const setItem = (i, patch) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => idx === i ? { ...x, item: { ...(x.item || {}), ...patch } } : x) }));
   const featureOnly = (i) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => ({ ...x, featured: idx === i ? !x.featured : false })) }));
   const moveGroup = (i, dir) => setForm((f) => { const arr = [...f.addonGroups]; const j = i + dir; if (j < 0 || j >= arr.length) return f; const t = arr[i]; arr[i] = arr[j]; arr[j] = t; return { ...f, addonGroups: arr }; });
-  const customizationsSection = (
+  const customizationsBody = (
     <>
-      <SectionHeader title="Add-ons" />
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Extras and questions clients see while booking, shown in the order below — use the arrows to reorder. Each one can add price, time, or both.</p>
       {form.addonGroups.map((g, i) => {
+        const reorder = form.addonGroups.length > 1 ? (
+          <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+            <button onClick={() => moveGroup(i, -1)} disabled={i === 0} style={{ background: "none", border: "none", color: i === 0 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: i === 0 ? "default" : "pointer", opacity: i === 0 ? 0.35 : 1 }}><ChevronUp size={18} /></button>
+            <button onClick={() => moveGroup(i, 1)} disabled={i === form.addonGroups.length - 1} style={{ background: "none", border: "none", color: i === form.addonGroups.length - 1 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: i === form.addonGroups.length - 1 ? "default" : "pointer", opacity: i === form.addonGroups.length - 1 ? 0.35 : 1 }}><ChevronDown size={18} /></button>
+          </div>
+        ) : null;
         if (g.type !== "addon") {
-          // Yes/No choice — kept simple
+          // Yes/No choice
           return (
-            <div key={i} style={{ background: "var(--panel)", borderRadius: 14, padding: 14, marginBottom: 10, border: "1px solid var(--border)" }}>
-              {form.addonGroups.length > 1 && (
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 2, marginBottom: 4 }}>
-                  <button onClick={() => moveGroup(i, -1)} disabled={i === 0} style={{ background: "none", border: "none", color: i === 0 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: i === 0 ? "default" : "pointer", opacity: i === 0 ? 0.35 : 1 }}><ChevronUp size={18} /></button>
-                  <button onClick={() => moveGroup(i, 1)} disabled={i === form.addonGroups.length - 1} style={{ background: "none", border: "none", color: i === form.addonGroups.length - 1 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: i === form.addonGroups.length - 1 ? "default" : "pointer", opacity: i === form.addonGroups.length - 1 ? 0.35 : 1 }}><ChevronDown size={18} /></button>
+            <div key={i} style={{ ...cardStyle, marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <span style={{ fontSize: 10.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Yes / No question</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  {reorder}
+                  <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", border: "none", color: "#c0392b", flexShrink: 0, display: "flex", padding: 4, cursor: "pointer" }}><Trash2 size={16} /></button>
                 </div>
-              )}
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <input value={g.label} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="Yes/No question (e.g. Skin fade?)" style={{ ...inputStyle, padding: "10px 12px" }} />
-                <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", color: "#C2703D", flexShrink: 0 }}><Trash2 size={16} /></button>
               </div>
-              <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 8 }}>Yes/No choice</div>
+              <input value={g.label} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="Yes/No question (e.g. Skin fade?)" style={inpStyle} />
+              <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 10, lineHeight: 1.4 }}>Clients answer yes or no while booking.</p>
             </div>
           );
         }
@@ -9504,36 +9574,38 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         const addsPrice = it.addsPrice !== false;
         const addsTime = it.addsTime !== false;
         return (
-          <div key={i} style={{ background: "var(--panel)", borderRadius: 16, padding: 16, marginBottom: 12, border: g.required ? "1.5px solid var(--gold)" : "1px solid var(--border)" }}>
-            {form.addonGroups.length > 1 && (
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 2, marginBottom: 4 }}>
-                <button onClick={() => moveGroup(i, -1)} disabled={i === 0} style={{ background: "none", border: "none", color: i === 0 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: i === 0 ? "default" : "pointer", opacity: i === 0 ? 0.35 : 1 }}><ChevronUp size={18} /></button>
-                <button onClick={() => moveGroup(i, 1)} disabled={i === form.addonGroups.length - 1} style={{ background: "none", border: "none", color: i === form.addonGroups.length - 1 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: i === form.addonGroups.length - 1 ? "default" : "pointer", opacity: i === form.addonGroups.length - 1 ? 0.35 : 1 }}><ChevronDown size={18} /></button>
+          <div key={i} style={{ ...cardStyle, marginBottom: 12, border: g.required ? "1.5px solid var(--text)" : "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <span style={{ fontSize: 10.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Add-on</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                {reorder}
+                <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", border: "none", color: "#c0392b", flexShrink: 0, display: "flex", padding: 4, cursor: "pointer" }}><Trash2 size={16} /></button>
               </div>
-            )}
-            <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 7 }}>Question clients see</div>
-            <input value={g.label || ""} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="e.g. Want to finish with a hot towel?" style={{ ...inputStyle, padding: "10px 12px", fontWeight: 500, marginBottom: 14 }} />
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 14 }}>
-              <button onClick={() => setPicker({ target: i })} style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", color: "var(--faint)", flexShrink: 0, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{g.photo ? <img src={imgUrl(g.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={18} />}</button>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <input value={it.name || ""} onChange={(e) => setItem(i, { name: e.target.value })} placeholder="Add-on name (e.g. Hot Towel Shave)" style={{ ...inputStyle, padding: "10px 12px", fontWeight: 600 }} />
-              </div>
-              <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", color: "#C2703D", flexShrink: 0, marginTop: 8 }}><Trash2 size={16} /></button>
             </div>
 
-            <textarea value={it.desc || ""} onChange={(e) => setItem(i, { desc: e.target.value })} placeholder="Short description (optional) — shown to clients" rows={2} style={{ ...inputStyle, padding: "10px 12px", resize: "vertical", marginBottom: 14, lineHeight: 1.4 }} />
+            <SectionLbl style={{ margin: "0 2px 8px" }}>Question clients see</SectionLbl>
+            <input value={g.label || ""} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="e.g. Want to finish with a hot towel?" style={{ ...inpStyle, fontWeight: 500 }} />
+
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 14 }}>
+              <button onClick={() => setPicker({ target: i })} style={{ width: 58, height: 58, borderRadius: 14, overflow: "hidden", border: g.photo ? "1px solid var(--border)" : "1.5px dashed var(--border2)", background: "var(--panel2)", color: "var(--faint)", flexShrink: 0, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>{g.photo ? <img src={imgUrl(g.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={18} />}</button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <input value={it.name || ""} onChange={(e) => setItem(i, { name: e.target.value })} placeholder="Add-on name (e.g. Hot Towel Shave)" style={{ ...inpStyle, fontWeight: 600 }} />
+              </div>
+            </div>
+
+            <textarea value={it.desc || ""} onChange={(e) => setItem(i, { desc: e.target.value })} placeholder="Short description (optional) — shown to clients" rows={2} style={{ ...inpStyle, resize: "vertical", marginTop: 12, lineHeight: 1.45, minHeight: 56 }} />
 
             {/* Adds to the price? */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)", marginTop: 12 }}>
               <span style={{ fontSize: 15.5, fontWeight: 500 }}>Adds to the price</span>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 {addsPrice && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                    <span style={{ fontSize: 15, color: "var(--sub)" }}>$</span>
-                    <input type="number" value={it.price ?? ""} onChange={(e) => setItem(i, { price: e.target.value })} placeholder="5" style={{ width: 60, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 10px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
+                  <div style={{ ...moneyWrap, width: 96 }}>
+                    <span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span>
+                    <input type="number" value={it.price ?? ""} onChange={(e) => setItem(i, { price: e.target.value })} placeholder="5" style={{ ...moneyInput, padding: "10px 12px", textAlign: "right", fontSize: 15, fontWeight: 500 }} />
                   </div>
                 )}
-                <Toggle on={addsPrice} onClick={() => setItem(i, { addsPrice: !addsPrice })} />
+                <span onClick={() => setItem(i, { addsPrice: !addsPrice })} style={{ cursor: "pointer" }}>{pillSwitch(addsPrice)}</span>
               </div>
             </div>
 
@@ -9542,33 +9614,32 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <span style={{ fontSize: 15.5, fontWeight: 500 }}>Adds time</span>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 {addsTime && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <input type="number" value={it.min ?? ""} onChange={(e) => setItem(i, { min: e.target.value })} placeholder="10" style={{ width: 56, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 10px", color: "var(--text)", fontSize: 15, fontWeight: 500, textAlign: "right", fontFamily: FONT_BODY }} />
-                    <span style={{ fontSize: 14, color: "var(--sub)" }}>min</span>
+                  <div style={{ ...moneyWrap, width: 104 }}>
+                    <input type="number" value={it.min ?? ""} onChange={(e) => setItem(i, { min: e.target.value })} placeholder="10" style={{ ...moneyInput, padding: "10px 8px 10px 12px", textAlign: "right", fontSize: 15, fontWeight: 500 }} />
+                    <span style={unitSuffix}>min</span>
                   </div>
                 )}
-                <Toggle on={addsTime} onClick={() => setItem(i, { addsTime: !addsTime })} />
+                <span onClick={() => setItem(i, { addsTime: !addsTime })} style={{ cursor: "pointer" }}>{pillSwitch(addsTime)}</span>
               </div>
             </div>
 
             {/* Optional vs required — required means clients must answer (No thanks still works) */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0 0", borderTop: "1px solid var(--line)" }}>
               <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>When booking</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Required just means they must answer — "No thanks" still works.</span></span>
-              <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 9, overflow: "hidden", flexShrink: 0 }}>
+              <div style={{ display: "flex", border: "1px solid var(--border2)", borderRadius: 10, overflow: "hidden", flexShrink: 0 }}>
                 {[{ v: false, l: "Optional" }, { v: true, l: "Required" }].map((o) => {
                   const on = !!g.required === o.v;
-                  return <button key={o.l} onClick={() => setGroup(i, { required: o.v })} style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: 0.5, padding: "8px 13px", border: "none", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--sub)", cursor: "pointer" }}>{o.l}</button>;
+                  return <button key={o.l} onClick={() => setGroup(i, { required: o.v })} style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: 0.5, padding: "9px 14px", border: "none", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--sub)", cursor: "pointer" }}>{o.l}</button>;
                 })}
               </div>
             </div>
           </div>
         );
       })}
-      <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-        <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "choice", photo: "", options: [{ id: "yes", label: "Yes", price: 5, min: 0 }, { id: "no", label: "No", price: 0, min: 0 }] }] })} style={{ flex: 1, background: "transparent", border: "1px dashed var(--border2)", color: "var(--sub)", padding: 12, fontSize: 15, borderRadius: 12 }}>+ Yes/No choice</button>
-        <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "addon", photo: "", featured: false, item: { name: "", desc: "", addsPrice: true, price: 5, addsTime: true, min: 10 } }] })} style={{ flex: 1, background: "transparent", border: "1px dashed var(--border2)", color: "var(--sub)", padding: 12, fontSize: 15, borderRadius: 12 }}>+ Add-on</button>
+      <div style={{ display: "flex", gap: 10, marginBottom: 4 }}>
+        <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "choice", photo: "", options: [{ id: "yes", label: "Yes", price: 5, min: 0 }, { id: "no", label: "No", price: 0, min: 0 }] }] })} style={{ ...addTileStyle, flex: 1, padding: "13px 10px" }}><Plus size={17} /> Question</button>
+        <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "addon", photo: "", featured: false, item: { name: "", desc: "", addsPrice: true, price: 5, addsTime: true, min: 10 } }] })} style={{ ...addTileStyle, flex: 1, padding: "13px 10px" }}><Plus size={17} /> Add-on</button>
       </div>
-      <SaveBar />
     </>
   );
 
@@ -9705,111 +9776,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     </>
   );
 
-  // ---- REFERENCE PHOTOS section (AI training) ----
-  // Picker for which target gets the next picked photo: { kind: 'service' } or { kind: 'cutType', id }
-  const [refPickTarget, setRefPickTarget] = useState(null);
-  const addRefPhoto = (target, photoId) => {
-    if (!photoId) return;
-    if (target.kind === "service") {
-      const list = form.referencePhotos || [];
-      if (list.includes(photoId)) return;
-      setForm({ ...form, referencePhotos: [...list, photoId] });
-    } else if (target.kind === "cutType") {
-      const cuts = (form.cutTypes || []).map((c) => {
-        if (c.id !== target.id) return c;
-        const list = c.referencePhotos || [];
-        if (list.includes(photoId)) return c;
-        return { ...c, referencePhotos: [...list, photoId] };
-      });
-      setForm({ ...form, cutTypes: cuts });
-    }
-  };
-  const removeRefPhoto = (target, photoId) => {
-    if (target.kind === "service") {
-      setForm({ ...form, referencePhotos: (form.referencePhotos || []).filter((p) => p !== photoId) });
-    } else if (target.kind === "cutType") {
-      const cuts = (form.cutTypes || []).map((c) => c.id === target.id ? { ...c, referencePhotos: (c.referencePhotos || []).filter((p) => p !== photoId) } : c);
-      setForm({ ...form, cutTypes: cuts });
-    }
-  };
-  const refTile = ({ photoId, target }) => (
-    <div key={photoId} style={{ position: "relative", aspectRatio: "1/1", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)" }}>
-      <img src={imgUrl(photoId, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-      <button onClick={() => removeRefPhoto(target, photoId)} style={{ position: "absolute", top: 6, right: 6, width: 26, height: 26, borderRadius: "50%", background: "rgba(0,0,0,0.65)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", border: "none", padding: 0 }} aria-label="Remove from training"><Trash2 size={13} /></button>
-    </div>
-  );
-  const referencePhotosSection = (
-    <>
-      <SectionHeader title="Reference Photos for AI" />
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18 }}>Upload examples of what this cut looks like in real life. The AI uses these to match a client's photo to the right service. You can keep adding as you work — every photo makes future matches sharper.</p>
-
-      {form.cutTypes && form.cutTypes.length > 0 ? (
-        form.cutTypes.map((ct) => {
-          const list = ct.referencePhotos || [];
-          const target = { kind: "cutType", id: ct.id };
-          return (
-            <div key={ct.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16, marginBottom: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.15 }}>{ct.label}</div>
-                <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>{list.length} PHOTO{list.length === 1 ? "" : "S"}</div>
-              </div>
-              {ct.desc && <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginBottom: 12 }}>{ct.desc}</p>}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                {list.map((pid) => refTile({ photoId: pid, target }))}
-                <button onClick={() => setRefPickTarget(target)} style={{ aspectRatio: "1/1", borderRadius: 12, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 4, padding: 0 }}>
-                  <Plus size={20} />
-                  <span style={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 600 }}>ADD</span>
-                </button>
-              </div>
-            </div>
-          );
-        })
-      ) : (
-        (() => {
-          const list = form.referencePhotos || [];
-          const target = { kind: "service" };
-          return (
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16, marginBottom: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>{form.name || "This service"}</div>
-                <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>{list.length} PHOTO{list.length === 1 ? "" : "S"}</div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                {list.map((pid) => refTile({ photoId: pid, target }))}
-                <button onClick={() => setRefPickTarget(target)} style={{ aspectRatio: "1/1", borderRadius: 12, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 4, padding: 0 }}>
-                  <Plus size={20} />
-                  <span style={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 600 }}>ADD</span>
-                </button>
-              </div>
-            </div>
-          );
-        })()
-      )}
-
-      <div style={{ background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 14, padding: "14px 16px", fontSize: 13, color: "var(--text)", lineHeight: 1.5, marginTop: 10 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>HOW IT LEARNS</div>
-        Every time you finish a client and add their final photo, Vero automatically adds it here too. Over time, your library grows and the AI's matches get sharper. You can remove any photo with the trash icon if it shouldn't train future matches.
-      </div>
-
-      <SaveBar />
-    </>
-  );
-
-  const refPhotoCount = (() => {
-    if (form.cutTypes && form.cutTypes.length) {
-      return form.cutTypes.reduce((sum, ct) => sum + (ct.referencePhotos || []).length, 0);
-    }
-    return (form.referencePhotos || []).length;
-  })();
-  const hubRows = [
-    { id: "details", label: "Details", sub: `$${form.price || "—"} · ${form.duration || "—"} min` },
-    { id: "cuttypes", label: "Cut types", sub: (form.cutTypes && form.cutTypes.length) ? `${form.cutTypes.length} option${form.cutTypes.length === 1 ? "" : "s"}` : "None" },
-    { id: "staff", label: "Staff & pricing", sub: `${staffList.filter((p) => form.staff[p.id]?.on !== false).length} of ${staffList.length} offering` },
-    { id: "customizations", label: "Add-ons", sub: `${form.addonGroups.length} group${form.addonGroups.length !== 1 ? "s" : ""}` },
-    { id: "refphotos", label: "Reference photos", sub: refPhotoCount === 0 ? "None yet" : `${refPhotoCount} photo${refPhotoCount === 1 ? "" : "s"}` },
-    { id: "booking", label: "Online booking", sub: !b.available ? "Off" : ((b.whoCanBook === "returning") ? "Returning only" : "Everyone") },
-    { id: "timerules", label: "Hours & pricing", sub: (form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Always available" },
-  ];
 
   // Reorder hooks must be declared before any early return (Rules of Hooks).
   const rowRefs = useRef({});
@@ -9867,17 +9833,17 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             </div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, paddingLeft: 4 }}>{libForm.label || "Edit style"}</h2>
             <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20, paddingLeft: 4 }}>Edit this style once. When you save, the name, description and photo update on every service that uses it. Each service keeps its own price and time.</p>
-            <div style={{ background: "var(--panel)", borderRadius: 16, padding: 20, border: "1px solid var(--border)" }}>
-              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>Photo</div>
-              <button onClick={() => setLibPicker(true)} className="lift" style={{ width: "100%", height: 150, borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, padding: 0, marginBottom: 8 }}>
-                {libForm.images && libForm.images[0] ? <img src={imgUrl(libForm.images[0], 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} /><span style={{ fontSize: 15 }}>Add a photo (library or upload)</span></>}
+            <div style={{ ...cardStyle, padding: 20 }}>
+              <SectionLbl style={{ margin: "0 2px 10px" }}>Photo</SectionLbl>
+              <button onClick={() => setLibPicker(true)} className="lift" style={{ width: "100%", height: 160, borderRadius: 14, border: (libForm.images && libForm.images[0]) ? "1px solid var(--border)" : "1.5px dashed var(--border2)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 9, padding: 0 }}>
+                {libForm.images && libForm.images[0] ? <img src={imgUrl(libForm.images[0], 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 14 }}>Add a photo</span></>}
               </button>
-              {libForm.images && libForm.images.length > 0 && <button onClick={() => setLibForm((f) => ({ ...f, images: [] }))} style={{ background: "none", color: "var(--gold)", fontSize: 14, marginBottom: 16 }}>Remove photo</button>}
-              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8, marginTop: 8 }}>Name</div>
-              <input value={libForm.label || ""} onChange={(e) => setLibForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Skin Fade" style={{ ...inputStyle, fontSize: 17, padding: "16px 16px", marginBottom: 16 }} />
-              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>Description</div>
-              <textarea value={libForm.desc || ""} onChange={(e) => setLibForm((f) => ({ ...f, desc: e.target.value }))} placeholder="Shown to clients under the name" rows={6} style={{ ...inputStyle, fontSize: 16, padding: "14px 16px", resize: "vertical", minHeight: 150, lineHeight: 1.55 }} />
-              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8, marginTop: 18 }}>Calendar color</div>
+              {libForm.images && libForm.images.length > 0 && <div style={{ textAlign: "center", marginTop: 8 }}><button onClick={() => setLibForm((f) => ({ ...f, images: [] }))} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 2, padding: 0, cursor: "pointer" }}>Remove photo</button></div>}
+              <SectionLbl style={{ margin: "20px 2px 8px" }}>Name</SectionLbl>
+              <input value={libForm.label || ""} onChange={(e) => setLibForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Skin Fade" style={inpStyle} />
+              <SectionLbl style={{ margin: "18px 2px 8px" }}>Description</SectionLbl>
+              <textarea value={libForm.desc || ""} onChange={(e) => setLibForm((f) => ({ ...f, desc: e.target.value }))} placeholder="Shown to clients under the name" rows={6} style={{ ...inpStyle, resize: "vertical", minHeight: 150, lineHeight: 1.55 }} />
+              <SectionLbl style={{ margin: "18px 2px 10px" }}>Calendar color</SectionLbl>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <button onClick={() => setLibForm((f) => ({ ...f, color: null }))} title="No color — use the service's color" style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", border: !libForm.color ? "2px solid var(--text)" : "2px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!libForm.color && <Check size={15} style={{ color: "var(--text)" }} />}</button>
                 {SERVICE_PALETTE.map((c) => { const on = libForm.color === c.id; return (
@@ -9897,15 +9863,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 8, paddingLeft: 4 }}>Cut Styles</h2>
             <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20, paddingLeft: 4 }}>Your styles in one place. Edit a style here and it updates on every service that offers it. Price and time stay set per service.</p>
             {(cutLibrary || []).length === 0 ? (
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, color: "var(--sub)", fontSize: 15, lineHeight: 1.5 }}>No styles yet. They'll appear here once your services have cut styles.</div>
+              <div style={{ ...cardStyle, padding: 24, color: "var(--sub)", fontSize: 15, lineHeight: 1.5 }}>No styles yet. They'll appear here once your services have cut styles.</div>
             ) : (
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
                 {(cutLibrary || []).map((entry, i) => (
-                  <button key={entry.id} onClick={() => setLibForm({ ...entry })} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                  <button key={entry.id} onClick={() => setLibForm({ ...entry })} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "15px 16px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none", cursor: "pointer" }}>
                     <span style={{ width: 52, height: 52, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{entry.images && entry.images[0] ? <img src={imgUrl(entry.images[0], 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={20} style={{ color: "var(--faint)" }} />}</span>
                     <span style={{ minWidth: 0, flex: 1 }}>
                       <span style={{ display: "block", fontSize: 18, fontWeight: 500 }}>{entry.label}</span>
-                      <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{libUsedCount(entry) > 0 ? `Used in ${libUsedCount(entry)} service${libUsedCount(entry) > 1 ? "s" : ""}` : "Not used yet"}</span>
+                      <span style={{ display: "block", fontSize: 13, color: "var(--faint)", marginTop: 3 }}>{libUsedCount(entry) > 0 ? `Used in ${libUsedCount(entry)} service${libUsedCount(entry) > 1 ? "s" : ""}` : "Not used yet"}</span>
                     </span>
                     <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
                   </button>
@@ -9918,116 +9884,266 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     );
   }
 
+  // ===========================================================================
+  //  NEW SECTIONED SERVICE EDITOR (built from scratch — clean bands + drill-ins)
+  // ===========================================================================
+  const [colorOpen, setColorOpen] = useState(false); // color popover on the main form
+  const photos = Array.isArray(form.photos) ? form.photos : (form.photo ? [form.photo] : []);
+  const addPhoto = (id) => { if (!id) return; setForm((f) => { const cur = Array.isArray(f.photos) ? f.photos : (f.photo ? [f.photo] : []); if (cur.includes(id)) return f; const next = [...cur, id]; return { ...f, photos: next, photo: next[0] }; }); };
+  const removePhoto = (id) => setForm((f) => { const next = (Array.isArray(f.photos) ? f.photos : (f.photo ? [f.photo] : [])).filter((p) => p !== id); return { ...f, photos: next, photo: next[0] || "" }; });
+
+  // ---- shared idiom for the new sectioned form ----
+  const band = (label, sub) => (
+    <div style={{ background: "var(--panel2)", padding: "9px 16px", margin: "0 -1px", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
+      <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.1px" }}>{label}</span>
+      {sub && <span style={{ fontSize: 12.5, color: "var(--sub)", fontWeight: 400 }}> · {sub}</span>}
+    </div>
+  );
+  const microLbl = { fontFamily: FONT_BODY, fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 5, display: "block" };
+  const fieldBox = { border: "1px solid var(--border2)", borderRadius: 12, background: "var(--panel)", padding: "9px 13px 10px" };
+  const bareInp = { width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: 0, color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+
+  const cutCount = (form.cutTypes || []).length;
+  const addonCount = (form.addonGroups || []).length;
+  const offeringCount = staffList.filter((p) => form.staff[p.id]?.on !== false).length;
+  const anyStaffOverride = staffList.some((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); });
+  const photoCount = photos.length;
+
+  const DrillRow = ({ icon, label, sub, target }) => (
+    <button onClick={() => setSection(target)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, background: "var(--panel)", border: "none", padding: "15px 4px", textAlign: "left", cursor: "pointer", borderTop: "1px solid var(--line)" }}>
+      <span style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "var(--text)" }}>{icon}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 15.5, fontWeight: 500, color: "var(--text)" }}>{label}</span>
+        <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{sub}</span>
+      </span>
+      <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
+    </button>
+  );
+
+  // ---- drill-in: PHOTOS gallery (new) ----
+  const photosScreen = (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+        <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
+        <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{(form.name || "SERVICE").toUpperCase()}</span>
+      </div>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 8px" }}>Photos</h2>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Add example photos so clients can see this service while they book. The first photo is the cover.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+        {photos.map((pid, i) => (
+          <button key={pid} onClick={() => removePhoto(pid)} style={{ position: "relative", aspectRatio: "1/1", borderRadius: 14, overflow: "hidden", border: i === 0 ? "1.5px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel2)", padding: 0, cursor: "pointer" }}>
+            <img src={imgUrl(pid, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            {i === 0 && <span style={{ position: "absolute", top: 6, left: 6, fontSize: 9.5, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 700, color: "var(--on-gold)", background: "var(--gold)", borderRadius: 20, padding: "2px 7px" }}>Cover</span>}
+            <span style={{ position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}><Trash2 size={12} /></span>
+          </button>
+        ))}
+        <button onClick={() => setPicker({ target: "gallery" })} style={{ aspectRatio: "1/1", borderRadius: 14, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 5, padding: 0, cursor: "pointer" }}>
+          <Plus size={22} /><span style={{ fontSize: 11, fontWeight: 600 }}>Add photo</span>
+        </button>
+      </div>
+      <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Tap a photo to remove it.</p>
+      <SaveBar />
+    </>
+  );
+
+  // ---- drill-in: CUT STYLES (rebuilt header, reuse cutTypesBody cards) ----
+  const cutstylesScreen = (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+        <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
+        <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{(form.name || "SERVICE").toUpperCase()}</span>
+      </div>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Cut styles</h2>
+      {cutTypesBody}
+      <SaveBar />
+    </>
+  );
+
+  // ---- drill-in: ADD-ONS & QUESTIONS (rebuilt header, reuse customizationsBody) ----
+  const addonsScreen = (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+        <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
+        <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{(form.name || "SERVICE").toUpperCase()}</span>
+      </div>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Add-ons &amp; questions</h2>
+      {customizationsBody}
+      <SaveBar />
+    </>
+  );
+
+  // ---- drill-in: STAFF & PRICING (rebuilt header, reuse staffBody) ----
+  const staffScreen = (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+        <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
+        <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{(form.name || "SERVICE").toUpperCase()}</span>
+      </div>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Staff &amp; pricing</h2>
+      {staffBody}
+      <SaveBar />
+    </>
+  );
+
   // ---- full-page service editor ----
   if (editing) {
+    const drill = section === "cutstyles" || section === "addons" || section === "staff" || section === "photos" || section === "timerules" || section === "booking";
     return (
       <div className="appt-screen" style={{ paddingBottom: 40 }}>
         {picker && <PhotoPicker onClose={() => setPicker(null)} onPick={(id) => {
           if (picker.target === "service") setForm({ ...form, photo: id });
+          else if (picker.target === "gallery") addPhoto(id);
           else if (picker.target === "cut") setCut(picker.index, { images: [id] });
           else setForm({ ...form, addonGroups: form.addonGroups.map((g, i) => i === picker.target ? { ...g, photo: id } : g) });
         }} />}
-        {refPickTarget && <PhotoPicker onClose={() => setRefPickTarget(null)} onPick={(id) => { addRefPhoto(refPickTarget, id); setRefPickTarget(null); }} />}
-        {section === "details" ? detailsSection
-          : section === "cuttypes" ? cutTypesSection
-          : section === "staff" ? staffSection
-          : section === "customizations" ? customizationsSection
-          : section === "refphotos" ? referencePhotosSection
-          : section === "booking" ? bookingSection
-          : section === "timerules" ? timeRulesSection
-          : editing !== "new" ? (() => {
-            // ---- READ-ONLY SERVICE VIEW (MangoMint pattern): calm cards, each with its own Edit ----
-            const live = b.available !== false;
-            const ViewCard = ({ label, sec, rows, empty }) => (
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>{label}</span>
-                  <button onClick={() => setSection(sec)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 4, padding: 0, cursor: "pointer" }}>Edit</button>
-                </div>
-                {(rows && rows.length) ? rows.map((r, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "11px 0", borderBottom: i < rows.length - 1 ? "1px solid var(--line)" : "none", fontSize: 15 }}>
-                    <span style={{ color: r.muted ? "var(--sub)" : "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.l}{r.req && <span style={{ fontStyle: "italic", color: "var(--sub)" }}> required</span>}</span>
-                    <span style={{ color: r.hi ? "var(--live)" : "var(--sub)", flexShrink: 0, fontWeight: r.hi ? 500 : 400 }}>{r.r}</span>
-                  </div>
-                )) : <div style={{ padding: "11px 0", fontSize: 14.5, color: "var(--faint)" }}>{empty || "None yet"}</div>}
-              </div>
-            );
-            const addonRows = (form.addonGroups || []).map((g) => g.type === "addon"
-              ? { l: g.item?.name || "Add-on", req: !!g.required, r: `$${g.item?.price ?? 0}${g.item?.min ? ` · +${g.item.min} min` : ""}` }
-              : { l: g.label || "Choice", r: `${(g.options || []).length} options` });
-            const staffRows = staffList.map((p) => {
-              const e = form.staff?.[p.id] || {};
-              if (e.on === false) return { l: p.name, r: "Not offering", muted: true };
-              const ov = (e.price !== null && e.price !== undefined && e.price !== "") || (e.duration !== null && e.duration !== undefined && e.duration !== "");
-              return { l: p.name, hi: ov, r: `$${(e.price ?? form.price) || "—"} · ${(e.duration ?? form.duration) || "—"} min` };
-            });
-            const cutRows = (form.cutTypes || []).map((c) => ({ l: c.label || "Style", r: c.price !== "" && c.price !== null && c.price !== undefined ? `$${c.price}` : "" }));
-            const archiveSvc = () => {
-              if (typeof window !== "undefined" && !window.confirm(form.archived ? `Restore "${form.name}" to your menu?` : `Archive "${form.name}"? It's hidden from booking and your list, and can be restored anytime.`)) return;
-              setServices(services.map((s) => (s.id === editing ? { ...s, archived: !form.archived } : s)));
-              setEditing(null); setSection(null);
-              showToast(form.archived ? "Service restored." : "Service archived.");
-            };
-            return (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 18 }}>
-                  <button onClick={() => setEditing(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
-                  <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>SERVICES</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
-                  <span style={{ width: 54, height: 54, borderRadius: 13, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{form.photo ? <img src={imgUrl(form.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ width: 13, height: 13, borderRadius: "50%", background: hexById(form.color) }} />}</span>
-                  <div style={{ minWidth: 0 }}>
-                    <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, letterSpacing: -0.3, lineHeight: 1.1, margin: 0 }}>{form.name}</h2>
-                    <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", gap: 7 }}>
-                      ${form.price || "—"} · {form.duration || "—"} min
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: live ? "var(--live)" : "var(--sub)", fontWeight: 500, fontSize: 12.5 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: live ? "var(--live)" : "var(--faint)" }} />{live ? "Live" : "Internal"}</span>
-                    </div>
-                  </div>
-                </div>
-                <ViewCard label="Basics" sec="details" rows={[{ l: "Price", r: `$${form.price || "—"}` }, { l: "Duration", r: `${form.duration || "—"} min` }, { l: "Category", r: form.category || cats[0] }]} />
-                <ViewCard label="Online booking" sec="booking" rows={[{ l: "Visible to clients", r: live ? "On" : "Off", hi: live }, { l: "Who can book", r: b.whoCanBook === "returning" ? "Returning only" : "Everyone" }]} />
-                <ViewCard label="Add-ons asked" sec="customizations" rows={addonRows} empty="None — clients aren't asked anything extra" />
-                <ViewCard label="Staff & pricing" sec="staff" rows={staffRows} />
-                <ViewCard label="Cut types" sec="cuttypes" rows={cutRows} empty="None yet" />
-                <ViewCard label="Reference photos" sec="refphotos" rows={refPhotoCount ? [{ l: "Photos", r: String(refPhotoCount) }] : null} empty="None yet" />
-                <ViewCard label="Hours & pricing" sec="timerules" rows={(form.timeRules || []).length ? [{ l: "Rules", r: `${form.timeRules.length} rule${form.timeRules.length === 1 ? "" : "s"}` }] : null} empty="Always available — no time rules" />
-                <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
-                  <button onClick={archiveSvc} style={{ background: "none", border: "none", color: form.archived ? "var(--gold)" : "#C2703D", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 4, padding: 8, cursor: "pointer" }}>{form.archived ? "Restore service" : "Archive service"}</button>
-                </div>
-              </>
-            );
-          })()
-          : (
+        {colorOpen && (
+          <Sheet open={colorOpen} onClose={() => setColorOpen(false)} align="bottom" maxWidth={460}>
+            <div style={{ width: 38, height: 5, borderRadius: 9, background: "var(--border2)", margin: "0 auto 14px" }} />
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontWeight: 500, fontSize: 23, letterSpacing: "-0.3px", margin: "0 0 4px" }}>Calendar color</h2>
+            <p style={{ fontSize: 13, color: "var(--sub)", margin: "0 0 16px" }}>Shows on the calendar before a client checks in.</p>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", paddingBottom: 8 }}>
+              {SERVICE_PALETTE.map((c) => { const on = (form.color || "sage") === c.id; return (
+                <button key={c.id} onClick={() => { setForm({ ...form, color: c.id }); setColorOpen(false); }} title={c.name} style={{ width: 42, height: 42, borderRadius: "50%", background: c.hex, border: on ? "3px solid var(--text)" : "3px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={17} style={{ color: "var(--on-gold)" }} />}</button>
+              ); })}
+            </div>
+          </Sheet>
+        )}
+
+        {/* ---- drill-in sub-screens ---- */}
+        {drill ? (
+          section === "photos" ? photosScreen
+            : section === "cutstyles" ? cutstylesScreen
+            : section === "addons" ? addonsScreen
+            : section === "timerules" ? timeRulesSection
+            : section === "booking" ? bookingSection
+            : staffScreen
+        ) : (() => {
+          // ---- MAIN SECTIONED FORM (section === null) ----
+          const live = (form.booking || {}).available !== false;
+          const archiveSvc = () => {
+            if (editing === "new") return;
+            if (typeof window !== "undefined" && !window.confirm(form.archived ? `Restore "${form.name}" to your menu?` : `Archive "${form.name}"? It's hidden from booking and your list, and can be restored anytime.`)) return;
+            setServices(services.map((s) => (s.id === editing ? { ...s, archived: !form.archived } : s)));
+            setEditing(null); setSection(null);
+            showToast(form.archived ? "Service restored." : "Service archived.");
+          };
+          const isCombo = !!form.isCombo || (form.comboOf || []).length > 0;
+          return (
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                 <button onClick={() => setEditing(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
                 <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>SERVICES</span>
               </div>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: -0.3, marginBottom: 22 }}>{form.name || (editing === "new" ? "New service" : "Service")}</h2>
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 17px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 16, fontWeight: 500 }}>Visible to clients</div>
-                  <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{b.available !== false ? "Shows on your booking page" : "Internal only — hidden from clients"}</div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: -0.3, margin: "0 0 18px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{form.name || (editing === "new" ? "New service" : "Service")}</h2>
+
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+                {/* Main details */}
+                {band("Main details", "required")}
+                <div style={{ padding: "16px 16px 4px" }}>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ ...fieldBox }}>
+                        <span style={microLbl}>Name</span>
+                        <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Signature Cut" style={bareInp} />
+                      </div>
+                    </div>
+                    <button onClick={() => setColorOpen(true)} style={{ ...fieldBox, cursor: "pointer", textAlign: "left", display: "flex", flexDirection: "column", justifyContent: "center", minWidth: 92 }}>
+                      <span style={microLbl}>Color</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ width: 18, height: 18, borderRadius: "50%", background: hexById(form.color), flexShrink: 0 }} />
+                        <ChevronRight size={16} style={{ color: "var(--faint)", marginLeft: "auto" }} />
+                      </span>
+                    </button>
+                  </div>
+                  <div style={{ ...fieldBox, marginTop: 12, display: "flex", flexDirection: "column" }}>
+                    <span style={microLbl}>Category</span>
+                    <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                      <select value={form.category || cats[0]} onChange={(e) => setForm({ ...form, category: e.target.value })} style={{ ...bareInp, appearance: "none", WebkitAppearance: "none", paddingRight: 22, cursor: "pointer" }}>
+                        {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <ChevronDown size={16} style={{ color: "var(--faint)", position: "absolute", right: 0, pointerEvents: "none" }} />
+                    </div>
+                  </div>
                 </div>
-                <Toggle on={b.available !== false} onClick={() => setBooking({ available: b.available === false })} />
+
+                {/* Price & time */}
+                {band("Price & time", "required")}
+                <div style={{ padding: "16px 16px 4px" }}>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <div style={{ ...fieldBox, flex: 1, display: "flex", flexDirection: "column" }}>
+                      <span style={microLbl}>Price</span>
+                      <span style={{ display: "flex", alignItems: "center" }}>
+                        <span style={{ color: "var(--sub)", fontSize: 16, marginRight: 4 }}>$</span>
+                        <input type="number" inputMode="decimal" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="42" style={bareInp} />
+                      </span>
+                    </div>
+                    <div style={{ ...fieldBox, flex: 1, display: "flex", flexDirection: "column" }}>
+                      <span style={microLbl}>Duration</span>
+                      <span style={{ display: "flex", alignItems: "center" }}>
+                        <input type="number" inputMode="numeric" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="45" style={bareInp} />
+                        <span style={{ color: "var(--sub)", fontSize: 14, marginLeft: 4 }}>min</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 7, flexWrap: "wrap", margin: "12px 0 6px" }}>
+                    {[15, 30, 45, 60, 90].map((m) => { const on = String(form.duration) === String(m); return (
+                      <button key={m} onClick={() => setForm({ ...form, duration: m })} style={{ background: on ? "var(--text)" : "transparent", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, color: on ? "var(--bg)" : "var(--text)", padding: "6px 13px", borderRadius: 20, fontSize: 13, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }}>{m}m</button>
+                    ); })}
+                  </div>
+                </div>
+
+                {/* Options */}
+                {band("Options", "tap to add, skip if you don't need it")}
+                <div style={{ padding: "4px 16px" }}>
+                  <DrillRow icon={<Scissors size={18} />} label="Cut styles" sub={cutCount ? `${cutCount} style${cutCount === 1 ? "" : "s"}` : "None yet"} target="cutstyles" />
+                  <DrillRow icon={<Plus size={18} />} label="Add-ons & questions" sub={addonCount ? `${addonCount} added` : "None yet"} target="addons" />
+                  <DrillRow icon={<Users size={18} />} label="Staff & pricing" sub={anyStaffOverride ? `${staffList.filter((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); }).length} custom` : `${offeringCount === staffList.length ? "All barbers" : offeringCount + " of " + staffList.length} · default`} target="staff" />
+                  <DrillRow icon={<ImageIcon size={18} />} label="Photos" sub={photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "None yet"} target="photos" />
+                </div>
+
+                {/* Booking */}
+                {band("Booking")}
+                <div style={{ padding: "2px 16px" }}>
+                  <Row title="Show on online booking" desc={live ? "Clients can book this service themselves." : "Internal only — hidden from your booking page."}>
+                    <Toggle on={live} onClick={() => setBooking({ available: live === false })} />
+                  </Row>
+                </div>
+
+                {/* More settings — how & when this service is offered */}
+                {band("More settings")}
+                <div style={{ padding: "4px 16px" }}>
+                  <DrillRow icon={<Clock size={18} />} label="Hours & pricing" sub={(form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Always available · standard price"} target="timerules" />
+                  <DrillRow icon={<Calendar size={18} />} label="Booking rules" sub={`${(form.booking || {}).whoCanBook === "returning" ? "Returning only" : "Everyone"}${(form.booking || {}).requireCard ? " · card held" : ""}`} target="booking" />
+                </div>
               </div>
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
-                {hubRows.map((r, i) => (
-                  <button key={r.id} onClick={() => setSection(r.id)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "18px 17px", minHeight: 64, background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
-                    <span style={{ fontSize: 16.5, fontWeight: 500, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.label}</span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, minWidth: 0 }}>
-                      <span style={{ fontSize: 15, color: "var(--gold)", fontWeight: 500, textAlign: "right", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.sub}</span>
-                      <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
-                    </span>
-                  </button>
-                ))}
+
+              {/* Advanced (combo) */}
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, marginTop: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+                <button onClick={() => setAdvancedOpen((v) => !v)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "16px 18px", background: "var(--panel)", color: "var(--text)", textAlign: "left" }}>
+                  <span style={{ fontSize: 11.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Advanced</span>
+                  {advancedOpen ? <ChevronUp size={18} style={{ color: "var(--faint)" }} /> : <ChevronDown size={18} style={{ color: "var(--faint)" }} />}
+                </button>
+                {advancedOpen && (
+                  <div style={{ padding: "4px 18px 20px", borderTop: "1px solid var(--line)" }}>
+                    <div style={{ fontSize: 11.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "16px 0 8px" }}>Combo</div>
+                    {comboBody}
+                  </div>
+                )}
               </div>
-              {editing === "new" && <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 14, lineHeight: 1.5 }}>Fill in Details and tap Save Service to add it to your menu.</p>}
+
+              <SaveBar />
+              {editing !== "new" && (
+                <div style={{ textAlign: "center", padding: "10px 0 4px" }}>
+                  <button onClick={archiveSvc} style={{ background: "none", border: "none", color: form.archived ? "var(--gold)" : "#C2703D", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 4, padding: 8, cursor: "pointer" }}>{form.archived ? "Restore service" : "Archive service"}</button>
+                </div>
+              )}
             </>
-          )}
+          );
+        })()}
       </div>
     );
   }
+
 
   // ---- reorder + category helpers ----
   const moveService = (id, dir) => {
@@ -10111,119 +10227,143 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     commitOrder(arr);
   };
 
+  // ===========================================================================
+  //  NEW HUB — two tabs only: Services + Add-ons
+  // ===========================================================================
+  const q = menuSearch.trim().toLowerCase();
+  const matchesSearch = (s) => !q || (s.name || "").toLowerCase().includes(q);
+
   return (
-    <div className="fade-up">
+    <div className="fade-up" style={{ paddingBottom: 90 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, letterSpacing: "-0.4px" }}>Menu</h2>
-        <button onClick={() => setEditMode((v) => !v)} style={{ background: "none", color: "var(--gold)", fontSize: 15.5, fontWeight: editMode ? 600 : 500, padding: "6px 2px" }}>{editMode ? "Done" : "Edit"}</button>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, letterSpacing: "-0.4px", margin: 0 }}>Services</h2>
+        {menuTab === "services" && <button onClick={() => setEditMode((v) => !v)} style={{ background: "none", color: "var(--gold)", fontSize: 15.5, fontWeight: editMode ? 600 : 500, padding: "6px 2px" }}>{editMode ? "Done" : "Reorder"}</button>}
       </div>
-      <p style={{ color: "var(--sub)", fontSize: 13, marginBottom: 20, fontWeight: 400, lineHeight: 1.5 }}>{editMode ? "Drag the handle to reorder · tap − to remove." : "Your services, grouped. Tap one to edit it."}</p>
 
-      {!editMode && (
-        <button className="lift" onClick={() => { setLibForm(null); setLibOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 16px", color: "var(--text)", textAlign: "left", marginBottom: 22, boxShadow: "var(--shadow-sm)", minHeight: 62 }}>
-          <span style={{ width: 38, height: 38, borderRadius: 11, background: "var(--tint)", color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Scissors size={19} /></span>
-          <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: "block", fontSize: 16, fontWeight: 500 }}>Cut styles</span>
-            <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>Edit once — updates everywhere it's used</span>
-          </span>
-          <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
-        </button>
-      )}
+      {/* two-tab switch */}
+      <div style={{ display: "flex", gap: 6, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 13, padding: 4, margin: "12px 0 18px" }}>
+        {[{ id: "services", label: "Services" }, { id: "addons", label: "Add-ons" }].map((t) => { const on = menuTab === t.id; return (
+          <button key={t.id} onClick={() => { setMenuTab(t.id); setEditMode(false); }} style={{ flex: 1, padding: "10px 6px", borderRadius: 10, border: "none", background: on ? "var(--panel)" : "transparent", color: on ? "var(--text)" : "var(--sub)", fontFamily: FONT_BODY, fontSize: 14, fontWeight: on ? 600 : 500, boxShadow: on ? "var(--shadow-sm)" : "none", cursor: "pointer", transition: "background .15s ease, color .15s ease" }}>{t.label}</button>
+        ); })}
+      </div>
 
-      {cats.map((cat, ci) => {
-        const inCat = services.filter((s) => !s.archived && (s.category || cats[0]) === cat);
-        const cardClipping = !(tDrag && tDrag.cat === cat);
-        return (
-          <div key={cat} style={{ marginBottom: 22 }}>
-            {/* category header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 9px 6px", minHeight: 22 }}>
-              <span style={{ flex: 1, fontSize: 11.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{cat}</span>
-            </div>
-            {/* services card */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: cardClipping ? "hidden" : "visible" }}>
-              {inCat.length === 0 && <div style={{ fontSize: 14, color: "var(--faint)", padding: "16px 16px" }}>No services here yet.</div>}
-              {inCat.map((s, si) => {
-                const dd = tDrag;
-                const act = dd && dd.cat === cat;
-                const held = act && dd.id === s.id;
-                let ty = 0, sc = 1, zz = 1;
-                let tr = "scale .17s ease, box-shadow .2s ease, border-color .2s ease";
-                if (held) {
-                  ty = dd.dy; sc = 1.03; zz = 50;
-                  tr = dd.dropping ? "translate .19s cubic-bezier(.2,.85,.25,1), scale .17s ease, box-shadow .2s ease" : "scale .16s ease, box-shadow .16s ease";
-                } else if (act) {
-                  tr = "translate .22s cubic-bezier(.2,.85,.25,1), scale .17s ease, box-shadow .2s ease";
-                  if (dd.overIndex > dd.fromIndex && si > dd.fromIndex && si <= dd.overIndex) ty = -dragRowH.current;
-                  else if (dd.overIndex < dd.fromIndex && si >= dd.overIndex && si < dd.fromIndex) ty = dragRowH.current;
-                }
-                const hairline = si > 0 && !held;
-                return (
-                <div key={s.id} ref={(el) => { if (el) rowRefs.current[s.id] = el; }} data-sid={s.id} draggable={editMode} onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} style={{ position: "relative", zIndex: zz, display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", padding: "14px 16px", minHeight: 60, borderTop: held ? "1.5px solid var(--gold)" : (hairline ? "1px solid var(--line)" : "none"), border: held ? "1.5px solid var(--gold)" : undefined, borderRadius: held ? 13 : 0, boxShadow: held ? "0 16px 34px rgba(60,50,30,0.22)" : "none", translate: `0px ${ty}px`, scale: String(sc), transition: tr, willChange: act ? "translate" : "auto" }}>
-                  {editMode && <button onClick={() => remove(s.id)} aria-label={`Remove ${s.name}`} style={{ width: 24, height: 24, borderRadius: "50%", background: "#C2703D", color: "#fff", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "none", padding: 0, fontSize: 20, lineHeight: 0, fontWeight: 600 }}>−</button>}
-                  <span style={{ width: 11, height: 11, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />
-                  {editMode ? (
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 16, fontWeight: 500, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
-                      <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>${s.price} · {s.duration} min</div>
-                    </div>
-                  ) : (
-                    <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--text)", minWidth: 0, padding: 0 }}>
-                      <div style={{ fontSize: 16, fontWeight: 500, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
-                      <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>${s.price} · {s.duration} min</div>
-                    </button>
-                  )}
-                  {editMode
-                    ? <span onTouchStart={touchStart(s.id, cat, inCat.map((x) => x.id))} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchEnd} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", flexShrink: 0, padding: "8px 2px 8px 8px", cursor: held ? "grabbing" : "grab" }}><GripVertical size={20} style={{ color: held ? "var(--gold)" : "var(--faint)" }} /></span>
-                    : (() => { const live = s.booking?.available !== false; return (
-                      <>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: live ? "var(--live)" : "var(--sub)", flexShrink: 0, whiteSpace: "nowrap" }}>
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: live ? "var(--live)" : "var(--faint)" }} />{live ? "Live" : "Internal"}
-                        </span>
-                        <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
-                      </>
-                    ); })()}
-                </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+      {/* ---- ADD-ONS TAB ---- */}
+      {menuTab === "addons" && <AddOnsEditor services={services} setServices={setServices} business={business} setBusiness={setBusiness} showToast={showToast} />}
 
-      {!editMode && (() => {
-        const arch = services.filter((s) => s.archived);
-        if (!arch.length) return null;
-        return (
-          <div style={{ marginBottom: 22 }}>
-            <button onClick={() => setShowArchived(!showArchived)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "1px dashed var(--border2)", borderRadius: 13, padding: "13px 16px", color: "var(--sub)", fontSize: 14.5, cursor: "pointer" }}>
-              <span>Archived ({arch.length})</span>
-              {showArchived ? <ChevronUp size={17} style={{ color: "var(--faint)" }} /> : <ChevronDown size={17} style={{ color: "var(--faint)" }} />}
-            </button>
-            {showArchived && (
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", marginTop: 10 }}>
-                {arch.map((s, i) => (
-                  <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
-                    <span style={{ width: 11, height: 11, borderRadius: "50%", background: hexById(s.color), flexShrink: 0, opacity: 0.5 }} />
-                    <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--sub)", minWidth: 0, padding: 0 }}>
-                      <div style={{ fontSize: 16, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
-                      <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>${s.price} · {s.duration} min</div>
-                    </button>
-                    <button onClick={() => { setServices(services.map((x) => (x.id === s.id ? { ...x, archived: false } : x))); showToast(`"${s.name}" restored.`); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 4, padding: 0, cursor: "pointer", flexShrink: 0 }}>Restore</button>
-                  </div>
-                ))}
+      {/* ---- SERVICES TAB ---- */}
+      {menuTab === "services" && (<>
+        {/* search */}
+        <div style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 26, padding: "11px 16px", marginBottom: 14 }}>
+          <Search size={17} style={{ color: "var(--faint)", flexShrink: 0 }} />
+          <input value={menuSearch} onChange={(e) => setMenuSearch(e.target.value)} placeholder="Search services" style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
+          {menuSearch && <button onClick={() => setMenuSearch("")} style={{ background: "none", border: "none", color: "var(--faint)", display: "flex", padding: 0, cursor: "pointer" }}><X size={16} /></button>}
+        </div>
+
+        {/* + New category (centered text button) */}
+        <div style={{ textAlign: "center", marginBottom: 18 }}>
+          <button onClick={() => setCatSheet(true)} style={{ background: "none", border: "none", color: "var(--gold)", fontFamily: FONT_BODY, fontSize: 14.5, fontWeight: 600, padding: "4px 8px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Plus size={16} /> New category</button>
+        </div>
+        <CategorySheet open={catSheet} onClose={() => setCatSheet(false)} categories={categories} setCategories={setCategories} services={services} setServices={setServices} showToast={showToast} />
+
+        {cats.map((cat) => {
+          const inCat = services.filter((s) => !s.archived && (s.category || cats[0]) === cat && matchesSearch(s));
+          if (q && inCat.length === 0) return null;
+          const cardClipping = !(tDrag && tDrag.cat === cat);
+          return (
+            <div key={cat} style={{ marginBottom: 22 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 9px 4px", minHeight: 20 }}>
+                <span style={{ flex: 1, fontSize: 11.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{cat}</span>
               </div>
-            )}
-          </div>
-        );
-      })()}
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: cardClipping ? "hidden" : "visible" }}>
+                {inCat.length === 0 && <div style={{ fontSize: 14, color: "var(--faint)", padding: "16px 16px" }}>No services here yet.</div>}
+                {inCat.map((s, si) => {
+                  const dd = tDrag;
+                  const act = dd && dd.cat === cat;
+                  const held = act && dd.id === s.id;
+                  let ty = 0, sc = 1, zz = 1;
+                  let trn = "scale .17s ease, box-shadow .2s ease, border-color .2s ease";
+                  if (held) {
+                    ty = dd.dy; sc = 1.03; zz = 50;
+                    trn = dd.dropping ? "translate .19s cubic-bezier(.2,.85,.25,1), scale .17s ease, box-shadow .2s ease" : "scale .16s ease, box-shadow .16s ease";
+                  } else if (act) {
+                    trn = "translate .22s cubic-bezier(.2,.85,.25,1), scale .17s ease, box-shadow .2s ease";
+                    if (dd.overIndex > dd.fromIndex && si > dd.fromIndex && si <= dd.overIndex) ty = -dragRowH.current;
+                    else if (dd.overIndex < dd.fromIndex && si >= dd.overIndex && si < dd.fromIndex) ty = dragRowH.current;
+                  }
+                  const hairline = si > 0 && !held;
+                  const live = s.booking?.available !== false;
+                  return (
+                    <div key={s.id} ref={(el) => { if (el) rowRefs.current[s.id] = el; }} data-sid={s.id} draggable={editMode} onDragStart={onDragStart(s.id)} onDragOver={(e) => e.preventDefault()} onDrop={onDropOn(s.id, cat)} style={{ position: "relative", zIndex: zz, display: "flex", alignItems: "stretch", background: "var(--panel)", minHeight: 62, borderTop: held ? "1.5px solid var(--gold)" : (hairline ? "1px solid var(--line)" : "none"), border: held ? "1.5px solid var(--gold)" : undefined, borderRadius: held ? 13 : 0, boxShadow: held ? "0 16px 34px rgba(60,50,30,0.22)" : "none", translate: `0px ${ty}px`, scale: String(sc), transition: trn, willChange: act ? "translate" : "auto" }}>
+                      {/* drag grip (far left) */}
+                      {editMode
+                        ? <span onTouchStart={touchStart(s.id, cat, inCat.map((x) => x.id))} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchEnd} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", flexShrink: 0, display: "flex", alignItems: "center", padding: "0 4px 0 12px", cursor: held ? "grabbing" : "grab" }}><GripVertical size={19} style={{ color: held ? "var(--gold)" : "var(--faint)" }} /></span>
+                        : <span style={{ width: 12, flexShrink: 0 }} />}
+                      {/* 4px color bar */}
+                      <span style={{ width: 4, alignSelf: "stretch", margin: "12px 0", borderRadius: 4, background: hexById(s.color), flexShrink: 0 }} />
+                      {/* name + duration */}
+                      {editMode ? (
+                        <div style={{ flex: 1, minWidth: 0, padding: "12px 12px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                          <div style={{ fontSize: 15.5, fontWeight: 500, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                          <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{fmtDur(Number(s.duration) || 0)}</div>
+                        </div>
+                      ) : (
+                        <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--text)", minWidth: 0, padding: "12px 12px", display: "flex", flexDirection: "column", justifyContent: "center", cursor: "pointer" }}>
+                          <div style={{ fontSize: 15.5, fontWeight: 500, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                          <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{fmtDur(Number(s.duration) || 0)}{live ? "" : " · Internal"}</div>
+                        </button>
+                      )}
+                      {/* price + chevron (right) */}
+                      {editMode ? (
+                        <button onClick={() => remove(s.id)} aria-label={`Remove ${s.name}`} style={{ alignSelf: "center", marginRight: 12, width: 26, height: 26, borderRadius: "50%", background: "#C2703D", color: "#fff", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "none", padding: 0, fontSize: 20, lineHeight: 0, fontWeight: 600 }}>−</button>
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingRight: 14, flexShrink: 0 }}>
+                          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, color: "var(--text)" }}>${s.price}</span>
+                          <ChevronRight size={19} style={{ color: "var(--faint)" }} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
 
-      {!editMode && (
-        <>
-          <button className="lift" onClick={openNew} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Plus size={18} /> Add a service</button>
-          <button onClick={() => setCatSheet(true)} className="lift" style={{ display: "flex", alignItems: "center", gap: 8, background: "transparent", boxShadow: "none", border: "1px dashed var(--border2)", color: "var(--gold)", padding: "13px 16px", borderRadius: 13, fontSize: 15, width: "100%", justifyContent: "center", fontWeight: 500 }}><GripVertical size={16} /> Edit categories</button>
-        </>
-      )}
-      <CategorySheet open={catSheet} onClose={() => setCatSheet(false)} categories={categories} setCategories={setCategories} services={services} setServices={setServices} showToast={showToast} />
+        {/* archived collapse */}
+        {!editMode && !q && (() => {
+          const arch = services.filter((s) => s.archived);
+          if (!arch.length) return null;
+          return (
+            <div style={{ marginBottom: 22 }}>
+              <button onClick={() => setShowArchived(!showArchived)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "1px dashed var(--border2)", borderRadius: 13, padding: "13px 16px", color: "var(--sub)", fontSize: 14.5, cursor: "pointer" }}>
+                <span>Archived ({arch.length})</span>
+                {showArchived ? <ChevronUp size={17} style={{ color: "var(--faint)" }} /> : <ChevronDown size={17} style={{ color: "var(--faint)" }} />}
+              </button>
+              {showArchived && (
+                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", marginTop: 10 }}>
+                  {arch.map((s, i) => (
+                    <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                      <span style={{ width: 11, height: 11, borderRadius: "50%", background: hexById(s.color), flexShrink: 0, opacity: 0.5 }} />
+                      <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--sub)", minWidth: 0, padding: 0 }}>
+                        <div style={{ fontSize: 16, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                        <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>${s.price} · {s.duration} min</div>
+                      </button>
+                      <button onClick={() => { setServices(services.map((x) => (x.id === s.id ? { ...x, archived: false } : x))); showToast(`"${s.name}" restored.`); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 4, padding: 0, cursor: "pointer", flexShrink: 0 }}>Restore</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* floating dark pill — + New service (sticky, in-flow) */}
+        {!editMode && (
+          <div style={{ position: "sticky", bottom: 16, display: "flex", justifyContent: "flex-end", marginTop: 18, pointerEvents: "none" }}>
+            <button className="lift" onClick={openNew} style={{ pointerEvents: "auto", background: "var(--text)", color: "var(--bg)", padding: "13px 20px", fontSize: 14.5, fontWeight: 600, borderRadius: 26, display: "inline-flex", alignItems: "center", gap: 8, border: "none", boxShadow: "0 10px 28px -8px rgba(0,0,0,0.4)", cursor: "pointer" }}><Plus size={18} /> New service</button>
+          </div>
+        )}
+      </>)}
     </div>
   );
 }
@@ -13897,6 +14037,12 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast 
   };
   const toggleSvc = (id) => setForm((f) => ({ ...f, services: (f.services || []).includes(id) ? f.services.filter((x) => x !== id) : [...(f.services || []), id] }));
 
+  // shared premium style idiom (matches ProductsEditor)
+  const aoInp = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+  const aoSectionLbl = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 2px 10px" };
+  const aoMoneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)" };
+  const aoMoneyInput = { flex: 1, border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+
   if (editing && form) {
     return (
       <div className="fade-up" style={{ paddingBottom: 40 }}>
@@ -13905,49 +14051,56 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast 
           <button onClick={() => { setEditing(null); setForm(null); }} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
           <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px" }}>{editing === "new" ? "New add-on" : form.name || "Add-on"}</h2>
         </div>
-        <button onClick={() => setPicker(true)} className="lift" style={{ width: "100%", height: 150, borderRadius: 14, border: "1px solid var(--border)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, padding: 0, marginBottom: 18 }}>
-          {form.photo ? <img src={imgUrl(form.photo, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} /><span style={{ fontSize: 14, letterSpacing: 1 }}>Add a photo</span></>}
+        <button onClick={() => setPicker(true)} className="lift" style={{ width: "100%", height: 160, borderRadius: 18, border: form.photo ? "1px solid var(--border)" : "1.5px dashed var(--border2)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 9, padding: 0, marginBottom: 6, boxShadow: form.photo ? "var(--shadow-sm)" : "none" }}>
+          {form.photo ? <img src={imgUrl(form.photo, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 14 }}>Add a photo</span></>}
         </button>
-        <div style={{ display: "grid", gap: 16 }}>
-          <div>
-            <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>Name</div>
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Hot Towel Finish" style={inputStyle} />
-          </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>Price ($)</div>
-              <input type="number" inputMode="decimal" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="8" style={inputStyle} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>Extra time (min)</div>
-              <input type="number" inputMode="numeric" value={form.extraMin} onChange={(e) => setForm({ ...form, extraMin: e.target.value })} placeholder="0" style={inputStyle} />
+
+        <div style={aoSectionLbl}>Name</div>
+        <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Hot Towel Finish" style={aoInp} />
+
+        <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={aoSectionLbl}>Price</div>
+            <div style={aoMoneyWrap}>
+              <span style={{ padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 }}>$</span>
+              <input type="number" inputMode="decimal" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="8" style={aoMoneyInput} />
             </div>
           </div>
-          <div>
-            <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>Description</div>
-            <textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} placeholder="What the client gets — shown while they book." rows={3} style={{ ...inputStyle, resize: "vertical", minHeight: 84, lineHeight: 1.55 }} />
+          <div style={{ flex: 1 }}>
+            <div style={aoSectionLbl}>Extra time</div>
+            <div style={aoMoneyWrap}>
+              <input type="number" inputMode="numeric" value={form.extraMin} onChange={(e) => setForm({ ...form, extraMin: e.target.value })} placeholder="0" style={{ ...aoMoneyInput, paddingLeft: 16 }} />
+              <span style={{ padding: "0 16px 0 0", color: "var(--sub)", fontSize: 14 }}>min</span>
+            </div>
           </div>
         </div>
-        <div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, margin: "26px 0 4px" }}>ASKED ON</div>
+
+        <div style={aoSectionLbl}>Description</div>
+        <textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} placeholder="What the client gets — shown while they book." rows={3} style={{ ...aoInp, resize: "vertical", minHeight: 84, lineHeight: 1.55 }} />
+
+        <div style={aoSectionLbl}>Asked on</div>
         {svcList.length === 0 && <p style={{ fontSize: 14, color: "var(--faint)", padding: "12px 0" }}>No services yet.</p>}
-        {svcList.map((s) => {
-          const on = (form.services || []).includes(s.id);
-          return (
-            <button key={s.id} onClick={() => toggleSvc(s.id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "none", padding: "14px 2px", borderBottom: "1px solid var(--line)", color: on ? "var(--text)" : "var(--faint)", textAlign: "left", fontSize: 15.5 }}>
-              <span>{s.name}</span>
-              {on && <Check size={17} style={{ color: "var(--gold)", flexShrink: 0 }} />}
-            </button>
-          );
-        })}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 24 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {svcList.map((s) => {
+            const on = (form.services || []).includes(s.id);
+            return (
+              <button key={s.id} onClick={() => toggleSvc(s.id)} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: on ? "var(--text)" : "transparent", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, color: on ? "var(--bg)" : "var(--text)", padding: "9px 15px", borderRadius: 22, fontSize: 14, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }}>
+                {on && <Check size={15} />}{s.name}
+              </button>
+            );
+          })}
+        </div>
+
+        <div onClick={() => setForm({ ...form, required: !form.required })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 26, padding: "16px 18px", border: "1px solid var(--border)", borderRadius: 14, cursor: "pointer" }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 15.5, fontWeight: 500 }}>Must answer to book</div>
-            <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Client picks yes or no thanks before continuing.</div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>Client picks yes or no thanks before continuing.</div>
           </div>
-          <Toggle on={!!form.required} onClick={() => setForm({ ...form, required: !form.required })} />
+          <span style={{ width: 50, height: 29, borderRadius: 29, background: form.required ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0, transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: form.required ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
         </div>
-        <button className="lift" onClick={save} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 16, fontWeight: 600, borderRadius: 13, boxShadow: "var(--glow)", marginTop: 28 }}>Save add-on</button>
-        {editing !== "new" && <button onClick={remove} style={{ width: "100%", background: "none", color: "#C2703D", fontSize: 14.5, fontWeight: 500, padding: 14, marginTop: 6 }}>Remove this add-on</button>}
+
+        <button className="lift" onClick={save} style={{ width: "100%", marginTop: 30, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 14, padding: 17, fontSize: 14, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>{editing === "new" ? "Add add-on" : "Save add-on"}</button>
+        {editing !== "new" && <button onClick={remove} style={{ width: "100%", background: "transparent", border: "1px solid #c0392b", color: "#c0392b", fontSize: 14, fontWeight: 500, padding: 15, marginTop: 12, borderRadius: 14, cursor: "pointer" }}>Remove this add-on</button>}
       </div>
     );
   }
@@ -13956,16 +14109,21 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast 
     <div className="fade-up">
       <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 8 }}>Build once, attach to any service. Clients get asked while booking — required ones must be answered before they can continue.</p>
       {lib.length === 0 && <p style={{ fontSize: 14.5, color: "var(--faint)", padding: "26px 0", textAlign: "center", fontStyle: "italic" }}>No add-ons yet.</p>}
-      {lib.map((a) => (
-        <button key={a.id} onClick={() => { setForm(JSON.parse(JSON.stringify(a))); setEditing(a.id); }} style={{ width: "100%", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, background: "none", padding: "20px 2px", borderBottom: "1px solid var(--line)", color: "var(--text)", textAlign: "left" }}>
-          <span style={{ minWidth: 0, flex: 1 }}>
-            <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500 }}>{a.name}</span>
-            <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 5, letterSpacing: 0.3 }}>{a.required ? "Required · " : ""}{(a.services || []).length ? (a.services || []).map(svcName).join(", ") : "Not attached yet"}</span>
-          </span>
-          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, flexShrink: 0 }}>${Number(a.price) || 0}</span>
-        </button>
-      ))}
-      <button className="lift" onClick={() => { setForm(blank()); setEditing("new"); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 22 }}><Plus size={18} /> Add an add-on</button>
+      {lib.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 4 }}>
+          {lib.map((a) => (
+            <button key={a.id} onClick={() => { setForm(JSON.parse(JSON.stringify(a))); setEditing(a.id); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "16px 18px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
+              <span style={{ width: 50, height: 50, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{a.photo ? <img src={imgUrl(a.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={18} style={{ color: "var(--faint)" }} />}</span>
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500 }}>{a.name}</span>
+                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 4, letterSpacing: 0.2 }}>{a.required ? "Required · " : ""}{(a.services || []).length ? (a.services || []).map(svcName).join(", ") : "Not attached yet"}</span>
+              </span>
+              <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, flexShrink: 0 }}>${Number(a.price) || 0}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <button className="lift" onClick={() => { setForm(blank()); setEditing("new"); }} style={{ width: "100%", background: "transparent", border: "1.5px dashed var(--border2)", color: "var(--text)", padding: "14px 16px", fontSize: 14.5, fontWeight: 500, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, marginTop: 20, cursor: "pointer" }}><Plus size={18} /> Add an add-on</button>
     </div>
   );
 }
@@ -14432,20 +14590,6 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: (<AppearancePicker theme={(form?.theme && THEME_IDS.includes(form.theme)) ? form.theme : theme} setTheme={(id) => setForm({ ...form, theme: id })} />),
     },
     {
-      id: "aicuthelper", title: "AI Cut Helper", icon: Sparkles, category: "Client Experience",
-      status: form.aiCutHelper ? "On" : "Off",
-      keywords: "ai cut helper photo upload not sure show us a photo i'm not sure match suggest",
-      editor: (
-        <>
-        <button onClick={() => setForm({ ...form, aiCutHelper: !form.aiCutHelper })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, color: "var(--text)", marginBottom: 14 }}>
-          <div style={{ textAlign: "left" }}><div style={{ fontSize: 15, marginBottom: 2 }}>Photo + description matching</div><div style={{ fontSize: 14, color: "var(--sub)", fontWeight: 300, lineHeight: 1.4 }}>Lets new clients upload a photo or describe what they want — we suggest a matching cut from your menu.</div></div>
-          <span style={{ width: 44, height: 26, borderRadius: 13, background: form.aiCutHelper ? "var(--gold)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: form.aiCutHelper ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-        </button>
-        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "var(--sub)", lineHeight: 1.5 }}>For best results, upload 3 reference photos per cut showing what each style looks like at your shop. The matcher uses these to learn your work. <em>Reference photo upload is coming soon.</em></div>
-        </>
-      ),
-    },
-    {
       id: "photos", title: "Display Preferences", icon: ImageIcon, category: "Calendar & Appointments",
       status: (() => { const bits = []; const rs = form.calendarRowSize || "L"; bits.push(`Row size ${rs}`); if (form.showAddonPhotos) bits.push("photos on"); return bits.join(" · "); })(),
       keywords: "photos images add-ons menu pictures display preferences calendar week start day begins sunday monday first day row size height calendar large small zoom",
@@ -14649,13 +14793,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "servicesmenu", fullBleed: true, title: "Services & Menu", icon: ImageIcon, category: "Services & Menu",
       status: `${(services || []).length} services`,
       keywords: "menu services service list edit add price duration photo category haircut beard add-ons addons cut types",
-      editor: <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} onBackRef={editorBack} />,
-    },
-    {
-      id: "addons", fullBleed: true, title: "Add-ons", icon: Plus, category: "Services & Menu",
-      status: `${(business.addOnsLibrary || []).length} add-on${(business.addOnsLibrary || []).length === 1 ? "" : "s"}`,
-      keywords: "add-ons addons upsell extras hot towel beard oil required mandatory ask during booking attach services question upgrade",
-      editor: <AddOnsEditor services={services} setServices={setServices} business={business} setBusiness={setBusiness} showToast={showToast} />,
+      editor: <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} onBackRef={editorBack} />,
     },
     {
       id: "products", fullBleed: true, title: "Products", icon: Sparkles, category: "Services & Menu",
@@ -14709,7 +14847,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const CATS = [
     { id: "shop",  section: "Set up your shop", label: "Your shop", icon: User, desc: "Name, hours & branding", settings: ["business", "hours", "locations", "phones", "appearance", "theme"] },
     { id: "staff", section: "Set up your shop", label: "Your team", icon: Users, desc: "Barbers, access & pay", settings: ["staff", "staffpin"] },
-    { id: "menu",  section: "Set up your shop", label: "Services & pricing", icon: Scissors, desc: "What you offer", settings: ["servicesmenu", "addons", "aicuthelper"] },
+    { id: "menu",  section: "Set up your shop", label: "Services & pricing", icon: Scissors, desc: "What you offer", settings: ["servicesmenu"] },
     { id: "productscat", section: "Set up your shop", label: "Products", icon: Sparkles, desc: "Retail you sell — haircare, skincare, merch", settings: ["products"] },
     { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "How clients book you", settings: ["avoidgaps", "autotiming", "anyonerouting", "booking", "newclient", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"], groups: [
       { label: "The times they see", ids: ["avoidgaps", "autotiming", "anyonerouting"] },
@@ -14804,8 +14942,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         { k: "menu_deposit", label: "Deposit-required services set (e.g. tattoo)", card: "servicesmenu" },
       ] },
       { label: "Add-ons & helpers", items: [
-        { k: "menu_addons", label: "Add-ons / finishing touches priced right", card: "addons" },
-        { k: "menu_ai", label: "AI Cut Helper on/off as you want", card: "aicuthelper" },
+        { k: "menu_addons", label: "Add-ons / finishing touches priced right", card: "servicesmenu" },
       ] },
     ] },
     { id: "book", label: "Online booking", icon: Calendar, desc: "How clients book you online", groups: [

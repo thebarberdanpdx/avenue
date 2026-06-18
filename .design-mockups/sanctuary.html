@@ -1,0 +1,260 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&display=swap');
+
+.sb-wrap { max-width: 680px; margin: 0 auto; padding: 16px; font-family: 'Manrope', system-ui, sans-serif; color: #4a4038; box-sizing: border-box; }
+.sb-wrap * { box-sizing: border-box; }
+
+/* browser chrome */
+.sb-chrome { background: #ece4d8; border: 1px solid #ddd0bf; border-radius: 16px 16px 0 0; padding: 10px 14px; display: flex; align-items: center; gap: 12px; }
+.sb-dots { display: flex; gap: 6px; }
+.sb-dots span { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.sb-addr { flex: 1; background: #fbf7f0; border: 1px solid #ddd0bf; border-radius: 999px; padding: 6px 14px; font-size: 12px; color: #8a7d6c; text-align: center; }
+
+/* the site frame */
+.sb-site { background: #faf5ec; border: 1px solid #ddd0bf; border-top: none; border-radius: 0 0 18px 18px; overflow: hidden; }
+
+/* announcement banner */
+.sb-banner { background: #c97b54; color: #fdf3e9; padding: 11px 16px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; }
+.sb-banner i { font-size: 16px; }
+.sb-banner .sb-x { margin-left: auto; cursor: pointer; opacity: .8; font-size: 16px; line-height: 1; }
+.sb-banner .sb-x:hover { opacity: 1; }
+
+/* nav */
+.sb-nav { position: sticky; top: 0; background: rgba(250,245,236,.92); border-bottom: 1px solid #e7dccb; padding: 14px 22px; display: flex; align-items: center; gap: 18px; z-index: 5; }
+.sb-mark { font-family: 'Fraunces', serif; font-weight: 600; font-size: 18px; color: #3a322b; letter-spacing: .3px; }
+.sb-mark small { display: block; font-family: 'Manrope'; font-size: 9.5px; letter-spacing: 2px; text-transform: uppercase; color: #b0795b; font-weight: 600; margin-top: 1px; }
+.sb-links { margin-left: auto; display: flex; gap: 18px; font-size: 13px; font-weight: 600; color: #6b5f52; }
+.sb-links span { cursor: pointer; }
+.sb-links span:hover { color: #c97b54; }
+.sb-book { background: #5f7355; color: #fbf6ec; border-radius: 999px; padding: 8px 18px; font-size: 13px; font-weight: 700; text-decoration: none; }
+
+/* sections */
+.sb-sec { padding: 40px 28px; }
+.sb-eyebrow { font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; color: #b0795b; font-weight: 700; margin: 0 0 14px; }
+.sb-h2 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 28px; color: #352d26; margin: 0 0 8px; line-height: 1.15; }
+
+/* hero */
+.sb-hero { padding: 46px 28px 40px; background: linear-gradient(0deg,#f5ede0,#faf5ec); }
+.sb-hero-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 42px; line-height: 1.02; color: #352d26; margin: 0 0 10px; }
+.sb-hero-tag { font-family: 'Fraunces', serif; font-style: italic; font-size: 21px; color: #c97b54; margin: 0 0 14px; }
+.sb-hero-pos { font-size: 15px; line-height: 1.6; color: #6b5f52; max-width: 440px; margin: 0 0 22px; }
+.sb-cta-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+.sb-cta { background: #5f7355; color: #fbf6ec; border-radius: 999px; padding: 13px 26px; font-size: 14px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+.sb-call { color: #6b5f52; font-size: 14px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.sb-call i { color: #c97b54; }
+.sb-rating { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #6b5f52; }
+.sb-stars { color: #d99a4e; font-size: 15px; letter-spacing: 1px; }
+.sb-rating b { color: #3a322b; }
+
+/* services grid */
+.sb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sb-svc { background: #fbf7f0; border: 1px solid #e9ddca; border-radius: 14px; padding: 16px 18px; display: flex; align-items: flex-start; gap: 12px; }
+.sb-svc .sb-ico { width: 38px; height: 38px; border-radius: 10px; background: #efe4d3; color: #b0795b; display: flex; align-items: center; justify-content: center; font-size: 19px; flex: none; }
+.sb-svc-name { font-weight: 700; font-size: 14px; color: #3a322b; }
+.sb-svc-price { font-family: 'Fraunces', serif; font-size: 16px; color: #5f7355; font-weight: 600; margin-top: 3px; }
+
+/* announcements — key feature */
+.sb-news { background: #f1 e8 d9; }
+.sb-news { background: #f2ead9; }
+.sb-news-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 18px; }
+.sb-news-head p { margin: 0; font-size: 13px; color: #8a7d6c; }
+.sb-post { background: #fbf7f0; border: 1px solid #e6d9c4; border-radius: 16px; padding: 18px 20px; margin-bottom: 12px; }
+.sb-post-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.sb-pill { background: #efe4d3; color: #b0795b; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; }
+.sb-date { font-size: 12px; color: #9a8d7c; font-weight: 600; }
+.sb-post h3 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 18px; color: #352d26; margin: 0 0 6px; }
+.sb-post p { font-size: 13.5px; line-height: 1.55; color: #685c4f; margin: 0 0 10px; }
+.sb-byline { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #8a7d6c; }
+.sb-byline .sb-av { width: 22px; height: 22px; border-radius: 50%; background: #c97b54; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+
+/* about */
+.sb-about { display: flex; gap: 22px; align-items: center; }
+.sb-about-img { flex: none; width: 150px; height: 175px; border-radius: 16px; background: #d9c4ac; color: #9a8466; display: flex; align-items: center; justify-content: center; font-size: 46px; }
+.sb-about p { font-size: 14px; line-height: 1.65; color: #685c4f; margin: 0 0 10px; }
+.sb-about .sb-sig { font-family: 'Fraunces', serif; font-style: italic; font-size: 17px; color: #c97b54; }
+
+/* reviews */
+.sb-rev { background: #5f7355; color: #f1ecdf; }
+.sb-rev .sb-h2 { color: #fbf6ec; }
+.sb-rev .sb-eyebrow { color: #c5d0b8; }
+.sb-quote { background: #6c815f; border: 1px solid #788d6a; border-radius: 14px; padding: 16px 18px; margin-bottom: 10px; }
+.sb-quote .sb-stars { color: #ecd58a; margin-bottom: 6px; }
+.sb-quote p { font-size: 13.5px; line-height: 1.55; margin: 0 0 8px; font-style: italic; }
+.sb-quote .sb-who { font-size: 12px; font-weight: 700; color: #d3dcc6; font-style: normal; }
+
+/* visit */
+.sb-visit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.sb-info p { margin: 0 0 4px; font-size: 14px; line-height: 1.5; color: #685c4f; }
+.sb-info .sb-lbl { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #b0795b; font-weight: 700; margin: 16px 0 5px; }
+.sb-hours { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.sb-hours td { padding: 5px 0; color: #685c4f; border-bottom: 1px solid #eadfcc; }
+.sb-hours td:last-child { text-align: right; font-weight: 600; color: #3a322b; }
+.sb-hours tr.closed td { color: #b0a596; }
+.sb-map { margin-top: 16px; height: 110px; border-radius: 14px; background: #e6dcc8; border: 1px solid #ddd0bf; display: flex; align-items: center; justify-content: center; color: #a8987f; font-size: 28px; }
+
+/* footer */
+.sb-foot { background: #efe4d3; padding: 24px 28px; text-align: center; }
+.sb-foot .sb-mark { justify-content: center; margin-bottom: 8px; }
+.sb-foot p { font-size: 12px; color: #8a7d6c; margin: 4px 0; }
+</style>
+
+<div class="sb-wrap">
+  <div class="sb-chrome">
+    <div class="sb-dots"><span style="background:#e0786a"></span><span style="background:#e8c06a"></span><span style="background:#8fb27a"></span></div>
+    <div class="sb-addr">sanctuarybarberco.com</div>
+  </div>
+
+  <div class="sb-site">
+
+    <!-- announcement banner -->
+    <div class="sb-banner" id="sbBanner">
+      <i class="ti ti-bell"></i>
+      <span>Welcome back — new summer hours start this week. We can't wait to see you.</span>
+      <span class="sb-x" id="sbDismiss"><i class="ti ti-x"></i></span>
+    </div>
+
+    <!-- nav -->
+    <nav class="sb-nav">
+      <div class="sb-mark">Sanctuary<small>Barber Co</small></div>
+      <div class="sb-links"><span>Services</span><span>About</span><span>Reviews</span><span>Visit</span></div>
+      <a href="#" class="sb-book">Book</a>
+    </nav>
+
+    <!-- hero -->
+    <section class="sb-hero">
+      <p class="sb-eyebrow">Beaverton, Oregon · By Appointment</p>
+      <h1 class="sb-hero-name">Sanctuary<br>Barber Co.</h1>
+      <p class="sb-hero-tag">Look Good, Feel Good</p>
+      <p class="sb-hero-pos">Private, appointment-only grooming designed to feel relaxed and unrushed — a quiet space to look after yourself.</p>
+      <div class="sb-cta-row">
+        <a href="#" class="sb-cta"><i class="ti ti-calendar-heart"></i> Book Your Appointment</a>
+        <a href="tel:5038402389" class="sb-call"><i class="ti ti-phone"></i> (503) 840-2389</a>
+      </div>
+      <div class="sb-rating">
+        <span class="sb-stars"><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i></span>
+        <span><b>400+</b> five-star Google reviews</span>
+      </div>
+    </section>
+
+    <!-- services -->
+    <section class="sb-sec">
+      <p class="sb-eyebrow">The Menu</p>
+      <h2 class="sb-h2">Services & Pricing</h2>
+      <div class="sb-grid" style="margin-top:20px;">
+        <div class="sb-svc"><div class="sb-ico"><i class="ti ti-mood-kid"></i></div><div><div class="sb-svc-name">First Haircut</div><div class="sb-svc-price">$45</div></div></div>
+        <div class="sb-svc"><div class="sb-ico"><i class="ti ti-scissors"></i></div><div><div class="sb-svc-name">Classic Cut</div><div class="sb-svc-price">$40</div></div></div>
+        <div class="sb-svc"><div class="sb-ico"><i class="ti ti-cut"></i></div><div><div class="sb-svc-name">Skin Fades / Specialty</div><div class="sb-svc-price">$45</div></div></div>
+        <div class="sb-svc"><div class="sb-ico"><i class="ti ti-mustache"></i></div><div><div class="sb-svc-name">Haircut + Beard Trim</div><div class="sb-svc-price">$60</div></div></div>
+        <div class="sb-svc"><div class="sb-ico"><i class="ti ti-razor"></i></div><div><div class="sb-svc-name">Beard Trim</div><div class="sb-svc-price">$30</div></div></div>
+        <div class="sb-svc"><div class="sb-ico"><i class="ti ti-droplet"></i></div><div><div class="sb-svc-name">Hot Towel Facial</div><div class="sb-svc-price">$40</div></div></div>
+      </div>
+    </section>
+
+    <!-- announcements (key feature) -->
+    <section class="sb-sec sb-news">
+      <div class="sb-news-head">
+        <div>
+          <p class="sb-eyebrow">What's New</p>
+          <h2 class="sb-h2">Announcements</h2>
+        </div>
+        <p>Posted by Dan &amp; Heather</p>
+      </div>
+
+      <article class="sb-post">
+        <div class="sb-post-meta"><span class="sb-pill">Hours</span><span class="sb-date">June 16, 2026</span></div>
+        <h3>New summer hours are here</h3>
+        <p>Starting this week we're open a little later on weekdays so you can come in after work. Saturdays stay the same — and as always, we're closed Sundays for family time.</p>
+        <div class="sb-byline"><span class="sb-av">D</span> Dan &amp; Heather</div>
+      </article>
+
+      <article class="sb-post">
+        <div class="sb-post-meta"><span class="sb-pill">Tip</span><span class="sb-date">June 2, 2026</span></div>
+        <h3>Hot towel facials, now bundled</h3>
+        <p>Add a hot towel facial to any cut and finish feeling brand new. Just let us know when you book — it's our favorite way to wrap up a visit.</p>
+        <div class="sb-byline"><span class="sb-av">H</span> Dan &amp; Heather</div>
+      </article>
+
+      <article class="sb-post">
+        <div class="sb-post-meta"><span class="sb-pill">Thank You</span><span class="sb-date">May 20, 2026</span></div>
+        <h3>400 five-star reviews — thank you</h3>
+        <p>We're humbled to have crossed 400 all five-star reviews on Google. Every one comes from someone who let us be part of their week. Thank you for trusting us.</p>
+        <div class="sb-byline"><span class="sb-av">D</span> Dan &amp; Heather</div>
+      </article>
+    </section>
+
+    <!-- about -->
+    <section class="sb-sec">
+      <p class="sb-eyebrow">Our Story</p>
+      <h2 class="sb-h2" style="margin-bottom:20px;">Dan &amp; Heather</h2>
+      <div class="sb-about">
+        <div class="sb-about-img"><i class="ti ti-users"></i></div>
+        <div>
+          <p>We're a husband-and-wife team who believe a haircut should feel like a break, not a rush. We built Sanctuary to be exactly that — private, calm, and entirely about you.</p>
+          <p>One client at a time. No waiting room, no noise. Just good conversation, a great cut, and the time to enjoy it.</p>
+          <p class="sb-sig">— Dan &amp; Heather</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- reviews -->
+    <section class="sb-sec sb-rev">
+      <p class="sb-eyebrow">In Their Words</p>
+      <h2 class="sb-h2" style="margin-bottom:20px;">5-Star Reviews</h2>
+      <div class="sb-quote">
+        <div class="sb-stars"><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i></div>
+        <p>"Best barber experience I've ever had. Calm, private, and never rushed — I actually look forward to my appointments."</p>
+        <div class="sb-who">Marcus T.</div>
+      </div>
+      <div class="sb-quote">
+        <div class="sb-stars"><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i></div>
+        <p>"Dan and Heather are the kindest people. My son's first haircut here was perfect — they made it so easy."</p>
+        <div class="sb-who">Priya R.</div>
+      </div>
+      <div class="sb-quote">
+        <div class="sb-stars"><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i></div>
+        <p>"The hot towel facial is unreal. I leave feeling like a new person every single time."</p>
+        <div class="sb-who">Jordan W.</div>
+      </div>
+    </section>
+
+    <!-- visit -->
+    <section class="sb-sec">
+      <p class="sb-eyebrow">Come See Us</p>
+      <h2 class="sb-h2" style="margin-bottom:20px;">Visit</h2>
+      <div class="sb-visit-grid">
+        <div class="sb-info">
+          <p class="sb-lbl" style="margin-top:0;">Location</p>
+          <p>2077 NE Town Center Dr, Suite 120<br>Beaverton, OR 97006<br><span style="color:#9a8d7c;">Inside the Image Studios building</span></p>
+          <p class="sb-lbl">Phone</p>
+          <p><a href="tel:5038402389" style="color:#5f7355;font-weight:600;text-decoration:none;">(503) 840-2389</a></p>
+          <div class="sb-map"><i class="ti ti-map-pin"></i></div>
+        </div>
+        <div class="sb-info">
+          <p class="sb-lbl" style="margin-top:0;">Hours</p>
+          <table class="sb-hours">
+            <tr><td>Mon – Fri</td><td>9am – 6pm</td></tr>
+            <tr><td>Saturday</td><td>9am – 3pm</td></tr>
+            <tr class="closed"><td>Sunday</td><td>Closed</td></tr>
+          </table>
+          <a href="#" class="sb-cta" style="margin-top:18px;"><i class="ti ti-calendar-heart"></i> Book Your Appointment</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- footer -->
+    <footer class="sb-foot">
+      <div class="sb-mark" style="display:inline-block;">Sanctuary<small>Barber Co</small></div>
+      <p>2077 NE Town Center Dr, Suite 120, Beaverton, OR 97006</p>
+      <p>(503) 840-2389 · By appointment only</p>
+      <p style="margin-top:10px;color:#b0a596;">© 2026 Sanctuary Barber Co. · Look Good, Feel Good</p>
+    </footer>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  var x = document.getElementById('sbDismiss'), b = document.getElementById('sbBanner');
+  if(x && b){ x.addEventListener('click', function(){ b.style.display = 'none'; }); }
+})();
+</script>

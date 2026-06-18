@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sanctuary Barber Co — Private barbering in Beaverton, OR</title>
+  <meta name="description" content="Private, appointment-only grooming in Beaverton, Oregon. Husband-and-wife barbershop with 400+ five-star reviews. Look good, feel good." />
+  <meta property="og:title" content="Sanctuary Barber Co" />
+  <meta property="og:description" content="Private, appointment-only grooming designed to feel relaxed and unrushed. Beaverton, OR." />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Jost:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- announcement bar (editable in the admin) -->
+  <div class="bar" id="bar" hidden>
+    <div class="wrap">
+      <i class="ti ti-speakerphone" aria-hidden="true"></i>
+      <span id="bar-text"></span>
+      <a id="bar-link" href="#book"></a>
+      <button class="close" id="bar-close" aria-label="Dismiss announcement">&times;</button>
+    </div>
+  </div>
+
+  <header id="header">
+    <div class="wrap nav">
+      <a href="#top" class="brand">Sanctuary Barber Co</a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#services">Services</a>
+        <a href="#news">What's new</a>
+        <a href="#about">About</a>
+        <a href="#first-visit">First visit</a>
+        <a href="#visit">Visit</a>
+      </nav>
+      <a href="#book" class="btn btn-fill nav-cta">Book</a>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false"><i class="ti ti-menu-2"></i></button>
+    </div>
+    <div class="mobile-menu" id="mobile-menu">
+      <a href="#services">Services</a>
+      <a href="#news">What's new</a>
+      <a href="#about">About</a>
+      <a href="#reviews">Reviews</a>
+      <a href="#first-visit">First visit</a>
+      <a href="#visit">Visit</a>
+      <a href="#book" class="btn btn-fill">Book your appointment</a>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div class="reveal">
+          <span class="eyebrow">Beaverton, Oregon · By appointment only · No walk-ins</span>
+          <h1 class="hero-name">Sanctuary<br>Barber Co</h1>
+          <p class="hero-tag">Look good, feel good.</p>
+          <p class="hero-pos">Private, appointment-only grooming designed to feel relaxed and unrushed. Just you, the chair, and a clean finish.</p>
+          <div class="hero-cta">
+            <a href="#book" class="btn btn-fill">Book your appointment</a>
+            <a href="tel:15038402389" class="hero-phone"><i class="ti ti-phone" aria-hidden="true"></i> (503) 840-2389</a>
+          </div>
+          <div class="proof">
+            <span class="stars" aria-hidden="true"><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i></span>
+            <span><b>400+</b> all five-star Google reviews</span>
+          </div>
+        </div>
+        <div class="hero-photo reveal">
+          <div class="ph"><i class="ti ti-camera" aria-hidden="true"></i><small>Shop / chair photo</small></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SERVICES -->
+    <section id="services" class="sec">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <span class="eyebrow">The menu</span>
+          <h2>Build your visit</h2>
+          <p>Tap the services you'd like — we'll add up your visit and walk you straight into booking.</p>
+        </div>
+        <div class="menu reveal" id="menu">
+          <div class="svc" role="button" tabindex="0" aria-pressed="false" data-id="first" data-name="First haircut" data-price="45" data-dur="30">
+            <span class="pick" aria-hidden="true"><i class="ti ti-plus"></i><i class="ti ti-check"></i></span>
+            <span class="name">First haircut<small class="desc">A gentle, patient first cut for little ones</small></span><span class="dots"></span><span class="price">$45</span>
+          </div>
+          <div class="svc" role="button" tabindex="0" aria-pressed="false" data-id="classic" data-name="Classic cut" data-price="40" data-dur="30">
+            <span class="pick" aria-hidden="true"><i class="ti ti-plus"></i><i class="ti ti-check"></i></span>
+            <span class="name">Classic cut<small class="desc">Scissor or clipper, finished clean</small></span><span class="dots"></span><span class="price">$40</span>
+          </div>
+          <div class="svc" role="button" tabindex="0" aria-pressed="false" data-id="fade" data-name="Skin fade / specialty" data-price="45" data-dur="45">
+            <span class="pick" aria-hidden="true"><i class="ti ti-plus"></i><i class="ti ti-check"></i></span>
+            <span class="name">Skin fades / specialty cuts<small class="desc">Precise fades and detailed work</small></span><span class="dots"></span><span class="price">$45</span>
+          </div>
+          <div class="svc" role="button" tabindex="0" aria-pressed="false" data-id="cutbeard" data-name="Haircut + beard trim" data-price="60" data-dur="60">
+            <span class="pick" aria-hidden="true"><i class="ti ti-plus"></i><i class="ti ti-check"></i></span>
+            <span class="name">Haircut + beard trim<small class="desc">The full reset, head to chin</small></span><span class="dots"></span><span class="price">$60</span>
+          </div>
+          <div class="svc" role="button" tabindex="0" aria-pressed="false" data-id="beard" data-name="Beard trim" data-price="30" data-dur="20">
+            <span class="pick" aria-hidden="true"><i class="ti ti-plus"></i><i class="ti ti-check"></i></span>
+            <span class="name">Beard trim<small class="desc">Shape, line up, hot towel finish</small></span><span class="dots"></span><span class="price">$30</span>
+          </div>
+          <div class="svc" role="button" tabindex="0" aria-pressed="false" data-id="facial" data-name="Hot towel facial" data-price="40" data-dur="20">
+            <span class="pick" aria-hidden="true"><i class="ti ti-plus"></i><i class="ti ti-check"></i></span>
+            <span class="name">Hot towel facial<small class="desc">Twenty quiet minutes, warm towels</small></span><span class="dots"></span><span class="price">$40</span>
+          </div>
+        </div>
+        <div class="builder reveal" id="builder">
+          <div class="builder-info">
+            <div class="builder-label" id="builder-label">Tap the services you want — we'll build your visit.</div>
+            <div class="builder-chips" id="builder-chips"></div>
+          </div>
+          <a class="btn btn-invert" id="builder-book" href="#book">Book your appointment</a>
+        </div>
+        <p class="menu-note"><i class="ti ti-calendar-check" aria-hidden="true"></i> By appointment only — we don't take walk-ins. Times are approximate; we'll confirm when you book.</p>
+      </div>
+    </section>
+
+    <!-- ANNOUNCEMENTS -->
+    <section id="news" class="sec alt">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <span class="eyebrow">Straight from the chair</span>
+          <h2>What's new</h2>
+          <p>News &amp; announcements, posted by Dan &amp; Heather.</p>
+        </div>
+        <div class="ann-list reveal" id="ann-list"></div>
+      </div>
+    </section>
+
+    <!-- GALLERY -->
+    <section class="sec">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <span class="eyebrow">The work</span>
+          <h2>A look around</h2>
+        </div>
+        <div class="gallery reveal">
+          <div class="ph tall"><i class="ti ti-camera" aria-hidden="true"></i><small>Fades</small></div>
+          <div class="ph"><i class="ti ti-camera" aria-hidden="true"></i><small>Beard work</small></div>
+          <div class="ph"><i class="ti ti-camera" aria-hidden="true"></i><small>The space</small></div>
+          <div class="ph"><i class="ti ti-camera" aria-hidden="true"></i><small>Details</small></div>
+          <div class="ph tall"><i class="ti ti-camera" aria-hidden="true"></i><small>Hot towel</small></div>
+          <div class="ph"><i class="ti ti-camera" aria-hidden="true"></i><small>First cuts</small></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section id="about" class="sec alt">
+      <div class="wrap about">
+        <div class="ph reveal"><i class="ti ti-users" aria-hidden="true"></i><small>Dan &amp; Heather</small></div>
+        <div class="reveal">
+          <span class="eyebrow">The people</span>
+          <h2>Dan &amp; Heather</h2>
+          <p>We're a husband-and-wife team who built Sanctuary to be the kind of barbershop we always wished existed — private, unhurried, and genuinely warm.</p>
+          <p>No crowded waiting room, no rushing you out the door. Just one client at a time, a great cut, and a little breathing room in your day.</p>
+          <div class="sig">— Dan &amp; Heather</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- REVIEWS -->
+    <section id="reviews" class="sec">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <span class="eyebrow">400+ five-star reviews</span>
+          <h2>What clients say</h2>
+        </div>
+        <div class="reviews">
+          <div class="review reveal">
+            <div class="stars" aria-hidden="true"><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i></div>
+            <blockquote>"Best haircut I've had in years. The private setup means you actually relax. Dan takes his time and it shows."</blockquote>
+            <cite>Marcus T.</cite>
+          </div>
+          <div class="review reveal">
+            <div class="stars" aria-hidden="true"><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i></div>
+            <blockquote>"Brought my son for his first haircut and they made it so easy. Felt like family. We're clients for life."</blockquote>
+            <cite>Priya S.</cite>
+          </div>
+          <div class="review reveal">
+            <div class="stars" aria-hidden="true"><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i></div>
+            <blockquote>"Clean fade, hot towel, zero rush. Worth every minute of the drive across town."</blockquote>
+            <cite>Jordan R.</cite>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FIRST VISIT / FINDING US -->
+    <section id="first-visit" class="sec">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <span class="eyebrow">First time here?</span>
+          <h2>Finding the shop</h2>
+          <p>We're tucked inside the Image Studios building, the front door stays locked for privacy and safety, and we're appointment-only — no walk-ins. Here's exactly how it works.</p>
+        </div>
+        <div class="firstvisit">
+          <div class="arrive reveal">
+            <i class="ti ti-lock ai" aria-hidden="true"></i>
+            <div>
+              <h3>Check in, then sit tight</h3>
+              <p>The front door stays locked for privacy and safety. When you arrive, tap your check-in link and relax in your car — we'll text you the moment we're ready and come meet you at the front door. No need to knock or hunt for the suite.</p>
+            </div>
+          </div>
+          <div class="steps reveal">
+            <div class="step">
+              <div class="n">1</div>
+              <i class="ti ti-message-2 si" aria-hidden="true"></i>
+              <h4>15 minutes before</h4>
+              <p>We text you a check-in link ahead of your appointment.</p>
+            </div>
+            <div class="step">
+              <div class="n">2</div>
+              <i class="ti ti-circle-check si" aria-hidden="true"></i>
+              <h4>When you arrive</h4>
+              <p>Tap the link to check in, then wait comfortably in your car.</p>
+            </div>
+            <div class="step">
+              <div class="n">3</div>
+              <i class="ti ti-door si" aria-hidden="true"></i>
+              <h4>We'll come get you</h4>
+              <p>The moment we're ready, we text you and meet you at the front door.</p>
+            </div>
+          </div>
+          <div class="fv-where reveal">
+            <i class="ti ti-map-pin" aria-hidden="true"></i>
+            <span>2077 NE Town Center Dr, Suite 120 — inside Image Studios.</span>
+            <a href="https://www.google.com/maps/search/?api=1&query=2077+NE+Town+Center+Dr+Suite+120+Beaverton+OR+97006" target="_blank" rel="noopener">Get directions</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISIT -->
+    <section id="visit" class="sec alt">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <span class="eyebrow">Find us</span>
+          <h2 id="book">Visit the shop</h2>
+          <p>Inside the Image Studios building. Booking is online and quick.</p>
+        </div>
+        <div class="visit reveal">
+          <div>
+            <div class="info-line"><i class="ti ti-map-pin" aria-hidden="true"></i><span>2077 NE Town Center Dr, Suite 120<br>Beaverton, OR 97006<br><span style="color:var(--faint)">Inside the Image Studios building</span></span></div>
+            <div class="info-line"><i class="ti ti-phone" aria-hidden="true"></i><a href="tel:15038402389">(503) 840-2389</a></div>
+            <div class="info-line"><i class="ti ti-calendar-check" aria-hidden="true"></i><span>By appointment only</span></div>
+            <a href="https://book.example.com" class="btn btn-fill" style="margin-top:8px">Book your appointment</a>
+          </div>
+          <div>
+            <table class="hours">
+              <tr><td>Monday – Friday</td><td>9am – 6pm</td></tr>
+              <tr><td>Saturday</td><td>9am – 3pm</td></tr>
+              <tr><td>Sunday</td><td>Closed</td></tr>
+            </table>
+            <div class="map">
+              <iframe title="Map to Sanctuary Barber Co" loading="lazy" src="https://www.google.com/maps?q=2077+NE+Town+Center+Dr+Suite+120+Beaverton+OR+97006&output=embed"></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot">
+      <div>
+        <h4>Sanctuary Barber Co</h4>
+        <p>Private, appointment-only grooming in Beaverton, Oregon.</p>
+        <p style="color:var(--faint)">Look good, feel good.</p>
+      </div>
+      <div>
+        <div class="ft-label">Visit</div>
+        <p>2077 NE Town Center Dr, Suite 120</p>
+        <p>Beaverton, OR 97006</p>
+        <a href="tel:15038402389">(503) 840-2389</a>
+      </div>
+      <div>
+        <div class="ft-label">Hours</div>
+        <p>Mon – Fri · 9am – 6pm</p>
+        <p>Saturday · 9am – 3pm</p>
+        <p style="color:var(--faint)">Sunday · Closed</p>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      © 2026 Sanctuary Barber Co · <a href="admin.html">Manage announcements</a>
+    </div>
+  </footer>
+
+  <div class="book-bar"><a href="#book" class="btn">Book your appointment</a></div>
+
+  <script src="data.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

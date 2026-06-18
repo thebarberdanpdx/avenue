@@ -1,0 +1,284 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+.lx-wrap { padding: 16px; font-family: 'Helvetica Neue', Arial, sans-serif; box-sizing: border-box; }
+.lx-wrap *, .lx-wrap *::before, .lx-wrap *::after { box-sizing: border-box; }
+
+/* Browser chrome */
+.lx-chrome { background:#161412; border:1px solid #2a2724; border-bottom:none; border-radius:12px 12px 0 0; padding:11px 14px; display:flex; align-items:center; gap:10px; }
+.lx-dots { display:flex; gap:7px; }
+.lx-dot { width:11px; height:11px; border-radius:50%; background:#34302b; }
+.lx-addr { flex:1; background:#0e0d0b; border:1px solid #2a2724; border-radius:7px; padding:6px 12px; font-size:12px; color:#8c857c; text-align:center; letter-spacing:.3px; }
+
+/* The dark site */
+.lx-site { background:#0c0b09; border:1px solid #2a2724; border-radius:0 0 12px 12px; overflow:hidden; color:#cfc8be; }
+
+/* Announcement banner */
+.lx-ann { background:#171411; border-bottom:1px solid #2a2724; padding:11px 18px; display:flex; align-items:center; gap:10px; }
+.lx-ann i { color:#c9a96a; font-size:15px; }
+.lx-ann span { flex:1; font-size:12.5px; color:#d8d1c6; letter-spacing:.2px; }
+.lx-ann b { color:#c9a96a; font-weight:600; }
+.lx-ann button { background:none; border:none; color:#6f685f; cursor:pointer; font-size:16px; line-height:1; padding:2px; }
+.lx-ann button:hover { color:#cfc8be; }
+
+/* Nav */
+.lx-nav { display:flex; align-items:center; padding:16px 22px; border-bottom:1px solid #1c1a17; }
+.lx-mark { font-family:'Cormorant Garamond',serif; font-size:19px; color:#f0ead f; letter-spacing:1.5px; font-weight:600; }
+.lx-mark { color:#efe9df; }
+.lx-mark small { display:block; font-family:'Helvetica Neue',sans-serif; font-size:9.5px; letter-spacing:3px; color:#8c857c; margin-top:1px; font-weight:400; }
+.lx-links { margin-left:auto; display:flex; gap:22px; align-items:center; }
+.lx-links a { color:#a39c92; text-decoration:none; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
+.lx-links a:hover { color:#efe9df; }
+.lx-book { border:1px solid #c9a96a; color:#c9a96a !important; padding:8px 16px; border-radius:2px; font-size:11px !important; }
+.lx-book:hover { background:#c9a96a; color:#0c0b09 !important; }
+
+/* Hero */
+.lx-hero { padding:58px 28px 54px; text-align:center; border-bottom:1px solid #1c1a17; }
+.lx-eyebrow { font-size:10px; letter-spacing:4px; text-transform:uppercase; color:#c9a96a; margin-bottom:20px; }
+.lx-hero h1 { font-family:'Cormorant Garamond',serif; font-weight:500; font-size:52px; line-height:1.04; color:#efe9df; margin:0 0 14px; letter-spacing:1px; }
+.lx-tag { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:22px; color:#c9a96a; margin:0 0 18px; }
+.lx-pos { font-size:13.5px; line-height:1.7; color:#a39c92; max-width:430px; margin:0 auto 30px; }
+.lx-cta-row { display:flex; gap:14px; justify-content:center; align-items:center; flex-wrap:wrap; }
+.lx-btn { background:#c9a96a; color:#0c0b09; text-decoration:none; padding:13px 26px; border-radius:2px; font-size:12px; letter-spacing:1.5px; text-transform:uppercase; font-weight:600; }
+.lx-btn:hover { background:#d8bd84; }
+.lx-phone { color:#cfc8be; text-decoration:none; font-size:12px; letter-spacing:1px; display:flex; align-items:center; gap:7px; }
+.lx-phone i { color:#c9a96a; }
+.lx-phone:hover { color:#fff; }
+.lx-rating { margin-top:34px; display:flex; flex-direction:column; align-items:center; gap:7px; }
+.lx-stars { color:#c9a96a; font-size:14px; letter-spacing:3px; }
+.lx-rating small { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#8c857c; }
+
+/* Section frame */
+.lx-sec { padding:52px 28px; border-bottom:1px solid #1c1a17; }
+.lx-sechead { text-align:center; margin-bottom:36px; }
+.lx-sechead .e { font-size:10px; letter-spacing:4px; text-transform:uppercase; color:#c9a96a; }
+.lx-sechead h2 { font-family:'Cormorant Garamond',serif; font-weight:500; font-size:34px; color:#efe9df; margin:10px 0 0; letter-spacing:.5px; }
+
+/* Services */
+.lx-svc { display:grid; gap:0; }
+.lx-svc-row { display:flex; align-items:baseline; padding:15px 4px; border-bottom:1px solid #1c1a17; gap:12px; }
+.lx-svc-row:last-child { border-bottom:none; }
+.lx-svc-row i { color:#8c857c; font-size:17px; width:22px; flex:0 0 auto; }
+.lx-svc-name { font-family:'Cormorant Garamond',serif; font-size:19px; color:#e8e2d8; }
+.lx-svc-dots { flex:1; border-bottom:1px dotted #34302b; margin:0 4px 5px; }
+.lx-svc-price { color:#c9a96a; font-size:15px; letter-spacing:.5px; }
+
+/* Announcements — the feature */
+.lx-feat { background:#0f0d0b; }
+.lx-feat .lx-sechead h2 { color:#efe9df; }
+.lx-posts { display:grid; gap:16px; }
+.lx-post { background:#141210; border:1px solid #2a2724; border-radius:6px; padding:22px 22px; }
+.lx-post-top { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.lx-pin { width:30px; height:30px; border-radius:50%; border:1px solid #c9a96a; display:flex; align-items:center; justify-content:center; color:#c9a96a; font-size:15px; flex:0 0 auto; }
+.lx-post-date { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:#8c857c; }
+.lx-post-by { font-size:11px; color:#a39c92; margin-top:1px; }
+.lx-post-by b { color:#c9a96a; font-weight:500; }
+.lx-post h3 { font-family:'Cormorant Garamond',serif; font-weight:500; font-size:21px; color:#efe9df; margin:0 0 8px; }
+.lx-post p { font-size:13px; line-height:1.65; color:#a39c92; margin:0; }
+
+/* About */
+.lx-about { display:flex; gap:24px; align-items:center; }
+.lx-portrait { width:130px; height:160px; flex:0 0 auto; background:#161412; border:1px solid #2a2724; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#34302b; font-size:46px; }
+.lx-about-body h2 { font-family:'Cormorant Garamond',serif; font-weight:500; font-size:30px; color:#efe9df; margin:0 0 12px; }
+.lx-about-body .e { font-size:10px; letter-spacing:4px; text-transform:uppercase; color:#c9a96a; }
+.lx-about-body p { font-size:13px; line-height:1.7; color:#a39c92; margin:6px 0 0; }
+
+/* Reviews */
+.lx-rev { display:grid; gap:16px; }
+.lx-quote { border-left:1px solid #c9a96a; padding:4px 0 4px 18px; }
+.lx-quote .s { color:#c9a96a; font-size:11px; letter-spacing:3px; margin-bottom:8px; }
+.lx-quote p { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:17px; line-height:1.5; color:#d8d1c6; margin:0 0 8px; }
+.lx-quote span { font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#8c857c; }
+
+/* Visit */
+.lx-visit { display:grid; grid-template-columns:1fr 1fr; gap:26px; }
+.lx-visit h4 { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:#c9a96a; margin:0 0 12px; }
+.lx-visit p { font-size:13px; line-height:1.7; color:#cfc8be; margin:0 0 16px; }
+.lx-hours { width:100%; font-size:12.5px; }
+.lx-hours tr td { padding:6px 0; border-bottom:1px solid #1c1a17; color:#a39c92; }
+.lx-hours tr td:last-child { text-align:right; color:#cfc8be; }
+.lx-hours tr:last-child td { border-bottom:none; }
+.lx-map { grid-column:1 / -1; height:130px; background:#141210; border:1px solid #2a2724; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#34302b; font-size:30px; gap:10px; }
+.lx-map span { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#6f685f; }
+.lx-visit .lx-phone { justify-content:flex-start; }
+
+/* Footer */
+.lx-foot { padding:34px 28px; text-align:center; }
+.lx-foot .m { font-family:'Cormorant Garamond',serif; font-size:18px; letter-spacing:2px; color:#efe9df; margin-bottom:8px; }
+.lx-foot p { font-size:11px; letter-spacing:1px; color:#6f685f; margin:4px 0; }
+</style>
+
+<div class="lx-wrap">
+  <div class="lx-chrome">
+    <div class="lx-dots"><span class="lx-dot"></span><span class="lx-dot"></span><span class="lx-dot"></span></div>
+    <div class="lx-addr">sanctuarybarberco.com</div>
+  </div>
+
+  <div class="lx-site">
+
+    <!-- Announcement banner -->
+    <div class="lx-ann" id="lxAnn">
+      <i class="ti ti-bell"></i>
+      <span><b>Now booking summer appointments</b> — limited slots remaining through August.</span>
+      <button onclick="this.parentNode.style.display='none'" aria-label="Dismiss">&times;</button>
+    </div>
+
+    <!-- Nav -->
+    <div class="lx-nav">
+      <div class="lx-mark">SANCTUARY<small>BARBER CO</small></div>
+      <div class="lx-links">
+        <a href="#">Services</a>
+        <a href="#">About</a>
+        <a href="#">Reviews</a>
+        <a href="#">Visit</a>
+        <a href="#" class="lx-book">Book</a>
+      </div>
+    </div>
+
+    <!-- Hero -->
+    <div class="lx-hero">
+      <div class="lx-eyebrow">Beaverton, Oregon · By Appointment</div>
+      <h1>Sanctuary<br>Barber Co</h1>
+      <p class="lx-tag">Look Good, Feel Good</p>
+      <p class="lx-pos">Private, appointment-only grooming designed to feel relaxed and unrushed. A quiet space to look like yourself — only sharper.</p>
+      <div class="lx-cta-row">
+        <a href="#" class="lx-btn">Book Your Appointment</a>
+        <a href="tel:5038402389" class="lx-phone"><i class="ti ti-phone"></i> (503) 840-2389</a>
+      </div>
+      <div class="lx-rating">
+        <div class="lx-stars">★ ★ ★ ★ ★</div>
+        <small>400+ Five-Star Google Reviews</small>
+      </div>
+    </div>
+
+    <!-- Services -->
+    <div class="lx-sec">
+      <div class="lx-sechead">
+        <div class="e">The Menu</div>
+        <h2>Services &amp; Pricing</h2>
+      </div>
+      <div class="lx-svc">
+        <div class="lx-svc-row"><i class="ti ti-mood-kid"></i><span class="lx-svc-name">First Haircut</span><span class="lx-svc-dots"></span><span class="lx-svc-price">$45</span></div>
+        <div class="lx-svc-row"><i class="ti ti-scissors"></i><span class="lx-svc-name">Classic Cut</span><span class="lx-svc-dots"></span><span class="lx-svc-price">$40</span></div>
+        <div class="lx-svc-row"><i class="ti ti-razor"></i><span class="lx-svc-name">Skin Fades / Specialty Cuts</span><span class="lx-svc-dots"></span><span class="lx-svc-price">$45</span></div>
+        <div class="lx-svc-row"><i class="ti ti-beach"></i><span class="lx-svc-name">Haircut + Beard Trim</span><span class="lx-svc-dots"></span><span class="lx-svc-price">$60</span></div>
+        <div class="lx-svc-row"><i class="ti ti-mustache"></i><span class="lx-svc-name">Beard Trim</span><span class="lx-svc-dots"></span><span class="lx-svc-price">$30</span></div>
+        <div class="lx-svc-row"><i class="ti ti-droplet"></i><span class="lx-svc-name">Hot Towel Facial</span><span class="lx-svc-dots"></span><span class="lx-svc-price">$40</span></div>
+      </div>
+    </div>
+
+    <!-- Announcements / What's new -->
+    <div class="lx-sec lx-feat">
+      <div class="lx-sechead">
+        <div class="e">From the Chair</div>
+        <h2>What's New</h2>
+      </div>
+      <div class="lx-posts">
+        <div class="lx-post">
+          <div class="lx-post-top">
+            <div class="lx-pin"><i class="ti ti-pin"></i></div>
+            <div>
+              <div class="lx-post-date">June 14, 2026</div>
+              <div class="lx-post-by">Posted by <b>Dan &amp; Heather</b></div>
+            </div>
+          </div>
+          <h3>Summer hours are live</h3>
+          <p>We've opened the full summer calendar. Saturdays fill quickly, so if you're a regular weekend client we'd recommend booking your next two visits now to hold your spot.</p>
+        </div>
+        <div class="lx-post">
+          <div class="lx-post-top">
+            <div class="lx-pin"><i class="ti ti-gift"></i></div>
+            <div>
+              <div class="lx-post-date">June 2, 2026</div>
+              <div class="lx-post-by">Posted by <b>Dan &amp; Heather</b></div>
+            </div>
+          </div>
+          <h3>Father's Day gift cards</h3>
+          <p>Looking for the perfect gift? Gift cards for any service are available — just text us and we'll have one ready before your visit. The Hot Towel Facial is a favorite.</p>
+        </div>
+        <div class="lx-post">
+          <div class="lx-post-top">
+            <div class="lx-pin"><i class="ti ti-leaf"></i></div>
+            <div>
+              <div class="lx-post-date">May 20, 2026</div>
+              <div class="lx-post-by">Posted by <b>Dan &amp; Heather</b></div>
+            </div>
+          </div>
+          <h3>A small refresh to the studio</h3>
+          <p>We've added new seating and a quieter waiting nook to keep your visit as calm and unrushed as ever. Thank you for trusting us with your time — it means everything.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- About -->
+    <div class="lx-sec">
+      <div class="lx-about">
+        <div class="lx-portrait"><i class="ti ti-users"></i></div>
+        <div class="lx-about-body">
+          <div class="e">Our Story</div>
+          <h2>Dan &amp; Heather</h2>
+          <p>We're a husband-and-wife team who built Sanctuary around a simple idea: grooming should feel like a moment to yourself, not a transaction. By appointment only, one guest at a time, no waiting room rush — just a sharp cut and good conversation.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reviews -->
+    <div class="lx-sec">
+      <div class="lx-sechead">
+        <div class="e">Kind Words</div>
+        <h2>What Clients Say</h2>
+      </div>
+      <div class="lx-rev">
+        <div class="lx-quote">
+          <div class="s">★ ★ ★ ★ ★</div>
+          <p>"Hands down the most relaxing haircut I've ever had. Private, calm, and the cut was perfect."</p>
+          <span>— Marcus T.</span>
+        </div>
+        <div class="lx-quote">
+          <div class="s">★ ★ ★ ★ ★</div>
+          <p>"Dan and Heather treat you like family. You never feel rushed and you always leave looking great."</p>
+          <span>— Priya R.</span>
+        </div>
+        <div class="lx-quote">
+          <div class="s">★ ★ ★ ★ ★</div>
+          <p>"Booked my son's first haircut here — patient, gentle, and a keepsake we'll never forget."</p>
+          <span>— Jordan W.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visit -->
+    <div class="lx-sec">
+      <div class="lx-sechead">
+        <div class="e">Find Us</div>
+        <h2>Visit Sanctuary</h2>
+      </div>
+      <div class="lx-visit">
+        <div>
+          <h4>Location</h4>
+          <p>2077 NE Town Center Dr<br>Suite 120<br>Beaverton, OR 97006<br><span style="color:#8c857c;font-size:12px;">Inside the Image Studios building</span></p>
+          <h4>Get in Touch</h4>
+          <a href="tel:5038402389" class="lx-phone"><i class="ti ti-phone"></i> (503) 840-2389</a>
+        </div>
+        <div>
+          <h4>Hours</h4>
+          <table class="lx-hours">
+            <tr><td>Monday – Friday</td><td>9am – 6pm</td></tr>
+            <tr><td>Saturday</td><td>9am – 3pm</td></tr>
+            <tr><td>Sunday</td><td>Closed</td></tr>
+          </table>
+        </div>
+        <div class="lx-map"><i class="ti ti-map-pin"></i><span>View on Map</span></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="lx-foot">
+      <div class="m">SANCTUARY BARBER CO</div>
+      <p>2077 NE Town Center Dr, Suite 120 · Beaverton, OR 97006</p>
+      <p>Look Good, Feel Good · By Appointment Only</p>
+      <p style="margin-top:12px;">© 2026 Sanctuary Barber Co</p>
+    </div>
+
+  </div>
+</div>

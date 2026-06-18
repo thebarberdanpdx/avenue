@@ -1,0 +1,264 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Jost:wght@400;500;600&display=swap');
+
+.st-wrap { padding: 16px; font-family: 'Jost', system-ui, sans-serif; box-sizing: border-box; }
+.st-wrap *, .st-wrap *::before, .st-wrap *::after { box-sizing: border-box; }
+
+.st-frame { border-radius: 12px; overflow: hidden; border: 1px solid #DCDCDC; box-shadow: 0 1px 0 #F2F2F2; }
+.st-chrome { background: #F7F7F7; border-bottom: 1px solid #ECECEC; display: flex; align-items: center; gap: 8px; padding: 9px 12px; }
+.st-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.st-addr { flex: 1; background: #FFFFFF; border: 1px solid #ECECEC; border-radius: 6px; text-align: center; font-size: 12px; color: #6B6B6B; padding: 4px 10px; letter-spacing: .2px; }
+
+.st-page { background: #FFFFFF; color: #0A0A0A; }
+.st-disp { font-family: 'Fraunces', Georgia, serif; }
+
+.st-banner { background: #0A0A0A; color: #FFFFFF; display: flex; align-items: center; gap: 10px; padding: 9px 16px; font-size: 12.5px; letter-spacing: .3px; }
+.st-banner i { font-size: 15px; flex-shrink: 0; }
+.st-banner b { font-weight: 600; }
+.st-banner .x { margin-left: auto; cursor: pointer; opacity: .7; font-size: 15px; line-height: 1; flex-shrink: 0; }
+.st-banner .x:hover { opacity: 1; }
+
+.st-nav { display: flex; align-items: center; padding: 14px 22px; border-bottom: 1px solid #ECECEC; }
+.st-mark { font-family: 'Fraunces', serif; font-weight: 600; font-size: 19px; letter-spacing: -.2px; }
+.st-links { display: flex; gap: 20px; margin-left: auto; margin-right: 20px; font-size: 12px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; }
+.st-links a { color: #2E2E2E; text-decoration: none; }
+.st-links a:hover { color: #0A0A0A; }
+.btn { font-size: 12px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; border-radius: 7px; padding: 9px 18px; text-decoration: none; display: inline-block; cursor: pointer; }
+.btn-fill { background: #0A0A0A; color: #FFFFFF; border: 1px solid #0A0A0A; }
+.btn-fill:hover { background: #2E2E2E; }
+.btn-line { background: #FFFFFF; color: #0A0A0A; border: 1px solid #DCDCDC; }
+.btn-line:hover { border-color: #0A0A0A; }
+
+.st-hero { padding: 56px 28px 50px; text-align: center; border-bottom: 1px solid #ECECEC; }
+.st-kicker { font-size: 11px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; color: #6B6B6B; margin-bottom: 18px; }
+.st-name { font-family: 'Fraunces', serif; font-size: 52px; font-weight: 500; line-height: .98; letter-spacing: -1px; margin: 0; }
+.st-tag { font-family: 'Fraunces', serif; font-size: 20px; font-style: italic; color: #2E2E2E; margin: 14px 0 0; }
+.st-pos { font-size: 14px; color: #6B6B6B; max-width: 430px; margin: 16px auto 0; line-height: 1.6; }
+.st-cta { display: flex; gap: 14px; justify-content: center; align-items: center; margin-top: 26px; flex-wrap: wrap; }
+.st-phone { font-size: 13px; font-weight: 500; letter-spacing: .5px; color: #0A0A0A; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.st-phone:hover { color: #6B6B6B; }
+.st-stars { margin-top: 26px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #6B6B6B; }
+.st-stars i { color: #0A0A0A; font-size: 14px; }
+.st-stars b { color: #0A0A0A; font-weight: 600; }
+
+.st-sec { padding: 44px 28px; border-bottom: 1px solid #ECECEC; }
+.st-head { text-align: center; margin-bottom: 28px; }
+.st-eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; color: #6B6B6B; }
+.st-title { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 500; letter-spacing: -.4px; margin: 8px 0 0; }
+
+.st-svc { border-top: 1px solid #ECECEC; }
+.st-row { display: flex; align-items: baseline; padding: 15px 4px; border-bottom: 1px solid #ECECEC; }
+.st-svc-name { font-size: 16px; font-weight: 500; }
+.st-svc-dots { flex: 1; border-bottom: 1px dotted #CFCFCF; margin: 0 12px; transform: translateY(-3px); }
+.st-svc-price { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 600; }
+
+.st-ann { background: #FAFAFA; }
+.st-ann-sub { text-align: center; font-size: 12px; color: #6B6B6B; margin: -18px 0 26px; }
+.st-pinned { background: #0A0A0A; color: #FFFFFF; border-radius: 10px; padding: 22px 22px; margin-bottom: 14px; }
+.st-pinned .meta { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+.st-pinned .pill { background: #FFFFFF; color: #0A0A0A; font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; padding: 3px 9px; border-radius: 5px; }
+.st-pinned .date { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #AEAEAE; }
+.st-pinned h3 { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 500; margin: 0 0 7px; }
+.st-pinned p { font-size: 13.5px; line-height: 1.6; color: #DCDCDC; margin: 0 0 12px; }
+.st-byline { display: flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: .3px; }
+.st-byline .av { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Fraunces', serif; font-size: 12px; }
+.st-pinned .av { background: #FFFFFF; color: #0A0A0A; }
+
+.st-post { background: #FFFFFF; border: 1px solid #ECECEC; border-radius: 10px; padding: 18px 20px; margin-bottom: 12px; }
+.st-post:last-child { margin-bottom: 0; }
+.st-post .meta { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+.st-post .pill { background: #0A0A0A; color: #FFFFFF; font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; padding: 3px 9px; border-radius: 5px; }
+.st-post .date { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #AEAEAE; }
+.st-post h3 { font-family: 'Fraunces', serif; font-size: 19px; font-weight: 500; margin: 0 0 6px; }
+.st-post p { font-size: 13.5px; line-height: 1.6; color: #6B6B6B; margin: 0 0 12px; }
+.st-post .av { background: #0A0A0A; color: #FFFFFF; }
+.st-post .st-byline { color: #2E2E2E; }
+
+.st-about { text-align: center; }
+.st-about p { font-size: 14px; color: #2E2E2E; line-height: 1.7; max-width: 470px; margin: 0 auto; }
+.st-sig { font-family: 'Fraunces', serif; font-style: italic; font-size: 22px; margin-top: 20px; }
+
+.st-revs { display: flex; flex-direction: column; gap: 14px; }
+.st-rev { border: 1px solid #ECECEC; border-radius: 10px; padding: 18px 20px; }
+.st-rev-stars i { color: #0A0A0A; font-size: 13px; }
+.st-rev p { font-family: 'Fraunces', serif; font-size: 17px; font-style: italic; line-height: 1.5; margin: 10px 0; color: #0A0A0A; }
+.st-rev cite { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; font-style: normal; color: #6B6B6B; font-weight: 500; }
+
+.st-visit { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.st-info-line { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: #2E2E2E; margin-bottom: 14px; line-height: 1.5; }
+.st-info-line i { color: #0A0A0A; font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.st-hours { font-size: 13px; width: 100%; border-collapse: collapse; }
+.st-hours td { padding: 6px 0; border-bottom: 1px solid #ECECEC; color: #2E2E2E; }
+.st-hours td:last-child { text-align: right; font-weight: 500; }
+.st-hours tr:last-child td { border-bottom: 0; color: #AEAEAE; }
+.st-map { background: #F7F7F7; border: 1px solid #ECECEC; border-radius: 10px; height: 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #AEAEAE; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; margin-top: 16px; }
+.st-map i { font-size: 26px; color: #CFCFCF; }
+
+.st-foot { background: #0A0A0A; color: #AEAEAE; padding: 28px; text-align: center; }
+.st-foot-mark { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 500; color: #FFFFFF; letter-spacing: .3px; }
+.st-foot p { font-size: 11.5px; line-height: 1.7; margin: 10px 0 0; letter-spacing: .3px; }
+</style>
+
+<div class="st-wrap">
+  <div class="st-frame">
+    <div class="st-chrome">
+      <span class="st-dot" style="background:#E0E0E0"></span>
+      <span class="st-dot" style="background:#E0E0E0"></span>
+      <span class="st-dot" style="background:#E0E0E0"></span>
+      <div class="st-addr">sanctuarybarberco.com</div>
+    </div>
+
+    <div class="st-page">
+
+      <div class="st-banner" id="stBanner">
+        <i class="ti ti-speakerphone"></i>
+        <span><b>Holiday hours:</b> closed July 4th — book early, slots are filling fast.</span>
+        <span class="x" id="stBannerX"><i class="ti ti-x"></i></span>
+      </div>
+
+      <div class="st-nav">
+        <div class="st-mark">Sanctuary Barber Co</div>
+        <div class="st-links">
+          <a href="#">Services</a>
+          <a href="#">About</a>
+          <a href="#">Reviews</a>
+          <a href="#">Visit</a>
+        </div>
+        <a href="#" class="btn btn-fill">Book</a>
+      </div>
+
+      <div class="st-hero">
+        <div class="st-kicker">Beaverton, Oregon · By appointment</div>
+        <h1 class="st-name">Sanctuary Barber Co</h1>
+        <div class="st-tag">Look good, feel good</div>
+        <p class="st-pos">Private, appointment-only grooming designed to feel relaxed and unrushed. Just you, the chair, and a clean finish.</p>
+        <div class="st-cta">
+          <a href="#" class="btn btn-fill" style="padding:12px 24px;">Book your appointment</a>
+          <a href="tel:15038402389" class="st-phone"><i class="ti ti-phone"></i> (503) 840-2389</a>
+        </div>
+        <div class="st-stars">
+          <i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i>
+          &nbsp; <b>400+</b> all five-star Google reviews
+        </div>
+      </div>
+
+      <div class="st-sec">
+        <div class="st-head">
+          <div class="st-eyebrow">The menu</div>
+          <h2 class="st-title">Services &amp; pricing</h2>
+        </div>
+        <div class="st-svc">
+          <div class="st-row"><span class="st-svc-name">First haircut</span><span class="st-svc-dots"></span><span class="st-svc-price">$45</span></div>
+          <div class="st-row"><span class="st-svc-name">Classic cut</span><span class="st-svc-dots"></span><span class="st-svc-price">$40</span></div>
+          <div class="st-row"><span class="st-svc-name">Skin fades / specialty cuts</span><span class="st-svc-dots"></span><span class="st-svc-price">$45</span></div>
+          <div class="st-row"><span class="st-svc-name">Haircut + beard trim</span><span class="st-svc-dots"></span><span class="st-svc-price">$60</span></div>
+          <div class="st-row"><span class="st-svc-name">Beard trim</span><span class="st-svc-dots"></span><span class="st-svc-price">$30</span></div>
+          <div class="st-row"><span class="st-svc-name">Hot towel facial</span><span class="st-svc-dots"></span><span class="st-svc-price">$40</span></div>
+        </div>
+      </div>
+
+      <div class="st-sec st-ann">
+        <div class="st-head">
+          <div class="st-eyebrow">Straight from the chair</div>
+          <h2 class="st-title">What's new</h2>
+        </div>
+        <p class="st-ann-sub">News &amp; announcements, posted by Dan &amp; Heather</p>
+
+        <div class="st-pinned">
+          <div class="meta"><span class="pill">News</span> <span class="date">June 16, 2026</span></div>
+          <h3>Summer Saturdays are back</h3>
+          <p>We've opened more Saturday morning slots through August. They go quick — if you've got a wedding or trip coming up, grab your spot now.</p>
+          <div class="st-byline"><span class="av">D</span> Posted by Dan &amp; Heather</div>
+        </div>
+
+        <div class="st-post">
+          <div class="meta"><span class="pill">Update</span> <span class="date">June 2, 2026</span></div>
+          <h3>New hot towel facial add-on</h3>
+          <p>By popular request, our hot towel facial is now available as a stand-alone visit. Twenty quiet minutes, warm towels, and you walk out brand new.</p>
+          <div class="st-byline"><span class="av">H</span> Posted by Dan &amp; Heather</div>
+        </div>
+
+        <div class="st-post">
+          <div class="meta"><span class="pill">Thank you</span> <span class="date">May 20, 2026</span></div>
+          <h3>400 five-star reviews — thank you</h3>
+          <p>We just crossed 400 all five-star Google reviews. Every one means the world to a small husband-and-wife shop. Thank you.</p>
+          <div class="st-byline"><span class="av">D</span> Posted by Dan &amp; Heather</div>
+        </div>
+      </div>
+
+      <div class="st-sec st-about">
+        <div class="st-head">
+          <div class="st-eyebrow">The people</div>
+          <h2 class="st-title">Dan &amp; Heather</h2>
+        </div>
+        <p>We're a husband-and-wife team who built Sanctuary to be the kind of barbershop we always wished existed — private, unhurried, and genuinely warm. No crowded waiting room, no rushing you out the door. Just one client at a time, a great cut, and a little breathing room in your day.</p>
+        <div class="st-sig">— Dan &amp; Heather</div>
+      </div>
+
+      <div class="st-sec">
+        <div class="st-head">
+          <div class="st-eyebrow">400+ five-star reviews</div>
+          <h2 class="st-title">What clients say</h2>
+        </div>
+        <div class="st-revs">
+          <div class="st-rev">
+            <div class="st-rev-stars"><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i></div>
+            <p>“Best haircut I've had in years. The private setup means you actually relax. Dan takes his time and it shows.”</p>
+            <cite>Marcus T.</cite>
+          </div>
+          <div class="st-rev">
+            <div class="st-rev-stars"><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i></div>
+            <p>“Brought my son for his first haircut and they made it so easy. Felt like family. We're clients for life.”</p>
+            <cite>Priya S.</cite>
+          </div>
+          <div class="st-rev">
+            <div class="st-rev-stars"><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i><i class="ti ti-star"></i></div>
+            <p>“Clean fade, hot towel, zero rush. Worth every minute of the drive across town.”</p>
+            <cite>Jordan R.</cite>
+          </div>
+        </div>
+      </div>
+
+      <div class="st-sec">
+        <div class="st-head">
+          <div class="st-eyebrow">Find us</div>
+          <h2 class="st-title">Visit the shop</h2>
+        </div>
+        <div class="st-visit">
+          <div>
+            <div class="st-info-line"><i class="ti ti-map-pin"></i><span>2077 NE Town Center Dr, Suite 120<br>Beaverton, OR 97006<br><span style="color:#AEAEAE">Inside the Image Studios building</span></span></div>
+            <div class="st-info-line"><i class="ti ti-phone"></i><a href="tel:15038402389" class="st-phone">(503) 840-2389</a></div>
+            <a href="#" class="btn btn-fill" style="margin-top:4px;">Book your appointment</a>
+          </div>
+          <div>
+            <table class="st-hours">
+              <tr><td>Mon – Fri</td><td>9am – 6pm</td></tr>
+              <tr><td>Saturday</td><td>9am – 3pm</td></tr>
+              <tr><td>Sunday</td><td>Closed</td></tr>
+            </table>
+            <div class="st-map">
+              <i class="ti ti-map-2"></i>
+              <span>Beaverton Town Center</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="st-foot">
+        <div class="st-foot-mark">Sanctuary Barber Co</div>
+        <p>2077 NE Town Center Dr, Suite 120, Beaverton, OR 97006 · (503) 840-2389<br>Look good, feel good · By appointment only · © 2026 Sanctuary Barber Co</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var x = document.getElementById('stBannerX');
+  if (x) x.addEventListener('click', function(){
+    var b = document.getElementById('stBanner');
+    if (b) b.style.display = 'none';
+  });
+})();
+</script>
