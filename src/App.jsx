@@ -18386,7 +18386,7 @@ function _accParse(s){ if(!s) return null; s=s.trim(); if(s[0]!=="#") return nul
 function _accLum(c){ const f=(x)=>{ x/=255; return x<=0.03928?x/12.92:Math.pow((x+0.055)/1.055,2.4); }; return 0.2126*f(c.r)+0.7152*f(c.g)+0.0722*f(c.b); }
 function accentOnDark(str, min){ let c=_accParse(str); if(!c) return null; const m=min||0.34; let guard=0; while(_accLum(c)<m && guard++<16){ c={r:c.r+(255-c.r)*0.16, g:c.g+(255-c.g)*0.16, b:c.b+(255-c.b)*0.16}; } return `rgb(${Math.round(c.r)}, ${Math.round(c.g)}, ${Math.round(c.b)})`; }
 
-function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, title, nextClient, nextIsWaiting, startedLate, startedLateBy, fmtTime, lateNotified, onLetThemKnow }) {
+function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, title, nextClient, nextIsWaiting, startedLate, startedLateBy, fmtTime, lateNotified, onLetThemKnow, upNext, nowMin }) {
   // Calm color = the theme's "live now" accent (--live; equals --gold on every theme except Electric's lime), read live so a "Make it yours" override applies too, guarded for the dark card.
   const [CUT, setCUT] = useState("#7CA084");
   useEffect(() => {
@@ -18414,6 +18414,9 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
   const leftLab = minutesLeft >= 0 ? "min left" : "min over";
   const pillBg = minutesLeft <= 5 ? "#D89A2E" : "#E8B04B";
   const showLatePrompt = (min10 || startedLate) && nextClient;
+  // "Up next" line — synced to the barber's calendar so a gap is obvious at a glance.
+  const upGap = (upNext && !upNext.waiting && nowMin != null) ? (upNext.start - nowMin) : null;
+  const upGapLabel = upGap == null ? "" : upGap <= 0 ? "now" : upGap < 60 ? `in ${upGap} min` : `in ${Math.floor(upGap / 60)}h${upGap % 60 ? " " + (upGap % 60) + "m" : ""}`;
   return (
     <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
       <div style={{ background: "radial-gradient(120% 120% at 50% 0%, #26241F 0%, #1A1916 62%)", border: "1px solid #34322C", borderRadius: 18, padding: 18, boxShadow: "0 14px 36px rgba(18,14,8,.34)", color: "#F4EFE4" }}>
@@ -18446,6 +18449,18 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
             </div>
             <div style={{ fontSize: 13, color: "rgba(244,239,228,.5)", marginTop: 3 }}>{dur} min booked</div>
           </div>
+        </div>
+        {/* Up next — synced to the barber's calendar (gap-aware) */}
+        <div style={{ marginTop: 14, paddingTop: 13, borderTop: "1px solid rgba(255,255,255,.09)", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", color: "rgba(244,239,228,.5)", fontWeight: 700, flexShrink: 0 }}>Next</span>
+          {upNext ? (
+            <>
+              <span style={{ fontSize: 14, color: "#F4EFE4", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{upNext.name}</span>
+              <span style={{ marginLeft: "auto", fontSize: 13, color: "rgba(244,239,228,.62)", whiteSpace: "nowrap", flexShrink: 0 }}>{upNext.waiting ? "checked in" : `${fmtTime(upNext.start)}${upGapLabel ? ` · ${upGapLabel}` : ""}`}</span>
+            </>
+          ) : (
+            <span style={{ marginLeft: "auto", fontSize: 13, color: "rgba(244,239,228,.5)", fontStyle: "italic" }}>Open chair after this</span>
+          )}
         </div>
       </div>
       {showLatePrompt && (
@@ -18762,8 +18777,10 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   // ---- "running late" prompt ----
   // The next client for this provider: the soonest later appointment that's
   // still upcoming (confirmed) or already waiting (checked-in).
+  const dayKey = (x) => { const d = x && x.bookedFor ? new Date(x.bookedFor) : null; return d && !isNaN(d) ? `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` : null; };
+  const apptDay = dayKey(appt);
   const laterClients = (appts || [])
-    .filter((a) => a.providerId === appt.providerId && a.id !== appt.id && a.start >= appt.start && (a.status === "confirmed" || a.status === "checked-in") && a.status !== "block")
+    .filter((a) => a.providerId === appt.providerId && a.id !== appt.id && a.start >= appt.start && (a.status === "confirmed" || a.status === "checked-in") && (apptDay == null || dayKey(a) === apptDay))
     .sort((a, b) => a.start - b.start);
   const nextClient = laterClients[0];
   const nextIsWaiting = nextClient && nextClient.status === "checked-in";
@@ -18910,6 +18927,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   dur={dur}
                   nextClient={(business && business.runningLate ? business.runningLate.enabled !== false : true) ? nextClient : null}
                   nextIsWaiting={nextIsWaiting}
+                  upNext={nextClient ? { name: apptDisplayName(nextClient, clients), start: nextClient.start, waiting: nextIsWaiting } : null}
+                  nowMin={nowMinTick}
                   startedLate={startedLate}
                   startedLateBy={startedLateBy}
                   fmtTime={fmtTime}
