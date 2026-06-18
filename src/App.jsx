@@ -13930,11 +13930,13 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
   const [draft, setDraft] = useState(null);
   const [addingCat, setAddingCat] = useState(false);
   const [newCat, setNewCat] = useState("");
+  const [filterCat, setFilterCat] = useState(null);   // active category filter on the list (null = all)
+  const [manageOpen, setManageOpen] = useState(false); // manage-categories sheet
   const fileRef = useRef(null);
   // Open the add/edit form at the top (the list may have been scrolled), and never auto-focus a
   // field — so opening it doesn't yank the page around or pop the keyboard.
   useEffect(() => { if (editId) { try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { try { window.scrollTo(0, 0); } catch (e2) {} } } }, [editId]);
-  const blank = () => ({ id: "prod_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: "", category: cats[0] || "Other", price: "", cost: "", image: "", trackStock: false, onHand: 0, active: true });
+  const blank = () => ({ id: "prod_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: "", category: filterCat || cats[0] || "Other", price: "", cost: "", image: "", trackStock: false, onHand: 0, active: true });
   const startNew = () => { setDraft(blank()); setEditId("new"); };
   const startEdit = (p) => { setDraft({ ...p, price: String(p.price ?? ""), cost: p.cost != null ? String(p.cost) : "" }); setEditId(p.id); };
   const close = () => { setDraft(null); setEditId(null); setAddingCat(false); setNewCat(""); };
@@ -14033,62 +14035,88 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
     );
   }
 
-  // ---- list, grouped by category ----
-  const order = [...cats, ...Array.from(new Set(products.map((p) => p.category).filter((c) => c && !cats.includes(c))))];
-  const groups = order.map((cat) => ({ cat, items: products.filter((p) => (p.category || "Other") === cat) })).filter((g) => g.items.length);
+  // ---- list (filterable grid) ----
+  const known = new Set(cats);
+  const allCats = [...cats, ...Array.from(new Set(products.map((p) => p.category).filter((c) => c && !known.has(c))))];
+  const countFor = (c) => products.filter((p) => (p.category || "Other") === c).length;
+  const shown = filterCat ? products.filter((p) => (p.category || "Other") === filterCat) : products;
 
-  const ProductRow = ({ p, first }) => (
-    <button onClick={() => startEdit(p)} className="lift" style={{ display: "flex", alignItems: "center", gap: 16, width: "100%", background: "none", border: "none", borderTop: first ? "none" : "1px solid var(--line)", padding: "14px 16px", textAlign: "left", color: "var(--text)", cursor: "pointer", opacity: p.active === false ? 0.55 : 1 }}>
-      <span style={{ width: 60, height: 60, borderRadius: 12, flexShrink: 0, border: "1px solid var(--line)", background: p.image ? `center/cover no-repeat url(${p.image})` : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!p.image && <Sparkles size={18} style={{ color: "var(--faint)" }} />}</span>
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: 16, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-        <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{p.trackStock ? `${p.onHand} in stock` : "Not tracked"}{p.active === false ? " · hidden" : ""}</span>
-      </span>
-      <span style={{ fontSize: 16, fontWeight: 600, flexShrink: 0 }}>${p.price}</span>
+  const ProductCard = ({ p }) => {
+    const out = p.trackStock && (p.onHand || 0) <= 0;
+    return (
+      <button onClick={() => startEdit(p)} className="lift" style={{ display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", textAlign: "left", color: "var(--text)", cursor: "pointer", padding: 0, boxShadow: "var(--shadow-sm)", opacity: p.active === false ? 0.6 : 1 }}>
+        <span style={{ position: "relative", width: "100%", aspectRatio: "1", background: p.image ? `center/cover no-repeat url(${p.image})` : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {!p.image && <Sparkles size={24} style={{ color: "var(--faint)" }} />}
+          {p.trackStock && <span style={{ position: "absolute", top: 8, right: 8, fontSize: 10.5, fontWeight: 600, letterSpacing: 0.2, color: out ? "#fff" : "var(--text)", background: out ? "#c0392b" : "rgba(255,255,255,.92)", border: out ? "none" : "1px solid var(--line)", borderRadius: 20, padding: "3px 9px" }}>{out ? "Out" : `${p.onHand} left`}</span>}
+          {p.active === false && <span style={{ position: "absolute", top: 8, left: 8, fontSize: 9.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "#fff", background: "rgba(10,10,10,.72)", borderRadius: 6, padding: "3px 7px" }}>Hidden</span>}
+        </span>
+        <span style={{ padding: "11px 13px 13px" }}>
+          <span style={{ display: "block", fontSize: 15, fontWeight: 500, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+          <span style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginTop: 5 }}>
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500 }}>${p.price}</span>
+            <span style={{ fontSize: 11.5, color: "var(--faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.category}</span>
+          </span>
+        </span>
+      </button>
+    );
+  };
+
+  const AddTile = ({ tall }) => (
+    <button onClick={startNew} className="lift" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: tall ? 168 : 0, background: "transparent", border: "1.5px dashed var(--border2)", borderRadius: 16, color: "var(--text)", cursor: "pointer", padding: tall ? 0 : "16px" }}>
+      <span style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--panel)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}><Plus size={21} /></span>
+      <span style={{ fontSize: 13.5, fontWeight: 500 }}>Add product</span>
     </button>
   );
 
   return (
     <div style={{ paddingBottom: 8 }}>
-      <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 8 }}>Your retail menu — haircare, skincare and merch. Add a photo and price, sort them into categories, and ring them up at checkout.</p>
-
-      {/* Categories — defined here; the new-product screen picks from these. */}
-      <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "24px 2px 12px" }}>Categories</div>
-      <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center" }}>
-        {cats.map((c) => (
-          <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid var(--border2)", borderRadius: 22, padding: "9px 10px 9px 16px", fontSize: 14, color: "var(--text)", background: "var(--panel)" }}>
-            {c}
-            <button onClick={() => removeCategory(c)} aria-label={`Remove ${c}`} style={{ background: "none", border: "none", color: "var(--faint)", cursor: "pointer", display: "flex", alignItems: "center", padding: 0 }}><X size={15} /></button>
-          </span>
-        ))}
-        {addingCat ? (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid var(--text)", borderRadius: 22, padding: "5px 6px 5px 14px", background: "var(--panel2)" }}>
-            <input autoFocus value={newCat} onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCategory(); if (e.key === "Escape") { setAddingCat(false); setNewCat(""); } }} placeholder="Category name" style={{ width: 130, border: "none", outline: "none", background: "transparent", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
-            <button onClick={addCategory} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 16, padding: "7px 13px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Add</button>
-          </span>
-        ) : (
-          <button onClick={() => { setAddingCat(true); setNewCat(""); }} style={{ padding: "11px 16px", borderRadius: 22, border: "1px dashed var(--border2)", background: "transparent", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Plus size={15} /> Add category</button>
-        )}
+      {/* category filter bar */}
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "2px 2px 14px", margin: "0 -2px", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
+        {[{ id: null, label: "All", n: products.length }, ...allCats.map((c) => ({ id: c, label: c, n: countFor(c) }))].map((t) => {
+          const on = filterCat === t.id;
+          return (
+            <button key={t.label} onClick={() => setFilterCat(t.id)} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 16px", borderRadius: 22, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" }}>
+              {t.label}<span style={{ fontSize: 12, opacity: on ? 0.7 : 0.5 }}>{t.n}</span>
+            </button>
+          );
+        })}
+        <button onClick={() => { setManageOpen(true); setAddingCat(false); setNewCat(""); }} aria-label="Manage categories" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 14px", borderRadius: 22, border: "1px dashed var(--border2)", background: "transparent", color: "var(--sub)", fontSize: 13.5, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" }}><Edit2 size={13} /> Edit</button>
       </div>
 
+      {/* grid */}
       {products.length === 0 ? (
-        <button onClick={startNew} className="lift" style={{ width: "100%", marginTop: 18, background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 16, padding: "40px 16px", color: "var(--sub)", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, cursor: "pointer" }}>
-          <Plus size={26} style={{ color: "var(--faint)" }} />
-          <span style={{ fontSize: 15.5 }}>Add your first product</span>
+        <button onClick={startNew} className="lift" style={{ width: "100%", background: "var(--panel2)", border: "1.5px dashed var(--border2)", borderRadius: 18, padding: "52px 16px", color: "var(--text)", display: "flex", flexDirection: "column", alignItems: "center", gap: 13, cursor: "pointer" }}>
+          <span style={{ width: 60, height: 60, borderRadius: "50%", background: "var(--panel)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow-sm)" }}><Plus size={26} /></span>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>Add your first product</span>
+          <span style={{ fontSize: 13.5, color: "var(--sub)" }}>Photo, price, category — ready to sell.</span>
         </button>
       ) : (
-        <>
-          {groups.map((g) => (
-            <div key={g.cat}>
-              <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 2px 11px" }}>{g.cat} <span style={{ color: "var(--border2)" }}>· {g.items.length}</span></div>
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
-                {g.items.map((p, i) => <ProductRow key={p.id} p={p} first={i === 0} />)}
-              </div>
-            </div>
-          ))}
-        </>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+          {shown.map((p) => <ProductCard key={p.id} p={p} />)}
+          <AddTile tall />
+        </div>
       )}
-      <button onClick={startNew} className="lift" style={{ width: "100%", marginTop: 22, background: "transparent", border: "1px dashed var(--border2)", borderRadius: 14, padding: 16, color: "var(--text)", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer" }}><Plus size={17} /> Add product</button>
+
+      {/* manage categories */}
+      <Sheet open={manageOpen} onClose={() => { setManageOpen(false); setAddingCat(false); setNewCat(""); }} align="bottom" maxWidth={460}>
+        <div style={{ padding: "6px 2px 10px" }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, marginBottom: 5 }}>Categories</div>
+          <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>These become the filters here and the dropdown on each product.</p>
+          <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+            {cats.map((c) => (
+              <div key={c} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px" }}>
+                <span style={{ fontSize: 15.5 }}>{c} <span style={{ color: "var(--faint)", fontSize: 13 }}>· {countFor(c)}</span></span>
+                <button onClick={() => removeCategory(c)} aria-label={`Remove ${c}`} style={{ background: "none", border: "none", color: "var(--sub)", cursor: "pointer", display: "flex", alignItems: "center", padding: 4 }}><Trash2 size={16} /></button>
+              </div>
+            ))}
+            {cats.length === 0 && <div style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", padding: "4px 2px" }}>No categories yet — add one below.</div>}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <input value={newCat} onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCategory(); }} placeholder="New category name" style={{ flex: 1, boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY }} />
+            <button onClick={addCategory} disabled={!newCat.trim()} style={{ background: newCat.trim() ? "var(--text)" : "var(--panel2)", color: newCat.trim() ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 12, padding: "0 22px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}>Add</button>
+          </div>
+        </div>
+      </Sheet>
     </div>
   );
 }
