@@ -6,7 +6,7 @@ import {
   Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock,
   Settings, Image as ImageIcon, Lock, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
-  BarChart3, TrendingUp, Palette, Globe, HelpCircle, BookOpen, Search, LifeBuoy, Scissors
+  BarChart3, TrendingUp, Palette, Globe, HelpCircle, BookOpen, Search, LifeBuoy, Scissors, Package
 } from "lucide-react";
 
 // ============================================================
@@ -13924,6 +13924,18 @@ function compressImageFile(file, onResult, max = 720, q = 0.72) {
   fr.readAsDataURL(file);
 }
 
+// Stock state for a tracked product — drives the low-stock badge, the restock banner,
+// and the "needs restocking" list. Untracked products never alert. `reorderAt` is the
+// low-stock threshold (0 = alert only when fully out).
+function stockState(p) {
+  if (!p || !p.trackStock) return "untracked";
+  const n = parseInt(p.onHand, 10) || 0;
+  if (n <= 0) return "out";
+  const at = parseInt(p.reorderAt, 10) || 0;
+  if (at > 0 && n <= at) return "low";
+  return "ok";
+}
+
 function ProductsEditor({ products = [], categories, onChange, onCategoriesChange, showToast }) {
   const cats = (categories && categories.length) ? categories : PRODUCT_CATEGORIES;
   const [editId, setEditId] = useState(null);   // product id | "new" | null (list)
@@ -13932,13 +13944,15 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
   const [newCat, setNewCat] = useState("");
   const [filterCat, setFilterCat] = useState(null);   // active category filter on the list (null = all)
   const [manageOpen, setManageOpen] = useState(false); // manage-categories sheet
+  const [restockOpen, setRestockOpen] = useState(false); // receive-shipment sheet
+  const [recv, setRecv] = useState({});                // {productId: unitsToAdd} while restocking
   const fileRef = useRef(null);
   // Open the add/edit form at the top (the list may have been scrolled), and never auto-focus a
   // field — so opening it doesn't yank the page around or pop the keyboard.
   useEffect(() => { if (editId) { try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { try { window.scrollTo(0, 0); } catch (e2) {} } } }, [editId]);
-  const blank = () => ({ id: "prod_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: "", category: filterCat || cats[0] || "Other", price: "", cost: "", image: "", trackStock: false, onHand: 0, active: true });
+  const blank = () => ({ id: "prod_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: "", category: filterCat || cats[0] || "Other", price: "", cost: "", image: "", trackStock: false, onHand: 0, reorderAt: 3, active: true });
   const startNew = () => { setDraft(blank()); setEditId("new"); };
-  const startEdit = (p) => { setDraft({ ...p, price: String(p.price ?? ""), cost: p.cost != null ? String(p.cost) : "" }); setEditId(p.id); };
+  const startEdit = (p) => { setDraft({ ...p, price: String(p.price ?? ""), cost: p.cost != null ? String(p.cost) : "", onHand: p.onHand ?? 0, reorderAt: p.reorderAt ?? 0 }); setEditId(p.id); };
   const close = () => { setDraft(null); setEditId(null); setAddingCat(false); setNewCat(""); };
   const save = () => {
     if (!draft.name.trim()) { showToast && showToast("Give the product a name."); return; }
@@ -13947,6 +13961,7 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
       price: Math.max(0, Math.round((Number(draft.price) || 0) * 100) / 100),
       cost: draft.cost === "" || draft.cost == null ? null : Math.max(0, Math.round((Number(draft.cost) || 0) * 100) / 100),
       onHand: draft.trackStock ? Math.max(0, parseInt(draft.onHand, 10) || 0) : 0,
+      reorderAt: draft.trackStock ? Math.max(0, parseInt(draft.reorderAt, 10) || 0) : 0,
     };
     const exists = products.some((p) => p.id === clean.id);
     onChange(exists ? products.map((p) => p.id === clean.id ? clean : p) : [...products, clean]);
@@ -13961,6 +13976,16 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
     setNewCat(""); setAddingCat(false);
   };
   const removeCategory = (c) => { if (onCategoriesChange) onCategoriesChange(cats.filter((x) => x !== c)); };
+  // ---- restock / receive shipment ----
+  const openRestock = () => { setRecv({}); setRestockOpen(true); };
+  const bumpRecv = (id, d) => setRecv((r) => ({ ...r, [id]: Math.max(0, (r[id] || 0) + d) }));
+  const recvTotal = Object.values(recv).reduce((s, n) => s + (n || 0), 0);
+  const applyRestock = () => {
+    if (recvTotal <= 0) { setRestockOpen(false); return; }
+    onChange(products.map((p) => { const add = recv[p.id] || 0; return (p.trackStock && add > 0) ? { ...p, onHand: (parseInt(p.onHand, 10) || 0) + add } : p; }));
+    setRestockOpen(false); setRecv({});
+    showToast && showToast(`Received ${recvTotal} unit${recvTotal === 1 ? "" : "s"}.`);
+  };
 
   const inp = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
   const sectionLbl = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" };
@@ -14020,6 +14045,16 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
             </div>
           </div>
         )}
+        {draft.trackStock && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4, padding: "4px 4px" }}>
+            <span style={{ fontSize: 14.5, color: "var(--sub)" }}>Alert me at <span style={{ color: "var(--faint)", fontSize: 13 }}>· low-stock</span></span>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <button onClick={() => setDraft({ ...draft, reorderAt: Math.max(0, (parseInt(draft.reorderAt, 10) || 0) - 1) })} style={{ width: 38, height: 38, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 20, cursor: "pointer" }}>–</button>
+              <input value={draft.reorderAt} onChange={(e) => setDraft({ ...draft, reorderAt: e.target.value.replace(/[^0-9]/g, "") })} inputMode="numeric" style={{ width: 62, textAlign: "center", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "9px", color: "var(--text)", fontSize: 17, fontFamily: FONT_BODY }} />
+              <button onClick={() => setDraft({ ...draft, reorderAt: (parseInt(draft.reorderAt, 10) || 0) + 1 })} style={{ width: 38, height: 38, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 20, cursor: "pointer" }}>+</button>
+            </div>
+          </div>
+        )}
 
         <div onClick={() => setDraft({ ...draft, active: !draft.active })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "16px 18px", border: "1px solid var(--border)", borderRadius: 14, cursor: "pointer" }}>
           <div><div style={{ fontSize: 15.5, fontWeight: 500 }}>Available to sell</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>Shows in checkout when on</div></div>
@@ -14040,14 +14075,22 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
   const allCats = [...cats, ...Array.from(new Set(products.map((p) => p.category).filter((c) => c && !known.has(c))))];
   const countFor = (c) => products.filter((p) => (p.category || "Other") === c).length;
   const shown = filterCat ? products.filter((p) => (p.category || "Other") === filterCat) : products;
+  const tracked = products.filter((p) => p.trackStock);
+  const needs = tracked.filter((p) => stockState(p) !== "ok");
+  const anyOut = needs.some((p) => stockState(p) === "out");
+  // Restock sheet lists every tracked product, neediest first (out → low → ok), then by name.
+  const stockRank = { out: 0, low: 1, ok: 2, untracked: 3 };
+  const restockList = [...tracked].sort((a, b) => (stockRank[stockState(a)] - stockRank[stockState(b)]) || a.name.localeCompare(b.name));
 
   const ProductCard = ({ p }) => {
-    const out = p.trackStock && (p.onHand || 0) <= 0;
+    const st = stockState(p);
+    const out = st === "out";
+    const low = st === "low";
     return (
       <button onClick={() => startEdit(p)} className="lift" style={{ display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", textAlign: "left", color: "var(--text)", cursor: "pointer", padding: 0, boxShadow: "var(--shadow-sm)", opacity: p.active === false ? 0.6 : 1 }}>
         <span style={{ position: "relative", width: "100%", aspectRatio: "1", background: p.image ? `center/cover no-repeat url(${p.image})` : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {!p.image && <Sparkles size={24} style={{ color: "var(--faint)" }} />}
-          {p.trackStock && <span style={{ position: "absolute", top: 8, right: 8, fontSize: 10.5, fontWeight: 600, letterSpacing: 0.2, color: out ? "#fff" : "var(--text)", background: out ? "#c0392b" : "rgba(255,255,255,.92)", border: out ? "none" : "1px solid var(--line)", borderRadius: 20, padding: "3px 9px" }}>{out ? "Out" : `${p.onHand} left`}</span>}
+          {p.trackStock && <span style={{ position: "absolute", top: 8, right: 8, fontSize: 10.5, fontWeight: 600, letterSpacing: 0.2, color: out ? "#fff" : low ? "#8A5A00" : "var(--text)", background: out ? "#c0392b" : low ? "#FBE7C9" : "rgba(255,255,255,.92)", border: (out || low) ? "none" : "1px solid var(--line)", borderRadius: 20, padding: "3px 9px" }}>{out ? "Out" : `${p.onHand} left`}</span>}
           {p.active === false && <span style={{ position: "absolute", top: 8, left: 8, fontSize: 9.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "#fff", background: "rgba(10,10,10,.72)", borderRadius: 6, padding: "3px 7px" }}>Hidden</span>}
         </span>
         <span style={{ padding: "11px 13px 13px" }}>
@@ -14083,6 +14126,22 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
         <button onClick={() => { setManageOpen(true); setAddingCat(false); setNewCat(""); }} aria-label="Manage categories" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 14px", borderRadius: 22, border: "1px dashed var(--border2)", background: "transparent", color: "var(--sub)", fontSize: 13.5, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" }}><Edit2 size={13} /> Edit</button>
       </div>
 
+      {/* low-stock / receive-shipment entry */}
+      {tracked.length > 0 && (needs.length > 0 ? (
+        <button onClick={openRestock} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, textAlign: "left", background: "#FCF3E0", border: "1px solid #F0DCAE", borderRadius: 14, padding: "13px 15px", marginBottom: 14, cursor: "pointer", color: "var(--text)" }}>
+          <span style={{ width: 38, height: 38, borderRadius: "50%", background: "#F5E2B8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><AlertCircle size={19} style={{ color: "#9A6A00" }} /></span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 14.5, fontWeight: 600 }}>{needs.length} product{needs.length === 1 ? "" : "s"} {anyOut ? "to restock" : "running low"}</span>
+            <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 1 }}>{needs.slice(0, 3).map((p) => p.name).join(" · ")}{needs.length > 3 ? "…" : ""}</span>
+          </span>
+          <ChevronRight size={20} style={{ color: "#9A6A00", flexShrink: 0 }} />
+        </button>
+      ) : (
+        <button onClick={openRestock} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "transparent", border: "1px solid var(--border)", borderRadius: 14, padding: "13px 15px", marginBottom: 14, cursor: "pointer", color: "var(--text)" }}>
+          <Package size={17} style={{ color: "var(--sub)" }} /><span style={{ fontSize: 14, fontWeight: 500 }}>Receive shipment</span>
+        </button>
+      ))}
+
       {/* grid */}
       {products.length === 0 ? (
         <button onClick={startNew} className="lift" style={{ width: "100%", background: "var(--panel2)", border: "1.5px dashed var(--border2)", borderRadius: 18, padding: "52px 16px", color: "var(--text)", display: "flex", flexDirection: "column", alignItems: "center", gap: 13, cursor: "pointer" }}>
@@ -14115,6 +14174,42 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
             <input value={newCat} onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCategory(); }} placeholder="New category name" style={{ flex: 1, boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY }} />
             <button onClick={addCategory} disabled={!newCat.trim()} style={{ background: newCat.trim() ? "var(--text)" : "var(--panel2)", color: newCat.trim() ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 12, padding: "0 22px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}>Add</button>
           </div>
+        </div>
+      </Sheet>
+
+      {/* receive shipment / restock */}
+      <Sheet open={restockOpen} onClose={() => setRestockOpen(false)} align="bottom" maxWidth={460}>
+        <div style={{ padding: "6px 2px 10px" }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, marginBottom: 5 }}>Receive shipment</div>
+          <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Add the units that just came in — they’re added to what’s on hand.</p>
+          {restockList.length === 0 ? (
+            <div style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", padding: "4px 2px 14px" }}>No tracked products yet. Turn on “Track inventory” for a product to restock it here.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 8, marginBottom: 16, maxHeight: "52vh", overflowY: "auto" }}>
+              {restockList.map((p) => {
+                const st = stockState(p); const add = recv[p.id] || 0; const onHand = parseInt(p.onHand, 10) || 0;
+                const chip = st === "out" ? { t: "Out", c: "#fff", b: "#c0392b" } : st === "low" ? { t: "Low", c: "#8A5A00", b: "#FBE7C9" } : null;
+                return (
+                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
+                    <span style={{ width: 42, height: 42, borderRadius: 10, flexShrink: 0, background: p.image ? `center/cover no-repeat url(${p.image})` : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--line)" }}>{!p.image && <Sparkles size={16} style={{ color: "var(--faint)" }} />}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                        <span style={{ fontSize: 14.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                        {chip && <span style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: chip.c, background: chip.b, borderRadius: 6, padding: "2px 6px" }}>{chip.t}</span>}
+                      </span>
+                      <span style={{ display: "block", fontSize: 12, color: "var(--sub)", marginTop: 1 }}>{onHand} on hand{add > 0 ? ` → ${onHand + add}` : ""}</span>
+                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                      <button onClick={() => bumpRecv(p.id, -1)} disabled={add <= 0} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: add <= 0 ? "var(--faint)" : "var(--text)", fontSize: 18, cursor: add <= 0 ? "default" : "pointer" }}>–</button>
+                      <span style={{ minWidth: 22, textAlign: "center", fontSize: 16, fontWeight: 600, color: add > 0 ? "var(--text)" : "var(--faint)" }}>+{add}</span>
+                      <button onClick={() => bumpRecv(p.id, 1)} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 18, cursor: "pointer" }}>+</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <button onClick={applyRestock} disabled={recvTotal <= 0} className="lift" style={{ width: "100%", background: recvTotal > 0 ? "var(--text)" : "var(--panel2)", color: recvTotal > 0 ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 14, padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", cursor: recvTotal > 0 ? "pointer" : "default" }}>{recvTotal > 0 ? `Receive ${recvTotal} unit${recvTotal === 1 ? "" : "s"}` : "Receive"}</button>
         </div>
       </Sheet>
     </div>
