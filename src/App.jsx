@@ -17125,6 +17125,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [prodName, setProdName] = useState("");
   const [prodPrice, setProdPrice] = useState("");
   const [showCustomItem, setShowCustomItem] = useState(false); // reveal the one-off item entry under the product grid
+  const [prodCat, setProdCat] = useState(null); // active category filter in the "+ Product" picker (null = all)
   const [payBusy, setPayBusy] = useState(false);
   const [payErr, setPayErr] = useState("");
   const [pendingMethod, setPendingMethod] = useState(null); // chosen on the method screen; charged after tip
@@ -17296,21 +17297,34 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         const addCustom = () => { setLines([...lines, { id: "ln_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: prodName.trim(), price: +Number(prodPrice).toFixed(2) }]); setAddSheet(null); setShowCustomItem(false); };
         return (
         <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", padding: "14px 16px", marginBottom: 16 }}>
-          {catalog.length > 0 && (<>
-            <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>Tap to add</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxHeight: "44vh", overflowY: "auto" }}>
-              {catalog.map((p) => { const out = p.trackStock && (p.onHand || 0) <= 0; return (
-                <button key={p.id} disabled={out} onClick={() => { setLines([...lines, { id: "ln_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: p.name, price: +Number(p.price || 0).toFixed(2), productId: p.id, image: p.image || "" }]); setAddSheet(null); }} style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "var(--panel)", textAlign: "left", cursor: out ? "not-allowed" : "pointer", opacity: out ? 0.5 : 1, padding: 0, display: "flex", flexDirection: "column" }}>
-                  <span style={{ width: "100%", aspectRatio: "1", background: p.image ? `center/cover no-repeat url(${p.image})` : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!p.image && <Sparkles size={18} style={{ color: "var(--faint)" }} />}</span>
-                  <span style={{ padding: "7px 8px 9px" }}>
-                    <span style={{ display: "block", fontSize: 12.5, fontWeight: 500, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                    <span style={{ display: "block", fontSize: 12, color: "var(--sub)", marginTop: 1 }}>${p.price}{out ? " · out" : (p.trackStock ? ` · ${p.onHand}` : "")}</span>
-                  </span>
-                </button>
-              ); })}
-            </div>
-            <button onClick={() => setShowCustomItem((v) => !v)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 2, padding: "10px 0 0", cursor: "pointer" }}>{showCustomItem ? "Hide custom item" : "+ One-off item"}</button>
-          </>)}
+          {catalog.length > 0 && (() => {
+            const defCats = business?.productCategories || PRODUCT_CATEGORIES;
+            const present = Array.from(new Set(catalog.map((p) => p.category || "Other")));
+            const orderedCats = [...defCats.filter((c) => present.includes(c)), ...present.filter((c) => !defCats.includes(c))];
+            const list = prodCat ? catalog.filter((p) => (p.category || "Other") === prodCat) : catalog;
+            return (<>
+              {orderedCats.length > 1 && (
+                <div style={{ display: "flex", gap: 7, overflowX: "auto", padding: "0 0 12px", margin: "0 -2px" }}>
+                  {[{ id: null, label: "All" }, ...orderedCats.map((c) => ({ id: c, label: c }))].map((t) => { const on = prodCat === t.id; return (
+                    <button key={t.label} onClick={() => setProdCat(t.id)} style={{ flexShrink: 0, padding: "8px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", fontSize: 13, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" }}>{t.label}</button>
+                  ); })}
+                </div>
+              )}
+              {orderedCats.length <= 1 && <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>Tap to add</div>}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxHeight: "44vh", overflowY: "auto" }}>
+                {list.map((p) => { const out = p.trackStock && (p.onHand || 0) <= 0; return (
+                  <button key={p.id} disabled={out} onClick={() => { setLines([...lines, { id: "ln_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: p.name, price: +Number(p.price || 0).toFixed(2), productId: p.id, image: p.image || "" }]); setAddSheet(null); }} style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "var(--panel)", textAlign: "left", cursor: out ? "not-allowed" : "pointer", opacity: out ? 0.5 : 1, padding: 0, display: "flex", flexDirection: "column" }}>
+                    <span style={{ width: "100%", aspectRatio: "1", background: p.image ? `center/cover no-repeat url(${p.image})` : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!p.image && <Sparkles size={18} style={{ color: "var(--faint)" }} />}</span>
+                    <span style={{ padding: "7px 8px 9px" }}>
+                      <span style={{ display: "block", fontSize: 12.5, fontWeight: 500, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                      <span style={{ display: "block", fontSize: 12, color: "var(--sub)", marginTop: 1 }}>${p.price}{out ? " · out" : (p.trackStock ? ` · ${p.onHand}` : "")}</span>
+                    </span>
+                  </button>
+                ); })}
+              </div>
+              <button onClick={() => setShowCustomItem((v) => !v)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 2, padding: "10px 0 0", cursor: "pointer" }}>{showCustomItem ? "Hide custom item" : "+ One-off item"}</button>
+            </>);
+          })()}
           {catalog.length === 0 && <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12 }}>No products in your catalog yet — add them in Settings → Products. You can still add a one-off item:</div>}
           {(catalog.length === 0 || showCustomItem) && (
             <div style={{ marginTop: catalog.length ? 10 : 0 }}>
