@@ -18454,7 +18454,7 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
             <div style={{ fontSize: 13.5, color: T.accent, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Check size={15} /> Notified · running {lateNotified} min behind</div>
           ) : (
             <>
-              <div style={{ fontSize: 14, color: T.text, marginBottom: 12, lineHeight: 1.45 }}>{startedLate && !behind10 ? `This one started about ${startedLateBy} min late. ` : ""}{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running a few minutes behind?</div>
+              <div style={{ fontSize: 14, color: T.text, marginBottom: 12, lineHeight: 1.45 }}>{startedLate ? `This one started about ${startedLateBy} min late. ` : ""}{nextIsWaiting ? `${nextClient.name} has already checked in.` : `${nextClient.name} is up next at ${fmtTime(nextClient.start)}.`} Want to let them know you're running a few minutes behind?</div>
               <button className="lift" onClick={onLetThemKnow} style={{ width: "100%", background: pillBg, color: "#3a2e10", padding: "13px", borderRadius: 11, fontSize: 14, fontWeight: 700, border: "none" }}>Let them know</button>
             </>
           )}
