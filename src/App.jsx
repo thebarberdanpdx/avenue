@@ -13924,14 +13924,17 @@ function compressImageFile(file, onResult, max = 720, q = 0.72) {
   fr.readAsDataURL(file);
 }
 
-function ProductsEditor({ products = [], onChange, showToast }) {
+function ProductsEditor({ products = [], categories, onChange, onCategoriesChange, showToast }) {
+  const cats = (categories && categories.length) ? categories : PRODUCT_CATEGORIES;
   const [editId, setEditId] = useState(null);   // product id | "new" | null (list)
   const [draft, setDraft] = useState(null);
+  const [addingCat, setAddingCat] = useState(false);
+  const [newCat, setNewCat] = useState("");
   const fileRef = useRef(null);
-  const blank = () => ({ id: "prod_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: "", category: "Haircare", price: "", cost: "", image: "", trackStock: false, onHand: 0, active: true });
+  const blank = () => ({ id: "prod_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: "", category: cats[0] || "Other", price: "", cost: "", image: "", trackStock: false, onHand: 0, active: true });
   const startNew = () => { setDraft(blank()); setEditId("new"); };
   const startEdit = (p) => { setDraft({ ...p, price: String(p.price ?? ""), cost: p.cost != null ? String(p.cost) : "" }); setEditId(p.id); };
-  const close = () => { setDraft(null); setEditId(null); };
+  const close = () => { setDraft(null); setEditId(null); setAddingCat(false); setNewCat(""); };
   const save = () => {
     if (!draft.name.trim()) { showToast && showToast("Give the product a name."); return; }
     const clean = {
@@ -13945,97 +13948,126 @@ function ProductsEditor({ products = [], onChange, showToast }) {
     close(); showToast && showToast(exists ? "Product saved." : "Product added.");
   };
   const remove = () => { onChange(products.filter((p) => p.id !== draft.id)); close(); showToast && showToast("Product removed."); };
+  const addCategory = () => {
+    const name = newCat.trim();
+    if (!name) { setAddingCat(false); return; }
+    if (!cats.some((c) => c.toLowerCase() === name.toLowerCase()) && onCategoriesChange) onCategoriesChange([...cats, name]);
+    setDraft((d) => ({ ...d, category: name }));
+    setNewCat(""); setAddingCat(false);
+  };
 
-  const inp = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 11, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY };
-  const lbl = { fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "16px 2px 7px" };
+  const inp = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+  const sectionLbl = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" };
+  const money$ = (n) => { const wrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)" }; return wrap; };
 
-  // ---- edit / add form ----
+  // ---- add / edit form ----
   if (draft) {
     return (
-      <div>
+      <div style={{ paddingBottom: 8 }}>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) compressImageFile(f, (url) => setDraft((d) => ({ ...d, image: url }))); }} />
-        <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-          <button onClick={() => fileRef.current && fileRef.current.click()} style={{ width: 92, height: 92, flexShrink: 0, borderRadius: 14, border: "1px solid var(--border)", background: draft.image ? `center/cover no-repeat url(${draft.image})` : "var(--panel2)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, color: "var(--sub)", cursor: "pointer", overflow: "hidden" }}>
-            {!draft.image && <><Camera size={20} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 10.5 }}>Photo</span></>}
+
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
+          <button onClick={() => fileRef.current && fileRef.current.click()} style={{ width: 132, height: 132, borderRadius: 18, border: "1px solid var(--border)", background: draft.image ? `center/cover no-repeat url(${draft.image})` : "var(--panel2)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 7, color: "var(--sub)", cursor: "pointer", overflow: "hidden", boxShadow: draft.image ? "var(--shadow-sm)" : "none" }}>
+            {!draft.image && <><Camera size={24} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 12 }}>Add photo</span></>}
           </button>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <input autoFocus value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Product name" style={{ ...inp, marginBottom: 10 }} />
-            <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--panel2)" }}>
-              <span style={{ padding: "0 0 0 14px", color: "var(--sub)", fontSize: 16 }}>$</span>
-              <input value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" placeholder="Price" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
-            </div>
-          </div>
         </div>
-        {draft.image && <button onClick={() => setDraft({ ...draft, image: "" })} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 2, padding: "8px 0 0 2px", cursor: "pointer" }}>Remove photo</button>}
+        {draft.image && <div style={{ textAlign: "center" }}><button onClick={() => setDraft({ ...draft, image: "" })} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 2, padding: "4px 0 0", cursor: "pointer" }}>Remove photo</button></div>}
 
-        <div style={lbl}>Category</div>
-        <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-          {PRODUCT_CATEGORIES.map((c) => { const on = draft.category === c; return (
-            <button key={c} onClick={() => setDraft({ ...draft, category: c })} style={{ padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }}>{c}</button>
+        <div style={sectionLbl}>Name</div>
+        <input autoFocus value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Matte Clay Pomade" style={inp} />
+
+        <div style={sectionLbl}>Price</div>
+        <div style={money$()}>
+          <span style={{ padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 }}>$</span>
+          <input value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" placeholder="0.00" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY }} />
+        </div>
+
+        <div style={sectionLbl}>Category</div>
+        <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
+          {cats.map((c) => { const on = draft.category === c; return (
+            <button key={c} onClick={() => setDraft({ ...draft, category: c })} style={{ padding: "11px 18px", borderRadius: 22, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }}>{c}</button>
           ); })}
+          {addingCat ? (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid var(--border2)", borderRadius: 22, padding: "5px 6px 5px 14px", background: "var(--panel2)" }}>
+              <input autoFocus value={newCat} onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCategory(); }} placeholder="New category" style={{ width: 120, border: "none", outline: "none", background: "transparent", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
+              <button onClick={addCategory} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 16, padding: "6px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Add</button>
+            </span>
+          ) : (
+            <button onClick={() => { setAddingCat(true); setNewCat(""); }} style={{ padding: "11px 16px", borderRadius: 22, border: "1px dashed var(--border2)", background: "transparent", color: "var(--sub)", fontSize: 14, fontFamily: FONT_BODY, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Plus size={14} /> New</button>
+          )}
         </div>
 
-        <div style={lbl}>Your cost (optional)</div>
-        <div style={{ display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--panel2)" }}>
-          <span style={{ padding: "0 0 0 14px", color: "var(--sub)", fontSize: 16 }}>$</span>
-          <input value={draft.cost} onChange={(e) => setDraft({ ...draft, cost: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" placeholder="What you pay — used for margin reports" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
+        <div style={sectionLbl}>Your cost <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--faint)" }}>· optional, for margin reports</span></div>
+        <div style={money$()}>
+          <span style={{ padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 }}>$</span>
+          <input value={draft.cost} onChange={(e) => setDraft({ ...draft, cost: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" placeholder="What you pay" style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY }} />
         </div>
 
-        <div onClick={() => setDraft({ ...draft, trackStock: !draft.trackStock })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 18, cursor: "pointer" }}>
-          <div><div style={{ fontSize: 15, fontWeight: 500 }}>Track inventory</div><div style={{ fontSize: 13, color: "var(--sub)" }}>Count down stock as it sells</div></div>
-          <span style={{ width: 46, height: 27, borderRadius: 14, background: draft.trackStock ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0, transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: draft.trackStock ? 22 : 3, width: 21, height: 21, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+        <div onClick={() => setDraft({ ...draft, trackStock: !draft.trackStock })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 26, padding: "16px 18px", border: "1px solid var(--border)", borderRadius: 14, cursor: "pointer" }}>
+          <div><div style={{ fontSize: 15.5, fontWeight: 500 }}>Track inventory</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>Count down stock as it sells</div></div>
+          <span style={{ width: 50, height: 29, borderRadius: 29, background: draft.trackStock ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0, transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: draft.trackStock ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
         </div>
         {draft.trackStock && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
-            <span style={{ fontSize: 14, color: "var(--sub)" }}>On hand</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button onClick={() => setDraft({ ...draft, onHand: Math.max(0, (parseInt(draft.onHand, 10) || 0) - 1) })} style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 18, cursor: "pointer" }}>–</button>
-              <input value={draft.onHand} onChange={(e) => setDraft({ ...draft, onHand: e.target.value.replace(/[^0-9]/g, "") })} inputMode="numeric" style={{ width: 56, textAlign: "center", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 9, padding: "8px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY }} />
-              <button onClick={() => setDraft({ ...draft, onHand: (parseInt(draft.onHand, 10) || 0) + 1 })} style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 18, cursor: "pointer" }}>+</button>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "4px 4px" }}>
+            <span style={{ fontSize: 14.5, color: "var(--sub)" }}>On hand</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <button onClick={() => setDraft({ ...draft, onHand: Math.max(0, (parseInt(draft.onHand, 10) || 0) - 1) })} style={{ width: 38, height: 38, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 20, cursor: "pointer" }}>–</button>
+              <input value={draft.onHand} onChange={(e) => setDraft({ ...draft, onHand: e.target.value.replace(/[^0-9]/g, "") })} inputMode="numeric" style={{ width: 62, textAlign: "center", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "9px", color: "var(--text)", fontSize: 17, fontFamily: FONT_BODY }} />
+              <button onClick={() => setDraft({ ...draft, onHand: (parseInt(draft.onHand, 10) || 0) + 1 })} style={{ width: 38, height: 38, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: "var(--text)", fontSize: 20, cursor: "pointer" }}>+</button>
             </div>
           </div>
         )}
 
-        <div onClick={() => setDraft({ ...draft, active: !draft.active })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 18, cursor: "pointer" }}>
-          <div><div style={{ fontSize: 15, fontWeight: 500 }}>Available to sell</div><div style={{ fontSize: 13, color: "var(--sub)" }}>Shows in checkout when on</div></div>
-          <span style={{ width: 46, height: 27, borderRadius: 14, background: draft.active ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0, transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: draft.active ? 22 : 3, width: 21, height: 21, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+        <div onClick={() => setDraft({ ...draft, active: !draft.active })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "16px 18px", border: "1px solid var(--border)", borderRadius: 14, cursor: "pointer" }}>
+          <div><div style={{ fontSize: 15.5, fontWeight: 500 }}>Available to sell</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>Shows in checkout when on</div></div>
+          <span style={{ width: 50, height: 29, borderRadius: 29, background: draft.active ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0, transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: draft.active ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
         </div>
 
-        <button className="lift" onClick={save} style={{ width: "100%", marginTop: 24, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>{editId === "new" ? "Add product" : "Save product"}</button>
-        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-          <button onClick={close} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 12, padding: 13, fontSize: 14, cursor: "pointer" }}>Cancel</button>
-          {editId !== "new" && <button onClick={remove} style={{ flex: 1, background: "transparent", border: "1px solid #c0392b", color: "#c0392b", borderRadius: 12, padding: 13, fontSize: 14, cursor: "pointer" }}>Remove</button>}
+        <button className="lift" onClick={save} style={{ width: "100%", marginTop: 30, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 14, padding: 17, fontSize: 14, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>{editId === "new" ? "Add product" : "Save product"}</button>
+        <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+          <button onClick={close} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 14, padding: 15, fontSize: 14, cursor: "pointer" }}>Cancel</button>
+          {editId !== "new" && <button onClick={remove} style={{ flex: 1, background: "transparent", border: "1px solid #c0392b", color: "#c0392b", borderRadius: 14, padding: 15, fontSize: 14, cursor: "pointer" }}>Remove</button>}
         </div>
       </div>
     );
   }
 
-  // ---- list ----
+  // ---- list, grouped by category ----
+  const order = [...cats, ...Array.from(new Set(products.map((p) => p.category).filter((c) => c && !cats.includes(c))))];
+  const groups = order.map((cat) => ({ cat, items: products.filter((p) => (p.category || "Other") === cat) })).filter((g) => g.items.length);
+
+  const ProductRow = ({ p, first }) => (
+    <button onClick={() => startEdit(p)} className="lift" style={{ display: "flex", alignItems: "center", gap: 16, width: "100%", background: "none", border: "none", borderTop: first ? "none" : "1px solid var(--line)", padding: "14px 16px", textAlign: "left", color: "var(--text)", cursor: "pointer", opacity: p.active === false ? 0.55 : 1 }}>
+      <span style={{ width: 60, height: 60, borderRadius: 12, flexShrink: 0, border: "1px solid var(--line)", background: p.image ? `center/cover no-repeat url(${p.image})` : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!p.image && <Sparkles size={18} style={{ color: "var(--faint)" }} />}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 16, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+        <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{p.trackStock ? `${p.onHand} in stock` : "Not tracked"}{p.active === false ? " · hidden" : ""}</span>
+      </span>
+      <span style={{ fontSize: 16, fontWeight: 600, flexShrink: 0 }}>${p.price}</span>
+    </button>
+  );
+
   return (
-    <div>
-      <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Your retail menu — haircare, skincare and merch. Add a photo and price; ring them up at checkout.</p>
+    <div style={{ paddingBottom: 8 }}>
+      <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 8 }}>Your retail menu — haircare, skincare and merch. Add a photo and price, sort them into categories, and ring them up at checkout.</p>
       {products.length === 0 ? (
-        <button onClick={startNew} className="lift" style={{ width: "100%", background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 14, padding: "26px 16px", color: "var(--sub)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, cursor: "pointer" }}>
-          <Plus size={22} style={{ color: "var(--faint)" }} />
-          <span style={{ fontSize: 14.5 }}>Add your first product</span>
+        <button onClick={startNew} className="lift" style={{ width: "100%", marginTop: 18, background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 16, padding: "40px 16px", color: "var(--sub)", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, cursor: "pointer" }}>
+          <Plus size={26} style={{ color: "var(--faint)" }} />
+          <span style={{ fontSize: 15.5 }}>Add your first product</span>
         </button>
       ) : (
-        <div style={{ display: "grid", gap: 8 }}>
-          {products.map((p) => (
-            <button key={p.id} onClick={() => startEdit(p)} className="lift" style={{ display: "flex", alignItems: "center", gap: 13, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "11px 13px", textAlign: "left", color: "var(--text)", cursor: "pointer", opacity: p.active === false ? 0.55 : 1 }}>
-              <span style={{ width: 48, height: 48, borderRadius: 10, flexShrink: 0, border: "1px solid var(--line)", background: p.image ? `center/cover no-repeat url(${p.image})` : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!p.image && <Sparkles size={16} style={{ color: "var(--faint)" }} />}</span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: "block", fontSize: 15, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)" }}>{p.category}{p.trackStock ? ` · ${p.onHand} in stock` : ""}{p.active === false ? " · hidden" : ""}</span>
-              </span>
-              <span style={{ fontSize: 15, fontWeight: 600, flexShrink: 0 }}>${p.price}</span>
-            </button>
+        <>
+          {groups.map((g) => (
+            <div key={g.cat}>
+              <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 2px 11px" }}>{g.cat} <span style={{ color: "var(--border2)" }}>· {g.items.length}</span></div>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+                {g.items.map((p, i) => <ProductRow key={p.id} p={p} first={i === 0} />)}
+              </div>
+            </div>
           ))}
-        </div>
+        </>
       )}
-      {products.length > 0 && (
-        <button onClick={startNew} className="lift" style={{ width: "100%", marginTop: 12, background: "transparent", border: "1px dashed var(--border2)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer" }}><Plus size={16} /> Add product</button>
-      )}
+      <button onClick={startNew} className="lift" style={{ width: "100%", marginTop: 22, background: "transparent", border: "1px dashed var(--border2)", borderRadius: 14, padding: 16, color: "var(--text)", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer" }}><Plus size={17} /> Add product</button>
     </div>
   );
 }
@@ -14396,7 +14428,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "products", fullBleed: true, title: "Products", icon: Sparkles, category: "Services & Menu",
       status: `${(form.products || []).length} product${(form.products || []).length === 1 ? "" : "s"}`,
       keywords: "products retail haircare skincare merch merchandise sell selling inventory stock catalog square pomade shampoo",
-      editor: <ProductsEditor products={form.products || []} onChange={(next) => setForm({ ...form, products: next })} showToast={showToast} />,
+      editor: <ProductsEditor products={form.products || []} categories={form.productCategories || PRODUCT_CATEGORIES} onChange={(next) => setForm({ ...form, products: next })} onCategoriesChange={(next) => setForm({ ...form, productCategories: next })} showToast={showToast} />,
     },
     {
       id: "rebookco", title: "Rebooking at Checkout", icon: Repeat, category: "Payments & Checkout",
