@@ -10709,7 +10709,7 @@ function LocationsEditor({ business, setForm, onBackRef }) {
 // ============================================================
 // Small {fact} tags fill in a single detail; {block} tags expand into a formatted card / button.
 const MERGE_FACTS = ["{client}", "{business}", "{service}", "{date}", "{time}", "{provider}", "{address}", "{phone}", "{email}"];
-const MERGE_BLOCKS = ["{appointment}", "{location}", "{policy}", "{cancel link}"];
+const MERGE_BLOCKS = ["{appointment}", "{location}", "{policy}", "{cancel link}", "{checkin link}"];
 const MERGE_TAGS = [...MERGE_FACTS, ...MERGE_BLOCKS];
 const BLOCK_SET = new Set(MERGE_BLOCKS);
 // Each message's original default wording, pulled from DEFAULT_BUSINESS so there's one source
@@ -10750,6 +10750,7 @@ function renderPlainPreview(body, business) {
   t = t.replace(/\{location\}/g, `${c.locName}\n${c.address}`);
   t = t.replace(/\{policy\}/g, c.policy);
   t = t.replace(/\{cancel link\}/g, `To reschedule, call or text ${c.phone}.`);
+  t = t.replace(/\{checkin link\}/g, `Here? Let us know you've arrived: (check-in link)`);
   return fillFacts(t, c);
 }
 
@@ -10776,9 +10777,12 @@ function EmailPreview({ body, business }) {
     if (tag === "{cancel link}") return (
       <div key={key} style={{ textAlign: "center", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 15, padding: 13, borderRadius: 11, margin: "12px 0" }}>Reschedule or cancel</div>
     );
+    if (tag === "{checkin link}") return (
+      <div key={key} style={{ textAlign: "center", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 15, padding: 13, borderRadius: 11, margin: "12px 0" }}>I'm here — let {c.provider} know</div>
+    );
     return null;
   };
-  const parts = String(body || "").split(/(\{appointment\}|\{location\}|\{policy\}|\{cancel link\})/g);
+  const parts = String(body || "").split(/(\{appointment\}|\{location\}|\{policy\}|\{cancel link\}|\{checkin link\})/g);
   return (
     <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
       <div style={{ textAlign: "center", padding: "20px 18px 14px", borderBottom: "1px solid var(--line)" }}>
