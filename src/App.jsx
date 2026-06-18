@@ -18667,8 +18667,9 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
 
   // Live clock for the in-service timer.
   //  - minutesInto = actual work elapsed (from the real In-Service tap; falls back to scheduled start)
-  //  - minutesLeftLive = time left in the SCHEDULED window (scheduled end − now), regardless of when
-  //    they actually started, so the slot is the slot.
+  //  - minutesLeftLive = booked duration counting down from the actual In-Service tap, so a service
+  //    started off-schedule still reads "≈dur left" at the start instead of comparing to a stale slot.
+  //    Before the service is started we fall back to the scheduled window.
   const liveNow = useNow(1000);
   const nowMinTick = liveNow.getHours() * 60 + liveNow.getMinutes();
   const minutesIntoService = appt.serviceStartedAt != null
@@ -18677,7 +18678,9 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const secondsIntoService = appt.serviceStartedAt != null
     ? Math.max(0, Math.floor((liveNow.getTime() - appt.serviceStartedAt) / 1000))
     : Math.max(0, (nowMinTick - appt.start) * 60);
-  const minutesLeftLive = Math.round((appt.start + dur) - nowMinTick);
+  const minutesLeftLive = appt.serviceStartedAt != null
+    ? Math.round(dur - (liveNow.getTime() - appt.serviceStartedAt) / 60000)
+    : Math.round((appt.start + dur) - nowMinTick);
   // Late start: In Service tapped 5+ min after the scheduled start time.
   const startedLateBy = appt.serviceStartedAt != null
     ? Math.round((new Date(appt.serviceStartedAt).getHours() * 60 + new Date(appt.serviceStartedAt).getMinutes()) - appt.start)
