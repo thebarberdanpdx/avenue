@@ -13955,9 +13955,10 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
     const name = newCat.trim();
     if (!name) { setAddingCat(false); return; }
     if (!cats.some((c) => c.toLowerCase() === name.toLowerCase()) && onCategoriesChange) onCategoriesChange([...cats, name]);
-    setDraft((d) => ({ ...d, category: name }));
+    if (draft) setDraft((d) => ({ ...d, category: name }));
     setNewCat(""); setAddingCat(false);
   };
+  const removeCategory = (c) => { if (onCategoriesChange) onCategoriesChange(cats.filter((x) => x !== c)); };
 
   const inp = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
   const sectionLbl = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" };
@@ -13980,19 +13981,16 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
         <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Matte Clay Pomade" style={inp} />
 
         <div style={sectionLbl}>Category</div>
-        <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
-          {cats.map((c) => { const on = draft.category === c; return (
-            <button key={c} onClick={() => setDraft({ ...draft, category: c })} style={{ padding: "11px 18px", borderRadius: 22, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }}>{c}</button>
-          ); })}
-          {addingCat ? (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid var(--border2)", borderRadius: 22, padding: "5px 6px 5px 14px", background: "var(--panel2)" }}>
-              <input autoFocus value={newCat} onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCategory(); }} placeholder="New category" style={{ width: 120, border: "none", outline: "none", background: "transparent", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
-              <button onClick={addCategory} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 16, padding: "6px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Add</button>
-            </span>
-          ) : (
-            <button onClick={() => { setAddingCat(true); setNewCat(""); }} style={{ padding: "11px 16px", borderRadius: 22, border: "1px dashed var(--border2)", background: "transparent", color: "var(--sub)", fontSize: 14, fontFamily: FONT_BODY, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Plus size={14} /> New</button>
-          )}
-        </div>
+        {cats.length === 0 ? (
+          <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px" }}>No categories yet — go back and add one on the Products screen first.</div>
+        ) : (
+          <div style={{ position: "relative" }}>
+            <select value={cats.includes(draft.category) ? draft.category : (cats[0] || "")} onChange={(e) => setDraft({ ...draft, category: e.target.value })} style={{ ...inp, appearance: "none", WebkitAppearance: "none", MozAppearance: "none", paddingRight: 42, cursor: "pointer" }}>
+              {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <ChevronDown size={18} style={{ position: "absolute", right: 15, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
+          </div>
+        )}
 
         <div style={sectionLbl}>Price</div>
         <div style={money$()}>
@@ -14053,6 +14051,26 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
   return (
     <div style={{ paddingBottom: 8 }}>
       <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 8 }}>Your retail menu — haircare, skincare and merch. Add a photo and price, sort them into categories, and ring them up at checkout.</p>
+
+      {/* Categories — defined here; the new-product screen picks from these. */}
+      <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "24px 2px 12px" }}>Categories</div>
+      <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center" }}>
+        {cats.map((c) => (
+          <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid var(--border2)", borderRadius: 22, padding: "9px 10px 9px 16px", fontSize: 14, color: "var(--text)", background: "var(--panel)" }}>
+            {c}
+            <button onClick={() => removeCategory(c)} aria-label={`Remove ${c}`} style={{ background: "none", border: "none", color: "var(--faint)", cursor: "pointer", display: "flex", alignItems: "center", padding: 0 }}><X size={15} /></button>
+          </span>
+        ))}
+        {addingCat ? (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid var(--text)", borderRadius: 22, padding: "5px 6px 5px 14px", background: "var(--panel2)" }}>
+            <input autoFocus value={newCat} onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCategory(); if (e.key === "Escape") { setAddingCat(false); setNewCat(""); } }} placeholder="Category name" style={{ width: 130, border: "none", outline: "none", background: "transparent", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
+            <button onClick={addCategory} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 16, padding: "7px 13px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Add</button>
+          </span>
+        ) : (
+          <button onClick={() => { setAddingCat(true); setNewCat(""); }} style={{ padding: "11px 16px", borderRadius: 22, border: "1px dashed var(--border2)", background: "transparent", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Plus size={15} /> Add category</button>
+        )}
+      </div>
+
       {products.length === 0 ? (
         <button onClick={startNew} className="lift" style={{ width: "100%", marginTop: 18, background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 16, padding: "40px 16px", color: "var(--sub)", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, cursor: "pointer" }}>
           <Plus size={26} style={{ color: "var(--faint)" }} />
