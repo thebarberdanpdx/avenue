@@ -285,15 +285,15 @@ const DEFAULT_BUSINESS = {
   // Merge tags {client} {provider} {service} {date} {time} {business} get filled in automatically.
   messages: [
     { id: "booked", label: "Appointment Booked", channel: "both", timing: "Right after booking", enabled: true,
-      body: "Hi {client},\n\nYou're all set! Here's your booking information for {business}:\n\n{appointment}\n\n{location}\n\nCancellation policy:\n{policy}\n\nQuestions? Email {email} or call {phone}.\n\n{cancel link}\n\nThanks,\n{business}" },
+      body: "You're all set, {client} — we can't wait to see you.\n\n{appointment}\n\n{location}\n\nPlans change, and that's okay. You can reschedule or cancel anytime here:\n{cancel link}\n\nSee you soon,\n{business}" },
     { id: "remind2d", label: "Reminder — 2 days before", channel: "email", timing: "2 days before", enabled: true,
-      body: "Hi {client}, just a reminder of your upcoming {service} with {provider} at {business} on {date} at {time}. See you soon!" },
-    { id: "remind24h", label: "Reminder — 24 hours before", channel: "text", timing: "24 hours before", enabled: true,
-      body: "Reminder: {service} with {provider} tomorrow at {time}. Reply C to confirm, or tap to reschedule." },
+      body: "Hi {client} — just a couple of days until your {service} with {provider} at {business}. We're looking forward to seeing you on {date} at {time}.\n\nNeed to move it? No problem:\n{cancel link}" },
+    { id: "remind24h", label: "Reminder — 1 day before", channel: "text", timing: "1 day before", enabled: true,
+      body: "See you tomorrow, {client}! {provider} has your {service} set for {time} at {business}. Looking forward to it.\n\n{cancel link}" },
     { id: "remind3h", label: "Reminder — 3 hours before", channel: "text", timing: "3 hours before", enabled: true,
-      body: "See you today at {time}, {client}! {provider} has you down for a {service}. {business}" },
-    { id: "checkin", label: "Check-in / Ready", channel: "text", timing: "When you tap \u201cready\u201d", enabled: true,
-      body: "{provider} is ready for you, {client}! Come on back whenever you're set." },
+      body: "Today's the day, {client}! {provider} will be ready for your {service} at {time}. Can't wait to see you.\n\n{cancel link}" },
+    { id: "checkin", label: "Reminder \u2014 15 minutes before", channel: "text", timing: "15 minutes before", enabled: true,
+      body: "Almost time, {client} \u2014 see you in about 15 minutes. {provider} is looking forward to your {service} at {business}.\n\nHere already? Let us know:\n{checkin link}" },
     { id: "canceled", label: "Appointment Canceled", channel: "both", timing: "When canceled", enabled: true,
       body: "Your {service} on {date} at {time} has been canceled, {client}. We'd love to see you again — book anytime at {business}." },
     { id: "rescheduled", label: "Appointment Rescheduled", channel: "both", timing: "When rescheduled", enabled: true,
@@ -311,6 +311,23 @@ const DEFAULT_BUSINESS = {
     { id: "loc1", name: "Main Studio", address: "2077 NE Town Center Dr, Suite 120", cityZip: "Beaverton, OR 97006", phone: "(503) 555-0142", hours: "Mon, Thu–Sun · 9–5" },
   ],
 };
+
+// One-time refresh of the five client-facing reminder templates to the current welcoming copy.
+// Version-guarded so a shop's own later edits in Settings → Messages are never clobbered: once
+// msgCopyVersion reaches MSG_COPY_VERSION the migration is a no-op. Only the listed ids are touched
+// (label/timing/body); channel and every other message are left exactly as the shop has them.
+const MSG_COPY_VERSION = 2;
+function migrateMessageCopy(biz) {
+  try {
+    if (!biz || (biz.msgCopyVersion || 0) >= MSG_COPY_VERSION) return biz;
+    const ids = ["booked", "remind2d", "remind24h", "remind3h", "checkin"];
+    const def = Object.fromEntries((DEFAULT_BUSINESS.messages || []).map((m) => [m.id, m]));
+    const base = (Array.isArray(biz.messages) && biz.messages.length) ? biz.messages : DEFAULT_BUSINESS.messages;
+    const messages = base.map((m) => (ids.includes(m.id) && def[m.id]) ? { ...m, label: def[m.id].label, timing: def[m.id].timing, body: def[m.id].body } : m);
+    ids.forEach((id) => { if (!messages.some((m) => m.id === id) && def[id]) messages.push(def[id]); });
+    return { ...biz, messages, msgCopyVersion: MSG_COPY_VERSION };
+  } catch (e) { return biz; }
+}
 
 // Each working day: { on: bool, start: minutes, end: minutes }. Keyed 0(Sun)–6(Sat).
 const DEFAULT_HOURS = {
@@ -1492,8 +1509,15 @@ function App() {
       const { data: shopRow, error: shopErr } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle();
       if (shopErr) { allLoaded = false; console.error('[vero] load shops failed:', shopErr); }
       else if (shopRow && shopRow.settings && Object.keys(shopRow.settings).length) {
-        const { _categories, _cutLibrary, ...biz } = shopRow.settings;
+        const { _categories, _cutLibrary, ...rawBiz } = shopRow.settings;
+        const biz = migrateMessageCopy(rawBiz);
         setBusiness(biz);
+        // If the one-time message-copy refresh changed anything, write it straight back so the
+        // reminder cron (which reads the DB, not this session) picks up the new wording + timings.
+        // Preserves _categories/_cutLibrary by merging over the row we just read.
+        if (biz !== rawBiz) {
+          try { supabase.from('shops').upsert({ id: SHOP_ID, name: biz.name || SHOP_ID, settings: { ...shopRow.settings, ...biz } }).then(() => {}, () => {}); } catch (e) {}
+        }
         if (Array.isArray(_categories) && _categories.length) setCategories(_categories);
         if (Array.isArray(_cutLibrary)) savedCutLibrary = _cutLibrary;
       }
@@ -2493,6 +2517,7 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject }) 
       email: business.email || "", policy: business.policy || "",
       locName: (business.multiLocation && business.locations && business.locations[0] && business.locations[0].name) || business.name || "",
       cancelUrl: (typeof window !== "undefined" && appt.manageToken) ? `${window.location.origin}/manage?t=${appt.manageToken}` : "",
+      arriveUrl: (typeof window !== "undefined" && appt.manageToken) ? `${window.location.origin}/manage?t=${appt.manageToken}&a=1` : "",
     };
     fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: m.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: subject || `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
   } catch (e) {}
@@ -5412,6 +5437,9 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
   const [busy, setBusy] = useState(false);
 
   const windowHrs = business.cancelWindowHrs || 24;
+  // Arrival deep-link: the 15-minute reminder's check-in link adds ?a=1 so we open straight
+  // onto the "I've arrived" screen.
+  const arriveFlag = (() => { try { return new URLSearchParams(window.location.search).get("a") === "1"; } catch (e) { return false; } })();
 
   useEffect(() => {
     if (!token) { setPhase("error"); return; }
@@ -5422,7 +5450,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
         if (!alive) return;
         if (error || !data || !data.id) { setPhase("error"); return; }
         setAppt(data);
-        setPhase(String(data.status || "").toLowerCase() === "cancelled" ? "cancelled" : "view");
+        setPhase(String(data.status || "").toLowerCase() === "cancelled" ? "cancelled" : (arriveFlag ? "arrive" : "view"));
       } catch (e) { if (alive) setPhase("error"); return; }
       try { const av = await supabase.rpc("get_availability", { p_shop: shopId }); if (alive && av && av.data) setAvail(av.data); } catch (e) {}
     })();
@@ -5461,6 +5489,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
         email: business.email || "", policy: business.policy || "",
         locName: (business.multiLocation && business.locations && business.locations[0] && business.locations[0].name) || business.name || "",
         cancelUrl: typeof window !== "undefined" ? `${window.location.origin}/manage?t=${token}` : "",
+        arriveUrl: typeof window !== "undefined" ? `${window.location.origin}/manage?t=${token}&a=1` : "",
       };
       fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: m.channel || "email", to: { email: (a.email || "").trim(), phone: (a.phone || "").trim(), smsOptOut: false }, subject: `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
     } catch (e) {}
@@ -5479,6 +5508,14 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
       const updated = { ...appt, start: newSlot, end: newSlot + dur, bookedFor: when.toISOString() };
       setAppt(updated); fireNotify("rescheduled", updated); fireStaffPush({ shopId, title: "Appointment rescheduled", appt: updated, prevAppt: appt }); setPhase("rescheduled");
     } catch (e) { setPhase("error"); } finally { setBusy(false); }
+  };
+  // Client self-check-in: flip the appointment to "in lobby" (RPC) AND push the barber. The push
+  // fires even if the RPC isn't deployed yet, so the barber is always notified they've arrived.
+  const submitArrive = async () => {
+    if (busy) return; setBusy(true);
+    try { await supabase.rpc("manage_checkin_by_token", { p_token: token }); } catch (e) {}
+    try { fireStaffPush({ shopId, title: "Client arrived", appt: { ...appt, status: "checked-in" } }); } catch (e) {}
+    setBusy(false); setPhase("arrived");
   };
 
   const A = "var(--gold)", ON = "var(--on-gold)", RED = "#B5564B";
@@ -5518,6 +5555,23 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
 
   if (phase === "cancelled") return <Shell>{centerCard(<><Tick /><Title>Appointment released</Title><Body>That time is back on the books for someone else. We'd love to see you again whenever you're ready.</Body><button onClick={onExit} style={goBtn}>Book again</button></>)}</Shell>;
   if (phase === "rescheduled") return <Shell>{centerCard(<><Tick /><Title>You're all set</Title><Body>Your appointment is now {when.date} at {when.time}. A fresh confirmation is on its way.</Body><button onClick={onExit} style={{ ...goBtn, background: "transparent", color: "var(--sub)", boxShadow: "none", textDecoration: "underline", textUnderlineOffset: 3 }}>Done</button></>)}</Shell>;
+  if (phase === "arrived") return <Shell>{centerCard(<><Tick /><Title>You're checked in</Title><Body>{prov ? prov.name : "Your barber"} knows you're here — have a seat and you'll be called shortly.</Body><button onClick={onExit} style={{ ...goBtn, background: "transparent", color: "var(--sub)", boxShadow: "none", textDecoration: "underline", textUnderlineOffset: 3 }}>Done</button></>)}</Shell>;
+
+  if (phase === "arrive") return (
+    <Shell>
+      <div style={ticketBox}>
+        <Band />
+        <div style={{ padding: 28, textAlign: "center" }}>
+          <Title>You're here!</Title>
+          <Body>Tap below and {prov ? prov.name : "your barber"} will know you've arrived for your {appt.serviceName || appt.title} at {when.time}.</Body>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button disabled={busy} onClick={submitArrive} style={goBtn}>{busy ? "Letting them know…" : "I've arrived"}</button>
+            <button onClick={() => setPhase("view")} style={ghostBtn}>View my appointment</button>
+          </div>
+        </div>
+      </div>
+    </Shell>
+  );
 
   if (phase === "cancel") return (
     <Shell>

@@ -13,6 +13,8 @@ import { createClient } from "@supabase/supabase-js";
 import { renderMessage, renderEmailHtml, renderPlainText, parseOffsetMinutes, formatApptDateTime, sendEmail, sendSms, resolveChannels } from "../lib/messaging.js";
 
 const DEAD_STATUSES = ["canceled", "cancelled", "done", "no-show", "noshow", "completed"];
+// Public site origin for the self-service manage / arrival links baked into reminders.
+const SITE = (process.env.SITE_URL || "https://gotvero.com").replace(/\/+$/, "");
 
 export default async function handler(req, res) {
   // Optional shared-secret guard so randoms can't trigger your sends.
@@ -81,6 +83,8 @@ export default async function handler(req, res) {
         locName: shopLoc,
         policy: shopPolicy,
         addons,
+        cancelUrl: a.manageToken ? `${SITE}/manage?t=${a.manageToken}` : "",
+        arriveUrl: a.manageToken ? `${SITE}/manage?t=${a.manageToken}&a=1` : "",
       };
       const email = String(client.email || "").trim();
       const phone = String(client.phone || a.phone || "").replace(/\D/g, "");
