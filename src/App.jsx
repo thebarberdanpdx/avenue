@@ -9470,8 +9470,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         )}
         {on && ct && offeringStaff.length > 0 && (
           <div style={{ ...cardStyle, marginBottom: 16 }}>
-            <SectionLbl style={{ margin: "0 2px 4px" }}>Prices by barber</SectionLbl>
-            <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 2px 14px", lineHeight: 1.45 }}>Each barber's own price/time for this cut. Blank uses the price above. Same data as My team → {offeringStaff[0] ? offeringStaff[0].name.split(" ")[0] : "barber"} → Services.</p>
+            <SectionLbl style={{ margin: "0 2px 4px" }}>Prices by staff member</SectionLbl>
+            <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 2px 14px", lineHeight: 1.45 }}>Each staff member's own price/time for this cut. Blank uses the price above. Same data as My team → {offeringStaff[0] ? offeringStaff[0].name.split(" ")[0] : "their"} → Services.</p>
             <div style={{ display: "grid", gap: 14 }}>
               {offeringStaff.map((p) => {
                 const se = form.staff[p.id] || {};

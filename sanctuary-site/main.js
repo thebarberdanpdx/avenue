@@ -68,7 +68,7 @@
     function update() {
       const items = rows.filter((r) => selected.has(r.dataset.id));
       if (!items.length) {
-        label.textContent = "Tap the services you want — we'll build your visit.";
+        label.textContent = "Select the services you'd like and we'll total your visit.";
         chips.innerHTML = "";
         book.textContent = "Book your appointment";
         return;
