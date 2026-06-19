@@ -6187,6 +6187,19 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{todayLabel}</div>
       </div>
 
+      {/* WRAP-UP — jumps to the very top whenever cuts are waiting to be logged, so it's
+          visible without scrolling. When caught up it disappears (the row in Quick actions covers that). */}
+      {wrapUpList.length > 0 && (
+        <button onClick={() => setWrapOpen(true)} className="lift" style={{ width: "100%", textAlign: "left", marginBottom: 11, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "15px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", color: "var(--text)" }}>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500 }}>Wrap up</span>
+            <span style={{ display: "block", fontSize: 13, color: "var(--text2)", marginTop: 3 }}>{wrapUpList.length} {wrapUpList.length === 1 ? "cut" : "cuts"} to log</span>
+          </span>
+          <span style={{ minWidth: 24, height: 24, borderRadius: 12, padding: "0 8px", background: "var(--gold)", color: "var(--on-gold)", fontSize: 12.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{wrapUpList.length}</span>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--gold)", flexShrink: 0 }}>→</span>
+        </button>
+      )}
+
       {/* TODAY — hero card: money + goal ring */}
       <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 11 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -6237,21 +6250,18 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       {/* Quick actions — wrap up (lights when cuts are waiting), growth, reports, team — Atelier hairline rows */}
       <div style={{ marginBottom: 30 }}>
         <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
-          {(() => {
-            const n = wrapUpList.length;
-            const lit = n > 0;
-            return (
-              <button onClick={() => (lit ? setWrapOpen(true) : (showToast && showToast("All caught up — nothing to log.")))} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+          {/* When cuts are waiting, the prominent card at the top of Pulse covers Wrap up;
+              here we only show the "All caught up" resting state to avoid a duplicate row. */}
+          {wrapUpList.length === 0 && (
+              <button onClick={() => (showToast && showToast("All caught up — nothing to log."))} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Wrap up</span>
-                  <span style={{ display: "block", fontSize: 12.5, color: lit ? "var(--text2)" : "var(--faint)", marginTop: 3 }}>{lit ? (n + (n === 1 ? " cut to log" : " cuts to log")) : "All caught up"}</span>
+                  <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>All caught up</span>
                 </span>
-                {lit && <span style={{ minWidth: 22, height: 22, borderRadius: 11, padding: "0 7px", background: "var(--text)", color: "var(--bg)", fontSize: 12, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, alignSelf: "center" }}>{n}</span>}
                 <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
               </button>
-            );
-          })()}
-          <button onClick={() => setGrowthOpen(true)} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+          )}
+          <button onClick={() => setGrowthOpen(true)} style={{ width: "100%", background: "none", border: "none", borderTop: wrapUpList.length === 0 ? "1px solid var(--line)" : "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
             <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>How you're growing</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>People keep coming back</span></span>
             <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
           </button>
