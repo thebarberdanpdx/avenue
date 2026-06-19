@@ -3537,7 +3537,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             setAddonFlow(null);
             const anyoneProv = providers.find((p) => p.id === "anyone") || providers[0];
             setCart([{ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }]);
-            const hasCuts = svc.cutTypes && svc.cutTypes.length > 0;
+            const hasCuts = svc.usesCutStyles !== false && svc.cutTypes && svc.cutTypes.length > 0;
             if (hasCuts) { setSimpleStep("cut"); }
             else { startAddons({ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }); }
           };
@@ -3783,7 +3783,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             if (svc.firstTime && svc.intake) { setIntakeFor(svc); return; }
             setDraft(svc); setDraftAddons({}); setCutType(null); setBeardType(null);
             const anyoneProv = providers.find((p) => p.id === "anyone") || providers[0];
-            if (svc.cutTypes && svc.cutTypes.length > 0) { setCutPhase("type"); setStep(2); }
+            if (svc.usesCutStyles !== false && svc.cutTypes && svc.cutTypes.length > 0) { setCutPhase("type"); setStep(2); }
             else { setCart((c) => (c.length ? c.map((e, i) => i === 0 ? { service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} } : e) : [{ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }])); startAddons({ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }); }
           };
           const metaFor = (svc) => {
@@ -9283,6 +9283,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [section, setSection] = useState(null); // legacy section nav (kept for read-only ViewCard "Edit" deep-links; main editor is single-page now)
   const [advancedOpen, setAdvancedOpen] = useState(false); // single-page editor: Advanced expander
   const [picker, setPicker] = useState(null); // {target}
+  const [stylePriceOpen, setStylePriceOpen] = useState({}); // {providerId: bool} — per-barber "prices per style" expander in Staff & pricing
   const [editMode, setEditMode] = useState(false); // list view: browse vs manage (reorder/delete/rename)
   const [catSheet, setCatSheet] = useState(false); // category manager sheet (add / rename / reorder / delete)
   const [showArchived, setShowArchived] = useState(false); // list view: archived services collapse
@@ -9301,17 +9302,32 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // build a default staff map: everyone ON, no overrides (null = use service default)
   const defaultStaffMap = () => { const m = {}; staffList.forEach((p) => { m[p.id] = { on: true, duration: null, price: null }; }); return m; };
   const defaultBooking = () => ({ available: true, description: "", customPrice: false, promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false });
-  const blank = { id: "", name: "", price: "", duration: "", color: "sage", photo: "", photos: [], category: cats[0], addonGroups: [], staff: {}, booking: defaultBooking() };
+  const blank = { id: "", name: "", price: "", duration: "", color: "sage", photo: "", photos: [], category: cats[0], addonGroups: [], staff: {}, booking: defaultBooking(), usesCutStyles: false };
   const [form, setForm] = useState(blank);
   const dragId = useRef(null);
 
   // ensure the form always has an entry for every current staff member
   const ensureStaff = (s) => { const m = { ...(s.staff || {}) }; staffList.forEach((p) => { if (!m[p.id]) m[p.id] = { on: true, duration: null, price: null }; }); return m; };
   const setStaff = (pid, patch) => setForm((f) => ({ ...f, staff: { ...f.staff, [pid]: { ...f.staff[pid], ...patch } } }));
+  // Per-barber, per-cut-style overrides — SAME keys as StaffMembersView's setCutPrice/setCutDur
+  // (service.staff[pid].cutPrice[ctId] / cutDur[ctId]) so the two screens stay mirrored.
+  // val === null clears the override (deletes the key → falls back to default); else Number.
+  const setStaffCutPrice = (pid, ctId, val) => setForm((f) => {
+    const cur = (f.staff && f.staff[pid]) || { on: true, duration: null, price: null };
+    const cutPrice = { ...(cur.cutPrice || {}) };
+    if (val == null) delete cutPrice[ctId]; else cutPrice[ctId] = Number(val);
+    return { ...f, staff: { ...f.staff, [pid]: { ...cur, cutPrice } } };
+  });
+  const setStaffCutDur = (pid, ctId, val) => setForm((f) => {
+    const cur = (f.staff && f.staff[pid]) || { on: true, duration: null, price: null };
+    const cutDur = { ...(cur.cutDur || {}) };
+    if (val == null) delete cutDur[ctId]; else cutDur[ctId] = Number(val);
+    return { ...f, staff: { ...f.staff, [pid]: { ...cur, cutDur } } };
+  });
   const setBooking = (patch) => setForm((f) => ({ ...f, booking: { ...(f.booking || defaultBooking()), ...patch } }));
 
   const openNew = () => { setForm({ ...blank, id: "svc-" + Date.now(), photos: [], staff: defaultStaffMap(), booking: defaultBooking() }); setSection(null); setEditing("new"); };
-  const openEdit = (s) => { const copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; copy.photos = copy.photos || (copy.photo ? [copy.photo] : []); setForm(copy); setSection(null); setEditing(s.id); };
+  const openEdit = (s) => { const copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; copy.photos = copy.photos || (copy.photo ? [copy.photo] : []); copy.usesCutStyles = (copy.usesCutStyles !== undefined) ? (copy.usesCutStyles !== false) : ((copy.cutTypes || []).length > 0); setForm(copy); setSection(null); setEditing(s.id); };
   const save = () => {
     if (!form.name || !form.price) { showToast("Name and price are required."); return; }
     // clean staff overrides: blank → null (use default), else Number
@@ -9319,13 +9335,17 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     Object.keys(form.staff || {}).forEach((pid) => {
       const e = form.staff[pid];
       cleanStaff[pid] = {
+        ...e,
         on: e.on !== false,
         duration: (e.duration === null || e.duration === "" || e.duration === undefined) ? null : Number(e.duration),
         price: (e.price === null || e.price === "" || e.price === undefined) ? null : Number(e.price),
       };
+      // preserve per-cut-style overrides (shared with My Team → barber → Services)
+      if (e.cutPrice && Object.keys(e.cutPrice).length) cleanStaff[pid].cutPrice = e.cutPrice; else delete cleanStaff[pid].cutPrice;
+      if (e.cutDur && Object.keys(e.cutDur).length) cleanStaff[pid].cutDur = e.cutDur; else delete cleanStaff[pid].cutDur;
     });
     const photos = Array.isArray(form.photos) ? form.photos.filter(Boolean) : [];
-    const clean = { ...form, price: Number(form.price), duration: Number(form.duration) || 30, staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) } };
+    const clean = { ...form, price: Number(form.price), duration: Number(form.duration) || 30, staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false };
     if (editing === "new") setServices([...services, clean]);
     else setServices(services.map((s) => (s.id === editing ? clean : s)));
     // MangoMint pattern: for an existing service, saving a section lands back on the
@@ -9343,7 +9363,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     </div>
   );
   const SaveBar = () => (
-    <button className="lift" onClick={save} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 16, fontWeight: 600, borderRadius: 13, boxShadow: "var(--glow)", marginTop: 26 }}>Save service</button>
+    <button className="lift" onClick={save} style={{ width: "100%", boxSizing: "border-box", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 16, fontWeight: 600, borderRadius: 13, boxShadow: "var(--glow)", marginTop: 26 }}>Save service</button>
   );
   // Toggle now uses the global <Toggle> (50×29) — local duplicate removed for consistency.
 
@@ -9357,12 +9377,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const inpStyle = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
   const sectionLblStyle = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" };
   const SectionLbl = ({ children, style }) => <div style={{ ...sectionLblStyle, ...style }}>{children}</div>;
-  const moneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)" };
-  const moneyInput = { flex: 1, border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+  const moneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)", boxSizing: "border-box", minWidth: 0 };
+  const moneyInput = { flex: 1, minWidth: 0, boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
   const moneyPrefix = { padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 };
   const unitSuffix = { padding: "0 16px 0 0", color: "var(--sub)", fontSize: 14 };
   const chip = (on) => ({ background: on ? "var(--text)" : "transparent", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, color: on ? "var(--bg)" : "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" });
-  const cardStyle = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, boxShadow: "var(--shadow-sm)" };
+  const cardStyle = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, boxShadow: "var(--shadow-sm)", boxSizing: "border-box", minWidth: 0 };
   const pillSwitch = (on) => (
     <span style={{ width: 50, height: 29, borderRadius: 29, background: on ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0, transition: "background .2s", display: "inline-block" }}><span style={{ position: "absolute", top: 3, left: on ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
   );
@@ -9397,10 +9417,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         return (
           <div key={entry.id} style={{ ...cardStyle, marginBottom: 14, border: on ? (ct.popular ? "1.5px solid var(--text)" : "1px solid var(--border2)") : "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ position: "relative", flexShrink: 0 }}>
-                <div onClick={() => setPicker({ target: "style", entry })} title="Add or change photo" style={{ width: 48, height: 48, borderRadius: 12, overflow: "hidden", background: "var(--panel2)", border: entry.images && entry.images[0] ? "1px solid var(--border)" : "1.5px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>{entry.images && entry.images[0] ? <img src={imgUrl(entry.images[0], 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={16} style={{ color: "var(--faint)" }} />}</div>
-                {entry.images && entry.images[0] && <div onClick={(e) => { e.stopPropagation(); setLibField(entry, { images: [] }); }} title="Remove photo" style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.65)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</div>}
-              </div>
               <span style={{ minWidth: 0, flex: 1 }}>
                 <span style={{ display: "block", fontSize: 17, fontWeight: 500 }}>{entry.label}{on && ct.popular ? <span style={{ marginLeft: 8, fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 700, color: "var(--bg)", background: "var(--text)", borderRadius: 20, padding: "2px 8px", verticalAlign: "middle" }}>Most common</span> : null}</span>
                 <span style={{ display: "block", fontSize: 13, color: "var(--faint)", marginTop: 3 }}>{on ? "Offered here" : "Not offered"}</span>
@@ -9431,6 +9447,22 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   <input value={entry.label || ""} onChange={(e) => setLibField(entry, { label: e.target.value })} placeholder="e.g. Skin Fade" style={inpStyle} />
                   <SectionLbl style={{ margin: "16px 2px 8px" }}>Description</SectionLbl>
                   <textarea value={entry.desc || ""} onChange={(e) => setLibField(entry, { desc: e.target.value })} placeholder="Shown to clients under the name" rows={4} style={{ ...inpStyle, resize: "vertical", minHeight: 92, lineHeight: 1.5 }} />
+                  <SectionLbl style={{ margin: "16px 2px 10px" }}>Photos <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--faint)" }}>· up to 3, optional</span></SectionLbl>
+                  {(() => { const imgs = Array.isArray(entry.images) ? entry.images.filter(Boolean) : []; return (
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      {imgs.map((pid) => (
+                        <div key={pid} style={{ position: "relative", width: 76, height: 76, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", flexShrink: 0 }}>
+                          <img src={imgUrl(pid, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                          <div onClick={() => setLibField(entry, { images: imgs.filter((x) => x !== pid) })} title="Remove photo" style={{ position: "absolute", top: 4, right: 4, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</div>
+                        </div>
+                      ))}
+                      {imgs.length < 3 && (
+                        <button onClick={() => setPicker({ target: "style", entry })} style={{ width: 76, height: 76, borderRadius: 12, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 3, padding: 0, cursor: "pointer", flexShrink: 0 }}>
+                          <Plus size={18} /><span style={{ fontSize: 10.5, fontWeight: 600 }}>Add photo</span>
+                        </button>
+                      )}
+                    </div>
+                  ); })()}
                   <SectionLbl style={{ margin: "16px 2px 10px" }}>Calendar color</SectionLbl>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <button onClick={() => setLibField(entry, { color: null })} title="No color — use the service's color" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--panel2)", border: !entry.color ? "2px solid var(--text)" : "2px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!entry.color && <Check size={14} style={{ color: "var(--text)" }} />}</button>
@@ -9527,10 +9559,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   })();
 
   // ---- STAFF section ----
+  // Per-style staff pricing only shows when this service actually uses cut styles.
+  const hasStyles = (form.usesCutStyles !== false) && (form.cutTypes || []).length > 0;
   const staffBody = (
     <>
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Everyone offers this by default. Turn someone off, or give them their own time and price. Blank = the service default ({form.duration || "—"} min · ${form.price || "—"}).</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 13, minWidth: 0 }}>
         {staffList.map((p) => {
           const e = form.staff[p.id] || { on: true, duration: null, price: null };
           const on = e.on !== false;
@@ -9550,16 +9584,16 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 <span onClick={() => setStaff(p.id, { on: !on })} style={{ cursor: "pointer" }}>{pillSwitch(on)}</span>
               </div>
               {on && (
-                <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
-                  <div style={{ flex: 1 }}>
+                <div style={{ marginTop: 14, display: "flex", gap: 10, minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ ...moneyWrap, borderColor: priceOver ? "var(--text)" : "var(--border2)" }}>
                       <span style={{ padding: "0 0 0 14px", color: priceOver ? "var(--text)" : "var(--sub)", fontSize: 16 }}>$</span>
-                      <input type="number" inputMode="decimal" value={e.price ?? ""} placeholder={String(form.price || "default")} onChange={(ev) => setStaff(p.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ ...moneyInput, padding: "12px 14px", color: priceOver ? "var(--text)" : "var(--text)", fontWeight: priceOver ? 600 : 400 }} />
+                      <input type="number" inputMode="decimal" value={e.price ?? ""} placeholder={String(form.price || "default")} onChange={(ev) => setStaff(p.id, { price: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ ...moneyInput, minWidth: 0, padding: "12px 14px", color: priceOver ? "var(--text)" : "var(--text)", fontWeight: priceOver ? 600 : 400 }} />
                     </div>
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ ...moneyWrap, borderColor: durOver ? "var(--text)" : "var(--border2)" }}>
-                      <input type="number" inputMode="numeric" value={e.duration ?? ""} placeholder={String(form.duration || "default")} onChange={(ev) => setStaff(p.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ ...moneyInput, padding: "12px 14px", paddingLeft: 14, fontWeight: durOver ? 600 : 400 }} />
+                      <input type="number" inputMode="numeric" value={e.duration ?? ""} placeholder={String(form.duration || "default")} onChange={(ev) => setStaff(p.id, { duration: ev.target.value === "" ? null : Number(ev.target.value) })} style={{ ...moneyInput, minWidth: 0, padding: "12px 14px", paddingLeft: 14, fontWeight: durOver ? 600 : 400 }} />
                       <span style={unitSuffix}>min</span>
                     </div>
                   </div>
@@ -9572,6 +9606,46 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                     : <span style={{ fontSize: 12.5, color: "var(--faint)" }}>Blank uses the service default</span>}
                 </div>
               )}
+              {on && hasStyles && (() => {
+                const open = !!stylePriceOpen[p.id];
+                return (
+                  <div style={{ marginTop: 12, borderTop: "1px solid var(--line)", paddingTop: 12, minWidth: 0 }}>
+                    <button onClick={() => setStylePriceOpen((o) => ({ ...o, [p.id]: !o[p.id] }))} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--sub)", fontSize: 13.5, fontWeight: 500 }}>
+                      <span>Set prices per style</span>
+                      {open ? <ChevronUp size={16} style={{ color: "var(--faint)", flexShrink: 0 }} /> : <ChevronDown size={16} style={{ color: "var(--faint)", flexShrink: 0 }} />}
+                    </button>
+                    {open && (
+                      <div style={{ display: "grid", gap: 9, marginTop: 12 }}>
+                        {(form.cutTypes || []).map((ct) => {
+                          const se = form.staff[p.id] || {};
+                          const pv = (se.cutPrice && se.cutPrice[ct.id] != null) ? se.cutPrice[ct.id] : "";
+                          const dv = (se.cutDur && se.cutDur[ct.id] != null) ? se.cutDur[ct.id] : "";
+                          return (
+                            <div key={ct.id} style={{ minWidth: 0 }}>
+                              <SectionLbl style={{ margin: "0 2px 6px" }}>{ct.label || "Style"}</SectionLbl>
+                              <div style={{ display: "flex", gap: 10 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={moneyWrap}>
+                                    <span style={{ padding: "0 0 0 14px", color: "var(--sub)", fontSize: 16 }}>$</span>
+                                    <input type="number" inputMode="decimal" value={pv} placeholder={String(cutStylePrice(form, p.id, ct.id) ?? ct.price ?? form.price ?? "")} onChange={(ev) => setStaffCutPrice(p.id, ct.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, minWidth: 0, padding: "11px 12px" }} />
+                                  </div>
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={moneyWrap}>
+                                    <input type="number" inputMode="numeric" value={dv} placeholder={String(ct.duration || form.duration || 45)} onChange={(ev) => setStaffCutDur(p.id, ct.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, minWidth: 0, padding: "11px 12px", paddingLeft: 14 }} />
+                                    <span style={unitSuffix}>min</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <p style={{ fontSize: 12, color: "var(--faint)", margin: "2px 2px 0", lineHeight: 1.45 }}>Blank uses the style's default. Mirrors My team → {p.name.split(" ")[0]} → Services.</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
@@ -9869,7 +9943,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   if (libOpen) {
     return (
       <div className="appt-screen" style={{ paddingBottom: 40 }}>
-        {libPicker && <PhotoPicker onClose={() => setLibPicker(false)} onPick={(id) => { setLibForm((f) => ({ ...f, images: [id] })); setLibPicker(false); }} />}
+        {libPicker && <PhotoPicker onClose={() => setLibPicker(false)} onPick={(id) => { setLibForm((f) => { const cur = Array.isArray(f.images) ? f.images.filter(Boolean) : []; return (cur.includes(id) || cur.length >= 3) ? f : { ...f, images: [...cur, id] }; }); setLibPicker(false); }} />}
         {libForm ? (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
@@ -9878,11 +9952,22 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, paddingLeft: 4 }}>{libForm.label || "Edit style"}</h2>
             <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20, paddingLeft: 4 }}>Edit this style once. When you save, the name, description and photo update on every service that uses it. Each service keeps its own price and time.</p>
             <div style={{ ...cardStyle, padding: 20 }}>
-              <SectionLbl style={{ margin: "0 2px 10px" }}>Photo</SectionLbl>
-              <button onClick={() => setLibPicker(true)} className="lift" style={{ width: "100%", height: 160, borderRadius: 14, border: (libForm.images && libForm.images[0]) ? "1px solid var(--border)" : "1.5px dashed var(--border2)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 9, padding: 0 }}>
-                {libForm.images && libForm.images[0] ? <img src={imgUrl(libForm.images[0], 400)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 14 }}>Add a photo</span></>}
-              </button>
-              {libForm.images && libForm.images.length > 0 && <div style={{ textAlign: "center", marginTop: 8 }}><button onClick={() => setLibForm((f) => ({ ...f, images: [] }))} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 2, padding: 0, cursor: "pointer" }}>Remove photo</button></div>}
+              <SectionLbl style={{ margin: "0 2px 10px" }}>Photos <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--faint)" }}>· up to 3, optional</span></SectionLbl>
+              {(() => { const imgs = Array.isArray(libForm.images) ? libForm.images.filter(Boolean) : []; return (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                  {imgs.map((pid) => (
+                    <div key={pid} style={{ position: "relative", aspectRatio: "1/1", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)" }}>
+                      <img src={imgUrl(pid, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      <div onClick={() => setLibForm((f) => ({ ...f, images: (Array.isArray(f.images) ? f.images : []).filter((x) => x !== pid) }))} title="Remove photo" style={{ position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14, lineHeight: 1 }}>×</div>
+                    </div>
+                  ))}
+                  {imgs.length < 3 && (
+                    <button onClick={() => setLibPicker(true)} className="lift" style={{ aspectRatio: "1/1", borderRadius: 12, border: "1.5px dashed var(--border2)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 6, padding: 0 }}>
+                      <ImageIcon size={22} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 12, fontWeight: 600 }}>Add a photo</span>
+                    </button>
+                  )}
+                </div>
+              ); })()}
               <SectionLbl style={{ margin: "20px 2px 8px" }}>Name</SectionLbl>
               <input value={libForm.label || ""} onChange={(e) => setLibForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Skin Fade" style={inpStyle} />
               <SectionLbl style={{ margin: "18px 2px 8px" }}>Description</SectionLbl>
@@ -9949,6 +10034,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const bareInp = { width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: 0, color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
 
   const cutCount = (form.cutTypes || []).length;
+  // Whether this service uses cut styles. undefined (legacy) → ON if it already has styles.
+  const usesCutStyles = (form.usesCutStyles !== undefined) ? (form.usesCutStyles !== false) : (cutCount > 0);
   const addonCount = (form.addonGroups || []).length;
   const offeringCount = staffList.filter((p) => form.staff[p.id]?.on !== false).length;
   const anyStaffOverride = staffList.some((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); });
@@ -10039,7 +10126,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           if (picker.target === "service") setForm({ ...form, photo: id });
           else if (picker.target === "gallery") addPhoto(id);
           else if (picker.target === "cut") setCut(picker.index, { images: [id] });
-          else if (picker.target === "style") setLibField(picker.entry, { images: [id] });
+          else if (picker.target === "style") { const cur = Array.isArray(picker.entry.images) ? picker.entry.images.filter(Boolean) : []; if (!cur.includes(id) && cur.length < 3) setLibField(picker.entry, { images: [...cur, id] }); }
           else setForm({ ...form, addonGroups: form.addonGroups.map((g, i) => i === picker.target ? { ...g, photo: id } : g) });
         }} />}
         {colorOpen && (
@@ -10141,7 +10228,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 {/* Options */}
                 {band("Options", "tap to add, skip if you don't need it")}
                 <div style={{ padding: "4px 16px" }}>
-                  <DrillRow icon={<Scissors size={18} />} label="Cut styles" sub={cutCount ? `${cutCount} style${cutCount === 1 ? "" : "s"}` : "None yet"} target="cutstyles" />
+                  <div style={{ borderTop: "1px solid var(--line)" }}>
+                    <Row title="This service has cut styles" desc={usesCutStyles ? "Clients pick a style (e.g. fade) when booking." : "Plain service — no style picker at booking."}>
+                      <Toggle on={usesCutStyles} onClick={() => setForm({ ...form, usesCutStyles: !usesCutStyles })} />
+                    </Row>
+                  </div>
+                  {usesCutStyles && <DrillRow icon={<Scissors size={18} />} label="Cut styles" sub={cutCount ? `${cutCount} style${cutCount === 1 ? "" : "s"}` : "None yet"} target="cutstyles" />}
                   <DrillRow icon={<Plus size={18} />} label="Add-ons & questions" sub={addonCount ? `${addonCount} added` : "None yet"} target="addons" />
                   <DrillRow icon={<Users size={18} />} label="Staff & pricing" sub={anyStaffOverride ? `${staffList.filter((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); }).length} custom` : `${offeringCount === staffList.length ? "All barbers" : offeringCount + " of " + staffList.length} · default`} target="staff" />
                   <DrillRow icon={<ImageIcon size={18} />} label="Photos" sub={photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "None yet"} target="photos" />
