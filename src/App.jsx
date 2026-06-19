@@ -9073,7 +9073,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
-        {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} />}
+        {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={() => setActiveClient(null)} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); setActiveClient(null); setTab("calendar"); }} />}
         {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
@@ -10074,6 +10074,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       {sub && <span style={{ fontSize: 12.5, color: "var(--sub)", fontWeight: 400 }}> · {sub}</span>}
     </div>
   );
+  // A whole-row back link (chevron + label both tappable, with a comfortable hit area).
+  const backBar = (label, onBack) => (
+    <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "none", padding: "6px 6px 6px 0", marginBottom: 6, cursor: "pointer", color: "var(--gold)", WebkitTapHighlightColor: "transparent" }}>
+      <ChevronLeft size={20} />
+      <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{label}</span>
+    </button>
+  );
   const microLbl = { fontFamily: FONT_BODY, fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 5, display: "block" };
   const fieldBox = { border: "1px solid var(--border2)", borderRadius: 12, background: "var(--panel)", padding: "9px 13px 10px" };
   const bareInp = { width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: 0, color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
@@ -10100,10 +10107,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // ---- drill-in: PHOTOS gallery (new) ----
   const photosScreen = (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-        <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
-        <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{(form.name || "SERVICE").toUpperCase()}</span>
-      </div>
+      {backBar((form.name || "SERVICE").toUpperCase(), () => setSection(null))}
       <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 8px" }}>Photos</h2>
       <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Add example photos so clients can see this service while they book. The first photo is the cover.</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
@@ -10140,10 +10144,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     }
     return (
       <>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-          <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
-          <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{(form.name || "SERVICE").toUpperCase()}</span>
-        </div>
+        {backBar((form.name || "SERVICE").toUpperCase(), () => setSection(null))}
         <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Cut styles</h2>
         {cutStylesList}
         <SaveBar />
@@ -10154,10 +10155,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // ---- drill-in: ADD-ONS & QUESTIONS (rebuilt header, reuse customizationsBody) ----
   const addonsScreen = (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-        <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
-        <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{(form.name || "SERVICE").toUpperCase()}</span>
-      </div>
+      {backBar((form.name || "SERVICE").toUpperCase(), () => setSection(null))}
       <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Add-ons &amp; questions</h2>
       {customizationsBody}
       <SaveBar />
@@ -10167,10 +10165,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // ---- drill-in: STAFF & PRICING (rebuilt header, reuse staffBody) ----
   const staffScreen = (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-        <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
-        <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{(form.name || "SERVICE").toUpperCase()}</span>
-      </div>
+      {backBar((form.name || "SERVICE").toUpperCase(), () => setSection(null))}
       <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Staff &amp; pricing</h2>
       {staffBody}
       <SaveBar />
@@ -10223,10 +10218,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           const isCombo = !!form.isCombo || (form.comboOf || []).length > 0;
           return (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <button onClick={() => setEditing(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
-                <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>SERVICES</span>
-              </div>
+              {backBar("SERVICES", () => setEditing(null))}
               <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: -0.3, margin: "0 0 18px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{form.name || (editing === "new" ? "New service" : "Service")}</h2>
 
               <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
@@ -10285,8 +10277,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   </div>
                 </div>
 
-                {/* Options */}
-                {band("Options", "tap to add, skip if you don't need it")}
+                {/* Service options — a clear, larger heading separating Price & time from the options below */}
+                <div style={{ background: "var(--panel2)", padding: "15px 16px 13px", margin: "0 -1px", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
+                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, letterSpacing: "-0.2px", color: "var(--text)" }}>Service options</span>
+                </div>
                 <div style={{ padding: "4px 16px" }}>
                   <div style={{ borderTop: "1px solid var(--line)" }}>
                     <Row title="This service has cut styles" desc={usesCutStyles ? "Clients pick a style (e.g. fade) when booking." : "Plain service — no style picker at booking."}>
@@ -20584,12 +20578,35 @@ function ReportsView({ appts, clients, providers, services, business, setBusines
   );
 }
 
-function ClientList({ clients, setClients, providers, onOpen, showToast }) {
+function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner, shopId, appts, setAppts, waitlist, setWaitlist }) {
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const staff = providers.filter((p) => p.id !== "anyone");
   const blank = { firstName: "", lastName: "", name: "", phone: "", email: "", provider: staff[0]?.id || "dan", notes: "" };
   const [draft, setDraft] = useState(blank);
+
+  // ── TEMPORARY pre-launch tool ──────────────────────────────────────────────
+  // Owner-only "delete everything" while all data is still test data. Wipes every
+  // client, appointment, and waitlist row for this shop from Supabase, then clears
+  // local state. REMOVE this (state, nukeAll, and the Danger-zone block in the
+  // return) before going live.
+  const [confirmNuke, setConfirmNuke] = useState(false);
+  const [nuking, setNuking] = useState(false);
+  const nukeAll = async () => {
+    if (nuking) return;
+    setNuking(true); setConfirmNuke(false);
+    try {
+      await Promise.all([
+        supabase.from("clients").delete().eq("shop_id", shopId),
+        supabase.from("appointments").delete().eq("shop_id", shopId),
+        supabase.from("waitlist").delete().eq("shop_id", shopId),
+      ]);
+      setClients([]); if (setAppts) setAppts([]); if (setWaitlist) setWaitlist([]);
+      if (showToast) showToast("All clients, appointments, and waitlist entries deleted.");
+    } catch (e) {
+      if (showToast) showToast("Couldn't delete everything — check your connection and try again.");
+    } finally { setNuking(false); }
+  };
 
   const q = query.trim().toLowerCase();
   // Most-recent activity first. Falls back to lastVisit, then to 0 for older records with neither stamp.
@@ -20655,6 +20672,20 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
   return (
     <>
     <div className="fade-up">
+      {/* TEMPORARY pre-launch tool — deletes EVERYTHING (clients + appointments + waitlist). Remove before go-live. */}
+      {isOwner && (
+        confirmNuke ? (
+          <div style={{ marginBottom: 18, padding: 14, border: "1px solid color-mix(in srgb, #c0392b 40%, var(--border))", borderRadius: 12, background: "var(--panel)" }}>
+            <div style={{ fontSize: 14.5, color: "var(--text)", marginBottom: 12, lineHeight: 1.45 }}>Delete all {(clients || []).length} client{(clients || []).length === 1 ? "" : "s"}, {(appts || []).length} appointment{(appts || []).length === 1 ? "" : "s"}, and {(waitlist || []).length} waitlist entr{(waitlist || []).length === 1 ? "y" : "ies"}? This can't be undone.</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={nukeAll} disabled={nuking} style={{ flex: 1, background: "#c0392b", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 600, cursor: nuking ? "default" : "pointer", opacity: nuking ? 0.6 : 1 }}>{nuking ? "Deleting…" : "Delete everything"}</button>
+              <button onClick={() => setConfirmNuke(false)} disabled={nuking} style={{ flex: 1, background: "transparent", color: "var(--sub)", border: "1px solid var(--border)", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmNuke(true)} disabled={nuking} style={{ width: "100%", marginBottom: 18, background: "transparent", color: "#c0392b", border: "1px solid color-mix(in srgb, #c0392b 45%, var(--border))", borderRadius: 12, padding: 13, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Delete all clients &amp; data</button>
+        )
+      )}
       {/* Editorial masthead */}
       <div style={{ marginBottom: 22, paddingTop: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
