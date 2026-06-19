@@ -6,7 +6,8 @@ import {
   Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock,
   Settings, Image as ImageIcon, Lock, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
-  BarChart3, TrendingUp, Palette, Globe, HelpCircle, BookOpen, Search, LifeBuoy, Scissors, Package
+  BarChart3, TrendingUp, Palette, Globe, HelpCircle, BookOpen, Search, LifeBuoy, Scissors, Package,
+  Smartphone, Link2, AlertTriangle, Pause, Play, RotateCw
 } from "lucide-react";
 
 // ============================================================
@@ -1259,6 +1260,20 @@ function App() {
       setView("preview");
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
+  }, []);
+  // In-page hash navigation for the legal pages. The mount router above runs only once
+  // (and short-circuits to the booking flow on /book), so anchor clicks to #terms / #privacy
+  // need a live listener to switch views without a full reload. Powers the booking-page
+  // footer links and the SMS-consent links throughout the flow.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onHash = () => {
+      const h = window.location.hash.toLowerCase();
+      if (h === "#terms") setView("terms");
+      else if (h === "#privacy") setView("privacy");
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
   }, []);
   const goView = (v) => {
     if (v === "shop" && !shopUnlocked) { setPwEntry(""); setPwError(false); setShopPwPrompt(true); return; }
@@ -5276,6 +5291,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
         {step === 9 && <ManageAppointment business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} initialPhone={phone} dateOptions={dateOptions} onExit={onExit} showToast={(m) => {}} />}
         </div>
+
+        {/* Legal footer — pinned to the bottom of the booking page on every step (#terms / #privacy
+            are handled by the App-level hashchange listener, so they open without a reload). */}
+        <div style={{ textAlign: "center", marginTop: 40, paddingTop: 22, borderTop: "1px solid var(--line)", fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--faint)" }}>
+          <a href="#terms" style={{ color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2 }}>Terms of Service</a>
+          <span style={{ margin: "0 9px", opacity: 0.6 }}>&middot;</span>
+          <a href="#privacy" style={{ color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2 }}>Privacy Policy</a>
+        </div>
       </div>
     </div>
   );
@@ -5912,10 +5935,24 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   const thisWeekMoney = sumRevenue(weekStart, nextWeekStart);
   const lastWeekMoney = sumRevenue(lastWeekStart, weekStart);
 
+  // --- Tips — captured at checkout, the number a barber actually feels. Same scope/range as revenue. ---
+  const sumTips = (start, end) => appts
+    .filter((a) => scopeFilter(a) && isRevenue(a) && inRange(a, start, end))
+    .reduce((sum, a) => sum + ((a.paid && a.paid.tip) || 0), 0);
+  const todayTips = sumTips(todayStart, tomorrowStart);
+  const weekTips = sumTips(weekStart, nextWeekStart);
+  const tipRate = todayMoney > 0 ? Math.round((todayTips / todayMoney) * 100) : 0;
+
   // --- Today's appointments in scope, time-sorted ---
   const todayApptsAll = appts
     .filter((a) => scopeFilter(a) && a.status !== "cancelled" && inRange(a, todayStart, tomorrowStart))
     .sort((a, b) => a.start - b.start);
+
+  // --- Projected finish — done revenue + the locked value of cuts still to come today. ---
+  const remainingTodayValue = todayApptsAll
+    .filter((a) => a.status !== "done" && a.status !== "no-show")
+    .reduce((sum, a) => sum + apptPrice(a), 0);
+  const projectedToday = todayMoney + remainingTodayValue;
 
   // --- "Right now" detection — what's on the chair, what's next, or when free until ---
   const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -6008,11 +6045,14 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   // Use a sensible default so the ring ALWAYS shows in personal view, even before a goal is set.
   const rawDailyGoal = !isShopView && viewedProvider ? (viewedProvider.dailyGoal || 0) : 0;
   const rawWeeklyGoal = !isShopView && viewedProvider ? (viewedProvider.weeklyGoal || 0) : 0;
-  const dailyGoal = rawDailyGoal > 0 ? rawDailyGoal : (isShopView ? 0 : 300);   // default $300/day target
-  const weeklyGoal = rawWeeklyGoal > 0 ? rawWeeklyGoal : (isShopView ? 0 : 1500); // default $1,500/week target
-  const goalIsDefault = rawDailyGoal === 0; // tells the UI to show a subtle "set your own" hint
-  const dailyPct = dailyGoal > 0 ? Math.min(100, Math.round((todayMoney / dailyGoal) * 100)) : 0;
-  const weeklyPct = weeklyGoal > 0 ? Math.min(100, Math.round((thisWeekMoney / weeklyGoal) * 100)) : 0;
+  // No fabricated targets — a goal only exists if the barber actually set one. The ring/bar
+  // become a "set a goal" prompt otherwise, instead of charting progress toward a fake number.
+  const dailyGoal = rawDailyGoal;
+  const weeklyGoal = rawWeeklyGoal;
+  const hasDailyGoal = !isShopView && dailyGoal > 0;
+  const hasWeeklyGoal = !isShopView && weeklyGoal > 0;
+  const dailyPct = hasDailyGoal ? Math.min(100, Math.round((todayMoney / dailyGoal) * 100)) : 0;
+  const weeklyPct = hasWeeklyGoal ? Math.min(100, Math.round((thisWeekMoney / weeklyGoal) * 100)) : 0;
 
   // --- Day timeline geometry — show the working hours for the viewed provider (or 9-7 fallback) ---
   let timelineStart = 9 * 60, timelineEnd = 19 * 60;
@@ -6207,7 +6247,11 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 46, fontWeight: 400, color: "var(--text)", lineHeight: 0.95, letterSpacing: -1 }}>
             {fmtMoney(todayMoney)}
           </div>
-          {todayVsYesterday ? (
+          {remainingTodayValue > 0 ? (
+            <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4, marginTop: 8 }}>
+              On track for <strong style={{ color: "var(--text)", fontWeight: 600 }}>{fmtMoney(projectedToday)}</strong> today
+            </div>
+          ) : todayVsYesterday ? (
             <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4, marginTop: 8 }}>
               {todayVsYesterday.up ? "+" : "−"}{fmtMoney(todayVsYesterday.abs)} vs {fmtMoney(yesterdayMoney)} yesterday
             </div>
@@ -6216,9 +6260,14 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               {todayApptsAll.length === 0 ? "Nothing booked today yet." : `${todayApptsAll.length} ${todayApptsAll.length === 1 ? "visit" : "visits"} booked`}
             </div>
           )}
+          {todayTips > 0 && (
+            <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4, marginTop: 3 }}>
+              Tips <strong style={{ color: "var(--text)", fontWeight: 600 }}>{fmtMoney(todayTips)}</strong>{tipRate > 0 ? ` · ${tipRate}%` : ""}
+            </div>
+          )}
         </div>
         {/* Goal ring — always shows in personal view (default target if none set). Tap to edit. */}
-        {!isShopView && (
+        {!isShopView && (hasDailyGoal ? (
           <button onClick={() => openGoalEditor("daily")} style={{ textAlign: "center", flexShrink: 0, background: "none", border: "none", padding: 0, cursor: "pointer" }}>
             <svg width="92" height="92" viewBox="0 0 96 96">
               <circle cx="48" cy="48" r="34" fill="none" stroke="var(--panel2)" strokeWidth="8" />
@@ -6226,9 +6275,17 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               <text x="48" y="53" textAnchor="middle" fill="var(--text)" fontSize="23" fontFamily="'Fraunces', serif" fontWeight="500">{dailyPct}%</text>
             </svg>
             <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 1 }}>{fmtMoney(todayMoney)} / {fmtMoney(dailyGoal)}</div>
-            <div style={{ fontSize: 11, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> {goalIsDefault ? "Set goal" : "Edit goal"}</div>
+            <div style={{ fontSize: 11, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> Edit goal</div>
           </button>
-        )}
+        ) : (
+          <button onClick={() => openGoalEditor("daily")} style={{ textAlign: "center", flexShrink: 0, background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+            <svg width="92" height="92" viewBox="0 0 96 96">
+              <circle cx="48" cy="48" r="34" fill="none" stroke="var(--panel2)" strokeWidth="8" strokeDasharray="4 7" />
+              <text x="48" y="56" textAnchor="middle" fill="var(--faint)" fontSize="34" fontFamily="'Fraunces', serif" fontWeight="400">+</text>
+            </svg>
+            <div style={{ fontSize: 11, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> Set a daily goal</div>
+          </button>
+        ))}
       </div>
 
       {/* STAT TILES — cuts, chair occupancy, avg ticket */}
@@ -6512,6 +6569,11 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             </button>
           )}
         </div>
+        {weekTips > 0 && (
+          <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 8, lineHeight: 1.5 }}>
+            incl. <strong style={{ color: "var(--text)", fontWeight: 600 }}>{fmtMoney(weekTips)}</strong> in tips
+          </div>
+        )}
         {weekDelta && (
           <div style={{ fontSize: 13.5, color: weekDelta.up ? "var(--gold)" : "var(--sub)", marginBottom: 14, marginTop: 8, lineHeight: 1.5 }}>
             {weekDelta.up ? "+" : "−"}{weekDelta.pct}% vs {fmtMoney(weekDelta.prior)} last week
@@ -6522,7 +6584,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         {!isShopView && weeklyGoal > 0 && (
           <div style={{ marginTop: 6 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-              <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>{goalIsDefault ? "WEEKLY (DEFAULT)" : "WEEKLY GOAL"}</div>
+              <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>WEEKLY GOAL</div>
               <div style={{ fontSize: 12.5, color: weeklyPct >= 100 ? "var(--gold)" : "var(--sub)", fontWeight: weeklyPct >= 100 ? 600 : 400 }}>
                 {weeklyPct >= 100 ? `🎯 ${fmtMoney(thisWeekMoney)} of ${fmtMoney(weeklyGoal)}` : `${fmtMoney(thisWeekMoney)} of ${fmtMoney(weeklyGoal)} · ${weeklyPct}%`}
               </div>
@@ -6530,12 +6592,6 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             <div style={{ height: 6, background: "var(--panel2)", borderRadius: 3, overflow: "hidden" }}>
               <div style={{ width: `${weeklyPct}%`, height: "100%", background: weeklyPct >= 100 ? "var(--gold)" : "var(--tint2)", transition: "width .3s ease" }} />
             </div>
-          </div>
-        )}
-        {/* When using the default goal, a subtle nudge to set a personal one */}
-        {!isShopView && goalIsDefault && (
-          <div style={{ fontSize: 12.5, color: "var(--faint)", fontStyle: "italic", marginTop: 12, lineHeight: 1.45 }}>
-            Using a default target. Set your own in Settings → Staff → your name → Compensation.
           </div>
         )}
       </div>
@@ -6569,7 +6625,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               <button onClick={saveGoal} style={{ flex: 2, padding: "14px", borderRadius: 12, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Save goal</button>
             </div>
             {((goalEditor === "daily" && rawDailyGoal > 0) || (goalEditor === "weekly" && rawWeeklyGoal > 0)) && (
-              <button onClick={() => { const field = goalEditor === "daily" ? "dailyGoal" : "weeklyGoal"; setProviders(providers.map((p) => p.id === viewedProvider.id ? { ...p, [field]: 0 } : p)); setGoalEditor(null); }} style={{ width: "100%", marginTop: 12, background: "none", border: "none", color: "var(--faint)", fontSize: 13, cursor: "pointer" }}>Clear goal (use default)</button>
+              <button onClick={() => { const field = goalEditor === "daily" ? "dailyGoal" : "weeklyGoal"; setProviders(providers.map((p) => p.id === viewedProvider.id ? { ...p, [field]: 0 } : p)); setGoalEditor(null); }} style={{ width: "100%", marginTop: 12, background: "none", border: "none", color: "var(--faint)", fontSize: 13, cursor: "pointer" }}>Remove this goal</button>
             )}
           </div>
         </div>
@@ -8964,6 +9020,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       const key = String(a.id);
       nextSnap[key] = { start: a.start, bookedFor: a.bookedFor, status: a.status };
       if (a.status === "block") continue;
+      if (a.source === "sync" || a._synced) continue; // mirrored appts stay silent — the Sync panel reports them, not the bell
       const prev = snap[key];
       const base = { apptId: key, name: a.name || a.title || "Client", service: a.serviceName || a.title || "", providerId: a.providerId, when: a.bookedFor, start: a.start, ts: Date.now() };
       if (a.status === "cancelled") {
@@ -11977,6 +12034,261 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
     </div>
   );
 }
+// ============================================================
+// CALENDAR SYNC — mirror a competitor's calendar into Vero
+// ============================================================
+// The "brain": take the events read from a calendar feed and reconcile them into
+// Vero's appointment list — add new ones, move changed ones, drop cancelled ones —
+// WITHOUT ever touching native (non-synced) appointments or firing a notification.
+// Synced appointments carry source:"sync" + a syncUid so re-running is idempotent.
+//
+// Returns { next, changes:{added,moved,cancelled}, blocked, blockedCount }.
+//   `blocked` is the safety rail: if a feed comes back empty or wants to remove a
+//   suspicious number of appointments at once, we change NOTHING and flag it.
+function reconcileCalendarSync(currentAppts, events, opts = {}) {
+  const providers = (opts.providers || []).filter((p) => p && p.id !== "anyone");
+  const defaultProviderId = (providers[0] || {}).id || null;
+  const services = opts.services || [];
+
+  // Best-effort split of a calendar title like "Greg Kuhns - Haircut" into name + service.
+  const splitSummary = (s) => {
+    const raw = (s || "").trim();
+    const parts = raw.split(/\s[-–—]\s/);
+    if (parts.length >= 2) return { name: parts[0].trim(), service: parts.slice(1).join(" - ").trim() };
+    return { name: raw || "Client", service: "" };
+  };
+  const matchProvider = (summary) => {
+    const t = (summary || "").toLowerCase();
+    const hit = providers.find((p) => { const f = (p.name || "").toLowerCase().split(" ")[0]; return f && t.includes(f); });
+    return hit ? hit.id : defaultProviderId;
+  };
+  const matchService = (svcName) => {
+    const t = (svcName || "").toLowerCase();
+    if (!t) return null;
+    const hit = services.find((s) => (s.name || "").toLowerCase() === t) || services.find((s) => t.includes((s.name || "").toLowerCase()) && (s.name || "").length > 2);
+    return hit ? hit.id : null;
+  };
+  const minsOf = (iso) => { const d = new Date(iso); return isNaN(d) ? null : d.getHours() * 60 + d.getMinutes(); };
+
+  // Build the desired Vero appointment for one feed event.
+  const toAppt = (ev, existing) => {
+    const { name, service } = splitSummary(ev.summary);
+    const startMin = minsOf(ev.start);
+    if (startMin == null) return null;
+    let endMin = ev.end ? minsOf(ev.end) : null;
+    if (endMin == null || endMin <= startMin) endMin = startMin + 30;
+    const bf = new Date(ev.start);
+    return {
+      id: existing ? existing.id : ("sync_" + Math.abs(hashStr(ev.uid)).toString(36)),
+      source: "sync", _synced: true, syncUid: ev.uid,
+      providerId: existing ? existing.providerId : matchProvider(ev.summary),
+      clientId: null, serviceId: matchService(service),
+      start: startMin, end: endMin, bookedFor: isNaN(bf) ? null : bf.toISOString(),
+      status: "confirmed", name, title: service || "Appointment", serviceName: service || "",
+      price: 0, phone: "", hasPhotos: false, photos: 0, hasNote: false, vip: false,
+    };
+  };
+
+  const incoming = (events || []).filter((e) => e && e.uid && !e.cancelled && !e.allDay);
+  const incomingByUid = new Map();
+  for (const e of incoming) incomingByUid.set(e.uid, e);
+
+  const synced = (currentAppts || []).filter((a) => a && (a.source === "sync" || a._synced));
+  const others = (currentAppts || []).filter((a) => !(a && (a.source === "sync" || a._synced)));
+  const syncedByUid = new Map();
+  for (const a of synced) if (a.syncUid) syncedByUid.set(a.syncUid, a);
+
+  let added = 0, moved = 0;
+  const kept = [];
+  for (const e of incoming) {
+    const existing = syncedByUid.get(e.uid);
+    const appt = toAppt(e, existing);
+    if (!appt) continue;
+    if (!existing) { added++; kept.push(appt); }
+    else {
+      if (existing.start !== appt.start || existing.bookedFor !== appt.bookedFor || existing.end !== appt.end || existing.title !== appt.title) moved++;
+      kept.push(appt);
+    }
+  }
+  // Synced appts whose feed event vanished → candidates for removal.
+  const toCancel = synced.filter((a) => a.syncUid && !incomingByUid.has(a.syncUid));
+
+  // Safety rail: never let a bad/empty feed wipe the calendar.
+  const emptyFeed = incoming.length === 0 && synced.length > 0;
+  const threshold = Math.max(5, Math.ceil(synced.length * 0.34));
+  const tooMany = toCancel.length > threshold;
+  if (emptyFeed || tooMany) {
+    // Apply nothing destructive; keep existing synced appts as-is, still add brand-new ones.
+    const safeNext = [...others, ...synced.map((a) => { const e = incomingByUid.get(a.syncUid); return e ? (toAppt(e, a) || a) : a; }),
+      ...kept.filter((a) => !syncedByUid.has(a.syncUid))];
+    return { next: safeNext, changes: { added, moved, cancelled: 0 }, blocked: true, blockedCount: toCancel.length };
+  }
+
+  const next = [...others, ...kept];
+  return { next, changes: { added, moved, cancelled: toCancel.length }, blocked: false, blockedCount: 0 };
+}
+
+// "Sync a calendar" door — paste a calendar link (Apple/Google buttons live here too).
+// Connecting turns this same screen into the live Sync panel the owner watches.
+function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], setAppts, business, setBusiness, showToast }) {
+  const cfg = (business && business.calSync) || {};
+  const connected = !!cfg.url;
+  const [urlInput, setUrlInput] = useState(cfg.url || "");
+  const [busy, setBusy] = useState(false);
+  const [blockNotice, setBlockNotice] = useState(null); // { count } when the safety rail trips
+  const [doorNote, setDoorNote] = useState(null); // "apple" | "google" — inline explainer for the not-yet-live doors
+  const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent || "");
+
+  const saveCfg = (patch) => setBusiness((b) => ({ ...(b || {}), calSync: { ...((b && b.calSync) || {}), ...patch } }));
+
+  const runSync = async (rawUrl, opts = {}) => {
+    const url = (rawUrl || "").trim().replace(/^webcal:\/\//i, "https://");
+    if (!url) return;
+    if (busy) return;
+    setBusy(true); setBlockNotice(null);
+    try {
+      const r = await fetch(API_BASE + "/api/calendar-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) { saveCfg({ url, lastSyncAt: Date.now(), lastError: data.error || "Couldn't read the calendar." }); if (showToast) showToast(data.error || "Couldn't read that calendar."); return; }
+      const result = reconcileCalendarSync(appts, data.events || [], { providers, services });
+      if (result.blocked) {
+        // Safety rail tripped — don't apply removals, tell the owner.
+        setAppts(result.next); // still applies adds/moves, just no mass-delete
+        saveCfg({ url, connectedVia: cfg.connectedVia || "link", lastSyncAt: Date.now(), lastError: null, lastBlockedCount: result.blockedCount, lastChanges: result.changes });
+        setBlockNotice({ count: result.blockedCount });
+        if (showToast) showToast(`Sync paused a big change — ${result.blockedCount} would have been removed. Review and hit Sync now to confirm.`);
+        return;
+      }
+      setAppts(result.next); // silent: no fireApptNotify anywhere in this path
+      saveCfg({ url, connectedVia: cfg.connectedVia || "link", lastSyncAt: Date.now(), lastError: null, lastBlockedCount: 0, lastChanges: result.changes });
+      if (!opts.quiet && showToast) {
+        const c = result.changes;
+        showToast(c.added + c.moved + c.cancelled === 0 ? "Already up to date." : `Synced — added ${c.added}, moved ${c.moved}, removed ${c.cancelled}.`);
+      }
+    } catch (e) {
+      saveCfg({ lastSyncAt: Date.now(), lastError: "Network error — will retry." });
+      if (showToast && !opts.quiet) showToast("Couldn't reach the calendar. Check your connection.");
+    } finally { setBusy(false); }
+  };
+
+  // Auto-poll every 6 min while connected, not paused, and the dashboard is open.
+  useEffect(() => {
+    if (!connected || cfg.paused) return;
+    const id = setInterval(() => { runSync(cfg.url, { quiet: true }); }, 6 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [connected, cfg.paused, cfg.url]); // eslint-disable-line
+
+  const connect = () => { const u = urlInput.trim(); if (!u) { if (showToast) showToast("Paste your calendar link first."); return; } saveCfg({ url: u.replace(/^webcal:\/\//i, "https://"), connectedVia: "link", paused: false }); runSync(u); };
+  const disconnect = () => { saveCfg({ url: "", connectedVia: null, paused: false, lastChanges: null, lastError: null }); setUrlInput(""); if (showToast) showToast("Calendar disconnected. Mirrored appointments stay on your calendar."); };
+  const togglePause = () => { const p = !cfg.paused; saveCfg({ paused: p }); if (!p) runSync(cfg.url); };
+
+  const ago = (ts) => { if (!ts) return "never"; const s = Math.round((Date.now() - ts) / 1000); if (s < 60) return "just now"; const m = Math.round(s / 60); if (m < 60) return `${m} min ago`; const h = Math.round(m / 60); if (h < 24) return `${h} hr ago`; return `${Math.round(h / 24)} d ago`; };
+  const syncedCount = (appts || []).filter((a) => a && (a.source === "sync" || a._synced)).length;
+
+  const doorBtn = { width: "100%", display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer", textAlign: "left" };
+
+  // ---- Connected: the live Sync panel ----
+  if (connected) {
+    const c = cfg.lastChanges || { added: 0, moved: 0, cancelled: 0 };
+    return (
+      <div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, padding: 16, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 9, background: cfg.paused ? "var(--faint)" : "#5E8C61", flexShrink: 0 }} />
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{cfg.paused ? "Sync paused" : "Synced"}</span>
+            <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--faint)" }}>{cfg.lastError ? "needs attention" : `${ago(cfg.lastSyncAt)}`}</span>
+          </div>
+          <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5 }}>
+            {syncedCount} appointment{syncedCount === 1 ? "" : "s"} mirrored{cfg.paused ? "" : " · checks every ~6 min while open"}.
+            {cfg.lastError ? <><br /><span style={{ color: "#c0392b" }}>{cfg.lastError}</span></> : null}
+          </div>
+          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 7 }}>Last check: added {c.added} · moved {c.moved} · removed {c.cancelled}</div>
+        </div>
+
+        {blockNotice && (
+          <div style={{ display: "flex", gap: 10, background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
+            <AlertTriangle size={18} style={{ color: "#c0392b", flexShrink: 0, marginTop: 1 }} />
+            <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>I held off — this sync wanted to remove <strong>{blockNotice.count}</strong> appointments at once, which usually means a feed glitch, not real cancellations. Nothing was deleted. If those really were cancelled, tap <strong>Sync now</strong> again to apply.</div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+          <button onClick={() => runSync(cfg.url)} disabled={busy} className="lift" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: 13, fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}><RotateCw size={16} />{busy ? "Syncing…" : "Sync now"}</button>
+          <button onClick={togglePause} disabled={busy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 11, padding: 13, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>{cfg.paused ? <><Play size={15} /> Resume</> : <><Pause size={15} /> Pause</>}</button>
+        </div>
+        <button onClick={disconnect} style={{ width: "100%", background: "transparent", color: "var(--sub)", border: "none", padding: 10, fontSize: 13, cursor: "pointer" }}>Disconnect calendar</button>
+        <p style={{ color: "var(--faint)", fontSize: 12, lineHeight: 1.5, marginTop: 8, textAlign: "center" }}>Clients are never notified about mirrored appointments. Vero won't double-book over them.</p>
+      </div>
+    );
+  }
+
+  // ---- Not connected yet: the three doors + instructions ----
+  return (
+    <div>
+      <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, margin: "0 0 16px" }}>Mirror your existing calendar into Vero. Future appointments flow in automatically — cancellations and reschedules adjust on their own, and <strong>clients are never notified</strong>.</p>
+
+      <button style={doorBtn} onClick={() => setDoorNote(doorNote === "apple" ? null : "apple")}>
+        <Smartphone size={20} style={{ color: "var(--gold)" }} /> Connect my iPhone Calendar <ChevronRight size={16} style={{ marginLeft: "auto", color: "var(--faint)" }} />
+      </button>
+      {doorNote === "apple" && (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", margin: "8px 0 4px", fontSize: 13, color: "var(--sub)", lineHeight: 1.55 }}>
+          Coming in the next Vero app update — it'll read the Mangomint calendar already on your iPhone with one tap (“Allow”). No link to copy. For now, use the paste-a-link option below.
+        </div>
+      )}
+
+      <div style={{ height: 10 }} />
+      <button style={doorBtn} onClick={() => setDoorNote(doorNote === "google" ? null : "google")}>
+        <Globe size={20} style={{ color: "var(--gold)" }} /> Connect Google Calendar <ChevronRight size={16} style={{ marginLeft: "auto", color: "var(--faint)" }} />
+      </button>
+      {doorNote === "google" && (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", margin: "8px 0 4px", fontSize: 13, color: "var(--sub)", lineHeight: 1.55 }}>
+          One-tap Google sign-in is being set up. In the meantime, your Google calendar has a “secret address in iCal format” link (Google Calendar → Settings → your calendar → Integrate) you can paste below.
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0 14px" }}>
+        <div style={{ flex: 1, height: 1, background: "var(--line)" }} /><span style={{ fontSize: 12, color: "var(--faint)", letterSpacing: 1, textTransform: "uppercase" }}>or paste a link</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "4px 6px 4px 14px" }}>
+        <Link2 size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+        <input value={urlInput} onChange={(e) => setUrlInput(e.target.value)} placeholder="Paste your calendar link here" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, padding: "12px 0" }} />
+        <button onClick={connect} disabled={busy || !urlInput.trim()} className="lift" style={{ background: urlInput.trim() ? "var(--gold)" : "var(--border2)", color: urlInput.trim() ? "var(--on-gold)" : "var(--faint)", border: "none", borderRadius: 9, padding: "10px 16px", fontSize: 14, fontWeight: 600, cursor: urlInput.trim() ? "pointer" : "default" }}>{busy ? "…" : "Sync"}</button>
+      </div>
+
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", marginTop: 18 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)", marginBottom: 10 }}>{isIOS ? "On your iPhone" : "How to get your link"}</div>
+        <ol style={{ margin: 0, paddingLeft: 18, color: "var(--sub)", fontSize: 13.5, lineHeight: 1.7 }}>
+          <li>In Mangomint, open <strong>Calendar → Sync / Subscribe</strong> and copy the calendar link. <span style={{ color: "var(--faint)" }}>(Can't find it? Mangomint support will send it if you ask — that's all we need.)</span></li>
+          <li>Come back here, tap the box above, {isIOS ? "double-tap → Paste" : "press and hold → Paste"}.</li>
+          <li>Tap <strong>Sync</strong>. Watch the “Synced ✓” panel appear.</li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+// Wraps the two migration doors (spreadsheet + calendar) behind one toggle inside the Import card.
+function ImportHub(props) {
+  const [mode, setMode] = useState("file"); // "file" | "calendar"
+  const tab = (id, label, Icon) => (
+    <button onClick={() => setMode(id)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: mode === id ? "var(--gold)" : "transparent", color: mode === id ? "var(--on-gold)" : "var(--text2)", border: "none", borderRadius: 9, padding: "10px 8px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY }}>
+      <Icon size={16} /> {label}
+    </button>
+  );
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 4, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: 4, marginBottom: 18 }}>
+        {tab("file", "Spreadsheet", Upload)}
+        {tab("calendar", "Calendar", Calendar)}
+      </div>
+      {mode === "file"
+        ? <ImportDataEditor shopId={props.shopId} services={props.services} providers={props.providers} clients={props.clients} setClients={props.setClients} appts={props.appts} setAppts={props.setAppts} showToast={props.showToast} onBackRef={props.onBackRef} />
+        : <CalendarSyncTool shopId={props.shopId} providers={props.providers} services={props.services} appts={props.appts} setAppts={props.setAppts} business={props.business} setBusiness={props.setBusiness} showToast={props.showToast} />}
+    </div>
+  );
+}
+
 function serviceCommissionFor(comp, serviceSales) {
   const sc = comp.service;
   if (!sc || !sc.on) return 0;
@@ -14765,7 +15077,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       id: "import", fullBleed: true, title: "Import Data", icon: Upload, category: "Business Setup",
       status: "Bring clients & history over",
       keywords: "import data migrate transfer clients appointments notes history switch from square glossgenius vagaro boulevard booksy csv export upload move",
-      editor: <ImportDataEditor shopId={shopId} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} showToast={showToast} onBackRef={editorBack} />,
+      editor: <ImportHub shopId={shopId} services={services} providers={providers} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} showToast={showToast} onBackRef={editorBack} />,
     },
     {
       id: "staff", fullBleed: true, title: "Staff Members", icon: Users, category: "Business Setup",
