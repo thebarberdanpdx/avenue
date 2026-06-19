@@ -87,9 +87,13 @@ header.scrolled{border-color:var(--line);box-shadow:0 1px 0 var(--shadow)}
 .hero-cta{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:30px}
 .hero-phone{display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:var(--ink);font-weight:500;letter-spacing:.3px}
 .hero-phone:hover{color:var(--sub)}
-.proof{display:flex;align-items:center;gap:10px;margin-top:32px;font-size:13px;letter-spacing:.6px;color:var(--sub);text-transform:uppercase}
+.hero-scarcity{display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13.5px;color:var(--sub)}
+.hero-scarcity i{color:var(--ink);font-size:16px}
+.proof{display:flex;align-items:center;gap:10px;margin-top:24px;font-size:13px;letter-spacing:.6px;color:var(--sub);text-transform:uppercase}
 .stars{color:var(--ink);font-size:15px;letter-spacing:2px;display:inline-flex}
 .proof b{color:var(--ink);font-weight:600}
+.hero-quote{margin-top:20px;font-family:var(--disp);font-style:italic;font-size:17px;color:var(--ink2);max-width:36ch;line-height:1.45}
+.hero-quote span{display:block;margin-top:8px;font-family:var(--body);font-style:normal;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint)}
 .hero-photo{aspect-ratio:4/5;border-radius:14px;overflow:hidden;position:relative}
 
 /* photo placeholder (swap for real images) */
@@ -199,6 +203,14 @@ section{scroll-margin-top:84px}
 .step .si{font-size:20px;color:var(--ink);margin-bottom:8px}
 .step h4{font-size:18px;margin:0 0 6px;font-family:var(--disp);font-weight:500}
 .step p{color:var(--sub);font-size:14.5px;margin:0}
+/* why / benefits */
+.why-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.why-card{border:1px solid var(--line);border-radius:14px;padding:24px 22px;background:#fff}
+.why-card > i{font-size:24px;color:var(--ink);display:block;margin-bottom:14px}
+.why-card h3{font-size:18px;margin:0 0 8px}
+.why-card p{color:var(--sub);font-size:14px;margin:0;line-height:1.55}
+.why-cta{text-align:center;margin-top:30px}
+
 .how-steps{grid-template-columns:repeat(4,1fr)}
 .how-cta{display:flex;align-items:center;justify-content:center;gap:18px 24px;flex-wrap:wrap;margin-top:30px;text-align:center}
 .how-cta .btn{flex:none}
@@ -236,6 +248,7 @@ footer{background:var(--ink);color:#B5B5B5}
   .reviews{grid-template-columns:1fr}
   .steps{grid-template-columns:1fr}
   .how-steps{grid-template-columns:repeat(2,1fr)}
+  .why-grid{grid-template-columns:repeat(2,1fr)}
   .arrive{flex-direction:column;gap:12px}
   .visit{grid-template-columns:1fr}
   .gallery{grid-template-columns:repeat(2,1fr)}
@@ -249,6 +262,7 @@ footer{background:var(--ink);color:#B5B5B5}
   .builder{flex-direction:column;align-items:stretch;gap:16px}
   .builder .btn{width:100%;justify-content:center}
   .how-steps{grid-template-columns:1fr}
+  .why-grid{grid-template-columns:1fr}
   .nav-toggle{display:block}
   .mobile-menu{display:none;flex-direction:column;gap:4px;padding:8px var(--pad) 18px;border-bottom:1px solid var(--line)}
   .mobile-menu.open{display:flex}

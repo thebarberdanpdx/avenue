@@ -9284,6 +9284,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [advancedOpen, setAdvancedOpen] = useState(false); // single-page editor: Advanced expander
   const [picker, setPicker] = useState(null); // {target}
   const [stylePriceOpen, setStylePriceOpen] = useState({}); // {providerId: bool} — per-barber "prices per style" expander in Staff & pricing
+  const [editStyleId, setEditStyleId] = useState(null); // cut-styles drill: which style's own screen is open (null = the list)
   const [editMode, setEditMode] = useState(false); // list view: browse vs manage (reorder/delete/rename)
   const [catSheet, setCatSheet] = useState(false); // category manager sheet (add / rename / reorder / delete)
   const [showArchived, setShowArchived] = useState(false); // list view: archived services collapse
@@ -9291,12 +9292,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     if (!onBackRef) return;
     let pop = null;
     if (catSheet) pop = () => { setCatSheet(false); return true; };
+    else if (editing && section === "cutstyles" && editStyleId) pop = () => { setEditStyleId(null); return true; };
     else if (editing && section) pop = () => { setSection(null); return true; };
     else if (editing) pop = () => { setEditing(null); return true; };
     else if (menuTab !== "services") pop = () => { setMenuTab("services"); return true; };
     onBackRef.current = pop;
     return () => { if (onBackRef) onBackRef.current = null; };
-  }, [editing, section, catSheet, menuTab]);
+  }, [editing, section, catSheet, menuTab, editStyleId]);
+  // Always start the cut-styles drill on the list, not a stale style.
+  useEffect(() => { if (section !== "cutstyles") setEditStyleId(null); }, [section]);
   const cats = (categories && categories.length) ? categories : ["Services"];
   const staffList = (providers || []).filter((p) => p.id !== "anyone");
   // build a default staff map: everyone ON, no overrides (null = use service default)
@@ -9405,86 +9409,127 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   });
   const setStyle = (entry, patch) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c) => (styleMatch(c, entry) ? { ...c, ...patch } : c)) }));
   const setStylePopular = (entry) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c) => ({ ...c, popular: styleMatch(c, entry) ? !c.popular : false })) }));
-  const cutTypesBody = (
+  // The cut styles drill is a LIST → tap a style → its OWN screen (styleDetailBody).
+  const styleSummary = (entry) => {
+    const ct = (form.cutTypes || []).find((c) => styleMatch(c, entry));
+    if (!ct) return "Not offered here";
+    const pr = (ct.price === "" || ct.price == null) ? (form.price || "—") : ct.price;
+    const du = (ct.duration === "" || ct.duration == null) ? (form.duration || 45) : ct.duration;
+    return `Offered · $${pr} · ${du} min`;
+  };
+  const cutStylesList = (
     <>
-      <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>Tick the styles this service offers, then set this service's price and time for each. Editing a style's name, description or color updates it on every service that offers it.</p>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The cuts clients can pick for this service. Tap one to set its price, time, photos and per-barber pricing.</p>
       {(cutLibrary || []).length === 0 ? (
-        <div style={{ ...cardStyle, color: "var(--sub)", fontSize: 15, lineHeight: 1.5, marginBottom: 14 }}>You don't have any cut styles yet. Tap "+ New style" below to create one.</div>
-      ) : (cutLibrary || []).map((entry) => {
-        const i = (form.cutTypes || []).findIndex((c) => styleMatch(c, entry));
-        const on = i >= 0;
-        const ct = on ? form.cutTypes[i] : null;
-        return (
-          <div key={entry.id} style={{ ...cardStyle, marginBottom: 14, border: on ? (ct.popular ? "1.5px solid var(--text)" : "1px solid var(--border2)") : "1px solid var(--border)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <span style={{ minWidth: 0, flex: 1 }}>
-                <span style={{ display: "block", fontSize: 17, fontWeight: 500 }}>{entry.label}{on && ct.popular ? <span style={{ marginLeft: 8, fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 700, color: "var(--bg)", background: "var(--text)", borderRadius: 20, padding: "2px 8px", verticalAlign: "middle" }}>Most common</span> : null}</span>
-                <span style={{ display: "block", fontSize: 13, color: "var(--faint)", marginTop: 3 }}>{on ? "Offered here" : "Not offered"}</span>
-              </span>
-              <span onClick={() => toggleStyle(entry)} style={{ cursor: "pointer" }}>{pillSwitch(on)}</span>
-            </div>
-            {on && (
-              <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <div style={{ flex: 1 }}>
-                    <SectionLbl style={{ margin: "0 2px 8px" }}>Price</SectionLbl>
-                    <div style={moneyWrap}>
-                      <span style={moneyPrefix}>$</span>
-                      <input type="number" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setStyle(entry, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="35" style={moneyInput} />
-                    </div>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <SectionLbl style={{ margin: "0 2px 8px" }}>Time</SectionLbl>
-                    <div style={moneyWrap}>
-                      <input type="number" value={ct.duration === undefined || ct.duration === null || ct.duration === "" ? "" : ct.duration} onChange={(e) => setStyle(entry, { duration: e.target.value === "" ? "" : Number(e.target.value) })} placeholder={String(form.duration || 45)} style={{ ...moneyInput, paddingLeft: 16 }} />
-                      <span style={unitSuffix}>min</span>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.4 }}>Leave time blank to use this service's default ({form.duration || 45} min).</div>
-                <div style={{ borderTop: "1px solid var(--line)", paddingTop: 16, marginTop: 16 }}>
-                  <SectionLbl style={{ margin: "0 2px 8px" }}>Name</SectionLbl>
-                  <input value={entry.label || ""} onChange={(e) => setLibField(entry, { label: e.target.value })} placeholder="e.g. Skin Fade" style={inpStyle} />
-                  <SectionLbl style={{ margin: "16px 2px 8px" }}>Description</SectionLbl>
-                  <textarea value={entry.desc || ""} onChange={(e) => setLibField(entry, { desc: e.target.value })} placeholder="Shown to clients under the name" rows={4} style={{ ...inpStyle, resize: "vertical", minHeight: 92, lineHeight: 1.5 }} />
-                  <SectionLbl style={{ margin: "16px 2px 10px" }}>Photos <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--faint)" }}>· up to 3, optional</span></SectionLbl>
-                  {(() => { const imgs = Array.isArray(entry.images) ? entry.images.filter(Boolean) : []; return (
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {imgs.map((pid) => (
-                        <div key={pid} style={{ position: "relative", width: 76, height: 76, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", flexShrink: 0 }}>
-                          <img src={imgUrl(pid, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                          <div onClick={() => setLibField(entry, { images: imgs.filter((x) => x !== pid) })} title="Remove photo" style={{ position: "absolute", top: 4, right: 4, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</div>
-                        </div>
-                      ))}
-                      {imgs.length < 3 && (
-                        <button onClick={() => setPicker({ target: "style", entry })} style={{ width: 76, height: 76, borderRadius: 12, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 3, padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                          <Plus size={18} /><span style={{ fontSize: 10.5, fontWeight: 600 }}>Add photo</span>
-                        </button>
-                      )}
-                    </div>
-                  ); })()}
-                  <SectionLbl style={{ margin: "16px 2px 10px" }}>Calendar color</SectionLbl>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <button onClick={() => setLibField(entry, { color: null })} title="No color — use the service's color" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--panel2)", border: !entry.color ? "2px solid var(--text)" : "2px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!entry.color && <Check size={14} style={{ color: "var(--text)" }} />}</button>
-                    {SERVICE_PALETTE.map((c) => { const on = entry.color === c.id; return (
-                      <button key={c.id} onClick={() => setLibField(entry, { color: c.id })} title={c.name} style={{ width: 32, height: 32, borderRadius: "50%", background: c.hex, border: on ? "2px solid var(--text)" : "2px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={14} style={{ color: "var(--on-gold)" }} />}</button>
-                    ); })}
-                  </div>
-                  <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 10, lineHeight: 1.45 }}>This cut's color wins over the service color on the calendar. Leave the dashed chip selected to use the service color instead. Name, description &amp; color are shared — editing here updates this style on every service.</p>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, borderTop: "1px solid var(--line)", paddingTop: 16, marginTop: 16 }}>
-                  <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Mark as most common</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Shows a “Most common” badge to clients.</span></span>
-                  <span onClick={() => setStylePopular(entry)} style={{ cursor: "pointer" }}>{pillSwitch(!!ct.popular)}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-      <button onClick={() => { setLibForm({ id: "lib_" + Date.now(), label: "", desc: "", images: [] }); setLibOpen(true); }} style={addTileStyle}><Plus size={18} /> New style</button>
-      <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>New styles open the Cut Styles editor. After you save one, come back here to tick it on.</p>
+        <div style={{ ...cardStyle, color: "var(--sub)", fontSize: 15, lineHeight: 1.5, marginBottom: 14 }}>No cut styles yet. Tap "New style" to create your first.</div>
+      ) : (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
+          {(cutLibrary || []).map((entry, idx) => {
+            const ct = (form.cutTypes || []).find((c) => styleMatch(c, entry));
+            const img = (entry.images || []).filter(Boolean)[0];
+            return (
+              <button key={entry.id} onClick={() => setEditStyleId(entry.id)} className="lift" style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 13, padding: "13px 15px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: idx ? "1px solid var(--line)" : "none", minWidth: 0 }}>
+                <span style={{ width: 44, height: 44, borderRadius: 11, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--line)" }}>{img ? <img src={imgUrl(img, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={17} style={{ color: "var(--faint)" }} />}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 15.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.label}{ct && ct.popular ? <span style={{ marginLeft: 7, fontSize: 9.5, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700, color: "var(--bg)", background: "var(--text)", borderRadius: 20, padding: "2px 7px", verticalAlign: "middle" }}>Common</span> : null}</span>
+                  <span style={{ display: "block", fontSize: 12.5, color: ct ? "var(--sub)" : "var(--faint)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{styleSummary(entry)}</span>
+                </span>
+                <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <button onClick={() => { const id = "lib_" + Date.now(); setCutLibrary([...(cutLibrary || []), { id, label: "New style", desc: "", images: [], color: null }]); setEditStyleId(id); }} style={addTileStyle}><Plus size={18} /> New style</button>
     </>
   );
+  // One style's OWN screen — offered toggle, price/time, per-barber pricing, then the shared name/desc/photos/color.
+  const styleDetailBody = (entry) => {
+    const i = (form.cutTypes || []).findIndex((c) => styleMatch(c, entry));
+    const on = i >= 0;
+    const ct = on ? form.cutTypes[i] : null;
+    const imgs = Array.isArray(entry.images) ? entry.images.filter(Boolean) : [];
+    const offeringStaff = staffList.filter((p) => (form.staff[p.id]?.on !== false));
+    const moneyCol = { flex: 1, minWidth: 0 };
+    return (
+      <>
+        <div style={{ ...cardStyle, marginBottom: 16 }}>
+          <Row title="Offer this style" desc={on ? "Clients can pick it for this service." : "Turn on to offer it here."}>
+            <span onClick={() => toggleStyle(entry)} style={{ cursor: "pointer" }}>{pillSwitch(on)}</span>
+          </Row>
+        </div>
+        {on && ct && (
+          <div style={{ ...cardStyle, marginBottom: 16 }}>
+            <SectionLbl style={{ margin: "0 2px 10px" }}>Price &amp; time</SectionLbl>
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={moneyCol}><div style={moneyWrap}><span style={moneyPrefix}>$</span><input type="number" inputMode="decimal" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setStyle(entry, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder={String(form.price || "")} style={{ ...moneyInput, minWidth: 0 }} /></div></div>
+              <div style={moneyCol}><div style={moneyWrap}><input type="number" inputMode="numeric" value={ct.duration === undefined || ct.duration === null || ct.duration === "" ? "" : ct.duration} onChange={(e) => setStyle(entry, { duration: e.target.value === "" ? "" : Number(e.target.value) })} placeholder={String(form.duration || 45)} style={{ ...moneyInput, minWidth: 0, paddingLeft: 16 }} /><span style={unitSuffix}>min</span></div></div>
+            </div>
+            <p style={{ fontSize: 12, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Blank uses the service default (${form.price || "—"} · {form.duration || 45} min).</p>
+          </div>
+        )}
+        {on && ct && offeringStaff.length > 0 && (
+          <div style={{ ...cardStyle, marginBottom: 16 }}>
+            <SectionLbl style={{ margin: "0 2px 4px" }}>Prices by barber</SectionLbl>
+            <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 2px 14px", lineHeight: 1.45 }}>Each barber's own price/time for this cut. Blank uses the price above. Same data as My team → {offeringStaff[0] ? offeringStaff[0].name.split(" ")[0] : "barber"} → Services.</p>
+            <div style={{ display: "grid", gap: 14 }}>
+              {offeringStaff.map((p) => {
+                const se = form.staff[p.id] || {};
+                const pv = (se.cutPrice && se.cutPrice[ct.id] != null) ? se.cutPrice[ct.id] : "";
+                const dv = (se.cutDur && se.cutDur[ct.id] != null) ? se.cutDur[ct.id] : "";
+                return (
+                  <div key={p.id} style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, margin: "0 2px 7px" }}>{p.name}</div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <div style={moneyCol}><div style={moneyWrap}><span style={moneyPrefix}>$</span><input type="number" inputMode="decimal" value={pv} placeholder={String(cutStylePrice(form, p.id, ct.id) ?? "")} onChange={(e) => setStaffCutPrice(p.id, ct.id, e.target.value === "" ? null : e.target.value)} style={{ ...moneyInput, minWidth: 0 }} /></div></div>
+                      <div style={moneyCol}><div style={moneyWrap}><input type="number" inputMode="numeric" value={dv} placeholder={String(ct.duration || form.duration || 45)} onChange={(e) => setStaffCutDur(p.id, ct.id, e.target.value === "" ? null : e.target.value)} style={{ ...moneyInput, minWidth: 0, paddingLeft: 16 }} /><span style={unitSuffix}>min</span></div></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div style={{ ...cardStyle, marginBottom: 16 }}>
+          <SectionLbl style={{ margin: "0 2px 8px" }}>Name</SectionLbl>
+          <input value={entry.label || ""} onChange={(e) => setLibField(entry, { label: e.target.value })} placeholder="e.g. Skin Fade" style={inpStyle} />
+          <SectionLbl style={{ margin: "16px 2px 8px" }}>Description <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--faint)" }}>· optional</span></SectionLbl>
+          <textarea value={entry.desc || ""} onChange={(e) => setLibField(entry, { desc: e.target.value })} placeholder="Shown to clients under the name" rows={4} style={{ ...inpStyle, resize: "vertical", minHeight: 92, lineHeight: 1.5 }} />
+          <SectionLbl style={{ margin: "16px 2px 10px" }}>Photos <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--faint)" }}>· up to 3, optional</span></SectionLbl>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {imgs.map((pid) => (
+              <div key={pid} style={{ position: "relative", width: 76, height: 76, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", flexShrink: 0 }}>
+                <img src={imgUrl(pid, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                <div onClick={() => setLibField(entry, { images: imgs.filter((x) => x !== pid) })} title="Remove photo" style={{ position: "absolute", top: 4, right: 4, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</div>
+              </div>
+            ))}
+            {imgs.length < 3 && (
+              <button onClick={() => setPicker({ target: "style", entry })} style={{ width: 76, height: 76, borderRadius: 12, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 3, padding: 0, cursor: "pointer", flexShrink: 0 }}>
+                <Plus size={18} /><span style={{ fontSize: 10.5, fontWeight: 600 }}>Add photo</span>
+              </button>
+            )}
+          </div>
+          <SectionLbl style={{ margin: "16px 2px 10px" }}>Calendar color</SectionLbl>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button onClick={() => setLibField(entry, { color: null })} title="No color — use the service's color" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--panel2)", border: !entry.color ? "2px solid var(--text)" : "2px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!entry.color && <Check size={14} style={{ color: "var(--text)" }} />}</button>
+            {SERVICE_PALETTE.map((c) => { const sel = entry.color === c.id; return (
+              <button key={c.id} onClick={() => setLibField(entry, { color: c.id })} title={c.name} style={{ width: 32, height: 32, borderRadius: "50%", background: c.hex, border: sel ? "2px solid var(--text)" : "2px solid transparent", boxShadow: sel ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{sel && <Check size={14} style={{ color: "var(--on-gold)" }} />}</button>
+            ); })}
+          </div>
+          <p style={{ fontSize: 12, color: "var(--faint)", marginTop: 10, lineHeight: 1.45 }}>Name, description, photos &amp; color are shared — editing here updates this style on every service that offers it.</p>
+        </div>
+        {on && ct && (
+          <div style={{ ...cardStyle, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Mark as most common</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Shows a "Most common" badge to clients.</span></span>
+            <span onClick={() => setStylePopular(entry)} style={{ cursor: "pointer" }}>{pillSwitch(!!ct.popular)}</span>
+          </div>
+        )}
+        <div style={{ textAlign: "center", padding: "2px 0 6px" }}>
+          <button onClick={() => { if (typeof window !== "undefined" && !window.confirm(`Delete the "${entry.label}" style? It's removed from every service that offers it.`)) return; setCutLibrary((cutLibrary || []).filter((e) => e.id !== entry.id)); setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).filter((c) => !styleMatch(c, entry)) })); setEditStyleId(null); }} style={{ background: "none", border: "none", color: "#C2703D", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 3, cursor: "pointer" }}>Delete this style</button>
+        </div>
+      </>
+    );
+  };
   // ---- DETAILS section ----
   const detailsBody = (
     <>
@@ -10079,17 +10124,32 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   );
 
   // ---- drill-in: CUT STYLES (rebuilt header, reuse cutTypesBody cards) ----
-  const cutstylesScreen = (
-    <>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-        <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
-        <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{(form.name || "SERVICE").toUpperCase()}</span>
-      </div>
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Cut styles</h2>
-      {cutTypesBody}
-      <SaveBar />
-    </>
-  );
+  const cutstylesScreen = (() => {
+    const entry = editStyleId ? (cutLibrary || []).find((e) => e.id === editStyleId) : null;
+    if (entry) {
+      return (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 16 }}>
+            <button onClick={() => setEditStyleId(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 3, fontSize: 14, fontWeight: 500, cursor: "pointer" }}><ChevronLeft size={20} /> Cut styles</button>
+          </div>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px", overflow: "hidden", textOverflow: "ellipsis" }}>{entry.label || "Style"}</h2>
+          {styleDetailBody(entry)}
+          <SaveBar />
+        </>
+      );
+    }
+    return (
+      <>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+          <button onClick={() => setSection(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
+          <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{(form.name || "SERVICE").toUpperCase()}</span>
+        </div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Cut styles</h2>
+        {cutStylesList}
+        <SaveBar />
+      </>
+    );
+  })();
 
   // ---- drill-in: ADD-ONS & QUESTIONS (rebuilt header, reuse customizationsBody) ----
   const addonsScreen = (
