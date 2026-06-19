@@ -2511,7 +2511,7 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject }) 
       client: String(appt.name || "there").split(" ")[0], business: business.name || "your shop",
       service: appt.serviceName || appt.title || "your appointment",
       addons: Array.isArray(appt.addonLabels) ? appt.addonLabels : [],
-      date: dateStr, time: `${h12}:${String(mn).padStart(2, "0")} ${ap}`, provider: prov.name || appt.providerName || "your barber",
+      date: dateStr, time: `${h12}:${String(mn).padStart(2, "0")} ${ap}`, provider: prov.name || appt.providerName || "your staff member",
       address: [business.address, business.address2].filter(Boolean).join(", "),
       phone: (business.phones && business.phones[0] && business.phones[0].number) || "",
       email: business.email || "", policy: business.policy || "",
@@ -3339,7 +3339,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     return matched ? matched.name.split(" ")[0] : "You";
   };
   const apptWhen = (a) => { try { return a && a.bookedFor ? new Date(a.bookedFor) : null; } catch (e) { return null; } };
-  const provFirst = (id) => { const p = providers.find((x) => x.id === id); return p ? p.name.split(" ")[0] : "your barber"; };
+  const provFirst = (id) => { const p = providers.find((x) => x.id === id); return p ? p.name.split(" ")[0] : "your staff member"; };
   const svcLabel = (a) => a.serviceName || (services.find((s) => s.id === a.serviceId) || {}).name || "Appointment";
   const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const fmtHomeDate = (a) => { const d = apptWhen(a); if (!d) return ""; return `${DOW[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
@@ -3743,7 +3743,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* SIMPLE · WHO — anyone, or a specific person? Defaults make this a one-tap step. */}
         {simpleStep === "who" && (
           <div className="fade-up">
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Your barber</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Your staff member</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Anyone in particular?</h2>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 0" }}>No wrong answer — if you're not sure, we'll match you with whoever's free soonest.</p>
             <div style={{ marginTop: 24, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
@@ -3905,7 +3905,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <>
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Choose your style</div>
                   <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Pick your cut</h2>
-                  <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, marginTop: 9 }}>Tap whichever's closest — your barber dials it in in the chair.</p>
+                  <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, marginTop: 9 }}>Tap whichever's closest — your staff member dials it in in the chair.</p>
                   <div style={{ marginTop: 26, marginBottom: 26, borderBottom: "1px solid var(--line)" }}>
                     {draft.cutTypes.map((ct) => {
                       const img = ct.images && ct.images[0];
@@ -3985,7 +3985,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     setPhotoResult(data);
                   } catch (err) {
                     console.error("Photo AI failed after retry:", err);
-                    setPhotoError("Couldn't read the photo right now — pick whichever cut looks closest below and we'll save the photo for your barber.");
+                    setPhotoError("Couldn't read the photo right now — pick whichever cut looks closest below and we'll save the photo for your staff member.");
                   } finally {
                     setPhotoLoading(false);
                   }
@@ -4026,7 +4026,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <>
                       <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
                       <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1.1, marginBottom: 10 }}>Here's the look</h3>
-                      <p style={{ color: "var(--text)", fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>We'll save this photo to your appointment so your barber sees it before you sit down.</p>
+                      <p style={{ color: "var(--text)", fontSize: 15, marginBottom: 18, lineHeight: 1.5 }}>We'll save this photo to your appointment so your staff member sees it before you sit down.</p>
                       {helperPhotoUrl && (
                         <div style={{ width: "100%", aspectRatio: "4/3", borderRadius: 14, overflow: "hidden", background: "var(--panel2)", marginBottom: 18 }}>
                           <img src={helperPhotoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
@@ -4338,7 +4338,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div className="fade-up">
               <div style={{ width: 32, height: 1.5, background: "var(--text)", marginBottom: 14 }} />
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Who and when</h2>
-              <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 26, fontWeight: 400, lineHeight: 1.5 }}>Tap a barber to lock in their next opening.</p>
+              <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 26, fontWeight: 400, lineHeight: 1.5 }}>Tap a staff member to lock in their next opening.</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {cards.map(({ p, next }) => (
                   <div key={p.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
@@ -4744,7 +4744,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>We can get everyone in on the same visit, or just find the soonest opening for each.</p>
             <button className="lift" onClick={() => { setGroupMode("together"); setShowSchedChoice(false); setShowWizardIntro(true); setWizardIdx(0); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", marginBottom: 13, textAlign: "left", display: "flex", flexDirection: "column", gap: 4 }}>
               <span style={{ fontSize: 17, fontWeight: 500 }}>Together — same visit</span>
-              <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300, lineHeight: 1.45 }}>Same day, at the same time with different barbers — or back-to-back if needed.</span>
+              <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 300, lineHeight: 1.45 }}>Same day, at the same time with different staff — or back-to-back if needed.</span>
             </button>
             <button className="lift" onClick={() => { setGroupMode("separate"); setShowSchedChoice(false); setShowWizardIntro(true); setWizardIdx(0); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", textAlign: "left", display: "flex", flexDirection: "column", gap: 4 }}>
               <span style={{ fontSize: 17, fontWeight: 500 }}>Separate — soonest for each</span>
@@ -5111,7 +5111,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     )}
                     {photoOn && (
                       <div style={{ marginTop: noteOn ? 16 : 0 }}>
-                        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12 }}>Up to 3 photos — a style you want, how your hair looks now, or anything that helps {provider.name === "Anyone" ? "your barber" : provider.name}.</p>
+                        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12 }}>Up to 3 photos — a style you want, how your hair looks now, or anything that helps {provider.name === "Anyone" ? "your staff member" : provider.name}.</p>
                         <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
                         <div style={{ display: "flex", gap: 8 }}>{[0, 1, 2].map((i) => { const src = photos[i]; return (
                           <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 14, overflow: "hidden", border: `1px dashed ${src ? "var(--text)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: src ? "var(--panel2)" : "transparent", cursor: src ? "default" : "pointer" }}>
@@ -5354,7 +5354,7 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
               </div>
             );
           })}
-          <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.5 }}>Use the arrows to see more examples. Not sure? Pick the closest — your barber will confirm in the chair.</p>
+          <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.5 }}>Use the arrows to see more examples. Not sure? Pick the closest — your staff member will confirm in the chair.</p>
         </div>
       )}
 
@@ -5397,7 +5397,7 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
           {photos > 0 && (
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", display: "flex", alignItems: "center", gap: 8 }}>
               <ImageIcon size={14} style={{ color: "var(--text)" }} />
-              <span>{photos} photo{photos > 1 ? "s" : ""} attached for your barber</span>
+              <span>{photos} photo{photos > 1 ? "s" : ""} attached for your staff member</span>
             </div>
           )}
         </div>
@@ -5515,7 +5515,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
       const ctx = {
         client: String(a.name || "there").split(" ")[0], business: business.name || "your shop",
         service: a.serviceName || a.title || "your appointment", addons: Array.isArray(a.addonLabels) ? a.addonLabels : [],
-        date: dateStr, time: `${h12}:${String(mn).padStart(2, "0")} ${ap}`, provider: pv.name || a.providerName || "your barber",
+        date: dateStr, time: `${h12}:${String(mn).padStart(2, "0")} ${ap}`, provider: pv.name || a.providerName || "your staff member",
         address: [business.address, business.address2].filter(Boolean).join(", "),
         phone: (business.phones && business.phones[0] && business.phones[0].number) || "",
         email: business.email || "", policy: business.policy || "",
@@ -5587,7 +5587,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
 
   if (phase === "cancelled") return <Shell>{centerCard(<><Tick /><Title>Appointment released</Title><Body>That time is back on the books for someone else. We'd love to see you again whenever you're ready.</Body><button onClick={onExit} style={goBtn}>Book again</button></>)}</Shell>;
   if (phase === "rescheduled") return <Shell>{centerCard(<><Tick /><Title>You're all set</Title><Body>Your appointment is now {when.date} at {when.time}. A fresh confirmation is on its way.</Body><button onClick={onExit} style={{ ...goBtn, background: "transparent", color: "var(--sub)", boxShadow: "none", textDecoration: "underline", textUnderlineOffset: 3 }}>Done</button></>)}</Shell>;
-  if (phase === "arrived") return <Shell>{centerCard(<><Tick /><Title>You're checked in</Title><Body>{prov ? prov.name : "Your barber"} knows you're here — have a seat and you'll be called shortly.</Body><button onClick={onExit} style={{ ...goBtn, background: "transparent", color: "var(--sub)", boxShadow: "none", textDecoration: "underline", textUnderlineOffset: 3 }}>Done</button></>)}</Shell>;
+  if (phase === "arrived") return <Shell>{centerCard(<><Tick /><Title>You're checked in</Title><Body>{prov ? prov.name : "Your staff member"} knows you're here — have a seat and you'll be called shortly.</Body><button onClick={onExit} style={{ ...goBtn, background: "transparent", color: "var(--sub)", boxShadow: "none", textDecoration: "underline", textUnderlineOffset: 3 }}>Done</button></>)}</Shell>;
 
   if (phase === "arrive") return (
     <Shell>
@@ -5595,7 +5595,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
         <Band />
         <div style={{ padding: 28, textAlign: "center" }}>
           <Title>You're here!</Title>
-          <Body>Tap below and {prov ? prov.name : "your barber"} will know you've arrived for your {appt.serviceName || appt.title} at {when.time}.</Body>
+          <Body>Tap below and {prov ? prov.name : "your staff member"} will know you've arrived for your {appt.serviceName || appt.title} at {when.time}.</Body>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <button disabled={busy} onClick={submitArrive} style={goBtn}>{busy ? "Letting them know…" : "I've arrived"}</button>
             <button onClick={() => setPhase("view")} style={ghostBtn}>View my appointment</button>
@@ -5611,7 +5611,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
         <Band color="linear-gradient(90deg,#C76A5E,#B5564B)" />
         <div style={{ padding: 28, textAlign: "center" }}>
           <Title>Cancel this appointment?</Title>
-          <Body>Your {appt.serviceName || appt.title} with {prov ? prov.name : "your barber"} on {when.date} at {when.time} will be released. You can always book again.</Body>
+          <Body>Your {appt.serviceName || appt.title} with {prov ? prov.name : "your staff member"} on {when.date} at {when.time} will be released. You can always book again.</Body>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <button disabled={busy} onClick={submitCancel} style={{ ...goBtn, background: RED, boxShadow: "0 8px 20px -10px rgba(181,86,75,.6)" }}>{busy ? "Cancelling…" : "Yes, cancel it"}</button>
             <button onClick={() => setPhase("view")} style={ghostBtn}>Keep my appointment</button>
@@ -5674,7 +5674,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
           {addonsStr && <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 14.5, color: A, marginTop: 5 }}>{addonsStr}</div>}
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 16, fontSize: 14.5 }}>
             <span style={{ width: 26, height: 26, borderRadius: "50%", background: A, color: ON, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif" }}>{(prov ? prov.name : "?").trim().charAt(0).toUpperCase()}</span>
-            <span>with <b>{prov ? prov.name : "your barber"}</b></span>
+            <span>with <b>{prov ? prov.name : "your staff member"}</b></span>
           </div>
         </div>
         <Perf />
@@ -6263,7 +6263,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           )}
           {(isOwner && onOpenBarbers && realProviders.length > 1) && (
             <button onClick={onOpenBarbers} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Team</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Compare each barber</span></span>
+              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Team</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Compare each staff member</span></span>
               <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
             </button>
           )}
@@ -6279,7 +6279,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           isOwner && onOpenAppointments && { onClick: onOpenAppointments, Icon: BarChart3, label: "Appointments", desc: "No-shows, busiest hour" },
           isOwner && onOpenClients && { onClick: onOpenClients, Icon: Users, label: "Clients", desc: "New vs returning" },
           isOwner && onOpenServices && { onClick: onOpenServices, Icon: Sparkles, label: "Service mix", desc: "What drives revenue" },
-          (isOwner && onOpenBarbers && realProviders.length > 1) && { onClick: onOpenBarbers, Icon: Users, label: "Team", desc: "Compare barbers" },
+          (isOwner && onOpenBarbers && realProviders.length > 1) && { onClick: onOpenBarbers, Icon: Users, label: "Team", desc: "Compare staff" },
         ].filter(Boolean);
         if (!insights.length) return null;
         return (
@@ -6545,7 +6545,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20 }}>
               {goalEditor === "daily"
                 ? "How much do you want to earn on a good day? Pulse fills the ring automatically as you complete cuts — no logging needed."
-                : "What's a strong week look like for you? The bar tracks toward this as the week builds. Most full-time barbers land 5–6× their daily goal."}
+                : "What's a strong week look like for you? The bar tracks toward this as the week builds. Most full-time staff land 5–6× their daily goal."}
             </p>
 
             {/* Big input */}
@@ -6646,7 +6646,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                 {pulseView === "me" && <Check size={17} style={{ color: "var(--gold)" }} />}
               </button>
               {realProviders.filter((p) => p.id !== me?.id).length > 0 && (
-                <div style={{ fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "10px 8px 3px" }}>Your barbers</div>
+                <div style={{ fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "10px 8px 3px" }}>Your staff</div>
               )}
               {realProviders.filter((p) => p.id !== me?.id).map((p) => (
                 <button key={p.id} onClick={() => { setPulseView(p.id); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 12px", background: pulseView === p.id ? "var(--panel2)" : "transparent", color: "var(--text)", border: `1px solid ${pulseView === p.id ? "var(--border2)" : "transparent"}`, borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
@@ -6744,7 +6744,7 @@ function GrowthView({ appts, scopeFilter, services, clients, onBack }) {
 
             <div style={headLbl}>Your following</div>
             <div style={groupStyle}>
-              {[{ name: "New faces this month", value: newThisMonth }, { name: "People who call you their barber", value: regulars }, { name: "You make per cut", value: "$" + avg }].map(statRow)}
+              {[{ name: "New faces this month", value: newThisMonth }, { name: "People who call you their go-to", value: regulars }, { name: "You make per cut", value: "$" + avg }].map(statRow)}
             </div>
 
             <div style={headLbl}>Worth celebrating</div>
@@ -8105,7 +8105,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
 
       {/* Masthead */}
       <div style={{ marginBottom: 22 }}>
-        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>PER BARBER</div>
+        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>PER STAFF MEMBER</div>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
       </div>
 
@@ -8126,7 +8126,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
             {fmtMoney(teamRevenue)}
           </div>
           <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
-            team total · <span style={{ fontWeight: 600 }}>{teamVisits}</span> {teamVisits === 1 ? "visit" : "visits"} across {realProviders.length} {realProviders.length === 1 ? "barber" : "barbers"}
+            team total · <span style={{ fontWeight: 600 }}>{teamVisits}</span> {teamVisits === 1 ? "visit" : "visits"} across {realProviders.length} {realProviders.length === 1 ? "staff member" : "staff"}
           </div>
         </div>
       )}
@@ -8207,7 +8207,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
         </div>
       ) : (
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "28px 22px", textAlign: "center" }}>
-          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto" }}>Add barbers in Settings → Staff to see per-barber breakdowns here.</p>
+          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto" }}>Add staff in Settings → Staff to see per-staff breakdowns here.</p>
         </div>
       )}
     </div>
@@ -9419,7 +9419,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   };
   const cutStylesList = (
     <>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The cuts clients can pick for this service. Tap one to set its price, time, photos and per-barber pricing.</p>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The cuts clients can pick for this service. Tap one to set its price, time, photos and per-staff pricing.</p>
       {(cutLibrary || []).length === 0 ? (
         <div style={{ ...cardStyle, color: "var(--sub)", fontSize: 15, lineHeight: 1.5, marginBottom: 14 }}>No cut styles yet. Tap "New style" to create your first.</div>
       ) : (
@@ -9695,7 +9695,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           );
         })}
       </div>
-      <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 16, lineHeight: 1.5 }}>To add a barber, go to My team in Settings.</p>
+      <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 16, lineHeight: 1.5 }}>To add a staff member, go to My team in Settings.</p>
     </>
   );
 
@@ -9892,7 +9892,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const timeRulesSection = (
     <>
       <SectionHeader title="Hours & Pricing" />
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18 }}>Add a rule for any window where this service should behave differently — block it off, or charge more at peak times and less when it's slow. Leave days unselected to mean every day. No rules = offered normally whenever the barber works.</p>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18 }}>Add a rule for any window where this service should behave differently — block it off, or charge more at peak times and less when it's slow. Leave days unselected to mean every day. No rules = offered normally whenever the staff member works.</p>
       <div style={{ display: "grid", gap: 14 }}>
         {tr.map((r) => (
           <div key={r.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16 }}>
@@ -9901,7 +9901,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <button onClick={() => removeRule(r.id)} style={{ background: "none", color: "var(--sub)", display: "flex" }}><Trash2 size={16} /></button>
             </div>
             <div style={{ marginBottom: 16 }}>
-              <Segmented options={[{ value: "all", label: "All barbers" }, ...staffList.map((p) => ({ value: p.id, label: p.name.split(" ")[0] }))]} value={r.scope} onChange={(v) => setRule(r.id, { scope: v })} />
+              <Segmented options={[{ value: "all", label: "All staff" }, ...staffList.map((p) => ({ value: p.id, label: p.name.split(" ")[0] }))]} value={r.scope} onChange={(v) => setRule(r.id, { scope: v })} />
             </div>
             <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>DAYS <span style={{ color: "var(--faint)", letterSpacing: 0, fontWeight: 400, textTransform: "none" }}>(none = every day)</span></div>
             <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
@@ -10295,7 +10295,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   </div>
                   {usesCutStyles && <DrillRow icon={<Scissors size={18} />} label="Cut styles" sub={cutCount ? `${cutCount} style${cutCount === 1 ? "" : "s"}` : "None yet"} target="cutstyles" />}
                   <DrillRow icon={<Plus size={18} />} label="Add-ons & questions" sub={addonCount ? `${addonCount} added` : "None yet"} target="addons" />
-                  <DrillRow icon={<Users size={18} />} label="Staff & pricing" sub={anyStaffOverride ? `${staffList.filter((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); }).length} custom` : `${offeringCount === staffList.length ? "All barbers" : offeringCount + " of " + staffList.length} · default`} target="staff" />
+                  <DrillRow icon={<Users size={18} />} label="Staff & pricing" sub={anyStaffOverride ? `${staffList.filter((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); }).length} custom` : `${offeringCount === staffList.length ? "All staff" : offeringCount + " of " + staffList.length} · default`} target="staff" />
                   <DrillRow icon={<ImageIcon size={18} />} label="Photos" sub={photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "None yet"} target="photos" />
                 </div>
 
@@ -10649,7 +10649,7 @@ const NOTIF_AUDIENCES = [
   },
   {
     key: "provider", label: "Providers",
-    desc: "What each barber gets about their own chair.",
+    desc: "What each staff member gets about their own chair.",
     channels: ["push", "sms", "email"],
     events: [
       { k: "created", label: "New appointment booked", def: { on: true, push: true } },
@@ -10664,9 +10664,9 @@ const NOTIF_AUDIENCES = [
     desc: "What you get across the whole shop.",
     channels: ["push", "sms", "email"],
     events: [
-      { k: "created", label: "New appointment (any barber)", def: { on: false, push: true } },
-      { k: "canceled", label: "Appointment canceled (any barber)", def: { on: true, push: true } },
-      { k: "rescheduled", label: "Appointment rescheduled (any barber)", def: { on: false, push: true } },
+      { k: "created", label: "New appointment (any staff member)", def: { on: false, push: true } },
+      { k: "canceled", label: "Appointment canceled (any staff member)", def: { on: true, push: true } },
+      { k: "rescheduled", label: "Appointment rescheduled (any staff member)", def: { on: false, push: true } },
       { k: "firstTime", label: "First-time client booked", def: { on: true, push: true } },
       { k: "endOfDay", label: "End-of-day summary (shop totals)", def: { on: true, push: true } },
       { k: "waitlistOpen", label: "Waitlist slot opened", def: { on: true, push: true } },
@@ -10959,7 +10959,7 @@ function BookingRulesEditor({ b, onChange }) {
               </div>
 
               <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 4, marginLeft: 4, fontStyle: "italic" }}>
-                Buffer and minimum notice live in Calendar &amp; day → Scheduling. Per-barber daily caps live under each staff member.
+                Buffer and minimum notice live in Calendar &amp; day → Scheduling. Per-staff daily caps live under each staff member.
               </p>
             </div>
           </>
@@ -11300,7 +11300,7 @@ function WaitlistRulesEditor({ w, onChange }) {
   const delays = [15, 30, 45, 60];
   return (
     <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 22 }}>When an appointment is cancelled, the system finds waitlisted clients whose preferred time and barber match the open slot, and reaches out with a link to book.</p>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 22 }}>When an appointment is cancelled, the system finds waitlisted clients whose preferred time and staff member match the open slot, and reaches out with a link to book.</p>
 
       <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>How it sends</div>
       <Opt active={w.mode === "ask"} title="Ask me first" sub="Show a confirmation listing who matches, and I send it." onClick={() => set({ mode: "ask" })} />
@@ -11371,7 +11371,7 @@ function BusinessHoursEditor({ hours, onChange }) {
   })();
   return (
     <div>
-      <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>The hours your shop is open — the outer frame of your calendar. Each barber's bookable times still come from their own work hours.</p>
+      <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>The hours your shop is open — the outer frame of your calendar. Each staff member's bookable times still come from their own work hours.</p>
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
         <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>This week</div>
         {summary.map((r, i) => (
@@ -11542,7 +11542,7 @@ function WaitingRoomEditor({ w, onChange }) {
     <div>
       <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Controls how clients are checked in when they arrive, and how they're told you're ready for them.</p>
 
-      <RowToggle title="Notify staff on arrival" desc="Ping the barber when a client is checked in and waiting." on={w.notifyOnArrival} onClick={() => set({ notifyOnArrival: !w.notifyOnArrival })} />
+      <RowToggle title="Notify staff on arrival" desc="Ping the staff member when a client is checked in and waiting." on={w.notifyOnArrival} onClick={() => set({ notifyOnArrival: !w.notifyOnArrival })} />
       <RowToggle title="Show waiting list" desc="Display a live list of clients who've checked in and are waiting." on={w.showWaitingList} onClick={() => set({ showWaitingList: !w.showWaitingList })} />
       <RowToggle title="Client self check-in" desc="Let clients check themselves in from a link or QR code on arrival." on={w.selfCheckIn} onClick={() => set({ selfCheckIn: !w.selfCheckIn })} soon />
 
@@ -11554,7 +11554,7 @@ function WaitingRoomEditor({ w, onChange }) {
         {w.autoReadyMessage && (<>
           <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 8 }}>Message wording</div>
           <textarea value={w.readyMessage || ""} onChange={(e) => set({ readyMessage: e.target.value })} rows={3} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", resize: "vertical", lineHeight: 1.5 }} />
-          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Use <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> to drop in the barber's name automatically.</div>
+          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Use <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> to drop in the staff member's name automatically.</div>
         </>)}
       </div>
     </div>
@@ -11598,7 +11598,7 @@ function RunningLateEditor({ r, onChange }) {
           <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Message to the client</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>Sent as an in-app notification — no text message.</div>
           <textarea value={r.message || ""} onChange={(e) => set({ message: e.target.value })} rows={4} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", resize: "vertical", lineHeight: 1.5 }} />
-          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.5 }}>Tags you can use: <strong style={{ color: "var(--sub)" }}>{"{client}"}</strong> name, <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> barber, <strong style={{ color: "var(--sub)" }}>{"{shop}"}</strong>, <strong style={{ color: "var(--sub)" }}>{"{range}"}</strong> minutes behind.</div>
+          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.5 }}>Tags you can use: <strong style={{ color: "var(--sub)" }}>{"{client}"}</strong> name, <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> staff member, <strong style={{ color: "var(--sub)" }}>{"{shop}"}</strong>, <strong style={{ color: "var(--sub)" }}>{"{range}"}</strong> minutes behind.</div>
         </div>
       </>)}
     </div>
@@ -11879,7 +11879,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
 
   const FIELD_LABELS = [
     ["full", "Full name"], ["first", "First name"], ["last", "Last name"], ["email", "Email"], ["phone", "Phone"],
-    ["date", "Appointment date"], ["time", "Appointment time"], ["service", "Service"], ["staff", "Barber / staff"], ["status", "Status"], ["price", "Price"],
+    ["date", "Appointment date"], ["time", "Appointment time"], ["service", "Service"], ["staff", "Staff"], ["status", "Status"], ["price", "Price"],
   ];
   const canPreview = !!(map.phone || map.full || map.first || map.email);
 
@@ -11917,7 +11917,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
             </div>
           ))}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 16px", borderTop: "1px solid var(--line)" }}>
-            <span style={{ fontSize: 14.5, color: "var(--text)", flexShrink: 0 }}>Default barber</span>
+            <span style={{ fontSize: 14.5, color: "var(--text)", flexShrink: 0 }}>Default staff member</span>
             <select value={defProv} onChange={(e) => setDefProv(e.target.value)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px", color: "var(--text)", fontSize: 14, maxWidth: 165 }}>
               {realProviders.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
@@ -12257,7 +12257,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
       return { ...s, staff: { ...(s.staff || {}), [person.id]: { ...cur, cutPrice } } };
     }));
     const allOff = services.every((s) => entryFor(s).on === false);
-    const first = (person.name || "").split(" ")[0] || "this barber";
+    const first = (person.name || "").split(" ")[0] || "this staff member";
     const usedCats = cats.filter((c) => services.some((s) => (s.category || "Services") === c));
     // NumBox is defined at module scope so typing never remounts the input (keyboard stays open).
     return (
@@ -12265,7 +12265,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         <SecHeader title="Services" onBack={() => setSection(null)} right={
           <button onClick={() => { const next = !!allOff; services.forEach((s) => setSvc(s.id, { on: next })); }} style={{ background: "none", color: "var(--gold)", fontSize: 15, fontWeight: 500 }}>{allOff ? "Enable all" : "Disable all"}</button>
         } />
-        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18, fontWeight: 400 }}>Turn services on or off for {first}, and set {first === "this barber" ? "their" : "their"} own time or price. Blank means the shop default.</p>
+        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, marginBottom: 18, fontWeight: 400 }}>Turn services on or off for {first}, and set {first === "this staff member" ? "their" : "their"} own time or price. Blank means the shop default.</p>
         {usedCats.map((cat) => {
           const inCat = services.filter((s) => (s.category || "Services") === cat);
           if (!inCat.length) return null;
@@ -12336,7 +12336,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
     const before = Math.max(0, Number(person.bufferBefore) || 0);
     const after = Math.max(0, Number(person.bufferAfter ?? 5) || 0);
     const setBuf = (patch) => setProviders(providers.map((p) => p.id === person.id ? { ...p, ...patch } : p));
-    const first = (person.name || "").split(" ")[0] || "this barber";
+    const first = (person.name || "").split(" ")[0] || "this staff member";
     const Step = ({ label, desc, val, onChange }) => (
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", boxShadow: "var(--shadow-sm)" }}>
         <div style={{ fontSize: 16, fontWeight: 600 }}>{label}</div>
@@ -12582,8 +12582,8 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         {/* Role — Owner sees all barbers + shop totals; Barber sees only their own chair. */}
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
           <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Fraunces', serif", marginBottom: 4 }}>Role</div>
-          <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, marginBottom: 14 }}>Owners see every barber's numbers and shop totals. Barbers see only their own chair.</div>
-          <Segmented options={[{ value: "barber", label: "Barber" }, { value: "owner", label: "Owner" }]} value={person.pulseRole || "barber"} onChange={(v) => patch(person.id, { pulseRole: v })} />
+          <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, marginBottom: 14 }}>Owners see every staff member's numbers and shop totals. Staff see only their own chair.</div>
+          <Segmented options={[{ value: "barber", label: "Staff member" }, { value: "owner", label: "Owner" }]} value={person.pulseRole || "barber"} onChange={(v) => patch(person.id, { pulseRole: v })} />
         </div>
 
         <button onClick={() => { showToast && showToast("Saved."); setSection(null); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 13, cursor: "pointer", marginTop: 4 }}>Save</button>
@@ -12805,7 +12805,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
       <HubCard label="Services" sec="services" rows={[{ l: "Offering", r: `${hubSvcOn} of ${services.length}` }]} />
       {/* Booking + calendar links — visible right on the profile, no drill-in needed */}
       {bookable && person.id !== "anyone" && (() => {
-        const first = (person.name || "").split(" ")[0] || "this barber";
+        const first = (person.name || "").split(" ")[0] || "this staff member";
         const bookUrl = `${ORIGIN}/book?shop=${SLUG}&with=${person.id}`;
         const icalUrl = `webcal://${ORIGIN.replace(/^https?:\/\//, "")}/api/ical/${SLUG}/${person.id}.ics`;
         const LinkRow = ({ title, sub, url, label }) => (
@@ -12827,7 +12827,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         );
       })()}
       <HubCard label="Compensation" sec="comp" rows={[{ l: "Service commission", r: hubSc.on ? (hubSc.type === "basic" ? `${hubSc.basicPct}%` : "Sliding scale") : "Not set", muted: !hubSc.on }, { l: "Hourly", r: (hubComp.hourly && hubComp.hourly.on) ? `$${hubComp.hourly.rate}/hr` : "Off", muted: !(hubComp.hourly && hubComp.hourly.on) }]} />
-      <HubCard label="Sign-in & access" sec="access" rows={[{ l: "App access", r: person.pulseRole === "owner" ? "Owner" : "Barber" }, { l: "Notifications", r: Object.values(hubNotif).some(Boolean) ? "On" : "Off", sec: "notifications" }, { l: "Permissions", r: person.userType === "Admin" ? "Admin defaults" : "Staff defaults", sec: "permissions" }]} />
+      <HubCard label="Sign-in & access" sec="access" rows={[{ l: "App access", r: person.pulseRole === "owner" ? "Owner" : "Staff member" }, { l: "Notifications", r: Object.values(hubNotif).some(Boolean) ? "On" : "Off", sec: "notifications" }, { l: "Permissions", r: person.userType === "Admin" ? "Admin defaults" : "Staff defaults", sec: "permissions" }]} />
       <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
         <button onClick={() => { if (typeof window === "undefined" || window.confirm(`Archive ${person.name}? They're hidden from booking and the calendar, and can be restored anytime.`)) archive(person.id); }} style={{ background: "none", border: "none", color: "#C2563F", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 4, padding: 8, cursor: "pointer" }}>Archive {person.name}</button>
       </div>
@@ -13260,13 +13260,13 @@ function AnyoneRoutingEditor({ b, onChange, providers = [] }) {
   };
   const modes = [
     { v: "soonest", label: "Whoever's available first", smart: true,
-      desc: "Books the barber who can take the client soonest.",
+      desc: "Books the staff member who can take the client soonest.",
       example: "Client wants 2:00. Heather's free at 2:00 but Dan isn't open until 3:30 — it goes to Heather." },
     { v: "share", label: "Share the work",
       desc: "Books whoever has the lightest day so far.",
       example: "Dan already has 6 cuts on the books and Heather has 2 — the next \u201cAnyone\u201d booking goes to Heather." },
     { v: "roundRobin", label: "Take turns, in order",
-      desc: "Rotates through your barbers in the order you set.",
+      desc: "Rotates through your staff in the order you set.",
       example: "Dan, then Heather, then back to Dan — one after another, in turn." },
   ];
   const showOrder = mode === "roundRobin";
@@ -13311,7 +13311,7 @@ function AnyoneRoutingEditor({ b, onChange, providers = [] }) {
           );
         })}
       </div>
-      <div style={{ marginTop: 13, fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5 }}>A client can always pick a specific barber instead. This only applies when they choose &ldquo;Anyone.&rdquo;</div>
+      <div style={{ marginTop: 13, fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5 }}>A client can always pick a specific staff member instead. This only applies when they choose &ldquo;Anyone.&rdquo;</div>
     </div>
   );
 }
@@ -13497,7 +13497,7 @@ This help center lives right inside the app. Search the box up top, or browse by
 ## To add someone
 - Go to Settings → Staff.
 - Add a new member and fill in their name, email, and role.
-- Set their role to Owner (sees all numbers and shop totals) or Barber (sees only their own chair).
+- Set their role to Owner (sees all numbers and shop totals) or Staff member (sees only their own chair).
 
 ## Tip
 Use each person's real email — it's how the app signs them in as themselves automatically.` },
@@ -13912,7 +13912,7 @@ function TestDataTool({ shopId, services, providers, appts, setAppts, clients, s
     setBusy(true);
     try {
       const realProviders = (providers || []).filter((p) => p.id !== "anyone");
-      if (!realProviders.length) { showToast("Add a barber under Settings → Staff first."); setBusy(false); return; }
+      if (!realProviders.length) { showToast("Add a staff member under Settings → Staff first."); setBusy(false); return; }
       let bookable = (services || []).filter((s) => s && s.id != null).map((s) => ({ id: s.id, name: s.name || "Service", duration: (typeof s.duration === "number" && s.duration > 0) ? s.duration : 30, price: (s.price != null ? s.price : 0) }));
       if (!bookable.length) bookable = [{ id: "test_svc_cut", name: "Haircut", duration: 30, price: 35 }, { id: "test_svc_cutbeard", name: "Cut & Beard", duration: 45, price: 50 }, { id: "test_svc_beard", name: "Beard Trim", duration: 20, price: 20 }];
       const stamp = Date.now();
@@ -13994,7 +13994,7 @@ function TestDataTool({ shopId, services, providers, appts, setAppts, clients, s
     setBusy(true);
     try {
       const dan = (providers || []).find((p) => p.id === "dan") || (providers || []).find((p) => /dan/i.test(p.name || "")) || (providers || []).filter((p) => p.id !== "anyone")[0];
-      if (!dan) { showToast("Couldn't find Dan as a barber — add him under Settings → Staff first."); setBusy(false); return; }
+      if (!dan) { showToast("Couldn't find Dan as a staff member — add him under Settings → Staff first."); setBusy(false); return; }
       const svc = (services || []).find((s) => /hair/i.test(s.name || "")) || (services || []).find((s) => s && s.id != null) || { id: "svc_haircut", name: "Haircut", duration: 35, price: 35 };
       const bf = new Date(); bf.setHours(0, 0, 0, 0); const bfISO = bf.toISOString();
       const day = [
@@ -14876,8 +14876,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <BookingTimesEditor b={form.booking || DEFAULT_BOOKING} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
     },
     {
-      id: "anyonerouting", title: "When a client picks \u201cAnyone\u201d", subtitle: "Which barber gets the booking", icon: Users, category: "Online Booking",
-      explain: <>When a client books without picking a specific barber, this decides who gets the appointment. <b>Whoever's available first</b> books the barber who can take them soonest. <b>Share the work</b> spreads bookings to whoever's lightest that day. <b>Take turns</b> rotates through your barbers in an order you set. A client who picks a specific barber is never affected — this only applies to &ldquo;Anyone.&rdquo;</>,
+      id: "anyonerouting", title: "When a client picks \u201cAnyone\u201d", subtitle: "Which staff member gets the booking", icon: Users, category: "Online Booking",
+      explain: <>When a client books without picking a specific staff member, this decides who gets the appointment. <b>Whoever's available first</b> books the staff member who can take them soonest. <b>Share the work</b> spreads bookings to whoever's lightest that day. <b>Take turns</b> rotates through your staff in an order you set. A client who picks a specific staff member is never affected — this only applies to &ldquo;Anyone.&rdquo;</>,
       status: (() => { const m = (form.booking || {}).anyoneMode || "soonest"; return { soonest: "Whoever's first", share: "Share the work", roundRobin: "Take turns" }[m] || "Whoever's first"; })(),
       keywords: "anyone first available routing which barber assign distribute share work round robin take turns rotation no preference whoever soonest balance load",
       editor: <AnyoneRoutingEditor b={form.booking || DEFAULT_BOOKING} providers={providers} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
@@ -15045,7 +15045,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   // so nothing falls through to search-only. Tap a tile → that category's list. ----
   const CATS = [
     { id: "shop",  section: "Set up your shop", label: "Your shop", icon: User, desc: "Name, hours & branding", settings: ["business", "hours", "locations", "phones", "appearance", "theme"] },
-    { id: "staff", section: "Set up your shop", label: "Your team", icon: Users, desc: "Barbers, access & pay", settings: ["staff", "staffpin"] },
+    { id: "staff", section: "Set up your shop", label: "Your team", icon: Users, desc: "Staff, access & pay", settings: ["staff", "staffpin"] },
     { id: "menu",  section: "Set up your shop", label: "Services & pricing", icon: Scissors, desc: "What you offer", settings: ["servicesmenu"] },
     { id: "productscat", section: "Set up your shop", label: "Products", icon: Sparkles, desc: "Retail you sell — haircare, skincare, merch", settings: ["products"] },
     { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "How clients book you", settings: ["avoidgaps", "autotiming", "anyonerouting", "booking", "newclient", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"], groups: [
@@ -15118,16 +15118,16 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         { k: "shop_theme_book", label: "Theme looks right on the live /book page", card: "theme" },
       ] },
     ] },
-    { id: "staff", label: "My team", icon: Users, desc: "Barbers, access & pay", groups: [
-      { label: "Your barbers", items: [
-        { k: "team_added", label: "Every barber added", card: "staff", auto: A(providers.filter((p) => p.id !== "anyone").length > 0) },
-        { k: "team_photo", label: "Each barber has a name & photo", card: "staff" },
+    { id: "staff", label: "My team", icon: Users, desc: "Staff, access & pay", groups: [
+      { label: "Your staff", items: [
+        { k: "team_added", label: "Every staff member added", card: "staff", auto: A(providers.filter((p) => p.id !== "anyone").length > 0) },
+        { k: "team_photo", label: "Each staff member has a name & photo", card: "staff" },
         { k: "team_bookable", label: "Bookable-online is on for who should show", card: "staff" },
-        { k: "team_hours", label: "Each barber's own hours are set", card: "staff" },
-        { k: "team_services", label: "Each barber's services / durations correct", card: "staff" },
+        { k: "team_hours", label: "Each staff member's own hours are set", card: "staff" },
+        { k: "team_services", label: "Each staff member's services / durations correct", card: "staff" },
       ] },
       { label: "Access", items: [
-        { k: "team_login", label: "Each barber can sign in on their device", card: "staff" },
+        { k: "team_login", label: "Each staff member can sign in on their device", card: "staff" },
         { k: "team_pin", label: "Staff PIN decided (on or off)", card: "staffpin" },
       ] },
     ] },
@@ -15148,7 +15148,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       { label: "The times they see", items: [
         { k: "book_gaps", label: "Avoid-small-gaps setting is how you want it", card: "avoidgaps" },
         { k: "book_gapmin", label: "Minimum gap size is correct", card: "avoidgaps" },
-        { k: "book_anyone", label: "\u201CAnyone\u201D routing picks the right barber", card: "anyonerouting" },
+        { k: "book_anyone", label: "\u201CAnyone\u201D routing picks the right staff member", card: "anyonerouting" },
       ] },
       { label: "Your booking page", items: [
         { k: "book_incr", label: "Booking increment set (5 / 10 / 15 min)", card: "booking" },
@@ -15162,7 +15162,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         { k: "book_family", label: "Family / group booking toggle", card: "family" },
       ] },
       { label: "Try it yourself", items: [
-        { k: "book_test_specific", label: "Booked a test appt for a specific barber", card: null },
+        { k: "book_test_specific", label: "Booked a test appt for a specific staff member", card: null },
         { k: "book_test_anyone", label: "Booked a test appt with \u201CAnyone\u201D", card: null },
         { k: "book_test_returning", label: "Returning-client email code flow works", card: null },
       ] },
@@ -16010,7 +16010,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             const w = provObj && provObj.hours && provObj.hours[(selectedDate || new Date()).getDay()];
             const outside = !w || !w.on || startMin < w.start || (startMin + apptDur) > w.end;
             if (!outside) return null;
-            const nm = provObj ? provObj.name.split(" ")[0] : "this barber";
+            const nm = provObj ? provObj.name.split(" ")[0] : "this staff member";
             return (
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--wash)", border: "1px solid var(--wash)", borderRadius: 10, padding: "9px 13px", marginTop: 14, fontSize: 13, color: "var(--text2)", lineHeight: 1.4 }}>
                 <AlertCircle size={14} style={{ color: "var(--gold)", flexShrink: 0 }} />
@@ -16857,7 +16857,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     const prov = providers.find((p) => p.id === providerId);
     const provCap = Math.max(0, Number(prov?.maxPerDay) || 0);
     const shopCap = Math.max(0, Number(business?.booking?.dailyCap) || 0);
-    if (provCap > 0 && dayCount((a) => a.providerId === providerId) >= provCap) return { who: prov?.name || "This barber", limit: provCap, scope: "provider" };
+    if (provCap > 0 && dayCount((a) => a.providerId === providerId) >= provCap) return { who: prov?.name || "This staff member", limit: provCap, scope: "provider" };
     if (shopCap > 0 && dayCount(() => true) >= shopCap) return { who: "the shop", limit: shopCap, scope: "shop" };
     return null;
   };
@@ -17342,7 +17342,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           // Which barber are we double-booking? Pull from the booking (create) or the moving appt (move).
           const provId = conflictModal.mode === "create" ? conflictModal.bookData.providerId : conflictModal.moveData.appt.providerId;
           const provObj = providers.find((p) => p.id === provId);
-          const barberName = provObj ? (provObj.name || "").split(" ")[0] : "This barber";
+          const barberName = provObj ? (provObj.name || "").split(" ")[0] : "This staff member";
           const onMove = () => {
             if (conflictModal.mode === "create") {
               commitAppt(conflictModal.bookData, conflictModal.nextSlot);
@@ -17434,7 +17434,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
       {blockSlot && (
         <TimeBlockSheet
-          providerName={(providers.find((p) => p.id === blockSlot.providerId) || {}).name || "Barber"}
+          providerName={(providers.find((p) => p.id === blockSlot.providerId) || {}).name || "Staff member"}
           dateLabel={selectedDate.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
           startLabel={fmtTime(blockSlot.start)}
           onClose={() => setBlockSlot(null)}
@@ -17465,7 +17465,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
         const wd = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][selectedDate.getDay()];
         return (
           <BarberHoursSheet
-            providerName={p?.name || "Barber"}
+            providerName={p?.name || "Staff member"}
             dateLabel={selectedDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
             weekdayName={wd}
             initial={eff}
@@ -18023,7 +18023,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         <p style={{ color: "var(--sub)", fontSize: 14.5, fontWeight: 300 }}>{targetLabel}{provider?.name ? ` · ${provider.name}` : ""}</p>
       </div>
       {daySlots.off ? (
-        <div style={{ textAlign: "center", padding: "24px 0", color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5 }}>{provider?.name || "This barber"} isn't working that day.<br />Go back and pick a different day.</div>
+        <div style={{ textAlign: "center", padding: "24px 0", color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5 }}>{provider?.name || "This staff member"} isn't working that day.<br />Go back and pick a different day.</div>
       ) : daySlots.slots.length === 0 ? (
         <div style={{ textAlign: "center", padding: "24px 0", color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5 }}>That day is fully booked.<br />Go back and try another day.</div>
       ) : (
@@ -19895,7 +19895,7 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
   const toD = new Date(to + "T23:59:59");
   const fmtShort = (iso) => { const d = new Date(iso + "T00:00:00"); return `${MONTHS[d.getMonth()]} ${d.getDate()}`; };
   const rangeLabel = `${fmtShort(from)} – ${fmtShort(to)}`;
-  const staffLabel = staffId === "all" ? "All barbers" : provName(staffId);
+  const staffLabel = staffId === "all" ? "All staff" : provName(staffId);
   const serviceLabel = serviceId === "all" ? "All services" : svcName(serviceId);
 
   // base filtered set (date + staff + service), excluding blocks
@@ -20174,7 +20174,7 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
         <Sheet open={pickerOpen === "staff"} onClose={() => setPickerOpen(null)} align="bottom" maxWidth={460}>
           <div style={{ padding: "8px 4px 12px" }}>
             <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 500, marginBottom: 14 }}>Staff</div>
-            {[{ id: "all", name: "All barbers" }, ...staff].map((p, i, arr) => (
+            {[{ id: "all", name: "All staff" }, ...staff].map((p, i, arr) => (
               <button key={p.id} onClick={() => { setStaffId(p.id); setPickerOpen(null); }} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 0", borderBottom: i === arr.length - 1 ? "none" : "1px solid var(--line)", background: "none", border: "none", fontSize: 16, color: "var(--text)", fontFamily: FB, cursor: "pointer", textAlign: "left" }}>{p.name}{staffId === p.id && <Check size={17} style={{ color: "var(--text)" }} />}</button>
             ))}
           </div>
@@ -20245,7 +20245,7 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
       <Sheet open={pickerOpen === "staff"} onClose={() => setPickerOpen(null)} align="bottom" maxWidth={460}>
         <div style={{ padding: "8px 4px 12px" }}>
           <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 500, marginBottom: 14 }}>Staff</div>
-          {[{ id: "all", name: "All barbers" }, ...staff].map((p, i, arr) => (
+          {[{ id: "all", name: "All staff" }, ...staff].map((p, i, arr) => (
             <button key={p.id} onClick={() => { setStaffId(p.id); setPickerOpen(null); }} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 0", borderBottom: i === arr.length - 1 ? "none" : "1px solid var(--line)", background: "none", border: "none", fontSize: 16, color: "var(--text)", fontFamily: FB, cursor: "pointer", textAlign: "left" }}>{p.name}{staffId === p.id && <Check size={17} style={{ color: "var(--text)" }} />}</button>
           ))}
         </div>
@@ -20350,7 +20350,7 @@ function TaxReportView({ appts, providers, services, business, setBusiness, me }
       </div>
 
       {/* per barber */}
-      <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 10px" }}>Per barber</div>
+      <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 10px" }}>Per staff member</div>
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "6px 20px", marginBottom: 22 }}>
         {rows.map((s, i) => {
           const r = rateFor(s.id);
@@ -20532,7 +20532,7 @@ function ReportsView({ appts, clients, providers, services, business, setBusines
           </div>
 
           {/* per barber */}
-          <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 10px" }}>Per barber</div>
+          <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 10px" }}>Per staff member</div>
           <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "6px 20px", marginBottom: 22 }}>
             {byStaff.map((s, i) => {
               const r = rateFor(s.id);
@@ -20706,7 +20706,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast }) {
           <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>EMAIL (optional)</label>
           <input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} placeholder="name@email.com" inputMode="email" style={{ ...inputS, marginBottom: 14 }} />
 
-          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PREFERRED BARBER</label>
+          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PREFERRED STAFF MEMBER</label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
             {staff.map((p) => { const on = draft.provider === p.id; return (
               <button key={p.id} onClick={() => setDraft({ ...draft, provider: p.id })} style={{ padding: "10px 16px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{p.name}</button>
