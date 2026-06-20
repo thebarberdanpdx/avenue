@@ -1,0 +1,17 @@
+# Free 24/7 calendar-sync pinger.
+#
+# Vercel Hobby only allows DAILY cron, so this GitHub Action pings the always-on
+# sync endpoint every 5 minutes (GitHub's shortest reliable schedule) to keep
+# every connected shop's calendar mirrored even when the app is closed. The
+# in-app sync still runs every minute while the dashboard is open.
+name: calendar-sync
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # every 5 minutes (GitHub may delay under load)
+  workflow_dispatch: {}       # allow manual runs from the Actions tab
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger calendar sync
+        run: curl -fsS --max-time 60 "https://gotvero.com/api/calendar-run" -o /dev/null -w "calendar-run HTTP %{http_code}\n"
