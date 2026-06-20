@@ -12192,6 +12192,7 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
   const [busy, setBusy] = useState(false);
   const [blockNotice, setBlockNotice] = useState(null); // { count } when the safety rail trips
   const [doorNote, setDoorNote] = useState(null); // "apple" | "google" — inline explainer for the not-yet-live doors
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false); // remove-sync choice (keep vs clear mirrored appts)
   const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent || "");
 
   const saveCfg = (patch) => setBusiness((b) => ({ ...(b || {}), calSync: { ...((b && b.calSync) || {}), ...patch } }));
@@ -12229,12 +12230,18 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
   // Auto-poll every 6 min while connected, not paused, and the dashboard is open.
   useEffect(() => {
     if (!connected || cfg.paused) return;
-    const id = setInterval(() => { runSync(cfg.url, { quiet: true }); }, 6 * 60 * 1000);
+    const id = setInterval(() => { runSync(cfg.url, { quiet: true }); }, 60 * 1000);
     return () => clearInterval(id);
   }, [connected, cfg.paused, cfg.url]); // eslint-disable-line
 
   const connect = () => { const u = urlInput.trim(); if (!u) { if (showToast) showToast("Paste your calendar link first."); return; } saveCfg({ url: u.replace(/^webcal:\/\//i, "https://"), connectedVia: "link", paused: false }); runSync(u); };
-  const disconnect = () => { saveCfg({ url: "", connectedVia: null, paused: false, lastChanges: null, lastError: null }); setUrlInput(""); if (showToast) showToast("Calendar disconnected. Mirrored appointments stay on your calendar."); };
+  // Stop syncing. `removeAppts` also pulls the mirrored appointments back off Vero's calendar.
+  const disconnect = (removeAppts) => {
+    if (removeAppts) setAppts((cur) => (cur || []).filter((a) => !(a && (a.source === "sync" || a._synced))));
+    saveCfg({ url: "", connectedVia: null, paused: false, lastChanges: null, lastError: null });
+    setUrlInput(""); setConfirmDisconnect(false);
+    if (showToast) showToast(removeAppts ? "Sync removed and mirrored appointments cleared." : "Sync stopped. Mirrored appointments left on your calendar.");
+  };
   const togglePause = () => { const p = !cfg.paused; saveCfg({ paused: p }); if (!p) runSync(cfg.url); };
 
   const ago = (ts) => { if (!ts) return "never"; const s = Math.round((Date.now() - ts) / 1000); if (s < 60) return "just now"; const m = Math.round(s / 60); if (m < 60) return `${m} min ago`; const h = Math.round(m / 60); if (h < 24) return `${h} hr ago`; return `${Math.round(h / 24)} d ago`; };
@@ -12254,7 +12261,7 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
             <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--faint)" }}>{cfg.lastError ? "needs attention" : `${ago(cfg.lastSyncAt)}`}</span>
           </div>
           <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5 }}>
-            {syncedCount} appointment{syncedCount === 1 ? "" : "s"} mirrored{cfg.paused ? "" : " · checks every ~6 min while open"}.
+            {syncedCount} appointment{syncedCount === 1 ? "" : "s"} mirrored{cfg.paused ? "" : " · checks every minute while open"}.
             {cfg.lastError ? <><br /><span style={{ color: "#c0392b" }}>{cfg.lastError}</span></> : null}
           </div>
           <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 7 }}>Last check: added {c.added} · moved {c.moved} · removed {c.cancelled}</div>
@@ -12271,7 +12278,18 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
           <button onClick={() => runSync(cfg.url)} disabled={busy} className="lift" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: 13, fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}><RotateCw size={16} />{busy ? "Syncing…" : "Sync now"}</button>
           <button onClick={togglePause} disabled={busy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 11, padding: 13, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>{cfg.paused ? <><Play size={15} /> Resume</> : <><Pause size={15} /> Pause</>}</button>
         </div>
-        <button onClick={disconnect} style={{ width: "100%", background: "transparent", color: "var(--sub)", border: "none", padding: 10, fontSize: 13, cursor: "pointer" }}>Disconnect calendar</button>
+        {confirmDisconnect ? (
+          <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: 12, background: "var(--panel)", marginTop: 4 }}>
+            <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.5, marginBottom: 12 }}>Stop syncing this calendar. Keep the {syncedCount} mirrored appointment{syncedCount === 1 ? "" : "s"} on your calendar, or remove them too?</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => disconnect(false)} style={{ flex: 1, background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, fontSize: 13.5, fontWeight: 500, cursor: "pointer" }}>Keep them</button>
+              <button onClick={() => disconnect(true)} style={{ flex: 1, background: "color-mix(in srgb, #c0392b 14%, var(--panel))", color: "var(--text)", border: "1px solid color-mix(in srgb, #c0392b 40%, transparent)", borderRadius: 10, padding: 12, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Remove them</button>
+            </div>
+            <button onClick={() => setConfirmDisconnect(false)} style={{ width: "100%", background: "transparent", color: "var(--sub)", border: "none", padding: "10px 0 2px", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmDisconnect(true)} style={{ width: "100%", background: "transparent", color: "var(--sub)", border: "none", padding: 10, fontSize: 13, cursor: "pointer" }}>Disconnect calendar</button>
+        )}
         <p style={{ color: "var(--faint)", fontSize: 12, lineHeight: 1.5, marginTop: 8, textAlign: "center" }}>Clients are never notified about mirrored appointments. Vero won't double-book over them.</p>
       </div>
     );
