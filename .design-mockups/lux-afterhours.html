@@ -1,0 +1,359 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap');
+
+.sbc-wrap{
+  background:#e9e7e1;
+  padding:34px 22px;
+  font-family:'Jost',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.sbc-frame{
+  max-width:636px;
+  margin:0 auto;
+  border-radius:14px;
+  overflow:hidden;
+  box-shadow:0 24px 60px -28px rgba(20,16,12,.55);
+  border:1px solid rgba(0,0,0,.06);
+}
+.sbc-bar{
+  display:flex;align-items:center;gap:14px;
+  background:#16130f;
+  padding:11px 16px;
+  border-bottom:1px solid rgba(255,255,255,.05);
+}
+.sbc-dots{display:flex;gap:7px}
+.sbc-dots i{width:11px;height:11px;border-radius:50%;display:block}
+.sbc-dots i:nth-child(1){background:#3a352d}
+.sbc-dots i:nth-child(2){background:#2f2b24}
+.sbc-dots i:nth-child(3){background:#2f2b24}
+.sbc-addr{
+  flex:1;
+  background:#0d0b08;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:7px;
+  text-align:center;
+  font-size:11.5px;
+  letter-spacing:.22em;
+  color:#8a8378;
+  padding:5px 0;
+  text-transform:uppercase;
+}
+.sbc-addr b{color:#c9a45e;font-weight:400}
+
+.sbc-site{
+  background:#0b0907;
+  color:#f3efe7;
+  position:relative;
+}
+
+.sbc-eye{
+  display:flex;align-items:center;gap:8px;
+  font-size:10.5px;letter-spacing:.34em;text-transform:uppercase;
+  color:#b89559;
+}
+.sbc-eye::before{content:"";width:26px;height:1px;background:#b89559;opacity:.6;display:block}
+.sbc-num{
+  font-family:'Cormorant',serif;
+  font-style:italic;
+  font-size:13px;
+  color:#9a7c46;
+  letter-spacing:.02em;
+}
+
+/* ---------- top nav ---------- */
+.sbc-nav{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 34px;
+  border-bottom:1px solid rgba(201,164,94,.12);
+}
+.sbc-mark{
+  font-family:'Cormorant',serif;
+  font-size:19px;font-weight:500;letter-spacing:.5em;
+  color:#f4efe6;text-transform:uppercase;
+  text-indent:.5em;
+}
+.sbc-navlinks{display:flex;gap:26px}
+.sbc-navlinks span{
+  font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:#9b9388;
+}
+
+/* ---------- hero ---------- */
+.sbc-hero{
+  position:relative;
+  padding:64px 34px 56px;
+  overflow:hidden;
+}
+.sbc-hero::before{
+  content:"";position:absolute;inset:0;
+  background:
+    radial-gradient(120% 90% at 88% 8%, rgba(201,164,94,.16), transparent 46%),
+    radial-gradient(90% 80% at 6% 96%, rgba(120,92,48,.13), transparent 52%),
+    linear-gradient(160deg,#0e0b08 0%,#070605 70%);
+}
+.sbc-hero > *{position:relative}
+.sbc-hero-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:46px}
+.sbc-h1{
+  font-family:'Cormorant',serif;
+  font-weight:400;
+  font-size:74px;
+  line-height:.93;
+  letter-spacing:-.012em;
+  color:#f6f1e8;
+  margin:0;
+}
+.sbc-h1 em{font-style:italic;color:#cda564;font-weight:400}
+.sbc-h1 .thin{display:block;font-size:60px;color:#e9e2d4;padding-left:54px}
+.sbc-hero-foot{
+  display:flex;align-items:flex-end;justify-content:space-between;
+  margin-top:44px;gap:24px;
+}
+.sbc-lede{
+  max-width:300px;font-size:13.5px;line-height:1.85;color:#d8d1c4;font-weight:300;
+}
+.sbc-cta{
+  flex-shrink:0;
+  display:inline-flex;align-items:center;gap:12px;
+  border:1px solid #c9a45e;
+  color:#0b0907;
+  background:#c9a45e;
+  padding:13px 26px;
+  font-size:11px;letter-spacing:.26em;text-transform:uppercase;
+  border-radius:2px;
+}
+.sbc-cta i{font-size:15px}
+
+/* framed cinematic plate */
+.sbc-plate{
+  position:relative;
+  margin-top:54px;
+  height:188px;
+  border-radius:3px;
+  border:1px solid rgba(201,164,94,.22);
+  background:
+    linear-gradient(115deg, rgba(201,164,94,.06), transparent 40%),
+    repeating-linear-gradient(118deg, #131009 0 2px, #0d0b07 2px 9px),
+    radial-gradient(70% 120% at 78% 14%, rgba(206,170,98,.20), transparent 55%);
+  overflow:hidden;
+}
+.sbc-plate::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,transparent 40%,rgba(5,4,3,.75));
+}
+.sbc-plate-tag{
+  position:absolute;left:18px;bottom:14px;z-index:2;
+  font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:#bcae98;
+}
+.sbc-plate-tag b{color:#cda564;font-weight:400}
+
+/* ---------- ethos ---------- */
+.sbc-ethos{
+  padding:72px 34px;
+  background:#0d0a08;
+  border-top:1px solid rgba(201,164,94,.1);
+  border-bottom:1px solid rgba(201,164,94,.1);
+}
+.sbc-ethos-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:34px}
+.sbc-statement{
+  font-family:'Cormorant',serif;
+  font-weight:300;
+  font-size:33px;
+  line-height:1.32;
+  color:#ece5d8;
+  margin:0;
+  max-width:520px;
+}
+.sbc-statement em{font-style:italic;color:#cda564}
+.sbc-proof{
+  display:flex;align-items:center;gap:14px;
+  margin-top:38px;padding-top:26px;
+  border-top:1px solid rgba(201,164,94,.14);
+}
+.sbc-proof-stars{color:#c9a45e;letter-spacing:.34em;font-size:13px}
+.sbc-proof-txt{font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:#9b9388}
+
+/* ---------- services ---------- */
+.sbc-svc{padding:70px 34px;background:#080706}
+.sbc-svc-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.sbc-svc-sub{
+  font-family:'Cormorant',serif;font-style:italic;font-size:21px;color:#a98c52;
+  margin:0 0 40px;
+}
+.sbc-row{
+  display:grid;grid-template-columns:42px 1fr auto;
+  align-items:baseline;gap:18px;
+  padding:22px 0;
+  border-top:1px solid rgba(201,164,94,.13);
+}
+.sbc-row:last-child{border-bottom:1px solid rgba(201,164,94,.13)}
+.sbc-row-no{
+  font-family:'Cormorant',serif;font-style:italic;font-size:15px;color:#7a6a4a;
+}
+.sbc-row-name{
+  font-family:'Cormorant',serif;font-size:25px;font-weight:400;color:#f1ebde;line-height:1.1;
+}
+.sbc-row-desc{
+  display:block;font-family:'Jost',sans-serif;font-size:11px;letter-spacing:.16em;
+  text-transform:uppercase;color:#8f877b;margin-top:7px;
+}
+.sbc-row-price{
+  font-family:'Cormorant',serif;font-size:24px;color:#cda564;font-weight:500;
+  white-space:nowrap;
+}
+.sbc-row-price small{font-size:13px;color:#7a6a4a;vertical-align:.35em;margin-right:1px}
+
+/* ---------- visit / footer ---------- */
+.sbc-visit{
+  position:relative;padding:66px 34px 30px;overflow:hidden;
+  background:linear-gradient(170deg,#0e0b08,#070504);
+  border-top:1px solid rgba(201,164,94,.1);
+}
+.sbc-visit::before{
+  content:"";position:absolute;inset:0;
+  background:radial-gradient(80% 120% at 50% -10%, rgba(201,164,94,.14), transparent 55%);
+}
+.sbc-visit>*{position:relative}
+.sbc-visit-h{
+  font-family:'Cormorant',serif;font-weight:300;font-size:44px;line-height:1;
+  color:#f4eee2;text-align:center;margin:0 0 10px;
+}
+.sbc-visit-h em{font-style:italic;color:#cda564}
+.sbc-visit-p{
+  text-align:center;font-size:12.5px;line-height:1.9;color:#cfc8bb;font-weight:300;
+  max-width:330px;margin:0 auto 30px;
+}
+.sbc-visit-cta{
+  display:flex;justify-content:center;margin-bottom:54px;
+}
+.sbc-foot{
+  display:flex;justify-content:space-between;align-items:flex-end;
+  padding-top:26px;border-top:1px solid rgba(201,164,94,.14);
+  gap:20px;
+}
+.sbc-foot-col b{
+  display:block;font-family:'Cormorant',serif;font-size:16px;letter-spacing:.42em;
+  color:#e9e2d4;text-transform:uppercase;font-weight:500;margin-bottom:10px;
+}
+.sbc-foot-col span{
+  display:block;font-size:11px;letter-spacing:.13em;color:#948c80;line-height:1.9;
+}
+.sbc-foot-r{text-align:right}
+.sbc-foot-r span{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#7a7165;line-height:2}
+</style>
+
+<div class="sbc-wrap">
+  <div class="sbc-frame">
+
+    <div class="sbc-bar">
+      <div class="sbc-dots"><i></i><i></i><i></i></div>
+      <div class="sbc-addr"><b>&#9737;</b>&nbsp;&nbsp;sanctuarybarberco.com</div>
+    </div>
+
+    <div class="sbc-site">
+
+      <div class="sbc-nav">
+        <div class="sbc-mark">Sanctuary</div>
+        <div class="sbc-navlinks">
+          <span>The room</span><span>Services</span><span>Visit</span>
+        </div>
+      </div>
+
+      <section class="sbc-hero">
+        <div class="sbc-hero-top">
+          <div class="sbc-eye">After hours</div>
+          <div class="sbc-num">No. 01 — Beaverton, Oregon</div>
+        </div>
+
+        <h1 class="sbc-h1">Look good,<br><span class="thin"><em>feel good.</em></span></h1>
+
+        <div class="sbc-hero-foot">
+          <p class="sbc-lede">A private, appointment-only chair tucked inside the Image Studios building. Unhurried, dimly lit, entirely yours for the hour.</p>
+          <a class="sbc-cta">Reserve your chair <i class="ti ti-arrow-right"></i></a>
+        </div>
+
+        <div class="sbc-plate">
+          <div class="sbc-plate-tag"><b>Plate I</b> &nbsp;·&nbsp; The chair, low light, late evening</div>
+        </div>
+      </section>
+
+      <section class="sbc-ethos">
+        <div class="sbc-ethos-head">
+          <div class="sbc-eye">The room</div>
+          <div class="sbc-num">No. 02</div>
+        </div>
+        <p class="sbc-statement">By appointment only — a handful of guests each day. Run by <em>Dan &amp; Heather</em>, a husband-and-wife shop where the door is locked, the music is low, and the only name on the books is yours.</p>
+
+        <div class="sbc-proof">
+          <span class="sbc-proof-stars">&#9733; &#9733; &#9733; &#9733; &#9733;</span>
+          <span class="sbc-proof-txt">Over 475 visits — every one, five stars</span>
+        </div>
+      </section>
+
+      <section class="sbc-svc">
+        <div class="sbc-svc-head">
+          <div class="sbc-eye">Services</div>
+          <div class="sbc-num">No. 03</div>
+        </div>
+        <p class="sbc-svc-sub">A short menu, considered carefully.</p>
+
+        <div class="sbc-row">
+          <span class="sbc-row-no">i.</span>
+          <div>
+            <span class="sbc-row-name">Classic cut</span>
+            <span class="sbc-row-desc">Scissor &amp; clipper · finished by hand</span>
+          </div>
+          <span class="sbc-row-price"><small>$</small>40</span>
+        </div>
+
+        <div class="sbc-row">
+          <span class="sbc-row-no">ii.</span>
+          <div>
+            <span class="sbc-row-name">Skin fade &amp; specialty</span>
+            <span class="sbc-row-desc">Precision taper · sharp line work</span>
+          </div>
+          <span class="sbc-row-price"><small>$</small>45</span>
+        </div>
+
+        <div class="sbc-row">
+          <span class="sbc-row-no">iii.</span>
+          <div>
+            <span class="sbc-row-name">Haircut &amp; beard trim</span>
+            <span class="sbc-row-desc">The full sit · hot towel to close</span>
+          </div>
+          <span class="sbc-row-price"><small>$</small>60</span>
+        </div>
+
+        <div class="sbc-row">
+          <span class="sbc-row-no">iv.</span>
+          <div>
+            <span class="sbc-row-name">Hot towel facial</span>
+            <span class="sbc-row-desc">Steam, cleanse, reset</span>
+          </div>
+          <span class="sbc-row-price"><small>$</small>40</span>
+        </div>
+      </section>
+
+      <section class="sbc-visit">
+        <div class="sbc-eye" style="justify-content:center;margin-bottom:22px">Visit</div>
+        <h2 class="sbc-visit-h">The door stays <em>closed.</em></h2>
+        <p class="sbc-visit-p">We see one guest at a time, by reservation only. Choose your hour, and the room is held for you alone.</p>
+        <div class="sbc-visit-cta">
+          <a class="sbc-cta">Reserve your chair <i class="ti ti-arrow-right"></i></a>
+        </div>
+
+        <div class="sbc-foot">
+          <div class="sbc-foot-col">
+            <b>Sanctuary</b>
+            <span>Barber Co.</span>
+            <span>Image Studios — Beaverton, OR</span>
+          </div>
+          <div class="sbc-foot-r">
+            <span>By appointment only</span>
+            <span>Dan &amp; Heather</span>
+            <span>sanctuarybarberco.com</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>

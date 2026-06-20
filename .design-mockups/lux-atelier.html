@@ -1,0 +1,361 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;1,9..144,400;1,9..144,500&display=swap');
+
+.atl-host {
+  --green: #1E3A2F;
+  --green-deep: #16291F;
+  --bone: #EFE9DC;
+  --bone2: #E4DCCB;
+  --paper: #F6F1E7;
+  --brass: #B58A4B;
+  --ink: #14201A;
+  --line: rgba(20,32,26,.16);
+  --line-light: rgba(239,233,220,.18);
+  background: #E8E3D7;
+  padding: 22px;
+  font-family: 'Space Grotesk', sans-serif;
+  color: var(--ink);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+.atl-host * { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* faux browser */
+.atl-win {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255,255,255,.5) inset, 0 18px 50px rgba(20,32,26,.18);
+  background: var(--paper);
+}
+.atl-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px;
+  background: #DED7C8;
+  border-bottom: 1px solid var(--line);
+}
+.atl-dots { display: flex; gap: 7px; }
+.atl-dots span { width: 11px; height: 11px; border-radius: 50%; background: rgba(20,32,26,.22); }
+.atl-addr {
+  flex: 1; text-align: center;
+  font-size: 12px; letter-spacing: .04em; color: rgba(20,32,26,.55);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+
+/* shared */
+.atl-mono { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; font-weight: 500; }
+.atl-serif { font-family: 'Fraunces', serif; }
+.atl-rule { height: 1px; background: var(--line); }
+
+/* ===== HERO ===== */
+.atl-hero { background: var(--green); color: var(--bone); position: relative; }
+.atl-hero-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line-light);
+}
+.atl-wordmark { font-size: 14px; letter-spacing: .26em; text-transform: uppercase; font-weight: 600; }
+.atl-nav { display: flex; gap: 22px; }
+.atl-nav span { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: rgba(239,233,220,.66); }
+
+.atl-hero-body {
+  display: grid;
+  grid-template-columns: 1fr 196px;
+  border-bottom: 1px solid var(--line-light);
+}
+.atl-hero-main { padding: 40px 24px 30px; border-right: 1px solid var(--line-light); }
+.atl-eyebrow { color: var(--brass); margin-bottom: 26px; }
+.atl-display {
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-size: 62px;
+  line-height: .94;
+  letter-spacing: -.015em;
+}
+.atl-display em { font-style: italic; color: var(--brass); }
+.atl-tag {
+  margin-top: 26px;
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 19px;
+  color: rgba(239,233,220,.8);
+}
+
+.atl-hero-side {
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 18px 18px 22px;
+}
+.atl-coord { font-size: 11px; letter-spacing: .1em; color: rgba(239,233,220,.6); line-height: 1.9; }
+.atl-coord b { color: var(--bone); font-weight: 500; letter-spacing: .04em; }
+.atl-figure {
+  margin: 14px 0;
+  aspect-ratio: 3/4;
+  background:
+    repeating-linear-gradient(135deg, rgba(239,233,220,.05) 0 9px, transparent 9px 18px),
+    var(--green-deep);
+  border: 1px solid var(--line-light);
+  display: flex; align-items: flex-end; padding: 9px;
+}
+.atl-figure span { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: rgba(239,233,220,.5); }
+
+.atl-hero-cta {
+  display: flex; align-items: stretch;
+}
+.atl-reserve {
+  flex: 1;
+  background: var(--brass);
+  color: var(--green-deep);
+  padding: 18px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; letter-spacing: .2em; text-transform: uppercase; font-weight: 600;
+}
+.atl-reserve i { font-size: 18px; }
+.atl-availability {
+  width: 196px;
+  padding: 18px;
+  display: flex; align-items: center;
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  color: rgba(239,233,220,.62);
+}
+
+/* ===== ETHOS ===== */
+.atl-ethos { background: var(--bone); padding: 0; }
+.atl-ethos-head {
+  display: grid; grid-template-columns: 90px 1fr;
+  border-bottom: 1px solid var(--line);
+}
+.atl-idx { padding: 20px 18px; border-right: 1px solid var(--line); }
+.atl-idx .atl-mono { color: var(--brass); }
+.atl-ethos-statement {
+  padding: 34px 28px 30px;
+}
+.atl-ethos-statement p {
+  font-family: 'Fraunces', serif;
+  font-size: 27px;
+  line-height: 1.28;
+  letter-spacing: -.01em;
+  color: var(--green);
+}
+.atl-ethos-statement p .lo { color: rgba(20,32,26,.42); }
+
+.atl-ethos-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+}
+.atl-ecell { padding: 22px 20px 26px; border-right: 1px solid var(--line); }
+.atl-ecell:last-child { border-right: none; }
+.atl-ecell .atl-mono { color: var(--brass); margin-bottom: 12px; display: block; }
+.atl-ecell h4 { font-size: 15px; font-weight: 600; letter-spacing: .01em; margin-bottom: 8px; }
+.atl-ecell p { font-size: 13px; color: rgba(20,32,26,.62); line-height: 1.55; }
+
+.atl-proof {
+  background: var(--green-deep); color: var(--bone);
+  padding: 20px 28px;
+  display: flex; align-items: baseline; gap: 16px;
+}
+.atl-proof .num { font-family: 'Fraunces', serif; font-size: 34px; color: var(--brass); line-height: 1; }
+.atl-proof .txt { font-family: 'Fraunces', serif; font-style: italic; font-size: 16px; color: rgba(239,233,220,.85); }
+
+/* ===== SERVICES ===== */
+.atl-svc { background: var(--paper); }
+.atl-svc-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 30px 28px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.atl-svc-head h3 {
+  font-family: 'Fraunces', serif; font-size: 36px; font-weight: 400; letter-spacing: -.01em;
+  color: var(--green);
+}
+.atl-svc-head .atl-mono { color: rgba(20,32,26,.45); }
+
+.atl-svc-row {
+  display: grid; grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  padding: 19px 28px;
+  border-bottom: 1px solid var(--line);
+  transition: background .2s;
+}
+.atl-svc-row:hover { background: var(--bone2); }
+.atl-svc-row .no { font-family: 'Fraunces', serif; font-size: 18px; color: var(--brass); }
+.atl-svc-row .meta h5 { font-size: 17px; font-weight: 600; letter-spacing: .005em; }
+.atl-svc-row .meta p { font-size: 12px; color: rgba(20,32,26,.55); margin-top: 3px; letter-spacing: .02em; }
+.atl-svc-row .price {
+  font-family: 'Fraunces', serif; font-size: 24px; color: var(--green);
+  display: flex; align-items: baseline; gap: 4px;
+}
+.atl-svc-row .price small { font-size: 13px; color: rgba(20,32,26,.4); }
+
+/* ===== VISIT / FOOTER ===== */
+.atl-foot { background: var(--green); color: var(--bone); }
+.atl-foot-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+}
+.atl-fcell { padding: 30px 28px; }
+.atl-fcell + .atl-fcell { border-left: 1px solid var(--line-light); }
+.atl-fcell .atl-mono { color: var(--brass); margin-bottom: 16px; display: block; }
+.atl-fcell .big {
+  font-family: 'Fraunces', serif; font-size: 26px; line-height: 1.15; letter-spacing: -.01em;
+}
+.atl-fcell .lines { font-size: 13px; line-height: 1.9; color: rgba(239,233,220,.78); }
+.atl-fcell .lines b { color: var(--bone); font-weight: 500; }
+
+.atl-foot-cta {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 22px 28px;
+  border-top: 1px solid var(--line-light);
+}
+.atl-foot-cta .small { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: rgba(239,233,220,.6); }
+.atl-foot-btn {
+  background: var(--brass); color: var(--green-deep);
+  padding: 13px 22px; border-radius: 2px;
+  font-size: 12px; letter-spacing: .2em; text-transform: uppercase; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 9px;
+}
+.atl-colophon {
+  display: flex; justify-content: space-between;
+  padding: 14px 28px;
+  border-top: 1px solid var(--line-light);
+  font-size: 11px; letter-spacing: .1em; color: rgba(239,233,220,.5);
+}
+</style>
+
+<div class="atl-host">
+  <div class="atl-win">
+
+    <div class="atl-bar">
+      <div class="atl-dots"><span></span><span></span><span></span></div>
+      <div class="atl-addr">sanctuarybarberco.com</div>
+    </div>
+
+    <!-- HERO -->
+    <section class="atl-hero">
+      <div class="atl-hero-top">
+        <div class="atl-wordmark">Sanctuary</div>
+        <nav class="atl-nav">
+          <span>The chair</span><span>Services</span><span>Visit</span>
+        </nav>
+      </div>
+
+      <div class="atl-hero-body">
+        <div class="atl-hero-main">
+          <div class="atl-eyebrow atl-mono">Beaverton, Oregon &middot; Est. by Dan &amp; Heather</div>
+          <h1 class="atl-display">A quieter<br>kind of<br><em>barbershop.</em></h1>
+          <p class="atl-tag">Look good, feel good.</p>
+        </div>
+        <aside class="atl-hero-side">
+          <div class="atl-coord">
+            <b>45&deg;29&prime; N</b><br>
+            <b>122&deg;48&prime; W</b><br>
+            Image Studios
+          </div>
+          <div class="atl-figure"><span>The room</span></div>
+          <div class="atl-coord">By appointment<br>only.</div>
+        </aside>
+      </div>
+
+      <div class="atl-hero-cta">
+        <a class="atl-reserve">Reserve your chair <i class="ti ti-arrow-narrow-right"></i></a>
+        <div class="atl-availability">A handful of guests, each day.</div>
+      </div>
+    </section>
+
+    <!-- ETHOS -->
+    <section class="atl-ethos">
+      <div class="atl-ethos-head">
+        <div class="atl-idx"><span class="atl-mono">01<br>Ethos</span></div>
+        <div class="atl-ethos-statement">
+          <p>We keep the door closed so the work can stay open. <span class="lo">No walk-ins, no waiting room, no noise &mdash; just the chair, the craft, and the time it deserves.</span></p>
+        </div>
+      </div>
+
+      <div class="atl-ethos-grid">
+        <div class="atl-ecell">
+          <span class="atl-mono">Private</span>
+          <h4>One guest at a time</h4>
+          <p>The studio is yours for the hour. Booked, never rushed.</p>
+        </div>
+        <div class="atl-ecell">
+          <span class="atl-mono">Considered</span>
+          <h4>Cut to the person</h4>
+          <p>We learn your hair before we lift a blade. Every visit, recorded.</p>
+        </div>
+        <div class="atl-ecell">
+          <span class="atl-mono">Familiar</span>
+          <h4>Two hands, two people</h4>
+          <p>Dan and Heather. The same faces, every time you sit down.</p>
+        </div>
+      </div>
+
+      <div class="atl-proof">
+        <span class="num">475+</span>
+        <span class="txt">visits, and every one of them five stars.</span>
+      </div>
+    </section>
+
+    <!-- SERVICES -->
+    <section class="atl-svc">
+      <div class="atl-svc-head">
+        <div>
+          <div class="atl-mono">02 &mdash; The menu</div>
+          <h3>Services</h3>
+        </div>
+        <div class="atl-mono">Four ways to sit</div>
+      </div>
+
+      <div class="atl-svc-row">
+        <span class="no">01</span>
+        <div class="meta"><h5>Classic cut</h5><p>Scissor &amp; clipper, washed and finished</p></div>
+        <div class="price">$40</div>
+      </div>
+      <div class="atl-svc-row">
+        <span class="no">02</span>
+        <div class="meta"><h5>Skin fade &amp; specialty</h5><p>Precision work, taken to the skin</p></div>
+        <div class="price">$45</div>
+      </div>
+      <div class="atl-svc-row">
+        <span class="no">03</span>
+        <div class="meta"><h5>Haircut + beard trim</h5><p>The full sit &mdash; head and jaw shaped together</p></div>
+        <div class="price">$60</div>
+      </div>
+      <div class="atl-svc-row">
+        <span class="no">04</span>
+        <div class="meta"><h5>Hot towel facial</h5><p>Steam, cleanse, and a reset</p></div>
+        <div class="price">$40</div>
+      </div>
+    </section>
+
+    <!-- VISIT / FOOTER -->
+    <footer class="atl-foot">
+      <div class="atl-foot-grid">
+        <div class="atl-fcell">
+          <span class="atl-mono">03 &mdash; The visit</span>
+          <div class="big">Find us inside the Image Studios building &mdash; suite numbers given on booking.</div>
+        </div>
+        <div class="atl-fcell">
+          <span class="atl-mono">Hours &amp; contact</span>
+          <div class="lines">
+            <b>Tuesday &ndash; Saturday</b><br>
+            By appointment, 9&ndash;5<br>
+            <br>
+            Beaverton, OR 97005<br>
+            hello@sanctuarybarberco.com
+          </div>
+        </div>
+      </div>
+
+      <div class="atl-foot-cta">
+        <span class="small">Hold your hour &mdash; we keep the rest of the day quiet.</span>
+        <a class="atl-foot-btn">Reserve your chair <i class="ti ti-arrow-narrow-right"></i></a>
+      </div>
+
+      <div class="atl-colophon">
+        <span>Sanctuary Barber Co.</span>
+        <span>Look good, feel good.</span>
+        <span>&copy; 2026</span>
+      </div>
+    </footer>
+
+  </div>
+</div>

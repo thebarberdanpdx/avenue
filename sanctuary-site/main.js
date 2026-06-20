@@ -1,151 +1,331 @@
-/* Site behavior: render announcements, banner, nav, reveals. */
+/* ============================================================
+   Sanctuary Barber Co — site behavior.
+   Renders the banner + announcements from window.SBC (data.js),
+   powers the "build your visit" menu, nav, scroll reveals, and
+   cross-tab refresh. Vanilla JS, no build step.
+   ============================================================ */
 (function () {
-  const $ = (s, r = document) => r.querySelector(s);
-  const esc = (s) =>
-    String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  "use strict";
 
-  /* ---- announcement bar ---- */
-  function renderBanner() {
-    const bar = $("#bar");
-    const b = window.SBC.getBanner();
-    const dismissed = sessionStorage.getItem("sbc_bar_dismissed") === "1";
-    if (!b || !b.enabled || !b.text || dismissed) {
-      bar.hidden = true;
-      bar.classList.add("hidden");
-      return;
-    }
-    $("#bar-text").innerHTML = esc(b.text);
-    const link = $("#bar-link");
-    if (b.linkLabel && b.link) {
-      link.textContent = b.linkLabel;
-      link.setAttribute("href", b.link);
-      link.style.display = "";
-    } else {
-      link.style.display = "none";
-    }
-    bar.hidden = false;
-    bar.classList.remove("hidden");
+  var STORE_KEY = "sbc_site_v1"; // matches data.js / admin.js
+  var BANNER_DISMISS_KEY = "sbc_banner_dismissed";
+
+  var $ = function (sel, root) { return (root || document).querySelector(sel); };
+  var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
   }
-  $("#bar-close").addEventListener("click", () => {
-    sessionStorage.setItem("sbc_bar_dismissed", "1");
-    $("#bar").classList.add("hidden");
-  });
 
-  /* ---- announcements list ---- */
-  function renderPosts() {
-    const list = $("#ann-list");
-    const posts = window.SBC.getPosts();
-    if (!posts.length) {
-      list.innerHTML = '<p class="ann-empty">No announcements just yet — check back soon.</p>';
+  /* ---------------------------------------------------------
+     BANNER
+  --------------------------------------------------------- */
+  function bannerSignature(b) {
+    // Used so a re-enabled / re-edited banner reappears after dismissal.
+    return [b && b.enabled ? "1" : "0", (b && b.text) || "", (b && b.link) || ""].join("|");
+  }
+
+  function renderBanner() {
+    var el = $("#banner");
+    if (!el || !window.SBC) return;
+
+    var b = (window.SBC.getBanner && window.SBC.getBanner()) || {};
+    var text = (b.text || "").trim();
+
+    if (!b.enabled || !text) {
+      el.hidden = true;
       return;
     }
+
+    // Honor dismissal only for this exact banner content (per session).
+    var dismissed = sessionStorage.getItem(BANNER_DISMISS_KEY);
+    if (dismissed && dismissed === bannerSignature(b)) {
+      el.hidden = true;
+      return;
+    }
+
+    $("#banner-text").textContent = text;
+
+    var linkEl = $("#banner-link");
+    var label = (b.linkLabel || "").trim();
+    var href = (b.link || "").trim();
+    if (label && href) {
+      linkEl.textContent = label;
+      linkEl.setAttribute("href", href);
+      linkEl.hidden = false;
+    } else {
+      linkEl.hidden = true;
+      linkEl.removeAttribute("href");
+    }
+
+    el.hidden = false;
+
+    var dismissBtn = $("#banner-dismiss");
+    if (dismissBtn && !dismissBtn.dataset.bound) {
+      dismissBtn.dataset.bound = "1";
+      dismissBtn.addEventListener("click", function () {
+        var cur = (window.SBC.getBanner && window.SBC.getBanner()) || {};
+        sessionStorage.setItem(BANNER_DISMISS_KEY, bannerSignature(cur));
+        el.hidden = true;
+      });
+    }
+  }
+
+  /* ---------------------------------------------------------
+     ANNOUNCEMENTS ("What's new")
+  --------------------------------------------------------- */
+  function renderPosts() {
+    var list = $("#posts");
+    if (!list || !window.SBC) return;
+
+    var posts = (window.SBC.getPosts && window.SBC.getPosts()) || [];
+
+    if (!posts.length) {
+      list.innerHTML = '<li class="posts-empty">Nothing new just now.</li>';
+      return;
+    }
+
     list.innerHTML = posts
-      .map((p) => {
-        const initial = "D";
-        return `
-        <article class="post${p.pinned ? " pinned" : ""}">
-          <div class="meta">
-            <span class="pill">${esc(p.tag || "News")}</span>
-            <span class="date">${esc(window.SBC.fmtDate(p.date))}</span>
-          </div>
-          <h3>${esc(p.title)}</h3>
-          <p>${esc(p.body)}</p>
-          <div class="byline"><span class="av">${initial}</span> Posted by Dan &amp; Heather</div>
-        </article>`;
+      .map(function (p) {
+        var date = window.SBC.fmtDate ? window.SBC.fmtDate(p.date) : p.date;
+        var pinned = !!p.pinned;
+        return (
+          '<li class="post' + (pinned ? " pinned" : "") + '">' +
+            '<div class="post-aside">' +
+              '<span class="post-tag">' + esc(p.tag || "News") + "</span>" +
+              '<span class="post-date">' + esc(date) + "</span>" +
+              (pinned
+                ? '<span class="post-pin"><i class="ti ti-pin" aria-hidden="true"></i> Pinned</span>'
+                : "") +
+            "</div>" +
+            '<div class="post-main">' +
+              '<h3 class="post-title">' + esc(p.title) + "</h3>" +
+              '<p class="post-body">' + esc(p.body) + "</p>" +
+            "</div>" +
+          "</li>"
+        );
       })
       .join("");
   }
 
-  /* ---- build your visit ---- */
-  (function initBuilder() {
-    const rows = [...document.querySelectorAll("#menu .svc")];
-    const chips = $("#builder-chips");
-    const label = $("#builder-label");
-    const book = $("#builder-book");
-    if (!rows.length || !label || !book) return;
-    const selected = new Set();
+  /* ---------------------------------------------------------
+     BUILD YOUR VISIT
+  --------------------------------------------------------- */
+  function money(n) { return "$" + n; }
+
+  function durationLabel(mins) {
+    if (mins < 60) return mins + " min";
+    var h = Math.floor(mins / 60);
+    var m = mins % 60;
+    var hr = h + (h === 1 ? " hr" : " hrs");
+    return m ? hr + " " + m + " min" : hr;
+  }
+
+  function setupMenu() {
+    var rows = $$(".menu-row");
+    if (!rows.length) return;
+
+    var summaryList = $("#summary-list");
+    var summaryTotal = $("#summary-total");
+    var priceEl = $("#summary-price");
+    var timeEl = $("#summary-time");
+    var reserveBtns = [$("#reserve-summary"), $("#reserve-hero"), $("#reserve-footer")].filter(Boolean);
+    var navReserve = $(".nav-reserve");
+    if (navReserve) reserveBtns.push(navReserve);
+
+    var baseLabels = reserveBtns.map(function (b) { return b.textContent.trim(); });
 
     function update() {
-      const items = rows.filter((r) => selected.has(r.dataset.id));
-      if (!items.length) {
-        label.textContent = "Select the services you'd like and we'll total your visit.";
-        chips.innerHTML = "";
-        book.textContent = "Book your appointment";
-        return;
+      var selected = rows.filter(function (r) { return r.getAttribute("aria-pressed") === "true"; });
+
+      // Summary list
+      if (!selected.length) {
+        summaryList.innerHTML = '<li class="summary-empty">Nothing selected yet — tap a service to begin.</li>';
+        summaryTotal.hidden = true;
+      } else {
+        summaryList.innerHTML = selected
+          .map(function (r) {
+            var name = r.getAttribute("data-name") || "";
+            var price = parseInt(r.getAttribute("data-price"), 10) || 0;
+            return (
+              '<li class="summary-line">' +
+                '<span class="s-name">' + esc(name) + "</span>" +
+                '<span class="s-price">' + money(price) + "</span>" +
+              "</li>"
+            );
+          })
+          .join("");
+        summaryTotal.hidden = false;
       }
-      let price = 0,
-        dur = 0;
-      items.forEach((r) => {
-        price += Number(r.dataset.price) || 0;
-        dur += Number(r.dataset.dur) || 0;
+
+      // Totals
+      var totalPrice = 0;
+      var totalMin = 0;
+      selected.forEach(function (r) {
+        totalPrice += parseInt(r.getAttribute("data-price"), 10) || 0;
+        totalMin += parseInt(r.getAttribute("data-dur"), 10) || 0;
       });
-      chips.innerHTML = items.map((r) => `<span class="builder-chip">${esc(r.dataset.name)}</span>`).join("");
-      label.innerHTML = `Your visit · <strong>$${price}</strong> · approx. ${dur} min`;
-      book.textContent = `Book your visit · $${price}`;
+
+      if (priceEl) priceEl.textContent = money(totalPrice);
+      if (timeEl) timeEl.textContent = totalMin ? "About " + durationLabel(totalMin) + " in the chair." : "";
+
+      // Reserve button labels reflect the selection.
+      reserveBtns.forEach(function (btn, i) {
+        var base = baseLabels[i] || "Reserve your chair";
+        btn.textContent = selected.length ? base + " · " + money(totalPrice) : base;
+      });
     }
 
-    rows.forEach((r) => {
-      const toggle = () => {
-        const id = r.dataset.id;
-        const on = !selected.has(id);
-        on ? selected.add(id) : selected.delete(id);
-        r.classList.toggle("sel", on);
-        r.setAttribute("aria-pressed", String(on));
-        update();
-      };
-      r.addEventListener("click", toggle);
-      r.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
+    function toggle(row) {
+      var on = row.getAttribute("aria-pressed") === "true";
+      row.setAttribute("aria-pressed", on ? "false" : "true");
+      update();
+    }
+
+    rows.forEach(function (row) {
+      row.addEventListener("click", function () { toggle(row); });
+      row.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
           e.preventDefault();
-          toggle();
+          toggle(row);
         }
       });
     });
+
     update();
-  })();
+  }
 
-  /* ---- header scroll state ---- */
-  const header = $("#header");
-  const onScroll = () => header.classList.toggle("scrolled", window.scrollY > 8);
-  window.addEventListener("scroll", onScroll, { passive: true });
-  onScroll();
+  /* ---------------------------------------------------------
+     HEADER SCROLL STATE
+  --------------------------------------------------------- */
+  function setupHeader() {
+    var header = $("#header");
+    if (!header) return;
+    var onScroll = function () {
+      if (window.scrollY > 12) header.classList.add("scrolled");
+      else header.classList.remove("scrolled");
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+  }
 
-  /* ---- mobile menu ---- */
-  const toggle = $("#nav-toggle");
-  const menu = $("#mobile-menu");
-  toggle.addEventListener("click", () => {
-    const open = menu.classList.toggle("open");
-    toggle.setAttribute("aria-expanded", String(open));
-  });
-  menu.querySelectorAll("a").forEach((a) =>
-    a.addEventListener("click", () => {
-      menu.classList.remove("open");
-      toggle.setAttribute("aria-expanded", "false");
-    })
-  );
+  /* ---------------------------------------------------------
+     MOBILE MENU
+  --------------------------------------------------------- */
+  function setupMenu_mobile() {
+    var toggle = $("#menu-toggle");
+    var nav = $("#nav");
+    var backdrop = $("#menu-backdrop");
+    if (!toggle || !nav) return;
 
-  /* ---- scroll reveal ---- */
-  const io = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting) {
-          e.target.classList.add("in");
-          io.unobserve(e.target);
-        }
-      });
-    },
-    { threshold: 0.12 }
-  );
-  document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
-
-  /* ---- re-render if the editor saved in another tab ---- */
-  window.addEventListener("storage", (e) => {
-    if (e.key === "sbc_site_v1") {
-      renderBanner();
-      renderPosts();
+    function open() {
+      nav.classList.add("open");
+      if (backdrop) backdrop.hidden = false;
+      toggle.setAttribute("aria-expanded", "true");
+      toggle.setAttribute("aria-label", "Close menu");
     }
-  });
+    function close() {
+      nav.classList.remove("open");
+      if (backdrop) backdrop.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.setAttribute("aria-label", "Open menu");
+    }
 
-  renderBanner();
-  renderPosts();
+    toggle.addEventListener("click", function () {
+      if (nav.classList.contains("open")) close();
+      else open();
+    });
+    if (backdrop) backdrop.addEventListener("click", close);
+    $$(".nav a").forEach(function (a) { a.addEventListener("click", close); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && nav.classList.contains("open")) close();
+    });
+  }
+
+  /* ---------------------------------------------------------
+     SMOOTH ANCHOR SCROLL (with sticky-header offset)
+  --------------------------------------------------------- */
+  function setupAnchors() {
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    $$('a[href^="#"]').forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        var id = a.getAttribute("href");
+        if (!id || id === "#") return;
+        var target = document.querySelector(id);
+        if (!target) return;
+        e.preventDefault();
+        var headerH = 78;
+        var y = target.getBoundingClientRect().top + window.scrollY - headerH;
+        window.scrollTo({ top: y < 0 ? 0 : y, behavior: reduce ? "auto" : "smooth" });
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------
+     SCROLL REVEAL
+  --------------------------------------------------------- */
+  function setupReveal() {
+    var els = $$(".reveal");
+    if (!els.length) return;
+
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !("IntersectionObserver" in window)) {
+      els.forEach(function (el) { el.classList.add("in"); });
+      return;
+    }
+
+    var io = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("in");
+            io.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
+    );
+    els.forEach(function (el) { io.observe(el); });
+  }
+
+  /* ---------------------------------------------------------
+     MISC
+  --------------------------------------------------------- */
+  function setYear() {
+    var y = $("#footer-year");
+    if (y) y.textContent = new Date().getFullYear();
+  }
+
+  // Re-render store-driven content if another tab updates the store.
+  function setupStorageSync() {
+    window.addEventListener("storage", function (e) {
+      if (e.key === STORE_KEY || e.key === null) {
+        renderBanner();
+        renderPosts();
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------
+     INIT
+  --------------------------------------------------------- */
+  function init() {
+    renderBanner();
+    renderPosts();
+    setupMenu();
+    setupHeader();
+    setupMenu_mobile();
+    setupAnchors();
+    setupReveal();
+    setupStorageSync();
+    setYear();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
 })();
