@@ -6103,13 +6103,28 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   const headerName = isShopView ? `${business?.name || "Shop"} · combined` : (pulseView !== "me" ? `Viewing ${viewedProvider?.name}` : `${greeting}, ${viewedProvider?.name || ""}`);
 
   // --- Overdue clients (for the CTA at the bottom) — owner sees overall, barber sees their own ---
-  const overdueCount = clients.filter((c) => {
+  // --- Overdue regulars — clients past their usual cadence. The biggest rebooking lever, surfaced as an
+  // action card with each client's dollars-at-risk (estimated from their last ticket, else a menu price). ---
+  const overdueClients = clients.filter((c) => {
     if (!c.cadenceDays || !c.lastVisit) return false;
     if (c.nudgeDismissedAt && new Date(c.nudgeDismissedAt) > new Date(c.lastVisit)) return false;
     if (!isOwner && c.provider && c.provider !== viewedProvider?.id) return false;
     const days = Math.round((Date.now() - new Date(c.lastVisit)) / 86400000);
     return (days - c.cadenceDays) > 0;
-  }).length;
+  }).map((c) => {
+    const daysSince = Math.round((Date.now() - new Date(c.lastVisit)) / 86400000);
+    const last = appts.filter((a) => a.clientId === c.id && a.price != null).sort((a, b) => new Date(b.bookedFor || 0) - new Date(a.bookedFor || 0))[0];
+    const value = (last && last.price != null) ? last.price : (services[0] ? getPrice(services[0], c.provider) : 0);
+    return { client: c, daysSince, value };
+  }).sort((a, b) => b.value - a.value);
+  const overdueCount = overdueClients.length;
+  const overdueDollars = overdueClients.reduce((s, o) => s + o.value, 0);
+
+  // --- "Your cut" — commission on today's done revenue. Personal view only, and only when the viewed
+  // staff member actually has service commission configured (for hourly-only staff it isn't a per-cut number). ---
+  const myComp = (!isShopView && viewedProvider && viewedProvider.comp) || null;
+  const showCut = !!(myComp && myComp.service && myComp.service.on && todayMoney > 0);
+  const todayCut = showCut ? serviceCommissionFor(myComp, todayMoney) : 0;
 
   // --- Formatters ---
   const fmtMoney = (n) => `$${Math.round(n).toLocaleString()}`;
@@ -6133,6 +6148,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   const [pickerOpen, setPickerOpen] = useState(false);
   const [growthOpen, setGrowthOpen] = useState(false); // "How you're growing" full-screen
   const [wrapOpen, setWrapOpen] = useState(false); // wrap-up sheet (opened from the tile)
+  const [rebookOpen, setRebookOpen] = useState(false); // overdue-regulars card expanded
   const wrapIsRecent = (a) => { if (!a.bookedFor) return true; const days = Math.round((Date.now() - new Date(a.bookedFor).getTime()) / 86400000); return days >= 0 && days <= 7; };
   const wrapUpList = viewedProvider ? appts.filter((a) => a.providerId === viewedProvider.id && a.status === "done" && (a.pendingDurationSave || (!a.hasNote && !a.hasPhotos && !a.noteLogged && clients.some((c) => c.id === a.clientId) && wrapIsRecent(a)))) : [];
   // --- Inline goal editor: tap the ring (daily) or the week number (weekly) to set goals in place ---
@@ -6240,6 +6256,40 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         </button>
       )}
 
+      {/* OVERDUE REGULARS — the rebooking engine, restored to Pulse as an action card. Tap to expand the
+          top clients by dollars-at-risk; each row opens their profile (call/text/rebook from there). */}
+      {overdueCount > 0 && (
+        <div style={{ marginBottom: 11, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+          <button onClick={() => setRebookOpen((v) => !v)} className="lift" style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "15px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", color: "var(--text)" }}>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500 }}>{overdueCount} {overdueCount === 1 ? "regular" : "regulars"} overdue</span>
+              <span style={{ display: "block", fontSize: 13, color: "var(--text2)", marginTop: 3 }}>About {fmtMoney(overdueDollars)} in cuts waiting · tap to {rebookOpen ? "hide" : "see who"}</span>
+            </span>
+            <span style={{ minWidth: 24, height: 24, borderRadius: 12, padding: "0 8px", background: "var(--gold)", color: "var(--on-gold)", fontSize: 12.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{overdueCount}</span>
+            <ChevronDown size={16} style={{ color: "var(--gold)", flexShrink: 0, transform: rebookOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+          </button>
+          {rebookOpen && (
+            <div style={{ borderTop: "1px solid color-mix(in srgb, var(--gold) 20%, var(--border))" }}>
+              {overdueClients.slice(0, 5).map(({ client: c, daysSince, value }, i) => (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 14px", borderTop: i ? "1px solid var(--line)" : "none" }}>
+                  <button onClick={() => onOpenClient && onOpenClient(c)} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 11, background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
+                    <Avatar size={34} initial={c.name?.charAt(0)} color={c.color} photo={c.photo} />
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                      <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 1 }}>{daysSince} days · usually {c.cadenceDays}{value > 0 ? ` · ${fmtMoney(value)}` : ""}</span>
+                    </span>
+                  </button>
+                  <button onClick={() => setClients((cur) => cur.map((x) => x.id === c.id ? { ...x, nudgeDismissedAt: new Date().toISOString() } : x))} aria-label={`Dismiss ${c.name}`} style={{ background: "none", border: "none", color: "var(--faint)", fontSize: 20, lineHeight: 1, padding: "0 4px", flexShrink: 0, cursor: "pointer" }}>×</button>
+                </div>
+              ))}
+              {overdueCount > 5 && onOpenClients && (
+                <button onClick={onOpenClients} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "11px 14px", borderTop: "1px solid var(--line)", fontSize: 13, color: "var(--gold)", cursor: "pointer", fontWeight: 500 }}>+ {overdueCount - 5} more — see all in Clients →</button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* TODAY — hero card: money + goal ring */}
       <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 11 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -6263,6 +6313,11 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           {todayTips > 0 && (
             <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4, marginTop: 3 }}>
               Tips <strong style={{ color: "var(--text)", fontWeight: 600 }}>{fmtMoney(todayTips)}</strong>{tipRate > 0 ? ` · ${tipRate}%` : ""}
+            </div>
+          )}
+          {showCut && (
+            <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.4, marginTop: 3 }}>
+              Your cut <strong style={{ color: "var(--text)", fontWeight: 600 }}>~{fmtMoney(todayCut)}</strong>
             </div>
           )}
         </div>
