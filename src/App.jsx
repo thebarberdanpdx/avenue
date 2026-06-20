@@ -12216,19 +12216,27 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
       const data = await r.json().catch(() => ({}));
       if (!r.ok) { saveCfg({ url, lastSyncAt: Date.now(), lastError: data.error || "Couldn't read the calendar." }); if (showToast) showToast(data.error || "Couldn't read that calendar."); return; }
       const result = reconcileCalendarSync(appts, data.events || [], { providers, services });
+      const syncedNext = (result.next || []).filter((a) => a && (a.source === "sync" || a._synced));
+      const calSyncPatch = { url, connectedVia: cfg.connectedVia || "link", lastChanges: result.changes, lastBlockedCount: result.blocked ? result.blockedCount : 0 };
+      // Persist through the SERVER (service key) — this is what actually saves, bypassing the
+      // client's save-gate which can silently block writes when an initial load errored.
+      let serverOk = false, serverErr = null;
+      try {
+        const pr = await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, mode: "sync", syncedAppts: syncedNext, calSync: calSyncPatch }) });
+        const pdata = await pr.json().catch(() => ({}));
+        serverOk = pr.ok && pdata.ok; serverErr = pdata.error || null;
+      } catch (e) { serverErr = "network"; }
+      setAppts(result.next); // local display (server is the source of truth for persistence)
+      saveCfg({ ...calSyncPatch, lastSyncAt: Date.now(), lastError: serverOk ? null : (serverErr ? "Couldn't save to server — will retry." : null) });
       if (result.blocked) {
-        // Safety rail tripped — don't apply removals, tell the owner.
-        setAppts(result.next); // still applies adds/moves, just no mass-delete
-        saveCfg({ url, connectedVia: cfg.connectedVia || "link", lastSyncAt: Date.now(), lastError: null, lastBlockedCount: result.blockedCount, lastChanges: result.changes });
         setBlockNotice({ count: result.blockedCount });
-        if (showToast) showToast(`Sync paused a big change — ${result.blockedCount} would have been removed. Review and hit Sync now to confirm.`);
+        if (showToast) showToast(`Sync paused a big change — ${result.blockedCount} would have been removed. Tap Sync now to confirm.`);
         return;
       }
-      setAppts(result.next); // silent: no fireApptNotify anywhere in this path
-      saveCfg({ url, connectedVia: cfg.connectedVia || "link", lastSyncAt: Date.now(), lastError: null, lastBlockedCount: 0, lastChanges: result.changes });
       if (!opts.quiet && showToast) {
         const c = result.changes;
-        showToast(c.added + c.moved + c.cancelled === 0 ? "Already up to date." : `Synced — added ${c.added}, moved ${c.moved}, removed ${c.cancelled}.`);
+        if (!serverOk) showToast("Synced on-screen, but the server save failed — check connection and tap Sync again.");
+        else showToast(c.added + c.moved + c.cancelled === 0 ? "Already up to date." : `Synced — added ${c.added}, moved ${c.moved}, removed ${c.cancelled}.`);
       }
     } catch (e) {
       saveCfg({ lastSyncAt: Date.now(), lastError: "Network error — will retry." });
@@ -12243,15 +12251,22 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
     return () => clearInterval(id);
   }, [connected, cfg.paused, cfg.url]); // eslint-disable-line
 
+  // Persist a config-only change (pause/resume, keep-disconnect) through the server.
+  const serverConfig = (patch) => { try { return fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, mode: "config", calSync: patch }) }); } catch (e) { return null; } };
   const connect = () => { const u = urlInput.trim(); if (!u) { if (showToast) showToast("Paste your calendar link first."); return; } saveCfg({ url: u.replace(/^webcal:\/\//i, "https://"), connectedVia: "link", paused: false }); runSync(u); };
-  // Stop syncing. `removeAppts` also pulls the mirrored appointments back off Vero's calendar.
-  const disconnect = (removeAppts) => {
-    if (removeAppts) setAppts((cur) => (cur || []).filter((a) => !(a && (a.source === "sync" || a._synced))));
+  // Stop syncing. `removeAppts` also pulls the mirrored appointments back off Vero's calendar (server-side).
+  const disconnect = async (removeAppts) => {
+    if (removeAppts) {
+      setAppts((cur) => (cur || []).filter((a) => !(a && (a.source === "sync" || a._synced))));
+      try { await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, mode: "clear" }) }); } catch (e) {}
+    } else {
+      serverConfig({ url: "", connectedVia: null, paused: false, lastChanges: null, lastError: null });
+    }
     saveCfg({ url: "", connectedVia: null, paused: false, lastChanges: null, lastError: null });
     setUrlInput(""); setConfirmDisconnect(false);
     if (showToast) showToast(removeAppts ? "Sync removed and mirrored appointments cleared." : "Sync stopped. Mirrored appointments left on your calendar.");
   };
-  const togglePause = () => { const p = !cfg.paused; saveCfg({ paused: p }); if (!p) runSync(cfg.url); };
+  const togglePause = () => { const p = !cfg.paused; saveCfg({ paused: p }); serverConfig({ paused: p }); if (!p) runSync(cfg.url); };
 
   const ago = (ts) => { if (!ts) return "never"; const s = Math.round((Date.now() - ts) / 1000); if (s < 60) return "just now"; const m = Math.round(s / 60); if (m < 60) return `${m} min ago`; const h = Math.round(m / 60); if (h < 24) return `${h} hr ago`; return `${Math.round(h / 24)} d ago`; };
   const syncedCount = (appts || []).filter((a) => a && (a.source === "sync" || a._synced)).length;
