@@ -12298,6 +12298,23 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
   // ---- Not connected yet: the three doors + instructions ----
   return (
     <div>
+      {/* Leftover cleanup: mirrored appts can linger after a disconnect — offer to clear them even when not connected. */}
+      {syncedCount > 0 && (
+        confirmDisconnect ? (
+          <div style={{ padding: 14, border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, background: "var(--panel)", marginBottom: 16 }}>
+            <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.5, marginBottom: 12 }}>Remove the {syncedCount} mirrored appointment{syncedCount === 1 ? "" : "s"} left on your calendar from an earlier sync? This won't touch any appointment you booked in Vero.</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => disconnect(true)} style={{ flex: 1, background: "#c0392b", color: "#fff", border: "none", borderRadius: 10, padding: 12, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Remove them</button>
+              <button onClick={() => setConfirmDisconnect(false)} style={{ flex: 1, background: "transparent", color: "var(--sub)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, fontSize: 13.5, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
+            <div style={{ flex: 1, fontSize: 13, color: "var(--sub)", lineHeight: 1.45 }}><strong style={{ color: "var(--text)" }}>{syncedCount} mirrored appointment{syncedCount === 1 ? "" : "s"}</strong> from a previous sync are still on your calendar.</div>
+            <button onClick={() => setConfirmDisconnect(true)} style={{ flexShrink: 0, background: "transparent", color: "#c0392b", border: "1px solid color-mix(in srgb, #c0392b 45%, var(--border))", borderRadius: 9, padding: "9px 13px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Remove</button>
+          </div>
+        )
+      )}
       <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, margin: "0 0 16px" }}>Mirror your existing calendar into Vero. Future appointments flow in automatically — cancellations and reschedules adjust on their own, and <strong>clients are never notified</strong>.</p>
 
       <button style={doorBtn} onClick={() => setDoorNote(doorNote === "apple" ? null : "apple")}>
