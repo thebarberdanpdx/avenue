@@ -1432,6 +1432,7 @@ function App() {
   const savingRef = useRef({});    // per-table { running, queued } — guarantees in-order saves
   const providersDirtyRef = useRef(false); // true between a local provider edit and its successful sync — blocks focus-reload clobber
   const [saveFailed, setSaveFailed] = useState(false); // drives a banner if a save to the server errors out
+  const [loadIncomplete, setLoadIncomplete] = useState(false); // a load errored → saves are blocked; surface it instead of failing silently
 
   // Save a whole in-memory list to its shop-scoped table.
   // Strategy: upsert current items first (never destroys data), then delete rows that aren't in the list.
@@ -1599,8 +1600,8 @@ function App() {
       }
 
       // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
-      if (allLoaded) loadedRef.current = true;
-      else console.error('[vero] one or more loads failed — saves are blocked until the next page reload to protect existing data');
+      if (allLoaded) { loadedRef.current = true; setLoadIncomplete(false); }
+      else { console.error('[vero] one or more loads failed — saves are blocked until reload to protect existing data'); setLoadIncomplete(true); }
       setDataLoaded(true);
     })();
   }, []);
@@ -1873,6 +1874,14 @@ function App() {
         <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#C2563F", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
           <span>Couldn't save your last change to the server. It's still safe on this device — check your connection.</span>
           <button onClick={resaveAll} style={{ flexShrink: 0, background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600, letterSpacing: 0.5 }}>Retry</button>
+        </div>
+      )}
+
+      {/* Loud, non-silent version of the save-gate: a load errored, so saving is paused. Reload re-runs the load. */}
+      {loadIncomplete && session && !saveFailed && (
+        <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#C2563F", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
+          <span>Some of your data didn't load, so saving is paused to protect it. Nothing you change right now will be kept until you reload.</span>
+          <button onClick={() => { try { window.location.reload(); } catch (e) {} }} style={{ flexShrink: 0, background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600, letterSpacing: 0.5 }}>Reload</button>
         </div>
       )}
 
