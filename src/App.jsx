@@ -314,6 +314,8 @@ const DEFAULT_BUSINESS = {
       body: "Thanks {client}! We've received your deposit for your {service} with {provider} on {date} at {time}. It goes toward your total — see you at {business}." },
     { id: "noshow", label: "Missed / Late Cancellation", channel: "both", timing: "On a no-show or late cancel", enabled: false,
       body: "Hi {client}, we missed you for your {service} on {date}. Per our policy, a fee may apply. Questions? Just reply and we'll help. — {business}" },
+    { id: "birthday", label: "Birthday message", channel: "email", timing: "On their birthday", enabled: false,
+      body: "Happy birthday, {client}! Everyone at {business} hopes your day is a great one. Whenever you're ready for a fresh look, we'd love to see you in the chair." },
   ],
   // ---- Locations: off by default; turns on for multi-location businesses ----
   multiLocation: false,
@@ -326,15 +328,21 @@ const DEFAULT_BUSINESS = {
 // Version-guarded so a shop's own later edits in Settings → Messages are never clobbered: once
 // msgCopyVersion reaches MSG_COPY_VERSION the migration is a no-op. Only the listed ids are touched
 // (label/timing/body); channel and every other message are left exactly as the shop has them.
-const MSG_COPY_VERSION = 2;
+const MSG_COPY_VERSION = 3;
 function migrateMessageCopy(biz) {
   try {
     if (!biz || (biz.msgCopyVersion || 0) >= MSG_COPY_VERSION) return biz;
-    const ids = ["booked", "remind2d", "remind24h", "remind3h", "checkin"];
     const def = Object.fromEntries((DEFAULT_BUSINESS.messages || []).map((m) => [m.id, m]));
     const base = (Array.isArray(biz.messages) && biz.messages.length) ? biz.messages : DEFAULT_BUSINESS.messages;
-    const messages = base.map((m) => (ids.includes(m.id) && def[m.id]) ? { ...m, label: def[m.id].label, timing: def[m.id].timing, body: def[m.id].body } : m);
-    ids.forEach((id) => { if (!messages.some((m) => m.id === id) && def[id]) messages.push(def[id]); });
+    let messages = base.slice();
+    // v2: one-time refresh of the five client reminder templates to current copy (only below v2).
+    if ((biz.msgCopyVersion || 0) < 2) {
+      const ids = ["booked", "remind2d", "remind24h", "remind3h", "checkin"];
+      messages = messages.map((m) => (ids.includes(m.id) && def[m.id]) ? { ...m, label: def[m.id].label, timing: def[m.id].timing, body: def[m.id].body } : m);
+      ids.forEach((id) => { if (!messages.some((m) => m.id === id) && def[id]) messages.push(def[id]); });
+    }
+    // v3: make sure the birthday message template exists (additive — never clobbers edits).
+    if (!messages.some((m) => m.id === "birthday") && def.birthday) messages.push(def.birthday);
     return { ...biz, messages, msgCopyVersion: MSG_COPY_VERSION };
   } catch (e) { return biz; }
 }
