@@ -12158,7 +12158,15 @@ function impGuessMap(headers) {
     staff: impGuess(headers, ["staff", "provider", "stylist", "barber", "employee", "team member", "served by", "with"]),
     status: impGuess(headers, ["status", "state"]),
     price: impGuess(headers, ["price", "total", "amount", "paid", "cost"]),
+    birthday: impGuess(headers, ["birthday", "birth date", "date of birth", "dob", "born"]),
   };
+}
+// A birthday may arrive with or without a year — keep an ISO date when parseable, else the raw text.
+function impBirthday(s) {
+  if (!s || !String(s).trim()) return undefined;
+  const t = String(s).trim();
+  const d = impParseDate(t);
+  return d ? d.toISOString() : t;
 }
 function impParseDate(dateStr, timeStr) {
   if (!dateStr) return null;
@@ -12251,8 +12259,8 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       const email = get(row, "email");
       const key = pd.length >= 7 ? pd : (name ? "n:" + name.toLowerCase() : null);
       if (!key) return;
-      if (!people.has(key)) people.set(key, { name: name || "Client", firstName: first, lastName: last, email, phone, key });
-      else { const ex = people.get(key); if (!ex.email && email) ex.email = email; if (!ex.name && name) ex.name = name; if (!ex.phone && phone) ex.phone = phone; }
+      if (!people.has(key)) people.set(key, { name: name || "Client", firstName: first, lastName: last, email, phone, key, birthday: get(row, "birthday") });
+      else { const ex = people.get(key); if (!ex.email && email) ex.email = email; if (!ex.name && name) ex.name = name; if (!ex.phone && phone) ex.phone = phone; if (!ex.birthday) ex.birthday = get(row, "birthday"); }
       // appointment for this row?
       const dateStr = get(row, "date");
       if (dateStr) {
@@ -12275,7 +12283,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       const pd = impDigits(p.phone);
       if (pd.length >= 7 && existingByPhone[pd]) { p.id = existingByPhone[pd]; reused++; return; }
       p.id = `imp_${bId}_c${newIdx++}`;
-      newClients.push({ id: p.id, name: p.name, firstName: p.firstName || "", lastName: p.lastName || "", email: p.email || "", phone: p.phone || "", provider: defProv, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], _import: bId });
+      newClients.push({ id: p.id, name: p.name, firstName: p.firstName || "", lastName: p.lastName || "", email: p.email || "", phone: p.phone || "", birthday: impBirthday(p.birthday), provider: defProv, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], _import: bId });
     });
     // 3. resolve appointments
     const matchProv = (txt) => { const t = (txt || "").toLowerCase(); const hit = realProviders.find((p) => t && p.name.toLowerCase().includes(t.split(" ")[0]) || (t && t.includes(p.name.toLowerCase().split(" ")[0]))); return hit ? hit.id : defProv; };
@@ -12290,6 +12298,21 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       const bf = new Date(d.dt); if (!d.hasTime) bf.setHours(9, 0, 0, 0);
       const price = d.price ? Number(impDigits(d.price.replace(/[.,]\d{2}$/, (m) => m)).replace(/\D/g, "")) || (parseFloat(d.price.replace(/[^0-9.]/g, "")) || 0) : (svc ? svc.price : 0);
       return { id: `imp_${bId}_a${aIdx++}`, providerId: matchProv(d.staff), clientId: person.id, serviceId: svc ? svc.id : null, price: parseFloat(String(d.price).replace(/[^0-9.]/g, "")) || (svc ? svc.price : 0) || 0, start: startMin, end: startMin + dur, status: impStatus(d.status, d.isPast), name: person.name, title: d.service || (svc ? svc.name : "Appointment"), phone: person.phone || "", bookedFor: bf.toISOString(), _import: bId };
+    });
+    // Plug imported clients into the retention engine: derive visit count, last visit, and
+    // cadence from their imported PAST appointments — otherwise they're invisible to the
+    // "due soon" / "overdue" / rebooking nudges (which read client.lastVisit & cadenceDays).
+    newClients.forEach((c) => {
+      const mine = newAppts
+        .filter((a) => a.clientId === c.id && new Date(a.bookedFor).getTime() < now)
+        .sort((x, y) => new Date(x.bookedFor) - new Date(y.bookedFor));
+      if (!mine.length) return;
+      c.visits = mine.length;
+      c.lastVisit = mine[mine.length - 1].bookedFor;
+      if (mine.length >= 2) {
+        let g = 0; for (let i = 1; i < mine.length; i++) g += (new Date(mine[i].bookedFor) - new Date(mine[i - 1].bookedFor)) / 86400000;
+        c.cadenceDays = Math.max(1, Math.round(g / (mine.length - 1)));
+      }
     });
     setBatchId(bId);
     setBuilt({ newClients, reused, newAppts, past, future, peopleCount: people.size });
@@ -12333,7 +12356,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
 
   const FIELD_LABELS = [
     ["full", "Full name"], ["first", "First name"], ["last", "Last name"], ["email", "Email"], ["phone", "Phone"],
-    ["date", "Appointment date"], ["time", "Appointment time"], ["service", "Service"], ["staff", "Staff"], ["status", "Status"], ["price", "Price"],
+    ["date", "Appointment date"], ["time", "Appointment time"], ["service", "Service"], ["staff", "Staff"], ["status", "Status"], ["price", "Price"], ["birthday", "Birthday"],
   ];
   const canPreview = !!(map.phone || map.full || map.first || map.email);
 
@@ -21492,7 +21515,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
     if (draft.phone.replace(/\D/g, "").length < 10) { if (showToast) showToast("Please enter a valid phone number."); return; }
     const id = "c" + Date.now() + Math.floor(Math.random() * 1000);
     const fullName = `${draft.firstName.trim()} ${draft.lastName.trim()}`;
-    const newClient = { id, name: fullName, firstName: draft.firstName.trim(), lastName: draft.lastName.trim(), phone: draft.phone.trim(), email: draft.email.trim(), provider: draft.provider, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: draft.notes.trim(), messages: [], gallery: [], timeline: [] };
+    const newClient = { id, name: fullName, firstName: draft.firstName.trim(), lastName: draft.lastName.trim(), phone: draft.phone.trim(), email: draft.email.trim(), birthday: draft.birthday || undefined, provider: draft.provider, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: draft.notes.trim(), messages: [], gallery: [], timeline: [] };
     setClients([newClient, ...clients]);
     setAdding(false); setDraft(blank);
     if (showToast) showToast(`${newClient.name} added.`);
@@ -21567,6 +21590,9 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
 
           <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>EMAIL (optional)</label>
           <input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} placeholder="name@email.com" inputMode="email" style={{ ...inputS, marginBottom: 14 }} />
+
+          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>BIRTHDAY (optional)</label>
+          <input type="date" value={draft.birthday ? String(draft.birthday).slice(0, 10) : ""} onChange={(e) => setDraft({ ...draft, birthday: e.target.value ? new Date(e.target.value + "T12:00:00").toISOString() : "" })} style={{ ...inputS, marginBottom: 14 }} />
 
           <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PREFERRED STAFF MEMBER</label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
@@ -21701,6 +21727,8 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const live = clients.find((c) => c.id === client.id) || client;
   const provider = providers.find((p) => p.id === live.provider) || providers[1] || providers[0] || {};
   const firstName = (live.name || "").split(" ")[0] || "this client";
+  const saveBirthday = (iso) => setClients(clients.map((c) => c.id === live.id ? { ...c, birthday: iso || undefined } : c));
+  const fmtBday = (v) => { if (!v) return null; const d = new Date(v); if (isNaN(d.getTime())) return String(v); return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
   const [pfTab, setPfTab] = useState("timeline"); // timeline | family | pricing
   const [openMember, setOpenMember] = useState(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
@@ -21757,6 +21785,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   // ---- editable owner note ----
   const [noteDraft, setNoteDraft] = useState(live.notes || "");
   const [editingNote, setEditingNote] = useState(false);
+  const [editBday, setEditBday] = useState(false);
   const noteDirty = noteDraft !== (live.notes || "");
   const saveNote = () => { setClients(clients.map((c) => c.id === client.id ? { ...c, notes: noteDraft } : c)); setEditingNote(false); showToast("Client note saved."); };
 
@@ -21908,6 +21937,13 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           {live.phone && live.email && "  ·  "}
           {live.email && <EmailLink email={live.email} />}
           {!live.phone && !live.email && <span style={{ color: "var(--faint)", fontStyle: "italic" }}>No contact info on file</span>}
+        </div>
+        <div style={{ marginTop: 7 }}>
+          {editBday ? (
+            <input type="date" autoFocus value={live.birthday ? String(live.birthday).slice(0, 10) : ""} onChange={(e) => saveBirthday(e.target.value ? new Date(e.target.value + "T12:00:00").toISOString() : "")} onBlur={() => setEditBday(false)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "6px 10px", color: "var(--text)", fontSize: 13, fontFamily: FONT_BODY }} />
+          ) : (
+            <button onClick={() => setEditBday(true)} style={{ background: "none", border: "none", color: live.birthday ? "var(--sub)" : "var(--faint)", fontSize: 12.5, cursor: "pointer", fontFamily: FONT_BODY }}>{live.birthday ? `Birthday · ${fmtBday(live.birthday)}` : "+ Add birthday"}</button>
+          )}
         </div>
       </div>
 
