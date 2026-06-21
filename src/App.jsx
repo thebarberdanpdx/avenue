@@ -10927,7 +10927,6 @@ const NC_WHO = [
   { v: "new", label: "New clients only" },
   { v: "returning", label: "Returning clients only" },
   { v: "anyone", label: "Anyone" },
-  { v: "walkin", label: "Walk-ins only", sub: "Kept off your online booking" },
 ];
 const hhmm2min = (s) => { const [h, m] = String(s || "0:0").split(":").map((n) => parseInt(n, 10) || 0); return h * 60 + m; };
 const min2hhmm = (m) => `${Math.floor(m / 60).toString().padStart(2, "0")}:${(m % 60).toString().padStart(2, "0")}`;
@@ -15670,7 +15669,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         }).length;
         return set ? `${set} of ${s.length} staff set` : "No limits set";
       })(),
-      keywords: "new clients per day limit cap first time first-time walk-in walkins reserve hold open slots times waitlist gate accept how many",
+      keywords: "new clients per day limit cap first time first-time reserve hold open slots times waitlist gate accept how many",
       editor: <NewClientsEditor providers={providers} setProviders={setProviders} onBackRef={editorBack} />,
     },
     {
