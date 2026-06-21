@@ -15825,7 +15825,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     { id: "menu",  section: "What you sell", label: "Services & menu", icon: Scissors, desc: "What you offer & pricing", settings: ["servicesmenu"] },
     { id: "productscat", section: "What you sell", label: "Products", icon: Package, desc: "Retail you sell — haircare, skincare, merch", settings: ["products"] },
     { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "Times, page & what clients can do", settings: ["avoidgaps", "autotiming", "anyonerouting", "newclients", "booking", "bookingwords", "website", "showprices", "rebook_usual", "family", "refphotos"], groups: [
-      { label: "Availability", ids: ["avoidgaps", "autotiming", "anyonerouting", "newclients"] },
+      { label: "Times & availability", collapse: true, desc: "Booking times, smart timing & who gets the booking", ids: ["avoidgaps", "autotiming", "anyonerouting", "newclients"] },
       { label: "Your booking page", ids: ["booking", "bookingwords", "website"] },
       { label: "What clients can do", ids: ["showprices", "rebook_usual", "family", "refphotos"] },
     ] },
@@ -15852,9 +15852,10 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
 
   const [openCat, setOpenCat] = useState(null);
+  const [openGroup, setOpenGroup] = useState(null); // a collapsed group opened as its own focused screen — { label, desc, ids, catLabel }
   // Open a settings page (or category) at the TOP — settings sub-pages share the window scroll,
   // so without this you'd land wherever the previous list was scrolled (e.g. Reports opening at the bottom).
-  useEffect(() => { try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { try { window.scrollTo(0, 0); } catch (e2) {} } }, [openCard, openCat]);
+  useEffect(() => { try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { try { window.scrollTo(0, 0); } catch (e2) {} } }, [openCard, openCat, openGroup]);
   const [helpOpen, setHelpOpen] = useState(false);
   const [cockpitHidden, setCockpitHidden] = useState(false);
   const [openSection, setOpenSection] = useState(null); // which checklist section is expanded
@@ -15876,7 +15877,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   };
   const A = (cond) => !!cond; // auto-detect helper
   const CHECKLIST = [
-    { id: "shop", label: "My shop", icon: User, desc: "Name, hours, locations, phones, branding, theme", groups: [
+    { id: "shop", label: "Your shop", icon: User, desc: "Name, hours, locations, phones, branding, theme", groups: [
       { label: "Business details", items: [
         { k: "shop_name", label: "Business name is set", card: "business", auto: A(form.name && form.name.trim()) },
         { k: "shop_contact", label: "Address & contact info filled in", card: "business" },
@@ -15897,7 +15898,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         { k: "shop_theme_book", label: "Theme looks right on the live /book page", card: "theme" },
       ] },
     ] },
-    { id: "staff", label: "My team", icon: Users, desc: "Staff, access & pay", groups: [
+    { id: "staff", label: "Team", icon: Users, desc: "Staff, access & pay", groups: [
       { label: "Your staff", items: [
         { k: "team_added", label: "Every staff member added", card: "staff", auto: A(providers.filter((p) => p.id !== "anyone").length > 0) },
         { k: "team_photo", label: "Each staff member has a name & photo", card: "staff" },
@@ -15946,7 +15947,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         { k: "book_test_returning", label: "Returning-client email code flow works", card: null },
       ] },
     ] },
-    { id: "dayof", label: "My calendar & day", icon: Clock, desc: "Running your day", groups: [
+    { id: "dayof", label: "Your day", icon: Clock, desc: "Running your day", groups: [
       { label: "Scheduling", items: [
         { k: "day_cal", label: "Calendar settings (progress card, etc.)", card: "calendarsettings" },
         { k: "day_waitlist", label: "Waitlist on/off as you want", card: "waitlist" },
@@ -15969,7 +15970,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         { k: "day_test_lifecycle", label: "Ran check-in \u2192 in-service \u2192 done", card: null },
       ] },
     ] },
-    { id: "pay", label: "Checkout & money", icon: CreditCard, desc: "Payments, tips & no-shows", groups: [
+    { id: "pay", label: "Payments & checkout", icon: CreditCard, desc: "Payments, tips & no-shows", groups: [
       { label: "Setup", items: [
         { k: "pay_connected", label: "Stripe connected & payouts set up", card: "payments", auto: A(form.paymentsConnected) },
         { k: "pay_livekey", label: "Live key confirmed (not test) before launch", card: "payments" },
@@ -15988,7 +15989,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         { k: "pay_test_deposit", label: "Deposit collected at booking", card: null },
       ] },
     ] },
-    { id: "msg", label: "Messages", icon: Bell, desc: "Texts & emails", groups: [
+    { id: "msg", label: "Messages & alerts", icon: Bell, desc: "Texts & emails", groups: [
       { label: "Client templates", items: [
         { k: "msg_booked", label: "Booked confirmation reads right", card: "messages" },
         { k: "msg_reminder", label: "Reminder template", card: "messages" },
@@ -16263,6 +16264,18 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             </div>
           )}
         </div>
+      ) : openGroup ? (
+        // GROUP SCREEN — a collapsed group's settings on their own focused screen
+        <div className="appt-screen">
+          <button onClick={() => setOpenGroup(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 400, marginBottom: 26, padding: 0, border: "none", letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> {openGroup.catLabel}</button>
+          <div style={{ marginBottom: 30 }}>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 0.98 }}>{openGroup.label}</h2>
+            {openGroup.desc && <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{openGroup.desc}</div>}
+          </div>
+          <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
+            {openGroup.ids.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean).map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
+          </div>
+        </div>
       ) : openCat ? (
         // CATEGORY DETAIL — one category's settings, each showing its current value
         (() => {
@@ -16279,6 +16292,22 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                 cat.groups.map((g) => {
                   const groupCards = g.ids.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
                   if (!groupCards.length) return null;
+                  // Collapsed group: a single row that opens the group on its own focused screen.
+                  if (g.collapse) {
+                    return (
+                      <div key={g.label} style={{ marginBottom: 22 }}>
+                        <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
+                          <button onClick={() => setOpenGroup({ label: g.label, desc: g.desc, ids: g.ids, catLabel: cat.label })} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "center", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                            <span style={{ flex: 1, minWidth: 0 }}>
+                              <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>{g.label}</span>
+                              {g.desc && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.desc}</span>}
+                            </span>
+                            <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={g.label} style={{ marginBottom: 22 }}>
                       <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 9px" }}>{g.label}</div>
