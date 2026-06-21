@@ -6477,23 +6477,23 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                   <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Wrap up</span>
                   <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>All caught up</span>
                 </span>
-                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
+                <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
               </button>
           )}
           <button onClick={() => setGrowthOpen(true)} style={{ width: "100%", background: "none", border: "none", borderTop: wrapUpList.length === 0 ? "1px solid var(--line)" : "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
             <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>How you're growing</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>People keep coming back</span></span>
-            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
+            <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
           </button>
           {(isOwner && onOpenRevenue) && (
             <button onClick={onOpenRevenue} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
               <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Reports</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>The full numbers</span></span>
-              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
+              <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </button>
           )}
           {(isOwner && onOpenBarbers && realProviders.length > 1) && (
             <button onClick={onOpenBarbers} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
               <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Team</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Compare each staff member</span></span>
-              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
+              <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </button>
           )}
         </div>
@@ -6523,7 +6523,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                       {it.desc && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>}
                     </span>
                     {it.badge > 0 && <span style={{ minWidth: 22, height: 22, borderRadius: 11, padding: "0 7px", background: "var(--text)", color: "var(--bg)", fontSize: 12, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, alignSelf: "center" }}>{it.badge > 9 ? "9+" : it.badge}</span>}
-                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
+                    <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
                   </button>
                 );
               })}
@@ -15830,12 +15830,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       { label: "What clients can do", ids: ["showprices", "rebook_usual", "family", "refphotos"] },
     ] },
     { id: "pay",   section: "Booking & money", label: "Payments & checkout", icon: CreditCard, desc: "Payments, tips, deposits & rebooking", settings: ["payments", "checkout", "tipping", "rebookco", "policy"], groups: [
-      { label: "Payments & tips", ids: ["payments", "checkout", "tipping", "rebookco"] },
+      { label: "Payments & tips", collapse: true, desc: "Payments, checkout, tipping & rebooking", ids: ["payments", "checkout", "tipping", "rebookco"] },
       { label: "Deposits & no-shows", ids: ["policy"] },
     ] },
     { id: "dayof", section: "Running the day", label: "Your day", icon: Clock, desc: "Calendar & running your day", settings: ["calendarsettings", "photos", "waitlist", "waitingroom", "runninglate", "overduebuffer"], groups: [
-      { label: "Calendar view", ids: ["calendarsettings", "photos"] },
-      { label: "During the day", ids: ["waitlist", "waitingroom", "runninglate", "overduebuffer"] },
+      { label: "Calendar view", collapse: true, desc: "Row size, hours & what shows on the calendar", ids: ["calendarsettings", "photos"] },
+      { label: "During the day", collapse: true, desc: "Waitlist, waiting room, late & overdue alerts", ids: ["waitlist", "waitingroom", "runninglate", "overduebuffer"] },
     ] },
     { id: "msg",   section: "Running the day", label: "Messages & alerts", icon: Bell, desc: "Client texts & staff alerts", settings: ["messages", "notifications"], groups: [
       { label: "Clients", ids: ["messages"] },
@@ -16161,17 +16161,18 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
   return (
     <div className="fade-up" style={{ width: "100%", padding: "12px 6px" }}>
-      {/* Masthead */}
+      {/* Masthead + search — only on the Settings home, not on a drilled-in sub-page */}
+      {!openCat && !openGroup && (<>
       <div style={{ marginBottom: 22, paddingTop: 8 }}>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 40, fontWeight: 400, lineHeight: 0.98, letterSpacing: "-0.8px" }}>Settings</h2>
         <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 13 }}>Your shop, your booking, your day</div>
       </div>
 
-      {/* HERO SEARCH */}
       <div style={{ position: "relative", marginBottom: 12 }}>
         <input value={query} onChange={(e) => { setQuery(e.target.value); setOpenCat(null); }} placeholder="Try “tipping”, “hours”, “remind clients”…" style={{ width: "100%", background: "var(--panel)", border: "1.5px solid var(--border)", borderRadius: 16, padding: "19px 18px 19px 52px", color: "var(--text)", fontSize: 17, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
         <Settings size={20} style={{ position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)", color: "var(--gold)", pointerEvents: "none" }} />
       </div>
+      </>)}
 
       {/* LAUNCH CHECKLIST — replaces the old cockpit. Progress + the 9 sections,
           each expandable to box-by-box checks. Collapses to a green line once done. */}
@@ -21547,7 +21548,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         <User size={17} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{c.visits} visits · {provider.name}</div></div></div><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span></button>); })}</div>
+      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}</div>
       {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : "No clients yet — tap + to add your first one."}</p>}
     </div>
 
