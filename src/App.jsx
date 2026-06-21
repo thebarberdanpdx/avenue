@@ -2751,6 +2751,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [cardInfo, setCardInfo] = useState(null); // { last4, paid, saved } once captured
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [waitlistDone, setWaitlistDone] = useState(false);
+  const [capBlock, setCapBlock] = useState(null); // set when book_public rejects a new client over the daily cap → offer the waitlist
   const [photos, setPhotos] = useState([]);      // booking reference photos — compressed image dataURLs (max 3)
   const clientPhotoRef = useRef(null);            // hidden file/camera input for booking photos
   const onPhotoPick = (e) => {
@@ -3305,7 +3306,17 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     supabase.rpc('book_public', { p_shop: shopId, p_client: newClientRow ? newClientRow.data : null, p_appts: newAppts })
       .then(({ error }) => {
         setBooking(false);
-        if (error) { setBookErr(true); return; } // nothing was held, nothing lost — they can just tap again
+        if (error) {
+          // New-client daily cap reached for this provider/day → offer the waitlist instead of a dead end.
+          const emsg = `${error.message || ""} ${error.details || ""} ${error.hint || ""}`;
+          if (emsg.includes("newclient_cap")) {
+            const ap0 = newAppts[0] || {};
+            const provName = (providers.find((p) => p.id === ap0.providerId) || {}).name || "This barber";
+            setCapBlock({ providerName: provName, name: (matched?.name || newName || "").trim(), phone: finalPhone, service: cart.map(describeEntry).join(", "), date: new Date(selectedDate) });
+            return;
+          }
+          setBookErr(true); return; // nothing was held, nothing lost — they can just tap again
+        }
         setAppts((cur) => [...cur, ...newAppts]);
         captureClientPhotos();
         dropFromWaitlist();
@@ -4690,6 +4701,32 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>{clientTypeBlock === "returning_only" ? "Returning clients only" : "New clients only"}</h2>
           <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>{clientTypeBlock === "returning_only" ? "Online booking at this shop is currently open to returning clients only. Please give us a call to book your first visit." : "Online booking at this shop is currently for new clients only. Please give us a call to book your next visit."}{business?.phones?.[0]?.number ? ` Phone: ${business.phones[0].number}.` : ""}</p>
           <button onClick={() => setClientTypeBlock(null)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>OK</button>
+        </Sheet>
+        {/* New-client daily cap — this barber is full for new clients that day; offer the existing waitlist. */}
+        <Sheet open={!!capBlock} onClose={() => setCapBlock(null)} align="top">
+          {capBlock && (capBlock.done ? (
+            <>
+              <CheckCircle2 size={30} style={{ color: "#7A9E9F", marginBottom: 12 }} />
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>You're on the list</h2>
+              <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>We'll text {capBlock.name ? capBlock.name.split(" ")[0] : "you"} the moment a spot opens up with {capBlock.providerName}. No need to check back.</p>
+              <button onClick={() => { setCapBlock(null); onExit(); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>Done</button>
+            </>
+          ) : (
+            <>
+              <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
+              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Fully booked for new clients</h2>
+              <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>{capBlock.providerName} is taking no more new clients on <strong style={{ color: "var(--text)" }}>{relativeDate(capBlock.date)}, {MONTHS[capBlock.date.getMonth()]} {capBlock.date.getDate()}</strong>. Join the waitlist and we'll text you the moment a spot opens.</p>
+              <button className="lift" onClick={() => {
+                const e = capBlock;
+                const dayLabel = `${relativeDate(e.date)}, ${MONTHS[e.date.getMonth()]} ${e.date.getDate()}`;
+                const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: e.name, phone: e.phone, forWho: "self", provider: e.providerName, anyProvider: false, days: [dayLabel], day: dayLabel, dayTimes: { [dayLabel]: "any" }, when: "any", service: e.service, photos: 0, at: new Date().toLocaleString() };
+                setWaitlist((cur) => [...cur, wlEntry]);
+                if (!isStaff) { try { supabase.rpc("join_waitlist", { p_shop: shopId, p_entry: wlEntry }); } catch (err) {} }
+                setCapBlock({ ...e, done: true });
+              }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>Join the waitlist</button>
+              <button onClick={() => setCapBlock(null)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 14.5, fontWeight: 500, borderRadius: 12 }}>Maybe later</button>
+            </>
+          ))}
         </Sheet>
         {step === 5 && showCodeEntry && (
           <div className="fade-up">
