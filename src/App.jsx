@@ -128,6 +128,15 @@ function Avatar({ size = 42, photo = null, initial = "", color = "var(--gold)", 
     </div>
   );
 }
+// One back control for the whole app — quiet gray chevron + the name of where you'll land.
+// Usage:  <BackBar to="Pulse" onClick={() => setPulseDetail(null)} />
+function BackBar({ to = "Back", onClick, style }) {
+  return (
+    <button onClick={onClick} style={{ background: "none", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 4, fontSize: 14.5, fontFamily: "'Jost', sans-serif", padding: 0, cursor: "pointer", marginBottom: 18, ...style }}>
+      <ChevronLeft size={18} /> {to}
+    </button>
+  );
+}
 const ALL_LIBRARY = Object.entries(PHOTO_LIBRARY).flatMap(([cat, ids]) => ids.map((id) => ({ id, cat })));
 
 // ============================================================
@@ -7314,8 +7323,6 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
 
   return (
     <div className="fade-up">
-      {/* Inner back button — matches the ClientProfile pattern */}
-      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> Back to Pulse</button>
 
       {/* Masthead */}
       <div style={{ marginBottom: 22 }}>
@@ -7554,7 +7561,6 @@ function AppointmentsView({ appts, providers, services, onBack }) {
 
   return (
     <div className="fade-up">
-      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> Back to Pulse</button>
 
       <div style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>APPOINTMENTS &middot; CAPACITY</div>
@@ -7734,7 +7740,6 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
 
   return (
     <div className="fade-up">
-      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> Back to Pulse</button>
 
       {/* Masthead */}
       <div style={{ marginBottom: 20 }}>
@@ -8014,7 +8019,6 @@ function ServiceMixView({ appts, services, providers, onBack }) {
 
   return (
     <div className="fade-up">
-      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> Back to Pulse</button>
 
       {/* Masthead */}
       <div style={{ marginBottom: 22 }}>
@@ -8323,7 +8327,6 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
 
   return (
     <div className="fade-up">
-      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, marginBottom: 18 }}><ArrowLeft size={16} /> Back to Pulse</button>
 
       {/* Masthead */}
       <div style={{ marginBottom: 22 }}>
@@ -9049,12 +9052,40 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   const [pulseOpenApptId, setPulseOpenApptId] = useState(null); // tapping a Pulse card → open that appt's sheet on the calendar (reuses the deep-link path)
   const [activeClient, setActiveClient] = useState(null);
   const [pulseDetail, setPulseDetail] = useState(null); // null | "revenue" — drill-in from Pulse
+  // ---- Dashboard navigation history ----
+  // A "screen" at the dashboard level = { tab, pulseDetail, activeClient }. navStack remembers
+  // where you've been so the corner back returns you to the EXACT previous screen (not a fixed
+  // tab). navTo() = drill forward (records current screen first); navBack() = pop to the previous
+  // screen; goTab() = a bottom-tab tap, which jumps to a tab root and clears the trail so tabs
+  // always work from anywhere. The corner back only shows while navStack is non-empty.
+  const [navStack, setNavStack] = useState([]);
   const [toast, setToast] = useState(null); // { id, msg } — id re-triggers the enter animation for repeat toasts
   const toastIdRef = useRef(0);
   // Notification deep-link: when a tapped push hands us an appointment, jump to the calendar so it can open it.
-  useEffect(() => { if (deepLinkApptId) { setActiveClient(null); setPulseDetail(null); setTab("calendar"); } }, [deepLinkApptId]);
+  useEffect(() => { if (deepLinkApptId) { setNavStack([]); setActiveClient(null); setPulseDetail(null); setTab("calendar"); } }, [deepLinkApptId]);
   const [msgTarget, setMsgTarget] = useState(null); // { clientId, draft } — opens a convo prefilled
   const showToast = (msg) => setToast({ id: ++toastIdRef.current, msg }); // <Toast/> handles its own timed enter/exit + unmount
+  // Navigation helpers (see navStack note above).
+  const navTo = (next) => {
+    setNavStack((st) => [...st, { tab, pulseDetail, activeClient }]);
+    if ("tab" in next) setTab(next.tab);
+    if ("pulseDetail" in next) setPulseDetail(next.pulseDetail);
+    if ("activeClient" in next) setActiveClient(next.activeClient);
+  };
+  const navBack = () => {
+    if (!navStack.length) return;
+    const prev = navStack[navStack.length - 1];
+    setNavStack(navStack.slice(0, -1));
+    setTab(prev.tab); setPulseDetail(prev.pulseDetail); setActiveClient(prev.activeClient);
+  };
+  const goTab = (id) => { setNavStack([]); setTab(id); setPulseDetail(null); setActiveClient(null); };
+  // Friendly name of a screen, used to label the corner back ("‹ Calendar", "‹ Clients"…).
+  const screenLabel = (s) => {
+    if (!s) return "Back";
+    if (s.tab === "pulse") return s.pulseDetail ? "Pulse" : "Home";
+    return { calendar: "Calendar", clients: "Clients", messages: "Messages", settings: "Settings" }[s.tab] || "Back";
+  };
+  const backLabel = navStack.length ? screenLabel(navStack[navStack.length - 1]) : null;
 
   // One-time "test day" seed: replace TODAY's schedule for the primary barber with a sample day
   // so the owner can practice check-in / timer / checkout. Runs once ever per device (localStorage
@@ -9261,7 +9292,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       setClients((cur) => [...cur, target]);
     }
     setMsgTarget({ clientId: target.id, draft });
-    setTab("messages");
+    goTab("messages");
   };
 
   // Gate: if a PIN is required and we're not yet authenticated, show the lock instead of the dashboard.
@@ -9282,23 +9313,23 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   return (
     <div style={{ position: "relative", minHeight: "100dvh" }}>
       <div style={{ borderBottom: "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 16px) 20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
-        <button onClick={() => { if (pulseDetail) { setPulseDetail(null); return; } if (tab === "pulse" && !activeClient) { onExit(); return; } setActiveClient(null); setTab("pulse"); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontFamily: "'Jost', sans-serif" }}><ArrowLeft size={16} /> {pulseDetail ? "Pulse" : (tab === "pulse" && !activeClient ? "Home" : "Pulse")}</button>
+        {navStack.length > 0 ? <BackBar to={backLabel} onClick={navBack} style={{ marginBottom: 0 }} /> : <div style={{ width: 50 }} />}
         <LocationSwitcher current={shopId} fallbackName={business.name} authEmail={authEmail} />
         <div style={{ width: 50 }} />
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
-        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => setTab(t)} onOpenRevenue={() => setPulseDetail("revenue")} onOpenPayments={() => setPulseDetail("payments")} onOpenAppointments={() => setPulseDetail("appointments")} onOpenClients={() => setPulseDetail("clients")} onOpenServices={() => setPulseDetail("services")} onOpenBarbers={() => setPulseDetail("barbers")} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} onOpenAppt={(id) => { setPulseDetail(null); setActiveClient(null); setPulseOpenApptId(id); setTab("calendar"); }} showToast={showToast} notifCount={unseenCount} onOpenNotifications={() => setPulseDetail("notifications")} />}
-        {tab === "pulse" && pulseDetail === "notifications" && <NotificationsView notifs={myNotifs} notifSeenAt={notifSeenAt} markSeen={markNotifsSeen} onClear={() => setNotifs([])} clients={clients} providers={providers} isOwner={isOwner} me={me} onBack={() => setPulseDetail(null)} onOpenCalendar={() => { setPulseDetail(null); setTab("calendar"); }} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} />}
-        {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} business={business} onBack={() => setPulseDetail(null)} />}
-        {tab === "pulse" && pulseDetail === "payments" && <PaymentsView appts={appts} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={() => setPulseDetail(null)} showToast={showToast} />}
-        {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={() => setPulseDetail(null)} />}
-        {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={() => setPulseDetail(null)} onOpenNudge={() => { setPulseDetail(null); setTab("clients"); }} onOpenClient={(c) => { setPulseDetail(null); setActiveClient(c); setTab("clients"); }} />}
-        {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={() => setPulseDetail(null)} />}
-        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
-        {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={setActiveClient} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
-        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={() => setActiveClient(null)} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); setActiveClient(null); setTab("calendar"); }} />}
-        {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => { setActiveClient(c); setTab("clients"); }} />}
+        {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => goTab(t)} onOpenRevenue={() => navTo({ pulseDetail: "revenue" })} onOpenPayments={() => navTo({ pulseDetail: "payments" })} onOpenAppointments={() => navTo({ pulseDetail: "appointments" })} onOpenClients={() => navTo({ pulseDetail: "clients" })} onOpenServices={() => navTo({ pulseDetail: "services" })} onOpenBarbers={() => navTo({ pulseDetail: "barbers" })} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c, pulseDetail: null })} onOpenAppt={(id) => { setPulseOpenApptId(id); navTo({ tab: "calendar", pulseDetail: null, activeClient: null }); }} showToast={showToast} notifCount={unseenCount} onOpenNotifications={() => navTo({ pulseDetail: "notifications" })} />}
+        {tab === "pulse" && pulseDetail === "notifications" && <NotificationsView notifs={myNotifs} notifSeenAt={notifSeenAt} markSeen={markNotifsSeen} onClear={() => setNotifs([])} clients={clients} providers={providers} isOwner={isOwner} me={me} onBack={navBack} onOpenCalendar={() => goTab("calendar")} onOpenNudge={() => goTab("clients")} />}
+        {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} business={business} onBack={navBack} />}
+        {tab === "pulse" && pulseDetail === "payments" && <PaymentsView appts={appts} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={navBack} showToast={showToast} />}
+        {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={navBack} />}
+        {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={navBack} onOpenNudge={() => goTab("clients")} onOpenClient={(c) => navTo({ pulseDetail: null, activeClient: c, tab: "clients" })} />}
+        {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={navBack} />}
+        {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={navBack} />}
+        {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
+        {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
+        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} />}
+        {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
         {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} onSignOutAccount={onSignOutAccount} authEmail={authEmail} /></ErrorBoundary>}
@@ -9307,7 +9338,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       {/* fixed bottom tab bar — anchors to viewport bottom. transform:translateZ(0) puts it on its own GPU layer so iOS Safari doesn't let it drift during scroll/overscroll. */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "color-mix(in srgb, var(--bg) 82%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderTop: "1px solid var(--line)", boxShadow: "0 -8px 30px -12px var(--shadow)", display: "flex", justifyContent: "space-around", alignItems: "stretch", padding: "10px 4px calc(10px + env(safe-area-inset-bottom))", zIndex: 20, transform: "translateZ(0)", WebkitTransform: "translateZ(0)", willChange: "transform" }}>
         {[["pulse", "Pulse", TrendingUp], ["calendar", "Calendar", Calendar], ["clients", "Clients", User], ["messages", "Messages", MessageSquare], ...(isOwner ? [["settings", "Settings", Settings]] : [])].map(([id, label, Icon]) => (
-          <button key={id} onClick={() => { setTab(id); setActiveClient(null); setPulseDetail(null); }} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
+          <button key={id} onClick={() => goTab(id)} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
             <div style={{ position: "relative", padding: "5px 16px", borderRadius: 13, background: tab === id ? "var(--wash)" : "transparent", boxShadow: tab === id ? "0 5px 16px -6px var(--wash)" : "none", transition: "background .2s var(--ease), box-shadow .2s var(--ease)" }}>
               <Icon size={21} />
               {id === "waitlist" && waitlist.length > 0 && <span style={{ position: "absolute", top: -5, right: -9, background: "var(--gold)", color: "var(--on-gold)", fontSize: 12, fontWeight: 600, borderRadius: 8, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{waitlist.length}</span>}
@@ -9585,7 +9616,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // ---- shared building blocks ----
   const SectionHeader = ({ title }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
-      <button onClick={() => { if (editing !== "new") { const s = services.find((x) => x.id === editing); if (s) { const copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; setForm(copy); } } setSection(null); }} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, fontSize: 16 }}><ChevronLeft size={20} /></button>
+      <button onClick={() => { if (editing !== "new") { const s = services.find((x) => x.id === editing); if (s) { const copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; setForm(copy); } } setSection(null); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 4, fontSize: 16 }}><ChevronLeft size={20} /></button>
       <div><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{form.name || "SERVICE"}</div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{title}</h2></div>
     </div>
   );
@@ -10215,7 +10246,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         {libForm ? (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-              <button onClick={() => setLibForm(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /> Cut Styles</button>
+              <BackBar to="Cut Styles" onClick={() => setLibForm(null)} style={{ marginBottom: 0 }} />
             </div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, paddingLeft: 4 }}>{libForm.label || "Edit style"}</h2>
             <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20, paddingLeft: 4 }}>Edit this style once. When you save, the name, description and photo update on every service that uses it. Each service keeps its own price and time.</p>
@@ -10255,7 +10286,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         ) : (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-              <button onClick={() => setLibOpen(false)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /> Menu</button>
+              <BackBar to="Menu" onClick={() => setLibOpen(false)} style={{ marginBottom: 0 }} />
             </div>
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, marginBottom: 8, paddingLeft: 4 }}>Cut Styles</h2>
             <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 20, paddingLeft: 4 }}>Your styles in one place. Edit a style here and it updates on every service that offers it. Price and time stay set per service.</p>
@@ -10357,7 +10388,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       return (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 16 }}>
-            <button onClick={() => setEditStyleId(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 3, fontSize: 14, fontWeight: 500, cursor: "pointer" }}><ChevronLeft size={20} /> Cut styles</button>
+            <BackBar to="Cut styles" onClick={() => setEditStyleId(null)} style={{ marginBottom: 0 }} />
           </div>
           <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px", overflow: "hidden", textOverflow: "ellipsis" }}>{entry.label || "Style"}</h2>
           {styleDetailBody(entry)}
@@ -11419,7 +11450,7 @@ function LocationsEditor({ business, setForm, onBackRef }) {
     const l = open;
     return (
       <div className="fade-up">
-        <button onClick={() => setOpenId(null)} style={{ background: "none", border: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, fontSize: 15, padding: 0, marginBottom: 16, cursor: "pointer", fontFamily: "inherit" }}><ChevronLeft size={18} /> Locations</button>
+        <BackBar to="Locations" onClick={() => setOpenId(null)} style={{ marginBottom: 16 }} />
         <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 18px" }}>{l.name || "Location"}</h2>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", boxShadow: "var(--shadow-sm)" }}>
           <F first label="Location name" val={l.name} on={(v) => setLoc(l.id, { name: v })} />
@@ -11584,7 +11615,7 @@ function MessagesEditor({ messages, onChange, business, onBackRef }) {
     const m = open;
     return (
       <div className="fade-up">
-        <button onClick={() => { setOpenId(null); setPreview(false); }} style={{ background: "none", border: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 4, fontSize: 15, padding: 0, marginBottom: 16, cursor: "pointer", fontFamily: "inherit" }}><ChevronLeft size={18} /> Messages</button>
+        <BackBar to="Messages" onClick={() => { setOpenId(null); setPreview(false); }} style={{ marginBottom: 16 }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
           <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, letterSpacing: "-0.3px", margin: 0 }}>{m.label}</h2>
           <Toggle on={m.enabled} onClick={() => update(m.id, { enabled: !m.enabled })} />
@@ -12829,7 +12860,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   );
   const SecHeader = ({ title, onBack, right }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
-      <button onClick={onBack} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
+      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
       <div style={{ flex: 1 }}><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{person ? person.name.toUpperCase() : "STAFF"}</div><h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{title}</h2></div>
       {right}
     </div>
@@ -13516,7 +13547,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   return (
     <div className="appt-screen" style={{ paddingBottom: 40 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 18 }}>
-        <button onClick={() => setOpenId(null)} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /> <span style={{ fontSize: 15 }}>Team</span></button>
+        <BackBar to="Team" onClick={() => setOpenId(null)} style={{ marginBottom: 0 }} />
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
         <Avatar size={56} photo={person.id === "anyone" ? null : staffPhoto(person)} initial={person.name.charAt(0)} color={person.color || "var(--gold)"} />
@@ -14975,7 +15006,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast 
       <div className="fade-up" style={{ paddingBottom: 40 }}>
         {picker && <PhotoPicker onClose={() => setPicker(false)} onPick={(id) => { setForm((f) => ({ ...f, photo: id })); setPicker(false); }} />}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
-          <button onClick={() => { setEditing(null); setForm(null); }} style={{ background: "none", color: "var(--gold)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
+          <button onClick={() => { setEditing(null); setForm(null); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
           <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px" }}>{editing === "new" ? "New add-on" : form.name || "Add-on"}</h2>
         </div>
         <button onClick={() => setPicker(true)} className="lift" style={{ width: "100%", height: 160, borderRadius: 18, border: form.photo ? "1px solid var(--border)" : "1.5px dashed var(--border2)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 9, padding: 0, marginBottom: 6, boxShadow: form.photo ? "var(--shadow-sm)" : "none" }}>
@@ -19589,16 +19620,22 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
             <div style={{ fontSize: 13, color: "rgba(244,239,228,.5)", marginTop: 3 }}>{dur} min booked</div>
           </div>
         </div>
-        {/* Up next — synced to the barber's calendar (gap-aware) */}
-        <div style={{ marginTop: 14, paddingTop: 13, borderTop: "1px solid rgba(255,255,255,.09)", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", color: "rgba(244,239,228,.5)", fontWeight: 700, flexShrink: 0 }}>Next</span>
+        {/* Up next — synced to the barber's calendar (gap-aware), independent of when the timer was started.
+            Shown big so the next client is always clear at a glance. */}
+        <div style={{ marginTop: 15, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,.09)" }}>
+          <div style={{ fontSize: 10, letterSpacing: 1.8, textTransform: "uppercase", color: "rgba(244,239,228,.5)", fontWeight: 700, marginBottom: 7 }}>Next in the chair</div>
           {upNext ? (
             <>
-              <span style={{ fontSize: 14, color: "#F4EFE4", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{upNext.name}</span>
-              <span style={{ marginLeft: "auto", fontSize: 13, color: "rgba(244,239,228,.62)", whiteSpace: "nowrap", flexShrink: 0 }}>{upNext.waiting ? "checked in" : `${fmtTime(upNext.start)}${upGapLabel ? ` · ${upGapLabel}` : ""}`}</span>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                <span style={{ fontSize: 20, fontWeight: 600, color: "#F4EFE4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{upNext.name}</span>
+                <span style={{ marginLeft: "auto", fontSize: 16, fontWeight: 600, color: tagColor, whiteSpace: "nowrap", flexShrink: 0 }}>{upNext.waiting ? "checked in" : fmtTime(upNext.start)}</span>
+              </div>
+              {!upNext.waiting && upGapLabel && (
+                <div style={{ fontSize: 13, color: "rgba(244,239,228,.6)", marginTop: 3 }}>{upGapLabel === "now" ? "Due now" : `Starts ${upGapLabel}`}</div>
+              )}
             </>
           ) : (
-            <span style={{ marginLeft: "auto", fontSize: 13, color: "rgba(244,239,228,.5)", fontStyle: "italic" }}>Open chair after this</span>
+            <div style={{ fontSize: 15, color: "rgba(244,239,228,.5)", fontStyle: "italic" }}>Open chair after this</div>
           )}
         </div>
       </div>
@@ -19752,7 +19789,9 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const [wuDirty, setWuDirty] = useState(false);     // something changed since last save
   const [wuSaved, setWuSaved] = useState(false);     // show "Saved ✓" briefly after a save
   const [pendingDur, setPendingDur] = useState(null); // staged duration, applied on Save
-  useEffect(() => { setWuNote(client?.notes || ""); setWuDirty(false); setWuSaved(false); setPendingDur(null); }, [client?.id]);
+  const [pendingPrice, setPendingPrice] = useState(null); // staged per-client price, applied on Save
+  const [wuPriceText, setWuPriceText] = useState(null); // null = show stored; string = mid-edit
+  useEffect(() => { setWuNote(client?.notes || ""); setWuDirty(false); setWuSaved(false); setPendingDur(null); setPendingPrice(null); setWuPriceText(null); }, [client?.id]);
   const wuFileRef = useRef(null);
   // Fallback only: if the sheet closes with an unsaved note, persist it so it isn't lost.
   useEffect(() => () => {
@@ -19788,6 +19827,16 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const storedDur = (client && service && client.customDurations && client.customDurations[service.id] != null) ? client.customDurations[service.id] : (service?.duration || dur);
   const wuDur = pendingDur != null ? pendingDur : storedDur; // show staged value if any
   const setWuDur = (val) => { setPendingDur(val); setWuDirty(true); setWuSaved(false); };
+  // Per-client price, mirroring the duration override. Stored falls back to the effective service price.
+  const storedPrice = (client && service && client.customPrices && client.customPrices[service.id] != null) ? client.customPrices[service.id] : (service ? getPrice(service, appt.providerId) : 0);
+  const wuPriceVal = wuPriceText != null ? wuPriceText : (storedPrice != null ? String(storedPrice) : "");
+  const setWuPrice = (raw) => {
+    const clean = String(raw).replace(/[^0-9.]/g, "");
+    setWuPriceText(clean);
+    const n = parseFloat(clean);
+    setPendingPrice(isNaN(n) ? null : Math.round(n * 100) / 100);
+    setWuDirty(true); setWuSaved(false);
+  };
   // Commit all pending Wrap Up changes (note + duration) on the Save button.
   const saveWrapUp = () => {
     if (!client) return;
@@ -19797,9 +19846,10 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
       const next = { ...c };
       if ((c.notes || "") !== v) next.notes = v;
       if (pendingDur != null && service) next.customDurations = { ...(c.customDurations || {}), [service.id]: pendingDur };
+      if (pendingPrice != null && service) next.customPrices = { ...(c.customPrices || {}), [service.id]: pendingPrice };
       return next;
     }));
-    setPendingDur(null); setWuDirty(false); setWuSaved(true);
+    setPendingDur(null); setPendingPrice(null); setWuPriceText(null); setWuDirty(false); setWuSaved(true);
     setTimeout(() => setWuSaved(false), 2500);
     if (showToast) showToast("Wrap-up saved to their profile.");
   };
@@ -20259,17 +20309,17 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               </div>
               {/* WRAP UP — service time, photos, note — auto-saved to the client profile */}
               {client && (
-                <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
+                <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}`, ...(appt.status === "done" ? { background: "color-mix(in srgb, var(--gold) 6%, transparent)" } : {}) }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
                     <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: "linear-gradient(155deg,#F4C84F,#CF971F)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 10px -3px rgba(190,135,20,.5)" }}><Sparkles size={19} style={{ color: "#33260A" }} /></div>
-                    <div style={{ fontFamily: FONT_BODY, fontSize: 18, fontWeight: 600, color: T.text, lineHeight: 1 }}>Wrap Up</div>
+                    <div style={{ fontFamily: FONT_BODY, fontSize: 18, fontWeight: 600, color: T.text, lineHeight: 1 }}>{appt.status === "done" ? "Wrap up the visit" : "Wrap Up"}</div>
                   </div>
-                  <div style={{ fontSize: 13.5, color: T.sub, marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}><Check size={14} style={{ color: T.accent }} /> Photos, notes &amp; timing — saved to {(client.name || "their").split(" ")[0]} automatically</div>
-                  <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 16, overflow: "hidden" }}>
+                  <div style={{ fontSize: 13.5, color: T.sub, marginBottom: 16, display: "flex", alignItems: "center", gap: 6, lineHeight: 1.45 }}><Check size={14} style={{ color: T.accent, flexShrink: 0 }} /> {appt.status === "done" ? `Checked out — capture this visit. Photos, notes, time & price save to ${(client.name || "their").split(" ")[0]} for next time.` : `Photos, notes & timing — saved to ${(client.name || "their").split(" ")[0]} automatically`}</div>
+                  <div style={{ background: T.panel, border: `1.5px solid ${appt.status === "done" ? "color-mix(in srgb, var(--gold) 45%, var(--line))" : T.line}`, borderRadius: 16, overflow: "hidden" }}>
                     {/* Service time — first */}
                     {service && (
                       <div style={{ padding: 18 }}>
-                        <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Service time</div>
+                        <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Service time &amp; price</div>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                           <span style={{ fontSize: 15.5, color: T.sub }}>{(client.name || "their").split(" ")[0]}'s time for {service.name}</span>
                           <div style={{ display: "flex", alignItems: "center", background: T.bg, border: `1px solid ${T.line}`, borderRadius: 11, overflow: "hidden", flexShrink: 0 }}>
@@ -20278,7 +20328,14 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                             <button onClick={() => setWuDur(wuDur + 5)} style={{ background: "none", border: "none", color: T.text, width: 44, height: 44, fontSize: 22 }}>+</button>
                           </div>
                         </div>
-                        <div style={{ fontSize: 12.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Booked at {service.duration} min. This sets {(client.name || "their").split(" ")[0]}'s time so future bookings get the right amount of chair.</div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginTop: 12 }}>
+                          <span style={{ fontSize: 15.5, color: T.sub }}>{(client.name || "their").split(" ")[0]}'s price for {service.name}</span>
+                          <div style={{ display: "flex", alignItems: "center", background: T.bg, border: `1px solid ${T.line}`, borderRadius: 11, overflow: "hidden", flexShrink: 0, paddingLeft: 14 }}>
+                            <span style={{ fontSize: 16, fontWeight: 700, color: T.sub }}>$</span>
+                            <input type="text" inputMode="decimal" value={wuPriceVal} onChange={(e) => setWuPrice(e.target.value)} placeholder="0" style={{ width: 80, textAlign: "center", background: "none", border: "none", outline: "none", color: T.text, fontSize: 16, fontWeight: 700, padding: "13px 8px", fontFamily: FONT_BODY }} />
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 12.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Booked at {service.duration} min · ${defaultPrice}. This sets {(client.name || "their").split(" ")[0]}'s time and price so future bookings get the right amount of chair — and quote the right amount.</div>
                         {timedMin != null && (
                           <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 11, background: `color-mix(in srgb, #E5AC34 12%, ${T.panel})`, border: "1px solid color-mix(in srgb, #E5AC34 32%, transparent)" }}>
                             <div style={{ fontSize: 13.5, color: T.text, lineHeight: 1.4 }}>
@@ -21803,7 +21860,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
     <div className="fade-up">
       {/* top bar: back · shop · kebab */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontFamily: "'Jost', sans-serif", fontSize: 14, cursor: "pointer" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16 }}>‹</span> Clients</button>
+        <div />
         <button onClick={() => setMenuOpen(true)} style={{ background: "none", border: "none", color: "var(--faint)", cursor: "pointer", padding: 4 }}><MoreHorizontal size={20} /></button>
       </div>
 
@@ -22001,7 +22058,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         const mh = (appts || []).filter((a) => a.familyMemberId === m.id && a.serviceId && a.status !== "block");
         return (
           <div style={{ paddingBottom: 24, paddingTop: 8 }}>
-            <button onClick={() => setOpenMember(null)} style={{ background: "none", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 14, marginBottom: 18, cursor: "pointer" }}><ArrowLeft size={15} /> Back to family</button>
+            <BackBar to="Family" onClick={() => setOpenMember(null)} />
             <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 20 }}>
               <div style={{ width: 48, height: 48, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 20, flexShrink: 0 }}>{m.name.charAt(0)}</div>
               <div><div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{m.name}</div>{m.note && <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{m.note}</div>}</div>
@@ -22259,7 +22316,7 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 215px)", minHeight: 440, margin: "0 -20px", marginBottom: -96 }}>
       {/* iMessage-style centered header */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px 12px", borderBottom: "1px solid var(--line)", position: "relative" }}>
-        <button onClick={() => setActiveId(null)} style={{ background: "none", color: "#0A84FF", display: "flex", alignItems: "center", fontSize: 15, position: "absolute", left: 6, top: 8, zIndex: 2 }}><ChevronLeft size={26} /></button>
+        <button onClick={() => setActiveId(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", fontSize: 15, position: "absolute", left: 6, top: 8, zIndex: 2 }}><ChevronLeft size={26} /></button>
         <button onClick={() => { if (onOpenClient) onOpenClient(active); }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "none", border: "none", color: "var(--text)", padding: 0, cursor: "pointer" }} aria-label={`Open ${active.name}'s profile`}>
           <Avatar size={50} photo={clientPhoto(active)} initial={active.name.charAt(0)} color={provColor(active)} />
           <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 14.5, color: "var(--text)" }}>{active.name.split(" ")[0]} <ChevronRight size={13} style={{ color: "var(--faint)" }} /></div>
