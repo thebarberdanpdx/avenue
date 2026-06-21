@@ -18048,6 +18048,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 const lanePos = laneCount > 1
                   ? { left: `calc(${(lane / laneCount) * 100}% + 2px)`, width: `calc(${100 / laneCount}% - 4px)` }
                   : { left: 3, right: 3 };
+                const isNew = !isBlock && !isDone && (!a.clientId || (() => { const c = clients.find((cl) => cl.id === a.clientId); return c && (c.visits || 0) === 0; })());
                 return (
                   <div key={a.id} data-appt
                     onClick={() => { const d = dragRef.current; if (d && (d.didDrag || d.scrolled)) return; setOpen(a); }}
@@ -18055,32 +18056,22 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     className={isDragging ? "" : "lift"}
                     style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: isDone ? (mono ? 0.55 : 0.7) : 1, border: blkBorder, borderLeft: blkLeft, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: blkShadow, transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
                     {/* name — always one line, never wraps or collides */}
-                    <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 18 }}>{apptDisplayName(a, clients)}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: isNew ? 44 : 14 }}>{apptDisplayName(a, clients)}</span>
                     {/* time range — shown once room exists */}
                     {height > 34 && <span style={{ fontSize: 12, color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fmtTime(liveStart)} – {fmtTime(liveStart + (a.end - a.start))}</span>}
                     {/* service name */}
                     {height > 58 && <div style={{ fontSize: 12.5, color: text2On, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.title}</div>}
                     {/* add-on detail only on tall blocks */}
                     {height > 84 && a.detail && <div style={{ fontSize: 12, color: subOn, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{a.detail}</div>}
+                    {height > 50 && (
                     <div style={{ position: "absolute", bottom: 5, right: 6, display: "flex", gap: 5, alignItems: "center", color: subOn }}>
                       {a.hasNote && <Edit2 size={11} style={{ opacity: 0.7 }} />}
                       {a.hasPhotos && <ImageIcon size={12} style={{ opacity: 0.7 }} />}
                       {a.vip && <span style={{ fontSize: 13, color: darkBlock ? "#fff" : accent }}>★</span>}
                     </div>
-                    {/* NEW pill — top-right — fires when this is the client's first-ever visit, or it's a walk-in with no client record */}
-                    {(() => {
-                      const isFirstTime = !a.clientId || (() => { const c = clients.find((cl) => cl.id === a.clientId); return c && (c.visits || 0) === 0; })();
-                      if (!isFirstTime || isBlock || isDone) return null;
-                      return (
-                        <span style={{ position: "absolute", top: 5, right: 6, fontSize: 9.5, fontWeight: 700, letterSpacing: 1, color: darkBlock ? "#fff" : "var(--gold)", border: `1px solid ${darkBlock ? "rgba(255,255,255,0.6)" : "var(--gold)"}`, borderRadius: 4, padding: "1px 5px", lineHeight: 1.3, background: "var(--wash)" }}>NEW</span>
-                      );
-                    })()}
-                    {/* subtle end-of-appointment marker: hairline at the bottom edge + end time */}
-                    {!isBlock && height > 28 && (
-                      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, borderBottom: `1.5px solid ${darkBlock ? "rgba(255,255,255,0.30)" : `color-mix(in srgb, ${accent} 55%, transparent)`}`, pointerEvents: "none" }}>
-                        <span style={{ position: "absolute", right: 6, bottom: 2, fontSize: 9.5, fontWeight: 600, letterSpacing: 0.3, color: darkBlock ? "rgba(255,255,255,0.80)" : `color-mix(in srgb, ${accent} 75%, var(--text))`, opacity: 0.75 }}>{fmtTime(liveStart + (a.end - a.start)).replace(/\s?[AP]M/, "")}</span>
-                      </div>
                     )}
+                    {/* NEW tag — top-right; name reserves room for it so they never overlap */}
+                    {isNew && <span style={{ position: "absolute", top: 6, right: 7, fontSize: 9, fontWeight: 700, letterSpacing: 0.8, color: darkBlock ? "#fff" : "var(--gold)", border: `1px solid ${darkBlock ? "rgba(255,255,255,0.6)" : "var(--gold)"}`, borderRadius: 4, padding: "1px 4px", lineHeight: 1.3, background: "var(--wash)" }}>NEW</span>}
                   </div>
                 );
               })}
