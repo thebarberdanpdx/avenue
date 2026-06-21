@@ -7,7 +7,7 @@ import {
   Settings, Image as ImageIcon, Lock, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
   BarChart3, TrendingUp, Palette, Globe, HelpCircle, BookOpen, Search, LifeBuoy, Scissors, Package,
-  Smartphone, Link2, AlertTriangle, Pause, Play, RotateCw
+  Smartphone, Link2, AlertTriangle, Pause, Play, RotateCw, UserPlus
 } from "lucide-react";
 
 // ============================================================
@@ -1685,7 +1685,15 @@ function App() {
     return () => { alive = false; };
   }, [session]);
 
-  useEffect(() => { if (!loadedRef.current || !session) return; const t = setTimeout(() => { supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories, _cutLibrary: cutLibrary } }).then(({ error }) => { if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false); }); }, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
+  useEffect(() => { if (!loadedRef.current || !session) return; const snap = { business, categories, cutLibrary }; const t = setTimeout(async () => {
+    // The calendar connection (calSync) is owned by the server (api/calendar-pull + the cron). NEVER let
+    // a general settings-save overwrite it with a stale local copy — that's what silently disconnected the
+    // calendar. Read the server's current calSync right before writing and preserve it verbatim.
+    let keptCalSync = snap.business?.calSync;
+    try { const { data } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle(); if (data?.settings && 'calSync' in data.settings) keptCalSync = data.settings.calSync; } catch (e) {}
+    const { error } = await supabase.from('shops').upsert({ id: SHOP_ID, name: snap.business?.name || SHOP_ID, settings: { ...snap.business, calSync: keptCalSync, _categories: snap.categories, _cutLibrary: snap.cutLibrary } });
+    if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false);
+  }, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
   // Stamp lastSaveAt the moment a LOCAL edit happens (this runs only for local changes — a
   // live-sync refetch sets state === lastRemoteRef, so it returns above). This suppresses the
   // realtime refetch during the ~800ms debounce BEFORE the save lands, so an incoming echo can't
@@ -1705,7 +1713,12 @@ function App() {
     syncList('waitlist', waitlist);
     syncList('services', services);
     syncList('providers', providers);
-    supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, _categories: categories, _cutLibrary: cutLibrary } }).then(({ error }) => { if (error) setSaveFailed(true); });
+    (async () => {
+      let keptCalSync = business?.calSync;
+      try { const { data } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle(); if (data?.settings && 'calSync' in data.settings) keptCalSync = data.settings.calSync; } catch (e) {}
+      const { error } = await supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, calSync: keptCalSync, _categories: categories, _cutLibrary: cutLibrary } });
+      if (error) setSaveFailed(true);
+    })();
   };
 
   // ---- LIVE SYNC ----
@@ -10741,13 +10754,22 @@ function Toggle({ on, onClick }) {
   );
 }
 
-function Stepper({ value, onChange, min = 0, max = 999, step = 1, suffix, zeroLabel }) {
-  const display = (zeroLabel && value === 0) ? zeroLabel : `${value}${suffix ? ` ${suffix}` : ""}`;
+function Stepper({ value, onChange, min = 0, max = 999, step = 1, suffix, zeroLabel, nullLabel, onValueTap }) {
+  // When nullLabel is supplied, value === null is a valid "no limit" state. The −/+ keys
+  // are inert in that state — you leave it by tapping the value (onValueTap). Both props
+  // default to undefined, so every existing call site behaves exactly as before.
+  const isNull = nullLabel != null && value == null;
+  const display = isNull ? nullLabel : (zeroLabel && value === 0) ? zeroLabel : `${value}${suffix ? ` ${suffix}` : ""}`;
+  const dec = () => { if (!isNull) onChange(Math.max(min, value - step)); };
+  const inc = () => { if (!isNull) onChange(Math.min(max, value + step)); };
+  const valStyle = { minWidth: 70, textAlign: "center", fontSize: 15, fontWeight: 500, color: "var(--text)", padding: "0 6px", whiteSpace: "nowrap" };
   return (
     <div style={{ display: "inline-flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: 11, overflow: "hidden" }}>
-      <button onClick={() => onChange(Math.max(min, value - step))} aria-label="Decrease" style={{ width: 42, height: 38, border: "none", borderRight: "1px solid var(--border)", background: "var(--panel2)", color: "var(--text)", fontSize: 19, lineHeight: 1, cursor: "pointer" }}>−</button>
-      <span style={{ minWidth: 70, textAlign: "center", fontSize: 15, fontWeight: 500, color: "var(--text)", padding: "0 6px" }}>{display}</span>
-      <button onClick={() => onChange(Math.min(max, value + step))} aria-label="Increase" style={{ width: 42, height: 38, border: "none", borderLeft: "1px solid var(--border)", background: "var(--panel2)", color: "var(--text)", fontSize: 19, lineHeight: 1, cursor: "pointer" }}>+</button>
+      <button onClick={dec} aria-label="Decrease" style={{ width: 42, height: 38, border: "none", borderRight: "1px solid var(--border)", background: "var(--panel2)", color: isNull ? "var(--faint)" : "var(--text)", fontSize: 19, lineHeight: 1, cursor: "pointer" }}>−</button>
+      {onValueTap
+        ? <button onClick={onValueTap} style={{ ...valStyle, background: "none", border: "none", height: 38, cursor: "pointer", fontFamily: FONT_BODY }}>{display}</button>
+        : <span style={valStyle}>{display}</span>}
+      <button onClick={inc} aria-label="Increase" style={{ width: 42, height: 38, border: "none", borderLeft: "1px solid var(--border)", background: "var(--panel2)", color: isNull ? "var(--faint)" : "var(--text)", fontSize: 19, lineHeight: 1, cursor: "pointer" }}>+</button>
     </div>
   );
 }
@@ -10850,6 +10872,204 @@ function Segmented({ options, value, onChange, inline }) {
           <button key={o.value} onClick={() => onChange(o.value)} style={{ border: "none", flex: stretch ? 1 : "0 0 auto", background: on ? "var(--gold)" : "transparent", padding: "7px 13px", borderRadius: 9, fontSize: 13.5, fontFamily: FONT_BODY, color: on ? "var(--on-gold)" : "var(--sub)", fontWeight: on ? 500 : 400, whiteSpace: "nowrap", cursor: "pointer" }}>{o.label}</button>
         );
       })}
+    </div>
+  );
+}
+
+// ============================================================
+// NEW CLIENTS — per-provider daily cap on first-time bookers, plus optional
+// reserved windows. Data shape lives on prov.newClients (see normNewClients).
+// This editor is UI + persistence only; the public booking flow does not yet
+// enforce the cap — that's a deliberate second pass (computeFreeSlots + the
+// book_public RPC do the actual gating, where new-client detection is safe).
+// ============================================================
+const NC_WEEK = [["mon", "Monday"], ["tue", "Tuesday"], ["wed", "Wednesday"], ["thu", "Thursday"], ["fri", "Friday"], ["sat", "Saturday"], ["sun", "Sunday"]];
+// Add-a-time day chips start on Sunday, matching the mock.
+const NC_CHIP_DAYS = [["sun", "Sun"], ["mon", "Mon"], ["tue", "Tue"], ["wed", "Wed"], ["thu", "Thu"], ["fri", "Fri"], ["sat", "Sat"]];
+const NC_WHO = [
+  { v: "new", label: "New clients only" },
+  { v: "returning", label: "Returning clients only" },
+  { v: "anyone", label: "Anyone" },
+  { v: "walkin", label: "Walk-ins only", sub: "Kept off your online booking" },
+];
+const hhmm2min = (s) => { const [h, m] = String(s || "0:0").split(":").map((n) => parseInt(n, 10) || 0); return h * 60 + m; };
+const min2hhmm = (m) => `${Math.floor(m / 60).toString().padStart(2, "0")}:${(m % 60).toString().padStart(2, "0")}`;
+function normNewClients(x) {
+  x = x || {};
+  return {
+    capMode: x.capMode === "week" ? "week" : "same",
+    capSame: x.capSame === undefined ? null : x.capSame,           // null = No limit, 0 = none
+    capWeek: { mon: null, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null, ...(x.capWeek || {}) },
+    saveOpenTimes: !!x.saveOpenTimes,
+    savedTimes: Array.isArray(x.savedTimes) ? x.savedTimes : [],
+  };
+}
+const ncDaysLabel = (days) => {
+  const set = new Set(days || []);
+  if (set.size === 7) return "Every day";
+  const wk = ["mon", "tue", "wed", "thu", "fri"];
+  if (set.size === 5 && wk.every((d) => set.has(d))) return "Weekdays";
+  if (set.size === 2 && set.has("sat") && set.has("sun")) return "Weekends";
+  // Keep chip order; single day reads as a plural ("Saturdays").
+  const picked = NC_WEEK.filter(([k]) => set.has(k));
+  if (picked.length === 1) return picked[0][1] + "s";
+  return picked.map(([, full]) => full.slice(0, 3)).join(", ");
+};
+const ncWhoLabel = (who) => (NC_WHO.find((w) => w.v === who) || NC_WHO[0]).label;
+const ncTimeRange = (t) => `${fmtTime(hhmm2min(t.from))}–${fmtTime(hhmm2min(t.to))}`;
+
+function NewClientsEditor({ providers = [], setProviders, onBackRef }) {
+  const staff = (providers || []).filter((p) => p.id !== "anyone");
+  const [pid, setPid] = useState(staff[0]?.id || null);
+  const [editing, setEditing] = useState(null); // null | { idx: number|null, draft }
+  const prov = staff.find((p) => p.id === pid) || staff[0] || null;
+  const nc = normNewClients(prov?.newClients);
+  const patch = (obj) => { if (!prov || !setProviders) return; setProviders(providers.map((p) => p.id === prov.id ? { ...p, newClients: { ...normNewClients(p.newClients), ...obj } } : p)); };
+
+  // The settings back arrow first closes the add-a-time sub-screen if it's open.
+  useEffect(() => {
+    if (!onBackRef) return;
+    onBackRef.current = editing ? () => { setEditing(null); return true; } : null;
+    return () => { if (onBackRef) onBackRef.current = null; };
+  }, [editing, onBackRef]);
+
+  if (!prov) return <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5 }}>Add a staff member first — each person sets their own new-client limits.</div>;
+
+  const CARD = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" };
+  const ROW = { display: "flex", alignItems: "center", minHeight: 58, padding: "13px 16px" };
+  const SOFT = { fontSize: 11.5, fontWeight: 600, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--sub)", margin: "26px 4px 10px" };
+  const HINT = { fontSize: 12.5, color: "var(--faint)", margin: "10px 4px 0", lineHeight: 1.45 };
+  const first = (prov.name || "").split(" ")[0] || "this person";
+
+  // ---------- Add / edit a saved time ----------
+  if (editing) {
+    const d = editing.draft;
+    const setD = (obj) => setEditing((e) => ({ ...e, draft: { ...e.draft, ...obj } }));
+    const toggleDay = (k) => setD({ days: d.days.includes(k) ? d.days.filter((x) => x !== k) : [...d.days, k] });
+    const canSave = d.days.length > 0 && hhmm2min(d.to) > hhmm2min(d.from);
+    const commit = () => {
+      const list = nc.savedTimes.slice();
+      const clean = { id: d.id, days: d.days, from: d.from, to: d.to, who: d.who };
+      if (editing.idx == null) list.push(clean); else list[editing.idx] = clean;
+      patch({ savedTimes: list });
+      setEditing(null);
+    };
+    const remove = () => { patch({ savedTimes: nc.savedTimes.filter((_, i) => i !== editing.idx) }); setEditing(null); };
+    return (
+      <div>
+        <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, letterSpacing: "-0.2px", marginBottom: 2 }}>{editing.idx == null ? "Add a time" : "Edit time"}</h3>
+        <div style={SOFT}>Which days</div>
+        <div style={{ ...CARD, padding: "14px 16px" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {NC_CHIP_DAYS.map(([k, lbl]) => {
+              const on = d.days.includes(k);
+              return (
+                <button key={k} onClick={() => toggleDay(k)} style={{ minWidth: 46, height: 42, padding: "0 12px", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--text2)", fontSize: 14, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" }}>{lbl}</button>
+              );
+            })}
+          </div>
+        </div>
+        <div style={SOFT}>From / to</div>
+        <div style={{ ...CARD, padding: "14px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1 }}><TimeScrollPicker value={hhmm2min(d.from)} onChange={(m) => setD({ from: min2hhmm(m) })} label="From" full /></div>
+            <span style={{ color: "var(--faint)", fontSize: 13 }}>to</span>
+            <div style={{ flex: 1 }}><TimeScrollPicker value={hhmm2min(d.to)} onChange={(m) => setD({ to: min2hhmm(m) })} label="To" full /></div>
+          </div>
+        </div>
+        <div style={SOFT}>Who can book it</div>
+        <div style={CARD}>
+          {NC_WHO.map((w, i) => {
+            const on = d.who === w.v;
+            return (
+              <button key={w.v} onClick={() => setD({ who: w.v })} style={{ ...ROW, width: "100%", textAlign: "left", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", cursor: "pointer", fontFamily: FONT_BODY }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, color: "var(--text)" }}>{w.label}</div>
+                  {w.sub && <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>{w.sub}</div>}
+                </div>
+                <span style={{ width: 21, height: 21, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={12} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
+              </button>
+            );
+          })}
+        </div>
+        <button disabled={!canSave} onClick={commit} style={{ width: "100%", marginTop: 18, background: canSave ? "var(--gold)" : "var(--panel2)", color: canSave ? "var(--on-gold)" : "var(--faint)", border: "none", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 13, cursor: canSave ? "pointer" : "default", fontFamily: FONT_BODY }}>Save</button>
+        {editing.idx != null && <button onClick={remove} style={{ width: "100%", marginTop: 4, background: "none", border: "none", color: "var(--sub)", fontSize: 14, padding: "12px 0 2px", cursor: "pointer", fontFamily: FONT_BODY }}>Remove this time</button>}
+      </div>
+    );
+  }
+
+  // ---------- Main screen ----------
+  const capStep = (value, onChange) => (
+    <Stepper value={value} onChange={onChange} min={0} max={99} nullLabel="No limit" onValueTap={() => onChange(value == null ? 3 : null)} />
+  );
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.45, maxWidth: "34ch", marginBottom: 4 }}>Decide how many new people can book each day. New means anyone who hasn't booked before — found automatically.</p>
+
+      {staff.length > 1 && (
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "16px 0 4px", margin: "0 -2px", WebkitOverflowScrolling: "touch" }}>
+          {staff.map((p) => {
+            const on = p.id === prov.id;
+            return (
+              <button key={p.id} onClick={() => setPid(p.id)} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, padding: "6px 13px 6px 6px", borderRadius: 999, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: "var(--text)", cursor: "pointer", fontFamily: FONT_BODY }}>
+                <Avatar size={26} photo={p.photo} initial={(p.name || "?")[0]} color={p.color} />
+                <span style={{ fontSize: 14, fontWeight: on ? 600 : 400 }}>{(p.name || "").split(" ")[0]}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={SOFT}>How many per day</div>
+      <Segmented options={[{ value: "same", label: "Same every day" }, { value: "week", label: "Per weekday" }]} value={nc.capMode} onChange={(m) => patch({ capMode: m })} />
+
+      {nc.capMode === "same" ? (
+        <>
+          <div style={{ ...CARD, marginTop: 12 }}>
+            <div style={ROW}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>New clients per day</div>{capStep(nc.capSame, (v) => patch({ capSame: v }))}</div>
+          </div>
+          <p style={HINT}>Tap the number to set "No limit." Set it to 0 to take none.</p>
+        </>
+      ) : (
+        <>
+          <div style={{ ...CARD, marginTop: 12 }}>
+            {NC_WEEK.map(([k, full], i) => (
+              <div key={k} style={{ ...ROW, borderTop: i ? "1px solid var(--line)" : "none" }}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>{full}</div>{capStep(nc.capWeek[k], (v) => patch({ capWeek: { ...nc.capWeek, [k]: v } }))}</div>
+            ))}
+          </div>
+          <p style={HINT}>Tap a number to set "No limit." 0 means no new clients that day.</p>
+        </>
+      )}
+
+      <div style={SOFT}>Save open times</div>
+      <div style={CARD}>
+        <div style={ROW}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, color: "var(--text)" }}>Save some open times</div>
+            <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.35 }}>Hold a few slots for walk-ins or new bookings</div>
+          </div>
+          <Toggle on={nc.saveOpenTimes} onClick={() => patch({ saveOpenTimes: !nc.saveOpenTimes })} />
+        </div>
+      </div>
+
+      {nc.saveOpenTimes && (
+        <div style={{ marginTop: 12 }}>
+          {nc.savedTimes.length > 0 && (
+            <div style={CARD}>
+              {nc.savedTimes.map((t, i) => (
+                <button key={t.id || i} onClick={() => setEditing({ idx: i, draft: { ...t } })} style={{ ...ROW, width: "100%", textAlign: "left", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", cursor: "pointer", fontFamily: FONT_BODY }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, color: "var(--text)" }}>{ncDaysLabel(t.days)} · {ncTimeRange(t)}</div>
+                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{ncWhoLabel(t.who)}</div>
+                  </div>
+                  <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={() => setEditing({ idx: null, draft: { id: `nct_${prov.id}_${Date.now()}`, days: ["sat"], from: "14:00", to: "16:00", who: "new" } })} style={{ display: "block", width: "100%", textAlign: "center", marginTop: nc.savedTimes.length ? 10 : 0, background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 13, padding: 14, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: FONT_BODY, boxShadow: "var(--shadow-sm)" }}>+ Add a time</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -12217,7 +12437,8 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
       if (!r.ok) { saveCfg({ url, lastSyncAt: Date.now(), lastError: data.error || "Couldn't read the calendar." }); if (showToast) showToast(data.error || "Couldn't read that calendar."); return; }
       const result = reconcileCalendarSync(appts, data.events || [], { providers, services });
       const syncedNext = (result.next || []).filter((a) => a && (a.source === "sync" || a._synced));
-      const calSyncPatch = { url, connectedVia: cfg.connectedVia || "link", lastChanges: result.changes, lastBlockedCount: result.blocked ? result.blockedCount : 0 };
+      let tz; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+      const calSyncPatch = { url, connectedVia: cfg.connectedVia || "link", lastChanges: result.changes, lastBlockedCount: result.blocked ? result.blockedCount : 0, ...(tz ? { tz } : {}) };
       // Persist through the SERVER (service key) — this is what actually saves, bypassing the
       // client's save-gate which can silently block writes when an initial load errored.
       let serverOk = false, serverErr = null;
@@ -15401,6 +15622,21 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <PhotoModeSetting mode={form.bookingPhotos?.mode || "optional"} onChange={(m) => setForm({ ...form, bookingPhotos: { ...(form.bookingPhotos || {}), mode: m } })} />,
     },
     {
+      id: "newclients", fullBleed: true, title: "New clients", icon: UserPlus, category: "Online Booking",
+      status: (() => {
+        const s = (providers || []).filter((p) => p.id !== "anyone");
+        const set = s.filter((p) => {
+          const n = p.newClients; if (!n) return false;
+          const same = n.capMode !== "week" && n.capSame != null;
+          const wk = n.capMode === "week" && Object.values(n.capWeek || {}).some((v) => v != null);
+          return same || wk || (n.saveOpenTimes && (n.savedTimes || []).length);
+        }).length;
+        return set ? `${set} of ${s.length} staff set` : "No limits set";
+      })(),
+      keywords: "new clients per day limit cap first time first-time walk-in walkins reserve hold open slots times waitlist gate accept how many",
+      editor: <NewClientsEditor providers={providers} setProviders={setProviders} onBackRef={editorBack} />,
+    },
+    {
       id: "tipping", title: "Tipping", icon: DollarSign, category: "Payments & Checkout",
       status: form.tipping?.enabled ? `${(form.tipping.presets || []).join("/")}%` : "Off", keywords: "tip tipping gratuity percent checkout payment",
       editor: <TippingEditor t={form.tipping || { enabled: true, presets: [18, 20, 25], allowCustom: true, allowNoTip: true, smartDefault: 20 }} onChange={(tp) => setForm({ ...form, tipping: tp })} />,
@@ -15478,9 +15714,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     { id: "staff", section: "Set up your shop", label: "Your team", icon: Users, desc: "Staff, access & pay", settings: ["staff", "staffpin"] },
     { id: "menu",  section: "Set up your shop", label: "Services & pricing", icon: Scissors, desc: "What you offer", settings: ["servicesmenu"] },
     { id: "productscat", section: "Set up your shop", label: "Products", icon: Sparkles, desc: "Retail you sell — haircare, skincare, merch", settings: ["products"] },
-    { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "How clients book you", settings: ["avoidgaps", "autotiming", "anyonerouting", "booking", "newclient", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"], groups: [
+    { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "How clients book you", settings: ["avoidgaps", "autotiming", "anyonerouting", "booking", "newclient", "newclients", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"], groups: [
       { label: "The times they see", ids: ["avoidgaps", "autotiming", "anyonerouting"] },
-      { label: "Your booking page", ids: ["booking", "newclient", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"] },
+      { label: "Your booking page", ids: ["booking", "newclient", "newclients", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"] },
     ] },
     { id: "noshow", section: "Booking & money", label: "Deposits & no-shows", icon: AlertCircle, desc: "Protect your time", settings: ["policy"] },
     { id: "pay",   section: "Booking & money", label: "Checkout & payments", icon: CreditCard, desc: "Pay, tips & rebooking", settings: ["payments", "checkout", "tipping", "rebookco"] },
