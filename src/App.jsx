@@ -6237,6 +6237,10 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   const [growthOpen, setGrowthOpen] = useState(false); // "How you're growing" full-screen
   const [wrapOpen, setWrapOpen] = useState(false); // wrap-up sheet (opened from the tile)
   const [rebookOpen, setRebookOpen] = useState(false); // overdue-regulars card expanded
+  // Pulse defaults to a barber-minimal view (money + live action cards). The busy stuff — stat tiles,
+  // the nav menus, this week — collapses behind one toggle. Choice is remembered across sessions.
+  const [simpleMode, setSimpleMode] = useState(() => { try { return localStorage.getItem("pulse_full") !== "1"; } catch (e) { return true; } });
+  const toggleSimple = () => setSimpleMode((v) => { const nv = !v; try { localStorage.setItem("pulse_full", nv ? "0" : "1"); } catch (e) {} return nv; });
   const wrapIsRecent = (a) => { if (!a.bookedFor) return true; const days = Math.round((Date.now() - new Date(a.bookedFor).getTime()) / 86400000); return days >= 0 && days <= 7; };
   const wrapUpList = viewedProvider ? appts.filter((a) => a.providerId === viewedProvider.id && a.status === "done" && (a.pendingDurationSave || (!a.hasNote && !a.hasPhotos && !a.noteLogged && clients.some((c) => c.id === a.clientId) && wrapIsRecent(a)))) : [];
   // --- Inline goal editor: tap the ring (daily) or the week number (weekly) to set goals in place ---
@@ -6431,6 +6435,12 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         ))}
       </div>
 
+      {/* SHOW MORE / LESS — the busy stuff (stat tiles, nav menus, this week) lives behind this, off by default. */}
+      <button onClick={toggleSimple} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 13, fontWeight: 500, padding: "2px 0 26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        {simpleMode ? "Show more" : "Show less"} <ChevronDown size={14} style={{ transform: simpleMode ? "none" : "rotate(180deg)", transition: "transform .2s" }} />
+      </button>
+
+      {!simpleMode && (<>
       {/* STAT TILES — cuts, chair occupancy, avg ticket */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 30 }}>
         <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "16px 10px", textAlign: "center" }}>
@@ -6512,6 +6522,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           </div>
         );
       })()}
+      </>)}
 
       {cutting && (
         <button onClick={() => onOpenAppt && onOpenAppt(cutting.id)} className="lift" style={{ display: "block", width: "100%", textAlign: "left", font: "inherit", color: "var(--text)", cursor: onOpenAppt ? "pointer" : "default", marginBottom: 16, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "15px 16px" }}>
@@ -6697,6 +6708,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         </div>
       )}
 
+      {!simpleMode && (<>
       <div style={{ height: 1, background: "var(--line)", margin: "0 0 30px" }} />
 
       {/* THIS WEEK */}
@@ -6738,6 +6750,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           </div>
         )}
       </div>
+      </>)}
 
 
       {/* The old overdue-rebook bell row now lives inside the Notifications feed. */}
