@@ -21857,11 +21857,6 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const sinceLabel = datedYears.length ? "’" + String(Math.min(...datedYears)).slice(2) : "—";
   const cadenceShort = cadenceAvg == null ? "—" : (cadenceAvg < 11 ? `${cadenceAvg}d` : `${Math.round(cadenceAvg / 7)} wk`);
 
-  // wrap-up + from-client note sources
-  // Per-visit wrap-up notes (stored on the appointment), newest first — separate from the client-level prefs note.
-  const visitWrapNotes = myAppts.filter((a) => (a.wrapNote || "").trim()).sort((a, b) => new Date(b.bookedFor || 0) - new Date(a.bookedFor || 0));
-  const bookingNotes = myAppts.filter((a) => (a.note || "").trim()).sort((a, b) => new Date(b.bookedFor || 0) - new Date(a.bookedFor || 0));
-
   // ---- detail / transaction / reschedule / money sheets ----
   const [detail, setDetail] = useState(null);   // { appt, mode: "past" | "up" }
   const [txnAppt, setTxnAppt] = useState(null);  // transaction breakdown

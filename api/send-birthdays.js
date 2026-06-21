@@ -46,9 +46,21 @@ export default async function handler(req, res) {
       if (!c.birthday) continue;
       const email = String(c.email || "").trim();
       if (!email) continue;                      // email only — no email means nothing to send
-      const bd = new Date(c.birthday);
-      if (isNaN(bd.getTime())) continue;
-      if (mdFmt.format(bd) !== todayMD) continue; // not their birthday today
+      // Birthdays are stored as ISO timestamps (toISOString). A date-only value like
+      // "1990-06-21" parses as UTC midnight, so formatting it in a west-of-UTC shop tz would
+      // roll it back to the 20th — emailing a day early. The intended calendar day already
+      // lives in the ISO date portion, so read MM/DD straight from the string; only fall back
+      // to the tz formatter for free-text birthdays we couldn't normalise to ISO at import.
+      const isoMD = String(c.birthday).match(/^\d{4}-(\d{2})-(\d{2})/);
+      let bdMD;
+      if (isoMD) {
+        bdMD = `${isoMD[1]}/${isoMD[2]}`;
+      } else {
+        const bd = new Date(c.birthday);
+        if (isNaN(bd.getTime())) continue;
+        bdMD = mdFmt.format(bd);
+      }
+      if (bdMD !== todayMD) continue; // not their birthday today
       checked++;
 
       // Idempotent: one birthday email per client per calendar year.
