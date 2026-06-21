@@ -12309,6 +12309,10 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       if (!mine.length) return;
       c.visits = mine.length;
       c.lastVisit = mine[mine.length - 1].bookedFor;
+      // Client-level lifetime from imported prices — shown on the card, but kept OFF the revenue
+      // reports (those sum real payment records, which imported appts don't have).
+      const spent = mine.reduce((s, a) => s + (Number(a.price) || 0), 0);
+      if (spent > 0) c.importedSpent = Math.round(spent);
       if (mine.length >= 2) {
         let g = 0; for (let i = 1; i < mine.length; i++) g += (new Date(mine[i].bookedFor) - new Date(mine[i - 1].bookedFor)) / 86400000;
         c.cadenceDays = Math.max(1, Math.round(g / (mine.length - 1)));
@@ -21823,7 +21827,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   // money helpers (mirror CalendarView.paidForAppt — payment records are the source of truth)
   const recsFor = (a) => (live.payments || []).filter((r) => r.apptId === a.id);
   const paidForAppt = (a) => { const recs = recsFor(a); if (recs.length) return recs.reduce((s, r) => s + (r.amount || 0) - (r.refunded || 0), 0); return (a.paid && a.paid.total) || 0; };
-  const lifetime = myAppts.reduce((s, a) => s + paidForAppt(a), 0);
+  const lifetime = myAppts.reduce((s, a) => s + paidForAppt(a), 0) + (Number(live.importedSpent) || 0);
   const money0 = (n) => "$" + (Math.round(n) === n ? Math.round(n) : n.toFixed(2));
 
   // elapsed-time (reuse the in→out measurement Checkout records)
