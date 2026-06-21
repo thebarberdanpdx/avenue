@@ -16125,14 +16125,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           </div>
           {!refreshed && <span onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, display: "flex", alignItems: "center" }}><Explain title={c.title}>{explainText}</Explain></span>}
           {hasToggle ? (
-            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 13, flexShrink: 0 }}>
-              <span style={{ fontSize: 14, fontWeight: 400, color: c.toggle.on ? "var(--text)" : "var(--faint)" }}>{c.toggle.on ? "On" : "Off"}</span>
-              <span onClick={(e) => { e.stopPropagation(); c.toggle.set(!c.toggle.on); }} role="switch" aria-checked={c.toggle.on} aria-label={c.title} style={{ width: 9, height: 9, borderRadius: "50%", flexShrink: 0, background: c.toggle.on ? "var(--text)" : "none", border: c.toggle.on ? "none" : "1px solid var(--border2)", cursor: "pointer" }} />
+            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", flexShrink: 0 }}>
+              <span onClick={(e) => { e.stopPropagation(); c.toggle.set(!c.toggle.on); }} role="switch" aria-checked={c.toggle.on} aria-label={c.title} style={{ width: 46, height: 27, borderRadius: 27, position: "relative", flexShrink: 0, background: c.toggle.on ? "var(--gold)" : "var(--border2)", cursor: "pointer", transition: "background .2s", display: "inline-block" }}><span style={{ position: "absolute", top: 3, left: c.toggle.on ? 22 : 3, width: 21, height: 21, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} /></span>
             </span>
           ) : (
             <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12, flexShrink: 1, minWidth: 0, justifyContent: "flex-end" }}>
               {refreshed && c.status && <span style={{ fontSize: 14, color: "var(--sub)", fontWeight: 400, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.status}</span>}
-              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
+              <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </span>
           )}
         </button>
@@ -16313,7 +16312,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                         <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>{cat.label}</span>
                         <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.desc}</span>
                       </span>
-                      <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
+                      <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
                     </button>
                   ))}
                 </div>
@@ -16332,7 +16331,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                 <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Help &amp; support</span>
                 <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Guides, answers &amp; how-tos</span>
               </span>
-              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--border2)", flexShrink: 0 }}>→</span>
+              <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </button>
           </div>
 
