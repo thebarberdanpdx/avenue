@@ -22074,6 +22074,19 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         );
       })()}
 
+      {/* quiet block control at the very bottom — opens the private "why?" prompt */}
+      {!openMember && (
+        <div style={{ marginTop: 30, paddingTop: 20, borderTop: "1px solid var(--line)", textAlign: "center", paddingBottom: 8 }}>
+          {isBlocked ? (<>
+            <div style={{ fontSize: 13, color: "#c0392b", fontWeight: 500 }}>Blocked from booking</div>
+            {live.blockReason && <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 4, lineHeight: 1.45 }}>{live.blockReason}</div>}
+            <button onClick={unblock} style={{ marginTop: 10, background: "none", border: "1px solid var(--border)", color: "var(--text)", fontSize: 12.5, padding: "7px 16px", borderRadius: 9, cursor: "pointer", fontFamily: FONT_BODY }}>Unblock</button>
+          </>) : (
+            <button onClick={() => setBlockPrompt(true)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 12.5, cursor: "pointer", fontFamily: FONT_BODY, textDecoration: "underline", textUnderlineOffset: 3 }}>Block {firstName} from booking</button>
+          )}
+        </div>
+      )}
+
       {/* ============ LIGHTBOX ============ */}
       {lightbox && (() => { const g = gallery.find((x) => x.id === lightbox); if (!g) return null; return (
         <Sheet open onClose={() => setLightbox(null)} align="center" maxWidth={560}>
@@ -22090,9 +22103,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       {/* ============ KEBAB MENU ============ */}
       <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} align="center" maxWidth={380}>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 14 }}>{live.name}</h2>
-        <button onClick={() => { setMenuOpen(false); if (isBlocked) unblock(); else setBlockPrompt(true); }} style={{ width: "100%", textAlign: "left", background: "none", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", fontSize: 15, color: isBlocked ? "var(--text)" : "#c0392b", fontFamily: FONT_BODY, cursor: "pointer" }}>{isBlocked ? "Unblock from booking" : "Block from booking"}</button>
-        {isBlocked && live.blockReason && <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 10, lineHeight: 1.45 }}>Reason: {live.blockReason}</p>}
-        <button onClick={() => { setMenuOpen(false); setDeletePrompt(true); }} style={{ width: "100%", textAlign: "left", background: "none", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", fontSize: 15, color: "#c0392b", fontFamily: FONT_BODY, cursor: "pointer", marginTop: 10 }}>Delete client…</button>
+        <button onClick={() => { setMenuOpen(false); setDeletePrompt(true); }} style={{ width: "100%", textAlign: "left", background: "none", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", fontSize: 15, color: "#c0392b", fontFamily: FONT_BODY, cursor: "pointer" }}>Delete client…</button>
       </Sheet>
       <Sheet open={deletePrompt} onClose={() => setDeletePrompt(false)} align="center" maxWidth={420}>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Delete {firstName}?</h2>
