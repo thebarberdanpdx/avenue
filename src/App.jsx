@@ -21701,7 +21701,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const live = clients.find((c) => c.id === client.id) || client;
   const provider = providers.find((p) => p.id === live.provider) || providers[1] || providers[0] || {};
   const firstName = (live.name || "").split(" ")[0] || "this client";
-  const [pfTab, setPfTab] = useState("overview"); // overview | visits | booking | notes | family
+  const [pfTab, setPfTab] = useState("timeline"); // timeline | family | pricing
   const [openMember, setOpenMember] = useState(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [mName, setMName] = useState("");
@@ -21915,7 +21915,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {/* tab bar */}
       <div style={{ display: "flex", gap: 20, borderBottom: "1px solid var(--line)", overflowX: "auto", padding: "18px 4px 0", marginBottom: 4 }}>
-        {[["overview", "Overview"], ["visits", "Visits"], ["booking", "Booking"], ["notes", "Notes & Photos"], ["family", "Family"]].map(([id, label]) => { const on = pfTab === id; return (
+        {[["timeline", "Timeline"], ["family", "Family"], ["pricing", "Pricing"]].map(([id, label]) => { const on = pfTab === id; return (
           <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontFamily: "'Jost', sans-serif", fontWeight: 500, fontSize: 13, paddingBottom: 12, marginBottom: -1, whiteSpace: "nowrap", cursor: "pointer" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
         ); })}
       </div>
@@ -21923,55 +21923,79 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       {picker && <StaffPhotoPicker hasPhoto={!!live.photo} onClose={() => setPicker(false)} onPick={setClientPhoto} onRemove={removeClientPhoto} />}
       {galPicker && <PhotoPicker onClose={() => setGalPicker(false)} onPick={addGalleryPhoto} />}
 
-      {/* ============ OVERVIEW ============ */}
-      {pfTab === "overview" && <div style={{ paddingBottom: 24 }}>
-        {nextAppt && (<>
-          <div style={tabLabel}>Next visit</div>
-          <div style={cardStyle}>
-            <button onClick={() => setDetail({ appt: nextAppt, mode: "up" })} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 18, cursor: "pointer", color: "var(--text)", position: "relative" }}>
-              <span style={{ position: "absolute", top: 16, right: 18, color: "var(--border2)", fontFamily: "'Fraunces', serif", fontSize: 18 }}>›</span>
-              <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Upcoming · {daysFromNow(nextAppt.bookedFor)}</div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginTop: 8, letterSpacing: "-0.3px" }}>{niceDateFull(nextAppt.bookedFor)} · {fmtTime(nextAppt.start)}</div>
-              <div style={{ fontSize: 13.5, color: "var(--text2)", marginTop: 4 }}>{nextAppt.title} · with {provName(nextAppt)}</div>
-            </button>
-          </div>
-        </>)}
-        {historyAppts.length > 0 && (<>
-          <div style={tabLabel}>Recent visits</div>
-          <div style={cardStyle}>{historyAppts.slice(0, 3).map((a) => <VisitRow key={a.id} a={a} mode="past" />)}</div>
-        </>)}
-        <div style={tabLabel}>Client note</div>
+      {/* ============ TIMELINE — pinned preferences + upcoming + one chronological feed ============ */}
+      {pfTab === "timeline" && <div style={{ paddingBottom: 24 }}>
+        {/* pinned preferences note */}
+        <div style={tabLabel}>Preferences</div>
         {editingNote ? (
           <div>
-            <textarea autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Preferences, allergies, formulas, conversation topics." rows={5} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", boxSizing: "border-box" }} />
+            <textarea autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Preferences, allergies, formulas, conversation topics." rows={4} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", boxSizing: "border-box" }} />
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
               <button onClick={() => { setNoteDraft(live.notes || ""); setEditingNote(false); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 12, borderRadius: 12, fontSize: 14, cursor: "pointer" }}>Cancel</button>
               <button onClick={saveNote} disabled={!noteDirty} style={{ flex: 1, background: noteDirty ? "var(--text)" : "var(--panel2)", color: noteDirty ? "var(--bg)" : "var(--faint)", padding: 12, borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}>Save note</button>
             </div>
           </div>
         ) : (
-          <div onClick={() => setEditingNote(true)} style={{ border: `1px ${live.notes ? "solid" : "dashed"} var(--border2)`, borderRadius: 14, padding: 16, cursor: "pointer", color: live.notes ? "var(--text2)" : "var(--sub)", fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-            {live.notes || "Nothing noted yet — tap to jot down preferences, allergies, or anything worth remembering."}
+          <div onClick={() => setEditingNote(true)} style={{ display: "flex", gap: 10, border: `1px ${live.notes ? "solid" : "dashed"} var(--border2)`, borderRadius: 14, padding: 14, cursor: "pointer", color: live.notes ? "var(--text2)" : "var(--sub)", fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+            <span style={{ color: "var(--gold)", flexShrink: 0, lineHeight: 1.5 }}>★</span>
+            <span>{live.notes || "Tap to note preferences, allergies, formulas — anything worth remembering."}</span>
           </div>
         )}
-      </div>}
 
-      {/* ============ VISITS ============ */}
-      {pfTab === "visits" && <div style={{ paddingBottom: 24 }}>
+        {/* upcoming */}
         {upcomingAppts.length > 0 && (<>
           <div style={tabLabel}>Upcoming</div>
           <div style={cardStyle}>{upcomingAppts.map((a) => <VisitRow key={a.id} a={a} mode="up" />)}</div>
         </>)}
-        <div style={tabLabel}>History</div>
-        {historyAppts.length === 0 ? (
-          <p style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", padding: "4px 4px" }}>No past visits yet.</p>
-        ) : (
-          <div style={cardStyle}>{historyAppts.map((a) => <VisitRow key={a.id} a={a} mode="past" showPrice />)}</div>
-        )}
+
+        {/* the feed: visits + photos + notes, newest first */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "22px 4px 10px" }}>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Timeline</div>
+          <button onClick={() => setGalPicker(true)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}><Plus size={14} /> Add photo</button>
+        </div>
+        {(() => {
+          const feed = [
+            ...historyAppts.map((a) => ({ kind: "visit", date: a.bookedFor, a })),
+            ...gallery.map((g) => ({ kind: "photo", date: g.date, g })),
+            ...(live.timeline || []).map((t) => ({ kind: "note", date: t.date, t })),
+          ].sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
+          if (!feed.length) return <p style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", padding: "4px 4px" }}>Nothing yet — visits, photos and notes will show up here.</p>;
+          return <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {feed.map((it, i) => {
+              if (it.kind === "visit") { const a = it.a; const el = elapsedMin(a); return (
+                <button key={`v-${a.id}`} onClick={() => setDetail({ appt: a, mode: "past" })} style={{ display: "block", width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 15px", background: "var(--bg)", cursor: "pointer", color: "var(--text)", boxShadow: "var(--shadow-sm)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                    <b style={{ fontWeight: 500, fontSize: 14.5 }}>{a.title}</b>
+                    <span style={{ fontSize: 12, color: "var(--sub)", whiteSpace: "nowrap" }}>{niceDate(a.bookedFor)} · {money0(paidForAppt(a))} · {provName(a)}</span>
+                  </div>
+                  {el != null && <span style={{ display: "inline-block", fontSize: 11, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "2px 9px", marginTop: 8, fontWeight: 500 }}>{el} min in the chair</span>}
+                  {a.note && <div style={{ fontSize: 12.5, color: "var(--text2)", background: "var(--panel2)", borderRadius: 9, padding: "8px 10px", marginTop: 8, lineHeight: 1.4 }}>“{a.note}” <span style={{ color: "var(--faint)" }}>· {firstName} at booking</span></div>}
+                  {a.wrapNote && <div style={{ fontSize: 12.5, color: "var(--text2)", background: "var(--panel2)", borderRadius: 9, padding: "8px 10px", marginTop: 8, lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{a.wrapNote}</div>}
+                </button>
+              ); }
+              if (it.kind === "photo") { const g = it.g; return (
+                <button key={`p-${g.id}`} onClick={() => setLightbox(g.id)} style={{ display: "flex", gap: 12, width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 13, padding: 10, background: "var(--bg)", cursor: "pointer", color: "var(--text)", alignItems: "center" }}>
+                  <img src={imgUrl(g.photo, 200)} alt="" style={{ width: 52, height: 52, borderRadius: 9, objectFit: "cover", flexShrink: 0, border: "1px solid var(--border)" }} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 13.5, color: "var(--text2)" }}>{g.note || "Photo"}</span>
+                    <span style={{ display: "block", fontSize: 11.5, color: "var(--faint)", marginTop: 3 }}>{g.source === "client" ? "From client" : "Photo"}{g.date ? ` · ${niceDate(g.date)}` : ""}</span>
+                  </span>
+                  {chev}
+                </button>
+              ); }
+              const t = it.t; return (
+                <div key={`n-${t.id || i}`} style={{ border: "1px solid var(--border)", borderRadius: 13, padding: "12px 15px", background: "var(--bg)" }}>
+                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{t.text}</div>
+                  {t.date && <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 6 }}>{niceDate(t.date)}</div>}
+                </div>
+              );
+            })}
+          </div>;
+        })()}
       </div>}
 
-      {/* ============ BOOKING ============ */}
-      {pfTab === "booking" && <div style={{ paddingBottom: 24 }}>
+      {/* ============ PRICING ============ */}
+      {pfTab === "pricing" && <div style={{ paddingBottom: 24 }}>
         <div style={tabLabel}>What {firstName} books at</div>
         <div style={cardStyle}>
           {services.map((s, i) => (
@@ -21990,62 +22014,6 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           ))}
           <div style={{ fontSize: 11.5, color: "var(--sub)", lineHeight: 1.5, padding: "14px 18px 16px" }}>These apply only to {firstName}. When {firstName} books this service online, they see this time and price automatically.</div>
         </div>
-      </div>}
-
-      {/* ============ NOTES & PHOTOS ============ */}
-      {pfTab === "notes" && <div style={{ paddingBottom: 24 }}>
-        <div style={tabLabel}>Your note</div>
-        {editingNote ? (
-          <div>
-            <textarea autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} rows={5} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", boxSizing: "border-box" }} />
-            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              <button onClick={() => { setNoteDraft(live.notes || ""); setEditingNote(false); }} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 12, borderRadius: 12, fontSize: 14, cursor: "pointer" }}>Cancel</button>
-              <button onClick={saveNote} disabled={!noteDirty} style={{ flex: 1, background: noteDirty ? "var(--text)" : "var(--panel2)", color: noteDirty ? "var(--bg)" : "var(--faint)", padding: 12, borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}>Save</button>
-            </div>
-          </div>
-        ) : (
-          <div onClick={() => setEditingNote(true)} style={{ border: `1px ${live.notes ? "solid" : "dashed"} var(--border2)`, borderRadius: 14, padding: 16, cursor: "pointer", color: live.notes ? "var(--text2)" : "var(--sub)", fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-            {live.notes || "Tap to add a private note."}
-          </div>
-        )}
-
-        <div style={tabLabel}>From {firstName} — at booking</div>
-        {bookingNotes.length === 0 ? (
-          <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", padding: "0 4px" }}>Nothing yet — notes {firstName} adds when booking land here.</p>
-        ) : bookingNotes.map((a) => (
-          <div key={a.id} style={{ border: "1px solid var(--border)", borderRadius: 13, padding: "13px 14px", marginBottom: 8 }}>
-            <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5 }}>“{a.note}”</div>
-            <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 7 }}>Submitted when booking · {a.bookedFor ? niceDate(a.bookedFor) : ""}</div>
-          </div>
-        ))}
-
-        <div style={tabLabel}>Wrap-up notes</div>
-        {visitWrapNotes.length === 0 ? (
-          <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", padding: "0 4px" }}>Notes you add at wrap-up — tied to each visit — show here. Tap a visit to add one.</p>
-        ) : visitWrapNotes.map((a) => (
-          <button key={a.id} onClick={() => setDetail({ appt: a, mode: "past" })} style={{ display: "block", width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 14px", marginBottom: 8, background: "none", cursor: "pointer", color: "var(--text)" }}>
-            <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{a.wrapNote}</div>
-            <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 7 }}>{a.title}{a.bookedFor ? ` · ${niceDate(a.bookedFor)}` : ""}</div>
-          </button>
-        ))}
-
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "22px 4px 10px" }}>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Photos</div>
-          <button onClick={() => setGalPicker(true)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}><Plus size={14} /> Add</button>
-        </div>
-        {gallery.length === 0 ? (
-          <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", padding: "0 4px" }}>No photos yet.</p>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7 }}>
-            {gallery.map((g) => (
-              <button key={g.id} onClick={() => setLightbox(g.id)} style={{ position: "relative", padding: 0, borderRadius: 11, overflow: "hidden", border: "1px solid var(--border)", aspectRatio: "1", background: "var(--panel2)", cursor: "pointer" }}>
-                <img src={imgUrl(g.photo, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                {g.source === "client" && <span style={{ position: "absolute", left: 6, bottom: 6, fontSize: 7.5, letterSpacing: 0.8, background: "rgba(10,10,10,0.7)", color: "#fff", padding: "2px 5px", borderRadius: 5 }}>FROM CLIENT</span>}
-              </button>
-            ))}
-          </div>
-        )}
-        <div style={{ fontSize: 11.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 14, paddingLeft: 4 }}>Notes and photos a client adds when booking, plus anything you capture at wrap-up, land here automatically.</div>
       </div>}
 
       {/* ============ FAMILY ============ */}
