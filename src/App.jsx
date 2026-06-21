@@ -21733,6 +21733,14 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
     setClients(clients.map((c) => c.id === live.id ? { ...c, blocked: false, blockReason: "", blockedAt: null } : c));
     showToast(`${firstName} can book again.`);
   };
+  // ---- Delete client ---- (syncList persists the removal; past appointments are left intact)
+  const [deletePrompt, setDeletePrompt] = useState(false);
+  const removeClient = () => {
+    setClients(clients.filter((c) => c.id !== live.id));
+    setDeletePrompt(false); setMenuOpen(false);
+    showToast(`${firstName} deleted.`);
+    if (onBack) onBack();
+  };
 
   // ---- per-client time + price overrides (mirror each other; applied at booking) ----
   const saveOverride = (sid, patch) => setClients(clients.map((c) => {
@@ -22084,6 +22092,13 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 14 }}>{live.name}</h2>
         <button onClick={() => { setMenuOpen(false); if (isBlocked) unblock(); else setBlockPrompt(true); }} style={{ width: "100%", textAlign: "left", background: "none", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", fontSize: 15, color: isBlocked ? "var(--text)" : "#c0392b", fontFamily: FONT_BODY, cursor: "pointer" }}>{isBlocked ? "Unblock from booking" : "Block from booking"}</button>
         {isBlocked && live.blockReason && <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 10, lineHeight: 1.45 }}>Reason: {live.blockReason}</p>}
+        <button onClick={() => { setMenuOpen(false); setDeletePrompt(true); }} style={{ width: "100%", textAlign: "left", background: "none", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px", fontSize: 15, color: "#c0392b", fontFamily: FONT_BODY, cursor: "pointer", marginTop: 10 }}>Delete client…</button>
+      </Sheet>
+      <Sheet open={deletePrompt} onClose={() => setDeletePrompt(false)} align="center" maxWidth={420}>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Delete {firstName}?</h2>
+        <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>This removes {live.name} and their notes, photos and preferences from your client list. Past appointments stay on the calendar. This can't be undone.</p>
+        <button onClick={removeClient} style={{ width: "100%", background: "#c0392b", color: "#fff", padding: 15, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", cursor: "pointer", marginBottom: 10 }}>DELETE CLIENT</button>
+        <button onClick={() => setDeletePrompt(false)} style={{ width: "100%", background: "transparent", color: "var(--sub)", border: "1px solid var(--border)", padding: 14, fontSize: 14, fontWeight: 500, borderRadius: 12, cursor: "pointer" }}>Cancel</button>
       </Sheet>
       <Sheet open={blockPrompt} onClose={() => setBlockPrompt(false)} align="center" maxWidth={420}>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Block {firstName}?</h2>
