@@ -12245,15 +12245,45 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
         }
       }
     });
-    // 2. resolve each person to an id (reuse existing by phone; else new tagged id)
+    // 2. resolve each person to an id. Dedupe against existing clients on phone → email
+    //    (both reliable unique identifiers): a match REUSES that client instead of creating a
+    //    duplicate, and fills any BLANK email/birthday on the existing record (never
+    //    overwrites). Name is NOT a safe auto-merge key (families, common names), so a
+    //    same-name existing client is only FLAGGED as a possible duplicate for the owner to
+    //    review — it still imports as a separate client. No match → a fresh tagged client.
     const bId = "b" + now;
-    const existingByPhone = {};
-    (clients || []).forEach((c) => { const d = impDigits(c.phone); if (d.length >= 7) existingByPhone[d] = c.id; });
-    let newIdx = 0, reused = 0;
+    const byId = {}, existingByPhone = {}, existingByEmail = {}, existingByName = {};
+    (clients || []).forEach((c) => {
+      byId[c.id] = c;
+      const d = impDigits(c.phone); if (d.length >= 7 && !existingByPhone[d]) existingByPhone[d] = c.id;
+      const e = String(c.email || "").trim().toLowerCase(); if (e && !existingByEmail[e]) existingByEmail[e] = c.id;
+      const n = String(c.name || "").trim().toLowerCase(); if (n && !existingByName[n]) existingByName[n] = c.id;
+    });
+    let newIdx = 0;
     const newClients = [];
+    const merges = [];            // confident merges: [{ id, name, basis: "phone"|"email", filled: [...] }]
+    const possibleDupes = [];     // same-name-only matches we did NOT merge: [{ name }]
+    const clientPatches = {};     // existing id -> { email?, birthday? } — blanks to fill on merge
     people.forEach((p) => {
       const pd = impDigits(p.phone);
-      if (pd.length >= 7 && existingByPhone[pd]) { p.id = existingByPhone[pd]; reused++; return; }
+      const pe = String(p.email || "").trim().toLowerCase();
+      const pn = String(p.name || "").trim().toLowerCase();
+      let mid = null, basis = null;
+      if (pd.length >= 7 && existingByPhone[pd]) { mid = existingByPhone[pd]; basis = "phone"; }
+      else if (pe && existingByEmail[pe]) { mid = existingByEmail[pe]; basis = "email"; }
+      if (mid) {
+        p.id = mid;
+        const ex = byId[mid] || {};
+        const patch = {};
+        if (!String(ex.email || "").trim() && p.email) patch.email = p.email;
+        const ibd = impBirthday(p.birthday);
+        if (!ex.birthday && ibd) patch.birthday = ibd;
+        if (Object.keys(patch).length) clientPatches[mid] = { ...(clientPatches[mid] || {}), ...patch };
+        merges.push({ id: mid, name: ex.name || p.name, basis, filled: Object.keys(patch) });
+        return;
+      }
+      // No confident match. If an existing client shares this name, flag it (don't merge).
+      if (pn && existingByName[pn]) possibleDupes.push({ name: byId[existingByName[pn]].name || p.name });
       p.id = `imp_${bId}_c${newIdx++}`;
       newClients.push({ id: p.id, name: p.name, firstName: p.firstName || "", lastName: p.lastName || "", email: p.email || "", phone: p.phone || "", birthday: impBirthday(p.birthday), provider: defProv, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], _import: bId });
     });
@@ -12291,7 +12321,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       }
     });
     setBatchId(bId);
-    setBuilt({ newClients, reused, newAppts, past, future, peopleCount: people.size });
+    setBuilt({ newClients, reused: merges.length, merges, possibleDupes, clientPatches, newAppts, past, future, peopleCount: people.size });
     setStage("preview");
   };
 
@@ -12300,13 +12330,21 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
   const commit = async () => {
     if (!built) return;
     setStage("running"); setErr("");
+    // Merge patches: blank email/birthday we filled on existing clients during dedupe.
+    const patches = built.clientPatches || {};
+    const patchedRows = (clients || []).filter((c) => patches[c.id]).map((c) => ({ ...c, ...patches[c.id] }));
     // show locally right away
     if (built.newClients.length) setClients((cur) => [...built.newClients, ...(cur || [])]);
+    if (patchedRows.length) setClients((cur) => (cur || []).map((c) => patches[c.id] ? { ...c, ...patches[c.id] } : c));
     if (built.newAppts.length) setAppts((cur) => [...(cur || []), ...built.newAppts]);
     let failed = 0;
     try {
       for (const c of chunk(built.newClients.map((c) => ({ id: c.id, shop_id: shopId, data: c })), 400)) {
         const { error } = await supabase.from("clients").insert(c); if (error) failed++;
+      }
+      // Persist the merged-in fields on existing clients (upsert — the row already exists).
+      for (const c of chunk(patchedRows.map((c) => ({ id: c.id, shop_id: shopId, data: c })), 400)) {
+        const { error } = await supabase.from("clients").upsert(c); if (error) failed++;
       }
       for (const a of chunk(built.newAppts.map((a) => ({ id: a.id, shop_id: shopId, data: a })), 400)) {
         const { error } = await supabase.from("appointments").insert(a); if (error) failed++;
@@ -12384,12 +12422,42 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
       {stage === "preview" && built && (<>
         <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 12 }}>Ready to import</div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden", marginBottom: 16 }}>
-          {[["New clients", built.newClients.length, false], ["Already on file (reused)", built.reused, false], ["Appointments", built.newAppts.length, false], ["past", built.past, true], ["upcoming", built.future, true]].map(([label, n, sub], i) => (
+          {[["New clients", built.newClients.length, false], ["Matched to existing", built.reused, false], ["Appointments", built.newAppts.length, false], ["past", built.past, true], ["upcoming", built.future, true]].map(([label, n, sub], i) => (
             <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
               <span style={{ fontSize: 14.5, color: "var(--sub)", paddingLeft: sub ? 14 : 0 }}>{label}</span><span style={{ fontSize: sub ? 15 : 16, fontWeight: sub ? 500 : 600, color: sub ? "var(--sub)" : "var(--text)" }}>{n}</span>
             </div>
           ))}
         </div>
+        {built.merges && built.merges.length > 0 && (() => {
+          const chip = (basis) => { const m = { phone: ["Phone", "var(--sub)", "var(--panel2)"], email: ["Email", "var(--sub)", "var(--panel2)"] }[basis] || ["Match", "var(--sub)", "var(--panel2)"]; return <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.3, color: m[1], background: m[2], borderRadius: 7, padding: "3px 8px", flexShrink: 0 }}>{m[0]}</span>; };
+          return (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>Merging into existing clients</div>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+                {built.merges.slice(0, 12).map((m, i) => (
+                  <div key={m.id + i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "11px 14px", borderTop: i ? "1px solid var(--line)" : "none", fontSize: 14 }}>
+                    <span style={{ color: "var(--text)", fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}{m.filled && m.filled.length > 0 && <span style={{ color: "var(--faint)", fontWeight: 400 }}> · +{m.filled.join(" & ")}</span>}</span>
+                    {chip(m.basis)}
+                  </div>
+                ))}
+                {built.merges.length > 12 && <div style={{ padding: "10px 14px", fontSize: 12.5, color: "var(--faint)", borderTop: "1px solid var(--line)" }}>+{built.merges.length - 12} more</div>}
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 8, paddingLeft: 2 }}>Matched on phone or email — their visits import onto the existing card instead of creating a duplicate.</div>
+            </div>
+          );
+        })()}
+        {built.possibleDupes && built.possibleDupes.length > 0 && (
+          <div style={{ marginBottom: 16, background: "color-mix(in srgb, var(--amber, #E5AC34) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--amber, #E5AC34) 30%, var(--border))", borderRadius: 16, padding: "13px 15px" }}>
+            <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 600, marginBottom: 5 }}>Possible duplicates ({built.possibleDupes.length})</div>
+            <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: built.possibleDupes.length ? 9 : 0 }}>These share a name with a client you already have but no matching phone or email, so they'll import as <b style={{ color: "var(--text)", fontWeight: 600 }}>separate</b> clients. If they're the same person, add a phone/email to the file and re-import.</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {built.possibleDupes.slice(0, 12).map((d, i) => (
+                <span key={d.name + i} style={{ fontSize: 12.5, color: "var(--text)", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "4px 10px" }}>{d.name}</span>
+              ))}
+              {built.possibleDupes.length > 12 && <span style={{ fontSize: 12.5, color: "var(--faint)", padding: "4px 2px" }}>+{built.possibleDupes.length - 12} more</span>}
+            </div>
+          </div>
+        )}
         {built.newClients.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>First few clients</div>
@@ -12418,7 +12486,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
         <div style={{ textAlign: "center", padding: "10px 0" }}>
           <CheckCircle2 size={40} style={{ color: "#5E8C61", marginBottom: 12 }} />
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>Import complete</div>
-          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>{result.clients} clients{result.reused ? ` (${result.reused} already on file)` : ""} and {result.appts} appointments are in your book{result.failed ? " — some rows didn't save, see toast." : "."}</div>
+          <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>{result.clients} new clients{result.reused ? ` (${result.reused} merged into existing)` : ""} and {result.appts} appointments are in your book{result.failed ? " — some rows didn't save, see toast." : "."}</div>
           <button onClick={undo} style={{ width: "100%", background: "transparent", border: "1px solid color-mix(in srgb, #c0392b 40%, var(--border))", color: "var(--text)", padding: 13, fontSize: 14, borderRadius: 10, marginBottom: 10 }}>Undo this import</button>
           <button className="lift" onClick={reset} style={{ width: "100%", background: "transparent", boxShadow: "none", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 14.5, fontWeight: 500, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><RefreshCw size={16} /> Import another file</button>
         </div>
