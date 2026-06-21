@@ -15819,25 +15819,29 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   // ---- Category grid: concrete, plain-named buckets. Every setting lives in exactly one,
   // so nothing falls through to search-only. Tap a tile → that category's list. ----
   const CATS = [
-    { id: "shop",  section: "Set up your shop", label: "Your shop", icon: User, desc: "Name, hours & branding", settings: ["business", "hours", "locations", "phones", "appearance", "theme"] },
-    { id: "staff", section: "Set up your shop", label: "Your team", icon: Users, desc: "Staff, access & pay", settings: ["staff", "staffpin"] },
-    { id: "menu",  section: "Set up your shop", label: "Services & pricing", icon: Scissors, desc: "What you offer", settings: ["servicesmenu"] },
-    { id: "productscat", section: "Set up your shop", label: "Products", icon: Sparkles, desc: "Retail you sell — haircare, skincare, merch", settings: ["products"] },
-    { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "How clients book you", settings: ["avoidgaps", "autotiming", "anyonerouting", "booking", "newclient", "newclients", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"], groups: [
-      { label: "The times they see", ids: ["avoidgaps", "autotiming", "anyonerouting"] },
-      { label: "Your booking page", ids: ["booking", "newclient", "newclients", "showprices", "rebook_usual", "refphotos", "family", "bookingwords", "website"] },
+    { id: "shop",  section: "Your shop", label: "Shop details", icon: User, desc: "Name, hours, locations & contact", settings: ["business", "hours", "locations", "phones"] },
+    { id: "branding", section: "Your shop", label: "Branding & theme", icon: Palette, desc: "Logo, colours & look", settings: ["appearance", "theme"] },
+    { id: "staff", section: "Your shop", label: "Team", icon: Users, desc: "Staff, access & pay", settings: ["staff", "staffpin"] },
+    { id: "menu",  section: "What you sell", label: "Services & menu", icon: Scissors, desc: "What you offer & pricing", settings: ["servicesmenu"] },
+    { id: "productscat", section: "What you sell", label: "Products", icon: Package, desc: "Retail you sell — haircare, skincare, merch", settings: ["products"] },
+    { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "Times, page & what clients can do", settings: ["avoidgaps", "autotiming", "anyonerouting", "newclients", "booking", "bookingwords", "website", "showprices", "rebook_usual", "family", "refphotos"], groups: [
+      { label: "Availability", ids: ["avoidgaps", "autotiming", "anyonerouting", "newclients"] },
+      { label: "Your booking page", ids: ["booking", "bookingwords", "website"] },
+      { label: "What clients can do", ids: ["showprices", "rebook_usual", "family", "refphotos"] },
     ] },
-    { id: "noshow", section: "Booking & money", label: "Deposits & no-shows", icon: AlertCircle, desc: "Protect your time", settings: ["policy"] },
-    { id: "pay",   section: "Booking & money", label: "Checkout & payments", icon: CreditCard, desc: "Pay, tips & rebooking", settings: ["payments", "checkout", "tipping", "rebookco"] },
-    { id: "dayof", section: "Running your day", label: "Your day", icon: Clock, desc: "Calendar & running your day", settings: ["calendarsettings", "waitlist", "photos", "waitingroom", "runninglate", "overduebuffer"], groups: [
-      { label: "Calendar", ids: ["calendarsettings", "photos"] },
+    { id: "pay",   section: "Booking & money", label: "Payments & checkout", icon: CreditCard, desc: "Payments, tips, deposits & rebooking", settings: ["payments", "checkout", "tipping", "rebookco", "policy"], groups: [
+      { label: "Payments & tips", ids: ["payments", "checkout", "tipping", "rebookco"] },
+      { label: "Deposits & no-shows", ids: ["policy"] },
+    ] },
+    { id: "dayof", section: "Running the day", label: "Your day", icon: Clock, desc: "Calendar & running your day", settings: ["calendarsettings", "photos", "waitlist", "waitingroom", "runninglate", "overduebuffer"], groups: [
+      { label: "Calendar view", ids: ["calendarsettings", "photos"] },
       { label: "During the day", ids: ["waitlist", "waitingroom", "runninglate", "overduebuffer"] },
     ] },
-    { id: "msg",   section: "Running your day", label: "Messages", icon: Bell, desc: "Texts & emails", settings: ["messages", "notifications"], groups: [
+    { id: "msg",   section: "Running the day", label: "Messages & alerts", icon: Bell, desc: "Client texts & staff alerts", settings: ["messages", "notifications"], groups: [
       { label: "Clients", ids: ["messages"] },
       { label: "My team", ids: ["notifications"] },
     ] },
-    { id: "data",  section: "Business & account", label: "Reports & data", icon: BarChart3, desc: "Your numbers & tools", settings: ["reports"] },
+    { id: "data",  section: "Business", label: "Reports & data", icon: BarChart3, desc: "Your numbers & tools", settings: ["reports"] },
   ];
   // Safety net: any card not placed above still appears (appended to Reports & Insights) so nothing is ever lost.
   // RETIRED cards are intentionally left out of the list (their function moved elsewhere).
@@ -16296,7 +16300,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       ) : (
         // HOME — sections grouped under Atelier section labels, hairline rows, no icon tiles
         <div>
-          {["Set up your shop", "Booking & money", "Running your day", "Business & account"].map((sectionName) => {
+          {["Your shop", "What you sell", "Booking & money", "Running the day", "Business"].map((sectionName) => {
             const inSection = CATS.filter((cat) => cat.section === sectionName);
             if (!inSection.length) return null;
             return (
