@@ -17135,6 +17135,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const DAY_END = ((business?.calendar?.dayEndHr ?? 22)) * 60;
   const [showWaitlistPanel, setShowWaitlistPanel] = useState(false);
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
+  const [calMenuOpen, setCalMenuOpen] = useState(false); // ⋯ overflow on the calendar header
   const [open, setOpen] = useState(null);
   const [dayOffset, setDayOffset] = useState(0);
   // Notification deep-link: when a tapped push hands us an appointment id, jump to its day and open its detail.
@@ -17859,28 +17860,27 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const dayList = (appts || []).filter((a) => a && a.status !== "cancelled" && a.status !== "block" && a.status !== "done" && a.bookedFor && sameDay(a.bookedFor, selectedDate) && typeof a.start === "number").sort((a, b) => a.start - b.start);
           const next = isToday ? dayList.find((a) => a.start >= nowMin) : dayList[0];
           const gapCount = orderedStaff.reduce((n, p) => n + gapsForProvider(p).length, 0);
-          const chip = (v, k, accent) => (
-            <div style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 13, padding: "11px 13px", minWidth: 0 }}>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 400, lineHeight: 1, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v}</div>
-              <div style={{ fontSize: 9.5, color: "var(--faint)", marginTop: 6, letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: 500 }}>{k}</div>
-            </div>
-          );
-          return (
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              {chip(booked, "Booked")}
-              {chip(next ? fmtTime(next.start).replace(/:00/, "") : "—", "Next up")}
-              {chip(gapCount, "Gap to fill", gapCount > 0)}
-            </div>
-          );
+          const parts = [
+            `${booked} booked`,
+            next ? `next at ${fmtTime(next.start).replace(/:00/, "")}` : (isToday ? "nothing left today" : "nothing booked"),
+            gapCount > 0 ? `${gapCount} gap${gapCount === 1 ? "" : "s"} to fill` : null,
+          ].filter(Boolean);
+          return <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2, fontFamily: FONT_BODY, textAlign: "left" }}>{parts.join("  ·  ")}</div>;
         })()}
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 16 }}>
           <button onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--text)", color: "var(--bg)", padding: "0 18px", height: 42, borderRadius: 13, fontSize: 13, fontWeight: 500, letterSpacing: 1.2, textTransform: "uppercase", fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 7 }}><Plus size={16} strokeWidth={2} /> New</button>
           <button onClick={() => setRegisterOpen(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 16px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 400, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 6 }}><DollarSign size={15} style={{ color: "var(--text2)" }} /> Sale</button>
           <div style={{ flex: 1, minWidth: 8 }} />
-          <button onClick={() => setShowWaitlistPanel(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 14px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 400, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 7, position: "relative" }}><Clock size={14} style={{ color: "var(--text2)" }} /> Waitlist{waitlist.length > 0 && <span style={{ background: "var(--text)", color: "var(--bg)", fontSize: 11, fontWeight: 500, borderRadius: 18, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", marginLeft: 2 }}>{waitlist.length}</span>}</button>
-          <button onClick={() => setShowCalendarOptions(true)} title="Calendar view" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 42, height: 42, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center" }}><Settings size={16} /></button>
+          <button onClick={() => setCalMenuOpen(true)} aria-label="More actions" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 42, height: 42, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><MoreHorizontal size={18} />{waitlist.length > 0 && <span style={{ position: "absolute", top: 8, right: 8, width: 7, height: 7, borderRadius: "50%", background: "var(--text)" }} />}</button>
         </div>
       </div>
+
+      <Sheet open={calMenuOpen} onClose={() => setCalMenuOpen(false)} align="bottom" maxWidth={420}>
+        <div style={{ padding: "8px 0 4px" }}>
+          <button onClick={() => { setCalMenuOpen(false); setShowWaitlistPanel(true); }} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "center", gap: 13, padding: "16px 6px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, cursor: "pointer", textAlign: "left", borderBottom: "1px solid var(--line)" }}><Clock size={18} style={{ color: "var(--sub)" }} /> <span style={{ flex: 1 }}>Waitlist</span>{waitlist.length > 0 && <span style={{ background: "var(--text)", color: "var(--bg)", fontSize: 12, fontWeight: 500, borderRadius: 18, minWidth: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 6px" }}>{waitlist.length}</span>}</button>
+          <button onClick={() => { setCalMenuOpen(false); setShowCalendarOptions(true); }} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "center", gap: 13, padding: "16px 6px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, cursor: "pointer", textAlign: "left" }}><Settings size={18} style={{ color: "var(--sub)" }} /> <span style={{ flex: 1 }}>Calendar settings</span></button>
+        </div>
+      </Sheet>
 
       {/* Scrollable multi-week day strip — swipe horizontally, tap to pick. Includes 14 days back so barbers can look up past visits. */}
       <div ref={dayStripRef} style={{ display: "flex", gap: 6, marginBottom: 24, padding: "4px 2px", overflowX: "auto", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
@@ -17912,13 +17912,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
       {/* the timeline grid */}
       <div style={{ display: "flex", position: "relative", gap: 10 }}>
-        {/* time gutter — every 15 min; hours bold, quarters lighter */}
+        {/* time gutter — hour labels only, for a calmer grid */}
         <div style={{ width: 56, flexShrink: 0, position: "relative", height: gridHeight }}>
-          {quarterLines.filter((t) => t < DAY_END).map((t) => { const isHour = t % 60 === 0; return (
-            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, right: 8, fontSize: isHour ? 14 : 11, color: isHour ? "var(--sub)" : "var(--faint)", fontWeight: isHour ? 600 : 400, transform: "translateY(-1px)" }}>
-              {isHour ? fmtTime(t).replace(":00", "") : fmtTime(t).replace(/\s?[AP]M/, "")}
+          {quarterLines.filter((t) => t < DAY_END && t % 60 === 0).map((t) => (
+            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, right: 8, fontSize: 13, color: "var(--sub)", fontWeight: 500, transform: "translateY(-1px)" }}>
+              {fmtTime(t).replace(":00", "")}
             </div>
-          ); })}
+          ))}
         </div>
 
         {/* columns */}
@@ -17988,9 +17988,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                   <div style={{ fontSize: 13, color: "var(--text2)", fontWeight: 500 }}>New Appointment</div>
                 </div>
               )}
-              {/* 15-min subdivision lines (faint) + bold hour lines */}
-              {quarterLines.map((t) => { const isHour = t % 60 === 0; return (
-                <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, left: 0, right: 0, borderTop: isHour ? "1px solid var(--line)" : "1px solid color-mix(in srgb, var(--line) 50%, transparent)", height: 0, pointerEvents: "none" }} />
+              {/* hour lines + a faint half-hour line (15-min lines dropped for calm) */}
+              {quarterLines.filter((t) => t % 30 === 0).map((t) => { const isHour = t % 60 === 0; return (
+                <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, left: 0, right: 0, borderTop: isHour ? "1px solid var(--line)" : "1px solid color-mix(in srgb, var(--line) 40%, transparent)", height: 0, pointerEvents: "none" }} />
               ); })}
               {/* open-gap markers — display only, sit behind the tap layer so tapping a gap still opens a new appointment */}
               {gapsForProvider(p).map((g) => (
