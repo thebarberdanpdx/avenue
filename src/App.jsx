@@ -17994,8 +17994,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               ); })}
               {/* open-gap markers — display only, sit behind the tap layer so tapping a gap still opens a new appointment */}
               {gapsForProvider(p).map((g) => (
-                <div key={`gap-${g.start}`} style={{ position: "absolute", top: (g.start - DAY_START) * PPM + 1, left: 4, right: 4, height: (g.end - g.start) * PPM - 2, borderRadius: 10, border: "1px dashed color-mix(in srgb, var(--amber) 50%, var(--border))", background: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--amber) 8%, transparent), color-mix(in srgb, var(--amber) 8%, transparent) 6px, transparent 6px, transparent 12px)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 600, color: "var(--amber)", pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
-                  {(g.end - g.start) >= 30 ? `${g.end - g.start}-min gap` : ""}
+                <div key={`gap-${g.start}`} style={{ position: "absolute", top: (g.start - DAY_START) * PPM + 1, left: 4, right: 4, height: (g.end - g.start) * PPM - 2, borderRadius: 10, background: "color-mix(in srgb, var(--text) 3.5%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 500, letterSpacing: 0.2, color: "var(--faint)", pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
+                  {(g.end - g.start) >= 30 ? `${g.end - g.start} min open` : ""}
                 </div>
               ))}
               {/* live "now" line — only on today, only within the visible grid window */}
