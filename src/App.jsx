@@ -7121,6 +7121,69 @@ function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, pr
 }
 
 // ============================================================
+// SHARED REPORT PRIMITIVES — one calm, consistent visual language across every
+// report drill-in (Revenue, Appointments, Clients, Service mix, Per-barber,
+// Payments, Tax). Locks the type scale, period toggle, section rhythm, stat
+// cards and accent hero so the reports stop each rolling their own.
+// ============================================================
+const RPT_HERO = { fontFamily: "'Fraunces', serif", fontSize: 46, fontWeight: 500, lineHeight: 1, letterSpacing: "-1.1px", color: "var(--text)" };
+const RPT_STATNUM = { fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1, letterSpacing: "-0.4px" };
+// Masthead: small uppercase eyebrow + serif title.
+function RptMast({ eyebrow, title }) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      {eyebrow && <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>{eyebrow}</div>}
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: "-0.4px", lineHeight: 1 }}>{title}</h2>
+    </div>
+  );
+}
+// Period toggle — the one pill row used by every report.
+function RptPeriod({ value, onChange, options = [["week", "Week"], ["month", "Month"], ["year", "Year"], ["custom", "Custom"]], style }) {
+  return (
+    <div style={{ display: "flex", gap: 6, ...style }}>
+      {options.map(([id, label]) => { const on = value === id; return (
+        <button key={id} onClick={() => onChange(id)} style={{ flex: 1, padding: "10px 6px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13, fontWeight: on ? 600 : 400, letterSpacing: 0.3, cursor: "pointer" }}>{label}</button>
+      ); })}
+    </div>
+  );
+}
+// Section eyebrow label, optionally with a right-aligned action.
+function RptLabel({ children, action, style }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14, ...style }}>
+      <div style={{ fontSize: 11, letterSpacing: "2.5px", color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>{children}</div>
+      {action}
+    </div>
+  );
+}
+// A report section: hairline above (unless first), eyebrow label, then body.
+function RptSection({ label, action, first, children, style }) {
+  return (
+    <>
+      {!first && <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />}
+      <div style={{ marginBottom: 30, ...style }}>
+        {label && <RptLabel action={action}>{label}</RptLabel>}
+        {children}
+      </div>
+    </>
+  );
+}
+// Bordered stat tile — label, serif value, optional sub. accent → gold value.
+function RptStat({ label, value, sub, accent, style }) {
+  return (
+    <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", minWidth: 0, ...style }}>
+      <div style={{ fontSize: 10.5, letterSpacing: "1.5px", color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 9 }}>{label}</div>
+      <div style={{ ...RPT_STATNUM, color: accent ? "var(--gold)" : "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 6, lineHeight: 1.4 }}>{sub}</div>}
+    </div>
+  );
+}
+// Gold-tinted hero card — the one accent treatment for a report's headline stat.
+function RptAccentCard({ children, style }) {
+  return <div style={{ background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "20px", marginBottom: 24, ...style }}>{children}</div>;
+}
+
+// ============================================================
 // REVENUE — first Pulse drill-in. Period toggle (week/month/year),
 // editorial bar chart, top services + top clients for the period.
 // ============================================================
@@ -7333,20 +7396,10 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
     <div className="fade-up">
 
       {/* Masthead */}
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>REVENUE</div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{period === "week" ? "This week" : period === "month" ? "This month" : period === "year" ? "This year" : "Custom range"}</h2>
-      </div>
+      <RptMast eyebrow="REVENUE" title={period === "week" ? "This week" : period === "month" ? "This month" : period === "year" ? "This year" : "Custom range"} />
 
       {/* Period toggle */}
-      <div style={{ display: "flex", gap: 6, marginBottom: period === "custom" ? 14 : 28 }}>
-        {[["week", "Week"], ["month", "Month"], ["year", "Year"], ["custom", "Custom"]].map(([id, label]) => {
-          const on = period === id;
-          return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 6px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13, fontWeight: on ? 600 : 400, letterSpacing: 0.3, cursor: "pointer" }}>{label}</button>
-          );
-        })}
-      </div>
+      <RptPeriod value={period} onChange={setPeriod} style={{ marginBottom: period === "custom" ? 14 : 28 }} />
       {period === "custom" && (<>
         <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
           <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, fontSize: 11, letterSpacing: 1, color: "var(--faint)", fontWeight: 600 }}>FROM
@@ -7365,7 +7418,7 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
 
       {/* Hero number */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
+        <div style={{ ...RPT_HERO, marginBottom: 8 }}>
           {fmtMoney(periodTotal)}
         </div>
         {delta && (
@@ -7402,24 +7455,17 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
 
       {/* Earned per chair-hour */}
       {chairHours > 0 && visitCount > 0 && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-          <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 14, fontWeight: 600 }}>EARNED PER CHAIR-HOUR</div>
+        <RptSection label="EARNED PER CHAIR-HOUR">
             <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -1.2, color: "var(--gold)" }}>{fmtMoney(revPerChairHr)}</div>
+              <div style={{ ...RPT_HERO, fontSize: 38, letterSpacing: "-0.9px", color: "var(--gold)" }}>{fmtMoney(revPerChairHr)}</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>per open chair-hour · {Math.round(chairHours)}h of chair time so far</div>
             </div>
-          </div>
-        </>
+        </RptSection>
       )}
 
       {/* Where it comes from */}
       {mixTotal > 0 && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-          <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 14, fontWeight: 600 }}>WHERE IT COMES FROM</div>
+        <RptSection label="WHERE IT COMES FROM">
             <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: "var(--panel2)", marginBottom: 16 }}>
               <div style={{ width: mixPct(serviceRev) + "%", background: "var(--gold)" }} />
               <div style={{ width: mixPct(posTotal) + "%", background: "var(--tint2)" }} />
@@ -7430,16 +7476,12 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 14.5 }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: "var(--tint2)", marginRight: 9 }} />Products / POS</span><span style={{ fontSize: 14.5, fontWeight: 500 }}>{fmtMoney(posTotal)} <span style={{ color: "var(--faint)", fontWeight: 400 }}>{mixPct(posTotal)}%</span></span></div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 14.5 }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: "var(--tint2)", marginRight: 9 }} />Tips</span><span style={{ fontSize: 14.5, fontWeight: 500 }}>{fmtMoney(tipsTotal)} <span style={{ color: "var(--faint)", fontWeight: 400 }}>{mixPct(tipsTotal)}%</span></span></div>
             </div>
-          </div>
-        </>
+        </RptSection>
       )}
 
       {/* By service */}
       {topServices.length > 0 && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-          <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>BY SERVICE</div>
+        <RptSection label="BY SERVICE">
             <div style={{ display: "grid", gap: 10 }}>
               {topServices.map((row) => (
                 <div key={row.svc.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
@@ -7451,16 +7493,12 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
                 </div>
               ))}
             </div>
-          </div>
-        </>
+        </RptSection>
       )}
 
       {/* Top clients */}
       {topClients.length > 0 && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>TOP CLIENTS</div>
+        <RptSection label="TOP CLIENTS">
             <div style={{ display: "grid", gap: 10 }}>
               {topClients.map((row) => (
                 <div key={row.client.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
@@ -7472,8 +7510,7 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
                 </div>
               ))}
             </div>
-          </div>
-        </>
+        </RptSection>
       )}
 
       {/* Empty period state */}
@@ -7563,22 +7600,14 @@ function AppointmentsView({ appts, providers, services, onBack }) {
   const gridH = topLabel + 7 * (cellH + gap) - gap;
 
   const periodLabel = period === "week" ? "This week" : period === "month" ? "This month" : "This year";
-  const Pill = ({ k, label }) => (
-    <button onClick={() => setPeriod(k)} style={{ flex: 1, padding: "10px 8px", borderRadius: 24, border: period === k ? "1px solid var(--gold)" : "1px solid var(--border2)", background: period === k ? "var(--wash)" : "transparent", color: period === k ? "var(--gold)" : "var(--sub)", fontWeight: period === k ? 600 : 400, fontSize: 13.5, cursor: "pointer" }}>{label}</button>
-  );
 
   return (
     <div className="fade-up">
 
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>APPOINTMENTS &middot; CAPACITY</div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1, margin: 0 }}>{periodLabel}</h2>
-        <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10 }}><b style={{ color: "var(--text)", fontWeight: 600 }}>{booked}</b> booked &middot; <b style={{ color: "var(--text)", fontWeight: 600 }}>{occupancy}%</b> of chair time filled</div>
-      </div>
+      <RptMast eyebrow="APPOINTMENTS · CAPACITY" title={periodLabel} />
+      <div style={{ fontSize: 14, color: "var(--sub)", marginTop: -12, marginBottom: 22 }}><b style={{ color: "var(--text)", fontWeight: 600 }}>{booked}</b> booked &middot; <b style={{ color: "var(--text)", fontWeight: 600 }}>{occupancy}%</b> of chair time filled</div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
-        <Pill k="week" label="Week" /><Pill k="month" label="Month" /><Pill k="year" label="Year" />
-      </div>
+      <RptPeriod value={period} onChange={setPeriod} options={[["week", "Week"], ["month", "Month"], ["year", "Year"]]} style={{ marginBottom: 28 }} />
 
       {booked === 0 ? (
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "26px 20px", textAlign: "center" }}>
@@ -7587,41 +7616,31 @@ function AppointmentsView({ appts, providers, services, onBack }) {
         </div>
       ) : (
       <>
-      <div style={{ background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "20px 18px 18px", marginBottom: 30 }}>
+      <RptAccentCard>
         <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700, marginBottom: 10 }}>CHAIR OCCUPANCY</div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 14 }}>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 52, fontWeight: 500, lineHeight: 1, letterSpacing: -1.5, color: "var(--gold)" }}>{occupancy}%</div>
+          <div style={{ ...RPT_HERO, color: "var(--gold)" }}>{occupancy}%</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>of your open chair time is booked</div>
         </div>
         <div style={{ height: 8, borderRadius: 4, background: "var(--tint2)", overflow: "hidden", marginBottom: 10 }}>
           <div style={{ width: Math.min(100, occupancy) + "%", height: "100%", background: "var(--gold)" }} />
         </div>
         <div style={{ fontSize: 12.5, color: "var(--sub)" }}><b style={{ color: "var(--text)" }}>{bookedHrs}h</b> booked &middot; <b style={{ color: "var(--text)" }}>{openHrs}h</b> still open of {availHrs}h</div>
-      </div>
+      </RptAccentCard>
 
-      <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 14 }}>SCHEDULE HEALTH</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 14px" }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1, color: "var(--text)" }}>{noShowRate}%</div>
-            <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 6 }}>no-show rate &middot; {noShow}</div>
-          </div>
-          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 14px" }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, lineHeight: 1, color: "var(--text)" }}>{cancelRate}%</div>
-            <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 6 }}>cancel rate &middot; {cancelled}</div>
-          </div>
+      <RptSection label="SCHEDULE HEALTH" style={{ marginBottom: 28 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: lost > 0 ? 14 : 0 }}>
+          <RptStat label="No-show rate" value={`${noShowRate}%`} sub={`${noShow} no-shows`} />
+          <RptStat label="Cancel rate" value={`${cancelRate}%`} sub={`${cancelled} cancels`} />
         </div>
         {lost > 0 && (
           <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>Roughly <b style={{ color: "var(--text)" }}>{fmtMoney(lost)}</b> in lost bookings from no-shows &amp; cancels <span style={{ color: "var(--faint)" }}>(est.)</span>. A card on file cuts this.</div>
         )}
-      </div>
+      </RptSection>
 
-      {heatmapHasData && (<>
-      <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>BUSIEST TIMES</div>
-        {busiestDay && busiestHour && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 16 }}>Your busiest stretch is <b style={{ color: "var(--text)" }}>{dayFull[busiestDay.dow]}s around {fmtHour(busiestHour.hour)}</b>.</div>)}
+      {heatmapHasData && (
+      <RptSection label="BUSIEST TIMES" style={{ marginBottom: 28 }}>
+        {busiestDay && busiestHour && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: -4, marginBottom: 16 }}>Your busiest stretch is <b style={{ color: "var(--text)" }}>{dayFull[busiestDay.dow]}s around {fmtHour(busiestHour.hour)}</b>.</div>)}
         <div style={{ overflowX: "auto", paddingBottom: 4 }}>
           <svg width={gridW} height={gridH} style={{ display: "block" }}>
             {hourLabels.map((h, i) => (i % 2 === 0 ? (<text key={"h" + h} x={leftLabel + i * (cellW + gap) + cellW / 2} y={12} textAnchor="middle" style={{ fontSize: 9, fill: "var(--faint)" }}>{fmtHour(h).replace(" ", "")}</text>) : null))}
@@ -7633,19 +7652,17 @@ function AppointmentsView({ appts, providers, services, onBack }) {
             ))}
           </svg>
         </div>
-      </div>
-      </>)}
+      </RptSection>
+      )}
 
-      <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-      <div style={{ marginBottom: 6 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 14 }}>BREAKDOWN</div>
+      <RptSection label="BREAKDOWN" style={{ marginBottom: 6 }}>
         {[["Completed", done], ["Upcoming", pending], ["No-shows", noShow], ["Cancelled", cancelled]].map(([lbl, n]) => (
           <div key={lbl} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 2px", borderTop: "1px solid var(--line)" }}>
             <span style={{ fontSize: 14.5 }}>{lbl}</span>
             <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500 }}>{n}</span>
           </div>
         ))}
-      </div>
+      </RptSection>
       </>
       )}
     </div>
@@ -7750,27 +7767,17 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
     <div className="fade-up">
 
       {/* Masthead */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>CLIENTS · RETENTION</div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{periodLabel}</h2>
-        <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10, lineHeight: 1.5 }}>
-          <span style={{ fontWeight: 600, color: "var(--text)" }}>{totalClients}</span> active{rebookPct !== null ? <> · <span style={{ fontWeight: 600, color: "var(--text)" }}>{rebookPct}%</span> rebooked</> : null}
-        </div>
+      <RptMast eyebrow="CLIENTS · RETENTION" title={periodLabel} />
+      <div style={{ fontSize: 14, color: "var(--sub)", marginTop: -12, marginBottom: 22, lineHeight: 1.5 }}>
+        <span style={{ fontWeight: 600, color: "var(--text)" }}>{totalClients}</span> active{rebookPct !== null ? <> · <span style={{ fontWeight: 600, color: "var(--text)" }}>{rebookPct}%</span> rebooked</> : null}
       </div>
 
       {/* Period toggle */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
-        {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
-          const on = period === id;
-          return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
-          );
-        })}
-      </div>
+      <RptPeriod value={period} onChange={setPeriod} options={[["week", "Week"], ["month", "Month"], ["year", "Year"]]} style={{ marginBottom: 28 }} />
 
       {/* WIN BACK — the hero action: lapsed clients + dollars at risk */}
       {lapsed.length > 0 && (
-        <div style={{ background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 28%, var(--border))", borderRadius: 18, padding: "18px 16px 12px", marginBottom: 30 }}>
+        <RptAccentCard style={{ padding: "18px 16px 12px" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
             <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700 }}>WIN BACK</div>
             <div style={{ fontSize: 12.5, color: "var(--sub)" }}>~{fmtMoney(atRisk)} at risk <span style={{ color: "var(--faint)" }}>(est.)</span></div>
@@ -7788,7 +7795,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
             ))}
           </div>
           <button onClick={onOpenNudge} className="lift" style={{ width: "100%", marginTop: 12, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: "13px 16px", fontSize: 14, fontWeight: 600, letterSpacing: 0.5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Bell size={16} /> Reach out to all {lapsed.length}</button>
-        </div>
+        </RptAccentCard>
       )}
 
       {/* REBOOKING % — the number that predicts next month */}
@@ -7798,7 +7805,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
           <div style={{ marginBottom: 30 }}>
             <Eyebrow>REBOOKING RATE</Eyebrow>
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 8 }}>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 48, fontWeight: 500, lineHeight: 1, letterSpacing: -1.2, color: rebookPct >= 60 ? "var(--gold)" : "var(--text)" }}>{rebookPct}%</div>
+              <div style={{ ...RPT_HERO, color: rebookPct >= 60 ? "var(--gold)" : "var(--text)" }}>{rebookPct}%</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>of recent clients already have their next visit booked</div>
             </div>
             <div style={{ fontSize: 12.5, color: "var(--faint)" }}>{rebooked} of {recent.length} seen in the last 90 days.</div>
@@ -7855,7 +7862,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
           <div style={{ marginBottom: 30 }}>
             <Eyebrow>FIRST-VISIT RETENTION</Eyebrow>
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 8 }}>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 42, fontWeight: 500, lineHeight: 1, letterSpacing: -1, color: retentionPct >= 60 ? "var(--gold)" : "var(--text)" }}>{retentionPct}%</div>
+              <div style={{ ...RPT_HERO, color: retentionPct >= 60 ? "var(--gold)" : "var(--text)" }}>{retentionPct}%</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>of first-timers came back within 60 days</div>
             </div>
             <div style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5 }}>Based on {cohortSize} {cohortSize === 1 ? "client whose" : "clients whose"} first visit was 60–180 days ago.</div>
@@ -8029,24 +8036,14 @@ function ServiceMixView({ appts, services, providers, onBack }) {
     <div className="fade-up">
 
       {/* Masthead */}
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>SERVICE MIX</div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
-      </div>
+      <RptMast eyebrow="SERVICE MIX" title={period === "week" ? "This week" : period === "month" ? "This month" : "This year"} />
 
       {/* Period toggle */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
-        {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
-          const on = period === id;
-          return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
-          );
-        })}
-      </div>
+      <RptPeriod value={period} onChange={setPeriod} options={[["week", "Week"], ["month", "Month"], ["year", "Year"]]} style={{ marginBottom: 28 }} />
 
       {/* Hero — total visits, total revenue, avg rev/hr */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
+        <div style={{ ...RPT_HERO, marginBottom: 8 }}>
           {totalVisits}
         </div>
         <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
@@ -8056,10 +8053,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
 
       {/* WHAT'S WORKING — editorial callouts for the standout services */}
       {(topByRevenue || topByPerHour) && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-          <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>WHAT'S WORKING</div>
+        <RptSection label="WHAT'S WORKING">
             <div style={{ display: "grid", gap: 14 }}>
               {topByRevenue && (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14 }}>
@@ -8080,18 +8074,14 @@ function ServiceMixView({ appts, services, providers, onBack }) {
                 </div>
               )}
             </div>
-          </div>
-        </>
+        </RptSection>
       )}
 
       {/* ADD-ON ATTACH */}
       {doneInPeriod.length > 0 && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-          <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 14, fontWeight: 600 }}>ADD-ON ATTACH</div>
+        <RptSection label="ADD-ON ATTACH">
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: topAddons.length ? 18 : 0 }}>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -1.2, color: "var(--gold)" }}>{attachRate}%</div>
+              <div style={{ ...RPT_HERO, fontSize: 38, letterSpacing: "-0.9px", color: "var(--gold)" }}>{attachRate}%</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>of visits added an add-on{addonRevenue > 0 && <> &middot; <span style={{ fontWeight: 600, color: "var(--text)" }}>{fmtMoney(addonRevenue)}</span> extra</>}</div>
             </div>
             {topAddons.map((x) => (
@@ -8101,26 +8091,14 @@ function ServiceMixView({ appts, services, providers, onBack }) {
               </div>
             ))}
             {topAddons.length === 0 && (<div style={{ fontSize: 13.5, color: "var(--sub)" }}>No add-ons attached yet — a prompt at checkout lifts this.</div>)}
-          </div>
-        </>
+        </RptSection>
       )}
 
       {/* Sort toggle + ranked list */}
       {sortedActive.length > 0 && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 18px" }} />
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 12, fontWeight: 600 }}>RANKED BY</div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-              {[["revenue", "Revenue"], ["visits", "Visits"], ["perhour", "$ per hour"]].map(([id, label]) => {
-                const on = sortBy === id;
-                return (
-                  <button key={id} onClick={() => setSortBy(id)} style={{ flex: 1, padding: "9px 10px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 12.5, fontWeight: on ? 600 : 400, letterSpacing: 0.3, cursor: "pointer" }}>{label}</button>
-                );
-              })}
-            </div>
-          </div>
-          <div style={{ display: "grid", gap: 14, marginBottom: 32 }}>
+        <RptSection label="RANKED BY" style={{ marginBottom: 32 }}>
+          <RptPeriod value={sortBy} onChange={setSortBy} options={[["revenue", "Revenue"], ["visits", "Visits"], ["perhour", "$ per hour"]]} style={{ marginBottom: 18 }} />
+          <div style={{ display: "grid", gap: 14 }}>
             {sortedActive.map((row) => {
               const pct = maxBarValue > 0 ? (valueFor(row) / maxBarValue) * 100 : 0;
               return (
@@ -8142,23 +8120,19 @@ function ServiceMixView({ appts, services, providers, onBack }) {
               );
             })}
           </div>
-        </>
+        </RptSection>
       )}
 
       {/* IDLE — services with zero activity this period (only shown if there are any) */}
       {idleRows.length > 0 && sortedActive.length > 0 && (
-        <>
-          <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
-          <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 600 }}>IDLE THIS PERIOD</div>
-            <div style={{ fontSize: 12.5, color: "var(--faint)", marginBottom: 14, lineHeight: 1.5 }}>Services on your menu that haven't been booked.</div>
+        <RptSection label="IDLE THIS PERIOD">
+            <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: -4, marginBottom: 14, lineHeight: 1.5 }}>Services on your menu that haven't been booked.</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
               {idleRows.map((row) => (
                 <span key={row.svc.id} style={{ fontSize: 13, color: "var(--sub)", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: "5px 11px" }}>{row.svc.name}</span>
               ))}
             </div>
-          </div>
-        </>
+        </RptSection>
       )}
 
       {/* Empty state */}
@@ -8337,25 +8311,15 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
     <div className="fade-up">
 
       {/* Masthead */}
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>PER STAFF MEMBER</div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{period === "week" ? "This week" : period === "month" ? "This month" : "This year"}</h2>
-      </div>
+      <RptMast eyebrow="PER STAFF MEMBER" title={period === "week" ? "This week" : period === "month" ? "This month" : "This year"} />
 
       {/* Period toggle */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
-        {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([id, label]) => {
-          const on = period === id;
-          return (
-            <button key={id} onClick={() => setPeriod(id)} style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "transparent", color: on ? "var(--gold)" : "var(--sub)", fontSize: 13.5, fontWeight: on ? 600 : 400, letterSpacing: 0.5, cursor: "pointer" }}>{label}</button>
-          );
-        })}
-      </div>
+      <RptPeriod value={period} onChange={setPeriod} options={[["week", "Week"], ["month", "Month"], ["year", "Year"]]} style={{ marginBottom: 28 }} />
 
       {/* Team total — hero */}
       {realProviders.length > 1 && teamVisits > 0 && (
         <div style={{ marginBottom: 28 }}>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 54, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -1.3, marginBottom: 8 }}>
+          <div style={{ ...RPT_HERO, marginBottom: 8 }}>
             {fmtMoney(teamRevenue)}
           </div>
           <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5 }}>
@@ -19138,9 +19102,6 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
   const cashPct = grossIn > 0 ? Math.round((cashIn / grossIn) * 100) : 0;
   const fmtMoney0 = (n) => "$" + Math.round(n || 0).toLocaleString();
   const periodLabel = period === "week" ? "This week" : period === "month" ? "This month" : "This year";
-  const Pill = ({ k, label }) => (
-    <button onClick={() => setPeriod(k)} style={{ flex: 1, padding: "9px 8px", borderRadius: 24, border: period === k ? "1px solid var(--gold)" : "1px solid var(--border2)", background: period === k ? "var(--wash)" : "transparent", color: period === k ? "var(--gold)" : "var(--sub)", fontWeight: period === k ? 600 : 400, fontSize: 13.5, cursor: "pointer" }}>{label}</button>
-  );
 
   const openRow = rows.find((r) => r.id === openId) || null;
   const openClient = openRow && openRow.clientId ? clients.find((c) => c.id === openRow.clientId) : null;
@@ -19173,20 +19134,14 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
 
   return (
     <div className="fade-in" style={{ padding: "8px 0 40px" }}>
-      <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 400, marginBottom: 24, letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> Pulse</button>
-      <div style={{ marginBottom: 22, paddingTop: 6 }}>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 42, fontWeight: 400, letterSpacing: "-0.8px", lineHeight: 0.95 }}>{periodLabel}</div>
-        <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginTop: 12, fontWeight: 500, textTransform: "uppercase" }}>Payments · money flow</div>
-        <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 10 }}><b style={{ color: "var(--text)", fontWeight: 500 }}>{fmtMoney0(netIn)}</b> net &middot; {periodRows.length} charge{periodRows.length === 1 ? "" : "s"}</div>
-      </div>
+      <RptMast eyebrow="PAYMENTS · MONEY FLOW" title={periodLabel} />
+      <div style={{ fontSize: 14, color: "var(--sub)", marginTop: -12, marginBottom: 22 }}><b style={{ color: "var(--text)", fontWeight: 600 }}>{fmtMoney0(netIn)}</b> net &middot; {periodRows.length} charge{periodRows.length === 1 ? "" : "s"}</div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 26 }}>
-        <Pill k="week" label="Week" /><Pill k="month" label="Month" /><Pill k="year" label="Year" />
-      </div>
+      <RptPeriod value={period} onChange={setPeriod} options={[["week", "Week"], ["month", "Month"], ["year", "Year"]]} style={{ marginBottom: 26 }} />
 
       <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, padding: "20px 18px", marginBottom: 16 }}>
         <div style={{ fontSize: 10.5, letterSpacing: "2.5px", color: "var(--faint)", fontWeight: 500, marginBottom: 8, textTransform: "uppercase" }}>Money in</div>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 46, fontWeight: 400, lineHeight: 1, letterSpacing: -1.3 }}>{fmtMoney0(grossIn)}</div>
+        <div style={{ ...RPT_HERO, fontWeight: 400 }}>{fmtMoney0(grossIn)}</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
           <span style={{ fontSize: 13.5, color: "var(--sub)" }}>&minus; Refunds</span>
           <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 400, color: refundsOut > 0 ? "var(--text)" : "var(--faint)" }}>{fmtMoney0(refundsOut)}</span>
@@ -19198,14 +19153,8 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px" }}>
-          <div style={{ fontSize: 11, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600, marginBottom: 6 }}>TIPS</div>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{fmtMoney0(tipsIn)}</div>
-        </div>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px" }}>
-          <div style={{ fontSize: 11, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600, marginBottom: 6 }}>NO-SHOW FEES</div>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1 }}>{fmtMoney0(noShowFees)}</div>
-        </div>
+        <RptStat label="Tips" value={fmtMoney0(tipsIn)} />
+        <RptStat label="No-show fees" value={fmtMoney0(noShowFees)} />
       </div>
 
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", marginBottom: 24 }}>
@@ -19223,7 +19172,7 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
         </div>
       </div>
 
-      <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 14 }}>CHARGES &middot; {periodLabel.toUpperCase()}</div>
+      <RptLabel>CHARGES &middot; {periodLabel.toUpperCase()}</RptLabel>
 
       {periodRows.length === 0 ? (
         <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--sub)" }}>
@@ -21180,18 +21129,14 @@ function TaxReportView({ appts, providers, services, business, setBusiness, me }
       <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 16, fontWeight: 300 }}>A simple set-aside guide so you're not caught short at tax time.</p>
 
       {/* range */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-        {[["week", "Week"], ["month", "Month"], ["year", "Year"]].map(([v, label]) => { const on = range === v; return (
-          <button key={v} onClick={() => setRange(v)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{label}</button>
-        ); })}
-      </div>
+      <RptPeriod value={range} onChange={setRange} options={[["week", "Week"], ["month", "Month"], ["year", "Year"]]} style={{ marginBottom: 20 }} />
 
-      <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 10px" }}>{rangeLabel}</div>
+      <RptLabel>{rangeLabel}</RptLabel>
 
       {/* hero — logged-in staff */}
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 20px", marginBottom: 22 }}>
         <div style={{ fontSize: 11.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 12 }}>{(meRow.name || "You").split(" ")[0]} · set aside for taxes</div>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: "-1px", color: "var(--text)" }}>{money(meRow.revenue)}</div>
+        <div style={{ ...RPT_HERO }}>{money(meRow.revenue)}</div>
         <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 8 }}>{earnedSub}</div>
         <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
@@ -21216,7 +21161,7 @@ function TaxReportView({ appts, providers, services, business, setBusiness, me }
       </div>
 
       {/* per barber */}
-      <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 10px" }}>Per staff member</div>
+      <RptLabel>Per staff member</RptLabel>
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "6px 20px", marginBottom: 22 }}>
         {rows.map((s, i) => {
           const r = rateFor(s.id);
