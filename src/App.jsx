@@ -1177,6 +1177,35 @@ function App() {
   // ---- AUTH: magic-link login, STAFF DASHBOARD ONLY (booking side is never gated) ----
   const [session, setSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+
+  // Auto-update: a cached (stale) app asks the server what's live and refreshes itself if it's
+  // behind. Kills the "features disappear until you reinstall" problem for good. Reloads at most
+  // once per server version (sessionStorage guard) so a stuck cache can never loop.
+  useEffect(() => {
+    const LOCAL = (typeof __BUILD_VERSION__ !== "undefined") ? __BUILD_VERSION__ : "dev";
+    if (LOCAL === "dev") return; // skip in local dev
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const r = await fetch(API_BASE + "/api/version", { cache: "no-store" });
+        if (!r.ok) return;
+        const { version } = await r.json();
+        if (cancelled || !version || version === LOCAL) return;
+        const KEY = "vero_reloaded_for";
+        if (sessionStorage.getItem(KEY) === version) return; // already tried for this version — don't loop
+        sessionStorage.setItem(KEY, version);
+        const u = new URL(window.location.href);
+        u.searchParams.set("v", String(version).slice(0, 8)); // change the URL to bust the webview cache
+        window.location.replace(u.toString());
+      } catch (e) {}
+    };
+    check();
+    const onVis = () => { if (document.visibilityState === "visible") check(); };
+    document.addEventListener("visibilitychange", onVis);
+    const id = setInterval(check, 5 * 60 * 1000);
+    return () => { cancelled = true; document.removeEventListener("visibilitychange", onVis); clearInterval(id); };
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
