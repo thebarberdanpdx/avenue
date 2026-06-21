@@ -18702,7 +18702,13 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{reopen ? "Balance due" : "Total"}</span>
         <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500 }}>{money(reopen ? balance : subtotal)}</span>
       </div>
-      <button className="lift" disabled={reopen && balance <= 0} onClick={() => { setPayErr(""); setStage("method"); }} style={{ ...goldBtn, opacity: reopen && balance <= 0 ? 0.45 : 1 }}>{reopen ? (balance > 0 ? `CHARGE BALANCE — ${money(balance)}` : "NOTHING OWED") : `CONTINUE — ${money(subtotal)}`}</button>
+      {reopen ? (
+        <button className="lift" disabled={balance <= 0} onClick={() => { setPayErr(""); setStage("method"); }} style={{ ...goldBtn, opacity: balance <= 0 ? 0.45 : 1 }}>{balance > 0 ? `CHARGE BALANCE — ${money(balance)}` : "NOTHING OWED"}</button>
+      ) : (<>
+        {/* Card is the 99% path — go straight to it (tip comes next). Other methods sit one tap behind. */}
+        <button className="lift" onClick={() => startMethod("card")} style={goldBtn}>{`PAY BY CARD — ${money(subtotal)}`}</button>
+        <button onClick={() => { setPayErr(""); setStage("method"); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: "15px 0 2px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, fontFamily: FONT_BODY }}>Other ways to pay</button>
+      </>)}
     </>);
 
   // ---------- 2 · METHOD ----------
