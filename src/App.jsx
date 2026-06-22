@@ -317,6 +317,9 @@ const DEFAULT_BUSINESS = {
     { id: "birthday", label: "Birthday message", channel: "email", timing: "On their birthday", enabled: false,
       body: "Happy birthday, {client}! Everyone at {business} hopes your day is a great one. Whenever you're ready for a fresh look, we'd love to see you in the chair." },
   ],
+  // ---- Staff push alerts: which appointment events push the team's iOS app. Read by
+  //      fireStaffPush (the real gate). Default all on = preserves prior always-push behavior. ----
+  staffAlerts: { newBooking: true, rescheduled: true, checkedIn: true },
   // ---- Locations: off by default; turns on for multi-location businesses ----
   multiLocation: false,
   locations: [
@@ -2661,9 +2664,12 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject }) 
 // Same server endpoint the online-booking path uses, so closed-app notifications
 // behave identically no matter where the change came from. Fire-and-forget — a
 // push failure must never affect the appointment itself.
-function fireStaffPush({ shopId, title, appt, prevAppt }) {
+function fireStaffPush({ shopId, title, appt, prevAppt, event, business }) {
   try {
     if (!shopId || !appt) return;
+    // The notifications center gates which events push the team. Missing flag → push (prior behavior).
+    const sa = business && business.staffAlerts;
+    if (event && sa && sa[event] === false) return;
     const fmtWhen = (a) => (a && a.bookedFor) ? new Date(a.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
     const whenStr = fmtWhen(appt);
     const nNote = (appt.note || "").trim();
@@ -3424,7 +3430,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         try {
           const ap0 = newAppts[0] || {};
           if (reschedPrev) {
-            fireStaffPush({ shopId, title: "Appointment rescheduled", appt: ap0, prevAppt: reschedPrev });
+            fireStaffPush({ shopId, title: "Appointment rescheduled", appt: ap0, prevAppt: reschedPrev, event: "rescheduled", business });
             setReschedPrev(null);
           } else {
             const whenStr = ap0.bookedFor ? new Date(ap0.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
@@ -5717,7 +5723,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
     try {
       await supabase.rpc("manage_reschedule_by_token", { p_token: token, p_start: newSlot, p_date: when.toISOString() });
       const updated = { ...appt, start: newSlot, end: newSlot + dur, bookedFor: when.toISOString() };
-      setAppt(updated); fireNotify("rescheduled", updated); fireStaffPush({ shopId, title: "Appointment rescheduled", appt: updated, prevAppt: appt }); setPhase("rescheduled");
+      setAppt(updated); fireNotify("rescheduled", updated); fireStaffPush({ shopId, title: "Appointment rescheduled", appt: updated, prevAppt: appt, event: "rescheduled", business }); setPhase("rescheduled");
     } catch (e) { setPhase("error"); } finally { setBusy(false); }
   };
   // Client self-check-in: flip the appointment to "in lobby" (RPC) AND push the barber. The push
@@ -5725,7 +5731,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
   const submitArrive = async () => {
     if (busy) return; setBusy(true);
     try { await supabase.rpc("manage_checkin_by_token", { p_token: token }); } catch (e) {}
-    try { fireStaffPush({ shopId, title: "Client arrived", appt: { ...appt, status: "checked-in" } }); } catch (e) {}
+    try { fireStaffPush({ shopId, title: "Client arrived", appt: { ...appt, status: "checked-in" }, event: "checkedIn", business }); } catch (e) {}
     setBusy(false); setPhase("arrived");
   };
 
@@ -10862,90 +10868,63 @@ function Stepper({ value, onChange, min = 0, max = 999, step = 1, suffix, zeroLa
   );
 }
 
-// Notification matrix metadata. Each audience lists the events it can receive, with the channels
-// that make sense for it and a sensible default on/off + default channels. The editor reads from this,
-// so anything the owner hasn't touched falls back to these defaults.
-const NOTIF_AUDIENCES = [
-  {
-    key: "client", label: "Clients",
-    desc: "What your clients receive. A booking confirmation always goes out — the rest is up to you.",
-    channels: ["sms", "email"],
-    events: [
-      { k: "created", label: "Booking confirmation", locked: true, def: { sms: true, email: true } },
-      { k: "canceled", label: "Cancellation notice", def: { on: true, sms: true, email: true } },
-      { k: "rescheduled", label: "Reschedule notice", def: { on: true, sms: true, email: true } },
-      { k: "reminder24", label: "Reminder — 24 hours before", def: { on: true, sms: true, email: false } },
-      { k: "reminder2", label: "Reminder — 2 hours before", def: { on: true, sms: true, email: false } },
-      { k: "waitlistOpen", label: "Waitlist slot opened (booking link)", def: { on: true, sms: true, email: false } },
-      { k: "earlierSlot", label: "Earlier spot opened (opted-in clients)", def: { on: true, sms: true, email: false } },
-      { k: "lapsed", label: "We-miss-you nudge (overdue for a visit)", def: { on: false, sms: true, email: false } },
-      { k: "birthday", label: "Birthday message", def: { on: false, sms: true, email: false } },
-    ],
-  },
-  {
-    key: "provider", label: "Providers",
-    desc: "What each staff member gets about their own chair.",
-    channels: ["push", "sms", "email"],
-    events: [
-      { k: "created", label: "New appointment booked", def: { on: true, push: true } },
-      { k: "canceled", label: "Appointment canceled", def: { on: true, push: true } },
-      { k: "rescheduled", label: "Appointment rescheduled", def: { on: true, push: true } },
-      { k: "firstTime", label: "First-time client booked with them", def: { on: true, push: true } },
-      { k: "endOfDay", label: "End-of-day summary (their numbers)", def: { on: false, push: true } },
-    ],
-  },
-  {
-    key: "shop", label: "Shop",
-    desc: "What you get across the whole shop.",
-    channels: ["push", "sms", "email"],
-    events: [
-      { k: "created", label: "New appointment (any staff member)", def: { on: false, push: true } },
-      { k: "canceled", label: "Appointment canceled (any staff member)", def: { on: true, push: true } },
-      { k: "rescheduled", label: "Appointment rescheduled (any staff member)", def: { on: false, push: true } },
-      { k: "firstTime", label: "First-time client booked", def: { on: true, push: true } },
-      { k: "endOfDay", label: "End-of-day summary (shop totals)", def: { on: true, push: true } },
-      { k: "waitlistOpen", label: "Waitlist slot opened", def: { on: true, push: true } },
-    ],
-  },
+// The staff-push events the app actually fires (gated for real by fireStaffPush via business.staffAlerts).
+const TEAM_ALERTS = [
+  { k: "newBooking", label: "New booking", desc: "A client books — online or in person" },
+  { k: "rescheduled", label: "Rescheduled or moved", desc: "An appointment's time changes" },
+  { k: "checkedIn", label: "Client checked in", desc: "Someone's marked as arrived" },
 ];
-const CHANNEL_LABEL = { sms: "Text", email: "Email", push: "Push" };
-
-function NotificationsEditor({ n, onChange }) {
-  const [aud, setAud] = useState("client");
-  const grp = NOTIF_AUDIENCES.find((a) => a.key === aud);
-  const data = (n && n[aud]) || {};
-  const setEvent = (k, patch) => onChange({ ...(n || {}), [aud]: { ...data, [k]: { ...(data[k] || {}), ...patch } } });
+// Notifications center — the single "who gets what, by what method" surface.
+// CLIENTS reflects business.messages (the real, wired client sends). YOUR TEAM reflects
+// business.staffAlerts (the real gate on staff push). Nothing here is cosmetic.
+function NotificationsCenter({ form, setForm, onOpenMessages }) {
+  const [aud, setAud] = useState("clients");
+  const messages = form.messages || [];
+  const setMsg = (id, patch) => setForm({ ...form, messages: messages.map((m) => m.id === id ? { ...m, ...patch } : m) });
+  const sa = { newBooking: true, rescheduled: true, checkedIn: true, ...(form.staffAlerts || {}) };
+  const setSA = (k, v) => setForm({ ...form, staffAlerts: { ...sa, [k]: v } });
+  const CH = [["email", "Email"], ["text", "Text"], ["both", "Both"]];
   return (
     <div>
-      <Segmented options={NOTIF_AUDIENCES.map((a) => ({ value: a.key, label: a.label }))} value={aud} onChange={setAud} />
-      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>{grp.desc}</p>
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 12px" }}>
-        {grp.events.map((ev, i) => {
-          const eff = { ...ev.def, ...(data[ev.k] || {}) };
-          const on = ev.locked ? true : eff.on !== false;
-          return (
-            <div key={ev.k} style={{ padding: "14px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
+      <Segmented options={[{ value: "clients", label: "Clients" }, { value: "team", label: "Your team" }]} value={aud} onChange={setAud} />
+      {aud === "clients" ? (<>
+        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>Automatic messages to the people you book. Each can go by text, email, or both — turn off any you don't want.</p>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 14px" }}>
+          {messages.map((m, i) => { const on = m.enabled !== false; return (
+            <div key={m.id} style={{ padding: "14px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <span style={{ fontSize: 15.5, lineHeight: 1.4 }}>{ev.label}{ev.locked && <span style={{ fontSize: 12, color: "var(--faint)", marginLeft: 8 }}>Always on</span>}</span>
-                <Toggle on={on} onClick={() => { if (!ev.locked) setEvent(ev.k, { on: !on }); }} />
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>{m.label}</span>
+                  {m.timing && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{m.timing}</span>}
+                </span>
+                <Toggle on={on} onClick={() => setMsg(m.id, { enabled: !on })} />
               </div>
               {on && (
-                <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-                  {grp.channels.map((ch) => {
-                    const active = !!eff[ch];
-                    return (
-                      <button key={ch} onClick={() => setEvent(ev.k, { [ch]: !active })} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, fontSize: 13.5, fontWeight: active ? 600 : 400, background: active ? "var(--wash)" : "var(--panel2)", border: `1px solid ${active ? "var(--gold)" : "var(--border2)"}`, color: active ? "var(--text)" : "var(--sub)" }}>
-                        {CHANNEL_LABEL[ch]}{ch === "sms" ? " *" : ""}
-                      </button>
-                    );
-                  })}
+                <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                  {CH.map(([v, lbl]) => { const sel = (m.channel || "email") === v; return (
+                    <button key={v} onClick={() => setMsg(m.id, { channel: v })} style={{ flex: 1, padding: "8px 6px", borderRadius: 10, fontSize: 13, fontWeight: sel ? 600 : 400, background: sel ? "var(--wash)" : "var(--panel2)", border: `1px solid ${sel ? "var(--gold)" : "var(--border2)"}`, color: sel ? "var(--text)" : "var(--sub)", cursor: "pointer" }}>{lbl}{(v === "text" || v === "both") ? " *" : ""}</button>
+                  ); })}
                 </div>
               )}
             </div>
-          );
-        })}
-      </div>
-      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 14 }}>* Text messages start sending once your A2P carrier registration clears. Email and in-app push are active now.</p>
+          ); })}
+        </div>
+        <button onClick={onOpenMessages} style={{ marginTop: 14, background: "none", border: "none", color: "var(--gold)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "4px 2px", display: "inline-flex", alignItems: "center", gap: 5 }}>Edit wording & timing <ChevronRight size={15} /></button>
+        <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>* Texts begin once your A2P carrier registration clears; until then a “Text” or “Both” message is delivered by email.</p>
+      </>) : (<>
+        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>Push alerts to your team on the Vero iOS app. Each staff member also has to allow notifications on their own device.</p>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
+          {TEAM_ALERTS.map((ev, i) => { const on = sa[ev.k] !== false; return (
+            <div key={ev.k} style={{ padding: "15px 0", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>{ev.label}</span>
+                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{ev.desc} · Push</span>
+              </span>
+              <Toggle on={on} onClick={() => setSA(ev.k, !on)} />
+            </div>
+          ); })}
+        </div>
+      </>)}
     </div>
   );
 }
@@ -12887,7 +12866,6 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
 
   const patch = (pid, obj) => setProviders(providers.map((p) => p.id === pid ? { ...p, ...obj } : p));
   const patchComp = (pid, branch, obj) => setProviders(providers.map((p) => p.id === pid ? { ...p, comp: { ...defaultComp(), ...(p.comp || {}), [branch]: { ...defaultComp()[branch], ...((p.comp || {})[branch] || {}), ...obj } } } : p));
-  const patchNotif = (pid, obj) => setProviders(providers.map((p) => p.id === pid ? { ...p, notifications: { ...defaultStaffNotifications(), ...(p.notifications || {}), ...obj } } : p));
   const patchDay = (pid, dow, obj) => setProviders(providers.map((p) => p.id === pid ? { ...p, hours: { ...p.hours, [dow]: { ...p.hours[dow], ...obj } } } : p));
   // Write a one-off override for a specific date (does NOT touch the recurring weekly shift).
   // Uses the same hoursOverrides store the calendar reads, so exceptions are honored everywhere.
@@ -13039,28 +13017,8 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   }
 
   // ---------- NOTIFICATIONS ----------
-  if (section === "notifications") {
-    const n = { ...defaultStaffNotifications(), ...(person.notifications || {}) };
-    const Row = ({ label, k }) => (
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, padding: "14px 0" }}>
-        <span style={{ fontSize: 15.5, flex: 1, lineHeight: 1.4 }}>{label}</span>
-        <Toggle on={!!n[k]} onClick={() => patchNotif(person.id, { [k]: !n[k] })} />
-      </div>
-    );
-    const Group = ({ title, children }) => (
-      <div style={{ marginBottom: 8 }}><div style={{ fontSize: 17, fontWeight: 700, margin: "18px 0 4px", fontFamily: "'Fraunces', serif" }}>{title}</div>{children}</div>
-    );
-    return (
-      <div className="appt-screen" style={{ paddingBottom: 40 }}>
-        <SecHeader title="Notifications" onBack={() => setSection(null)} />
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "8px 18px 18px" }}>
-          <Group title="Send SMS when:"><Row label="Online bookings are created, changed, or removed" k="smsOnlineBooking" /><Row label="Other bookings are created, changed, or removed" k="smsOtherBooking" /></Group>
-          <Group title="Send email when:"><Row label="Online bookings are created" k="emailOnlineBooking" /></Group>
-          <Group title="Send mobile app notification when:"><Row label="New text message is received" k="appNewText" /><Row label="New web chat message is received" k="appNewChat" /><Row label="Missed call or voicemail is received" k="appMissedCall" /></Group>
-        </div>
-      </div>
-    );
-  }
+  // Per-staff notification prefs were removed — staff/client alerts now live in one place,
+  // Settings → Notifications (the wired NotificationsCenter). The old per-staff toggles were cosmetic.
 
   // ---------- SERVICES (per-staff) — reads/writes the SAME service.staff store as the service editor ----------
   if (section === "services") {
@@ -13572,7 +13530,6 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   }
 
   // ---------- MEMBER HUB (read-only view, MangoMint pattern: calm cards, each with its own Edit) ----------
-  const hubNotif = { ...defaultStaffNotifications(), ...(person.notifications || {}) };
   const hubComp = { ...defaultComp(), ...(person.comp || {}) };
   const hubSc = { ...defaultComp().service, ...hubComp.service };
   const hubSvcOn = services.filter((s) => ((s.staff && s.staff[person.id] && s.staff[person.id].on) !== false)).length;
@@ -13662,7 +13619,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         );
       })()}
       <HubCard label="Compensation" sec="comp" rows={[{ l: "Service commission", r: hubSc.on ? (hubSc.type === "basic" ? `${hubSc.basicPct}%` : "Sliding scale") : "Not set", muted: !hubSc.on }, { l: "Hourly", r: (hubComp.hourly && hubComp.hourly.on) ? `$${hubComp.hourly.rate}/hr` : "Off", muted: !(hubComp.hourly && hubComp.hourly.on) }]} />
-      <HubCard label="Sign-in & access" sec="access" rows={[{ l: "App access", r: person.pulseRole === "owner" ? "Owner" : "Staff member" }, { l: "Notifications", r: Object.values(hubNotif).some(Boolean) ? "On" : "Off", sec: "notifications" }, { l: "Permissions", r: person.userType === "Admin" ? "Admin defaults" : "Staff defaults", sec: "permissions" }]} />
+      <HubCard label="Sign-in & access" sec="access" rows={[{ l: "App access", r: person.pulseRole === "owner" ? "Owner" : "Staff member" }, { l: "Permissions", r: person.userType === "Admin" ? "Admin defaults" : "Staff defaults", sec: "permissions" }]} />
       <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
         <button onClick={() => { if (typeof window === "undefined" || window.confirm(`Archive ${person.name}? They're hidden from booking and the calendar, and can be restored anytime.`)) archive(person.id); }} style={{ background: "none", border: "none", color: "#C2563F", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 4, padding: 8, cursor: "pointer" }}>Archive {person.name}</button>
       </div>
@@ -15605,9 +15562,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "notifications", fullBleed: true, title: "Notifications", icon: Bell, category: "Business Setup",
-      status: "Clients, providers & shop",
-      keywords: "notifications alerts sms text email push reminders confirmation canceled rescheduled waitlist birthday end of day summary lapsed first time client who gets notified",
-      editor: <NotificationsEditor n={form.notifications} onChange={(nx) => setForm({ ...form, notifications: nx })} />,
+      status: "Who gets told what",
+      keywords: "notifications alerts sms text email push reminders confirmation canceled rescheduled waitlist birthday client staff team who gets notified by what method",
+      editor: <NotificationsCenter form={form} setForm={setForm} onOpenMessages={() => setOpenCard("messages")} />,
     },
     {
       id: "appearance", title: "Logo & Branding", icon: ImageIcon, category: "Business Setup",
@@ -17391,7 +17348,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const dur = src.end - src.start;
           const startMin = (summary.rebookStart != null) ? summary.rebookStart : earliestOpenSlot(src.providerId, nd, dur);
           const newAppt = { ...src, id: "rb" + Date.now() + Math.floor(Math.random() * 1000), status: "confirmed", paid: null, prepaid: false, rebookDiscount: (business?.rebook?.discountEnabled !== false ? (business?.rebook?.discount || 0) : 0), rebookDiscountType: business?.rebook?.discountType || "amount", bookedFor: nd.toISOString(), start: startMin, end: startMin + dur, photos: 0, hasPhotos: false, hasNote: false };
-          fireStaffPush({ shopId, title: "New booking", appt: newAppt });
+          fireStaffPush({ shopId, title: "New booking", appt: newAppt, event: "newBooking", business });
           done.push(newAppt);
         }
       }
@@ -17657,7 +17614,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     // until a later retry. This was the drag-to-reschedule-needs-a-few-tries bug.
     setAppts((cur) => cur.map((a) => a.id === p.appt.id ? { ...a, start: p.newStart, end: p.newEnd, bookedFor: bf.toISOString() } : a));
     if (notifyMove) { const _cl = (clients || []).find((c) => c.id === p.appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: moved, business, providers, contact: { email: _cl.email || "", phone: p.appt.phone || _cl.phone || "" } }); }
-    fireStaffPush({ shopId, title: "Appointment moved", appt: moved });
+    fireStaffPush({ shopId, title: "Appointment moved", appt: moved, event: "rescheduled", business });
     showToast(notifyMove ? `${p.appt.name} moved — client notified.` : `${p.appt.name} moved to ${fmtTime(p.newStart)}.`);
     setPending(null);
     setConflictModal(null);
@@ -17832,7 +17789,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     setAppts((cur) => [...cur, newAppt]);
     // Staff-created booking → fire the confirmation too (same engine as online bookings).
     fireApptNotify({ msgId: "booked", appt: newAppt, business, providers, contact: { email: (bookClient ? bookClient.email : walkInEmail) || "", phone: (bookClient ? bookClient.phone : walkInPhone) || "" }, subject: `${business.name}: Appointment confirmed` });
-    fireStaffPush({ shopId, title: "New booking", appt: newAppt });
+    fireStaffPush({ shopId, title: "New booking", appt: newAppt, event: "newBooking", business });
     setNewApptSlot(null);
     setConflictModal(null);
     showToast(`${newAppt.name} booked at ${fmtTime(useStart)}.`);
@@ -20115,7 +20072,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const DUR_OPTS = []; for (let m = 5; m <= 240; m += 5) DUR_OPTS.push(m);
   const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setDraftDate(appt.bookedFor ? new Date(appt.bookedFor) : new Date()); setNotifyChange(false); setPickList(null); setDateOpen(false); setMode("edit"); setMenuOpen(false); };
   const cancelEdit = () => { setPickList(null); setDateOpen(false); setNotifyChange(false); setMode("detail"); };
-  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged; onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); if (willNotify) { const _cl = (clients || []).find((c) => c.id === appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: { ...appt, start: draftStart, end: draftStart + draftDur, providerId: draftProvider, bookedFor: bf.toISOString() }, business, providers, contact: { email: _cl.email || "", phone: appt.phone || _cl.phone || "" } }); } if (timeOrDayChanged) { fireStaffPush({ shopId, title: "Appointment moved", appt: { ...appt, start: draftStart, bookedFor: bf.toISOString() } }); } showToast(willNotify ? "Updated — client notified." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
+  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged; onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); if (willNotify) { const _cl = (clients || []).find((c) => c.id === appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: { ...appt, start: draftStart, end: draftStart + draftDur, providerId: draftProvider, bookedFor: bf.toISOString() }, business, providers, contact: { email: _cl.email || "", phone: appt.phone || _cl.phone || "" } }); } if (timeOrDayChanged) { fireStaffPush({ shopId, title: "Appointment moved", appt: { ...appt, start: draftStart, bookedFor: bf.toISOString() }, event: "rescheduled", business }); } showToast(willNotify ? "Updated — client notified." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
   // TODO(SMS live): when willNotify, dispatch the reschedule/moved template to the client's phone.
 
   // ---- price (admin-editable; per-appointment override stored on appt.price) ----
