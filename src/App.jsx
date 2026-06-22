@@ -2203,7 +2203,7 @@ function Storefront({ business, services = [], providers = [], categories = [], 
           <div style={{ display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap" }}>
             {realProviders.map((p) => (
               <div key={p.id} style={{ textAlign: "center", width: 96 }}>
-                <Avatar size={72} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
+                <Avatar size={72} initial={p.name?.charAt(0)} color={p.color} photo={p.photo} />
                 <div style={{ fontSize: 14.5, fontWeight: 500, marginTop: 8 }}>{p.name}</div>
                 {p.role && <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{p.role}</div>}
               </div>
@@ -3905,7 +3905,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   setSelectedDate(null); setSlot(null);
                   setSimpleStep(null); setStep(6);
                 }} style={{ border: "1px solid var(--border)", borderRadius: 13, minHeight: 104, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--panel)", padding: "10px 6px", color: "var(--text)", cursor: "pointer" }}>
-                  <Avatar size={46} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
+                  <Avatar size={46} initial={p.name?.charAt(0)} color={p.color} photo={p.photo} />
                   <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, textAlign: "center", lineHeight: 1.2 }}>{p.name}</span>
                 </button>
               ))}
@@ -6901,7 +6901,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               )}
               {realProviders.filter((p) => p.id !== me?.id).map((p) => (
                 <button key={p.id} onClick={() => { setPulseView(p.id); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 12px", background: pulseView === p.id ? "var(--panel2)" : "transparent", color: "var(--text)", border: `1px solid ${pulseView === p.id ? "var(--border2)" : "transparent"}`, borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
-                  <Avatar size={32} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
+                  <Avatar size={32} initial={p.name?.charAt(0)} color={p.color} photo={p.photo} />
                   <span style={{ flex: 1, fontWeight: 500 }}>{p.name}</span>
                   <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500 }}>{fmtMoney(provToday(p.id))}</span>
                   {pulseView === p.id && <Check size={17} style={{ color: "var(--gold)" }} />}
@@ -8349,7 +8349,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
               <div key={r.prov.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px 20px" }}>
                 {/* Barber row */}
                 <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
-                  <Avatar size={42} initial={r.prov.name.charAt(0)} color={r.prov.color} photo={r.prov.photo} />
+                  <Avatar size={42} initial={r.prov.name?.charAt(0)} color={r.prov.color} photo={r.prov.photo} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.prov.name}</div>
                     {r.prov.role && <div style={{ fontSize: 13, color: "var(--sub)" }}>{r.prov.role}</div>}
@@ -9356,7 +9356,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
                 <div style={{ display: "grid", gap: 8 }}>
                   {realProviders.map((p) => (
                     <button key={p.id} onClick={() => { if (p.pin) { setPinFor(p.id); setPinEntry(""); setPinErr(false); } else { setSignedInAs(p.id); setShowSignInPicker(false); } }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: signedInAs === p.id ? "var(--tint2)" : "var(--panel2)", border: `1px solid ${signedInAs === p.id ? "var(--gold)" : "var(--border2)"}`, color: "var(--text)", borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
-                      <Avatar size={36} initial={p.name.charAt(0)} color={p.color} photo={p.photo} />
+                      <Avatar size={36} initial={p.name?.charAt(0)} color={p.color} photo={p.photo} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 15.5, fontWeight: 500 }}>{p.name}</div>
                         <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{p.role}{p.pulseRole === "owner" ? " · Owner" : ""}{p.pin ? " · PIN" : ""}</div>
@@ -9858,7 +9858,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <div key={p.id} style={{ ...cardStyle, padding: "16px 18px", opacity: on ? 1 : 0.55, transition: "opacity .18s ease" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-                  <span style={{ width: 38, height: 38, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 16, flexShrink: 0 }}>{p.name.charAt(0)}</span>
+                  <span style={{ width: 38, height: 38, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 16, flexShrink: 0 }}>{p.name?.charAt(0)}</span>
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 16, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
                     <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 1 }}>{on ? (overridden ? "Custom price · time" : "Service default") : "Not offering"}</span>
@@ -12929,7 +12929,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           {active.map((p, i) => editMode ? (
             <div key={p.id} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "14px 4px", borderBottom: "1px solid var(--line)" }}>
               <button onClick={() => archive(p.id)} aria-label={`Archive ${p.name}`} style={{ width: 24, height: 24, borderRadius: "50%", background: "#C2563F", color: "#fff", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "none", padding: 0, fontSize: 20, lineHeight: 0, fontWeight: 600 }}>−</button>
-              <Avatar size={40} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--gold)"} />
+              <Avatar size={40} photo={staffPhoto(p)} initial={p.name?.charAt(0)} color={p.color || "var(--gold)"} />
               <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{p.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{p.role}</div></div>
               <div style={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
                 <button onClick={() => moveStaff(p.id, -1)} disabled={i === 0} style={{ background: "none", color: i === 0 ? "var(--faint)" : "var(--sub)", padding: 3, opacity: i === 0 ? 0.4 : 1 }}><ChevronUp size={18} /></button>
@@ -12939,7 +12939,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           ) : (
             <button key={p.id} onClick={() => { setOpenId(p.id); setSection(null); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-                <Avatar size={40} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--gold)"} />
+                <Avatar size={40} photo={staffPhoto(p)} initial={p.name?.charAt(0)} color={p.color || "var(--gold)"} />
                 <div style={{ minWidth: 0 }}><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{p.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[p.role, p.id !== "anyone" ? (p.email || p.phone) : null].filter(Boolean).join(" · ") || "No title set"}</div></div>
               </div>
               <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
@@ -12957,7 +12957,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             <div style={{ display: "flex", flexDirection: "column" }}>
               {archived.map((p) => (
                 <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 4px", borderBottom: "1px solid var(--line)" }}>
-                  <Avatar size={40} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--faint)"} />
+                  <Avatar size={40} photo={staffPhoto(p)} initial={p.name?.charAt(0)} color={p.color || "var(--faint)"} />
                   <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px", color: "var(--sub)" }}>{p.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Archived</div></div>
                   <button onClick={() => restore(p.id)} style={{ background: "none", color: "var(--gold)", fontSize: 14, fontWeight: 500 }}>Restore</button>
                 </div>
@@ -12979,7 +12979,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         {/* avatar */}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 22 }}>
           <button onClick={() => setPicker(true)} style={{ position: "relative", width: 96, height: 96, borderRadius: "50%", background: "none", border: "none", padding: 0 }}>
-            <Avatar size={96} photo={person.id === "anyone" ? null : staffPhoto(person)} initial={person.name.charAt(0)} color={person.color || "var(--gold)"} />
+            <Avatar size={96} photo={person.id === "anyone" ? null : staffPhoto(person)} initial={person.name?.charAt(0)} color={person.color || "var(--gold)"} />
             <span style={{ position: "absolute", bottom: 2, right: 2, width: 30, height: 30, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={14} /></span>
           </button>
         </div>
@@ -13582,7 +13582,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
         <BackBar to="Team" onClick={() => setOpenId(null)} style={{ marginBottom: 0 }} />
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
-        <Avatar size={56} photo={person.id === "anyone" ? null : staffPhoto(person)} initial={person.name.charAt(0)} color={person.color || "var(--gold)"} />
+        <Avatar size={56} photo={person.id === "anyone" ? null : staffPhoto(person)} initial={person.name?.charAt(0)} color={person.color || "var(--gold)"} />
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, lineHeight: 1.1 }}>{person.name}</div>
           <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", gap: 7 }}>
@@ -16979,7 +16979,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             <div style={{ ...fieldWrap }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 17 }}>{client.name.charAt(0)}</div>
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 17 }}>{client.name?.charAt(0)}</div>
                   <div><div style={{ fontSize: 17, fontWeight: 500 }}>{client.name}</div><div style={{ fontSize: 14, color: "var(--sub)" }}>{client.phone || `${client.visits} visits`}</div></div>
                 </div>
                 <button onClick={() => setClient(null)} style={{ background: "none", color: "var(--gold)", fontSize: 14.5 }}>Change</button>
@@ -17026,7 +17026,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
                 <div style={{ display: "grid", gap: 6, maxHeight: 280, overflowY: "auto", marginTop: 16 }}>
                   {matches.map((c) => (
                     <button key={c.id} onClick={() => { setClient(c); setQ(""); }} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 14px", color: "var(--text)", textAlign: "left" }}>
-                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 14 }}>{c.name.charAt(0)}</div>
+                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 14 }}>{c.name?.charAt(0)}</div>
                       <div style={{ flex: 1 }}><div style={{ fontSize: 15 }}>{c.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{c.phone || `${c.visits} visits`}</div></div>
                     </button>
                   ))}
@@ -21217,320 +21217,6 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
   );
 }
 
-// Estimated taxes — a standalone, dedicated report. Per-staff set-aside estimate
-// from real appointment revenue, with an editable rate per barber and a firm
-// disclaimer that this is only an estimate, not tax advice.
-function TaxReportView({ appts, providers, services, business, setBusiness, me }) {
-  const [range, setRange] = useState("week"); // today | week | month | year
-  const staff = providers.filter((p) => p.id !== "anyone");
-  const money = (n) => "$" + Math.round(n).toLocaleString();
-  const priceOf = (a) => { const s = services.find((x) => x.id === a.serviceId); return s ? s.price : 45; };
-
-  // Real revenue per staff over the chosen window.
-  const now = new Date();
-  const start = new Date(now);
-  if (range === "today") start.setHours(0, 0, 0, 0);
-  else if (range === "week") start.setDate(now.getDate() - 7);
-  else if (range === "month") start.setMonth(now.getMonth() - 1);
-  else start.setFullYear(now.getFullYear() - 1);
-  const inWindow = (a) => { const d = new Date(a.bookedFor); return !isNaN(d) && d >= start && d <= now; };
-  const counts = (a) => a.status !== "block" && a.status !== "cancelled" && a.status !== "no-show";
-
-  const rows = staff.map((p) => {
-    const mine = appts.filter((a) => a.providerId === p.id && counts(a) && inWindow(a));
-    return { id: p.id, name: p.name, revenue: mine.reduce((s, a) => s + priceOf(a), 0), count: mine.length };
-  });
-
-  const taxRates = business?.taxSetAside || {};
-  const rateFor = (pid) => { const r = taxRates[pid]; return (typeof r === "number" && r >= 0 && r <= 100) ? r : 25; };
-  const [rateEdit, setRateEdit] = useState(null);
-  const [rateDraft, setRateDraft] = useState("");
-  const saveRate = (pid) => {
-    const v = Math.max(0, Math.min(100, Math.round(Number(rateDraft) || 0)));
-    if (setBusiness) setBusiness({ taxSetAside: { ...(business?.taxSetAside || {}), [pid]: v } });
-    setRateEdit(null); setRateDraft("");
-  };
-
-  const rangeLabel = range === "today" ? "Today" : range === "week" ? "This week" : range === "month" ? "This month" : "This year";
-  const earnedSub = range === "today" ? "Earned today" : range === "week" ? "Earned this week" : range === "month" ? "Earned this month" : "Earned this year";
-  const meRow = rows.find((r) => r.id === (me?.id)) || rows[0] || { id: staff[0]?.id || "dan", name: me?.name || "You", revenue: 0 };
-  const meRate = rateFor(meRow.id);
-  const meAside = meRow.revenue * (meRate / 100);
-  const isEditingMe = rateEdit === meRow.id;
-  const FONT_BODY = "'Jost', sans-serif";
-
-  return (
-    <div className="fade-up" style={{ paddingBottom: 24 }}>
-      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 4 }}>Estimated taxes</h2>
-      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 16, fontWeight: 300 }}>A simple set-aside guide so you're not caught short at tax time.</p>
-
-      {/* range */}
-      <RptPeriod value={range} onChange={setRange} options={[["week", "Week"], ["month", "Month"], ["year", "Year"]]} style={{ marginBottom: 20 }} />
-
-      <RptLabel>{rangeLabel}</RptLabel>
-
-      {/* hero — logged-in staff */}
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 20px", marginBottom: 22 }}>
-        <div style={{ fontSize: 11.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 12 }}>{(meRow.name || "You").split(" ")[0]} · set aside for taxes</div>
-        <div style={{ ...RPT_HERO }}>{money(meRow.revenue)}</div>
-        <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 8 }}>{earnedSub}</div>
-        <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-          <span style={{ fontSize: 16, color: "var(--text)" }}>Suggested set-aside</span>
-          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, lineHeight: 1, letterSpacing: "-0.5px", color: "var(--text)" }}>{money(meAside)}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 16 }}>
-          {isEditingMe ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input autoFocus type="number" inputMode="numeric" value={rateDraft} onChange={(e) => setRateDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveRate(meRow.id); }} placeholder={String(meRate)} style={{ width: 64, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "9px 11px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, textAlign: "center", boxSizing: "border-box" }} />
-              <span style={{ fontSize: 15, color: "var(--sub)" }}>%</span>
-              <button onClick={() => saveRate(meRow.id)} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 9, padding: "9px 15px", fontSize: 13, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Save</button>
-              <button onClick={() => { setRateEdit(null); setRateDraft(""); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
-            </div>
-          ) : (
-            <>
-              <span style={{ display: "inline-block", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 20, padding: "8px 16px", fontSize: 14, color: "var(--text)" }}>{meRate}%{taxRates[meRow.id] == null ? " · default" : ""}</span>
-              <button onClick={() => { setRateEdit(meRow.id); setRateDraft(String(meRate)); }} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 14.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 3, padding: "6px 2px", cursor: "pointer", fontFamily: FONT_BODY }}>Change %</button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* per barber */}
-      <RptLabel>Per staff member</RptLabel>
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "6px 20px", marginBottom: 22 }}>
-        {rows.map((s, i) => {
-          const r = rateFor(s.id);
-          const aside = s.revenue * (r / 100);
-          const editing = rateEdit === s.id;
-          return (
-            <div key={s.id} style={{ padding: "16px 0", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <span style={{ fontSize: 15.5, color: "var(--text)" }}>{s.name}</span>
-                <span style={{ fontSize: 14.5, color: "var(--sub)" }}>{money(s.revenue)} <span style={{ color: "var(--faint)" }}>→</span> set aside <b style={{ color: "var(--text)", fontWeight: 600 }}>{money(aside)}</b></span>
-              </div>
-              <div style={{ marginTop: 9 }}>
-                {editing ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <input autoFocus type="number" inputMode="numeric" value={rateDraft} onChange={(e) => setRateDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveRate(s.id); }} placeholder={String(r)} style={{ width: 60, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 9, padding: "7px 9px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, textAlign: "center", boxSizing: "border-box" }} />
-                    <span style={{ fontSize: 14, color: "var(--sub)" }}>%</span>
-                    <button onClick={() => saveRate(s.id)} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 8, padding: "7px 13px", fontSize: 12.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Save</button>
-                    <button onClick={() => { setRateEdit(null); setRateDraft(""); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, cursor: "pointer" }}>Cancel</button>
-                  </div>
-                ) : (
-                  <button onClick={() => { setRateEdit(s.id); setRateDraft(String(r)); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, padding: 0, cursor: "pointer", fontFamily: FONT_BODY }}>{r}% rate · <span style={{ color: "var(--text)", textDecoration: "underline", textUnderlineOffset: 2 }}>change</span></button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* disclaimer */}
-      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px" }}>
-        <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>Important — please read</div>
-        <p style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.6, margin: 0 }}>
-          These figures are a rough estimate only and are <b style={{ color: "var(--text)", fontWeight: 600 }}>not tax advice</b>. They apply a flat percentage to gross booking revenue shown in Vero and do not account for tips, cash payments, business expenses, deductions, credits, your filing status, or your federal, state, and local tax obligations. Your actual tax owed may be significantly higher or lower. Vero is not a tax preparer, accountant, or financial advisor, and is not responsible for amounts you set aside or owe. Consult a qualified tax professional before making financial or tax decisions.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// Reports — owner dashboard. Computes live from real appointments + service
-// prices where possible; trend/retention use representative sample data until
-// the backend stores real sales history.
-function ReportsView({ appts, clients, providers, services, business, setBusiness, me }) {
-  const [range, setRange] = useState("week"); // today | week | month
-  const staff = providers.filter((p) => p.id !== "anyone");
-  const money = (n) => "$" + Math.round(n).toLocaleString();
-  const priceOf = (a) => { const s = services.find((x) => x.id === a.serviceId); return s ? s.price : 45; };
-
-  // ---- Tax set-aside ----
-  // Per-barber rate overrides live on business.taxSetAside ({ providerId: percent }).
-  // Default 25%. Reads the real per-staff revenue (byStaff), never the sample trend.
-  const taxRates = business?.taxSetAside || {};
-  const rateFor = (pid) => { const r = taxRates[pid]; return (typeof r === "number" && r >= 0 && r <= 100) ? r : 25; };
-  const [rateEdit, setRateEdit] = useState(null); // providerId currently editing, or null
-  const [rateDraft, setRateDraft] = useState("");
-  const saveRate = (pid) => {
-    const v = Math.max(0, Math.min(100, Math.round(Number(rateDraft) || 0)));
-    if (setBusiness) setBusiness({ taxSetAside: { ...(business?.taxSetAside || {}), [pid]: v } });
-    setRateEdit(null); setRateDraft("");
-  };
-
-  // ---- live figures from current appointments ----
-  const active = appts.filter((a) => a.status !== "block" && a.status !== "cancelled");
-  const todayRevenue = active.reduce((sum, a) => sum + priceOf(a), 0);
-  const todayCount = active.length;
-  const avgTicket = todayCount ? todayRevenue / todayCount : 0;
-  const cancelled = appts.filter((a) => a.status === "cancelled").length;
-
-  // per-staff (live)
-  const byStaff = staff.map((p) => {
-    const mine = active.filter((a) => a.providerId === p.id);
-    return { id: p.id, name: p.name, color: p.color, count: mine.length, revenue: mine.reduce((s, a) => s + priceOf(a), 0) };
-  }).sort((a, b) => b.revenue - a.revenue);
-
-  // ---- representative trend (sample — real history needs the backend) ----
-  const mult = range === "today" ? 1 : range === "week" ? 6 : 26;
-  const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const weekTrend = [820, 640, 910, 1180, 1540, 1720, 0].map((v) => Math.round(v * (todayRevenue ? todayRevenue / 700 : 1)));
-  const maxTrend = Math.max(...weekTrend, 1);
-  const periodRevenue = Math.round(todayRevenue * mult);
-  const periodAppts = todayCount * mult;
-  const retention90 = 68; // % returning within 90 days (sample)
-  const rebookRate = 54;  // % who rebooked on the spot (sample)
-  const topServices = [...services].slice(0, 5).map((s, i) => ({ name: s.name, sold: [38, 27, 19, 12, 8][i] || 5, rev: ([38, 27, 19, 12, 8][i] || 5) * (s.price || 40) }));
-  const maxSvc = Math.max(...topServices.map((s) => s.rev), 1);
-
-  const Stat = ({ label, value, sub }) => (
-    <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 12.5, letterSpacing: 1, color: "var(--faint)", marginBottom: 6, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
-      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 5 }}>{sub}</div>}
-    </div>
-  );
-
-  return (
-    <div className="fade-up" style={{ paddingBottom: 20 }}>
-      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 4 }}>Reports</h2>
-      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 16, fontWeight: 300 }}>How the shop is performing at a glance.</p>
-
-      {/* range toggle */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-        {[["today", "Today"], ["week", "This week"], ["month", "This month"]].map(([v, label]) => { const on = range === v; return (
-          <button key={v} onClick={() => setRange(v)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
-        ); })}
-      </div>
-
-      {/* headline stats */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-        <Stat label="Revenue" value={money(periodRevenue)} sub={range === "today" ? "booked today" : "estimated"} />
-        <Stat label="Appointments" value={periodAppts} sub={`${cancelled} cancelled`} />
-      </div>
-      <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>
-        <Stat label="Avg ticket" value={money(avgTicket)} />
-        <Stat label="Rebooked" value={rebookRate + "%"} sub="on the spot" />
-      </div>
-
-      {/* revenue trend */}
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}><TrendingUp size={17} style={{ color: "var(--gold)" }} /><span style={{ fontSize: 15.5, fontWeight: 600 }}>Revenue this week</span></div>
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8, height: 130 }}>
-          {weekTrend.map((v, i) => (
-            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, height: "100%", justifyContent: "flex-end" }}>
-              <div style={{ width: "100%", maxWidth: 30, height: `${Math.max(4, (v / maxTrend) * 100)}%`, background: i === 5 ? "var(--gold)" : "var(--tint2)", borderRadius: "6px 6px 0 0", transition: "height .3s var(--ease)" }} />
-              <span style={{ fontSize: 11.5, color: "var(--faint)" }}>{dayLabels[i]}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* by staff */}
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}><Users size={17} style={{ color: "var(--gold)" }} /><span style={{ fontSize: 15.5, fontWeight: 600 }}>By staff member</span></div>
-        {byStaff.map((s) => { const max = Math.max(...byStaff.map((x) => x.revenue), 1); return (
-          <div key={s.name} style={{ marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}><span style={{ fontSize: 14.5 }}>{s.name}</span><span style={{ fontSize: 14, color: "var(--sub)" }}>{money(s.revenue)} · {s.count} appts</span></div>
-            <div style={{ height: 8, borderRadius: 4, background: "var(--panel2)", overflow: "hidden" }}><div style={{ height: "100%", width: `${(s.revenue / max) * 100}%`, background: s.color || "var(--gold)", borderRadius: 4 }} /></div>
-          </div>
-        ); })}
-      </div>
-
-      {/* tax set-aside */}
-      {(() => {
-        const rangeLabel = range === "today" ? "Today" : range === "week" ? "This week" : "This month";
-        const earnedSub = range === "today" ? "Earned today" : range === "week" ? "Earned this week" : "Earned this month";
-        const meRow = byStaff.find((s) => s.id === (me?.id)) || byStaff[0] || { id: staff[0]?.id || "dan", name: me?.name || staff[0]?.name || "You", revenue: 0 };
-        const meRate = rateFor(meRow.id);
-        const meEarned = meRow.revenue;
-        const meAside = meEarned * (meRate / 100);
-        const isEditingMe = rateEdit === meRow.id;
-        return (
-        <>
-          <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "4px 2px 10px" }}>Reports · {rangeLabel}</div>
-          {/* hero — logged-in staff's own set-aside */}
-          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 20px", marginBottom: 22 }}>
-            <div style={{ fontSize: 11.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 12 }}>{(meRow.name || "You").split(" ")[0]} · set aside for taxes</div>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: "-1px", color: "var(--text)" }}>{money(meEarned)}</div>
-            <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 8 }}>{earnedSub}</div>
-            <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-              <span style={{ fontSize: 16, color: "var(--text)" }}>Suggested set-aside</span>
-              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, lineHeight: 1, letterSpacing: "-0.5px", color: "var(--text)" }}>{money(meAside)}</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 16 }}>
-              {isEditingMe ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <input autoFocus type="number" inputMode="numeric" value={rateDraft} onChange={(e) => setRateDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveRate(meRow.id); }} placeholder={String(meRate)} style={{ width: 64, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "9px 11px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, textAlign: "center", boxSizing: "border-box" }} />
-                  <span style={{ fontSize: 15, color: "var(--sub)" }}>%</span>
-                  <button onClick={() => saveRate(meRow.id)} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 9, padding: "9px 15px", fontSize: 13, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Save</button>
-                  <button onClick={() => { setRateEdit(null); setRateDraft(""); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Cancel</button>
-                </div>
-              ) : (
-                <>
-                  <span style={{ display: "inline-block", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 20, padding: "8px 16px", fontSize: 14, color: "var(--text)" }}>{meRate}%{taxRates[meRow.id] == null ? " · default" : ""}</span>
-                  <button onClick={() => { setRateEdit(meRow.id); setRateDraft(String(meRate)); }} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 14.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 3, padding: "6px 2px", cursor: "pointer", fontFamily: FONT_BODY }}>Change %</button>
-                </>
-              )}
-            </div>
-            <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.55, margin: "18px 0 0" }}>Estimate only — a simple guide so you're not caught short. Your real tax depends on expenses, deductions, and filing status. Check with a tax professional.</p>
-          </div>
-
-          {/* per barber */}
-          <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 10px" }}>Per staff member</div>
-          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "6px 20px", marginBottom: 22 }}>
-            {byStaff.map((s, i) => {
-              const r = rateFor(s.id);
-              const aside = s.revenue * (r / 100);
-              const editing = rateEdit === s.id;
-              return (
-                <div key={s.id} style={{ padding: "16px 0", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                    <span style={{ fontSize: 15.5, color: "var(--text)" }}>{s.name}</span>
-                    <span style={{ fontSize: 14.5, color: "var(--sub)" }}>{money(s.revenue)} <span style={{ color: "var(--faint)" }}>→</span> set aside <b style={{ color: "var(--text)", fontWeight: 600 }}>{money(aside)}</b></span>
-                  </div>
-                  <div style={{ marginTop: 9 }}>
-                    {editing ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <input autoFocus type="number" inputMode="numeric" value={rateDraft} onChange={(e) => setRateDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveRate(s.id); }} placeholder={String(r)} style={{ width: 60, background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 9, padding: "7px 9px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, textAlign: "center", boxSizing: "border-box" }} />
-                        <span style={{ fontSize: 14, color: "var(--sub)" }}>%</span>
-                        <button onClick={() => saveRate(s.id)} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 8, padding: "7px 13px", fontSize: 12.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Save</button>
-                        <button onClick={() => { setRateEdit(null); setRateDraft(""); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, cursor: "pointer" }}>Cancel</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => { setRateEdit(s.id); setRateDraft(String(r)); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, padding: 0, cursor: "pointer", fontFamily: FONT_BODY }}>{r}% rate · <span style={{ color: "var(--text)", textDecoration: "underline", textUnderlineOffset: 2 }}>change</span></button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-        );
-      })()}
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}><BarChart3 size={17} style={{ color: "var(--gold)" }} /><span style={{ fontSize: 15.5, fontWeight: 600 }}>Top services</span></div>
-        {topServices.map((s) => (
-          <div key={s.name} style={{ marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}><span style={{ fontSize: 14.5 }}>{s.name}</span><span style={{ fontSize: 14, color: "var(--sub)" }}>{money(s.rev)} · {s.sold} sold</span></div>
-            <div style={{ height: 8, borderRadius: 4, background: "var(--panel2)", overflow: "hidden" }}><div style={{ height: "100%", width: `${(s.rev / maxSvc) * 100}%`, background: "var(--gold)", borderRadius: 4 }} /></div>
-          </div>
-        ))}
-      </div>
-
-      {/* retention */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-        <Stat label="Client retention" value={retention90 + "%"} sub="returned in 90 days" />
-        <Stat label="Total clients" value={clients.length.toLocaleString()} />
-      </div>
-
-      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, textAlign: "center", padding: "4px 10px" }}>Headline numbers and staff breakdown are calculated from your live appointments. Weekly trends and retention show representative figures until sales history is being stored.</p>
-    </div>
-  );
-}
-
 function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner, shopId, appts, setAppts, waitlist, setWaitlist }) {
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
@@ -21661,7 +21347,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         <User size={17} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}</div>
+      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}</div>
       {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : "No clients yet — tap + to add your first one."}</p>}
     </div>
 
@@ -21725,7 +21411,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
               const provider = providers.find((p) => p.id === o.c.provider) || providers[1];
               return (
                 <div key={o.c.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 25%, var(--border))", borderRadius: 16, padding: "12px 14px" }}>
-                  <Avatar size={40} photo={clientPhoto(o.c)} initial={o.c.name.charAt(0)} color={provider.color} />
+                  <Avatar size={40} photo={clientPhoto(o.c)} initial={o.c.name?.charAt(0)} color={provider.color} />
                   <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => { setShowNudgeFolder(false); onOpen(o.c); }}>
                     <div style={{ fontSize: 15.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.c.name}</div>
                     <div style={{ fontSize: 13, color: "var(--sub)" }}>Usually every {o.c.cadenceDays}d · <span style={{ color: "var(--gold)", fontWeight: 600 }}>{o.over}d overdue</span></div>
@@ -22161,7 +21847,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           <div style={cardStyle}>
             {family.map((m, i) => (
               <button key={m.id} onClick={() => setOpenMember(m.id)} style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 18px", borderTop: i === 0 ? "none" : "1px solid var(--line)", width: "100%", background: "none", border: "none", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
-                <span style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 15, flexShrink: 0 }}>{m.name.charAt(0)}</span>
+                <span style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 15, flexShrink: 0 }}>{m.name?.charAt(0)}</span>
                 <span style={{ flex: 1 }}><b style={{ display: "block", fontWeight: 500, fontSize: 14.5 }}>{m.name}</b>{m.note && <span style={{ fontSize: 12, color: "var(--sub)" }}>{m.note}</span>}</span>
                 {chev}
               </button>
@@ -22190,7 +21876,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           <div style={{ paddingBottom: 24, paddingTop: 8 }}>
             <BackBar to="Family" onClick={() => setOpenMember(null)} />
             <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 20 }}>
-              <div style={{ width: 48, height: 48, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 20, flexShrink: 0 }}>{m.name.charAt(0)}</div>
+              <div style={{ width: 48, height: 48, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 20, flexShrink: 0 }}>{m.name?.charAt(0)}</div>
               <div><div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{m.name}</div>{m.note && <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{m.note}</div>}</div>
             </div>
             <div style={tabLabel}>Note</div>
@@ -22457,7 +22143,7 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
             return (
               <button key={c.id} onClick={() => setActiveId(c.id)} style={{ display: "flex", alignItems: "center", gap: 14, background: "transparent", border: "none", padding: "14px 4px", textAlign: "left", color: "var(--text)", borderBottom: "1px solid var(--line)", cursor: "pointer" }}>
                 <div onClick={(e) => { e.stopPropagation(); if (onOpenClient) onOpenClient(c); }} style={{ flexShrink: 0, cursor: "pointer" }} aria-label={`Open ${c.name}'s profile`}>
-                  <Avatar size={46} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provColor(c)} />
+                  <Avatar size={46} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provColor(c)} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
@@ -22486,7 +22172,7 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
                 <p style={{ fontSize: 13.5, color: "var(--faint)", textAlign: "center", padding: "24px 0" }}>No clients match “{composeQ}”.</p>
               ) : composeList.map((c) => (
                 <button key={c.id} onClick={() => startWith(c)} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", background: "none", border: "none", borderBottom: "1px solid var(--line)", padding: "11px 4px", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-                  <Avatar size={38} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provColor(c)} />
+                  <Avatar size={38} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provColor(c)} />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 15.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
                     {c.phone && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 1 }}>{c.phone}</span>}
@@ -22510,7 +22196,7 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px 12px", borderBottom: "1px solid var(--line)", position: "relative" }}>
         <button onClick={() => setActiveId(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", fontSize: 15, position: "absolute", left: 6, top: 8, zIndex: 2 }}><ChevronLeft size={26} /></button>
         <button onClick={() => { if (onOpenClient) onOpenClient(active); }} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "none", border: "none", color: "var(--text)", padding: 0, cursor: "pointer" }} aria-label={`Open ${active.name}'s profile`}>
-          <Avatar size={50} photo={clientPhoto(active)} initial={active.name.charAt(0)} color={provColor(active)} />
+          <Avatar size={50} photo={clientPhoto(active)} initial={active.name?.charAt(0)} color={provColor(active)} />
           <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 14.5, color: "var(--text)" }}>{active.name.split(" ")[0]} <ChevronRight size={13} style={{ color: "var(--faint)" }} /></div>
         </button>
       </div>
