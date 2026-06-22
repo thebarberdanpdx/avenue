@@ -16148,7 +16148,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     const hasToggle = refreshed && !!c.toggle;
     return (
       <div style={{ position: "relative", background: "var(--panel)", borderTop: first ? "none" : "1px solid var(--line)" }}>
-        <button onClick={() => setOpenCard(c.id)} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 12, padding: refreshed ? "17px 17px" : "16px 17px", minHeight: refreshed ? 60 : "auto", textAlign: "left", cursor: "pointer" }}>
+        {/* role="button" (not <button>) so the inner Explain/toggle controls aren't nested buttons (invalid HTML) */}
+        <div role="button" tabIndex={0} onClick={() => setOpenCard(c.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenCard(c.id); } }} aria-label={`Open ${c.title}`} style={{ width: "100%", background: "none", border: "none", color: "var(--text)", display: "flex", alignItems: "center", gap: 12, padding: refreshed ? "17px 17px" : "16px 17px", minHeight: refreshed ? 60 : "auto", textAlign: "left", cursor: "pointer", boxSizing: "border-box" }}>
           <div style={{ minWidth: 0, flexShrink: 0, maxWidth: hasToggle ? "82%" : "52%" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
               <span style={{ fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px", whiteSpace: refreshed ? "normal" : "normal" }}>{c.title}</span>
@@ -16167,7 +16168,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
               <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </span>
           )}
-        </button>
+        </div>
       </div>
     );
   };
