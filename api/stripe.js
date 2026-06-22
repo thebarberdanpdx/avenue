@@ -99,7 +99,7 @@ export default async function handler(req, res) {
     // --- Charge a saved card -------------------------------------------------
     // Used for a no-show fee. `amount` is in dollars; Stripe works in cents.
     if (action === "charge") {
-      const { customerId, paymentMethodId, amount, description } = body;
+      const { customerId, paymentMethodId, amount, description, idempotencyKey } = body;
       if (!customerId || !paymentMethodId || !amount) {
         return res.status(400).json({ error: "Missing customerId, paymentMethodId, or amount." });
       }
@@ -111,7 +111,7 @@ export default async function handler(req, res) {
         off_session: true,
         confirm: true,
         description: description || "Vero — no-show fee",
-      });
+      }, idempotencyKey ? { idempotencyKey } : undefined); // dedupe retries of the same charge
       return res.status(200).json({ status: pi.status, id: pi.id });
     }
 
@@ -136,13 +136,13 @@ export default async function handler(req, res) {
     // Full refund if `amount` is omitted; partial refund (also used to give a
     // discount after the fact) when `amount` (in dollars) is provided.
     if (action === "refund") {
-      const { paymentIntentId, amount } = body;
+      const { paymentIntentId, amount, idempotencyKey } = body;
       if (!paymentIntentId) {
         return res.status(400).json({ error: "Missing paymentIntentId." });
       }
       const params = { payment_intent: paymentIntentId };
       if (amount) params.amount = Math.round(Number(amount) * 100);
-      const r = await stripe.refunds.create(params);
+      const r = await stripe.refunds.create(params, idempotencyKey ? { idempotencyKey } : undefined); // dedupe retries of the same refund
       return res.status(200).json({ status: r.status, id: r.id, amount: (r.amount || 0) / 100 });
     }
 

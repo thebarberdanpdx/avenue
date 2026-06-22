@@ -731,6 +731,26 @@ function getStripe() {
   });
   return _stripePromise;
 }
+// ---- Idempotency for money-moving actions ----------------------------------
+// A retried charge/refund (e.g. the response was lost on a flaky connection)
+// must never move money twice. Each logical operation gets a stable key, reused
+// while the operation is still outstanding so Stripe collapses duplicates. The
+// key is derived from the operation's parameters (card / payment-intent + the
+// exact amount) so two genuinely different amounts never collide. We rotate the
+// key as soon as the server gives a DEFINITIVE answer (a clean success, or a
+// real 4xx like a card decline — money didn't move), and keep it only when the
+// network never answered (a 5xx or no response) — exactly the case where a
+// blind retry could otherwise double up.
+const _idemKeys = new Map();
+const newIdemKey = () => { try { return crypto.randomUUID(); } catch (e) { return Date.now().toString(36) + Math.random().toString(36).slice(2); } };
+const idemKeyFor = (sig) => { if (!_idemKeys.has(sig)) _idemKeys.set(sig, newIdemKey()); return _idemKeys.get(sig); };
+const idemSig = (p) => {
+  const cents = Math.round((Number(p.amount) || 0) * 100);
+  if (p.action === "charge") return `charge:${p.customerId}:${p.paymentMethodId}:${cents}`;
+  if (p.action === "refund") return `refund:${p.paymentIntentId}:${cents}`;
+  return null; // setup / sale_intent: no server-side double-charge to guard
+};
+
 // Call our serverless Stripe function. Throws with a readable message on failure.
 // Money-moving actions (charge / refund) are staff-only on the server, so we
 // attach the signed-in staff member's token when there is a session. Public
@@ -740,13 +760,25 @@ function getStripe() {
 async function stripeApi(payload) {
   const headers = { "Content-Type": "application/json" };
   try {
-    const { data } = await supabase.auth.getSession();
-    const token = data && data.session && data.session.access_token;
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess && sess.session && sess.session.access_token;
     if (token) headers.Authorization = `Bearer ${token}`;
   } catch (e) {}
-  const r = await fetch(API_BASE + "/api/stripe", { method: "POST", headers, body: JSON.stringify(payload) });
+  const sig = idemSig(payload);
+  const body = sig ? { ...payload, idempotencyKey: idemKeyFor(sig) } : payload;
+  let r;
+  try {
+    r = await fetch(API_BASE + "/api/stripe", { method: "POST", headers, body: JSON.stringify(body) });
+  } catch (netErr) {
+    // No response at all — outcome unknown. Keep the key so a retry is idempotent.
+    throw new Error("Couldn't reach the payment server — check your connection and try again.");
+  }
   let data = {};
   try { data = await r.json(); } catch (e) {}
+  // Definitive answer = a 2xx, or a 4xx (decline / bad request / not authorized) where money did not move.
+  // A 5xx is NOT definitive, so we hold the key for an idempotent retry.
+  const definitive = r.ok || (r.status >= 400 && r.status < 500);
+  if (sig && definitive) _idemKeys.delete(sig);
   if (!r.ok || data.error) throw new Error(data.error || `Request failed (${r.status})`);
   return data;
 }
