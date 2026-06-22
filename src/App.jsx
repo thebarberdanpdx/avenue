@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { supabase } from './supabaseClient'
 import {
   Calendar, Phone, Check, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MessageSquare, Bell, User, Camera,
-  Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock,
+  Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock, PenSquare,
   Settings, Image as ImageIcon, Lock, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
   BarChart3, TrendingUp, Palette, Globe, HelpCircle, BookOpen, Search, LifeBuoy, Scissors, Package,
@@ -22346,6 +22346,8 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, onOpenClient }) {
   const [activeId, setActiveId] = useState(null); // null = list view
   const [draft, setDraft] = useState("");
+  const [composeOpen, setComposeOpen] = useState(false); // "new message" client picker
+  const [composeQ, setComposeQ] = useState("");
   // jump straight into a conversation when sent from the waitlist
   useEffect(() => {
     if (msgTarget) { setActiveId(msgTarget.clientId); setDraft(msgTarget.draft || ""); if (clearTarget) clearTarget(); }
@@ -22356,15 +22358,31 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
 
   // ---- conversation list ----
   if (!active) {
-    const totalUnread = clients.filter((c) => { const m = (c.messages || []); return m.length && m[m.length - 1].from === "client"; }).length;
+    const convos = clients.filter((c) => (c.messages || []).length > 0);
+    const totalUnread = convos.filter((c) => { const m = c.messages || []; return m[m.length - 1].from === "client"; }).length;
+    const composeList = clients
+      .filter((c) => { const q = composeQ.trim().toLowerCase(); return !q || (c.name || "").toLowerCase().includes(q) || (c.phone || "").includes(q); })
+      .slice(0, 60);
+    const startWith = (c) => { setActiveId(c.id); setComposeOpen(false); setComposeQ(""); };
     return (
       <div className="fade-up">
-        <div style={{ marginBottom: 22, paddingTop: 8 }}>
-          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, marginBottom: 12 }}>Messages</h2>
-          <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500 }}>{totalUnread > 0 ? `${totalUnread} unread` : "All caught up"}</div>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 22, paddingTop: 8 }}>
+          <div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, marginBottom: 12 }}>Messages</h2>
+            <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500 }}>{totalUnread > 0 ? `${totalUnread} unread` : "All caught up"}</div>
+          </div>
+          <button onClick={() => setComposeOpen(true)} aria-label="New message" style={{ flexShrink: 0, background: "var(--text)", color: "var(--bg)", border: "none", width: 42, height: 42, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", marginTop: 2 }}><PenSquare size={18} /></button>
         </div>
+        {convos.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "48px 24px", color: "var(--sub)" }}>
+            <MessageSquare size={30} style={{ color: "var(--faint)", marginBottom: 14 }} />
+            <div style={{ fontSize: 16, color: "var(--text)", fontWeight: 500, marginBottom: 6 }}>No conversations yet</div>
+            <div style={{ fontSize: 14, lineHeight: 1.5, maxWidth: 300, margin: "0 auto 18px" }}>{clients.length ? "Start a thread with any client — they'll get it as a text." : "Add clients first, then you can message them here."}</div>
+            {clients.length > 0 && <button onClick={() => setComposeOpen(true)} className="lift" style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}><PenSquare size={16} /> New message</button>}
+          </div>
+        ) : (
         <div style={{ display: "flex", flexDirection: "column" }}>
-          {clients.map((c) => {
+          {convos.map((c) => {
             const msgs = c.messages || [];
             const last = msgs[msgs.length - 1];
             const unread = last && last.from === "client";
@@ -22385,6 +22403,32 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
             );
           })}
         </div>
+        )}
+        <Sheet open={composeOpen} onClose={() => { setComposeOpen(false); setComposeQ(""); }} align="bottom" maxWidth={460}>
+          <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginBottom: 14 }}>New message</h3>
+          {clients.length === 0 ? (
+            <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, padding: "8px 0 12px" }}>You don't have any clients yet. Add a client first, then you can text them from here.</p>
+          ) : (<>
+            <div style={{ position: "relative", marginBottom: 12 }}>
+              <Search size={16} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
+              <input autoFocus value={composeQ} onChange={(e) => setComposeQ(e.target.value)} placeholder="Search clients" style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 12px 11px 36px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+            </div>
+            <div style={{ maxHeight: "46vh", overflowY: "auto", margin: "0 -4px" }}>
+              {composeList.length === 0 ? (
+                <p style={{ fontSize: 13.5, color: "var(--faint)", textAlign: "center", padding: "24px 0" }}>No clients match “{composeQ}”.</p>
+              ) : composeList.map((c) => (
+                <button key={c.id} onClick={() => startWith(c)} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", background: "none", border: "none", borderBottom: "1px solid var(--line)", padding: "11px 4px", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
+                  <Avatar size={38} photo={clientPhoto(c)} initial={c.name.charAt(0)} color={provColor(c)} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                    {c.phone && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 1 }}>{c.phone}</span>}
+                  </span>
+                  <ChevronRight size={17} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                </button>
+              ))}
+            </div>
+          </>)}
+        </Sheet>
       </div>
     );
   }
