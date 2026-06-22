@@ -2732,6 +2732,30 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [guidedCat, setGuidedCat] = useState(null); // chosen category on the guided (step 1) screen (null = showing categories)
   useEffect(() => { if (step === 0) setGuidedCat(null); }, [step]);
 
+  // Carrier opt-in deep link — gotvero.com/book?optin=1 jumps straight to the
+  // booking confirm step so the SMS consent disclosure ("...reminders from
+  // Sanctuary Barber Co ... Reply STOP to opt out") is visible the instant the
+  // page loads. This is the page a toll-free / 10DLC reviewer needs to see; the
+  // normal flow only reaches it after several clicks and never changes the URL.
+  // Strictly guarded by the query param + a one-shot ref, so real bookings are
+  // untouched. A sample service/provider/slot is filled in purely to render.
+  const optinPreviewRef = useRef(false);
+  useEffect(() => {
+    if (optinPreviewRef.current) return;
+    let isPreview = false;
+    try { isPreview = new URLSearchParams(window.location.search).get("optin") === "1"; } catch (e) {}
+    if (!isPreview) return;
+    if (!services?.length || !providers?.length) return;
+    optinPreviewRef.current = true;
+    const svc0 = services.find((s) => Array.isArray(s.addonGroups)) || services[0];
+    const svc = { ...svc0, addonGroups: svc0.addonGroups || [] };
+    const prov = providers.find((p) => p.id !== "anyone") || providers[0];
+    setCart([{ service: svc, addons: {}, cutType: null, beardType: null, provider: prov, forMemberId: null, forName: "" }]);
+    setSelectedDate(new Date());
+    setSlot(600);
+    setStep(7);
+  }, [services, providers]);
+
   // ---- Guided consultation (auto-launches for brand-new clients) ----
   const [consult, setConsult] = useState(null); // null = off; otherwise { step, sides, bottom, condition } answers
   const [tapSel, setTapSel] = useState(null); // id of the service tile being tapped — turns it black briefly before advancing
