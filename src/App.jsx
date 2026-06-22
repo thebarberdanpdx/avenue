@@ -732,8 +732,19 @@ function getStripe() {
   return _stripePromise;
 }
 // Call our serverless Stripe function. Throws with a readable message on failure.
+// Money-moving actions (charge / refund) are staff-only on the server, so we
+// attach the signed-in staff member's token when there is a session. Public
+// booking calls (setup / sale_intent) run without a session — no token is
+// sent and the server leaves those actions open, so the booking flow is
+// unaffected.
 async function stripeApi(payload) {
-  const r = await fetch(API_BASE + "/api/stripe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  const headers = { "Content-Type": "application/json" };
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data && data.session && data.session.access_token;
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch (e) {}
+  const r = await fetch(API_BASE + "/api/stripe", { method: "POST", headers, body: JSON.stringify(payload) });
   let data = {};
   try { data = await r.json(); } catch (e) {}
   if (!r.ok || data.error) throw new Error(data.error || `Request failed (${r.status})`);
@@ -15893,8 +15904,10 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const [openSection, setOpenSection] = useState(null); // which checklist section is expanded
 
   // ============================================================
-  // LAUNCH CHECKLIST — every setting & toggle, box by box, in the
-  // same 9 sections (and order) as Settings itself. You tick each
+  // LAUNCH CHECKLIST — organised by what you run, not by Settings: one
+  // section per area of the business (Clients, Appointments, Team, Services,
+  // Booking, Payments, Messages, Reports…) plus go-live/safety/dry-run. Each
+  // section lists what to CHECK and what to TEST. You tick each
   // one off as you verify it; state saves to your shop so it's here
   // every time you come back. A few items auto-detect (auto:true) —
   // those tick themselves when the underlying value is set, but you
@@ -15909,20 +15922,17 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   };
   const A = (cond) => !!cond; // auto-detect helper
   const CHECKLIST = [
-    { id: "shop", label: "Your shop", icon: User, desc: "Name, hours, locations, phones, branding, theme", groups: [
+    { id: "shop", label: "Shop & branding", icon: User, desc: "Name, hours, contact, logo & theme", groups: [
       { label: "Business details", items: [
         { k: "shop_name", label: "Business name is set", card: "business", auto: A(form.name && form.name.trim()) },
         { k: "shop_contact", label: "Address & contact info filled in", card: "business" },
-        { k: "shop_words", label: "Booking wording reads the way you want", card: "bookingwords" },
+        { k: "shop_loc", label: "Location(s) entered correctly", card: "locations" },
+        { k: "shop_phone", label: "Shop phone number is right", card: "phones" },
       ] },
       { label: "Hours", items: [
         { k: "shop_hours_open", label: "Each open day's hours are correct", card: "hours", auto: A(form.hours && Object.values(form.hours).some((h) => h && h.on)) },
         { k: "shop_hours_closed", label: "Closed days are marked closed", card: "hours" },
         { k: "shop_hours_breaks", label: "Lunch / breaks blocked where needed", card: "hours" },
-      ] },
-      { label: "Locations & phones", items: [
-        { k: "shop_loc", label: "Location(s) entered correctly", card: "locations" },
-        { k: "shop_phone", label: "Shop phone number is right", card: "phones" },
       ] },
       { label: "Branding & theme", items: [
         { k: "shop_logo", label: "Logo uploaded", card: "appearance" },
@@ -15930,170 +15940,273 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         { k: "shop_theme_book", label: "Theme looks right on the live /book page", card: "theme" },
       ] },
     ] },
-    { id: "staff", label: "Team", icon: Users, desc: "Staff, access & pay", groups: [
-      { label: "Your staff", items: [
-        { k: "team_added", label: "Every staff member added", card: "staff", auto: A(providers.filter((p) => p.id !== "anyone").length > 0) },
-        { k: "team_photo", label: "Each staff member has a name & photo", card: "staff" },
-        { k: "team_bookable", label: "Bookable-online is on for who should show", card: "staff" },
-        { k: "team_hours", label: "Each staff member's own hours are set", card: "staff" },
-        { k: "team_services", label: "Each staff member's services / durations correct", card: "staff" },
+    { id: "staff", label: "Team", icon: Users, desc: "Staff, hours, pay & access", groups: [
+      { label: "Add & identify each staff member", items: [
+        { k: "team_added", label: "Every staff member who takes appointments is added", card: "staff", auto: A(providers.filter((p) => p.id !== "anyone").length > 0) },
+        { k: "team_name", label: "Each staffer's name & role are right (no “New Staff Member” left over)", card: "staff" },
+        { k: "team_photo", label: "Each staff member has a real photo", card: "staff" },
+        { k: "team_color", label: "Each staffer has a distinct calendar colour", card: "staff" },
+        { k: "team_contact", label: "Email & phone filled in for everyone (email is needed to sign in)", card: "staff" },
+        { k: "team_isprovider", label: "“Is a service provider” is on for anyone who takes appointments", card: "staff" },
       ] },
-      { label: "Access", items: [
-        { k: "team_login", label: "Each staff member can sign in on their device", card: "staff" },
-        { k: "team_pin", label: "Staff PIN decided (on or off)", card: "staffpin" },
+      { label: "Bookable, hours & services", items: [
+        { k: "team_bookable", label: "Bookable-online is on for who should show (off for who shouldn't)", card: "staff" },
+        { k: "team_hours", label: "Each staffer's own working hours are set", card: "staff" },
+        { k: "team_buffer", label: "Turnaround / buffer before & after appts is right", card: "staff" },
+        { k: "team_services", label: "Each staffer is on for the services they perform", card: "staff" },
+        { k: "team_services_dur", label: "Per-staff duration overrides correct where someone's faster / slower", card: "staff" },
+        { k: "team_services_price", label: "Per-staff price overrides correct where someone charges differently", card: "staff" },
+        { k: "team_newclient_cap", label: "Per-staffer new-client / day cap set as intended", card: "staff" },
+      ] },
+      { label: "Pay, access & sign-in", items: [
+        { k: "team_comp", label: "Pay set per staffer (commission, hourly, or greater-of)", card: "staff" },
+        { k: "team_role", label: "App-access role right — owners see shop totals, staff see only their chair", card: "staff" },
+        { k: "team_permissions", label: "Permissions reviewed per staffer (not just left at defaults)", card: "staff" },
+        { k: "team_pin", label: "Staff PIN decided (on for a shared device, off if everyone has their own login)", card: "staffpin" },
+      ] },
+      { label: "Try it yourself", items: [
+        { k: "team_try_login", label: "Each staff member signed in with their magic-link code on their own device", card: null },
+        { k: "team_try_book", label: "Confirmed each bookable staffer shows on /book with the right services", card: null },
+        { k: "team_try_scope", label: "Signed in as a non-owner — confirmed they see only their own chair", card: null },
       ] },
     ] },
-    { id: "menu", label: "Services & menu", icon: Scissors, desc: "What you offer & pricing", groups: [
-      { label: "Your menu", items: [
+    { id: "menu", label: "Services & menu", icon: Scissors, desc: "Services, pricing, add-ons & retail", groups: [
+      { label: "Your services", items: [
         { k: "menu_built", label: "Menu has every service you offer", card: "servicesmenu", auto: A((services || []).length > 0) },
-        { k: "menu_price", label: "Every price is correct", card: "servicesmenu" },
-        { k: "menu_dur", label: "Every duration is correct", card: "servicesmenu" },
+        { k: "menu_price", label: "Every service price is correct", card: "servicesmenu" },
+        { k: "menu_dur", label: "Every service duration is correct", card: "servicesmenu" },
         { k: "menu_cat", label: "Services grouped into the right categories", card: "servicesmenu" },
         { k: "menu_desc", label: "Descriptions read well on /book", card: "servicesmenu" },
-        { k: "menu_deposit", label: "Deposit-required services set (e.g. tattoo)", card: "servicesmenu" },
+        { k: "menu_photos", label: "Each service has a photo that looks right on /book", card: "servicesmenu" },
+        { k: "menu_color", label: "Service colours are easy to tell apart on the calendar", card: "servicesmenu" },
+        { k: "menu_staff_offer", label: "Each service is turned on for the staff who perform it", card: "servicesmenu" },
+        { k: "menu_timerules", label: "Time-of-day price rules / booking blocks land on the right hours", card: "servicesmenu" },
+        { k: "menu_confirm", label: "“Require read & confirm” set on services that need it (tattoo, colour)", card: "servicesmenu" },
+        { k: "menu_deposit", label: "Deposit / card-on-file policy is right for deposit-required services", card: null },
       ] },
-      { label: "Add-ons & helpers", items: [
-        { k: "menu_addons", label: "Add-ons / finishing touches priced right", card: "servicesmenu" },
+      { label: "Cut styles & add-ons", items: [
+        { k: "menu_cutstyles", label: "Cut styles enabled where needed, each with the right price & extra time", card: "servicesmenu" },
+        { k: "menu_cutstyles_copy", label: "Cut-style names, descriptions & reference photos help clients pick", card: "servicesmenu" },
+        { k: "menu_addons", label: "Add-ons / finishing touches priced right and add the right time", card: "servicesmenu" },
+        { k: "menu_addons_copy", label: "Add-on labels & descriptions read well at booking", card: "servicesmenu" },
+      ] },
+      { label: "Retail products", items: [
+        { k: "menu_prod_built", label: "Retail catalog has every product you sell", card: "products", auto: A(((business && business.products) || []).length > 0) },
+        { k: "menu_prod_price", label: "Every product price is correct", card: "products" },
+        { k: "menu_prod_cost", label: "Costs entered where you want margin reports", card: "products" },
+        { k: "menu_prod_photos", label: "Products have photos", card: "products" },
+        { k: "menu_prod_cat", label: "Products sorted into the right categories", card: "products" },
+        { k: "menu_prod_stock", label: "Inventory tracking on for products you count, with correct on-hand & low-stock alerts", card: "products" },
+        { k: "menu_prod_active", label: "Only products you're ready to sell are marked available", card: "products" },
+        { k: "menu_prod_test", label: "Sold a test product at checkout — stock counted down", card: null },
       ] },
     ] },
-    { id: "book", label: "Online booking", icon: Calendar, desc: "How clients book you online", groups: [
-      { label: "The times they see", items: [
-        { k: "book_gaps", label: "Avoid-small-gaps setting is how you want it", card: "avoidgaps" },
-        { k: "book_gapmin", label: "Minimum gap size is correct", card: "avoidgaps" },
-        { k: "book_anyone", label: "\u201CAnyone\u201D routing picks the right staff member", card: "anyonerouting" },
+    { id: "clients", label: "Clients", icon: UserPlus, desc: "Profiles, families, pricing & migration", groups: [
+      { label: "Bringing clients in", items: [
+        { k: "cli_import_done", label: "Existing clients imported from your old system", card: "import" },
+        { k: "cli_import_fields", label: "Imported names, phones & emails landed in the right fields", card: "import" },
+        { k: "cli_import_birthdays", label: "Birthdays carried over where your file had them", card: "import" },
+        { k: "cli_import_history", label: "Visit history turned into a rebooking rhythm (cadence)", card: "import" },
+        { k: "cli_dupes_merged", label: "Duplicate clients (same phone) merged into one profile", card: "mergedupes" },
+        { k: "cli_dupes_namecheck", label: "Name-clash duplicates reviewed before merging", card: "mergedupes" },
+        { k: "cli_testdata_wiped", label: "Test / demo clients & appointments wiped before launch", card: "testdata" },
+      ] },
+      { label: "What's on each client", items: [
+        { k: "cli_profile_contact", label: "Profiles show the right name, phone & email", card: null },
+        { k: "cli_profile_photo", label: "Client photos / avatars look right", card: null },
+        { k: "cli_overrides", label: "Per-client custom prices & durations set where someone pays a special rate", card: null },
+        { k: "cli_overrides_online", label: "Those custom prices & times show up when that client books online", card: null },
+        { k: "cli_family", label: "Family members added under the right account", card: null },
+        { k: "cli_birthday", label: "Birthdays on file feed the birthday message", card: "messages" },
+        { k: "cli_notes", label: "Private preference notes (allergies, formulas) read well and stay private", card: null },
+        { k: "cli_blocked", label: "Any problem clients blocked from booking, with a private reason", card: null },
+      ] },
+      { label: "Try it yourself", items: [
+        { k: "cli_try_add", label: "Added a brand-new client (first + last name + phone)", card: null },
+        { k: "cli_try_override", label: "Set a custom price / duration on one client in the Pricing tab", card: null },
+        { k: "cli_try_family", label: "Added a family member to a client", card: null },
+        { k: "cli_try_block", label: "Blocked a test client, confirmed they can't book, then unblocked", card: null },
+        { k: "cli_try_merge", label: "Created two clients with the same phone, then merged them", card: "mergedupes" },
+      ] },
+    ] },
+    { id: "book", label: "Online booking", icon: Globe, desc: "Your /book page & storefront", groups: [
+      { label: "The times clients see", items: [
+        { k: "book_gaps", label: "Avoid-small-gaps is set the way you want", card: "avoidgaps" },
+        { k: "book_gapmin", label: "Minimum gap size won't leave unsellable holes", card: "avoidgaps" },
+        { k: "book_smarttiming", label: "Smart timing offers slots that fit each service's real length", card: "autotiming" },
+        { k: "book_anyone", label: "“Anyone” routing picks the right staffer (soonest / round-robin / order)", card: "anyonerouting" },
       ] },
       { label: "Your booking page", items: [
         { k: "book_incr", label: "Booking increment set (5 / 10 / 15 min)", card: "booking" },
         { k: "book_window", label: "How far ahead clients can book", card: "booking" },
         { k: "book_lead", label: "Lead time before the first bookable slot", card: "booking" },
-        { k: "book_newclient", label: "New-client booking allowed / gated correctly", card: "newclient" },
-        { k: "book_prices", label: "Show-prices on booking page is right", card: "showprices" },
-        { k: "book_rebook", label: "\u201CRebook your usual\u201D toggle", card: "rebook_usual" },
+        { k: "book_newclient", label: "New-client booking allowed / gated correctly", card: "newclients" },
+        { k: "book_prices", label: "Show-prices on the booking page is how you want it", card: "showprices" },
+        { k: "book_rebook", label: "“Rebook your usual” one-tap toggle", card: "rebook_usual" },
         { k: "book_refphotos", label: "Reference photos: off / optional / required", card: "refphotos" },
-        { k: "book_note", label: "Appointment-note prompt shows on booking", card: "booking" },
+        { k: "book_note", label: "Appointment-note prompt shows (or is hidden) as intended", card: "booking" },
         { k: "book_family", label: "Family / group booking toggle", card: "family" },
+        { k: "book_words", label: "Booking wording reads the way you want", card: "bookingwords" },
+      ] },
+      { label: "Your storefront & link", items: [
+        { k: "book_site_on", label: "Storefront website is turned on", card: "website", auto: A((form.website || {}).enabled === true) },
+        { k: "book_site_intro", label: "Intro / tagline read well", card: "website" },
+        { k: "book_site_social", label: "Social links (Instagram) are correct", card: "website" },
+        { k: "book_site_link", label: "Shareable booking link (gotvero.com/your-shop) is right & copies", card: "website" },
+        { k: "book_site_phone", label: "Storefront looks right on a phone", card: "website" },
       ] },
       { label: "Try it yourself", items: [
         { k: "book_test_specific", label: "Booked a test appt for a specific staff member", card: null },
-        { k: "book_test_anyone", label: "Booked a test appt with \u201CAnyone\u201D", card: null },
-        { k: "book_test_returning", label: "Returning-client email code flow works", card: null },
+        { k: "book_test_anyone", label: "Booked a test appt with “Anyone” — landed on the right staffer", card: null },
+        { k: "book_test_returning", label: "Returning-client phone → code → booked flow works", card: null },
+        { k: "book_test_phone_e2e", label: "Booked through the public page on a phone, start to finish", card: null },
       ] },
     ] },
-    { id: "dayof", label: "Your day", icon: Clock, desc: "Running your day", groups: [
-      { label: "Scheduling", items: [
-        { k: "day_cal", label: "Calendar settings (progress card, etc.)", card: "calendarsettings" },
-        { k: "day_waitlist", label: "Waitlist on/off as you want", card: "waitlist" },
-        { k: "day_photos", label: "Display preferences set", card: "photos" },
+    { id: "appts", label: "Appointments & calendar", icon: Calendar, desc: "Booking, drag, lifecycle & waitlist", groups: [
+      { label: "Calendar display", items: [
+        { k: "appt_cal_hours", label: "Visible hours cover your real open hours", card: "calendarsettings" },
+        { k: "appt_cal_progress", label: "Live progress card (in-service timer) on/off as you want", card: "calendarsettings" },
+        { k: "appt_cal_colorder", label: "Staff column order reads the way you want", card: "calendarsettings" },
+        { k: "appt_cal_rowsize", label: "Calendar row size feels right for your day", card: "photos" },
+        { k: "appt_cal_weekstart", label: "Week starts on the correct day", card: "photos" },
       ] },
-      { label: "During the day", items: [
-        { k: "day_waiting", label: "Waiting room behaviour", card: "waitingroom" },
-        { k: "day_late", label: "Running-late alerts", card: "runninglate" },
-        { k: "day_overdue", label: "\u201CIt's been a while\u201D buffer", card: "overduebuffer" },
+      { label: "Booking & moving", items: [
+        { k: "appt_book_from_cal", label: "Book an appt from an empty slot on the calendar", card: null },
+        { k: "appt_book_price_dur", label: "A calendar booking locks the right price & duration (overrides + time rules)", card: null },
+        { k: "appt_drag", label: "Dragging an appt updates its time", card: null },
+        { k: "appt_move_notify", label: "The Move dialog's “notify client” toggle only texts when on", card: null },
+        { k: "appt_dbl_book", label: "Double-booking is blocked — conflicts warn and offer the next free slot", card: null },
+        { k: "appt_cap", label: "Daily cap warns but lets you book anyway", card: "calendarsettings" },
       ] },
-      { label: "Smart timing", items: [
-        { k: "day_autotiming", label: "Auto-timing on/off as you want", card: "autotiming" },
+      { label: "Visit lifecycle & day tools", items: [
+        { k: "appt_checkin", label: "Check-in puts a client in the lobby", card: null },
+        { k: "appt_notify_ready", label: "NOTIFY sends the “you're ready” message and flips to NOTIFIED", card: "waitingroom" },
+        { k: "appt_start_done", label: "Start service → in-service timer → checkout marks it done", card: null },
+        { k: "appt_block", label: "Block off time (label, duration, optional repeat)", card: null },
+        { k: "appt_walkin", label: "Add a walk-in (saved as a real client)", card: null },
+        { k: "appt_late", label: "Running-late prompt can notify the next client", card: "runninglate" },
+        { k: "appt_overdue", label: "“It's been a while” padding for overdue clients", card: "overduebuffer" },
+        { k: "appt_wrap", label: "Per-visit wrap-up note saves to the client profile", card: null },
+      ] },
+      { label: "Cancellations & waitlist", items: [
+        { k: "appt_cancel", label: "Cancelling keeps the record (still shows in reports), not deleted", card: null },
+        { k: "appt_noshow", label: "No-show offers to charge a fee when a card is on file", card: null },
+        { k: "appt_waitlist_freed", label: "A freed slot surfaces matching waitlisted clients", card: "waitlist" },
+        { k: "appt_waitlist_mode", label: "Waitlist mode & order set the way you want", card: "waitlist" },
       ] },
       { label: "Try it yourself", items: [
-        { k: "day_test_book", label: "Booked an appt from the calendar", card: null },
-        { k: "day_test_move", label: "Dragged an appt to a new time", card: null },
-        { k: "day_test_block", label: "Added a time block", card: null },
-        { k: "day_test_walkin", label: "Added a walk-in", card: null },
-        { k: "day_test_cancel", label: "Cancelled an appt \u2014 shows in feed", card: null },
-        { k: "day_test_lifecycle", label: "Ran check-in \u2192 in-service \u2192 done", card: null },
+        { k: "appt_try_lifecycle", label: "Ran check-in → in-service → done", card: null },
+        { k: "appt_try_conflict", label: "Dragged an appt and confirmed a conflicting move was blocked", card: null },
+        { k: "appt_try_block_walkin", label: "Added a time block and a walk-in", card: null },
+        { k: "appt_try_cancel", label: "Cancelled a test appt — it still shows in the feed", card: null },
       ] },
     ] },
-    { id: "pay", label: "Payments & checkout", icon: CreditCard, desc: "Payments, tips & no-shows", groups: [
+    { id: "pay", label: "Payments & checkout", icon: CreditCard, desc: "Stripe, tips, refunds & deposits", groups: [
       { label: "Setup", items: [
         { k: "pay_connected", label: "Stripe connected & payouts set up", card: "payments", auto: A(form.paymentsConnected) },
+        { k: "pay_livemode", label: "Live payments turned on (real cards charged)", card: "payments", auto: A(business && business.payments && business.payments.live === true) },
         { k: "pay_livekey", label: "Live key confirmed (not test) before launch", card: "payments" },
-        { k: "pay_checkout", label: "Checkout options set", card: "checkout" },
-        { k: "pay_tips", label: "Tipping set (presets, on/off)", card: "tipping" },
-        { k: "pay_rebookco", label: "Rebook-at-checkout toggle", card: "rebookco" },
-        { k: "pay_policy", label: "No-show / cancellation policy set", card: "policy" },
+        { k: "pay_payouts", label: "Payout bank account verified in Stripe — first payout will land", card: "payments" },
+        { k: "pay_checkout", label: "Checkout methods set (cash / Venmo / Zelle show at checkout)", card: "checkout" },
+        { k: "pay_surcharge", label: "Card-on-file surcharge decided (on/off + %)", card: "checkout" },
+        { k: "pay_receipt", label: "Signature rule & receipt option chosen", card: "checkout" },
+        { k: "pay_tips", label: "Tipping set (presets, smart default, custom / no-tip)", card: "tipping" },
+        { k: "pay_rebookco", label: "Rebook-at-checkout toggle & discount set", card: "rebookco" },
+        { k: "pay_policy", label: "No-show / cancellation policy & notice window set", card: "policy" },
+        { k: "pay_deposit", label: "Deposit at booking configured (none / fixed / percent)", card: "policy" },
       ] },
       { label: "Try it yourself", items: [
         { k: "pay_test_cash", label: "Cash checkout closes the ticket", card: null },
-        { k: "pay_test_product", label: "Added a product to a ticket", card: null },
-        { k: "pay_test_balance", label: "Charged the balance", card: null },
-        { k: "pay_test_refund", label: "Ran a partial refund", card: null },
-        { k: "pay_test_card", label: "Card-on-file checkout with a real card", card: null },
-        { k: "pay_test_cardrefund", label: "Refunded that real-card charge", card: null },
-        { k: "pay_test_deposit", label: "Deposit collected at booking", card: null },
+        { k: "pay_test_product", label: "Added a product to a ticket — stock decremented once", card: null },
+        { k: "pay_test_tip", label: "Tip applied — total & tip line read right", card: null },
+        { k: "pay_test_balance", label: "Reopened a paid ticket & charged the balance (no extra stock hit, no second tip)", card: null },
+        { k: "pay_test_refund", label: "Ran a partial refund — status shows “partial”", card: null },
+        { k: "pay_test_card", label: "Card-on-file checkout with a REAL card — charge succeeds", card: null },
+        { k: "pay_test_cardrefund", label: "Refunded that real-card charge — money returns in Stripe", card: null },
+        { k: "pay_test_deposit", label: "Deposit collected at booking with a real card", card: null },
       ] },
     ] },
-    { id: "msg", label: "Messages & alerts", icon: Bell, desc: "Texts & emails", groups: [
+    { id: "msg", label: "Messages & alerts", icon: Bell, desc: "Client texts / emails & your alerts", groups: [
       { label: "Client templates", items: [
         { k: "msg_booked", label: "Booked confirmation reads right", card: "messages" },
-        { k: "msg_reminder", label: "Reminder template", card: "messages" },
-        { k: "msg_checkin", label: "Check-in template", card: "messages" },
-        { k: "msg_canceled", label: "Canceled template", card: "messages" },
-        { k: "msg_resched", label: "Rescheduled template", card: "messages" },
-        { k: "msg_waitlist", label: "Waitlist template", card: "messages" },
-        { k: "msg_deposit", label: "Deposit template", card: "messages" },
-        { k: "msg_noshow", label: "No-show template", card: "messages" },
-        { k: "msg_words", label: "Booking wording matches your voice", card: "bookingwords" },
+        { k: "msg_remind2d", label: "Reminder — 2 days before reads right", card: "messages" },
+        { k: "msg_remind24h", label: "Reminder — 1 day before reads right", card: "messages" },
+        { k: "msg_remind3h", label: "Reminder — 3 hours before reads right", card: "messages" },
+        { k: "msg_checkin", label: "Check-in reminder — 15 min before reads right", card: "messages" },
+        { k: "msg_canceled", label: "Canceled template reads right", card: "messages" },
+        { k: "msg_rescheduled", label: "Rescheduled template reads right", card: "messages" },
+        { k: "msg_waitlist", label: "Waitlist — slot opened template reads right", card: "messages" },
+        { k: "msg_deposit", label: "Deposit received template reads right", card: "messages" },
+        { k: "msg_noshow", label: "Missed / late-cancel template reads right (if you turn it on)", card: "messages" },
+        { k: "msg_birthday", label: "Birthday message reads right (if you turn it on)", card: "messages" },
+        { k: "msg_merge_fields", label: "Merge fields fill correctly ({client} {service} {date} {time}…)", card: "messages" },
+        { k: "msg_words", label: "Booking wording matches your shop's voice", card: "bookingwords" },
       ] },
       { label: "Your team's alerts", items: [
-        { k: "msg_staff_push", label: "Staff notifications on for new bookings", card: "notifications" },
-        { k: "msg_sms_status", label: "Text messaging status checked (10DLC)", card: "notifications", auto: A(form.smsApproved) },
+        { k: "msg_staff_push", label: "Staff push on for new bookings", card: "notifications" },
+        { k: "msg_provider_firsttime", label: "Providers get a “first-time client” alert", card: "notifications" },
+        { k: "msg_shop_alerts", label: "Shop-wide alerts set how you want (cancel / reschedule / end-of-day)", card: "notifications" },
+        { k: "msg_sms_status", label: "Text-messaging status checked — A2P 10DLC cleared", card: "notifications", auto: A(form.smsApproved) },
       ] },
       { label: "Try it yourself", items: [
-        { k: "msg_test_push", label: "New booking pushed to your phone", card: null },
-        { k: "msg_test_note", label: "A booking with a note showed the \uD83D\uDCDD note", card: null },
+        { k: "msg_test_push", label: "Test booking pushed to your phone", card: null },
+        { k: "msg_test_note", label: "A booking with a note shows the 📝 note on the calendar tile", card: null },
+        { k: "msg_test_confirm", label: "Read the booked confirmation on a real phone", card: null },
+        { k: "msg_test_cancel", label: "Cancelled a test appt — the cancellation notice fired", card: null },
       ] },
     ] },
-    { id: "web", label: "Website", icon: Globe, desc: "Your booking page", groups: [
-      { label: "Your page", items: [
-        { k: "web_on", label: "Website / storefront turned on", card: "website" },
-        { k: "web_intro", label: "Intro / tagline reads well", card: "website" },
-        { k: "web_social", label: "Instagram / social links correct", card: "website" },
-        { k: "web_link", label: "Booking link works & is shareable", card: "website" },
+    { id: "data", label: "Reports & data", icon: BarChart3, desc: "Your numbers & data tools", groups: [
+      { label: "Reports show real numbers", items: [
+        { k: "rep_revenue", label: "Revenue — totals, average ticket & visit count match completed appts", card: "reports" },
+        { k: "rep_appts", label: "Appointments — booked / completed / no-show / cancel counts & rates match the calendar", card: "reports" },
+        { k: "rep_servicemix", label: "Service mix — revenue, visits & $/hour per service look right", card: "reports" },
+        { k: "rep_perbarber", label: "Per-staff — each provider's revenue, tips, occupancy & retention tie out", card: "reports" },
+        { k: "rep_perbarber_noproduct", label: "Per-staff revenue isn't inflated — retail isn't attributed to staff yet", card: "reports" },
+        { k: "rep_clients", label: "Clients — lapsed / win-back, dollars at risk & new-vs-returning are correct", card: "reports" },
+        { k: "rep_retail", label: "Retail — product revenue, units & top sellers pull from real sales", card: "reports" },
+        { k: "rep_payments", label: "Payments — gross, tips, refunds, deposits & net list real transactions", card: "reports" },
+        { k: "rep_tax", label: "Estimated taxes — set-aside uses real revenue × your rate", card: "reports" },
       ] },
-      { label: "Try it yourself", items: [
-        { k: "web_test_phone", label: "Opened the page on your phone \u2014 looks right", card: null },
-        { k: "web_test_book", label: "Booked through the public page end to end", card: null },
-      ] },
-    ] },
-    { id: "data", label: "Reports & data", icon: BarChart3, desc: "Your numbers & tools", groups: [
-      { label: "Data", items: [
-        { k: "data_import", label: "Existing clients imported (if migrating)", card: "import" },
-        { k: "data_dupes", label: "Duplicate clients merged", card: "mergedupes" },
-        { k: "data_testwipe", label: "Test data wiped before launch", card: "testdata" },
-        { k: "data_reports", label: "Reports show real numbers", card: "reports" },
+      { label: "Date range & data integrity", items: [
+        { k: "rep_daterange", label: "Date-range presets & custom From/To filter every report correctly", card: "reports" },
+        { k: "rep_empty", label: "Empty periods show a clean no-data state (no NaN / broken charts)", card: "reports" },
+        { k: "rep_export", label: "Export / print a report — only the report area prints", card: "reports" },
+        { k: "rep_reflects_real", label: "After wiping test data, reports show only real data", card: "testdata" },
+        { k: "rep_import_merge", label: "Imported & merged clients flow into reports without double-counting", card: "import" },
       ] },
     ] },
     { id: "golive", label: "Going live", icon: Send, desc: "Deploy, domain & email health", groups: [
       { label: "Deploy & domain", items: [
-        { k: "golive_https", label: "gotvero.com loads over HTTPS \u2014 no certificate warning", card: null },
+        { k: "golive_https", label: "gotvero.com loads over HTTPS — no certificate warning", card: null },
         { k: "golive_deploy", label: "Your latest App.jsx is the live production build", card: null },
-        { k: "golive_env", label: "Vercel env vars all set \u2014 Stripe live secret, Resend key + EMAIL_FROM, Supabase URL + service-role key, APNs key/ID/team", card: null },
+        { k: "golive_env", label: "Vercel env vars all set — Stripe live secret, Resend key + EMAIL_FROM, Supabase URL + service-role key, APNs key/ID/team", card: null },
         { k: "golive_errors", label: "Vercel error rate looks clean (~0%)", card: null },
       ] },
       { label: "Email deliverability", items: [
         { k: "golive_spf", label: "SPF record is set for gotvero.com", card: null },
-        { k: "golive_dkim", label: "DKIM (Resend) is set \u2014 your mail is signed", card: null },
+        { k: "golive_dkim", label: "DKIM (Resend) is set — your mail is signed", card: null },
         { k: "golive_dmarc", label: "DMARC record is live (v=DMARC1)", card: null },
         { k: "golive_inbox", label: "A fresh confirmation lands in the inbox, not spam", card: null },
       ] },
     ] },
     { id: "safety", label: "Safety & data", icon: Lock, desc: "Protecting bookings & client data", groups: [
       { label: "Booking integrity", items: [
-        { k: "safety_double", label: "Two clients can't grab the same slot \u2014 taken times vanish and the server blocks overlaps", card: null },
-        { k: "safety_cancelkeep", label: "Cancelling keeps the record \u2014 client, appointment & saved card all persist", card: null },
+        { k: "safety_double", label: "Two clients can't grab the same slot — taken times vanish and the server blocks overlaps", card: null },
+        { k: "safety_cancelkeep", label: "Cancelling keeps the record — client, appointment & saved card all persist", card: null },
       ] },
       { label: "Client data", items: [
-        { k: "safety_dedupe", label: "Booking twice with one email reuses the profile \u2014 no duplicate rows", card: null },
+        { k: "safety_dedupe", label: "Booking twice with one email reuses the profile — no duplicate rows", card: null },
         { k: "safety_rls", label: "Logged-in owner can edit on the phone; the public can only book", card: null },
         { k: "safety_backups", label: "Supabase automatic backups are turned on", card: null },
       ] },
     ] },
     { id: "dryrun", label: "Final dry run", icon: CheckCircle2, desc: "One real run before you open the doors", groups: [
       { label: "The real thing", items: [
-        { k: "dry_full", label: "A real booking shows up everywhere \u2014 calendar, Stripe, email, and a push to your phone", card: null },
-        { k: "dry_refund", label: "Cancel + refund it \u2014 money returns and records stay intact", card: null },
+        { k: "dry_full", label: "A real booking shows up everywhere — calendar, Stripe, email, and a push to your phone", card: null },
+        { k: "dry_refund", label: "Cancel + refund it — money returns and records stay intact", card: null },
         { k: "dry_2nd", label: "Repeat from a second device / browser", card: null },
         { k: "dry_heather", label: "Heather runs one full booking through her account", card: null },
-        { k: "dry_friend", label: "A real friend books end-to-end \u2014 a true outside rehearsal", card: null },
+        { k: "dry_friend", label: "A real friend books end-to-end — a true outside rehearsal", card: null },
       ] },
     ] },
   ];
@@ -16207,7 +16320,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       </div>
       </>)}
 
-      {/* LAUNCH CHECKLIST — replaces the old cockpit. Progress + the 9 sections,
+      {/* LAUNCH CHECKLIST — replaces the old cockpit. Progress + per-area sections,
           each expandable to box-by-box checks. Collapses to a green line once done. */}
       {showCockpit && !openCat && !q && (
         allDone ? (
@@ -16239,7 +16352,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             <button onClick={() => setCockpitHidden(true)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 6, display: "flex", alignItems: "flex-start" }}><X size={16} /></button>
           </div>
 
-          {/* the 9 sections */}
+          {/* the sections */}
           {CHECKLIST.map((s) => {
             const { done, total } = sectionTally(s);
             const open = openSection === s.id;

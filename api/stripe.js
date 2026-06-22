@@ -19,14 +19,39 @@
 // origin is safe — the secret key still lives only on the server.
 // ---------------------------------------------------------------------------
 import Stripe from "stripe";
+import { createClient } from "@supabase/supabase-js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// --- Staff-only guard --------------------------------------------------------
+// "charge" (pull a saved card) and "refund" (send money out) move money and are
+// only ever triggered by signed-in staff in the dashboard. We require a valid
+// Supabase session token for those two actions so the endpoint can't be used as
+// an open proxy to the Stripe account. "setup" and "sale_intent" stay open —
+// they're also called from the public booking page, where there is no login.
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+const STAFF_ONLY = new Set(["charge", "refund"]);
+
+async function getStaffUser(req) {
+  const header = req.headers.authorization || req.headers.Authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  if (!token || !SERVICE_KEY) return null;
+  try {
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data || !data.user) return null;
+    return data.user;
+  } catch (e) {
+    return null;
+  }
+}
 
 export default async function handler(req, res) {
   // --- Allow the app (a different address) to call this server -------------
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Max-Age", "86400"); // cache the pre-check for a day
 
   // Answer the browser's pre-check immediately so the real POST can follow.
@@ -44,6 +69,14 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const { action } = body;
+
+    // Money-moving actions require a signed-in staff member.
+    if (STAFF_ONLY.has(action)) {
+      const user = await getStaffUser(req);
+      if (!user) {
+        return res.status(401).json({ error: "Not authorized — please sign in again." });
+      }
+    }
 
     // --- Save a card on file -------------------------------------------------
     // Creates (or reuses) a Stripe customer for this client and returns a
