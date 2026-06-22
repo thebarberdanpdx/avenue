@@ -268,14 +268,9 @@ const DEFAULT_BUSINESS = {
   },
   // ---- Checkout / payment behavior (Payments & Checkout → Checkout Settings) ----
   checkout: {
-    customMethods: ["Cash", "Card", "Venmo"], // accepted payment method labels
-    requireSignature: "over",  // never | always | over (over a threshold)
-    signatureThreshold: 25,    // $ amount above which a signature is asked
-    changeCalculator: true,    // show change-due calculator on cash payments
-    requireStaffAssignment: true, // every line item must have a staff member
-    clientSelfCheckout: false, // (needs payment backend) let clients pay on their own device
-    receiptDefault: "ask",     // ask | email | text | print | none
-    receiptFooter: "Thank you for visiting!",
+    // Manual "mark as paid" methods shown at checkout (the card reader + card-on-file are separate,
+    // Stripe-processed options). Owner-editable in Settings → Checkout.
+    customMethods: ["Cash", "Venmo", "Zelle"],
   },
   // ---- Payments master mode (Checkout & money → Payments) ----
   // live:false = Test mode — cards entered, full flow, but NOTHING is charged.
@@ -11867,19 +11862,11 @@ function CheckoutSettingsEditor({ c, onChange }) {
       {children}
     </div>
   );
-  const RowToggle = ({ title, desc, on, onClick, soon }) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14, opacity: soon ? 0.7 : 1 }}>
-      <div><div style={{ fontSize: 15.5, fontWeight: 600 }}>{title} {soon && <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 20, padding: "1px 7px", marginLeft: 6 }}>WHEN LIVE</span>}</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{desc}</div></div>
-      <Toggle on={on} onClick={onClick} />
-    </div>
-  );
-  const sigOpts = [["never", "Never"], ["over", "Over an amount"], ["always", "Always"]];
-  const rcptOpts = [["ask", "Ask the client"], ["email", "Email"], ["text", "Text"], ["print", "Print"], ["none", "No receipt"]];
   return (
     <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>How checkout and payments behave. Items marked “when live” turn on once payment processing is connected.</p>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>The non-card ways you let clients pay, and how a card on file is surcharged.</p>
 
-      <Card title="Custom payment methods" desc="The payment types that appear at checkout.">
+      <Card title="Payment methods" desc="The “mark as paid” options shown at checkout, alongside the card reader and card on file.">
         {methods.map((m, i) => (
           <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
             <input value={m} onChange={(e) => setMethod(i, e.target.value)} placeholder="e.g. Cash, Venmo, Zelle" style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
@@ -11905,35 +11892,7 @@ function CheckoutSettingsEditor({ c, onChange }) {
         )}
       </Card>
 
-      <div style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginBottom: 14, padding: "0 4px" }}>Tip buttons & options are set in <strong style={{ color: "var(--sub)" }}>Payments & Checkout → Tipping</strong>.</div>
-
-      <Card title="Signature required" desc="When to ask the client for a signature at checkout.">
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {sigOpts.map(([v, label]) => { const on = c.requireSignature === v; return (
-            <button key={v} onClick={() => set({ requireSignature: v })} style={{ flex: "1 1 30%", padding: "11px 8px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: on ? 600 : 400 }}>{label}</button>
-          ); })}
-        </div>
-        {c.requireSignature === "over" && (
-          <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 8 }}>Ask for a signature on totals above:</div>
-            <Stepper value={c.signatureThreshold || 0} onChange={(v) => set({ signatureThreshold: v })} min={0} max={500} step={5} suffix="$" />
-          </div>
-        )}
-      </Card>
-
-      <RowToggle title="Change calculator for cash" desc="Show change-due math when a client pays cash." on={c.changeCalculator} onClick={() => set({ changeCalculator: !c.changeCalculator })} />
-      <RowToggle title="Require staff assignments" desc="Every item in a sale must be assigned to a staff member before checkout." on={c.requireStaffAssignment} onClick={() => set({ requireStaffAssignment: !c.requireStaffAssignment })} />
-      <RowToggle title="Client self-checkout" desc="Let clients review and pay on their own device." on={c.clientSelfCheckout} onClick={() => set({ clientSelfCheckout: !c.clientSelfCheckout })} soon />
-
-      <Card title="Default receipt" desc="What happens with the receipt after a sale.">
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {rcptOpts.map(([v, label]) => { const on = c.receiptDefault === v; return (
-            <button key={v} onClick={() => set({ receiptDefault: v })} style={{ flex: "1 1 30%", padding: "11px 8px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{label}</button>
-          ); })}
-        </div>
-        <div style={{ fontSize: 13.5, color: "var(--sub)", margin: "14px 0 8px" }}>Receipt footer message</div>
-        <input value={c.receiptFooter || ""} onChange={(e) => set({ receiptFooter: e.target.value })} placeholder="Thank you for visiting!" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
-      </Card>
+      <div style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginBottom: 4, padding: "0 4px" }}>Tip buttons & options are set in <strong style={{ color: "var(--sub)" }}>Payments & Checkout → Tipping</strong>.</div>
     </div>
   );
 }
@@ -18704,9 +18663,12 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     else { if (m === "cof") setStage("charging"); executeCharge(m); }
   };
   const executeCharge = (m) => {
-    if (m === "cash") { payCash(); return; }
-    if (m === "cof") { payCardOnFile(); return; }
     if (m === "card") { setStage("card"); return; }
+    if (m === "cof") { payCardOnFile(); return; }
+    // Anything else is a manual "mark as paid" method (cash + the owner's custom labels). The
+    // "m:" prefix carries the chosen label; legacy "cash" maps to a Cash record.
+    const label = m && m.startsWith("m:") ? m.slice(2) : (m === "cash" ? "Cash" : m);
+    recordSale(makeRec(label, null, chargeBase)); setStage("approved");
   };
 
   // ---------- 1 · SALE (full screen, editable) ----------
@@ -18825,8 +18787,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         {[
           { id: "card", t: "Card reader", s: "Tap, chip, or key in", dis: !liveMode },
           { id: "cof", t: "Card on file", s: cofCard ? `${(cofCard.brand || "Card").charAt(0).toUpperCase() + (cofCard.brand || "card").slice(1)} ··${cofCard.last4}${scOn ? ` · +${scPct}% card fee` : ""}` : "No card saved", dis: !liveMode || !cofCard },
-          { id: "cash", t: "Cash", s: "Mark as paid", dis: false },
-          { id: "gift", t: "Gift card", s: "Coming soon", dis: true },
+          // Owner-configured manual methods (Settings → Checkout); card-equivalents excluded since the
+          // reader / card-on-file rows above cover them. Falls back to Cash if none set.
+          ...(((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^card( on file)?$/i.test(s)).map((label) => ({ id: "m:" + label, t: label, s: "Mark as paid", dis: false }))),
         ].map((m) => (
           <button key={m.id} disabled={m.dis || payBusy} onClick={() => startMethod(m.id)} className={m.dis ? "" : "lift"} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "21px 20px", color: "var(--text)", textAlign: "left", opacity: m.dis ? 0.45 : 1, cursor: m.dis ? "default" : "pointer", boxShadow: "var(--shadow-sm)" }}>
             <span><span style={{ display: "block", fontSize: 17, fontWeight: 600 }}>{m.t}</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{m.s}</span></span>
@@ -19470,6 +19433,16 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
     setDone({ amount: total, method: "cash", change: changeDue });
     showToast(`Sale recorded — ${fm(total)} cash.`);
   };
+  // The owner's manual "mark as paid" methods (Settings → Checkout). Cash gets the tendered/change
+  // sheet; the rest (Venmo, Zelle, …) just record the sale under that label.
+  // Exclude card-equivalents — the dedicated card reader / card-on-file buttons already cover those.
+  const manualMethods = (((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^card( on file)?$/i.test(s)));
+  const payManual = (label) => {
+    if (String(label).toLowerCase() === "cash") { setTendered(String(total)); setPayMode("cash"); return; }
+    recordSale({ method: label });
+    setDone({ amount: total, method: label, change: 0 });
+    showToast(`Sale recorded — ${fm(total)} · ${label}.`);
+  };
 
   const matches = clientQuery.trim()
     ? clients.filter((c) => (c.name || "").toLowerCase().includes(clientQuery.trim().toLowerCase())).slice(0, 6)
@@ -19481,7 +19454,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
         <div style={{ padding: "40px 8px", textAlign: "center" }}>
           <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}><CheckCircle2 size={38} color="var(--on-gold)" /></div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Paid {fm(done.amount)}</div>
-          <div style={{ fontSize: 14.5, color: "var(--sub)" }}>{done.method === "cash" ? "Cash" : "Card"}{client ? ` · ${client.name}` : ""}</div>
+          <div style={{ fontSize: 14.5, color: "var(--sub)" }}>{done.method === "cash" ? "Cash" : done.method === "card" ? "Card" : done.method}{client ? ` · ${client.name}` : ""}</div>
           {done.method === "cash" && done.change > 0 && <div style={{ fontSize: 18, color: "var(--text)", marginTop: 14, fontWeight: 600 }}>Change due: {fm(done.change)}</div>}
           <div style={{ display: "flex", gap: 10, marginTop: 28 }}>
             <button onClick={() => { setItems([]); setDiscount(""); setPayMode(null); setTendered(""); setClient(null); setDone(null); }} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border2)", color: "var(--text)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14 }}>NEW SALE</button>
@@ -19564,9 +19537,11 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
                   <button onClick={() => setPayMode("onfile")} disabled={total <= 0} style={{ width: "100%", marginBottom: 10, background: "var(--panel)", border: "1px solid var(--text)", color: "var(--text)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: total <= 0 ? 0.5 : 1 }}><CreditCard size={16} /> {(oc.brand ? oc.brand.charAt(0).toUpperCase() + oc.brand.slice(1) : "Card")} ···· {oc.last4 || "••••"} ON FILE</button>
                 );
               })()}
-              <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => { setTendered(String(total)); setPayMode("cash"); }} disabled={total <= 0} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border2)", color: "var(--text)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: total <= 0 ? 0.5 : 1 }}><DollarSign size={16} style={{ color: "var(--gold)" }} /> CASH</button>
-                <button onClick={() => setPayMode("card")} disabled={total <= 0} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: total <= 0 ? 0.5 : 1 }}><CreditCard size={16} /> {(client && (client.card || client.savedCard)) ? "NEW CARD" : "CARD"}</button>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {manualMethods.map((label) => (
+                  <button key={label} onClick={() => payManual(label)} disabled={total <= 0} style={{ flex: "1 1 28%", minWidth: 92, background: "var(--panel)", border: "1px solid var(--border2)", color: "var(--text)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: total <= 0 ? 0.5 : 1 }}>{String(label).toLowerCase() === "cash" && <DollarSign size={16} style={{ color: "var(--gold)" }} />} {label.toUpperCase()}</button>
+                ))}
+                <button onClick={() => setPayMode("card")} disabled={total <= 0} style={{ flex: "1 1 28%", minWidth: 92, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: total <= 0 ? 0.5 : 1 }}><CreditCard size={16} /> {(client && (client.card || client.savedCard)) ? "NEW CARD" : "CARD"}</button>
               </div>
             </>
           )}
