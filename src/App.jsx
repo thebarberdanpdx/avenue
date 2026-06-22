@@ -5453,6 +5453,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           <a href="#terms" style={{ color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2 }}>Terms of Service</a>
           <span style={{ margin: "0 9px", opacity: 0.6 }}>&middot;</span>
           <a href="#privacy" style={{ color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2 }}>Privacy Policy</a>
+          <div style={{ marginTop: 10 }}>
+            <a href="mailto:contact@sanctuarybarberco.com" style={{ color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2 }}>contact@sanctuarybarberco.com</a>
+          </div>
         </div>
       </div>
     </div>
