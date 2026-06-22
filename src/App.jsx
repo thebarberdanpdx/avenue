@@ -1477,6 +1477,7 @@ function App() {
   const [dataLoaded, setDataLoaded] = useState(false); // true once the first load finishes — used to avoid flashing placeholder names
   const savingRef = useRef({});    // per-table { running, queued } — guarantees in-order saves
   const providersDirtyRef = useRef(false); // true between a local provider edit and its successful sync — blocks focus-reload clobber
+  const providersFullRef = useRef(false); // true once a signed-in session holds FULL provider rows (with email/phone/PIN) — stops the sanitized public feed from overwriting them on a remount race (the "email/phone disappears" bug)
   const [saveFailed, setSaveFailed] = useState(false); // drives a banner if a save to the server errors out
   const [loadIncomplete, setLoadIncomplete] = useState(false); // a load errored → saves are blocked; surface it instead of failing silently
 
@@ -1603,12 +1604,14 @@ function App() {
       try { const rp = await supabase.rpc('get_public_providers', { p_shop: SHOP_ID }); if (!rp.error && Array.isArray(rp.data)) pr = rp.data; } catch (e) {}
       if (pr === null) pr = await loadList('providers');
       if (pr) pr = sortProviders(pr);
-      if (pr && pr.length) setProviders(pr);
+      // The public feed is SANITIZED (no email/phone/PIN). If a signed-in session has already loaded
+      // the full rows, never let this stripped copy overwrite them — that race blanked staff email/phone.
+      if (pr && pr.length && !providersFullRef.current) setProviders(pr);
       const sv = await loadList('services');     if (sv) sv.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9)); if (sv && sv.length) setServices(sv);
 
       // Record the loaded baseline so the safe-delete reconciliation knows which rows this device
       // already knew about (so it never deletes a row another device adds later).
-      if (pr && pr.length) lastRemoteRef.current.providers = pr;
+      if (pr && pr.length && !providersFullRef.current) lastRemoteRef.current.providers = pr;
       if (sv && sv.length) lastRemoteRef.current.services = sv;
 
       // Cut-style library + linkage (Step 2a). Use the saved library if present, else seed it from
@@ -1692,7 +1695,12 @@ function App() {
     (async () => {
       const provBusy = () => { const s = savingRef.current.providers; return providersDirtyRef.current || (s && (s.running || s.queued)); };
       const pr = await supabase.from('providers').select('data').eq('shop_id', SHOP_ID);
-      if (alive && !pr.error && Array.isArray(pr.data) && !provBusy()) { const list = sortProviders(pr.data.map((r) => r.data)); lastRemoteRef.current.providers = list; if (list.length) setProviders(list); }
+      if (alive && !pr.error && Array.isArray(pr.data)) {
+        // We now hold (or are mid-edit on) the FULL provider rows for this session — protect them
+        // from the sanitized public feed even if an in-flight edit makes us skip applying below.
+        providersFullRef.current = true;
+        if (!provBusy()) { const list = sortProviders(pr.data.map((r) => r.data)); lastRemoteRef.current.providers = list; if (list.length) setProviders(list); }
+      }
       const wl = await supabase.from('waitlist').select('data').eq('shop_id', SHOP_ID);
       if (alive && !wl.error && Array.isArray(wl.data)) { const list = wl.data.map((r) => r.data); lastRemoteRef.current.waitlist = list; setWaitlist(list); }
     })();
@@ -6159,22 +6167,6 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
   const dailyPct = hasDailyGoal ? Math.min(100, Math.round((todayMoney / dailyGoal) * 100)) : 0;
   const weeklyPct = hasWeeklyGoal ? Math.min(100, Math.round((thisWeekMoney / weeklyGoal) * 100)) : 0;
 
-  // --- Day timeline geometry — show the working hours for the viewed provider (or 9-7 fallback) ---
-  let timelineStart = 9 * 60, timelineEnd = 19 * 60;
-  if (!isShopView && viewedProvider) {
-    const h = viewedProvider.hours?.[now.getDay()];
-    if (h?.on) { timelineStart = h.start; timelineEnd = h.end; }
-  } else if (isShopView) {
-    let minS = 24 * 60, maxE = 0;
-    realProviders.forEach((p) => {
-      const h = p.hours?.[now.getDay()];
-      if (h?.on) { if (h.start < minS) minS = h.start; if (h.end > maxE) maxE = h.end; }
-    });
-    if (maxE > 0) { timelineStart = minS; timelineEnd = maxE; }
-  }
-  const timelineSpan = Math.max(60, timelineEnd - timelineStart);
-  const pctFor = (mins) => Math.max(0, Math.min(100, ((mins - timelineStart) / timelineSpan) * 100));
-
   // --- Cockpit stat tiles: today's completed cuts, chair occupancy %, average ticket ---
   const todayDone = todayApptsAll.filter((a) => a.status === "done");
   const cutsToday = todayDone.length;
@@ -6695,35 +6687,6 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       })()}
 
       <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={addTimelinePhoto} />
-
-      {/* DAY TIMELINE — horizontal bar showing today's bookings */}
-      {todayApptsAll.length > 0 && (
-        <div style={{ marginBottom: 30 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600 }}>TODAY AT A GLANCE</div>
-            <div style={{ fontSize: 11, color: "var(--faint)" }}>{fmtTime(timelineStart)} → {fmtTime(timelineEnd)}</div>
-          </div>
-          <button onClick={() => onNavigate && onNavigate("calendar")} style={{ width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-            <div style={{ position: "relative", height: 30, background: "var(--panel2)", borderRadius: 6, overflow: "hidden" }}>
-              {todayApptsAll.map((a) => {
-                const left = pctFor(a.start);
-                const width = pctFor(a.end) - left;
-                if (width <= 0) return null;
-                return (
-                  <div key={a.id} title={`${a.name} · ${fmtTime(a.start)}`} style={{ position: "absolute", left: `${left}%`, width: `${width}%`, top: 3, bottom: 3, background: "var(--gold)", borderRadius: 3, opacity: a.status === "done" ? 0.5 : 1 }} />
-                );
-              })}
-              {/* "Now" line — only show if we're within the timeline range */}
-              {nowMin >= timelineStart && nowMin <= timelineEnd && (
-                <div style={{ position: "absolute", left: `${pctFor(nowMin)}%`, top: 0, bottom: 0, width: 2, background: "var(--text)", boxShadow: "0 0 0 2px var(--bg)" }} />
-              )}
-            </div>
-          </button>
-          <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 6, lineHeight: 1.4 }}>
-            {todayApptsAll.filter((a) => a.status === "done").length} done · {todayApptsAll.filter((a) => a.status !== "done").length} to go
-          </div>
-        </div>
-      )}
 
       {!simpleMode && (<>
       <div style={{ height: 1, background: "var(--line)", margin: "0 0 30px" }} />
@@ -12941,38 +12904,40 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, fontWeight: 400, flex: 1 }}>{editMode ? "Reorder with the arrows · tap − to archive." : "Tap anyone to edit their photo, title, hours, access, and pay."}</p>
           <button onClick={() => setEditMode((v) => !v)} style={{ background: "none", color: "var(--gold)", fontSize: 15.5, fontWeight: editMode ? 600 : 500, padding: "2px 2px", flexShrink: 0 }}>{editMode ? "Done" : "Edit"}</button>
         </div>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           {active.map((p, i) => editMode ? (
-            <div key={p.id} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "13px 16px", minHeight: 64, borderTop: i ? "1px solid var(--line)" : "none" }}>
+            <div key={p.id} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "14px 4px", borderBottom: "1px solid var(--line)" }}>
               <button onClick={() => archive(p.id)} aria-label={`Archive ${p.name}`} style={{ width: 24, height: 24, borderRadius: "50%", background: "#C2563F", color: "#fff", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "none", padding: 0, fontSize: 20, lineHeight: 0, fontWeight: 600 }}>−</button>
-              <Avatar size={42} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--gold)"} />
-              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 16, fontWeight: 500 }}>{p.name}</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>{p.role}</div></div>
+              <Avatar size={40} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--gold)"} />
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{p.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{p.role}</div></div>
               <div style={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
                 <button onClick={() => moveStaff(p.id, -1)} disabled={i === 0} style={{ background: "none", color: i === 0 ? "var(--faint)" : "var(--sub)", padding: 3, opacity: i === 0 ? 0.4 : 1 }}><ChevronUp size={18} /></button>
                 <button onClick={() => moveStaff(p.id, 1)} disabled={i === active.length - 1} style={{ background: "none", color: i === active.length - 1 ? "var(--faint)" : "var(--sub)", padding: 3, opacity: i === active.length - 1 ? 0.4 : 1 }}><ChevronDown size={18} /></button>
               </div>
             </div>
           ) : (
-            <button key={p.id} onClick={() => { setOpenId(p.id); setSection(null); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "13px 16px", minHeight: 64, background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: i ? "1px solid var(--line)" : "none" }}>
-              <Avatar size={46} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--gold)"} />
-              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 16, fontWeight: 500 }}>{p.name}</div><div style={{ fontSize: 13.5, color: "var(--sub)" }}>{p.role}</div></div>
-              <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+            <button key={p.id} onClick={() => { setOpenId(p.id); setSection(null); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+                <Avatar size={40} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--gold)"} />
+                <div style={{ minWidth: 0 }}><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{p.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[p.role, p.id !== "anyone" ? (p.email || p.phone) : null].filter(Boolean).join(" · ") || "No title set"}</div></div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </button>
           ))}
         </div>
 
         {!editMode && (
-          <button onClick={addStaff} className="lift" style={{ width: "100%", marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, boxShadow: "var(--shadow-sm)" }}><Plus size={18} /> Add a team member</button>
+          <button onClick={addStaff} className="lift" style={{ width: "100%", marginTop: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, boxShadow: "var(--shadow-sm)" }}><Plus size={18} /> Add a team member</button>
         )}
 
         {!editMode && archived.length > 0 && (
           <>
-            <div style={{ fontSize: 11.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "22px 0 9px 6px" }}>Archived</div>
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
-              {archived.map((p, i) => (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 13, padding: "13px 16px", minHeight: 60, borderTop: i ? "1px solid var(--line)" : "none" }}>
+            <div style={{ fontSize: 11.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 0 4px 4px" }}>Archived</div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {archived.map((p) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 4px", borderBottom: "1px solid var(--line)" }}>
                   <Avatar size={40} photo={staffPhoto(p)} initial={p.name.charAt(0)} color={p.color || "var(--faint)"} />
-                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15.5, fontWeight: 500, color: "var(--sub)" }}>{p.name}</div><div style={{ fontSize: 13, color: "var(--faint)" }}>Archived</div></div>
+                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px", color: "var(--sub)" }}>{p.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Archived</div></div>
                   <button onClick={() => restore(p.id)} style={{ background: "none", color: "var(--gold)", fontSize: 14, fontWeight: 500 }}>Restore</button>
                 </div>
               ))}
