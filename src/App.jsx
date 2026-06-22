@@ -238,11 +238,9 @@ const DEFAULT_BUSINESS = {
   },
   // ---- Waiting Room / check-in behavior (Calendar & Appointments → Waiting Room) ----
   waitingRoom: {
-    selfCheckIn: false,        // (needs link/QR) clients can check themselves in
+    enabled: true,             // master on/off — when off, an arriving client goes straight "in the chair" (no lobby step)
     autoReadyMessage: true,    // send a "we're ready for you" notice on Notify·Ready
     readyMessage: "{provider} will meet you at the door.",
-    showWaitingList: true,     // show a live "who's waiting" panel
-    notifyOnArrival: true,     // ping the provider when a client checks in
   },
   // ---- Running-late alert: prompt to notify the next client when wrapping up ----
   runningLate: {
@@ -11940,34 +11938,34 @@ function CheckoutSettingsEditor({ c, onChange }) {
   );
 }
 
-// Waiting Room — how client check-in behaves (arrival → waiting → ready).
+// Waiting Room — the master on/off for the lobby/check-in step, plus the "we're ready" message.
 function WaitingRoomEditor({ w, onChange }) {
   const set = (patch) => onChange({ ...w, ...patch });
-  const RowToggle = ({ title, desc, on, onClick, soon }) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14, opacity: soon ? 0.7 : 1 }}>
-      <div><div style={{ fontSize: 15.5, fontWeight: 600 }}>{title} {soon && <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 20, padding: "1px 7px", marginLeft: 6 }}>WHEN LIVE</span>}</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{desc}</div></div>
-      <Toggle on={on} onClick={onClick} />
-    </div>
-  );
+  const on = w.enabled !== false;
   return (
     <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Controls how clients are checked in when they arrive, and how they're told you're ready for them.</p>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>When the waiting room is on, an arriving client can be marked <strong style={{ color: "var(--text)" }}>In&nbsp;lobby</strong> first, then started when you're ready. Turn it off and check-in goes straight to <strong style={{ color: "var(--text)" }}>in the chair</strong>.</p>
 
-      <RowToggle title="Notify staff on arrival" desc="Ping the staff member when a client is checked in and waiting." on={w.notifyOnArrival} onClick={() => set({ notifyOnArrival: !w.notifyOnArrival })} />
-      <RowToggle title="Show waiting list" desc="Display a live list of clients who've checked in and are waiting." on={w.showWaitingList} onClick={() => set({ showWaitingList: !w.showWaitingList })} />
-      <RowToggle title="Client self check-in" desc="Let clients check themselves in from a link or QR code on arrival." on={w.selfCheckIn} onClick={() => set({ selfCheckIn: !w.selfCheckIn })} soon />
-
-      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: w.autoReadyMessage ? 14 : 0 }}>
-          <div><div style={{ fontSize: 15.5, fontWeight: 600 }}>Send "ready" message</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>When you tap Notify · Ready, let the client know you're ready for them.</div></div>
-          <Toggle on={w.autoReadyMessage} onClick={() => set({ autoReadyMessage: !w.autoReadyMessage })} />
-        </div>
-        {w.autoReadyMessage && (<>
-          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 8 }}>Message wording</div>
-          <textarea value={w.readyMessage || ""} onChange={(e) => set({ readyMessage: e.target.value })} rows={3} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", resize: "vertical", lineHeight: 1.5 }} />
-          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Use <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> to drop in the staff member's name automatically.</div>
-        </>)}
+      {/* Master on/off */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel2)", border: `1px solid ${on ? "color-mix(in srgb, var(--gold) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: 18, marginBottom: 14 }}>
+        <div><div style={{ fontSize: 15.5, fontWeight: 600 }}>Use the waiting room</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Show an “In lobby” step on each appointment so you can check clients in while they wait.</div></div>
+        <Toggle on={on} onClick={() => set({ enabled: !on })} />
       </div>
+
+      {/* "Ready" message — only relevant while the waiting room is on */}
+      {on && (
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: w.autoReadyMessage ? 14 : 0 }}>
+            <div><div style={{ fontSize: 15.5, fontWeight: 600 }}>Send “ready” message</div><div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>When you tap Notify client, text them that you're ready.</div></div>
+            <Toggle on={w.autoReadyMessage} onClick={() => set({ autoReadyMessage: !w.autoReadyMessage })} />
+          </div>
+          {w.autoReadyMessage && (<>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 8 }}>Message wording</div>
+            <textarea value={w.readyMessage || ""} onChange={(e) => set({ readyMessage: e.target.value })} rows={3} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", resize: "vertical", lineHeight: 1.5 }} />
+            <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Use <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> to drop in the staff member's name automatically.</div>
+          </>)}
+        </div>
+      )}
     </div>
   );
 }
@@ -15676,7 +15674,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "waitingroom", title: "Waiting Room", icon: Users, category: "Calendar & Appointments",
-      status: (form.waitingRoom?.selfCheckIn ? "Self check-in" : "Staff check-in") + (form.waitingRoom?.autoReadyMessage ? " · ready msg on" : ""),
+      status: (form.waitingRoom?.enabled === false ? "Off" : "On") + (form.waitingRoom?.enabled !== false && form.waitingRoom?.autoReadyMessage ? " · ready msg" : ""),
       keywords: "waiting room check in checkin arrival ready notify waiting list self check-in front desk client arrived",
       editor: <WaitingRoomEditor w={form.waitingRoom || {}} onChange={(wr) => setForm({ ...form, waitingRoom: { ...(form.waitingRoom || {}), ...wr } })} />,
     },
@@ -20217,7 +20215,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     <span style={{ width: 11, height: 11, borderRadius: "50%", background: status.dot }} />
                     <span style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: 0.2, color: appt.status === "checked-in" ? status.dot : T.text }}>{status.label}</span>
                   </div>
-                  {appt.status === "confirmed" && (
+                  {appt.status === "confirmed" && (((business && business.waitingRoom) ? business.waitingRoom.enabled !== false : true) ? (
                     <div style={{ position: "relative" }}>
                       <button className="lift" onClick={() => setCheckinOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--gold)", border: "none", color: "var(--on-gold)", padding: "11px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 1, fontWeight: 700, boxShadow: "var(--shadow)" }}>CHECK-IN <ChevronDown size={15} style={{ transform: checkinOpen ? "rotate(180deg)" : "none", transition: "transform .18s var(--ease)" }} /></button>
                       {checkinOpen && (
@@ -20234,7 +20232,9 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                         </>
                       )}
                     </div>
-                  )}
+                  ) : (
+                    <button className="lift" onClick={() => onSetStatus(appt.id, "in-service", `${appt.name} is in the chair.`)} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--gold)", border: "none", color: "var(--on-gold)", padding: "11px 18px", borderRadius: 30, fontSize: 13, letterSpacing: 1, fontWeight: 700, boxShadow: "var(--shadow)" }}>START</button>
+                  ))}
                   {appt.status === "checked-in" && (() => {
                     const notified = !!appt.lobbyNotifiedAt;
                     const doNotify = () => {
