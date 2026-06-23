@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from './supabaseClient'
+import * as Sentry from '@sentry/react'
 import {
   Calendar, Phone, Check, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MessageSquare, Bell, User, Camera,
   Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock, PenSquare,
@@ -1570,6 +1571,7 @@ function App() {
     } catch (err) {
       console.error(`[vero] save '${table}' failed (data on server unchanged):`, err);
       setSaveFailed(true);
+      try { Sentry.captureException(new Error(`save failed: ${table}`), { tags: { area: "save", table }, extra: { detail: String((err && err.message) || err) } }); } catch (e) {}
     } finally {
       // Drain the queue: if more changes arrived while we were saving, run once more with the latest.
       const next = savingRef.current[table].queued;
@@ -1799,7 +1801,7 @@ function App() {
     let keptCalSync = snap.business?.calSync;
     try { const { data } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle(); if (data?.settings && 'calSync' in data.settings) keptCalSync = data.settings.calSync; } catch (e) {}
     const { error } = await supabase.from('shops').upsert({ id: SHOP_ID, name: snap.business?.name || SHOP_ID, settings: { ...snap.business, calSync: keptCalSync, _categories: snap.categories, _cutLibrary: snap.cutLibrary } });
-    if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false);
+    if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); try { Sentry.captureException(new Error('settings save failed'), { tags: { area: "save", table: "shops" }, extra: { detail: String((error && error.message) || error) } }); } catch (e) {} } else setSaveFailed(false);
   }, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
   // Stamp lastSaveAt the moment a LOCAL edit happens (this runs only for local changes — a
   // live-sync refetch sets state === lastRemoteRef, so it returns above). This suppresses the
@@ -10198,7 +10200,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 {r.priceMode !== "none" && (
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
                     <span style={{ fontSize: 14.5, color: "var(--sub)" }}>{r.priceMode === "more" ? "Add" : "Take off"}</span>
-                    <input type="number" value={r.amount || ""} onChange={(e) => setRule(r.id, { amount: e.target.value === "" ? 0 : Number(e.target.value) })} style={{ width: 80, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
+                    <input type="number" value={r.amount || ""} onChange={(e) => setRule(r.id, { amount: e.target.value === "" ? 0 : Math.max(0, Math.min(100000, Number(e.target.value))) })} style={{ width: 80, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 12px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
                     <Segmented inline options={[{ value: "amount", label: "$" }, { value: "percent", label: "%" }]} value={r.amountType} onChange={(v) => setRule(r.id, { amountType: v })} />
                   </div>
                 )}
@@ -13927,7 +13929,7 @@ function NoShowEditor({ b, policy, onBooking, onPolicy }) {
         {dep.mode === "fixed" && (
           <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 15px" }}>
             <span style={{ fontSize: 16, color: "var(--gold)", fontWeight: 700 }}>$</span>
-            <input type="number" value={dep.amount || ""} onChange={(e) => setDep({ amount: e.target.value === "" ? 0 : Number(e.target.value) })} placeholder="20" style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 16, fontWeight: 600, fontFamily: FONT_BODY }} />
+            <input type="number" value={dep.amount || ""} onChange={(e) => setDep({ amount: e.target.value === "" ? 0 : Math.max(0, Math.min(100000, Number(e.target.value))) })} placeholder="20" style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 16, fontWeight: 600, fontFamily: FONT_BODY }} />
             <span style={{ fontSize: 14, color: "var(--faint)" }}>per booking</span>
           </div>
         )}
@@ -18882,7 +18884,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
           {tipCfg.allowCustom !== false && (
             customTip != null && customTip !== 0
-              ? <input autoFocus type="number" inputMode="decimal" value={customTip} onChange={(e) => setCustomTip(e.target.value === "" ? 0.01 : Math.max(0, Number(e.target.value) || 0))} style={{ flex: 1, background: "var(--panel2)", border: "1.5px solid var(--gold)", borderRadius: 14, padding: "14px 16px", color: "var(--text)", fontSize: 16, textAlign: "center", fontFamily: FONT_BODY }} />
+              ? <input autoFocus type="number" inputMode="decimal" value={customTip} onChange={(e) => setCustomTip(e.target.value === "" ? 0.01 : Math.max(0, Math.min(100000, Number(e.target.value) || 0)))} style={{ flex: 1, background: "var(--panel2)", border: "1.5px solid var(--gold)", borderRadius: 14, padding: "14px 16px", color: "var(--text)", fontSize: 16, textAlign: "center", fontFamily: FONT_BODY }} />
               : <button onClick={() => setCustomTip(0.01)} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 14, fontSize: 14.5, color: "var(--text2)", fontWeight: 500, cursor: "pointer" }}>Custom amount</button>
           )}
           {tipCfg.allowNoTip !== false && <button onClick={() => setCustomTip(0)} style={{ flex: 1, background: "var(--panel)", border: `1px solid ${customTip === 0 ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: 14, fontSize: 14.5, color: customTip === 0 ? "var(--gold)" : "var(--text2)", fontWeight: 500, cursor: "pointer" }}>No tip</button>}

@@ -16,7 +16,7 @@ const DEAD_STATUSES = ["canceled", "cancelled", "done", "no-show", "noshow", "co
 // Public site origin for the self-service manage / arrival links baked into reminders.
 const SITE = (process.env.SITE_URL || "https://gotvero.com").replace(/\/+$/, "");
 
-import { withErrorReporting } from "../lib/observe.js";
+import { withErrorReporting, reportServerError } from "../lib/observe.js";
 export default withErrorReporting(handler, "send-reminders");
 async function handler(req, res) {
   // Optional shared-secret guard so randoms can't trigger your sends.
@@ -119,5 +119,6 @@ async function handler(req, res) {
     }
   }
 
+  if (failed > 0) await reportServerError(new Error(`send-reminders: ${failed} message(s) failed to send`), { fn: "send-reminders", checked, sent, failed });
   return res.status(200).json({ ok: true, checked, sent, failed, smsLive: SMS_LIVE });
 }

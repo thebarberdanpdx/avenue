@@ -11,7 +11,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { renderEmailHtml, renderPlainText, sendEmail } from "../lib/messaging.js";
 
-import { withErrorReporting } from "../lib/observe.js";
+import { withErrorReporting, reportServerError } from "../lib/observe.js";
 export default withErrorReporting(handler, "send-birthdays");
 async function handler(req, res) {
   // Optional shared-secret guard so randoms can't trigger your sends.
@@ -80,5 +80,6 @@ async function handler(req, res) {
     }
   }
 
+  if (failed > 0) await reportServerError(new Error(`send-birthdays: ${failed} email(s) failed to send`), { fn: "send-birthdays", checked, sent, failed });
   return res.status(200).json({ ok: true, todayMD, checked, sent, failed });
 }
