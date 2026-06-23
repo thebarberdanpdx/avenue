@@ -136,6 +136,15 @@ async function writeCfg(supabase, shop, shopRow, patch) {
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  // Optional shared-secret guard so randoms can't trigger syncs. Vercel Cron sends
+  // this automatically when CRON_SECRET is set; matches api/send-reminders.js.
+  if (process.env.CRON_SECRET) {
+    const auth = req.headers.authorization || "";
+    const q = (req.query && req.query.key) || "";
+    if (auth !== `Bearer ${process.env.CRON_SECRET}` && q !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: "unauthorized" });
+    }
+  }
   if (!SERVICE_KEY) return res.status(500).json({ error: "server not configured" });
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
