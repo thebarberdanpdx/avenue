@@ -50,11 +50,9 @@ _Last updated: 2026-06-23_
 10. **Locked the last open cron** — `api/calendar-run` (the nightly auto-sync) could be triggered by anyone; now it requires the secret password Vercel already uses for the other timed jobs. Anonymous trigger → 401, tested live; the nightly run still works. **Every behind-the-scenes address that writes data now requires a lock.** (commit `e75f360`, deployed 2026-06-23)
 11. **Added a browser-permissions lock** — denies device features the app never uses (camera, mic, location, etc.) so injected code couldn't reach them. Left card payments untouched. Tested live. (commit `d9cab32`, deployed 2026-06-23)
 
-12. **Built the money safety net** — `api/stripe.js` now has a webhook so if a payment is refunded, disputed (chargeback), or fails, your app's records update to match. It's built, live, and secure, but **dormant until Dan connects it in Stripe** (see ACTIVATION below). Your live payments are 100% untouched. (commit `de4c97f`, deployed 2026-06-23)
+12. **Money safety net — built AND turned on** ✅ — `api/stripe.js` has a webhook so if a payment is refunded, disputed (chargeback), or fails, your app's records update to match. Dan registered the endpoint in Stripe on 2026-06-23 (confirmed **Active**, URL exact, listening to the right events). Live payments 100% untouched. (commit `de4c97f`)
 
-> **⏳ WAITING ON DAN — connect the money safety net (~2 min, no rush):** Stripe Dashboard → make sure it says **LIVE** (not Test) → **Developers → Webhooks → Add endpoint** → URL `https://gotvero.com/api/stripe` → choose events **charge.refunded**, **charge.dispute.created**, **payment_intent.payment_failed** → **Add endpoint**. No secret to copy. Once added, it's working.
-
-> **Note for next session:** ~62% done. Remaining items each need ~2 min of Dan's help or carry real risk — discuss with Dan before diving in. Don't autonomously edit the save/login flows without his okay.
+> **Note for next session:** ~63% done. The four open doors + cron + payment safety net + pre-flight check + permissions header are all DONE & live. Remaining items each need ~2 min of Dan's help or carry real risk — discuss with Dan before diving in. Don't autonomously edit the save/login flows without his okay. Likely-next candidates: error monitoring (Sentry signup), schema→git (needs DB creds — ask), 2-device concurrency guard (save-path risk), remove `avenue2026` (lockout risk), SMS STOP handler (once SMS approved).
 - Also confirmed safe (no fix needed): **booking photo uploads** auto-shrink + cap at 3.
 
 ## ▶️ What's NEXT on Track A (pick up here)
