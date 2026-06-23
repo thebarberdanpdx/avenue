@@ -52,7 +52,9 @@ _Last updated: 2026-06-23_
 
 12. **Money safety net — built AND turned on** ✅ — `api/stripe.js` has a webhook so if a payment is refunded, disputed (chargeback), or fails, your app's records update to match. Dan registered the endpoint in Stripe on 2026-06-23 (confirmed **Active**, URL exact, listening to the right events). Live payments 100% untouched. (commit `de4c97f`)
 
-> **Note for next session:** ~63% done. The four open doors + cron + payment safety net + pre-flight check + permissions header are all DONE & live. Remaining items each need ~2 min of Dan's help or carry real risk — discuss with Dan before diving in. Don't autonomously edit the save/login flows without his okay. Likely-next candidates: error monitoring (Sentry signup), schema→git (needs DB creds — ask), 2-device concurrency guard (save-path risk), remove `avenue2026` (lockout risk), SMS STOP handler (once SMS approved).
+13. **Error alerts now on** ✅ — Sentry is wired into the app (production-only, errors-only, no customer data sent). If anything breaks on the live site, Dan gets an email. Dan made the free account; Claude did the wiring. (commit `2b4acc7`)
+
+> **Note for next session:** ~68% done. Working through Dan's "let's go in order" 3-item list: ✅ (1) error alerts [done]. **Next: (2) database backup-to-git** — needs Dan to grab a Postgres connection string from Supabase (Settings → Database → Connection string) so the schema/RLS/functions can be dumped to the repo. Then **(3) two-phone concurrency guard** (touches the save path — careful). Other remaining: remove `avenue2026` (lockout risk), SMS STOP handler (once SMS approved). Don't autonomously edit save/login/payment flows without Dan's okay.
 - Also confirmed safe (no fix needed): **booking photo uploads** auto-shrink + cap at 3.
 
 ## ▶️ What's NEXT on Track A (pick up here)
