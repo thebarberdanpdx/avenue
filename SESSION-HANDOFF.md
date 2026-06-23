@@ -31,7 +31,7 @@ _Last updated: 2026-06-23_
 ### 2) Security hardening — 🔶 IN PROGRESS (this is the active work)
 - Goal: make the app safe for Dan's own shop launch first, then (later) for selling to many shops.
 - **Two trackers, both in the repo:**
-  - `HARDENING-SHOP.md` — **Track A: Dan's own shop. DO NOW.** Currently **~26%**.
+  - `HARDENING-SHOP.md` — **Track A: Dan's own shop. DO NOW.** Currently **~70%**.
   - `HARDENING-SAAS.md` — Track B: multi-tenant SaaS. **Later.** (Includes all of Track A first.)
 - These came out of a full audit / pen-test / threat-model done earlier in the session.
 
@@ -56,21 +56,28 @@ _Last updated: 2026-06-23_
 
 14. **Database blueprint written to code** — `DATABASE.md` documents your whole backend (tables, rules, security model) so it could be rebuilt or reviewed. The full exact dump is parked for before-launch (needs database tools + your password, and there's barely any real data yet). (commit `d79d9d6`)
 
-> **Note for next session:** ~70% done. Dan's "let's go in order" 3-item list: ✅ (1) error alerts · 🔶 (2) DB backup — blueprint done; exact `pg_dump` + Supabase auto-backup check deferred to before-launch · ⏪ (3) two-phone guard — appts/clients already safe (per-row upserts + Realtime); the settings-blob merge guard was tried and **REVERTED (84cfbc7)** after a live save showed local≠server (likely an unsaved UI draft, not the guard, but reverted out of caution — the save path needs a real logged-in test BEFORE deploy). Rare settings-collision gap left as-is. **Re-verifying that normal settings saves still persist cleanly post-revert.** Other remaining: remove `avenue2026` (lockout risk), SMS STOP handler (once SMS approved). Don't autonomously edit save/login/payment flows without Dan's okay.
+15. **Two-phone (concurrency) guard — TRIED then REVERTED ⏪** — appts/clients/services/providers/waitlist were ALREADY safe (per-row upserts + Supabase Realtime live-sync). The one gap was the whole-blob `shops.settings` write; a merge guard was added (1d3610b) but **reverted (84cfbc7)** out of caution after a confusing live test (see OPEN ISSUE). The rare "two people edit Settings at the same instant" gap is left as-is — fine for a 1–2 chair shop.
+
+> **Status: ~70% done.** Dan's "let's go in order" 3-item list: ✅ (1) error alerts · 🔶 (2) DB backup (blueprint done; exact `pg_dump` + Supabase auto-backup check deferred to before-launch) · ⏪ (3) two-phone guard (reverted, see above).
 - Also confirmed safe (no fix needed): **booking photo uploads** auto-shrink + cap at 3.
 
-## ▶️ What's NEXT on Track A (pick up here)
-Open `HARDENING-SHOP.md` for the full list. The four open doors are done. Remaining, roughly in value/safety order:
-1. **Stripe webhook** — keeps your books in sync if a payment is refunded/disputed/fails. NOTE: we're at Vercel's **12-function limit**, so this must be folded into an existing endpoint (or remove an unused one first), AND Dan must add the webhook + a signing secret in the Stripe dashboard.
-2. **Reliability** — error monitoring; put the database design into git; schedule the reminder cron (only matters once SMS is approved).
-3. **Concurrency guard** — stop two devices at the desk from overwriting each other (touches the save path — careful).
-4. **Remove the hardcoded password `avenue2026`** — careful: it's wired into the login/lock screen, so a clumsy change could lock Dan out. Low real-risk (the real data is already protected by the login + database lock).
-5. **STOP opt-out handler** — legally required once SMS goes live.
-2. **Stripe webhook** — so refunds/chargebacks/failed payments stay in sync (pairs with the amount guard already done).
-3. **Reliability** — error monitoring; schedule the appointment-reminder cron (only matters once SMS is approved); put the database schema into git.
-4. **Concurrency guard** — stop two staff devices from overwriting each other.
-5. **Remove the hardcoded password** `avenue2026` in the bundle (low risk, but verify the login screen still works).
-6. **STOP opt-out handler** — required once SMS goes live (legal).
+## ⚠️ OPEN ISSUE — settings save didn't visibly persist (INVESTIGATE FIRST next session)
+While testing the (now-reverted) concurrency guard, Dan changed a **tipping preset** (18→15→5%) on his **logged-in dashboard**. It showed on screen but did **NOT** reach the server — an anonymous read of `shops.settings.tipping` stayed `[18,20,25]` across many attempts.
+- **Ruled OUT:** (a) my concurrency guard — it was **reverted** and the change *still* didn't persist, so the guard was innocent; (b) the load-incomplete save-block — Dan confirmed there is **NO red "saving paused" banner**.
+- **Leading hypotheses (untested — Dan paused with "I think it's fine"):**
+  1. **Save not completed.** The tipping editor buffers edits in a `form` state; it only commits via the **"Save changes" button at the bottom of the card** (`App.jsx` ~16257 → `save()` → `setBusiness(form)` → debounced `shops` upsert). Tapping back/X runs `cancel()` and **discards** the draft.
+  2. **Focus/app-switch race.** Dan was switching apps (to screenshot/message) right after editing, which can interrupt the ~800ms-debounced save.
+- **Next session — verify settings actually persist:** have Dan change one setting → tap **"Save changes"** (watch for the "…saved" toast) → **wait ~10s without switching apps** → refresh → then confirm from your side:
+  `curl -s "https://iufgznminbujcabqeesk.supabase.co/rest/v1/shops?id=eq.avenue-phi&select=settings" -H "apikey: sb_publishable_aGX3akW7VfHO6Lm-FsZmEA_sf95Nu2i"`
+- **Also worth checking:** the live settings still look like **DEMO/seed values** (email `hello@meridianstudio.com`, address "2077 NE Town Center Dr", phone 555-0142, default tipping). Confirm whether Dan has *ever* successfully customized + saved settings, or if there's a genuine settings-save bug to fix before launch.
+
+## ▶️ What's NEXT on Track A (after the open issue above)
+Open `HARDENING-SHOP.md` for the full list. **All 4 "open door" endpoints + cron + payment safety net + error alerts + pre-flight check + permissions header are DONE & live.** Genuinely remaining:
+1. **Finish DB backup** — exact `pg_dump`/`supabase db dump` of the schema/RLS/RPC bodies into git (needs DB tooling installed + the Postgres connection string from Supabase → and rotate the DB password after, since nothing in the app uses it). Plus confirm Supabase auto-backups for the data. Do before launch.
+2. **Remove the hardcoded password `avenue2026`** — ⚠️ wired into the login/PIN-lock screen, so a clumsy change could lock Dan out. Low real-risk (data is already protected by login + RLS). Do carefully or defer.
+3. **STOP opt-out handler** — legally required once SMS goes live (still in carrier review).
+4. **Full CSP header** — later, careful (app uses heavy inline styles).
+- **Track B (SaaS, later):** tighten the public `shops.settings` read (currently exposes the whole settings blob to anon); scope the iCal-key endpoint to shop membership. See `HARDENING-SAAS.md`.
 
 ## ⏸ Intentionally left alone (Dan's call)
 - The **"Delete all clients & data"** button in Settings — Dan is keeping it for now because he's still adding/removing **test clients** pre-launch. **Remove (or lock behind a typed confirmation) before real launch.**
