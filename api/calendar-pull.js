@@ -14,11 +14,19 @@
 // Times/timezone are computed on the CLIENT (which knows the user's local zone),
 // so this endpoint does NO date math — it only persists what it's handed.
 import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
 const isSynced = (a) => !!a && (a.source === "sync" || a._synced);
+
+// Per-shop iCal feed key (mode:"icaltoken"). Must stay byte-for-byte identical
+// to the check in api/ical/[shop]/[file].js. Issued only to a signed-in owner
+// (the getUser guard above gates this whole endpoint), so the browser can show a
+// working "Subscribe to calendar" link without exposing the secret.
+const normShop = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9-]/g, "");
+const icalToken = (shop) => crypto.createHmac("sha256", SERVICE_KEY || "").update("ical:" + normShop(shop)).digest("hex").slice(0, 24);
 
 // Owner-only guard. This endpoint writes appointments with the service-role key
 // (it can rewrite or wipe the synced calendar), and it is ONLY ever called from
@@ -56,6 +64,8 @@ export default async function handler(req, res) {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const shop = (body.shop || "").toString();
     if (!shop) return res.status(400).json({ error: "missing shop" });
+    // Issue the owner's private iCal feed key (owner-only via the guard above; no DB work needed).
+    if (body.mode === "icaltoken") return res.status(200).json({ ok: true, token: icalToken(shop) });
     const mode = ["clear", "config"].includes(body.mode) ? body.mode : "sync";
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 

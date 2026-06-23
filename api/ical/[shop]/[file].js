@@ -1,10 +1,22 @@
 // /api/ical/[shop]/[file] — read-only iCal (.ics) feed of a provider's upcoming
 // appointments, so a barber can subscribe in Apple/Google Calendar.
-// Route: GET /api/ical/{shop}/{providerId}.ics
+// Route: GET /api/ical/{shop}/{providerId}.ics?k={token}
+// The ?k= token is required — without it the feed returns 404, so a stranger who
+// guesses the (public) shop slug + provider id still can't read client names.
+// The token is issued to the signed-in owner by /api/calendar-pull (mode:"icaltoken").
 import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+
+// Per-shop feed key — must stay byte-for-byte identical to api/ical-token.js.
+const icalToken = (shop) => crypto.createHmac("sha256", SERVICE_KEY || "").update("ical:" + String(shop || "")).digest("hex").slice(0, 24);
+const tokenOk = (given, shop) => {
+  const expected = icalToken(shop);
+  const g = String(given || "");
+  return g.length === expected.length && crypto.timingSafeEqual(Buffer.from(g), Buffer.from(expected));
+};
 
 const esc = (s) => String(s || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 const dt = (d) => {
@@ -27,6 +39,11 @@ export default async function handler(req, res) {
     const providerId = String(file || "").replace(/\.ics$/i, "").replace(/[^a-zA-Z0-9_-]/g, "");
     if (!shopId || !providerId) return res.status(400).send("bad request");
     if (!SERVICE_KEY) return res.status(500).send("server not configured");
+
+    // Require the per-shop feed key. Missing/wrong → 404 (don't confirm the feed exists).
+    let k = req.query && req.query.k;
+    if (Array.isArray(k)) k = k[0];
+    if (!tokenOk(k, shopId)) return res.status(404).send("Not found");
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 

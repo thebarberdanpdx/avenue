@@ -12857,6 +12857,21 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   const [repeatFor, setRepeatFor] = useState(null); // { dow, h } when the "repeat on days" popup is open
   const [dayEdit, setDayEdit] = useState(null); // { dow } when editing one day's shift in a focused sheet
   const [editMode, setEditMode] = useState(false); // team list: browse vs manage (reorder/archive)
+  // The owner's private iCal feed key — fetched once (only a signed-in owner can
+  // obtain it). Used to build a working "Subscribe to calendar" link below; the
+  // feed rejects any URL without it, so a stranger can't read client names.
+  const [icalToken, setIcalToken] = useState("");
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: await authedHeaders(), body: JSON.stringify({ shop: SLUG, mode: "icaltoken" }) });
+        const d = await r.json().catch(() => ({}));
+        if (alive && d && d.token) setIcalToken(d.token);
+      } catch (e) {}
+    })();
+    return () => { alive = false; };
+  }, [SLUG]);
 
   const staff = providers.filter((p) => p.id !== "anyone");
   const active = sortProviders(staff.filter((p) => !p.archived)).filter((p) => p.id !== "anyone");
@@ -13598,7 +13613,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
       {bookable && person.id !== "anyone" && (() => {
         const first = (person.name || "").split(" ")[0] || "this staff member";
         const bookUrl = `${ORIGIN}/book?shop=${SLUG}&with=${person.id}`;
-        const icalUrl = `webcal://${ORIGIN.replace(/^https?:\/\//, "")}/api/ical/${SLUG}/${person.id}.ics`;
+        const icalUrl = `webcal://${ORIGIN.replace(/^https?:\/\//, "")}/api/ical/${SLUG}/${person.id}.ics?k=${icalToken}`;
         const LinkRow = ({ title, sub, url, label }) => (
           <div style={{ padding: "12px 0", borderTop: "1px solid var(--line)" }}>
             <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 500, marginBottom: 6 }}>{title}</div>
@@ -13613,7 +13628,9 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px 14px", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
             <span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Booking &amp; calendar links</span>
             <LinkRow title={`Book ${first} directly`} url={bookUrl} label={`${first}'s booking link`} sub={`Opens your booking page with ${first} already selected.`} />
-            <LinkRow title={`Subscribe to ${first}'s calendar`} url={icalUrl} label="Calendar link" sub="Paste into Apple or Google Calendar — read-only." />
+            {icalToken
+              ? <LinkRow title={`Subscribe to ${first}'s calendar`} url={icalUrl} label="Calendar link" sub="Paste into Apple or Google Calendar — read-only. Private to you; don't share it." />
+              : <div style={{ padding: "12px 0", borderTop: "1px solid var(--line)", fontSize: 12.5, color: "var(--faint)" }}>Preparing {first}'s private calendar link…</div>}
           </div>
         );
       })()}
