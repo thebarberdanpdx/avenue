@@ -10,6 +10,10 @@
 //   3) The api/ folder has AT MOST 12 serverless functions (Vercel Hobby plan
 //      limit — exceeding it makes the production deploy FAIL, as happened
 //      2026-06-23 when a 13th function was briefly added).
+//   4) No secret keys are hardcoded in src/ or api/ (Stripe secret/restricted/
+//      webhook keys, Supabase secret key). These must live ONLY in Vercel env —
+//      shipping one in source would expose it to anyone who views the bundle.
+//      (Public keys like pk_live_ / sb_publishable_ are fine and NOT flagged.)
 //
 // Exits 0 only if all pass, non-zero otherwise — so it's safe to chain:
 //   npm run ship-check && npx vercel --prod --force
@@ -62,6 +66,43 @@ try {
     `${fnCount} function file(s) under api/` + (fnCount <= MAX_FUNCTIONS ? "" : ` — over the limit by ${fnCount - MAX_FUNCTIONS}; fold one into an existing endpoint`));
 } catch (e) {
   record(false, `Serverless functions ≤ ${MAX_FUNCTIONS}`, "could not scan api/: " + e.message);
+}
+
+// 4) No hardcoded secret keys in source (src/ + api/). Public keys (pk_live_,
+//    sb_publishable_) are intentionally inline and are NOT in this list.
+const SECRET_PATTERNS = [
+  { re: /\bsk_live_[A-Za-z0-9]/, label: "Stripe LIVE secret key (sk_live_)" },
+  { re: /\bsk_test_[A-Za-z0-9]/, label: "Stripe test secret key (sk_test_)" },
+  { re: /\brk_live_[A-Za-z0-9]/, label: "Stripe restricted key (rk_live_)" },
+  { re: /\bwhsec_[A-Za-z0-9]/, label: "Stripe webhook signing secret (whsec_)" },
+  { re: /\bsb_secret_[A-Za-z0-9]/, label: "Supabase secret key (sb_secret_)" },
+];
+const CODE_EXTS = [".js", ".jsx", ".ts", ".tsx", ".mjs"];
+const walkCode = (dir) => {
+  let files = [];
+  let entries;
+  try { entries = readdirSync(dir); } catch (e) { return files; }
+  for (const entry of entries) {
+    const p = join(dir, entry);
+    if (statSync(p).isDirectory()) files = files.concat(walkCode(p));
+    else if (CODE_EXTS.some((x) => entry.endsWith(x))) files.push(p);
+  }
+  return files;
+};
+try {
+  const findings = [];
+  for (const d of ["src", "api"]) {
+    for (const f of walkCode(join(ROOT, d))) {
+      const txt = readFileSync(f, "utf8");
+      for (const { re, label } of SECRET_PATTERNS) {
+        if (re.test(txt)) findings.push(`${label} in ${f.replace(ROOT + "/", "")}`);
+      }
+    }
+  }
+  record(findings.length === 0, "No hardcoded secrets in source",
+    findings.length ? findings.join(" · ") : "scanned src/ + api/ — clean");
+} catch (e) {
+  record(false, "No hardcoded secrets in source", "scan error: " + e.message);
 }
 
 // Report.
