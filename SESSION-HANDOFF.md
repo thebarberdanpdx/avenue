@@ -45,11 +45,16 @@ _Last updated: 2026-06-23_
 5. **Baseline security headers** — frame/sniff/referrer/HSTS in `vercel.json`. Verified live. (commit `93add2c`)
 6. **Locked the calendar "wipe" door** — `api/calendar-pull` (could add/erase synced appointments) now requires the owner to be signed in. Anonymous request → 401, tested live. (commit `c0a542d`, deployed 2026-06-23). The nightly auto-sync uses a different door (`api/calendar-run`) and is unaffected.
 7. **Locked the calendar "read" feed** — `api/ical` (the .ics calendar feed) would have leaked client names once real bookings exist. Now it needs a private key in the URL; without it (or with a wrong one) it returns "Not found" (404). The owner's key is handed out only to a signed-in owner. Tested live. (commit `a478b3a`, deployed 2026-06-23).
+8. **Locked the text/email + notification senders** — `api/notify` and `api/push` no longer accept requests from other websites (a foreign browser request is turned away). Your own booking page still works. Tested live. (commit `5adc05e`, deployed 2026-06-23). **All four "open doors" are now locked.**
 - Also confirmed safe (no fix needed): **booking photo uploads** auto-shrink + cap at 3.
 
 ## ▶️ What's NEXT on Track A (pick up here)
-Open `HARDENING-SHOP.md` for the full list. Remaining, roughly in safe-first order:
-1. **Last open door: `api/notify` + `api/push`** (text/email + push-notification senders). These run on the PUBLIC booking path, so they CANNOT require login. Add a gentler guard that won't break booking confirmations — an `Origin`/`Referer` allowlist (gotvero.com + the native app) to block cross-site abuse, plus sane request caps. (SMS is still behind the `SMS_LIVE` flag and email uses a fixed from-address, so the blast radius is limited today.) Real rate-limiting needs a KV store → defer/note.
+Open `HARDENING-SHOP.md` for the full list. The four open doors are done. Remaining, roughly in value/safety order:
+1. **Stripe webhook** — keeps your books in sync if a payment is refunded/disputed/fails. NOTE: we're at Vercel's **12-function limit**, so this must be folded into an existing endpoint (or remove an unused one first), AND Dan must add the webhook + a signing secret in the Stripe dashboard.
+2. **Reliability** — error monitoring; put the database design into git; schedule the reminder cron (only matters once SMS is approved).
+3. **Concurrency guard** — stop two devices at the desk from overwriting each other (touches the save path — careful).
+4. **Remove the hardcoded password `avenue2026`** — careful: it's wired into the login/lock screen, so a clumsy change could lock Dan out. Low real-risk (the real data is already protected by the login + database lock).
+5. **STOP opt-out handler** — legally required once SMS goes live.
 2. **Stripe webhook** — so refunds/chargebacks/failed payments stay in sync (pairs with the amount guard already done).
 3. **Reliability** — error monitoring; schedule the appointment-reminder cron (only matters once SMS is approved); put the database schema into git.
 4. **Concurrency guard** — stop two staff devices from overwriting each other.
