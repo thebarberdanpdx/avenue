@@ -14,8 +14,22 @@
 
 import { renderMessage, renderEmailHtml, renderPlainText, sendEmail, sendSms, resolveChannels } from "../lib/messaging.js";
 
+// Light anti-abuse guard. Booking runs on gotvero.com (web AND the native app,
+// which loads from server.url = https://gotvero.com), so the only legitimate
+// browser origin is ours. Server-to-server callers (e.g. api/client-code.js)
+// send NO Origin header. So: block only a *foreign* browser Origin; allow our
+// origin and allow no-Origin. This stops another website from scripting our
+// send pipe; curl-level flooding still needs rate-limiting (deferred — needs a
+// KV store). SMS remains gated by SMS_LIVE and email uses a fixed from-address.
+const ALLOWED_ORIGINS = new Set(["https://gotvero.com", "https://www.gotvero.com"]);
+function originAllowed(req) {
+  const o = (req.headers.origin || req.headers.Origin || "").toString().toLowerCase();
+  return !o || ALLOWED_ORIGINS.has(o);
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  if (!originAllowed(req)) return res.status(403).json({ error: "forbidden" });
   const b = req.body || {};
   const to = b.to || {};
   const SMS_LIVE = process.env.SMS_LIVE === "true";

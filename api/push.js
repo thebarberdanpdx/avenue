@@ -18,6 +18,15 @@ import { createClient } from "@supabase/supabase-js";
 
 const BUNDLE_ID = process.env.APNS_BUNDLE_ID || "com.gotvero.app";
 
+// Light anti-abuse guard (see api/notify.js for the rationale). Booking — which
+// fires the "new booking" push — runs on gotvero.com (web + native). Block only
+// a foreign browser Origin; allow our origin and allow no-Origin callers.
+const ALLOWED_ORIGINS = new Set(["https://gotvero.com", "https://www.gotvero.com"]);
+function originAllowed(req) {
+  const o = (req.headers.origin || req.headers.Origin || "").toString().toLowerCase();
+  return !o || ALLOWED_ORIGINS.has(o);
+}
+
 // Build the short-lived ES256 JWT APNs wants, signed with the .p8 key.
 // Uses Node's built-in crypto (ieee-p1363 gives the raw r||s signature APNs needs).
 function makeProviderToken() {
@@ -67,6 +76,7 @@ function sendOne(host, token, providerToken, payload) {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  if (!originAllowed(req)) return res.status(403).json({ error: "forbidden" });
   const { shopId, title, body, data } = req.body || {};
   if (!shopId || !title) return res.status(400).json({ error: "missing shopId or title" });
 
