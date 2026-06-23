@@ -11,7 +11,7 @@
 ## Status legend
 `✅ done` · `🔶 in progress` · `🟦 next` · `🟨 queued` · `☐ not started`
 
-## Overall: ~55%  ▓▓▓▓▓▒░░░░
+## Overall: ~57%  ▓▓▓▓▓▒░░░░
 
 | Status | Item | Why it matters for ONE shop |
 |---|---|---|
@@ -21,7 +21,7 @@
 | 🔶 | Safe cleanups — ✅ **LIVE** price/duration + deposit + per-barber-override guards (deployed 2026-06-23, commit de9f32e) · ✅ booking photo upload already safe (auto-shrinks, caps at 3) · ⏸ "delete all" button — **kept on purpose for now** (owner uses it to clear test clients pre-launch; REMOVE before real launch) | Prevent accidental data wipe + garbage data |
 | 🔶 | Reliability — ✅ **DONE** pre-flight `npm run ship-check` + GitHub CI (build + consent×4 + ≤12-function gate; commit 1e75d08; chain as `ship-check && vercel --prod`) · ☐ error monitoring (needs Sentry signup) · ☐ schema → git (needs DB creds) · ☐ schedule reminder cron (only once SMS approved) | Know when things break; deploys can't silently break; reminders actually send |
 | 🟨 | Concurrency data-loss guard | Two devices at the desk won't overwrite each other |
-| 🔶 | Security headers — ✅ **LIVE** frame/sniff/referrer/HSTS (deployed 2026-06-23) · ☐ full CSP (later, careful) · ☐ remove hardcoded password `avenue2026` | Basic web hardening |
+| 🔶 | Security headers — ✅ **LIVE** frame/sniff/referrer/HSTS (2026-06-23) · ✅ **LIVE** Permissions-Policy denies unused device features (d9cab32; `payment` left open for Stripe) · ☐ full CSP (later, careful — app uses heavy inline styles, needs `'unsafe-inline'` for style) · ☐ remove hardcoded password `avenue2026` (touches login/lock — lockout risk) | Basic web hardening |
 | 🟨 | STOP opt-out handler | Required once SMS goes live (TCPA) |
 
 ## Next action

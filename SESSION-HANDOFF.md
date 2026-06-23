@@ -48,6 +48,9 @@ _Last updated: 2026-06-23_
 8. **Locked the text/email + notification senders** — `api/notify` and `api/push` no longer accept requests from other websites (a foreign browser request is turned away). Your own booking page still works. Tested live. (commit `5adc05e`, deployed 2026-06-23). **All four "open doors" are now locked.**
 9. **Added a pre-flight safety check** — `npm run ship-check` catches the three things that can sink a deploy (build errors, SMS-consent count ≠ 4, more than 12 serverless functions — that last one is what made today's deploy fail). Also runs automatically on GitHub. No deploy needed — it's a workshop tool. (commit `1e75d08`)
 10. **Locked the last open cron** — `api/calendar-run` (the nightly auto-sync) could be triggered by anyone; now it requires the secret password Vercel already uses for the other timed jobs. Anonymous trigger → 401, tested live; the nightly run still works. **Every behind-the-scenes address that writes data now requires a lock.** (commit `e75f360`, deployed 2026-06-23)
+11. **Added a browser-permissions lock** — denies device features the app never uses (camera, mic, location, etc.) so injected code couldn't reach them. Left card payments untouched. Tested live. (commit `d9cab32`, deployed 2026-06-23)
+
+> **Note for next session:** the quick, zero-risk locks are now essentially done (~57%). Each remaining item needs either ~2 min of Dan's help or carries real risk — see the prioritized list below and discuss with Dan before diving in. Don't autonomously edit `api/stripe.js` (live payments) or the save/login flows without his okay.
 - Also confirmed safe (no fix needed): **booking photo uploads** auto-shrink + cap at 3.
 
 ## ▶️ What's NEXT on Track A (pick up here)
