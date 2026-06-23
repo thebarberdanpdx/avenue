@@ -9,7 +9,7 @@ Tracks **every** finding from `LAUNCH-AUDIT-2026-06.md`. Update this as items ge
 
 ## 🟢 Shop-launch readiness — the [NOW] list (what Dan needs before real bookings)
 
-### Done & live: 3 / 23 → **13%**  ▓░░░░░░░░░
+### Done & live: 4 / 23 → **17%**  ▓▓░░░░░░░░
 ### In progress (code-ready, awaiting deploy): 0
 
 | Status | Fix (plain English) | ID · Severity |
@@ -24,7 +24,7 @@ Tracks **every** finding from `LAUNCH-AUDIT-2026-06.md`. Update this as items ge
 | ☐ | Confirm the login-code can't be guessed by brute force (check in DB) | H7 · High |
 | ☐ | Verify Stripe receipts (webhook signatures) so they can't be faked/replayed | M1 · Medium |
 | ☐ | Lock down the open "start a payment" endpoint + verify the amount | M2 · Medium |
-| ☐ | Stop the calendar tool from fetching internal/secret web addresses (SSRF) | M3 · Medium |
+| ✅ | Stop the calendar tool from fetching internal/secret web addresses (SSRF) — **LIVE: lib/safeFetch.js blocks private/metadata IPs + bad schemes, verified live** | M3 · Medium |
 | ☐ | Make the background-job password required (not optional) | M4 · Medium |
 | ☐ | Enforce "blocked client can't book" on the server, not just the screen | M5 · Medium |
 | ☐ | Add length limits to typed text fields | M6 · Medium |
@@ -34,7 +34,7 @@ Tracks **every** finding from `LAUNCH-AUDIT-2026-06.md`. Update this as items ge
 | ☐ | Show an error when a background load fails (no more silent blanks) | M10 · Medium |
 | ☐ | Trim client names/notes out of the calendar feed; make its key resettable | L1 · Low |
 | ✅ | Delete the unused `sync-status` endpoint (also frees a slot) — **LIVE (b545eb5)** | L2 · Low |
-| ☐ | Strengthen HTTPS header + add a content-security policy | L3 · Low |
+| 🔶 | Strengthen HTTPS header + add a content-security policy — **HSTS includeSubDomains LIVE; full CSP still deferred (risky with the app's heavy inline styles)** | L3 · Low |
 | ☐ | Trim build info from the `version` endpoint | L4 · Low |
 | ✅ | Add upper limits to deposit/tip entry boxes — **LIVE (981dd70)** | L5 · Low |
 
