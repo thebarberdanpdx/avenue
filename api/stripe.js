@@ -57,6 +57,73 @@ async function getStaffUser(req) {
   }
 }
 
+// --- Webhook: keep our records in sync with Stripe ---------------------------
+// Stripe calls us when something happens out-of-band — a refund issued from the
+// Stripe dashboard, a chargeback/dispute, or a saved-card charge that failed.
+// We DON'T trust the POST body: we re-fetch the event from Stripe by its id
+// (using the secret key) so a forged request can't fake a refund. Then we patch
+// the matching appointment's payment record. Everything here is best-effort and
+// always replies 200 so Stripe doesn't retry-storm. Isolated from the action
+// handlers — normal app calls never reach this code.
+async function applyToAppt(piId, patch) {
+  if (!piId || !SERVICE_KEY) return { matched: false };
+  try {
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+    // Small DB (one shop today): scan + match in JS. Track B: index data->paid->>paymentIntentId.
+    const { data: rows } = await supabase.from("appointments").select("id, shop_id, data");
+    const hit = (rows || []).find((r) => r.data && r.data.paid && r.data.paid.paymentIntentId === piId);
+    if (!hit) return { matched: false };
+    const next = { ...hit.data, paid: { ...hit.data.paid, ...patch } };
+    await supabase.from("appointments").update({ data: next }).eq("id", hit.id).eq("shop_id", hit.shop_id);
+    return { matched: true, id: hit.id, shop: hit.shop_id };
+  } catch (e) {
+    return { matched: false, error: e.message };
+  }
+}
+
+async function handleStripeWebhook(req, res, body) {
+  try {
+    const evId = body && body.id;
+    if (typeof evId !== "string" || !evId.startsWith("evt_")) {
+      return res.status(200).json({ received: true, ignored: "no event id" });
+    }
+    // Re-fetch from Stripe to verify authenticity. If we can't (forged id, or a
+    // dashboard "test" event), we simply take no action and still reply 200.
+    let event;
+    try { event = await stripe.events.retrieve(evId); }
+    catch (e) { return res.status(200).json({ received: true, ignored: "unverified" }); }
+
+    const ts = new Date((event.created || Math.floor(Date.now() / 1000)) * 1000).toISOString();
+    const obj = (event.data && event.data.object) || {};
+    let result = { matched: false };
+
+    if (event.type === "charge.refunded") {
+      result = await applyToAppt(obj.payment_intent, {
+        refunded: true,
+        refundedAmount: (obj.amount_refunded || 0) / 100,
+        refundFull: (obj.amount_refunded || 0) >= (obj.amount || 0),
+        refundedAt: ts,
+      });
+    } else if (event.type === "charge.dispute.created") {
+      result = await applyToAppt(obj.payment_intent, {
+        disputed: true,
+        disputeAmount: (obj.amount || 0) / 100,
+        disputeStatus: obj.status || null,
+        disputedAt: ts,
+      });
+    } else if (event.type === "payment_intent.payment_failed") {
+      result = await applyToAppt(obj.id, {
+        chargeFailed: true,
+        failReason: (obj.last_payment_error && obj.last_payment_error.message) || null,
+        failedAt: ts,
+      });
+    }
+    return res.status(200).json({ received: true, type: event.type, applied: !!result.matched });
+  } catch (e) {
+    return res.status(200).json({ received: true, error: "handler" });
+  }
+}
+
 export default async function handler(req, res) {
   // --- Allow the app (a different address) to call this server -------------
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -79,6 +146,13 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const { action } = body;
+
+    // Stripe webhook? Real webhook POSTs carry a Stripe-Signature header and an
+    // event-shaped body ({object:"event", id:"evt_..."}); the app's own calls
+    // carry {action} and neither of these, so they never enter this branch.
+    if (req.headers["stripe-signature"] || (body && body.object === "event")) {
+      return handleStripeWebhook(req, res, body);
+    }
 
     // Money-moving actions require a signed-in staff member.
     if (STAFF_ONLY.has(action)) {
