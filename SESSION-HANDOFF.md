@@ -54,7 +54,9 @@ _Last updated: 2026-06-23_
 
 13. **Error alerts now on** ✅ — Sentry is wired into the app (production-only, errors-only, no customer data sent). If anything breaks on the live site, Dan gets an email. Dan made the free account; Claude did the wiring. (commit `2b4acc7`)
 
-> **Note for next session:** ~68% done. Working through Dan's "let's go in order" 3-item list: ✅ (1) error alerts [done]. **Next: (2) database backup-to-git** — needs Dan to grab a Postgres connection string from Supabase (Settings → Database → Connection string) so the schema/RLS/functions can be dumped to the repo. Then **(3) two-phone concurrency guard** (touches the save path — careful). Other remaining: remove `avenue2026` (lockout risk), SMS STOP handler (once SMS approved). Don't autonomously edit save/login/payment flows without Dan's okay.
+14. **Database blueprint written to code** — `DATABASE.md` documents your whole backend (tables, rules, security model) so it could be rebuilt or reviewed. The full exact dump is parked for before-launch (needs database tools + your password, and there's barely any real data yet). (commit `d79d9d6`)
+
+> **Note for next session:** ~70% done. Dan's "let's go in order" 3-item list: ✅ (1) error alerts · 🔶 (2) DB backup — blueprint done; exact `pg_dump` + Supabase auto-backup check deferred to before-launch (no local pg tooling; needs DB password). **Next: (3) two-phone concurrency guard** — ⚠️ touches the SAVE path. Note from code: appts/clients already use per-row upserts (concurrency-OK), the real clobber risk is the single-row `shops.settings`/`business` blob (whole-object overwrite); there's already a calSync read-before-write to preserve. Do carefully, can't fully test multi-device locally — discuss approach with Dan first. Other remaining: remove `avenue2026` (lockout risk), SMS STOP handler (once SMS approved). Don't autonomously edit save/login/payment flows without Dan's okay.
 - Also confirmed safe (no fix needed): **booking photo uploads** auto-shrink + cap at 3.
 
 ## ▶️ What's NEXT on Track A (pick up here)
