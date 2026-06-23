@@ -11,7 +11,7 @@
 ## Status legend
 `✅ done` · `🔶 in progress` · `🟦 next` · `🟨 queued` · `☐ not started`
 
-## Overall: ~63%  ▓▓▓▓▓▓░░░░
+## Overall: ~64%  ▓▓▓▓▓▓░░░░
 
 | Status | Item | Why it matters for ONE shop |
 |---|---|---|
@@ -19,7 +19,7 @@
 | ✅ | Lock open API endpoints — ✅ **LIVE** `calendar-pull` wipe/sync requires owner login (c0a542d; anon POST → 401) · ✅ **LIVE** `ical` feed requires a per-shop key (a478b3a; no/wrong key → 404) · ✅ **LIVE** `notify`/`push` reject foreign browser origins (5adc05e; evil-origin → 403, same-origin booking → 200) · ✅ **LIVE** `calendar-run` cron requires CRON_SECRET (e75f360; anon → 401) — **every DB-writing endpoint now requires auth** | Anyone could read your clients / abuse your SMS / wipe your calendar |
 | ✅ | Payment integrity — ✅ **LIVE** server-side amount guard (commit adfc1ef; rejects negative/zero/giant) · ✅ **LIVE & ACTIVE** Stripe webhook in api/stripe.js (refund/dispute/failed-charge → patches appt `paid.{refunded,disputed,chargeFailed}`; verified by re-fetching event from Stripe, NOT signature, so existing handlers untouched; commit de4c97f) — **Dan registered the endpoint in Stripe 2026-06-23; confirmed Active, URL exact match, listening to 21 events (Charge + Payment Intent groups)**. Signing secret exists (whsec_…) but unused (we use retrieve) — a future session could switch to signature verification, but that needs a bodyParser change to stripe.js. | Stop price-tampering; keep books in sync with Stripe |
 | 🔶 | Safe cleanups — ✅ **LIVE** price/duration + deposit + per-barber-override guards (deployed 2026-06-23, commit de9f32e) · ✅ booking photo upload already safe (auto-shrinks, caps at 3) · ⏸ "delete all" button — **kept on purpose for now** (owner uses it to clear test clients pre-launch; REMOVE before real launch) | Prevent accidental data wipe + garbage data |
-| 🔶 | Reliability — ✅ **DONE** pre-flight `npm run ship-check` + GitHub CI (build + consent×4 + ≤12-function gate; commit 1e75d08; chain as `ship-check && vercel --prod`) · ☐ error monitoring (needs Sentry signup) · ☐ schema → git (needs DB creds) · ☐ schedule reminder cron (only once SMS approved) | Know when things break; deploys can't silently break; reminders actually send |
+| 🔶 | Reliability — ✅ **DONE** pre-flight `npm run ship-check` + GitHub CI (gates build + consent×4 + ≤12 functions + hardcoded-secret scan; commits 1e75d08, 11d372e; chain as `ship-check && vercel --prod`) · ☐ error monitoring (needs Sentry signup) · ☐ schema → git (needs DB creds / pg connection) · ☐ schedule reminder cron (only once SMS approved) | Know when things break; deploys can't silently break or leak a secret; reminders actually send |
 | 🟨 | Concurrency data-loss guard | Two devices at the desk won't overwrite each other |
 | 🔶 | Security headers — ✅ **LIVE** frame/sniff/referrer/HSTS (2026-06-23) · ✅ **LIVE** Permissions-Policy denies unused device features (d9cab32; `payment` left open for Stripe) · ☐ full CSP (later, careful — app uses heavy inline styles, needs `'unsafe-inline'` for style) · ☐ remove hardcoded password `avenue2026` (touches login/lock — lockout risk) | Basic web hardening |
 | 🟨 | STOP opt-out handler | Required once SMS goes live (TCPA) |
