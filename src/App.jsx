@@ -1616,29 +1616,6 @@ function App() {
     } catch (e) { console.error('[vero] live-sync refetch error:', e); }
   };
 
-  // Concurrency guard for the settings (shops) row. We track the settings we last
-  // loaded/saved so a save writes ONLY the top-level sections THIS device changed,
-  // layered on the server's current settings — preventing one device from wiping a
-  // different section another device edited meanwhile. (Lists like clients/appts are
-  // already safe via per-row upserts + live-sync; this closes the remaining gap: the
-  // whole-blob shops.settings write.) Falls back to a full write when there's no
-  // baseline or the server read fails — i.e. the exact prior behavior.
-  const settingsBaselineRef = useRef(null);
-  const buildSettingsToSave = (serverSettings, localSettings, keptCalSync) => {
-    const base = settingsBaselineRef.current;
-    let out;
-    if (!serverSettings || !base) {
-      out = { ...localSettings };
-    } else {
-      out = { ...serverSettings };
-      for (const k of new Set([...Object.keys(localSettings), ...Object.keys(base)])) {
-        if (JSON.stringify(localSettings[k]) !== JSON.stringify(base[k])) out[k] = localSettings[k];
-      }
-    }
-    out.calSync = keptCalSync; // calSync stays server-owned — never overwritten by a settings save
-    return out;
-  };
-
   useEffect(() => {
     (async () => {
       let allLoaded = true; // flipped to false on ANY real error — blocks saves so seeds can't overwrite real data
@@ -1651,7 +1628,6 @@ function App() {
         const { _categories, _cutLibrary, ...rawBiz } = shopRow.settings;
         const biz = migrateMessageCopy(rawBiz);
         setBusiness(biz);
-        settingsBaselineRef.current = shopRow.settings; // baseline for concurrency-safe settings merges
         // If the one-time message-copy refresh changed anything, write it straight back so the
         // reminder cron (which reads the DB, not this session) picks up the new wording + timings.
         // Preserves _categories/_cutLibrary by merging over the row we just read.
@@ -1819,15 +1795,11 @@ function App() {
   useEffect(() => { if (!loadedRef.current || !session) return; const snap = { business, categories, cutLibrary }; const t = setTimeout(async () => {
     // The calendar connection (calSync) is owned by the server (api/calendar-pull + the cron). NEVER let
     // a general settings-save overwrite it with a stale local copy — that's what silently disconnected the
-    // calendar. Read the server's current settings right before writing: preserve calSync verbatim AND
-    // overlay only the sections this device actually changed (concurrency guard, see buildSettingsToSave).
+    // calendar. Read the server's current calSync right before writing and preserve it verbatim.
     let keptCalSync = snap.business?.calSync;
-    let serverSettings = null;
-    try { const { data } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle(); if (data?.settings) { serverSettings = data.settings; if ('calSync' in data.settings) keptCalSync = data.settings.calSync; } } catch (e) {}
-    const localSettings = { ...snap.business, _categories: snap.categories, _cutLibrary: snap.cutLibrary };
-    const settings = buildSettingsToSave(serverSettings, localSettings, keptCalSync);
-    const { error } = await supabase.from('shops').upsert({ id: SHOP_ID, name: snap.business?.name || SHOP_ID, settings });
-    if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else { settingsBaselineRef.current = settings; setSaveFailed(false); }
+    try { const { data } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle(); if (data?.settings && 'calSync' in data.settings) keptCalSync = data.settings.calSync; } catch (e) {}
+    const { error } = await supabase.from('shops').upsert({ id: SHOP_ID, name: snap.business?.name || SHOP_ID, settings: { ...snap.business, calSync: keptCalSync, _categories: snap.categories, _cutLibrary: snap.cutLibrary } });
+    if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); } else setSaveFailed(false);
   }, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
   // Stamp lastSaveAt the moment a LOCAL edit happens (this runs only for local changes — a
   // live-sync refetch sets state === lastRemoteRef, so it returns above). This suppresses the
@@ -1850,12 +1822,9 @@ function App() {
     syncList('providers', providers);
     (async () => {
       let keptCalSync = business?.calSync;
-      let serverSettings = null;
-      try { const { data } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle(); if (data?.settings) { serverSettings = data.settings; if ('calSync' in data.settings) keptCalSync = data.settings.calSync; } } catch (e) {}
-      const localSettings = { ...business, _categories: categories, _cutLibrary: cutLibrary };
-      const settings = buildSettingsToSave(serverSettings, localSettings, keptCalSync);
-      const { error } = await supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings });
-      if (error) setSaveFailed(true); else settingsBaselineRef.current = settings;
+      try { const { data } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle(); if (data?.settings && 'calSync' in data.settings) keptCalSync = data.settings.calSync; } catch (e) {}
+      const { error } = await supabase.from('shops').upsert({ id: SHOP_ID, name: business?.name || SHOP_ID, settings: { ...business, calSync: keptCalSync, _categories: categories, _cutLibrary: cutLibrary } });
+      if (error) setSaveFailed(true);
     })();
   };
 
