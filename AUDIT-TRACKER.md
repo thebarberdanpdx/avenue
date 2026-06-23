@@ -10,7 +10,7 @@ Tracks **every** finding from `LAUNCH-AUDIT-2026-06.md`. Update this as items ge
 ## 🟢 Shop-launch readiness — the [NOW] list (what Dan needs before real bookings)
 
 ### Done & live: 0 / 23 → **0%**  ░░░░░░░░░░
-### In progress (code-ready, awaiting deploy): 2  → L2, H5 (part 1)
+### In progress (code-ready, awaiting deploy): 3  → L2, H5, L5
 
 | Status | Fix (plain English) | ID · Severity |
 |---|---|---|
@@ -19,7 +19,7 @@ Tracks **every** finding from `LAUNCH-AUDIT-2026-06.md`. Update this as items ge
 | ☐ | Close the two behind-the-scenes doors still open to scripts (notify/push) — **do carefully: same code path runs inside the native iOS app; a wrong origin tightening could break native booking confirmations/push. Needs a native test, not a rushed edit.** (notify's only server caller is client-code → use internal secret.) | H2 · High |
 | ☐ | Stop huge photos/text being saved into the database (caps + move images out) | H3 · High |
 | ⚠️ | Switch the reminder texts/emails on (schedule the job) — **BLOCKED: needs a plan decision.** Vercel Hobby allows only 2 scheduled jobs (you have 2) and runs them once/day; reminders need ~every 15 min. Options: upgrade Vercel Pro (~$20/mo) OR wire a free external scheduler to poke the endpoint. | H4 · High |
-| 🔶 | Put an alarm on the money/text/background code; stop losing failed saves — **part 1 done (5d13b21): server crash alerts on stripe/notify/push + 3 crons, awaiting deploy. Next: alert on per-item cron fails + capture client-side lost saves** | H5 · High |
+| 🔶 | Put an alarm on the money/text/background code; stop losing failed saves — **CODE-READY (5d13b21 + 981dd70): server crash alerts on stripe/notify/push + 3 crons; per-item cron-fail alerts; client-side lost-save capture. Awaiting deploy.** | H5 · High |
 | ☐ | Save a timestamped record when customers agree to texts | H6 · High |
 | ☐ | Confirm the login-code can't be guessed by brute force (check in DB) | H7 · High |
 | ☐ | Verify Stripe receipts (webhook signatures) so they can't be faked/replayed | M1 · Medium |
@@ -36,7 +36,7 @@ Tracks **every** finding from `LAUNCH-AUDIT-2026-06.md`. Update this as items ge
 | ☐ | Delete the unused `sync-status` endpoint (also frees a slot) | L2 · Low |
 | ☐ | Strengthen HTTPS header + add a content-security policy | L3 · Low |
 | ☐ | Trim build info from the `version` endpoint | L4 · Low |
-| ☐ | Add upper limits to deposit/tip entry boxes | L5 · Low |
+| 🔶 | Add upper limits to deposit/tip entry boxes — **committed 981dd70, awaiting deploy** | L5 · Low |
 
 ---
 
