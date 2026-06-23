@@ -11,12 +11,12 @@
 ## Status legend
 `✅ done` · `🔶 in progress` · `🟦 next` · `🟨 queued` · `☐ not started`
 
-## Overall: ~33%  ▓▓▓░░░░░░░
+## Overall: ~40%  ▓▓▓▓░░░░░░
 
 | Status | Item | Why it matters for ONE shop |
 |---|---|---|
 | ✅ | Audit + threat model | Done — we know exactly what to fix |
-| 🔶 | Lock open API endpoints — ✅ **LIVE** `calendar-pull` wipe/sync now requires owner login (deployed 2026-06-23, commit c0a542d; tested live: anonymous POST → 401) · ☐ `ical` PII leak (add URL token — before real appts exist) · ☐ `notify`/`push` relay (public-booking path — needs gentle guard/rate-limit, not login) | Anyone could read your clients / abuse your SMS / wipe your calendar |
+| 🔶 | Lock open API endpoints — ✅ **LIVE** `calendar-pull` wipe/sync requires owner login (commit c0a542d; tested: anon POST → 401) · ✅ **LIVE** `ical` feed requires a per-shop key (commit a478b3a; tested: no/wrong key → 404, key-issuing door → 401) · ☐ `notify`/`push` relay (public-booking path — needs gentle guard/rate-limit, NOT login) | Anyone could read your clients / abuse your SMS / wipe your calendar |
 | 🔶 | Payment integrity — ✅ **LIVE** server-side amount guard (deployed 2026-06-23, commit adfc1ef; tested: rejects negative/zero/giant) · ☐ Stripe webhook | Stop price-tampering at checkout; keep books in sync with Stripe |
 | 🔶 | Safe cleanups — ✅ **LIVE** price/duration + deposit + per-barber-override guards (deployed 2026-06-23, commit de9f32e) · ✅ booking photo upload already safe (auto-shrinks, caps at 3) · ⏸ "delete all" button — **kept on purpose for now** (owner uses it to clear test clients pre-launch; REMOVE before real launch) | Prevent accidental data wipe + garbage data |
 | 🟨 | Reliability (error monitoring, schedule reminder cron, schema→git, CI build gate) | Know when things break; reminders actually send |
@@ -25,9 +25,10 @@
 | 🟨 | STOP opt-out handler | Required once SMS goes live (TCPA) |
 
 ## Next action
-🟦 Remaining open doors, in order: (1) `ical` feed — add an unguessable URL token (needs a small design choice: where the per-shop secret lives, since shops/providers are publicly readable for booking) — do before real appointments exist; (2) `notify`/`push` — these run on the PUBLIC booking path so they can't require login; add a gentle guard (rate-limit / origin check / cap) instead. Each = its own revertible commit, booking verified first.
+🟦 Last open door: `notify` (email/SMS sender) + `push` (staff alerts). These run on the PUBLIC booking path, so they CANNOT require login. Add a gentle guard that doesn't break booking: an `Origin`/`Referer` allowlist (gotvero.com + native) to stop cross-site browser abuse, a sane per-request cap/validation, and rely on existing gates (SMS is still behind `SMS_LIVE`, email is a fixed from-address). True rate-limiting needs a KV store (defer — note it). Each = its own revertible commit, booking verified first.
 
 ## Diagnostics log
+- **2026-06-23 — `ical` feed locked & LIVE (commit a478b3a):** feed now requires `?k=<token>` (HMAC of the server-only service secret); missing/wrong key → **404 "Not found"** (verified live on `/api/ical/avenue-phi/dan.ics`). The key is issued only to a signed-in owner via `/api/calendar-pull` `mode:"icaltoken"` (folded into that existing owner-only endpoint to stay at Vercel's 12-function cap — a standalone `api/ical-token.js` was tried first and blocked the deploy). Key-issuing door with no login → **401**. Dashboard (`StaffMembersView`) fetches the key once and shows a ready-to-paste link (placeholder until loaded). Owner happy-path not curl-testable (needs a login session) but code path is straightforward + no real appointments exist yet. **Track B:** key endpoint issues for any shop a signed-in user names — scope to membership before multi-tenant.
 - **2026-06-23 — `calendar-pull` locked & LIVE (commit c0a542d):** endpoint now requires a valid Supabase session token (same `getUser()` guard as `api/stripe.js`); client attaches the owner's token via new `authedHeaders()` helper on all 3 call sites; `Authorization` added to CORS allow-list. Verified on gotvero.com: anonymous `POST /api/calendar-pull` → **401 "Not authorized"** (was an open calendar-wipe), booking site → 200, preflight allow-headers now include `Authorization`. Daily cron (`/api/calendar-run`) unaffected (separate path). Booking flow re-verified in preview (consent ×4, footer email, card step all intact).
 - **2026-06-23 — anonymous read test (public key, no login):**
   - `clients` → 0 rows · `appointments` → 0 rows → no PII returned to a stranger ✅

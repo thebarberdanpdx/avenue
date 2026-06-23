@@ -44,11 +44,12 @@ _Last updated: 2026-06-23_
 4. **Stripe server-side amount guard** — `api/stripe.js` rejects amounts that are ≤0, non-numbers, or > $100k, before reaching Stripe. Tested live: negative/zero/giant all rejected. (commit `adfc1ef`)
 5. **Baseline security headers** — frame/sniff/referrer/HSTS in `vercel.json`. Verified live. (commit `93add2c`)
 6. **Locked the calendar "wipe" door** — `api/calendar-pull` (could add/erase synced appointments) now requires the owner to be signed in. Anonymous request → 401, tested live. (commit `c0a542d`, deployed 2026-06-23). The nightly auto-sync uses a different door (`api/calendar-run`) and is unaffected.
+7. **Locked the calendar "read" feed** — `api/ical` (the .ics calendar feed) would have leaked client names once real bookings exist. Now it needs a private key in the URL; without it (or with a wrong one) it returns "Not found" (404). The owner's key is handed out only to a signed-in owner. Tested live. (commit `a478b3a`, deployed 2026-06-23).
 - Also confirmed safe (no fix needed): **booking photo uploads** auto-shrink + cap at 3.
 
 ## ▶️ What's NEXT on Track A (pick up here)
 Open `HARDENING-SHOP.md` for the full list. Remaining, roughly in safe-first order:
-1. **Lock the remaining "open doors"** — `api/calendar-pull` is now locked (done above). Left: **`api/ical`** (read-only calendar feed — empty now, but leaks appointment names once real bookings exist; needs an unguessable token in the URL since calendar apps can't send a password — small design choice about where the per-shop secret lives) and **`api/notify` / `api/push`** (text/email + push senders — these run on the PUBLIC booking path, so they CANNOT require login; they need a gentler guard like rate-limiting or an origin check so booking confirmations don't break).
+1. **Last open door: `api/notify` + `api/push`** (text/email + push-notification senders). These run on the PUBLIC booking path, so they CANNOT require login. Add a gentler guard that won't break booking confirmations — an `Origin`/`Referer` allowlist (gotvero.com + the native app) to block cross-site abuse, plus sane request caps. (SMS is still behind the `SMS_LIVE` flag and email uses a fixed from-address, so the blast radius is limited today.) Real rate-limiting needs a KV store → defer/note.
 2. **Stripe webhook** — so refunds/chargebacks/failed payments stay in sync (pairs with the amount guard already done).
 3. **Reliability** — error monitoring; schedule the appointment-reminder cron (only matters once SMS is approved); put the database schema into git.
 4. **Concurrency guard** — stop two staff devices from overwriting each other.
