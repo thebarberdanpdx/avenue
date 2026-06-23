@@ -11,7 +11,7 @@
 ## Status legend
 `✅ done` · `🔶 in progress` · `🟦 next` · `🟨 queued` · `☐ not started`
 
-## Overall: ~64%  ▓▓▓▓▓▓░░░░
+## Overall: ~65%  ▓▓▓▓▓▓▒░░░
 
 | Status | Item | Why it matters for ONE shop |
 |---|---|---|
@@ -33,6 +33,7 @@
 5. **STOP opt-out handler** — required once SMS goes live (TCPA).
 
 ## Diagnostics log
+- **2026-06-23 — dependency / supply-chain audit:** `npm audit --omit=dev` → **0 vulnerabilities in production deps** (what ships to users is clean ✅). Full audit = 10 (1 low / 2 mod / 7 high) but ALL are dev-only build tooling: `@capacitor/assets` chain (`tar`, `minimatch` — no fix available, only exploitable on malicious archives/patterns, not normal builds), `@babel/core` + `uuid` (fixable via `npm audit fix` but they don't reduce the high count, which is the unfixable tar/minimatch). Decision: **leave as-is** — none reach customers, force-fixing risks the iOS build pipeline for zero production benefit. Re-check when bumping Capacitor. The new `ship-check` secret-scan + this audit cover the supply-chain basics for one shop.
 - **2026-06-23 — Stripe webhook ACTIVATED ✅:** Dan registered the endpoint in the Stripe dashboard (destination `we_1Tla0Z0XV9TtWHCqbS6E2hzz`, "charming-finesse", **Active**, URL `https://gotvero.com/api/stripe` exact match, listening to 21 events across Charge + Payment Intent groups). Deliveries 0 so far (no refunds/disputes yet — expected). Verified my side responds 200 to event POSTs. The money safety net is fully live.
 - **2026-06-23 — Stripe webhook CODE LIVE (commit de4c97f), dormant pending Dan:** isolated branch in `api/stripe.js` updates appt payment records on out-of-band Stripe events (dashboard refund, dispute/chargeback, failed off-session charge). Verifies via `stripe.events.retrieve(id)` (no signing secret, no bodyParser change → existing setup/charge/sale_intent/refund handlers byte-for-byte untouched). Forged/test events take no action, always 200 (no retry-storm). Verified live: OPTIONS→204, unknown action→400, sale_intent bad amount→400, charge→staff-guard 401, forged event→200 ignored, booking→200. **ACTIVATION (Dan, ~2 min):** Stripe Dashboard (LIVE mode) → Developers → Webhooks → Add endpoint → URL `https://gotvero.com/api/stripe` → select events `charge.refunded` + `charge.dispute.created` + `payment_intent.payment_failed` → Add. No secret to copy. (Dashboard "Send test webhook" will show 200 but won't change a record — it's a fake event we correctly ignore; real refunds/disputes update records.)
 - **2026-06-23 — `calendar-run` cron locked & LIVE (commit e75f360):** the daily background sync had NO auth (anyone could trigger external-feed fetches + DB writes via `?shop=`). Added the optional `CRON_SECRET` guard (same as send-reminders/send-birthdays). Confirmed via `vercel env ls` that **CRON_SECRET is set** (so this is an immediate lock, and send-reminders/send-birthdays were already protected). Verified live: anon `GET /api/calendar-run?shop=avenue-phi` → **401 unauthorized**; booking → 200. Vercel Cron auto-sends the secret, so the scheduled 9am run is unaffected. **All DB-writing endpoints now require auth.**
