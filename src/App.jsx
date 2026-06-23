@@ -5339,7 +5339,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const dep = bk.deposit || { mode: "none", amount: 0 };
               const needsCard = !!bk.requireCard || (dep.mode && dep.mode !== "none");
               if (!needsCard) return null;
-              const depositAmt = dep.mode === "fixed" ? Number(dep.amount || 0) : dep.mode === "percent" ? Math.round(cartAdjTotal * (Number(dep.amount || 0) / 100)) : 0;
+              const depositAmt = Math.max(0, Math.min(cartAdjTotal, dep.mode === "fixed" ? Number(dep.amount || 0) : dep.mode === "percent" ? Math.round(cartAdjTotal * (Number(dep.amount || 0) / 100)) : 0));
               const livePay = business.payments?.live === true;
               const last4 = (cardInfo && cardInfo.last4) || "••••";
               return (
@@ -9591,7 +9591,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const openNew = () => { setForm({ ...blank, id: "svc-" + Date.now(), photos: [], staff: defaultStaffMap(), booking: defaultBooking() }); setSection(null); setEditing("new"); };
   const openEdit = (s) => { const copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; copy.photos = copy.photos || (copy.photo ? [copy.photo] : []); copy.usesCutStyles = (copy.usesCutStyles !== undefined) ? (copy.usesCutStyles !== false) : ((copy.cutTypes || []).length > 0); setForm(copy); setSection(null); setEditing(s.id); };
   const save = () => {
-    if (!form.name || !form.price) { showToast("Name and price are required."); return; }
+    const priceNum = Number(form.price);
+    if (!form.name || !(priceNum > 0)) { showToast("Name and a valid price are required."); return; }
     // clean staff overrides: blank → null (use default), else Number
     const cleanStaff = {};
     Object.keys(form.staff || {}).forEach((pid) => {
@@ -9599,15 +9600,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       cleanStaff[pid] = {
         ...e,
         on: e.on !== false,
-        duration: (e.duration === null || e.duration === "" || e.duration === undefined) ? null : Number(e.duration),
-        price: (e.price === null || e.price === "" || e.price === undefined) ? null : Number(e.price),
+        duration: (e.duration === null || e.duration === "" || e.duration === undefined) ? null : Math.max(5, Math.min(600, Number(e.duration) || 30)),
+        price: (e.price === null || e.price === "" || e.price === undefined) ? null : Math.max(0, Math.min(100000, Number(e.price) || 0)),
       };
       // preserve per-cut-style overrides (shared with My Team → barber → Services)
       if (e.cutPrice && Object.keys(e.cutPrice).length) cleanStaff[pid].cutPrice = e.cutPrice; else delete cleanStaff[pid].cutPrice;
       if (e.cutDur && Object.keys(e.cutDur).length) cleanStaff[pid].cutDur = e.cutDur; else delete cleanStaff[pid].cutDur;
     });
     const photos = Array.isArray(form.photos) ? form.photos.filter(Boolean) : [];
-    const clean = { ...form, price: Number(form.price), duration: Number(form.duration) || 30, staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false };
+    const clean = { ...form, price: Math.min(100000, priceNum), duration: Math.max(5, Math.min(600, Number(form.duration) || 30)), staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false };
     if (editing === "new") setServices([...services, clean]);
     else setServices(services.map((s) => (s.id === editing ? clean : s)));
     // MangoMint pattern: for an existing service, saving a section lands back on the
