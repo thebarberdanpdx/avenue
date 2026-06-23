@@ -50,7 +50,11 @@ _Last updated: 2026-06-23_
 10. **Locked the last open cron** — `api/calendar-run` (the nightly auto-sync) could be triggered by anyone; now it requires the secret password Vercel already uses for the other timed jobs. Anonymous trigger → 401, tested live; the nightly run still works. **Every behind-the-scenes address that writes data now requires a lock.** (commit `e75f360`, deployed 2026-06-23)
 11. **Added a browser-permissions lock** — denies device features the app never uses (camera, mic, location, etc.) so injected code couldn't reach them. Left card payments untouched. Tested live. (commit `d9cab32`, deployed 2026-06-23)
 
-> **Note for next session:** the quick, zero-risk locks are now essentially done (~57%). Each remaining item needs either ~2 min of Dan's help or carries real risk — see the prioritized list below and discuss with Dan before diving in. Don't autonomously edit `api/stripe.js` (live payments) or the save/login flows without his okay.
+12. **Built the money safety net** — `api/stripe.js` now has a webhook so if a payment is refunded, disputed (chargeback), or fails, your app's records update to match. It's built, live, and secure, but **dormant until Dan connects it in Stripe** (see ACTIVATION below). Your live payments are 100% untouched. (commit `de4c97f`, deployed 2026-06-23)
+
+> **⏳ WAITING ON DAN — connect the money safety net (~2 min, no rush):** Stripe Dashboard → make sure it says **LIVE** (not Test) → **Developers → Webhooks → Add endpoint** → URL `https://gotvero.com/api/stripe` → choose events **charge.refunded**, **charge.dispute.created**, **payment_intent.payment_failed** → **Add endpoint**. No secret to copy. Once added, it's working.
+
+> **Note for next session:** ~62% done. Remaining items each need ~2 min of Dan's help or carry real risk — discuss with Dan before diving in. Don't autonomously edit the save/login flows without his okay.
 - Also confirmed safe (no fix needed): **booking photo uploads** auto-shrink + cap at 3.
 
 ## ▶️ What's NEXT on Track A (pick up here)
