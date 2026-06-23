@@ -33,6 +33,16 @@ const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.s
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const STAFF_ONLY = new Set(["charge", "refund"]);
 
+// Reject a bad money amount before it ever reaches Stripe. `amount` is in
+// dollars. It must be a real number, greater than zero, and under a sane
+// ceiling — so a tampered browser value or a fat-fingered entry can never
+// create a negative, zero, or absurdly large charge on the live account.
+const MAX_AMOUNT = 100000; // $100,000 — far above any real salon transaction
+function validAmount(amount) {
+  const n = Number(amount);
+  return Number.isFinite(n) && n > 0 && n <= MAX_AMOUNT;
+}
+
 async function getStaffUser(req) {
   const header = req.headers.authorization || req.headers.Authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
@@ -100,8 +110,11 @@ export default async function handler(req, res) {
     // Used for a no-show fee. `amount` is in dollars; Stripe works in cents.
     if (action === "charge") {
       const { customerId, paymentMethodId, amount, description, idempotencyKey } = body;
-      if (!customerId || !paymentMethodId || !amount) {
-        return res.status(400).json({ error: "Missing customerId, paymentMethodId, or amount." });
+      if (!customerId || !paymentMethodId) {
+        return res.status(400).json({ error: "Missing customerId or paymentMethodId." });
+      }
+      if (!validAmount(amount)) {
+        return res.status(400).json({ error: "Invalid amount." });
       }
       const pi = await stripe.paymentIntents.create({
         amount: Math.round(Number(amount) * 100),
@@ -120,8 +133,8 @@ export default async function handler(req, res) {
     // Returns a clientSecret the app confirms with the card field.
     if (action === "sale_intent") {
       const { amount, description } = body;
-      if (!amount) {
-        return res.status(400).json({ error: "Missing amount." });
+      if (!validAmount(amount)) {
+        return res.status(400).json({ error: "Invalid amount." });
       }
       const pi = await stripe.paymentIntents.create({
         amount: Math.round(Number(amount) * 100),
@@ -141,7 +154,12 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Missing paymentIntentId." });
       }
       const params = { payment_intent: paymentIntentId };
-      if (amount) params.amount = Math.round(Number(amount) * 100);
+      if (amount) {
+        if (!validAmount(amount)) {
+          return res.status(400).json({ error: "Invalid refund amount." });
+        }
+        params.amount = Math.round(Number(amount) * 100);
+      }
       const r = await stripe.refunds.create(params, idempotencyKey ? { idempotencyKey } : undefined); // dedupe retries of the same refund
       return res.status(200).json({ status: r.status, id: r.id, amount: (r.amount || 0) / 100 });
     }
