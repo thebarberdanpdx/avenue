@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "ship-check": "node scripts/ship-check.mjs"
   },
   "dependencies": {
     "@capacitor/cli": "^8.4.0",

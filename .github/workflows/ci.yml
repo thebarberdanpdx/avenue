@@ -1,0 +1,22 @@
+name: CI
+
+# Runs the pre-flight check (build + SMS-consent count + serverless-function
+# limit) on every push to main and on pull requests, so a broken build, a
+# drifted consent phrase, or an over-limit api/ folder is caught in GitHub —
+# not at deploy time.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ship-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run ship-check
