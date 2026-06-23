@@ -27,7 +27,9 @@ function originAllowed(req) {
   return !o || ALLOWED_ORIGINS.has(o);
 }
 
-export default async function handler(req, res) {
+import { withErrorReporting } from "../lib/observe.js";
+export default withErrorReporting(handler, "notify");
+async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   if (!originAllowed(req)) return res.status(403).json({ error: "forbidden" });
   const b = req.body || {};

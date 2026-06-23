@@ -61,26 +61,28 @@ _Last updated: 2026-06-23_
 > **Status: ~70% done.** Dan's "let's go in order" 3-item list: ✅ (1) error alerts · 🔶 (2) DB backup (blueprint done; exact `pg_dump` + Supabase auto-backup check deferred to before-launch) · ⏪ (3) two-phone guard (reverted, see above).
 - Also confirmed safe (no fix needed): **booking photo uploads** auto-shrink + cap at 3.
 
-## ⚠️ OPEN ISSUE — settings save didn't visibly persist (INVESTIGATE FIRST next session)
-While testing the (now-reverted) concurrency guard, Dan changed a **tipping preset** (18→15→5%) on his **logged-in dashboard**. It showed on screen but did **NOT** reach the server — an anonymous read of `shops.settings.tipping` stayed `[18,20,25]` across many attempts.
-- **Ruled OUT:** (a) my concurrency guard — it was **reverted** and the change *still* didn't persist, so the guard was innocent; (b) the load-incomplete save-block — Dan confirmed there is **NO red "saving paused" banner**.
-- **Leading hypotheses (untested — Dan paused with "I think it's fine"):**
-  1. **Save not completed.** The tipping editor buffers edits in a `form` state; it only commits via the **"Save changes" button at the bottom of the card** (`App.jsx` ~16257 → `save()` → `setBusiness(form)` → debounced `shops` upsert). Tapping back/X runs `cancel()` and **discards** the draft.
-  2. **Focus/app-switch race.** Dan was switching apps (to screenshot/message) right after editing, which can interrupt the ~800ms-debounced save.
-- **Next session — verify settings actually persist:** have Dan change one setting → tap **"Save changes"** (watch for the "…saved" toast) → **wait ~10s without switching apps** → refresh → then confirm from your side:
-  `curl -s "https://iufgznminbujcabqeesk.supabase.co/rest/v1/shops?id=eq.avenue-phi&select=settings" -H "apikey: sb_publishable_aGX3akW7VfHO6Lm-FsZmEA_sf95Nu2i"`
-- **Also worth checking:** the live settings still look like **DEMO/seed values** (email `hello@meridianstudio.com`, address "2077 NE Town Center Dr", phone 555-0142, default tipping). Confirm whether Dan has *ever* successfully customized + saved settings, or if there's a genuine settings-save bug to fix before launch.
+## ✅ RESOLVED — settings save works (was a false alarm). DO NOT re-investigate.
+The previous session worried a tip-preset change "didn't persist." **2026-06-23: Dan — the owner who uses the app daily — confirmed directly: "I change the tip. It saves. I see that it saves. I have not seen it change on its own ever."** A full code trace agrees: the save path is sound (`save()` → `setBusiness(form)` → debounced `shops` upsert; the tipping editor correctly buffers to `form` and commits on "Save changes"; nothing re-pulls or clobbers the settings blob — Realtime only re-pulls list tables; the save gate was open, no "saving paused" banner). The earlier symptom was almost certainly an **unsaved draft** (tapping back/X discards it) or an **app-switch during the ~800ms save** — not a bug. **Do NOT re-open this** unless Dan reports a real, repeatable revert with his own eyes.
+- **Launch heads-up (data entry, NOT a bug):** the live `shops.settings` still holds **demo/seed values** (business name "Vero", email `hello@meridianstudio.com`, address "2077 NE Town Center Dr", phone 555-0142, default tipping `[18,20,25]`). Dan simply hasn't filled in his real business info yet. Worth doing before launch — but it's a 5-minute data-entry step in Settings, not something to fix in code.
 
-## ▶️ What's NEXT on Track A (after the open issue above)
-Open `HARDENING-SHOP.md` for the full list. **All 4 "open door" endpoints + cron + payment safety net + error alerts + pre-flight check + permissions header are DONE & live.** Genuinely remaining:
-1. **Finish DB backup** — exact `pg_dump`/`supabase db dump` of the schema/RLS/RPC bodies into git (needs DB tooling installed + the Postgres connection string from Supabase → and rotate the DB password after, since nothing in the app uses it). Plus confirm Supabase auto-backups for the data. Do before launch.
-2. **Remove the hardcoded password `avenue2026`** — ⚠️ wired into the login/PIN-lock screen, so a clumsy change could lock Dan out. Low real-risk (data is already protected by login + RLS). Do carefully or defer.
-3. **STOP opt-out handler** — legally required once SMS goes live (still in carrier review).
-4. **Full CSP header** — later, careful (app uses heavy inline styles).
+## ▶️ What's NEXT on Track A
+> **NEW 2026-06-23 — full pre-launch audit done: `LAUNCH-AUDIT-2026-06.md`** (5-role + pentest + due-diligence + threat model, code-grounded). It confirmed the [NOW] list below and surfaced extra single-shop items beyond backups — top ones: schedule the `send-reminders` cron (reminders don't fire today), close the missing-Origin `curl` doors on `notify`/`push`, stop anonymous client enumeration (`lookup_client_by_phone` phone-path + `/api/client-code`), add server-side error alerts, capture+audit the DB schema/RLS/RPC dump, persist a consent record, cap photo/text sizes server-side. Multi-tenant isolation + billing + compliance = [SAAS] (later). Severity-ranked action plan is at the end of the audit file.
+
+Open `HARDENING-SHOP.md` for the full list. **All 4 "open door" endpoints + cron + payment safety net + error alerts + pre-flight check + permissions header are DONE & live.** The scary stuff is handled. What's left splits into "anytime" work and a hard "before launch" gate (next section).
+
+**Can do anytime (not blocking):**
+1. **STOP opt-out handler** — legally required once SMS goes live (still in carrier review). Can be pre-built now (must fold into an existing `api/` function to respect the 12-function cap).
+2. **Full CSP header** — later, careful (app uses heavy inline styles, needs `'unsafe-inline'` for style).
+3. **Exact DB schema dump to git** — `pg_dump`/`supabase db dump` of schema/RLS/RPC bodies (needs DB tooling installed — none locally as of 2026-06-23 — + the Postgres connection string from Supabase → rotate the DB password after). Nice-to-have; the code-derived blueprint already lives in `DATABASE.md`.
 - **Track B (SaaS, later):** tighten the public `shops.settings` read (currently exposes the whole settings blob to anon); scope the iCal-key endpoint to shop membership. See `HARDENING-SAAS.md`.
 
-## ⏸ Intentionally left alone (Dan's call)
-- The **"Delete all clients & data"** button in Settings — Dan is keeping it for now because he's still adding/removing **test clients** pre-launch. **Remove (or lock behind a typed confirmation) before real launch.**
+## 🚀 PRE-LAUNCH CHECKLIST — must do before the first REAL client books
+Fine to leave today; MUST be handled before going live. (Dan asked these be tracked so they're not forgotten.)
+1. **⛔ TURN ON BACKUPS — #1 priority.** Upgrade Supabase **Free → Pro (~$25/mo)** for daily automatic backups (7-day retention, restore anytime). Confirmed 2026-06-23: org "thebarberdanpdx's Org" is on **Free = NO backups**. Dan chose to wait until launch (no real data to lose yet). **A wipe with no backup is unrecoverable — this gates launch.** See memory `prelaunch-backups-upgrade.md`. (In-app launch checklist already has a matching `safety_backups` line.)
+2. **Remove / lock the "Delete all clients & data" button** (Settings) — Dan keeps it for now to clear test clients; **remove or hide behind a typed confirmation before launch.**
+3. **Fill in real business info** in Settings — name/email/address/phone still show **demo values** ("Vero" / `hello@meridianstudio.com` / "2077 NE Town Center Dr" / 555-0142). 5-minute data-entry step (not a code bug — see RESOLVED section above).
+4. **Remove the hardcoded password `avenue2026`** — ⚠️ wired into login/PIN-lock (lockout risk); low real-risk since login + RLS already protect data. Do carefully.
+5. **STOP opt-out handler live** — required the moment SMS is approved (TCPA).
 
 ---
 

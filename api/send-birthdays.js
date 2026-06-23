@@ -11,7 +11,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { renderEmailHtml, renderPlainText, sendEmail } from "../lib/messaging.js";
 
-export default async function handler(req, res) {
+import { withErrorReporting } from "../lib/observe.js";
+export default withErrorReporting(handler, "send-birthdays");
+async function handler(req, res) {
   // Optional shared-secret guard so randoms can't trigger your sends.
   if (process.env.CRON_SECRET) {
     const auth = req.headers.authorization || "";

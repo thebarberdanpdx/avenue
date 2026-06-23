@@ -134,7 +134,9 @@ async function writeCfg(supabase, shop, shopRow, patch) {
   await supabase.from("shops").upsert({ id: shop, name: (shopRow && shopRow.name) || shop, settings });
 }
 
-export default async function handler(req, res) {
+import { withErrorReporting } from "../lib/observe.js";
+export default withErrorReporting(handler, "calendar-run");
+async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   // Optional shared-secret guard so randoms can't trigger syncs. Vercel Cron sends
   // this automatically when CRON_SECRET is set; matches api/send-reminders.js.

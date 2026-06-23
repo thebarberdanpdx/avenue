@@ -124,7 +124,9 @@ async function handleStripeWebhook(req, res, body) {
   }
 }
 
-export default async function handler(req, res) {
+import { withErrorReporting } from "../lib/observe.js";
+export default withErrorReporting(handler, "stripe");
+async function handler(req, res) {
   // --- Allow the app (a different address) to call this server -------------
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");

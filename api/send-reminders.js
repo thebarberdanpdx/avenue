@@ -16,7 +16,9 @@ const DEAD_STATUSES = ["canceled", "cancelled", "done", "no-show", "noshow", "co
 // Public site origin for the self-service manage / arrival links baked into reminders.
 const SITE = (process.env.SITE_URL || "https://gotvero.com").replace(/\/+$/, "");
 
-export default async function handler(req, res) {
+import { withErrorReporting } from "../lib/observe.js";
+export default withErrorReporting(handler, "send-reminders");
+async function handler(req, res) {
   // Optional shared-secret guard so randoms can't trigger your sends.
   if (process.env.CRON_SECRET) {
     const auth = req.headers.authorization || "";
