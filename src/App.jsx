@@ -747,6 +747,20 @@ const idemSig = (p) => {
   return null; // setup / sale_intent: no server-side double-charge to guard
 };
 
+// Build JSON request headers with the signed-in user's token attached, for
+// owner-only server endpoints (e.g. /api/calendar-pull) that must reject
+// anonymous callers. When there's no session the Authorization header is simply
+// omitted — harmless for any endpoint that doesn't require it.
+async function authedHeaders() {
+  const headers = { "Content-Type": "application/json" };
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess && sess.session && sess.session.access_token;
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch (e) {}
+  return headers;
+}
+
 // Call our serverless Stripe function. Throws with a readable message on failure.
 // Money-moving actions (charge / refund) are staff-only on the server, so we
 // attach the signed-in staff member's token when there is a session. Public
@@ -12589,7 +12603,7 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
       // client's save-gate which can silently block writes when an initial load errored.
       let serverOk = false, serverErr = null;
       try {
-        const pr = await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, mode: "sync", syncedAppts: syncedNext, calSync: calSyncPatch }) });
+        const pr = await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: await authedHeaders(), body: JSON.stringify({ shop: shopId, mode: "sync", syncedAppts: syncedNext, calSync: calSyncPatch }) });
         const pdata = await pr.json().catch(() => ({}));
         serverOk = pr.ok && pdata.ok; serverErr = pdata.error || null;
       } catch (e) { serverErr = "network"; }
@@ -12619,13 +12633,13 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
   }, [connected, cfg.paused, cfg.url]); // eslint-disable-line
 
   // Persist a config-only change (pause/resume, keep-disconnect) through the server.
-  const serverConfig = (patch) => { try { return fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, mode: "config", calSync: patch }) }); } catch (e) { return null; } };
+  const serverConfig = async (patch) => { try { return fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: await authedHeaders(), body: JSON.stringify({ shop: shopId, mode: "config", calSync: patch }) }); } catch (e) { return null; } };
   const connect = () => { const u = urlInput.trim(); if (!u) { if (showToast) showToast("Paste your calendar link first."); return; } saveCfg({ url: u.replace(/^webcal:\/\//i, "https://"), connectedVia: "link", paused: false }); runSync(u); };
   // Stop syncing. `removeAppts` also pulls the mirrored appointments back off Vero's calendar (server-side).
   const disconnect = async (removeAppts) => {
     if (removeAppts) {
       setAppts((cur) => (cur || []).filter((a) => !(a && (a.source === "sync" || a._synced))));
-      try { await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, mode: "clear" }) }); } catch (e) {}
+      try { await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: await authedHeaders(), body: JSON.stringify({ shop: shopId, mode: "clear" }) }); } catch (e) {}
     } else {
       serverConfig({ url: "", connectedVia: null, paused: false, lastChanges: null, lastError: null });
     }

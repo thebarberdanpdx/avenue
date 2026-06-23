@@ -20,13 +20,37 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABAS
 
 const isSynced = (a) => !!a && (a.source === "sync" || a._synced);
 
+// Owner-only guard. This endpoint writes appointments with the service-role key
+// (it can rewrite or wipe the synced calendar), and it is ONLY ever called from
+// the signed-in dashboard — never from the public booking page. So we require a
+// valid Supabase session token; anonymous callers are rejected. (The daily
+// background sync uses /api/calendar-run, NOT this endpoint, so it's unaffected.)
+// Same mechanism the Stripe endpoint uses for money-moving actions.
+async function getUser(req) {
+  const header = req.headers.authorization || req.headers.Authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  if (!token || !SERVICE_KEY) return null;
+  try {
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data || !data.user) return null;
+    return data.user;
+  } catch (e) {
+    return null;
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   if (!SERVICE_KEY) return res.status(500).json({ error: "server not configured" });
+
+  // Require a signed-in user before touching the calendar.
+  const user = await getUser(req);
+  if (!user) return res.status(401).json({ error: "Not authorized — please sign in again." });
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
