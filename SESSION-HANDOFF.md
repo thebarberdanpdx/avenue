@@ -43,11 +43,12 @@ _Last updated: 2026-06-23_
 3. **Deposit guard** — booking deposit can never be negative or exceed the ticket total. (in `de9f32e`)
 4. **Stripe server-side amount guard** — `api/stripe.js` rejects amounts that are ≤0, non-numbers, or > $100k, before reaching Stripe. Tested live: negative/zero/giant all rejected. (commit `adfc1ef`)
 5. **Baseline security headers** — frame/sniff/referrer/HSTS in `vercel.json`. Verified live. (commit `93add2c`)
+6. **Locked the calendar "wipe" door** — `api/calendar-pull` (could add/erase synced appointments) now requires the owner to be signed in. Anonymous request → 401, tested live. (commit `c0a542d`, deployed 2026-06-23). The nightly auto-sync uses a different door (`api/calendar-run`) and is unaffected.
 - Also confirmed safe (no fix needed): **booking photo uploads** auto-shrink + cap at 3.
 
 ## ▶️ What's NEXT on Track A (pick up here)
 Open `HARDENING-SHOP.md` for the full list. Remaining, roughly in safe-first order:
-1. **Lock the "open doors"** — a few behind-the-scenes web addresses (`api/notify`, `api/push`, `api/calendar-pull`, `api/ical`) currently have no password. **Delicate** — some are used by the public booking flow, so each needs careful preview-testing so booking confirmations don't break. (Biggest remaining single-shop item. The iCal feed is empty now but will leak appointment names once real bookings exist — fix before real appointments.)
+1. **Lock the remaining "open doors"** — `api/calendar-pull` is now locked (done above). Left: **`api/ical`** (read-only calendar feed — empty now, but leaks appointment names once real bookings exist; needs an unguessable token in the URL since calendar apps can't send a password — small design choice about where the per-shop secret lives) and **`api/notify` / `api/push`** (text/email + push senders — these run on the PUBLIC booking path, so they CANNOT require login; they need a gentler guard like rate-limiting or an origin check so booking confirmations don't break).
 2. **Stripe webhook** — so refunds/chargebacks/failed payments stay in sync (pairs with the amount guard already done).
 3. **Reliability** — error monitoring; schedule the appointment-reminder cron (only matters once SMS is approved); put the database schema into git.
 4. **Concurrency guard** — stop two staff devices from overwriting each other.
