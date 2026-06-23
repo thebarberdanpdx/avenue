@@ -48,6 +48,8 @@ const splitSummary = (s) => {
   return { name: raw || "Client", service: "" };
 };
 
+import { safeFetch } from "../lib/safeFetch.js";
+
 async function syncShop(supabase, shop) {
   const { data: shopRow } = await supabase.from("shops").select("settings,name").eq("id", shop).maybeSingle();
   const settings = (shopRow && shopRow.settings) || {};
@@ -61,7 +63,7 @@ async function syncShop(supabase, shop) {
   const url = cfg.url.replace(/^webcal:\/\//i, "https://");
   let events;
   try {
-    const r = await fetch(url, { headers: { Accept: "text/calendar, */*" }, redirect: "follow" });
+    const r = await safeFetch(url, { headers: { Accept: "text/calendar, */*" } });
     if (!r.ok) throw new Error("status " + r.status);
     const text = await r.text();
     if (!/BEGIN:VCALENDAR/i.test(text)) throw new Error("not a calendar");

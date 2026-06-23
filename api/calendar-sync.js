@@ -11,6 +11,8 @@
 //   TZID values are returned as wall-clock "YYYY-MM-DDTHH:MM:SS" so the client's
 //   new Date() reads them at the same clock time the owner sees in their calendar.
 
+import { safeFetch } from "../lib/safeFetch.js";
+
 // RFC 5545 line unfolding: a line beginning with a space or tab continues the previous one.
 function unfold(text) {
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n[ \t]/g, "");
@@ -86,7 +88,7 @@ export default async function handler(req, res) {
     url = url.replace(/^webcal:\/\//i, "https://");
     if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: "That doesn't look like a calendar link." });
 
-    const r = await fetch(url, { headers: { Accept: "text/calendar, text/plain, */*" }, redirect: "follow" });
+    const r = await safeFetch(url, { headers: { Accept: "text/calendar, text/plain, */*" } });
     if (!r.ok) return res.status(502).json({ error: `Couldn't reach the calendar (status ${r.status}).` });
     const text = await r.text();
     if (!/BEGIN:VCALENDAR/i.test(text)) {
