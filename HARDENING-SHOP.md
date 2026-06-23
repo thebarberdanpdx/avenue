@@ -11,17 +11,17 @@
 ## Status legend
 `✅ done` · `🔶 in progress` · `🟦 next` · `🟨 queued` · `☐ not started`
 
-## Overall: ~17%  ▓▓░░░░░░░░
+## Overall: ~26%  ▓▓▓░░░░░░░
 
 | Status | Item | Why it matters for ONE shop |
 |---|---|---|
 | ✅ | Audit + threat model | Done — we know exactly what to fix |
 | 🟦 | Lock open API endpoints (`ical` PII leak, `notify`/`push` relay, `calendar-pull` wipe) | Anyone can read your clients / abuse your SMS / wipe your calendar today |
-| 🟨 | Payment integrity (server-side amount check + Stripe webhook) | Stop price-tampering at checkout; keep books in sync with Stripe |
+| 🔶 | Payment integrity — ✅ **LIVE** server-side amount guard (deployed 2026-06-23, commit adfc1ef; tested: rejects negative/zero/giant) · ☐ Stripe webhook | Stop price-tampering at checkout; keep books in sync with Stripe |
 | 🔶 | Safe cleanups — ✅ **LIVE** price/duration + deposit + per-barber-override guards (deployed 2026-06-23, commit de9f32e) · ✅ booking photo upload already safe (auto-shrinks, caps at 3) · ⏸ "delete all" button — **kept on purpose for now** (owner uses it to clear test clients pre-launch; REMOVE before real launch) | Prevent accidental data wipe + garbage data |
 | 🟨 | Reliability (error monitoring, schedule reminder cron, schema→git, CI build gate) | Know when things break; reminders actually send |
 | 🟨 | Concurrency data-loss guard | Two devices at the desk won't overwrite each other |
-| 🟨 | Security headers / CSP + remove hardcoded password | Basic web hardening |
+| 🔶 | Security headers — ✅ **LIVE** frame/sniff/referrer/HSTS (deployed 2026-06-23) · ☐ full CSP (later, careful) · ☐ remove hardcoded password `avenue2026` | Basic web hardening |
 | 🟨 | STOP opt-out handler | Required once SMS goes live (TCPA) |
 
 ## Next action
