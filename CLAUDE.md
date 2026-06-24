@@ -74,6 +74,14 @@ Themeable via CSS variables — `THEMES` (~536), `buildThemeCSS` (~601), `Appear
 - **Don't overwrite `api/stripe.js`** — it handles `setup`/`sale_intent`/`charge`/`refund`.
 - Inline styles with CSS vars are the norm (there's no CSS-in-JS lib / Tailwind).
 
+## ⛔ Protected invariant — staff (provider) email/phone must never be lost
+
+This regressed and infuriated the owner 5+ times. Two guards in `App.jsx` keep staff email/phone/PIN from being blanked — **NEVER remove or weaken them:**
+1. **Load gate:** the sanitized `get_public_providers` feed only applies when `!hasStoredSession()` — so a signed-in owner's `providers` come ONLY from the full `from('providers')` load, never the email/phone-stripped feed.
+2. **Save backstop:** `syncList` re-reads server providers and restores any `email`/`phone`/`pin` that's `undefined` locally before upserting (an explicit `""` clear is respected) — a save can never blank server-held contact info.
+
+`syncList('providers', …)` must remain the SOLE writer of the providers table. After ANY change near provider load/save or the staff editor, test: enter staff email+phone → Save → hard-reload → it persists. See memory `provider-email-phone-dataloss`.
+
 ## Compliance — do not touch without explicit instruction
 
 SMS consent / privacy / terms wording is under 10DLC carrier vetting. The phrase **"reminders from Sanctuary Barber Co"** must appear **exactly 4 times** in `App.jsx` (the SMS consent lines at ~4484, ~4808, ~4953, ~5589). Do not edit consent/privacy/terms copy as a side effect of other work. Verify the count before any deploy.
