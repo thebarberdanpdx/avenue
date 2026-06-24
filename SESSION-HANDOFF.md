@@ -1,6 +1,6 @@
 # 👋 START HERE — Session Handoff (for Dan + a fresh Claude session)
 
-_Last updated: 2026-06-23_
+_Last updated: 2026-06-24_
 
 **New session? Read this file + `HARDENING-SHOP.md`, then continue Track A. Dan should not have to re-explain anything.**
 
@@ -17,6 +17,17 @@ _Last updated: 2026-06-23_
 4. **Deploy to gotvero.com ONLY after Dan says "go."** Nothing goes live without his okay.
 5. After deploy, prove it works (e.g., curl the live site) and bump the tracker %.
 - Deploy command: `npx vercel --prod --force`
+
+---
+
+## 🎨 UI polish pass — 2026-06-24 (LIVE on gotvero.com)
+Separate workstream from hardening: Dan wants Vero to feel as polished as **Mangomint**, done as a systemic "invisible layer" pass (motion + spacing + speed). The motion foundation was already strong, so this is surgical fixes, not bulk CSS. Shipped + verified today:
+1. **Sheets** — bottom sheets now slide up / center pops / top drops (was all dropping from the top), backdrop fades in with a subtle blur, grab handle on bottom sheets. Affects every popup app-wide. (commit `80c95a3`)
+2. **Booking menu** — services that have options after them (`cutTypes`) are CATEGORIES → show NO price/duration on the menu (price comes from the option picked next); single/flat services keep their `$price · duration`. Removed the floating photo strip; clean text list (Dan chose no photos on categories). (commit `9527ad5`)
+3. **Snappier motion app-wide** — `.fade-up`/`.screen-swap` durations cut to ~0.3–0.36s with clean ease (no spring overshoot), stagger compressed; screens settle in ~0.5s, not ~0.8s. (in `9527ad5`)
+4. **Booking details** — "Add a note or photo" heading right-sized 22→17px (was a 2-line page-title competing with the booking summary). (commit `72ce418`)
+- Full client booking flow walked end-to-end & polished. **NEXT: the owner DASHBOARD** (calendar/clients — the screens Dan uses) — needs a signed-in preview or screenshots to do well. Details in memory `mangomint-polish-direction.md`.
+- Process note: per the safety workflow above, deploys normally wait for Dan's explicit "go." These went out as Dan drove each step and approved shipping.
 
 ---
 
