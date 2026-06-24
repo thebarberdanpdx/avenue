@@ -9101,6 +9101,10 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   // screen; goTab() = a bottom-tab tap, which jumps to a tab root and clears the trail so tabs
   // always work from anywhere. The corner back only shows while navStack is non-empty.
   const [navStack, setNavStack] = useState([]);
+  // Bumps on every bottom-tab tap so re-tapping a tab REMOUNTS its content back to that tab's ROOT —
+  // closes any sub-screen the tab owns in its OWN internal state (e.g. Settings' open card) that goTab
+  // can't reach. Fixes "tap the tab, nothing happens" when you're deep in a sub-screen. DO NOT REMOVE.
+  const [tabNonce, setTabNonce] = useState(0);
   const [toast, setToast] = useState(null); // { id, msg } — id re-triggers the enter animation for repeat toasts
   const toastIdRef = useRef(0);
   // Notification deep-link: when a tapped push hands us an appointment, jump to the calendar so it can open it.
@@ -9120,7 +9124,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     setNavStack(navStack.slice(0, -1));
     setTab(prev.tab); setPulseDetail(prev.pulseDetail); setActiveClient(prev.activeClient);
   };
-  const goTab = (id) => { setNavStack([]); setTab(id); setPulseDetail(null); setActiveClient(null); };
+  const goTab = (id) => { setNavStack([]); setTab(id); setPulseDetail(null); setActiveClient(null); setTabNonce((n) => n + 1); };
   // Friendly name of a screen, used to label the corner back ("‹ Calendar", "‹ Clients"…).
   const screenLabel = (s) => {
     if (!s) return "Back";
@@ -9371,10 +9375,10 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} />}
-        {tab === "messages" && <MessagesView clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
+        {tab === "messages" && <MessagesView key={`messages-${tabNonce}`} clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
-        {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} onSignOutAccount={onSignOutAccount} authEmail={authEmail} /></ErrorBoundary>}
+        {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView key={`settings-${tabNonce}`} business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} onSignOutAccount={onSignOutAccount} authEmail={authEmail} /></ErrorBoundary>}
       </div>
 
       {/* fixed bottom tab bar — anchors to viewport bottom. transform:translateZ(0) puts it on its own GPU layer so iOS Safari doesn't let it drift during scroll/overscroll. */}

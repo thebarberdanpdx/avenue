@@ -105,6 +105,24 @@ try {
   record(false, "No hardcoded secrets in source", "scan error: " + e.message);
 }
 
+// 5) Regression lock — previously-shipped fixes that already regressed and cost the owner trust.
+//    Each marker is STABLE CODE that must stay present in src/App.jsx; if a future edit removes one,
+//    this check FAILS and blocks the deploy, so a "done" fix can't silently un-ship. Add to this list
+//    whenever you fix a painful regression you never want to come back.
+const GUARDS = [
+  { needle: "table === 'providers' && rows.length", label: "staff email/phone save-backstop (never blank on save)" },
+  { needle: "!hasStoredSession()", label: "staff email/phone load-gate (sanitized feed can't overwrite owner)" },
+  { needle: "setTabNonce(", label: "bottom-tab tap resets to tab root" },
+];
+try {
+  const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
+  const missing = GUARDS.filter((g) => !app.includes(g.needle)).map((g) => g.label);
+  record(missing.length === 0, "Regression lock (shipped fixes intact)",
+    missing.length ? "REMOVED: " + missing.join(" · ") + " — a shipped fix was deleted; restore it before deploy" : `all ${GUARDS.length} guarded fixes still present`);
+} catch (e) {
+  record(false, "Regression lock (shipped fixes intact)", "could not read src/App.jsx: " + e.message);
+}
+
 // Report.
 console.log("\n  Pre-flight check\n  " + "─".repeat(40));
 for (const r of results) {

@@ -82,6 +82,10 @@ This regressed and infuriated the owner 5+ times. Two guards in `App.jsx` keep s
 
 `syncList('providers', …)` must remain the SOLE writer of the providers table. After ANY change near provider load/save or the staff editor, test: enter staff email+phone → Save → hard-reload → it persists. See memory `provider-email-phone-dataloss`.
 
+**Bottom-tab navigation:** tapping any bottom tab must ALWAYS land on that tab's ROOT, even from deep in a sub-screen. `goTab()` bumps `tabNonce`; tab content that owns internal sub-state (e.g. `SettingsView`'s open card, `MessagesView`) is keyed by `tabNonce` so a re-tap remounts it to root. Don't remove the `tabNonce` bump or the keys.
+
+**Regression lock:** `npm run ship-check` FAILS the deploy if any guarded fix is removed from `src/App.jsx` (the `GUARDS` list in `scripts/ship-check.mjs`). When you fix a painful regression you never want back, add a stable code marker for it to that list — that's how shipped fixes stay shipped.
+
 ## Compliance — do not touch without explicit instruction
 
 SMS consent / privacy / terms wording is under 10DLC carrier vetting. The phrase **"reminders from Sanctuary Barber Co"** must appear **exactly 4 times** in `App.jsx` (the SMS consent lines at ~4484, ~4808, ~4953, ~5589). Do not edit consent/privacy/terms copy as a side effect of other work. Verify the count before any deploy.
