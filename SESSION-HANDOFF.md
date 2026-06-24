@@ -76,13 +76,28 @@ Open `HARDENING-SHOP.md` for the full list. **All 4 "open door" endpoints + cron
 3. **Exact DB schema dump to git** — `pg_dump`/`supabase db dump` of schema/RLS/RPC bodies (needs DB tooling installed — none locally as of 2026-06-23 — + the Postgres connection string from Supabase → rotate the DB password after). Nice-to-have; the code-derived blueprint already lives in `DATABASE.md`.
 - **Track B (SaaS, later):** tighten the public `shops.settings` read (currently exposes the whole settings blob to anon); scope the iCal-key endpoint to shop membership. See `HARDENING-SAAS.md`.
 
-## 🚀 PRE-LAUNCH CHECKLIST — must do before the first REAL client books
-Fine to leave today; MUST be handled before going live. (Dan asked these be tracked so they're not forgotten.)
-1. **⛔ TURN ON BACKUPS — #1 priority.** Upgrade Supabase **Free → Pro (~$25/mo)** for daily automatic backups (7-day retention, restore anytime). Confirmed 2026-06-23: org "thebarberdanpdx's Org" is on **Free = NO backups**. Dan chose to wait until launch (no real data to lose yet). **A wipe with no backup is unrecoverable — this gates launch.** See memory `prelaunch-backups-upgrade.md`. (In-app launch checklist already has a matching `safety_backups` line.)
-2. **"Delete all clients & data" button** — ✅ **now gated behind type-to-confirm (must type `DELETE`), LIVE 2026-06-23.** Button disabled until it matches + `nukeAll()` hard-guards on it (fails safe). Owner can still clear test data; an accidental tap can't wipe everything. (Full removal still optional at real launch.)
-3. **Fill in real business info** in Settings — name/email/address/phone still show **demo values** ("Vero" / `hello@meridianstudio.com` / "2077 NE Town Center Dr" / 555-0142). 5-minute data-entry step (not a code bug — see RESOLVED section above).
-4. **Remove the hardcoded password `avenue2026`** — ⚠️ wired into login/PIN-lock (lockout risk); low real-risk since login + RLS already protect data. Do carefully.
-5. **STOP opt-out handler live** — required the moment SMS is approved (TCPA).
+## 🚀 LAUNCH CHECKLIST — to open Dan's own shop
+The hard engineering is done (app, live payments, security hardening, the recurring bugs fixed + regression-locked). What's left to actually open the doors:
+
+**A. Must do before the first REAL booking (mostly Dan; quick):**
+1. **⛔ TURN ON BACKUPS — #1.** Upgrade Supabase **Free → Pro (~$25/mo)**: daily backups, 7-day retention, restore anytime. Org "thebarberdanpdx's Org" is on **Free = NO backups**; Dan deferred to launch. Unrecoverable if skipped. See memory `prelaunch-backups-upgrade.md`.
+2. **Real shop info + menu.** Replace the demo values in Settings ("Vero" / `hello@meridianstudio.com` / "2077 NE Town Center Dr" / 555-0142) with real Sanctuary Barber Co info; confirm real **services, prices, staff, hours**; and **clear the demo/test clients & appointments** (Delete-all button, now type-`DELETE` guarded) so reports start clean.
+3. **Booking link.** Confirm the exact URL customers use to reach the shop's booking page (slug `avenue-phi`; `resolveShopId` reads `?shop=`/subdomain/path). Verify it lands on the right shop.
+4. **Stripe payouts.** Confirm Dan's bank is connected + payouts enabled in Stripe (charges are live; make sure money actually reaches him).
+5. **Full dry-run booking** (do together): book as a customer → pay → confirmation EMAIL arrives → shows on calendar → refund it. Final proof before real customers.
+
+**B. Turns on after / in parallel (NOT day-1 blockers):**
+6. **Text messages** (SMS confirmations + auto-STOP handler) — auto-on when Vonage approves the toll-free number (in carrier review). Email confirmations cover launch until then. STOP handler still to build (TCPA); folds into an existing `api/` function (12-fn cap).
+7. **Reminders firing** — blocked by Vercel plan: Hobby allows only 2 crons, once/day; reminders need ~15 min. Decision: **Vercel Pro (~$20/mo)** OR a free external scheduler (Claude wires it). `send-reminders` cron is built, just unscheduled.
+8. **Cleanups:** remove hardcoded `avenue2026` (⚠️ login/PIN lockout risk); a few audit privacy tightenings that need ~10 min Supabase access (stop client-lookup snooping, enforce blocked-clients server-side, confirm login-code brute-force cap). See `AUDIT-TRACKER.md`.
+
+## 📱 iOS app → TestFlight (for testers) — NOT a launch blocker, do in parallel anytime
+Customers book on the **web** (gotvero.com link); the native app is for **Dan + staff + testers**, so this is separate from opening the shop.
+- **Status:** not started. **Dan HAS an Apple Developer account ($99/yr)** → fast path, ~1–2 days when he's ready.
+- **App config** (`capacitor.config.json`): appId `com.gotvero.app`, name "Vero", `server.url = https://gotvero.com` — the app loads the LIVE site, so testers always see the latest; upload the shell **once**, web updates need no re-upload.
+- **Path = TestFlight** (not the public App Store). Internal testers (≤100) get builds instantly after the first upload; external testers (≤10,000 via email/link) need a one-time ~1-day Apple beta review.
+- **Who does what:** Claude can prep the build (`npm run build && npx cap sync`) + write the click-by-click. Dan does the Xcode archive → upload → App Store Connect app record → add testers (GUI/account steps Claude can't drive).
+- **Steps:** (1) Apple Dev account active ✅; (2) Xcode: set version/build + signing team → Product → Archive → Distribute → App Store Connect; (3) App Store Connect: create the app (`com.gotvero.app`) if needed → TestFlight → add testers; (4) testers install the **TestFlight** app + accept the beta. APNs push is already wired server-side (`api/push.js`).
 
 ---
 
