@@ -6433,10 +6433,12 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
     <div className="fade-up">
       {/* MASTHEAD — greeting + owner view picker */}
       <div style={{ marginBottom: 26, paddingTop: 8 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "flex-end", gap: 12, marginBottom: 16 }}>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, color: "var(--text)" }}>{headerName}</h2>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 14 }}>
+          <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500 }}>{todayLabel}</div>
           {/* Owner-only "viewing as" picker. Barbers see only their avatar + name (no toggle). */}
           {isOwner && realProviders.length > 1 ? (
-            <div>
+            <div style={{ flexShrink: 0 }}>
               <button onClick={() => setPickerOpen(true)} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 24, padding: "6px 12px 6px 6px", cursor: "pointer" }}>
                 {isShopView ? (
                   <div style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={13} style={{ color: "var(--text2)" }} /></div>
@@ -6449,14 +6451,12 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             </div>
           ) : (
             /* Barber view — small avatar + name, no toggle */
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 24, padding: "6px 12px 6px 6px" }}>
+            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 24, padding: "6px 12px 6px 6px" }}>
               <Avatar size={26} initial={viewedProvider?.name?.charAt(0)} color={viewedProvider?.color} photo={viewedProvider?.photo} />
               <span style={{ fontSize: 13, color: "var(--text)" }}>{viewedProvider?.name}</span>
             </div>
           )}
         </div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, color: "var(--text)" }}>{headerName}</h2>
-        <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{todayLabel}</div>
       </div>
 
       {/* WRAP-UP — jumps to the very top whenever cuts are waiting to be logged, so it's
@@ -18148,7 +18148,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               {/* off-shift shade: dim the hours outside this barber's shift for the selected day (behind cards, ignores taps) */}
               {(() => {
                 const h = hoursForDate(p, selectedDate);
-                const shade = "color-mix(in srgb, var(--text) 7%, transparent)";
+                const shade = "color-mix(in srgb, var(--text) 4%, transparent)";
                 if (!h || !h.on) return <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: gridHeight, background: shade, pointerEvents: "none" }} />;
                 const segs = [];
                 const sStart = Math.max(DAY_START, h.start);
@@ -21370,6 +21370,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
     if (!draft.firstName || !draft.firstName.trim()) { if (showToast) showToast("Please enter a first name."); return; }
     if (!draft.lastName || !draft.lastName.trim()) { if (showToast) showToast("Please enter a last name."); return; }
     if (draft.phone.replace(/\D/g, "").length < 10) { if (showToast) showToast("Please enter a valid phone number."); return; }
+    if (!draft.email || !draft.email.trim() || !draft.email.includes("@")) { if (showToast) showToast("Please enter a valid email address."); return; }
     const id = "c" + Date.now() + Math.floor(Math.random() * 1000);
     const fullName = `${draft.firstName.trim()} ${draft.lastName.trim()}`;
     const newClient = { id, name: fullName, firstName: draft.firstName.trim(), lastName: draft.lastName.trim(), phone: draft.phone.trim(), email: draft.email.trim(), birthday: draft.birthday || undefined, provider: draft.provider, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: draft.notes.trim(), messages: [], gallery: [], timeline: [] };
@@ -21447,7 +21448,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
           <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PHONE</label>
           <input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} placeholder="(555) 000-0000" inputMode="tel" style={{ ...inputS, marginBottom: 14 }} />
 
-          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>EMAIL (optional)</label>
+          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>EMAIL</label>
           <input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} placeholder="name@email.com" inputMode="email" style={{ ...inputS, marginBottom: 14 }} />
 
           <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>BIRTHDAY (optional)</label>
