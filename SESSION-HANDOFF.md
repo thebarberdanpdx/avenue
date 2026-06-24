@@ -4,6 +4,8 @@ _Last updated: 2026-06-24_
 
 **New session? Read this file + `HARDENING-SHOP.md`, then continue Track A. Dan should not have to re-explain anything.**
 
+> 👉 **The clean, plain-English list of everything STILL TO DO is [`TODO.md`](TODO.md)** — start there for "what's left."
+
 ---
 
 ## Who + how to talk to Dan
