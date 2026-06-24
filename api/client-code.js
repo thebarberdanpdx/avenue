@@ -34,31 +34,35 @@ export default async function handler(req, res) {
     const { data: rows, error } = await supabase.from("clients").select("id, data").eq("shop_id", shop);
     if (error) return res.status(500).json({ error: "lookup failed" });
     const hit = (rows || []).find((r) => String(r.data?.email || "").trim().toLowerCase() === em && !r.data?.blocked);
-    if (!hit) return res.status(200).json({ found: false });
 
-    // Generate + store the code (10-minute expiry).
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-    const { error: insErr } = await supabase.from("client_login_codes").insert({
-      shop_id: shop, email: em, client_id: hit.id, code, expires_at: expires,
-    });
-    if (insErr) return res.status(500).json({ error: "could not create code" });
+    // Only generate + send a code when the email is actually on file. CRITICAL:
+    // we return an IDENTICAL response below whether or not it matched, so this
+    // endpoint can't be used to check who is (or isn't) a client (enumeration).
+    if (hit) {
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      const { error: insErr } = await supabase.from("client_login_codes").insert({
+        shop_id: shop, email: em, client_id: hit.id, code, expires_at: expires,
+      });
+      if (insErr) return res.status(500).json({ error: "could not create code" });
 
-    // Send it through the existing email pipe. Template is pre-rendered (no tags).
-    const origin = `https://${req.headers.host}`;
-    await fetch(origin + "/api/notify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        channel: "email",
-        to: { email: em },
-        subject: "Your sign-in code",
-        template: `Your sign-in code is ${code}. It expires in 10 minutes. If you didn't request this, you can ignore this email.`,
-        context: {},
-      }),
-    }).catch(() => {});
+      // Send it through the existing email pipe. Template is pre-rendered (no tags).
+      const origin = `https://${req.headers.host}`;
+      await fetch(origin + "/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel: "email",
+          to: { email: em },
+          subject: "Your sign-in code",
+          template: `Your sign-in code is ${code}. It expires in 10 minutes. If you didn't request this, you can ignore this email.`,
+          context: {},
+        }),
+      }).catch(() => {});
+    }
 
-    return res.status(200).json({ found: true, masked: mask(em) });
+    // Uniform success — never reveals whether the address matched a client.
+    return res.status(200).json({ ok: true, masked: mask(em) });
   } catch (e) {
     return res.status(500).json({ error: "unexpected" });
   }

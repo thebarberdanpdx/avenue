@@ -4784,11 +4784,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>What's your email?</h2>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 24px", fontWeight: 400, lineHeight: 1.55 }}>The one we have on file from your last visit — we'll email you a quick sign-in code.</p>
             <div style={{ position: "relative", marginBottom: 18 }}><Mail size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus inputMode="email" autoComplete="email" autoCapitalize="none" value={clientEmail} onChange={(e) => { setClientEmail(e.target.value); setLoginNoMatch(null); }} placeholder="you@email.com" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
-            {loginNoMatch === "nomatch" && (
-              <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", marginBottom: 16, fontSize: 14, lineHeight: 1.5, color: "var(--text)" }}>
-                We couldn't find that email on file. Double-check it, or <button onClick={() => { setLoginNoMatch(null); setStep(0); setSimpleStep("what"); }} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer", fontFamily: "inherit" }}>book as a new client</button>.
-              </div>
-            )}
             {loginNoMatch === "error" && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Couldn't send the code — give it another try in a moment.</p>}
             {loginNoMatch === "throttled" && (
               <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", marginBottom: 16, fontSize: 14, lineHeight: 1.5, color: "var(--text)" }}>
@@ -4801,11 +4796,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               try {
                 const res = await fetch(API_BASE + "/api/client-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, email: em }) });
                 const out = await res.json().catch(() => ({}));
-                if (res.ok && out && out.found) {
+                if (res.ok && out && out.ok) {
+                  // Uniform: always advance to the code screen. If the email isn't on file
+                  // no code is sent — but we never reveal that here (anti-enumeration).
                   setEmailMasked(out.masked || em);
                   setPendingMatch(null); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true);
-                } else if (res.ok && out && out.found === false) {
-                  setLoginNoMatch("nomatch");
                 } else if (res.status === 429) {
                   setLoginNoMatch("throttled");
                 } else { setLoginNoMatch("error"); }
