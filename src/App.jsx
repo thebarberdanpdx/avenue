@@ -21267,8 +21267,10 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
   // return) before going live.
   const [confirmNuke, setConfirmNuke] = useState(false);
   const [nuking, setNuking] = useState(false);
+  const [nukeConfirmText, setNukeConfirmText] = useState("");
   const nukeAll = async () => {
     if (nuking) return;
+    if (nukeConfirmText.trim().toUpperCase() !== "DELETE") return; // hard type-to-confirm guard (can't fire without it)
     setNuking(true); setConfirmNuke(false);
     try {
       await Promise.all([
@@ -21280,7 +21282,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
       if (showToast) showToast("All clients, appointments, and waitlist entries deleted.");
     } catch (e) {
       if (showToast) showToast("Couldn't delete everything — check your connection and try again.");
-    } finally { setNuking(false); }
+    } finally { setNuking(false); setNukeConfirmText(""); }
   };
 
   const q = query.trim().toLowerCase();
@@ -21352,13 +21354,15 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         confirmNuke ? (
           <div style={{ marginBottom: 18, padding: 14, border: "1px solid color-mix(in srgb, #c0392b 40%, var(--border))", borderRadius: 12, background: "var(--panel)" }}>
             <div style={{ fontSize: 14.5, color: "var(--text)", marginBottom: 12, lineHeight: 1.45 }}>Delete all {(clients || []).length} client{(clients || []).length === 1 ? "" : "s"}, {(appts || []).length} appointment{(appts || []).length === 1 ? "" : "s"}, and {(waitlist || []).length} waitlist entr{(waitlist || []).length === 1 ? "y" : "ies"}? This can't be undone.</div>
+            <div style={{ fontSize: 12.5, color: "var(--sub)", marginBottom: 7 }}>Type <b style={{ color: "var(--text)", letterSpacing: 1 }}>DELETE</b> to confirm.</div>
+            <input value={nukeConfirmText} onChange={(e) => setNukeConfirmText(e.target.value)} autoFocus placeholder="DELETE" style={{ width: "100%", boxSizing: "border-box", marginBottom: 12, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, letterSpacing: 1, fontFamily: FONT_BODY }} />
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={nukeAll} disabled={nuking} style={{ flex: 1, background: "#c0392b", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 600, cursor: nuking ? "default" : "pointer", opacity: nuking ? 0.6 : 1 }}>{nuking ? "Deleting…" : "Delete everything"}</button>
-              <button onClick={() => setConfirmNuke(false)} disabled={nuking} style={{ flex: 1, background: "transparent", color: "var(--sub)", border: "1px solid var(--border)", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
+              <button onClick={nukeAll} disabled={nuking || nukeConfirmText.trim().toUpperCase() !== "DELETE"} style={{ flex: 1, background: "#c0392b", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 600, cursor: (nuking || nukeConfirmText.trim().toUpperCase() !== "DELETE") ? "default" : "pointer", opacity: (nuking || nukeConfirmText.trim().toUpperCase() !== "DELETE") ? 0.5 : 1 }}>{nuking ? "Deleting…" : "Delete everything"}</button>
+              <button onClick={() => { setConfirmNuke(false); setNukeConfirmText(""); }} disabled={nuking} style={{ flex: 1, background: "transparent", color: "var(--sub)", border: "1px solid var(--border)", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
             </div>
           </div>
         ) : (
-          <button onClick={() => setConfirmNuke(true)} disabled={nuking} style={{ width: "100%", marginBottom: 18, background: "transparent", color: "#c0392b", border: "1px solid color-mix(in srgb, #c0392b 45%, var(--border))", borderRadius: 12, padding: 13, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Delete all clients &amp; data</button>
+          <button onClick={() => { setConfirmNuke(true); setNukeConfirmText(""); }} disabled={nuking} style={{ width: "100%", marginBottom: 18, background: "transparent", color: "#c0392b", border: "1px solid color-mix(in srgb, #c0392b 45%, var(--border))", borderRadius: 12, padding: 13, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Delete all clients &amp; data</button>
         )
       )}
       {/* Editorial masthead */}
