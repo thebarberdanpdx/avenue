@@ -1909,7 +1909,7 @@ function App() {
           --glow: 0 10px 26px -8px var(--wash), 0 2px 8px -4px var(--shadow);
           --radius: 16px;
         }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(14px);} to {opacity:1; transform:none;} }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px);} to {opacity:1; transform:none;} }
         @keyframes screenIn { from { opacity: 0; transform: translateY(10px) scale(0.992);} to {opacity:1; transform:none;} }
         @keyframes pulse { 0% { transform: scale(0.92); opacity: 0.7; } 50% { transform: scale(1.06); opacity: 0.3; } 100% { transform: scale(0.92); opacity: 0.7; } }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -1933,22 +1933,22 @@ function App() {
         }
         @keyframes slideInRight { from { opacity:0; transform: translateX(34%);} to {opacity:1; transform:none;} }
         /* Screen container eases in as a whole (move-through-space feel) */
-        .fade-up { animation: screenIn .42s var(--ease) both; }
-        .fade-in { animation: fadeIn .4s var(--ease) both; }
+        .fade-up { animation: screenIn .3s var(--ease) both; }
+        .fade-in { animation: fadeIn .28s var(--ease) both; }
         /* Keyed screen swaps: deliberately OBVIOUS so motion is easy to confirm.
            Once verified working, the distance (28px) and duration can be dialed back to taste. */
         @keyframes screenSwap { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
-        .screen-swap { animation: screenSwap .52s var(--spring) both; }
+        .screen-swap { animation: screenSwap .36s var(--ease) both; }
         /* Direct children cascade in with a gentle stagger + spring */
-        .fade-up > * { animation: fadeUp .5s var(--spring) both; }
-        .screen-swap > * > * { animation: fadeUp .55s var(--spring) both; }
-        .fade-up > *:nth-child(1){animation-delay:.02s} .fade-up > *:nth-child(2){animation-delay:.06s}
-        .fade-up > *:nth-child(3){animation-delay:.10s} .fade-up > *:nth-child(4){animation-delay:.14s}
-        .fade-up > *:nth-child(5){animation-delay:.18s} .fade-up > *:nth-child(6){animation-delay:.22s}
-        .fade-up > *:nth-child(7){animation-delay:.26s} .fade-up > *:nth-child(8){animation-delay:.30s}
-        .screen-swap > * > *:nth-child(1){animation-delay:.06s} .screen-swap > * > *:nth-child(2){animation-delay:.12s}
-        .screen-swap > * > *:nth-child(3){animation-delay:.18s} .screen-swap > * > *:nth-child(4){animation-delay:.24s}
-        .screen-swap > * > *:nth-child(5){animation-delay:.30s} .screen-swap > * > *:nth-child(6){animation-delay:.36s}
+        .fade-up > * { animation: fadeUp .34s var(--ease) both; }
+        .screen-swap > * > * { animation: fadeUp .36s var(--ease) both; }
+        .fade-up > *:nth-child(1){animation-delay:0s} .fade-up > *:nth-child(2){animation-delay:.03s}
+        .fade-up > *:nth-child(3){animation-delay:.06s} .fade-up > *:nth-child(4){animation-delay:.09s}
+        .fade-up > *:nth-child(5){animation-delay:.12s} .fade-up > *:nth-child(6){animation-delay:.15s}
+        .fade-up > *:nth-child(7){animation-delay:.18s} .fade-up > *:nth-child(8){animation-delay:.21s}
+        .screen-swap > * > *:nth-child(1){animation-delay:.03s} .screen-swap > * > *:nth-child(2){animation-delay:.07s}
+        .screen-swap > * > *:nth-child(3){animation-delay:.11s} .screen-swap > * > *:nth-child(4){animation-delay:.15s}
+        .screen-swap > * > *:nth-child(5){animation-delay:.19s} .screen-swap > * > *:nth-child(6){animation-delay:.23s}
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
         /* Stop iOS Safari from rubber-band overscrolling past the top/bottom of the page,
            which was dragging the fixed bottom tab bar halfway up the viewport.
@@ -3765,10 +3765,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" };
           const rowBtn = { width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "19px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" };
           const metaFor = (svc) => {
-            const cts = (svc.cutTypes || []).map((c) => Number(c.price)).filter((n) => !isNaN(n) && n > 0);
+            // Categories (services with options chosen after) show no price/time here — those depend on the option picked next.
+            if (svc.usesCutStyles !== false && svc.cutTypes && svc.cutTypes.length > 0) return "";
             let priceStr = "";
-            if (cts.length) priceStr = "from $" + Math.min(...cts);
-            else if (svc.price !== "" && svc.price != null && !isNaN(Number(svc.price)) && Number(svc.price) > 0) priceStr = "$" + Number(svc.price);
+            if (svc.price !== "" && svc.price != null && !isNaN(Number(svc.price)) && Number(svc.price) > 0) priceStr = "$" + Number(svc.price);
             const durStr = (svc.duration != null && !isNaN(Number(svc.duration)) && Number(svc.duration) > 0) ? Number(svc.duration) + " min" : "";
             return [durStr, priceStr].filter(Boolean).join(" · ");
           };
@@ -3813,7 +3813,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       </span>
                       <span className="svc-ar">&#8594;</span>
                     </button>
-                    {(svc.photos && svc.photos.length > 0) && <ServicePhotoStrip photos={svc.photos} />}
                   </div>
                 ))}
               </div>
@@ -4003,10 +4002,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             else { setCart((c) => (c.length ? c.map((e, i) => i === 0 ? { service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} } : e) : [{ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }])); startAddons({ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }); }
           };
           const metaFor = (svc) => {
-            const cts = (svc.cutTypes || []).map((c) => Number(c.price)).filter((n) => !isNaN(n) && n > 0);
+            // Categories (services with options chosen after) show no price/time here — those depend on the option picked next.
+            if (svc.usesCutStyles !== false && svc.cutTypes && svc.cutTypes.length > 0) return "";
             let priceStr = "";
-            if (cts.length) priceStr = "from $" + Math.min(...cts);
-            else if (svc.price !== "" && svc.price != null && !isNaN(Number(svc.price)) && Number(svc.price) > 0) priceStr = "$" + Number(svc.price);
+            if (svc.price !== "" && svc.price != null && !isNaN(Number(svc.price)) && Number(svc.price) > 0) priceStr = "$" + Number(svc.price);
             const durStr = (svc.duration != null && !isNaN(Number(svc.duration)) && Number(svc.duration) > 0) ? Number(svc.duration) + " min" : "";
             return [durStr, priceStr].filter(Boolean).join(" · ");
           };
@@ -4042,7 +4041,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                           </span>
                           <span className="svc-ar">&#8594;</span>
                         </button>
-                        {(svc.photos && svc.photos.length > 0) && <ServicePhotoStrip photos={svc.photos} />}
                       </div>
                     ))}
               </div>
