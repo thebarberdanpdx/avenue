@@ -5334,7 +5334,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               return (
               <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginBottom: 18 }}>
                 <button onClick={() => setPersonalizeOpen((o) => !o)} style={{ width: "100%", background: "none", border: "none", padding: 0, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer", color: "var(--text)" }}>
-                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{ttl}</span>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, lineHeight: 1.2 }}>{ttl}</span>
                   <span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                     <span style={{ fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: photoReq ? "var(--text)" : "var(--faint)", fontWeight: 600 }}>{photoReq ? "Required" : "Optional"}</span>
                     <ChevronDown size={18} style={{ color: "var(--text)", transform: personalizeOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
