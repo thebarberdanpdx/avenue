@@ -79,7 +79,7 @@ Open `HARDENING-SHOP.md` for the full list. **All 4 "open door" endpoints + cron
 ## 🚀 PRE-LAUNCH CHECKLIST — must do before the first REAL client books
 Fine to leave today; MUST be handled before going live. (Dan asked these be tracked so they're not forgotten.)
 1. **⛔ TURN ON BACKUPS — #1 priority.** Upgrade Supabase **Free → Pro (~$25/mo)** for daily automatic backups (7-day retention, restore anytime). Confirmed 2026-06-23: org "thebarberdanpdx's Org" is on **Free = NO backups**. Dan chose to wait until launch (no real data to lose yet). **A wipe with no backup is unrecoverable — this gates launch.** See memory `prelaunch-backups-upgrade.md`. (In-app launch checklist already has a matching `safety_backups` line.)
-2. **Remove / lock the "Delete all clients & data" button** (Settings) — Dan keeps it for now to clear test clients; **remove or hide behind a typed confirmation before launch.**
+2. **"Delete all clients & data" button** — ✅ **now gated behind type-to-confirm (must type `DELETE`), LIVE 2026-06-23.** Button disabled until it matches + `nukeAll()` hard-guards on it (fails safe). Owner can still clear test data; an accidental tap can't wipe everything. (Full removal still optional at real launch.)
 3. **Fill in real business info** in Settings — name/email/address/phone still show **demo values** ("Vero" / `hello@meridianstudio.com` / "2077 NE Town Center Dr" / 555-0142). 5-minute data-entry step (not a code bug — see RESOLVED section above).
 4. **Remove the hardcoded password `avenue2026`** — ⚠️ wired into login/PIN-lock (lockout risk); low real-risk since login + RLS already protect data. Do carefully.
 5. **STOP opt-out handler live** — required the moment SMS is approved (TCPA).
