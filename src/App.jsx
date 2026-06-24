@@ -673,12 +673,14 @@ function Sheet({ open, onClose, children, align = "top", maxWidth = 520 }) {
   }, [open]);
   if (!open) return null;
   const justify = align === "bottom" ? "flex-end" : align === "top" ? "flex-start" : "center";
+  // Animate from the correct edge: bottom slides up, center pops, top/default drops down (shared .appt-drop).
+  const animClass = align === "bottom" ? "sheet-up" : align === "center" ? "sheet-pop" : "appt-drop";
   // The outer flex container fills the screen; the inner box is capped and its body scrolls.
   // Rendered through a portal to document.body so a transformed ancestor (animations) can't
   // trap the position:fixed overlay and cut off scrolling.
   return createPortal((
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 2000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: justify, padding: align === "center" ? "20px" : "0", boxSizing: "border-box" }}>
-      <div onClick={(e) => e.stopPropagation()} className="appt-drop" style={{
+    <div onClick={onClose} className="sheet-overlay" style={{ position: "fixed", inset: 0, background: "var(--overlay)", backdropFilter: "blur(3px) saturate(1.08)", WebkitBackdropFilter: "blur(3px) saturate(1.08)", zIndex: 2000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: justify, padding: align === "center" ? "20px" : "0", boxSizing: "border-box" }}>
+      <div onClick={(e) => e.stopPropagation()} className={animClass} style={{
         width: "100%", maxWidth, background: "var(--bg)",
         borderRadius: align === "top" ? "0 0 22px 22px" : (align === "center" ? 22 : "22px 22px 0 0"),
         paddingTop: align === "top" ? "calc(env(safe-area-inset-top) + 16px)" : 20,
@@ -686,6 +688,7 @@ function Sheet({ open, onClose, children, align = "top", maxWidth = 520 }) {
         display: "flex", flexDirection: "column",
         boxShadow: "0 20px 60px rgba(0,0,0,0.4)", boxSizing: "border-box", overflow: "hidden",
       }}>
+        {align === "bottom" && <div aria-hidden="true" style={{ width: 38, height: 4, borderRadius: 3, background: "var(--border2)", margin: "0 auto 12px", flexShrink: 0 }} />}
         <div style={{
           overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain",
           padding: "0 20px calc(24px + env(safe-area-inset-bottom))",
@@ -1914,6 +1917,13 @@ function App() {
         @keyframes popIn { 0% { transform: scale(0); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
         @keyframes dropDown { from { opacity: 0; transform: translateY(-24px);} to {opacity:1; transform:none;} }
         .appt-drop { animation: dropDown .32s var(--ease) both; }
+        /* Sheet motion — each alignment enters from its correct edge so popups feel native, not dropped-from-top. Backdrop fades in. */
+        @keyframes sheetUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: none; } }
+        @keyframes sheetPop { from { opacity: 0; transform: translateY(8px) scale(0.96); } to { opacity: 1; transform: none; } }
+        @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+        .sheet-overlay { animation: overlayIn .26s var(--ease) both; }
+        .sheet-up { animation: sheetUp .4s var(--ease) both; }
+        .sheet-pop { animation: sheetPop .34s var(--spring) both; }
         @keyframes fadeIn { from { opacity: 0;} to {opacity:1;} }
         @media print {
           body * { visibility: hidden !important; }
