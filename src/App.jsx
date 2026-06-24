@@ -1532,6 +1532,10 @@ function App() {
   const savingRef = useRef({});    // per-table { running, queued } — guarantees in-order saves
   const providersDirtyRef = useRef(false); // true between a local provider edit and its successful sync — blocks focus-reload clobber
   const providersFullRef = useRef(false); // true once a signed-in session holds FULL provider rows (with email/phone/PIN) — stops the sanitized public feed from overwriting them on a remount race (the "email/phone disappears" bug)
+  // Synchronous "is someone signed in?" check — Supabase persists the auth token in localStorage, so this
+  // is true at mount BEFORE the async session resolves. Used to guarantee the sanitized public provider
+  // feed NEVER populates a signed-in owner's staff list (root cause of staff email/phone vanishing). DO NOT REMOVE.
+  const hasStoredSession = () => { try { return Object.keys(localStorage).some((k) => /^sb-.*-auth-token$/.test(k)); } catch (e) { return false; } };
   const [saveFailed, setSaveFailed] = useState(false); // drives a banner if a save to the server errors out
   const [loadIncomplete, setLoadIncomplete] = useState(false); // a load errored → saves are blocked; surface it instead of failing silently
 
@@ -1546,7 +1550,25 @@ function App() {
     try {
       await ensureFreshSession(); // refresh a stale token before writing (fixes native 42501)
       const list = items || [];
-      const rows = list.map((it, i) => ({ id: String(it.id ?? `${table}_${i}`), shop_id: SHOP_ID, data: it }));
+      let rows = list.map((it, i) => ({ id: String(it.id ?? `${table}_${i}`), shop_id: SHOP_ID, data: it }));
+      // SAFETY BACKSTOP (recurring "staff email/phone disappears" bug): a provider save must NEVER blank
+      // out an email/phone/pin that the server still has. The sanitized public feed can leave local state
+      // without these fields; without this guard a later save would persist the blanks permanently. We
+      // restore only MISSING (undefined) fields — an explicit "" clear is still respected. DO NOT REMOVE.
+      if (table === 'providers' && rows.length) {
+        try {
+          const { data: serverRows } = await supabase.from('providers').select('id,data').eq('shop_id', SHOP_ID);
+          if (Array.isArray(serverRows)) {
+            const sv = new Map(serverRows.map((r) => [String(r.id), r.data || {}]));
+            rows = rows.map((r) => {
+              const prev = sv.get(String(r.id)); if (!prev) return r;
+              const d = { ...r.data };
+              for (const k of ['email', 'phone', 'pin']) { if (d[k] === undefined && prev[k] !== undefined && prev[k] !== '') d[k] = prev[k]; }
+              return { ...r, data: d };
+            });
+          }
+        } catch (e) { /* safety read failed — fall through with the un-merged rows */ }
+      }
       // 1. Upsert what we currently have — adds new rows, updates existing ones, destroys nothing.
       if (rows.length) {
         const { error: upErr } = await supabase.from(table).upsert(rows);
@@ -1661,12 +1683,12 @@ function App() {
       if (pr) pr = sortProviders(pr);
       // The public feed is SANITIZED (no email/phone/PIN). If a signed-in session has already loaded
       // the full rows, never let this stripped copy overwrite them — that race blanked staff email/phone.
-      if (pr && pr.length && !providersFullRef.current) setProviders(pr);
+      if (pr && pr.length && !providersFullRef.current && !hasStoredSession()) setProviders(pr);
       const sv = await loadList('services');     if (sv) sv.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9)); if (sv && sv.length) setServices(sv);
 
       // Record the loaded baseline so the safe-delete reconciliation knows which rows this device
       // already knew about (so it never deletes a row another device adds later).
-      if (pr && pr.length && !providersFullRef.current) lastRemoteRef.current.providers = pr;
+      if (pr && pr.length && !providersFullRef.current && !hasStoredSession()) lastRemoteRef.current.providers = pr;
       if (sv && sv.length) lastRemoteRef.current.services = sv;
 
       // Cut-style library + linkage (Step 2a). Use the saved library if present, else seed it from
