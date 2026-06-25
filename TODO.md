@@ -21,7 +21,8 @@ Status legend: ☐ not started · ⏳ waiting on someone/something · ✅ done
 
 ## 2) 📱 iOS app → TestFlight (for testers) — parallel, NOT a launch blocker
 Customers book on the **web**; the app is for you, staff, and testers.
-- ☐ **Upload to TestFlight + add testers.** You **have** the Apple Developer account → ~1–2 days when ready. I prep the build (`npm run build && npx cap sync`) + walk you through the ~15 min of Xcode clicks live (or you give me one App Store Connect API key and I drive most of it from the command line). App = `com.gotvero.app`, loads the live site so it auto-updates. Full steps in `SESSION-HANDOFF.md`.
+- ✅ **Upload to TestFlight + add testers — DONE 2026-06-24.** App is live on TestFlight as **"Vero Booking"** (`com.gotvero.app`); **you + Heather both have it installed.** App loads the live site, so every web change appears automatically — no re-upload except rare native changes (and TestFlight builds expire ~every 90 days, so a fresh upload roughly quarterly).
+- ⏳ **Public download link** — an external review is in flight (~1 day); once Apple approves, flip on the group's **Public Link** to share with anyone. *(I'll walk you through it.)*
 
 ## 3) ✨ Make it feel premium — UI polish
 - ☐ **Owner dashboard polish** (calendar + clients — the screens you live in), Mangomint-grade. The client booking flow is already polished + live. Needs a signed-in preview or screenshots to do well. See memory `mangomint-polish-direction`.

@@ -1,10 +1,43 @@
 # 👋 START HERE — Session Handoff (for Dan + a fresh Claude session)
 
-_Last updated: 2026-06-24_
+_Last updated: 2026-06-24 (evening — **the iOS app is LIVE on TestFlight**; Dan + Heather both running it)_
 
 **New session? Read this file + `HARDENING-SHOP.md`, then continue Track A. Dan should not have to re-explain anything.**
 
 > 👉 **The clean, plain-English list of everything STILL TO DO is [`TODO.md`](TODO.md)** — start there for "what's left."
+
+---
+
+## 🚀 LATEST SESSION — 2026-06-24 (evening): the iOS app is LIVE on TestFlight
+
+### Where we are
+- **The native iOS app is real and on phones.** Dan **and** Heather both have **Vero** installed via **TestFlight**, running the live site. The entire pipeline is proven end-to-end: code → gotvero.com → Xcode archive → App Store Connect → TestFlight → on a phone.
+- Web app still live at gotvero.com; shop-launch security hardening is now **~26%** (3 new locks added today).
+
+### What we just finished (this session)
+1. **iOS → TestFlight — DONE.** Archived + uploaded build **1.0 (1)**; Dan installed (internal/Owner); **Heather added as Admin** (internal) → instant install, "what Dan has." Accepted Apple's **updated Developer Program License Agreement** (it was silently blocking uploads — that's what made Xcode throw "create app record" errors). Set **`aps-environment` → `production`** for release builds (commit `9a7518e`).
+2. **Security — 3 new locks (tracker → 26%):**
+   - **Email enumeration closed** — `/api/client-code` returns a uniform `{ok,masked}` whether or not the email matches (commit `88365de`, verified live).
+   - **Blocked client can't book (server-side)** — `book_public` RPC now rejects blocked clients (LIVE in Supabase).
+   - **Login-code brute-force cap** — `verify_client_code` RPC + new `attempts` column (LIVE in Supabase).
+   - Both DB changes are recorded in **`db/hardening-2026-06-24.sql`** (DB changes do NOT auto-apply from the repo) and committed (`838987d`).
+   - ⚠️ **DEFERRED (logged in AUDIT-TRACKER H1):** `lookup_client_by_phone` / `lookup_client_by_email` hand a returning client's PII (name/email/family) to ANY anonymous caller — they power booking autofill, and the phone sign-in isn't server-verified. Proper fix = a code-gated returning-client flow (ties into SMS, not yet live). NOT a quick SQL change.
+3. **UI polish:** add-client form now **requires email**; calendar off-shift grey **softened**; Pulse account chip **repositioned** (commit `ab0a768`); **category colors** — categories show NO color, real services keep their color (matches calendar), and the editor's color picker is hidden for categories (commit `a5d9d28`).
+
+### Key iOS facts (so nobody relearns them)
+- **App Store Connect app name = "Vero Booking"** — NOT "Vero" (that's trademarked by a social app, Apple rejected it). The icon on the phone still says **Vero** (`CFBundleDisplayName`). Bundle ID + SKU = `com.gotvero.app`.
+- **Apple Team:** Dan Michaels (`AQ3A2Z9WQV`). **Heather** (`barberinapdx@gmail.com`) is now an **Admin** on the Apple account.
+- **Updates are automatic:** the app loads gotvero.com, so a **web deploy reaches the app with no re-upload.** Only native-shell changes (icon/name/plugins/permissions/iOS upgrade) need `npm run build && npx cap sync` → Xcode archive → re-upload.
+- **TestFlight builds expire ~every 90 days** → push a fresh build roughly quarterly to keep it alive.
+- **Internal vs external testers:** team members (internal) install **instantly, no review**; anyone else (external, by email/public link) needs a one-time **~1-day Apple beta review**. An external review was submitted toward a shareable **public link**.
+
+### What's left / next
+- **Push notifications:** app side is now `production`; confirm **`api/push.js` sends to PRODUCTION APNs** (env must match) so alerts actually deliver. *(Free, Claude.)*
+- **Public link:** once the external build clears review (~1 day), turn on the group's **Public Link** for a shareable installer.
+- **Checklist redesign:** mockup shown — a short **"to open your doors"** essentials list on top + the full 150-item checklist folded into an optional **"dial in every detail"** drawer. Dan to approve → then build. *(Free.)*
+- **Category colors:** Dan to send a screenshot of any remaining spot still showing a category color (menu list + editor already fixed & live).
+- **Launch gates (see `TODO.md`):** real shop info + menu · **backups (Supabase Pro ~$25/mo — the one paid gate)** · Stripe payout check · one real test booking · reminders (free external timer).
+- **Deferred security:** the lookup-PII redesign (H1).
 
 ---
 
@@ -106,7 +139,7 @@ The hard engineering is done (app, live payments, security hardening, the recurr
 
 ## 📱 iOS app → TestFlight (for testers) — NOT a launch blocker, do in parallel anytime
 Customers book on the **web** (gotvero.com link); the native app is for **Dan + staff + testers**, so this is separate from opening the shop.
-- **Status:** not started. **Dan HAS an Apple Developer account ($99/yr)** → fast path, ~1–2 days when he's ready.
+- **Status:** ✅ **DONE — LIVE on TestFlight (2026-06-24 evening).** Build 1.0(1) uploaded to app record **"Vero Booking"** (`com.gotvero.app`); **Dan + Heather both installed** (Dan internal/Owner, Heather internal/Admin). Full detail in the **🚀 LATEST SESSION** section at the top of this file. An external review is in flight to enable the shareable **public link**. The steps below are kept as reference for future re-uploads.
 - **App config** (`capacitor.config.json`): appId `com.gotvero.app`, name "Vero", `server.url = https://gotvero.com` — the app loads the LIVE site, so testers always see the latest; upload the shell **once**, web updates need no re-upload.
 - **Path = TestFlight** (not the public App Store). Internal testers (≤100) get builds instantly after the first upload; external testers (≤10,000 via email/link) need a one-time ~1-day Apple beta review.
 - **Who does what:** Claude can prep the build (`npm run build && npx cap sync`) + write the click-by-click. Dan does the Xcode archive → upload → App Store Connect app record → add testers (GUI/account steps Claude can't drive).
