@@ -2900,6 +2900,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [cutPhase, setCutPhase] = useState("type"); // within step 2: "type" -> "beard" -> "addons"
   const [cutCarousel, setCutCarousel] = useState({}); // per-cut-type image index
   const [phone, setPhone] = useState("");
+  const [smsConsent, setSmsConsent] = useState(false);  // Vonage-required SMS opt-in checkbox (optional, never pre-checked)
   const [newFirst, setNewFirst] = useState("");  // first-timer first name collected at the end
   const [newLast, setNewLast] = useState("");    // first-timer last name collected at the end
   const [newEmail, setNewEmail] = useState(""); // first-timer email collected at the end (optional)
@@ -3443,7 +3444,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         clientId = existing.id; // reuse the existing profile
       } else {
         clientId = "c" + baseId + Math.floor(Math.random() * 1000);
-        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30), business) : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile) ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } : undefined };
+        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), smsConsent: smsConsent, smsConsentAt: smsConsent ? new Date().toISOString() : undefined, provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30), business) : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile) ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } : undefined };
         setClients((cur) => [newClient, ...cur]);
         newClientRow = { id: String(clientId), shop_id: shopId, data: newClient };
       }
@@ -5397,6 +5398,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
                 By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text)", textDecoration: "underline" }}>terms</a>.
               </p>
+              {/* Vonage-required explicit SMS opt-in checkbox — NOT pre-checked, optional (booking works either way) */}
+              <button type="button" onClick={() => setSmsConsent(v => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, marginBottom: 14, cursor: "pointer" }}>
+                <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${smsConsent ? "var(--gold)" : "var(--border2)"}`, background: smsConsent ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1, transition: "background .15s, border-color .15s" }}>
+                  {smsConsent && <Check size={14} style={{ color: "var(--on-gold)" }} />}
+                </span>
+                <span style={{ color: "var(--faint)", fontSize: 12.5, lineHeight: 1.5 }}>
+                  By checking this box, I agree to receive appointment reminders via SMS from Sanctuary Barber Co. Message and data rates may apply. Message frequency varies. Text HELP for help or STOP to opt out. See our <a href="https://sanctuarybarberco.com/privacy-policy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a>.
+                </span>
+              </button>
             </div>
 
             {/* note + photo — combined into one collapsible card; opens to the note box and photo slots */}
