@@ -65,8 +65,20 @@ async function handler(req, res) {
     const svc = String(c.service || "an appointment").slice(0, 120);
     const when = String(c.when || "").slice(0, 60);
     const note = String(c.note || "").slice(0, 300);
+    // The client's permanent profile note — resolved here on the server (never sent by a public
+    // booker) so the barber gets both the booking note AND the note on file.
+    let clientNote = "";
+    if (b.staff.clientId && b.staff.clientId !== "guest") {
+      try {
+        const { data: crow } = await supa.from("clients").select("data").eq("shop_id", shopId).eq("id", b.staff.clientId).maybeSingle();
+        clientNote = crow && crow.data ? String(crow.data.notes || "").trim().slice(0, 500) : "";
+      } catch (e) {}
+    }
     const subject = `New booking — ${clientName}`;
-    const textBody = [`${clientName} booked ${svc}.`, when, note ? `Note: ${note}` : ""].filter(Boolean).join("\n");
+    const lines = [`${clientName} booked ${svc}.`, when];
+    if (note) lines.push(`Booking note: "${note}"`);
+    if (clientNote) lines.push(`Note on file: "${clientNote}"`);
+    const textBody = lines.filter(Boolean).join("\n");
 
     const sent = [];
     for (const p of recip) {

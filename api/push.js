@@ -79,7 +79,7 @@ export default withErrorReporting(handler, "push");
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   if (!originAllowed(req)) return res.status(403).json({ error: "forbidden" });
-  const { shopId, title, body, data } = req.body || {};
+  const { shopId, title, body, data, clientId } = req.body || {};
   if (!shopId || !title) return res.status(400).json({ error: "missing shopId or title" });
 
   if (!process.env.APNS_KEY || !process.env.APNS_KEY_ID || !process.env.APNS_TEAM_ID ||
@@ -97,8 +97,19 @@ async function handler(req, res) {
   try { providerToken = makeProviderToken(); }
   catch (e) { return res.status(500).json({ error: "jwt: " + (e && e.message) }); }
 
+  // Enrich with the client's permanent profile note — looked up here on the server (never sent
+  // by a public booker) so the barber sees it next to the booking note.
+  let finalBody = body || "";
+  if (clientId && clientId !== "guest") {
+    try {
+      const { data: crow } = await supa.from("clients").select("data").eq("shop_id", shopId).eq("id", clientId).maybeSingle();
+      const cnote = crow && crow.data ? String(crow.data.notes || "").trim() : "";
+      if (cnote) finalBody = finalBody ? `${finalBody}\nNote on file: ${cnote}` : `Note on file: ${cnote}`;
+    } catch (e) {}
+  }
+
   const payload = {
-    aps: { alert: { title, body: body || "" }, sound: "default", badge: 1 },
+    aps: { alert: { title, body: finalBody }, sound: "default", badge: 1 },
     ...(data ? { data } : {}),
   };
 

@@ -2725,7 +2725,7 @@ function fireStaffPush({ shopId, title, appt, prevAppt, event, business }) {
     fetch(API_BASE + "/api/push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shopId, title, body, data: { t: "appt", id: appt.id } }),
+      body: JSON.stringify({ shopId, title, body, data: { t: "appt", id: appt.id }, clientId: appt.clientId || null }),
     }).catch(() => {});
   } catch (e) {}
 }
@@ -2745,7 +2745,7 @@ function fireStaffNotify({ shopId, appt, business }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        staff: { shopId, providerId: appt.providerId || null, scope },
+        staff: { shopId, providerId: appt.providerId || null, scope, clientId: appt.clientId || null },
         context: { client: appt.name || "A client", service: appt.title || appt.serviceName || "an appointment", when, note: (appt.note || appt.detail || "").trim() },
       }),
     }).catch(() => {});
@@ -3525,7 +3525,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             fetch(API_BASE + "/api/push", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : ""), data: { t: "appt", id: ap0.id } }),
+              body: JSON.stringify({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : ""), data: { t: "appt", id: ap0.id }, clientId: ap0.clientId || null }),
             }).catch(() => {});
             fireStaffNotify({ shopId, appt: ap0, business });
           }
