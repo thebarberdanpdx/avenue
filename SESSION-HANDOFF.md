@@ -6,6 +6,8 @@ _Last updated: 2026-06-24 (evening — **the iOS app is LIVE on TestFlight**; Da
 
 > 👉 **The clean, plain-English list of everything STILL TO DO is [`TODO.md`](TODO.md)** — start there for "what's left."
 
+> 🔄 **This handoff is a LIVING doc, updated by EVERY session — Dan runs more than one Claude session at a time.** Each session must log what it shipped here so nothing drifts out of date and Dan never re-explains. Two active workstreams as of 2026-06-24: **(1) launch / security + iOS** (the "🚀 LATEST SESSION" block just below) and **(2) the UI "Mangomint polish" pass** (the "🎨 UI polish pass" section further down — client booking flow done & live; owner dashboard is next). Finished work in any session? Add it here before you stop.
+
 ---
 
 ## 🚀 LATEST SESSION — 2026-06-24 (evening): the iOS app is LIVE on TestFlight
@@ -61,7 +63,7 @@ Separate workstream from hardening: Dan wants Vero to feel as polished as **Mang
 2. **Booking menu** — services that have options after them (`cutTypes`) are CATEGORIES → show NO price/duration on the menu (price comes from the option picked next); single/flat services keep their `$price · duration`. Removed the floating photo strip; clean text list (Dan chose no photos on categories). (commit `9527ad5`)
 3. **Snappier motion app-wide** — `.fade-up`/`.screen-swap` durations cut to ~0.3–0.36s with clean ease (no spring overshoot), stagger compressed; screens settle in ~0.5s, not ~0.8s. (in `9527ad5`)
 4. **Booking details** — "Add a note or photo" heading right-sized 22→17px (was a 2-line page-title competing with the booking summary). (commit `72ce418`)
-- Full client booking flow walked end-to-end & polished. **NEXT: the owner DASHBOARD** (calendar/clients — the screens Dan uses) — needs a signed-in preview or screenshots to do well. Details in memory `mangomint-polish-direction.md`.
+- Full client booking flow walked end-to-end & polished. **NEXT: the owner DASHBOARD** (calendar/clients — the screens Dan uses). Polishing it needs a SIGNED-IN preview or screenshots — heads-up so the next session doesn't repeat the dead-end: the dashboard hard-requires a real Supabase session (`App.jsx` ~2063), and the `avenue2026` `SHOP_PASSWORD` is only an extra lock, **NOT** a login bypass. Details in memory `mangomint-polish-direction.md`.
 - Process note: per the safety workflow above, deploys normally wait for Dan's explicit "go." These went out as Dan drove each step and approved shipping.
 
 ---
