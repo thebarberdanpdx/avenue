@@ -3467,7 +3467,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     };
 
     // Staff/preview bookings persist through the dashboard's own save path — show success immediately.
-    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); captureClientPhotos(); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); setBookedId(baseId); setStep(8); return; }
+    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); captureClientPhotos(); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); fireStaffPush({ shopId, title: "New booking", appt: newAppts[0], event: "newBooking", business }); setBookedId(baseId); setStep(8); return; }
     // Public booking: the slot is never held while saving, and the client is only told they're booked
     // once the server actually has it — so a failed save can never become a ghost booking.
     setBooking(true); setBookErr(false);
