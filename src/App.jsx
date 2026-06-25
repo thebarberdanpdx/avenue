@@ -1046,6 +1046,28 @@ const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Satur
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const relativeDate = (date) => { const today = new Date(); today.setHours(0,0,0,0); const d = new Date(date); d.setHours(0,0,0,0); const diff = Math.round((d - today) / 86400000); if (diff === 0) return "Today"; if (diff === 1) return "Tomorrow"; if (diff > 1 && diff < 7) return DAYS[d.getDay()]; if (diff >= 7 && diff < 14) return `Next ${DAYS[d.getDay()]}`; return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
 const daysFromNow = (date) => { const today = new Date(); today.setHours(0,0,0,0); const d = new Date(date); d.setHours(0,0,0,0); const diff = Math.round((d - today) / 86400000); if (diff === 0) return "Today"; if (diff === 1) return "Tomorrow"; if (diff < 7) return `in ${diff} days`; if (diff === 7) return "1 week away — next " + DAYS[d.getDay()]; if (diff < 14) return `${diff} days away — next week`; const wks = Math.round(diff / 7); return `about ${wks} weeks away`; };
+// "Client since" anchor — the earliest of a client's appointments (covers both booked and
+// imported visit history), falling back to any stored creation/import date. Returns a Date or null.
+const clientSinceDate = (client, appts = []) => {
+  if (!client) return null;
+  const times = [];
+  for (const a of (appts || [])) {
+    if (a && a.clientId === client.id && a.bookedFor && a.status !== "block") {
+      const t = new Date(a.bookedFor).getTime();
+      if (!isNaN(t)) times.push(t);
+    }
+  }
+  for (const k of ["since", "memberSince", "clientSince", "createdAt", "addedAt", "importedAt"]) {
+    if (client[k]) { const t = new Date(client[k]).getTime(); if (!isNaN(t)) times.push(t); }
+  }
+  if (!times.length) return null;
+  return new Date(Math.min(...times));
+};
+// Compact M/YY label for "Client since", e.g. 11/25.
+const clientSinceLabel = (client, appts = []) => {
+  const d = clientSinceDate(client, appts);
+  return d ? `${d.getMonth() + 1}/${String(d.getFullYear()).slice(-2)}` : null;
+};
 const DAYS_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const apptDateLabel = () => { const d = new Date(); return `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
 // Heartbeat: returns a Date that re-renders the component on an interval, so live
@@ -20576,7 +20598,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                             <span style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.1, color: T.text }}>{apptDisplayName(appt, clients)}</span>
                             {canOpen && <ChevronRight size={17} style={{ color: T.faint, flexShrink: 0 }} />}
                           </button>
-                          <div style={{ fontSize: 13, color: T.sub, marginTop: 2 }}>{client && client.since ? `Client since ${client.since}` : (client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client")}</div>
+                          <div style={{ fontSize: 13, color: T.sub, marginTop: 2 }}>{(() => { const sl = client && clientSinceLabel(client, appts); return sl ? `Client since ${sl}` : (client ? (client.visits > 0 ? `${client.visits} ${client.visits === 1 ? "visit" : "visits"}` : "New client") : "New client"); })()}</div>
                         </div>
                       </>
                     );
@@ -21824,8 +21846,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
   // stat strip
   const visitCount = Math.max(live.visits || 0, historyAppts.length);
-  const datedYears = myAppts.filter((a) => a.bookedFor).map((a) => new Date(a.bookedFor).getFullYear());
-  const sinceLabel = datedYears.length ? "’" + String(Math.min(...datedYears)).slice(2) : "—";
+  const sinceLabel = clientSinceLabel(live, appts) || "—";
   const cadenceShort = cadenceAvg == null ? "—" : (cadenceAvg < 11 ? `${cadenceAvg}d` : `${Math.round(cadenceAvg / 7)} wk`);
 
   // ---- detail / transaction / reschedule / money sheets ----
@@ -21916,6 +21937,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           <span style={{ position: "absolute", bottom: 0, right: 0, width: 24, height: 24, borderRadius: "50%", background: "var(--text)", color: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={12} /></span>
         </button>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 31, fontWeight: 500, letterSpacing: "-0.5px", marginTop: 14 }}>{live.name}</h2>
+        {(() => { const sl = clientSinceLabel(live, appts); return sl ? <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 6 }}>Client since {sl}</div> : null; })()}
         <div style={{ color: "var(--sub)", fontSize: 13, marginTop: 9 }}>
           {live.phone && <PhoneLink number={live.phone} />}
           {live.phone && live.email && "  ·  "}
