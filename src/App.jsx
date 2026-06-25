@@ -20448,6 +20448,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const price = lockedApptPrice(appt, service);
   const defaultPrice = service ? getPrice(service, appt.providerId) : 0;
   const [priceOpen, setPriceOpen] = useState(false);
+  const [discOpen, setDiscOpen] = useState(false); // discount picker for this appointment
   const [priceDraft, setPriceDraft] = useState("");
   const openPriceEditor = () => { setPriceDraft(price != null ? String(price) : ""); setPriceOpen(true); };
   const savePrice = () => {
@@ -20785,6 +20786,16 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     <span style={{ fontSize: 18, fontWeight: 600, color: T.text, flexShrink: 0 }}>${price}</span>
                   )}
                 </div>
+                {canEditPrice && (
+                  <div style={{ marginBottom: 13 }}>
+                    {appt.discount ? (
+                      <button onClick={() => setDiscOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--tint)", border: "1px solid var(--gold)", borderRadius: 8, padding: "5px 11px", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>{appt.discount.name} · {discountLabel(appt.discount)}<Edit2 size={12} /></button>
+                    ) : (
+                      <button onClick={() => setDiscOpen(true)} style={{ background: "none", border: "none", padding: 0, color: T.faint, fontSize: 13.5, fontWeight: 500, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>+ Add a discount</button>
+                    )}
+                  </div>
+                )}
+                {discOpen && <DiscountPicker discounts={business?.discounts || []} current={appt.discount || null} onPick={(d) => { onUpdate(appt.id, { discount: d }); showToast(d ? `${d.name} applied — comes off at checkout.` : "Discount removed."); }} onClose={() => setDiscOpen(false)} />}
                 {appt.detail && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 13 }}>
                     {appt.detail.split(",").map((d, i) => (
