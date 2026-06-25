@@ -9402,7 +9402,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} />}
         {tab === "messages" && <MessagesView key={`messages-${tabNonce}`} clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
-        {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} />}
+        {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
         {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView key={`settings-${tabNonce}`} business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} onSignOutAccount={onSignOutAccount} authEmail={authEmail} /></ErrorBoundary>}
       </div>
@@ -16668,11 +16668,43 @@ function NativeDiagnostics() {
 }
 
 // ---------- shared dashboard pieces ----------
-function WaitlistView({ waitlist, setWaitlist, onText, showToast }) {
+function WaitlistView({ waitlist, setWaitlist, onText, showToast, providers = [], services = [] }) {
   const whenLabel = { early: "Early — open to 11am", midday: "Midday — 11am to 2pm", afternoon: "Afternoon — 2pm to close" };
   const whenWord = { early: "morning", midday: "midday", afternoon: "afternoon" };
   const [openId, setOpenId] = useState(null);
   const open = waitlist.find((w, i) => (w.id || i) === openId);
+
+  // ---- Staff-side "add a client to the waitlist" (mirrors the client join form: up to 3 days) ----
+  const [adding, setAdding] = useState(false);
+  const [aName, setAName] = useState("");
+  const [aPhone, setAPhone] = useState("");
+  const [aService, setAService] = useState("");
+  const [aProvider, setAProvider] = useState("Anyone");
+  const [aDays, setADays] = useState([]);
+  const [aDayTimes, setADayTimes] = useState({});
+  const realProvs = (providers || []).filter((p) => p.id !== "anyone" && p.isProvider !== false && !p.archived);
+  const provOptions = ["Anyone", ...realProvs.map((p) => p.name)];
+  const dayOpts = Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i); return d; });
+  const dayLabel = (d) => { const r = relativeDate(d); return r.includes(",") ? r : `${r}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
+  const addReady = !!(aName.trim() && aPhone.replace(/\D/g, "").length >= 10 && aService && aDays.length > 0);
+  const lbl = { fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 };
+  const fld = { width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, marginBottom: 16, boxSizing: "border-box" };
+  const resetAdd = () => { setAdding(false); setAName(""); setAPhone(""); setAService(""); setAProvider("Anyone"); setADays([]); setADayTimes({}); };
+  const toggleDay = (l) => setADays((prev) => {
+    if (prev.includes(l)) { setADayTimes((t) => { const n = { ...t }; delete n[l]; return n; }); return prev.filter((x) => x !== l); }
+    if (prev.length >= 3) return prev;
+    setADayTimes((t) => ({ ...t, [l]: "any" }));
+    return [...prev, l];
+  });
+  const saveAdd = () => {
+    if (!addReady) return;
+    const dayTimes = {}; aDays.forEach((l) => { dayTimes[l] = aDayTimes[l] || "any"; });
+    const entry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: aName.trim(), phone: aPhone, forWho: "self", provider: aProvider, anyProvider: aProvider === "Anyone", days: aDays, day: aDays[0] || "", dayTimes, when: dayTimes[aDays[0]] || "any", service: aService, photos: 0, at: new Date().toLocaleString(), addedByStaff: true };
+    setWaitlist([...(waitlist || []), entry]);
+    const first = aName.trim().split(" ")[0];
+    resetAdd();
+    if (showToast) showToast(`${first} added to the waitlist.`);
+  };
 
   // Send the client an in-app notification that a slot opened, including a booking link.
   const notifyOpening = (w) => {
@@ -16685,7 +16717,8 @@ function WaitlistView({ waitlist, setWaitlist, onText, showToast }) {
     <>
     <div className="fade-up">
       <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Waitlist</h2>
-      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 20, fontWeight: 300 }}>Clients hoping for an opening. Tap one to see their preferred time and notify them when a space frees up.</p>
+      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 16, fontWeight: 300 }}>Clients hoping for an opening. Tap one to see their preferred time and notify them when a space frees up.</p>
+      <button className="lift" onClick={() => setAdding(true)} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: "11px 16px", fontSize: 14, fontWeight: 600, marginBottom: 20, cursor: "pointer" }}><UserPlus size={17} /> Add to waitlist</button>
       {waitlist.length === 0 ? <div style={{ color: "var(--faint)", fontSize: 14, textAlign: "center", padding: "40px 0" }}>No one waiting right now. When a day's full, clients can hop on here — and you'll be the first to know.</div> : (
         <div style={{ display: "grid", gap: 12 }}>{waitlist.map((w, i) => (
           <button key={w.id || i} className="lift" onClick={() => setOpenId(w.id || i)} style={{ textAlign: "left", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -16725,6 +16758,63 @@ function WaitlistView({ waitlist, setWaitlist, onText, showToast }) {
 
               <button onClick={() => removeEntry(open, waitlist.indexOf(open))} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Trash2 size={16} /> REMOVE FROM WAITLIST</button>
             </div>
+        </div>
+      )}
+
+      {/* ADD — staff manually places a client on the waitlist (same up-to-3-days shape as the client form) */}
+      {adding && (
+        <div className="fade-in" onClick={resetAdd} style={{ position: "fixed", inset: 0, zIndex: 60, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, maxHeight: "85vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26 }}>Add to waitlist</div>
+              <button onClick={resetAdd} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
+            </div>
+
+            <label style={lbl}>Name</label>
+            <input value={aName} onChange={(e) => setAName(e.target.value)} placeholder="First and last name" style={fld} />
+
+            <label style={lbl}>Phone</label>
+            <input value={aPhone} onChange={(e) => setAPhone(formatPhone(e.target.value))} inputMode="tel" placeholder="(503) 555-0142" style={fld} />
+
+            <label style={lbl}>Service</label>
+            <select value={aService} onChange={(e) => setAService(e.target.value)} style={fld}>
+              <option value="">Select a service…</option>
+              {services.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+            </select>
+
+            <label style={lbl}>Preferred barber</label>
+            <select value={aProvider} onChange={(e) => setAProvider(e.target.value)} style={fld}>
+              {provOptions.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+
+            <label style={lbl}>Which days work? <span style={{ color: "var(--sub)", fontWeight: 400 }}>(up to 3)</span></label>
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 14 }}>
+              {dayOpts.map((d, i) => { const l = dayLabel(d); const on = aDays.includes(l); const atMax = !on && aDays.length >= 3; return (
+                <button key={i} disabled={atMax} onClick={() => toggleDay(l)} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", textAlign: "center", opacity: atMax ? 0.4 : 1 }}>
+                  <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{d.getDate()}</div>
+                </button>
+              ); })}
+            </div>
+
+            {aDays.length > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <label style={lbl}>What time works each day?</label>
+                {aDays.map((l) => { const sel = aDayTimes[l] || "any"; const opts = [["morning", "Morning"], ["afternoon", "Afternoon"], ["evening", "Evening"], ["any", "Any time"]]; return (
+                  <div key={l} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 12px", marginBottom: 8 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>{l}</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {opts.map(([id, label]) => { const on = sel === id; return (
+                        <button key={id} onClick={() => setADayTimes((t) => ({ ...t, [l]: id }))} style={{ padding: "7px 12px", borderRadius: 9, border: `1.5px solid ${on ? "var(--text)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--text) 12%, var(--panel))" : "var(--panel)", color: "var(--text)", fontSize: 13, fontWeight: on ? 600 : 400 }}>{label}</button>
+                      ); })}
+                    </div>
+                  </div>
+                ); })}
+              </div>
+            )}
+
+            <button className="lift" disabled={!addReady} onClick={saveAdd} style={{ width: "100%", background: addReady ? "var(--gold)" : "var(--border2)", color: addReady ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none" }}>Add to waitlist</button>
+          </div>
         </div>
       )}
     </>
