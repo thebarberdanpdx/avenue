@@ -2995,6 +2995,27 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     };
     reader.readAsDataURL(file);
   };
+  // Profile selfie — a photo of the CLIENT for their profile (the $5-off incentive), entirely
+  // separate from the reference/inspiration photos above. Becomes client.photo on save.
+  const [selfie, setSelfie] = useState(null);
+  const selfieRef = useRef(null);
+  const onSelfiePick = (e) => {
+    const file = e.target.files && e.target.files[0]; if (e.target) e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 600; let w = img.width, h = img.height;
+        if (w > h && w > max) { h = Math.round(h * max / w); w = max; } else if (h > max) { w = Math.round(w * max / h); h = max; }
+        const c = document.createElement("canvas"); c.width = w; c.height = h;
+        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        setSelfie(c.toDataURL("image/jpeg", 0.7));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
   const [descConfirmed, setDescConfirmed] = useState(false); // service-description read-confirm (per-service booking.requireConfirm)
   const [confirmSheet, setConfirmSheet] = useState(null); // cut-style confirm bottom sheet — holds the cut type being confirmed
   const [confirmReveal, setConfirmReveal] = useState(false); // two-beat reveal: heading holds alone, then body appears
@@ -3470,6 +3491,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         groupId: isMultiPerson ? baseId : null,
         manageToken: makeManageToken(),
         wantsEarlier: wantEarlier,
+        discount: (pi === 0 && selfie) ? { id: "selfie", name: "Profile photo", type: "amount", value: 5 } : undefined, // $5 off for adding a profile selfie
       });
       if (!isSame) cursor += person.durMin;
     });
@@ -3493,6 +3515,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         email: (finalEmail || matched?.email || "").trim(),
         phone: (finalPhone || matched?.phone || "").trim(),
         provider: matched?.provider || (newAppts[0] && newAppts[0].providerId) || "dan",
+        photo: selfie || matched?.photo || undefined, // selfie taken at booking becomes the profile photo
         visits: matched?.visits || 0,
         lastActivity: new Date().toISOString(),
         customDurations: matched?.customDurations || {},
@@ -5338,7 +5361,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               return (
                 <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", textAlign: "center", margin: "10px 0 20px" }}>
                   <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, lineHeight: 1.2, color: "var(--text)" }}>{lbl} · {fmtTime(slot)}</div>
-                  <div style={{ fontSize: 13.5, color: "var(--text2)", marginTop: 4, lineHeight: 1.45 }}>{!hasFull ? `${dateFull} · ` : ""}{cart.map((e) => describeEntry(e)).join(" · ")} · ${cartAdjTotal} · with {provider.name}</div>
+                  <div style={{ fontSize: 13.5, color: "var(--text2)", marginTop: 4, lineHeight: 1.45 }}>{!hasFull ? `${dateFull} · ` : ""}{cart.map((e) => describeEntry(e)).join(" · ")} · ${selfie ? Math.max(0, cartAdjTotal - 5) : cartAdjTotal}{selfie ? " · $5 off" : ""} · with {provider.name}</div>
                   <div style={{ height: 1, background: "var(--line)", margin: "13px 0" }} />
                   <button onClick={() => setWantEarlier(!wantEarlier)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, width: "100%", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
                     <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
@@ -5377,6 +5400,30 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             </div>
 
             {/* note + photo — combined into one collapsible card; opens to the note box and photo slots */}
+            {/* Profile selfie incentive — only when we have no photo of this client yet. A photo of
+                THEM for the profile, explicitly NOT a haircut inspiration pic; adds $5 off the visit. */}
+            {!(matched && matched.photo) && (
+              <div style={{ background: "var(--panel)", border: `1px solid ${selfie ? "var(--gold)" : "var(--border)"}`, borderRadius: 16, padding: "18px", marginBottom: 18 }}>
+                <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <button onClick={() => { if (!selfie && selfieRef.current) selfieRef.current.click(); }} style={{ position: "relative", width: 60, height: 60, borderRadius: "50%", flexShrink: 0, border: `2px ${selfie ? "solid" : "dashed"} ${selfie ? "var(--gold)" : "var(--border2)"}`, background: "var(--panel2)", overflow: "hidden", cursor: "pointer", padding: 0 }}>
+                    {selfie ? <img src={selfie} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={22} style={{ color: "var(--faint)" }} />}
+                  </button>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, lineHeight: 1.2 }}>Add a profile photo — save $5</div>
+                    <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{selfie ? "Looking good — $5 comes off this visit." : <>A quick <b style={{ color: "var(--text)" }}>selfie of you</b> so {provider.name === "Anyone" ? "your barber" : provider.name} knows who to expect. It's your profile photo — <b style={{ color: "var(--text)" }}>not a haircut example.</b></>}</div>
+                  </div>
+                </div>
+                {selfie ? (
+                  <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                    <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border2)", color: "var(--text)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Retake</button>
+                    <button onClick={() => setSelfie(null)} style={{ flex: 1, background: "none", border: "1px solid var(--border2)", color: "var(--sub)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Remove</button>
+                  </div>
+                ) : (
+                  <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ width: "100%", marginTop: 14, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Camera size={16} /> Take a selfie &amp; save $5</button>
+                )}
+              </div>
+            )}
             {(business?.booking?.askNote !== false || business?.bookingPhotos?.mode !== "off") && (() => {
               const noteOn = business?.booking?.askNote !== false;
               const photoOn = business?.bookingPhotos?.mode !== "off";
