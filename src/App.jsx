@@ -1068,6 +1068,17 @@ const clientSinceLabel = (client, appts = []) => {
   const d = clientSinceDate(client, appts);
   return d ? `${d.getMonth() + 1}/${String(d.getFullYear()).slice(-2)}` : null;
 };
+// ---- Discounts: reusable presets (business.discounts) applied at checkout or to an appointment.
+// A discount is { id, name, type: "amount"|"percent", value }. resolveDiscount turns it into the
+// dollars coming off a given gross — never below 0, never more than the gross itself.
+const resolveDiscount = (d, gross) => {
+  if (!d) return 0;
+  const g = Math.max(0, Number(gross) || 0);
+  const v = Math.max(0, Number(d.value) || 0);
+  const amt = d.type === "percent" ? (g * v) / 100 : v;
+  return +Math.min(g, amt).toFixed(2);
+};
+const discountLabel = (d) => !d ? "" : (d.type === "percent" ? `${+d.value || 0}% off` : `$${+d.value || 0} off`);
 const DAYS_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const apptDateLabel = () => { const d = new Date(); return `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
 // Heartbeat: returns a Date that re-renders the component on an interval, so live
@@ -13956,6 +13967,95 @@ function RebookCheckoutEditor({ r, onChange }) {
   );
 }
 
+// Create / manage reusable discount presets (business.discounts). Each: { id, name, type, value }.
+// Applied at checkout or to any appointment. % is off the service subtotal; $ is a flat amount.
+function DiscountsEditor({ discounts = [], onChange }) {
+  const [editing, setEditing] = useState(null); // discount id being edited, or "new"
+  const [draft, setDraft] = useState({ name: "", type: "amount", value: "" });
+  const startNew = () => { setDraft({ name: "", type: "amount", value: "" }); setEditing("new"); };
+  const startEdit = (d) => { setDraft({ name: d.name || "", type: d.type || "amount", value: String(d.value ?? "") }); setEditing(d.id); };
+  const save = () => {
+    const name = draft.name.trim();
+    const value = Math.max(0, parseFloat(draft.value) || 0);
+    if (!name || value <= 0) return;
+    if (editing === "new") onChange([...(discounts || []), { id: "disc_" + Date.now().toString(36), name, type: draft.type, value }]);
+    else onChange((discounts || []).map((d) => d.id === editing ? { ...d, name, type: draft.type, value } : d));
+    setEditing(null);
+  };
+  const remove = (id) => onChange((discounts || []).filter((d) => d.id !== id));
+  const fld = { width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" };
+  return (
+    <div style={{ display: "grid", gap: 12 }}>
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 2px", fontWeight: 300 }}>Create a discount once, then apply it at checkout or to any appointment.</p>
+      {(discounts || []).map((d) => editing === d.id ? (
+        <DiscountForm key={d.id} draft={draft} setDraft={setDraft} onSave={save} onCancel={() => setEditing(null)} fld={fld} />
+      ) : (
+        <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px" }}>
+          <div style={{ minWidth: 0 }}><div style={{ fontSize: 15.5, fontWeight: 500 }}>{d.name}</div><div style={{ fontSize: 13, color: "var(--gold)", marginTop: 2 }}>{discountLabel(d)}</div></div>
+          <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+            <button onClick={() => startEdit(d)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Edit</button>
+            <button onClick={() => remove(d.id)} style={{ background: "none", border: "none", color: "var(--faint)", fontSize: 14, cursor: "pointer" }}>Delete</button>
+          </div>
+        </div>
+      ))}
+      {editing === "new" ? (
+        <DiscountForm draft={draft} setDraft={setDraft} onSave={save} onCancel={() => setEditing(null)} fld={fld} />
+      ) : editing == null ? (
+        <button onClick={startNew} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer", justifySelf: "start" }}><Plus size={16} /> New discount</button>
+      ) : null}
+    </div>
+  );
+}
+function DiscountForm({ draft, setDraft, onSave, onCancel, fld }) {
+  const ready = draft.name.trim() && (parseFloat(draft.value) || 0) > 0;
+  return (
+    <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, display: "grid", gap: 12 }}>
+      <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Name (e.g. First responder)" style={fld} />
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={() => setDraft({ ...draft, type: "amount" })} style={{ flex: 1, padding: "11px", borderRadius: 12, border: `1.5px solid ${draft.type !== "percent" ? "var(--gold)" : "var(--border2)"}`, background: draft.type !== "percent" ? "var(--tint)" : "var(--panel)", color: "var(--text)", fontSize: 14.5, fontWeight: 500 }}>Dollar ($)</button>
+        <button onClick={() => setDraft({ ...draft, type: "percent" })} style={{ flex: 1, padding: "11px", borderRadius: 12, border: `1.5px solid ${draft.type === "percent" ? "var(--gold)" : "var(--border2)"}`, background: draft.type === "percent" ? "var(--tint)" : "var(--panel)", color: "var(--text)", fontSize: 14.5, fontWeight: 500 }}>Percent (%)</button>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px" }}>
+        <span style={{ fontSize: 18, color: "var(--sub)" }}>{draft.type === "percent" ? "%" : "$"}</span>
+        <input type="number" min={0} value={draft.value} onChange={(e) => setDraft({ ...draft, value: e.target.value })} placeholder="0" style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 20, fontWeight: 600, outline: "none" }} />
+        <span style={{ fontSize: 14, color: "var(--faint)" }}>off</span>
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={onCancel} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border2)", color: "var(--sub)", padding: 12, fontSize: 14, fontWeight: 500, borderRadius: 12 }}>Cancel</button>
+        <button onClick={onSave} disabled={!ready} style={{ flex: 1, background: ready ? "var(--gold)" : "var(--border2)", color: ready ? "var(--on-gold)" : "var(--faint)", border: "none", padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 12 }}>Save</button>
+      </div>
+    </div>
+  );
+}
+// Pick a discount preset (or remove the current one) — shared by checkout and the appointment sheet.
+function DiscountPicker({ discounts = [], current, onPick, onClose }) {
+  return createPortal((
+    <div className="fade-in" onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1200, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 20, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 18px 50px var(--shadow)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22 }}>Apply a discount</div>
+          <button onClick={onClose} style={{ background: "none", color: "var(--sub)" }}><X size={20} /></button>
+        </div>
+        {(discounts || []).length === 0 ? (
+          <div style={{ color: "var(--faint)", fontSize: 14, textAlign: "center", padding: "18px 0", lineHeight: 1.5 }}>No discounts yet.<br />Create them in Settings → Discounts.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 8 }}>
+            {(discounts || []).map((d) => { const on = current && current.id === d.id; return (
+              <button key={d.id} onClick={() => { onPick(d); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "13px 15px", borderRadius: 12, border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--tint)" : "var(--panel2)", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
+                <span style={{ fontSize: 15, fontWeight: 500 }}>{d.name}</span>
+                <span style={{ fontSize: 14, color: "var(--gold)", fontWeight: 600 }}>{discountLabel(d)}</span>
+              </button>
+            ); })}
+          </div>
+        )}
+        {current && (
+          <button onClick={() => { onPick(null); onClose(); }} style={{ width: "100%", marginTop: 12, background: "transparent", border: "1px solid var(--border2)", color: "var(--sub)", padding: 12, fontSize: 14, fontWeight: 500, borderRadius: 12 }}>Remove discount</button>
+        )}
+      </div>
+    </div>
+  ), document.body);
+}
+
 // Tiny "Explain" link → opens a small plain-English popover (what it is / why you'd use it),
 // X to close. Invisible weight for pros, a lifeline for first-timers. Drop next to any setting title.
 function Explain({ title, children }) {
@@ -15923,6 +16023,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       status: (form.rebook?.enabled === false) ? "Off" : ((form.rebook?.discountEnabled !== false && (form.rebook?.discount || 0) > 0) ? `On · ${form.rebook?.discountType === "percent" ? form.rebook?.discount + "% off" : "$" + form.rebook?.discount + " off"}` : "On · no discount"),
       keywords: "rebook rebooking checkout discount percent dollar amount incentive next visit prompt save offer",
       editor: <RebookCheckoutEditor r={form.rebook || { enabled: true, discountEnabled: true, discountType: "amount", discount: 5, weeks: [2,3,4,6,8] }} onChange={(rb) => setForm({ ...form, rebook: { ...(form.rebook || {}), ...rb } })} />,
+    },
+    {
+      id: "discounts", title: "Discounts", icon: DollarSign, category: "Payments & Checkout",
+      status: (form.discounts || []).length ? `${(form.discounts || []).length} discount${(form.discounts || []).length === 1 ? "" : "s"}` : "None yet",
+      keywords: "discount discounts coupon promo percent dollar off deal comp first responder student senior loyalty markdown",
+      editor: <DiscountsEditor discounts={form.discounts || []} onChange={(next) => { setForm((f) => ({ ...f, discounts: next })); setBusiness((b) => ({ ...(b || {}), discounts: next })); }} />,
     },
     {
       id: "booking", title: "Booking page rules", fullBleed: true, subtitle: "Lead time, deposit & card requirements", icon: Calendar, category: "Online Booking",
@@ -18805,7 +18911,13 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [payErr, setPayErr] = useState("");
   const [pendingMethod, setPendingMethod] = useState(null); // chosen on the method screen; charged after tip
   const [paidRec, setPaidRec] = useState(null);     // the ledger record written on success
-  const subtotal = +lines.reduce((s, l) => s + (Number(l.price) || 0), 0).toFixed(2);
+  const [checkoutDiscount, setCheckoutDiscount] = useState(appt.discount || null); // applied discount preset (from the appt or chosen here)
+  const [showDiscPick, setShowDiscPick] = useState(false);
+  // Subtotal is the line total minus any applied discount, so every downstream amount (tip,
+  // total, balance, the charge) follows automatically. Tip is calculated on the discounted total.
+  const grossSubtotal = +lines.reduce((s, l) => s + (Number(l.price) || 0), 0).toFixed(2);
+  const discountAmt = reopen ? 0 : resolveDiscount(checkoutDiscount, grossSubtotal);
+  const subtotal = +Math.max(0, grossSubtotal - discountAmt).toFixed(2);
   const tipAmt = reopen ? 0 : (customTip != null ? +Number(customTip).toFixed(2) : +(subtotal * tipPct / 100).toFixed(2));
   // Reopened tickets only ever charge the balance — what's on the ticket minus what was already paid.
   const balance = reopen ? Math.max(0, +(subtotal - alreadyPaid).toFixed(2)) : 0;
@@ -18870,7 +18982,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   useEffect(() => {
     if (stage === "approved") { const t = setTimeout(() => setStage(!reopen && rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
     if (stage === "rebook" && rhythmWeek != null && rebookWeeks == null && !customDate) { setRebookWeeks(rhythmWeek); }
-    if (stage === "done") { const grandTotal = reopen ? +(alreadyPaid + (paidRec ? paidRec.amount : 0)).toFixed(2) : total; const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt; const t = setTimeout(() => onDone(appt.id, { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, rebookWeeks, rebookDate: customDate, rebookStart: chosenStart, rebookLabel: hasSelection ? selectionLabel : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null }), 1200); return () => clearTimeout(t); }
+    if (stage === "done") { const grandTotal = reopen ? +(alreadyPaid + (paidRec ? paidRec.amount : 0)).toFixed(2) : total; const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt; const t = setTimeout(() => onDone(appt.id, { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, discount: reopen ? 0 : discountAmt, discountName: (!reopen && checkoutDiscount) ? checkoutDiscount.name : null, rebookWeeks, rebookDate: customDate, rebookStart: chosenStart, rebookLabel: hasSelection ? selectionLabel : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null }), 1200); return () => clearTimeout(t); }
   }, [stage]);
 
   const rebookDate = (weeks) => { const d = new Date(); d.setDate(d.getDate() + weeks * 7); return d; };
@@ -19026,6 +19138,19 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           <span>Paid earlier</span><span>−{money(alreadyPaid)}</span>
         </div>
       )}
+      {!reopen && (
+        <div style={{ borderTop: "1px solid var(--line)", padding: "14px 2px 0" }}>
+          {checkoutDiscount ? (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 14.5 }}>
+              <button onClick={() => setShowDiscPick(true)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 14.5, fontWeight: 600, cursor: "pointer", padding: 0, textAlign: "left" }}>{checkoutDiscount.name} · change</button>
+              <span style={{ color: "var(--gold)" }}>−{money(discountAmt)}</span>
+            </div>
+          ) : (
+            <button onClick={() => setShowDiscPick(true)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", padding: 0, textDecoration: "underline", textUnderlineOffset: 3, fontFamily: FONT_BODY }}>+ Add a discount</button>
+          )}
+        </div>
+      )}
+      {showDiscPick && <DiscountPicker discounts={business?.discounts || []} current={checkoutDiscount} onPick={setCheckoutDiscount} onClose={() => setShowDiscPick(false)} />}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: reopen ? "none" : "1px solid var(--line)", padding: reopen ? "10px 2px 16px" : "18px 2px 16px" }}>
         <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{reopen ? "Balance due" : "Total"}</span>
         <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500 }}>{money(reopen ? balance : subtotal)}</span>
