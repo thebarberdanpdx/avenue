@@ -102,14 +102,15 @@ async function handler(req, res) {
     ...(data ? { data } : {}),
   };
 
-  // Dev (Xcode) builds get sandbox tokens; App Store builds get production tokens.
-  // Try sandbox first, then production on a token-environment error — so both just work.
+  // App Store / TestFlight builds get PRODUCTION tokens; local Xcode dev builds get sandbox.
+  // The app ships with aps-environment=production, so production is the common case — try it
+  // FIRST, then fall back to sandbox on a token-environment error so a local dev build still works.
   let sent = 0;
   const results = [];
   for (const t of tokens) {
-    let r = await sendOne("api.sandbox.push.apple.com", t, providerToken, payload);
+    let r = await sendOne("api.push.apple.com", t, providerToken, payload);
     if (!r.ok && (r.status === 400 || r.reason === "BadDeviceToken")) {
-      r = await sendOne("api.push.apple.com", t, providerToken, payload);
+      r = await sendOne("api.sandbox.push.apple.com", t, providerToken, payload);
     }
     if (r.ok) sent++;
     results.push({ token: t.slice(0, 10) + "…", status: r.status || 0, reason: r.reason || "" });
