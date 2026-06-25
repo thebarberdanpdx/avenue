@@ -18792,6 +18792,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [customDate, setCustomDate] = useState(null); // ISO date string when picked manually
   const [chosenStart, setChosenStart] = useState(null); // minutes-of-day the barber picked for the rebook
   const [pickView, setPickView] = useState("list"); // "list" chips | "calendar" day-timeline
+  const [showAllRebookTimes, setShowAllRebookTimes] = useState(false); // optimal (no-gap) times by default; "show all times" reveals every open slot
   // ---- POS sale lines: the appointment's locked total is the first line; more can be added ----
   const [lines, setLines] = useState([{ id: "main", name: service?.name || appt.title || "Service", withName: provider?.name || null, price: base }]);
   const [addSheet, setAddSheet] = useState(null);   // null | "service" | "product"
@@ -18894,6 +18895,10 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     return { off: false, slots };
   })();
   const hasBest = daySlots.slots.some((s) => s.best);
+  // Optimal = the gap-free anchors (flush against an appt, or day open/close). Show ONLY these by
+  // default so a rebook fits in nicely; "Show all times" reveals every open slot.
+  const optimalSlots = hasBest ? daySlots.slots.filter((s) => s.best) : daySlots.slots;
+  const listSlots = showAllRebookTimes ? daySlots.slots : optimalSlots;
 
   const sheet = (inner, dismissable, top = true) => createPortal((
     <div className="fade-in" onClick={dismissable ? onClose : undefined} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", alignItems: top ? "flex-start" : "flex-end", justifyContent: "center" }}>
@@ -19173,7 +19178,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         {customDate ? <Check size={18} style={{ color: "var(--gold)" }} /> : <ChevronRight size={18} style={{ color: "var(--faint)" }} />}
         <input type="date" value={customDate || ""} min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)} onChange={(e) => { if (e.target.value) { setCustomDate(e.target.value); setRebookWeeks(null); } }} style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
       </label>
-      <button className="lift" disabled={!hasSelection} onClick={() => { setChosenStart(null); setStage("pickTime"); }} style={{ width: "100%", background: !hasSelection ? "var(--panel2)" : "linear-gradient(155deg,#FCE187 0%,#F4C84F 34%,#E5AC34 70%,#CF971F 100%)", color: !hasSelection ? "var(--faint)" : "#33260A", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: !hasSelection ? "none" : "0 10px 22px -8px rgba(190,135,20,.55), inset 0 1px 0 rgba(255,255,255,.6)" }}>{!hasSelection ? "PICK A DAY FIRST" : `PICK A TIME · ${selectionLabel}`}</button>
+      <button className="lift" disabled={!hasSelection} onClick={() => { setChosenStart(null); setShowAllRebookTimes(false); setStage("pickTime"); }} style={{ width: "100%", background: !hasSelection ? "var(--panel2)" : "linear-gradient(155deg,#FCE187 0%,#F4C84F 34%,#E5AC34 70%,#CF971F 100%)", color: !hasSelection ? "var(--faint)" : "#33260A", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: !hasSelection ? "none" : "0 10px 22px -8px rgba(190,135,20,.55), inset 0 1px 0 rgba(255,255,255,.6)" }}>{!hasSelection ? "PICK A DAY FIRST" : `PICK A TIME · ${selectionLabel}`}</button>
       {hasSelection && <p style={{ color: "var(--faint)", fontSize: 12.5, lineHeight: 1.5, textAlign: "center", marginTop: 10 }}>{discountOn ? `Nothing is charged today — the ${discLabel} is taken off when they come in. ` : "Nothing is charged today. "}We'll send the confirmation and reminders automatically.</p>}
       <button onClick={() => { setRebookWeeks(null); setCustomDate(null); setChosenStart(null); setStage("done"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 4 }}>NO THANKS</button>
     </div>
@@ -19205,7 +19210,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           </div>
           {pickView === "list" ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-              {daySlots.slots.map((s) => {
+              {listSlots.map((s) => {
                 const sel = chosenStart === s.start;
                 return (
                   <button key={s.start} onClick={() => setChosenStart(s.start)} className={sel ? "vslot-sel" : undefined} style={{ position: "relative", overflow: "hidden", padding: "14px 0", borderRadius: 13, fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: sel || s.best ? 600 : 500,
@@ -19256,6 +19261,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
               </div>
             );
           })()}
+          {hasBest && pickView === "list" && (
+            <button onClick={() => setShowAllRebookTimes((v) => !v)} style={{ display: "block", margin: "16px auto 0", background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>{showAllRebookTimes ? "Show best times only" : "Show all times"}</button>
+          )}
           <button className="lift" disabled={chosenStart == null} onClick={() => setStage("done")} style={{ width: "100%", marginTop: 20, background: chosenStart == null ? "var(--panel2)" : "linear-gradient(155deg,#FCE187 0%,#F4C84F 34%,#E5AC34 70%,#CF971F 100%)", color: chosenStart == null ? "var(--faint)" : "#33260A", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: chosenStart == null ? "none" : "0 10px 22px -8px rgba(190,135,20,.55), inset 0 1px 0 rgba(255,255,255,.6)" }}>{chosenStart == null ? "TAP A TIME ABOVE" : (discountOn ? `BOOK ${fmtTime(chosenStart)} · SAVE ${discLabel}` : `BOOK ${fmtTime(chosenStart)}`)}</button>
         </>
       )}
