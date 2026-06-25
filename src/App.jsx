@@ -313,7 +313,7 @@ const DEFAULT_BUSINESS = {
   ],
   // ---- Staff push alerts: which appointment events push the team's iOS app. Read by
   //      fireStaffPush (the real gate). Default all on = preserves prior always-push behavior. ----
-  staffAlerts: { newBooking: true, rescheduled: true, checkedIn: true },
+  staffAlerts: { newBooking: true, rescheduled: true, checkedIn: true, emailStaffOnBooking: true, bookingAlertScope: "assigned" },
   // ---- Locations: off by default; turns on for multi-location businesses ----
   multiLocation: false,
   locations: [
@@ -2730,6 +2730,28 @@ function fireStaffPush({ shopId, title, appt, prevAppt, event, business }) {
   } catch (e) {}
 }
 
+// Email (and, once SMS is live, text) the barber a new booking — at the email/phone saved in
+// their staff profile. Recipients are resolved SERVER-SIDE (api/notify) so a public booker
+// never sees staff contact info; this only sends shopId + providerId + scope + plain context.
+// Scope is owner-set in Notifications → Your team: "assigned" (default) | "ownerPlus" | "all".
+function fireStaffNotify({ shopId, appt, business }) {
+  try {
+    if (!shopId || !appt) return;
+    const sa = (business && business.staffAlerts) || {};
+    if (sa.emailStaffOnBooking === false) return; // master off
+    const scope = sa.bookingAlertScope || "assigned";
+    const when = appt.bookedFor ? new Date(appt.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+    fetch(API_BASE + "/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        staff: { shopId, providerId: appt.providerId || null, scope },
+        context: { client: appt.name || "A client", service: appt.title || appt.serviceName || "an appointment", when, note: (appt.note || appt.detail || "").trim() },
+      }),
+    }).catch(() => {});
+  } catch (e) {}
+}
+
 // Horizontally-scrollable example-photo strip shown under a service while booking,
 // so clients can see what the service looks like before they pick it. Tap a photo
 // to open it full-screen. Lightweight — only renders when the service has photos.
@@ -3467,7 +3489,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     };
 
     // Staff/preview bookings persist through the dashboard's own save path — show success immediately.
-    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); captureClientPhotos(); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); fireStaffPush({ shopId, title: "New booking", appt: newAppts[0], event: "newBooking", business }); setBookedId(baseId); setStep(8); return; }
+    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); captureClientPhotos(); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); fireStaffPush({ shopId, title: "New booking", appt: newAppts[0], event: "newBooking", business }); fireStaffNotify({ shopId, appt: newAppts[0], business }); setBookedId(baseId); setStep(8); return; }
     // Public booking: the slot is never held while saving, and the client is only told they're booked
     // once the server actually has it — so a failed save can never become a ghost booking.
     setBooking(true); setBookErr(false);
@@ -3505,6 +3527,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : ""), data: { t: "appt", id: ap0.id } }),
             }).catch(() => {});
+            fireStaffNotify({ shopId, appt: ap0, business });
           }
         } catch (e) {}
         setBookedId(baseId); setStep(8);
@@ -10949,7 +10972,7 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
   const [aud, setAud] = useState("clients");
   const messages = form.messages || [];
   const setMsg = (id, patch) => setForm({ ...form, messages: messages.map((m) => m.id === id ? { ...m, ...patch } : m) });
-  const sa = { newBooking: true, rescheduled: true, checkedIn: true, ...(form.staffAlerts || {}) };
+  const sa = { newBooking: true, rescheduled: true, checkedIn: true, emailStaffOnBooking: true, bookingAlertScope: "assigned", ...(form.staffAlerts || {}) };
   const setSA = (k, v) => setForm({ ...form, staffAlerts: { ...sa, [k]: v } });
   const CH = [["email", "Email"], ["text", "Text"], ["both", "Both"]];
   return (
@@ -10980,7 +11003,7 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
         <button onClick={onOpenMessages} style={{ marginTop: 14, background: "none", border: "none", color: "var(--gold)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "4px 2px", display: "inline-flex", alignItems: "center", gap: 5 }}>Edit wording & timing <ChevronRight size={15} /></button>
         <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>* Texts begin once your A2P carrier registration clears; until then a “Text” or “Both” message is delivered by email.</p>
       </>) : (<>
-        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>Push alerts to your team on the Vero iOS app. Each staff member also has to allow notifications on their own device.</p>
+        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>How your team is alerted to activity. App pop-ups need the Vero iOS app (and each person allowing notifications on their device); email &amp; text alerts go to the contact info saved in each staff profile.</p>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
           {TEAM_ALERTS.map((ev, i) => { const on = sa[ev.k] !== false; return (
             <div key={ev.k} style={{ padding: "15px 0", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -10991,6 +11014,23 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
               <Toggle on={on} onClick={() => setSA(ev.k, !on)} />
             </div>
           ); })}
+        </div>
+
+        <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", margin: "22px 2px 10px" }}>Email / text the barber</p>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
+          <div style={{ padding: "15px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>Alert the barber on new bookings</span>
+              <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Sent to the email in their staff profile · text joins once your carrier clears</span>
+            </span>
+            <Toggle on={sa.emailStaffOnBooking !== false} onClick={() => setSA("emailStaffOnBooking", !(sa.emailStaffOnBooking !== false))} />
+          </div>
+          {sa.emailStaffOnBooking !== false && (
+            <div style={{ padding: "4px 0 14px", borderTop: "1px solid var(--line)" }}>
+              <div style={{ fontSize: 13, color: "var(--sub)", margin: "12px 0 9px" }}>Who gets the alert</div>
+              <Segmented options={[{ value: "assigned", label: "Assigned barber" }, { value: "ownerPlus", label: "You + barber" }, { value: "all", label: "All staff" }]} value={sa.bookingAlertScope || "assigned"} onChange={(v) => setSA("bookingAlertScope", v)} />
+            </div>
+          )}
         </div>
       </>)}
     </div>
@@ -17398,6 +17438,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const startMin = (summary.rebookStart != null) ? summary.rebookStart : earliestOpenSlot(src.providerId, nd, dur);
           const newAppt = { ...src, id: "rb" + Date.now() + Math.floor(Math.random() * 1000), status: "confirmed", paid: null, prepaid: false, rebookDiscount: (business?.rebook?.discountEnabled !== false ? (business?.rebook?.discount || 0) : 0), rebookDiscountType: business?.rebook?.discountType || "amount", bookedFor: nd.toISOString(), start: startMin, end: startMin + dur, photos: 0, hasPhotos: false, hasNote: false };
           fireStaffPush({ shopId, title: "New booking", appt: newAppt, event: "newBooking", business });
+          fireStaffNotify({ shopId, appt: newAppt, business });
           done.push(newAppt);
         }
       }
@@ -17839,6 +17880,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     // Staff-created booking → fire the confirmation too (same engine as online bookings).
     fireApptNotify({ msgId: "booked", appt: newAppt, business, providers, contact: { email: (bookClient ? bookClient.email : walkInEmail) || "", phone: (bookClient ? bookClient.phone : walkInPhone) || "" }, subject: `${business.name}: Appointment confirmed` });
     fireStaffPush({ shopId, title: "New booking", appt: newAppt, event: "newBooking", business });
+    fireStaffNotify({ shopId, appt: newAppt, business });
     setNewApptSlot(null);
     setConflictModal(null);
     showToast(`${newAppt.name} booked at ${fmtTime(useStart)}.`);
