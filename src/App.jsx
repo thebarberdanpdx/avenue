@@ -17062,7 +17062,7 @@ function BarberMenu({ working, weekdayName, cx, top, onEditHours, onToggleDay, o
 // ============================================================
 // NEW APPOINTMENT — pick client + service, then book (full page)
 // ============================================================
-function NewAppointmentForm({ slot, providers, clients, services, appts, selectedDate, onClose, onBook, onBlock, onPickDate, initialClient = null, initialService = null }) {
+function NewAppointmentForm({ slot, providers, clients, services, appts, selectedDate, business = {}, onClose, onBook, onBlock, onPickDate, initialClient = null, initialService = null, smartTimes = false }) {
   const [provId, setProvId] = useState(slot.providerId);
   const staff = providers.filter((p) => p.role !== "owner-nonstaff");
   const [client, setClient] = useState(initialClient);
@@ -17094,11 +17094,14 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
 
   const [showTimePick, setShowTimePick] = useState(false);
   const [showDatePick, setShowDatePick] = useState(false);
+  const [showAllTimes, setShowAllTimes] = useState(false); // smart (no-gap) times by default; reveal every open time on demand
   const scrollRef = useRef(null);
   useLayoutEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     try { window.scrollTo(0, 0); } catch (e) {}
   }, []);
+  // Rebook flow: guide "choose the day → then pick from smart times" by opening the date picker first.
+  useEffect(() => { if (smartTimes) setShowDatePick(true); }, []);
   // search by first name, last name, OR any part of the phone number (digits only)
   const qd = q.replace(/\D/g, "");
   const matches = q.trim() ? clients.filter((c) => {
@@ -17127,6 +17130,14 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
     timeOptions.push({ start: m, best: dayAppts.some((a) => a.end === m || a.start === end) });
   }
   const hasBest = timeOptions.some((s) => s.best);
+
+  // Settings-aware "optimum" slots — the SAME engine online booking uses (honors buffers, lead
+  // time, daily caps, and the shop's gap-avoidance mode). These are the smart options shown by
+  // default so rebooking can't leave an awkward hole; "Show all times" reveals every open minute.
+  const smartSlots = (service && provObj && provObj.id !== "anyone")
+    ? computeFreeSlots({ prov: provObj, date: slotDate, durMin: apptDur, providers, appts, business, services })
+    : [];
+  const pickerSlots = (smartSlots.length && !showAllTimes) ? smartSlots : timeOptions;
 
   const fieldWrap = { padding: "26px 0", borderBottom: "1px solid var(--line)" };
 
@@ -17295,20 +17306,23 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             <span style={{ width: 50 }} />
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: "18px 18px 40px" }}>
-            {hasBest && (
-              <div style={{ maxWidth: 460, margin: "0 auto 14px", display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4 }}>
-                <span style={{ width: 12, height: 12, borderRadius: 3, background: "var(--wash)", border: "1px solid var(--gold)", flexShrink: 0 }} />
-                Gold times sit right against another appointment — no gap left behind.
-              </div>
-            )}
-            {timeOptions.length === 0 ? (
-              <div style={{ maxWidth: 460, margin: "0 auto", color: "var(--sub)", fontSize: 14.5, textAlign: "center", padding: "30px 0", lineHeight: 1.5 }}>No openings that fit this service{provObj ? ` in ${provObj.name.split(" ")[0]}'s day` : ""}. Try someone else or another day.</div>
+            <div style={{ maxWidth: 460, margin: "0 auto 14px", display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4 }}>
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: "var(--wash)", border: "1px solid var(--gold)", flexShrink: 0 }} />
+              {showAllTimes
+                ? "Every open time. Gold sits flush against another appointment — no gap left behind."
+                : "Smart times only — these keep the day gap-free. Gold sits flush against another appointment."}
+            </div>
+            {pickerSlots.length === 0 ? (
+              <div style={{ maxWidth: 460, margin: "0 auto", color: "var(--sub)", fontSize: 14.5, textAlign: "center", padding: "30px 0", lineHeight: 1.5 }}>No openings that fit this service{provObj ? ` in ${provObj.name.split(" ")[0]}'s day` : ""}. Try another day or someone else.</div>
             ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxWidth: 460, margin: "0 auto" }}>
-              {timeOptions.map((s) => { const on = s.start === startMin; return (
+              {pickerSlots.map((s) => { const on = s.start === startMin; return (
                 <button key={s.start} onClick={() => { setStartMin(s.start); setShowTimePick(false); }} style={{ padding: "14px 0", borderRadius: 10, background: on ? "var(--gold)" : s.best ? "var(--wash)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)", border: `1px solid ${on ? "var(--gold)" : s.best ? "var(--gold)" : "var(--border2)"}`, fontSize: 14.5, fontWeight: on || s.best ? 600 : 400 }}>{fmtHM(s.start)}</button>
               ); })}
             </div>
+            )}
+            {smartSlots.length > 0 && (
+              <button onClick={() => setShowAllTimes((v) => !v)} style={{ display: "block", margin: "20px auto 0", background: "none", border: "none", color: "var(--gold)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>{showAllTimes ? "← Back to smart times" : "Show all available times"}</button>
             )}
           </div>
         </div>
@@ -17330,6 +17344,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
                   const w = provObj && provObj.hours && provObj.hours[d.getDay()];
                   setStartMin(w && typeof w.start === "number" ? w.start : 9 * 60);
                   setShowDatePick(false);
+                  if (smartTimes) setShowTimePick(true); // rebook: day chosen → show smart times for it
                 }}
               />
             </div>
@@ -17496,7 +17511,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     const pid = rebookSeed.providerId || (c && c.provider) || (providers[1] || providers[0] || {}).id;
     const dur = s ? getDuration(c, s, pid) : 30;
     const start = earliestOpenSlot(pid, selectedDate, dur);
-    setNewApptSlot({ providerId: pid, start, initialClient: c, initialService: s });
+    setNewApptSlot({ providerId: pid, start, initialClient: c, initialService: s, rebook: true });
     if (onRebookHandled) onRebookHandled();
   }, [rebookSeed]);
   const [drag, setDrag] = useState(null);     // { id, deltaMin } while dragging
@@ -18558,6 +18573,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           services={services}
           appts={appts}
           selectedDate={selectedDate}
+          business={business}
+          smartTimes={!!newApptSlot.rebook}
           onClose={() => setNewApptSlot(null)}
           onPickDate={(d) => { const t0 = new Date(); t0.setHours(0, 0, 0, 0); const tg = new Date(d); tg.setHours(0, 0, 0, 0); setDayOffset(Math.round((tg - t0) / 86400000)); }}
           onBook={bookAppt}
