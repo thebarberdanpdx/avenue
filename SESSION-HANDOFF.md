@@ -4,6 +4,16 @@ _Last updated: 2026-06-25 (BIG session — all LIVE: Customer Reviews feature ·
 
 > 🧭 **Reviews + Discounts settings placement (2026-06-25):** new settings cards inherit a `category` but ALSO must be added to the nav group lists in the `CATS` array (~`src/App.jsx:16387+`) or the safety-net dumps them under "Reports & data". Reviews now under Online booking → "Your booking page"; Discounts under Payments & checkout → "Payments & tips" (commits `28bbb22`/`0d2605b`).
 
+## 🎨 LATEST SESSION — 2026-06-25 (later): Theme gallery redesign — ✅ LIVE
+Replaced the whole theme set (Dan: all but Studio/Noir were "garbage", earlier batch "terrible — too muddy/earthy, colors cheap"). Now **12 art-directed themes in two lanes** (commit `2d44b86`, deployed to gotvero.com):
+- **Crisp & Minimal** (light, one jewel accent): Studio, Cobalt, Emerald, Plum, Rose, Steel
+- **Bold & Sleek** (deep dark + vivid gradient): Noir, Emerald Noir, Cobalt Night, Ultraviolet, Aubergine Orchid, Cyan
+- Dropped at Dan's request: red (Carbon Scarlet) + Teal; all old earthy themes (vero/linen/petal/almond/fern/claret/velvet/tailor/graphite/mist) + Electric removed.
+- **Every theme WCAG-checked** (Dan's #1 complaint = unreadable text/buttons): body text ≥7:1, text2/sub ≥4.5, faint ≥3, and `onGold` on the accent INCLUDING the lightest gradient stop ≥4.5 (had to darken cobalt-night/ultraviolet gradient tops + 3 accents for white-label readability).
+- **Save-on-tap:** the Theme card (`AppearancePicker`, ~`src/App.jsx:14001`) now applies + persists instantly on tap via the real `setTheme` + `showToast("Theme saved")` — NO bottom Save button (`src/App.jsx` theme-card editor ~16095). `THEME_CATS` = `["Crisp & Minimal","Bold & Sleek"]`; theme `cat` field carries the lane.
+- **New-shop default theme → `cobalt`** (was `electric`, removed). Existing shops on a now-removed id fall back to `studio` (line ~1468) until the owner picks one.
+- Build/ship-check clean, consent phrase still ×4.
+
 **New session? Read this file + `HARDENING-SHOP.md`, then continue Track A. Dan should not have to re-explain anything.**
 
 > 👉 **The clean, plain-English list of everything STILL TO DO is [`TODO.md`](TODO.md)** — start there for "what's left."
