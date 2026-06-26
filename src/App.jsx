@@ -572,69 +572,67 @@ const FONT_BODY = "var(--font-body, 'Inter', -apple-system, sans-serif)";
 // and feel different, not just recolored.
 // ============================================================
 const THEMES = [
-  // Twelve art-directed rooms. Each carries a `canvas` (gradient/glow background) and a
-  // `grain` intensity on top of the full color ramp, so themes differ in light & material,
-  // not just hue. --bg stays a FLAT base color (used by color-mix tints); --canvas is the
-  // painted background; grain is a root overlay driven by --grain / --grain-blend.
-  // ===== LIGHT =====
-  { id: "vero", name: "Vero", tagline: "Porcelain & sage", cat: "Light", dark: false,
-    disp: "'Fraunces', serif", body: "'Hanken Grotesk', sans-serif", grain: 0.045,
-    canvas: "linear-gradient(176deg,#FBFAF6 0%,#F2ECE1 70%,#EFE7D8 100%)",
-    t: { bg:"#FAF8F3", panel:"#FFFFFF", panel2:"#F4EFE4", line:"#ECE4D5", border:"#E0D8C7", border2:"#CFC6B7", text:"#232221", text2:"#3A382F", sub:"#6F685D", faint:"#A39C8A", gold:"#6E8B74", onGold:"#FFFFFF", shadow:"rgba(60,55,45,.10)", overlay:"rgba(35,34,33,0.34)" } },
-  { id: "studio", name: "Studio", tagline: "Editorial black & white", cat: "Light", dark: false,
+  // Eleven themes across two lanes: CRISP & MINIMAL (light, one jewel accent) and
+  // BOLD & SLEEK (dark, vivid gradient). Each carries a painted `canvas`, a `grain`
+  // overlay on the full color ramp, plus its display/body fonts. --bg stays a FLAT base
+  // (for color-mix tints); --canvas is the painted background; --grain drives the overlay.
+  // ===== CRISP & MINIMAL — pristine light, one jewel accent =====
+  { id: "studio", name: "Studio", tagline: "Editorial black & white", cat: "Crisp & Minimal", dark: false,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.03,
     canvas: "#FFFFFF",
     t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#FFFFFF", line:"#ECECEC", border:"#DCDCDC", border2:"#CFCFCF", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#AEAEAE", gold:"#0A0A0A", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.07)", overlay:"rgba(0,0,0,0.3)" } },
-  { id: "mist", name: "Mist", tagline: "Cool porcelain & slate", cat: "Light", dark: false,
+  { id: "cobalt", name: "Cobalt", tagline: "Porcelain & deep cobalt", cat: "Crisp & Minimal", dark: false,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.04,
+    canvas: "linear-gradient(176deg,#FBFCFE,#F2F6FB)",
+    t: { bg:"#F6F8FB", panel:"#FFFFFF", panel2:"#EFF3F9", line:"#E9EEF5", border:"#DEE5EF", border2:"#C7D1E0", text:"#0E1320", text2:"#38414F", sub:"#555F76", faint:"#8792A8", gold:"#1B54C9", onGold:"#FFFFFF", shadow:"rgba(20,35,70,.08)", overlay:"rgba(14,19,32,0.38)" } },
+  { id: "emerald", name: "Emerald", tagline: "Snow & jewel green", cat: "Crisp & Minimal", dark: false,
     disp: "'Fraunces', serif", body: "'Inter', sans-serif", grain: 0.04,
-    canvas: "linear-gradient(176deg,#F1F4F6,#E6ECEF)",
-    t: { bg:"#EEF1F3", panel:"#FBFCFD", panel2:"#E6ECEF", line:"#DDE4E8", border:"#CDD6DB", border2:"#AEBAC1", text:"#1A2024", text2:"#39424A", sub:"#69737A", faint:"#A2ADB3", gold:"#41707C", onGold:"#FFFFFF", shadow:"rgba(30,45,55,.08)", overlay:"rgba(26,32,36,0.34)" } },
-  { id: "linen", name: "Linen", tagline: "Warm oat & raw clay", cat: "Light", dark: false,
-    disp: "'Fraunces', serif", body: "'Inter', sans-serif", grain: 0.05,
-    canvas: "linear-gradient(176deg,#F4EFE6,#EBE2D3)",
-    t: { bg:"#F4EFE6", panel:"#FCFAF6", panel2:"#ECE3D4", line:"#E2D9C8", border:"#D8CDBB", border2:"#BDB199", text:"#23201B", text2:"#41382D", sub:"#766E60", faint:"#A89E8B", gold:"#B26749", onGold:"#FFFFFF", shadow:"rgba(80,60,35,.09)", overlay:"rgba(35,32,27,0.34)" } },
-  { id: "petal", name: "Petal", tagline: "Pale rose, dusted mauve", cat: "Light", dark: false,
-    disp: "'Cormorant Garamond', serif", body: "'Inter', sans-serif", grain: 0.045,
-    canvas: "linear-gradient(176deg,#FBF1F1,#F5E5E8)",
-    t: { bg:"#FBF1F1", panel:"#FFF9FA", panel2:"#F6E6E8", line:"#EFDADE", border:"#EBD3D8", border2:"#D9B3BC", text:"#2A1E22", text2:"#4E3239", sub:"#856871", faint:"#C0A2AA", gold:"#B86B7A", onGold:"#FFFFFF", shadow:"rgba(120,70,85,.09)", overlay:"rgba(42,30,34,0.34)" } },
-  { id: "almond", name: "Almond", tagline: "Toasted beige & espresso", cat: "Light", dark: false,
-    disp: "'Fraunces', serif", body: "'Inter', sans-serif", grain: 0.05,
-    canvas: "linear-gradient(176deg,#F3ECE2,#E8DECE)",
-    t: { bg:"#F3ECE2", panel:"#FBF7F0", panel2:"#E8DECE", line:"#DED3C0", border:"#DACEBB", border2:"#C0B299", text:"#241D15", text2:"#473A2C", sub:"#7A6A57", faint:"#AD9D86", gold:"#6F4E37", onGold:"#FFFFFF", shadow:"rgba(80,60,35,.09)", overlay:"rgba(36,29,21,0.34)" } },
-  // ===== DARK =====
-  // Electric is Vero's identity theme — the app default. Deep indigo, one violet→azure
-  // gradient, and a single bright "live" lime reserved for what's happening right now.
-  { id: "electric", name: "Electric", tagline: "Graphite & a spark of lime", cat: "Dark", dark: true,
-    disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.04,
-    canvas: "radial-gradient(70% 50% at 50% 0%,rgba(255,255,255,0.04),transparent 60%),#16181C",
-    grad: "linear-gradient(135deg,#F4F5F7 0%,#D7D9DE 100%)",
-    t: { bg:"#16181C", panel:"#22252B", panel2:"#2A2D34", line:"#2F333A", border:"#383C44", border2:"#4A4E57", text:"#F5F6F8", text2:"#D7DAE0", sub:"#9BA0A8", faint:"#6E727B", gold:"#ECEDEF", onGold:"#16181C", live:"#C6F24E", shadow:"rgba(0,0,0,.5)", overlay:"rgba(10,11,13,0.82)" } },
-  { id: "noir", name: "Noir", tagline: "Midnight, lit in platinum", cat: "Dark", dark: true,
+    canvas: "linear-gradient(176deg,#FAFDFB,#F0F7F3)",
+    t: { bg:"#F5F9F6", panel:"#FFFFFF", panel2:"#ECF4EF", line:"#E6EFE9", border:"#D9E6DF", border2:"#BFD3C8", text:"#0B1611", text2:"#324139", sub:"#51655B", faint:"#7E9389", gold:"#0C7A54", onGold:"#FFFFFF", shadow:"rgba(15,55,40,.08)", overlay:"rgba(11,22,17,0.38)" } },
+  { id: "plum", name: "Plum", tagline: "Porcelain & rich violet", cat: "Crisp & Minimal", dark: false,
+    disp: "'Playfair Display', serif", body: "'Inter', sans-serif", grain: 0.04,
+    canvas: "linear-gradient(176deg,#FCFAFD,#F4EFF8)",
+    t: { bg:"#F9F7FB", panel:"#FFFFFF", panel2:"#F2EDF6", line:"#EDE6F2", border:"#E1D7EA", border2:"#C9B9D8", text:"#150F1C", text2:"#3D3247", sub:"#5F5370", faint:"#9990A6", gold:"#6A28C4", onGold:"#FFFFFF", shadow:"rgba(60,30,110,.09)", overlay:"rgba(21,15,28,0.38)" } },
+  { id: "rose", name: "Rose", tagline: "Porcelain & raspberry", cat: "Crisp & Minimal", dark: false,
+    disp: "'Playfair Display', serif", body: "'Inter', sans-serif", grain: 0.04,
+    canvas: "linear-gradient(176deg,#FDFAFC,#F8EFF3)",
+    t: { bg:"#FBF7F9", panel:"#FFFFFF", panel2:"#F7EDF1", line:"#F1E5EB", border:"#EEDCE4", border2:"#DCC0CD", text:"#1C0F15", text2:"#45323A", sub:"#6E5560", faint:"#9C8390", gold:"#C01651", onGold:"#FFFFFF", shadow:"rgba(120,20,60,.09)", overlay:"rgba(28,15,21,0.38)" } },
+  { id: "steel", name: "Steel", tagline: "Porcelain & steel blue", cat: "Crisp & Minimal", dark: false,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.04,
+    canvas: "linear-gradient(176deg,#FBFCFD,#F1F4F6)",
+    t: { bg:"#F7F8F9", panel:"#FFFFFF", panel2:"#EFF1F3", line:"#E8EBEE", border:"#E0E3E7", border2:"#C8CDD3", text:"#14181C", text2:"#3A4046", sub:"#5A6066", faint:"#8C949C", gold:"#33536E", onGold:"#FFFFFF", shadow:"rgba(30,45,60,.08)", overlay:"rgba(20,24,28,0.38)" } },
+  // ===== BOLD & SLEEK — deep, dramatic dark themes =====
+  { id: "noir", name: "Noir", tagline: "Midnight, lit in platinum", cat: "Bold & Sleek", dark: true,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.08,
     canvas: "linear-gradient(176deg,#121211,#0B0B0A)",
     t: { bg:"#0E0E0D", panel:"#181817", panel2:"#211F1E", line:"#262523", border:"#333230", border2:"#4A4843", text:"#F2F0EC", text2:"#D6D3CC", sub:"#9A988F", faint:"#5C5A54", gold:"#F2F0EC", onGold:"#0A0A0A", shadow:"rgba(0,0,0,.6)", overlay:"rgba(0,0,0,0.85)" } },
-  { id: "velvet", name: "Velvet Hour", tagline: "Candlelit black & gold leaf", cat: "Dark", dark: true,
-    disp: "'Fraunces', serif", body: "'Inter', sans-serif", grain: 0.08,
-    canvas: "radial-gradient(130% 80% at 50% -12%,rgba(222,178,108,.20),rgba(222,178,108,0) 55%),linear-gradient(180deg,#1A1510,#13100C)",
-    t: { bg:"#15120F", panel:"#241E18", panel2:"#2C251D", line:"#382F25", border:"#42382C", border2:"#5C4D3B", text:"#F3E9D9", text2:"#D8C7AE", sub:"#9C9079", faint:"#615847", gold:"#DEB26C", onGold:"#1A1510", shadow:"rgba(0,0,0,.6)", overlay:"rgba(8,5,3,0.8)" } },
-  { id: "tailor", name: "Tailor", tagline: "Midnight navy, brass thread", cat: "Dark", dark: true,
-    disp: "'Playfair Display', serif", body: "'Inter', sans-serif", grain: 0.07,
-    canvas: "radial-gradient(130% 80% at 50% -12%,rgba(194,163,92,.13),transparent 55%),linear-gradient(180deg,#131A28,#0E1420)",
-    t: { bg:"#0F1420", panel:"#161C2A", panel2:"#1E2535", line:"#283044", border:"#333D54", border2:"#49546F", text:"#EAEDF3", text2:"#C7CEDC", sub:"#8B93A6", faint:"#565E72", gold:"#C2A35C", onGold:"#0F1420", shadow:"rgba(0,0,0,.6)", overlay:"rgba(5,8,14,0.8)" } },
-  { id: "fern", name: "Fern", tagline: "Forest green at dusk", cat: "Dark", dark: true,
-    disp: "'Cormorant Garamond', serif", body: "'Jost', sans-serif", grain: 0.07,
-    canvas: "radial-gradient(130% 80% at 50% -12%,rgba(167,185,125,.14),transparent 55%),linear-gradient(180deg,#141A12,#0D110B)",
-    t: { bg:"#101511", panel:"#1B2117", panel2:"#232B1B", line:"#2D3724", border:"#333D2A", border2:"#4C5A3C", text:"#ECF1E4", text2:"#CCD6BD", sub:"#8E9880", faint:"#56603F", gold:"#A7B97D", onGold:"#10140C", shadow:"rgba(0,0,0,.6)", overlay:"rgba(4,8,3,0.8)" } },
-  { id: "claret", name: "Claret", tagline: "Oxblood & rose gold", cat: "Dark", dark: true,
-    disp: "'Playfair Display', serif", body: "'Inter', sans-serif", grain: 0.07,
-    canvas: "radial-gradient(130% 80% at 50% -12%,rgba(216,169,142,.15),transparent 55%),linear-gradient(180deg,#1F1014,#15090C)",
-    t: { bg:"#1A0F12", panel:"#271519", panel2:"#321A1F", line:"#3E2227", border:"#4A2C30", border2:"#693E43", text:"#F4E6E3", text2:"#DCC2BD", sub:"#A8898A", faint:"#6A4B4C", gold:"#D8A98E", onGold:"#1A0C0E", shadow:"rgba(0,0,0,.6)", overlay:"rgba(10,4,5,0.8)" } },
-  { id: "graphite", name: "Graphite", tagline: "Cold steel & icy light", cat: "Dark", dark: true,
-    disp: "'Jost', sans-serif", body: "'Inter', sans-serif", grain: 0.06,
-    canvas: "linear-gradient(176deg,#1C2024,#141719)",
-    t: { bg:"#16181B", panel:"#21262B", panel2:"#282E34", line:"#323941", border:"#39414A", border2:"#515A64", text:"#EDF1F4", text2:"#CDD4DA", sub:"#8B939B", faint:"#565E66", gold:"#9FB4C4", onGold:"#12171B", shadow:"rgba(0,0,0,.55)", overlay:"rgba(8,10,12,0.8)" } },
+  { id: "emerald-noir", name: "Emerald Noir", tagline: "Deep emerald, electric mint", cat: "Bold & Sleek", dark: true,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.055,
+    canvas: "radial-gradient(130% 100% at 80% -10%,#0e3a2c,#07120e 60%)",
+    grad: "linear-gradient(135deg,#3BE5AD,#12C088 52%,#059E6C)",
+    t: { bg:"#07120E", panel:"#0F1D17", panel2:"#17271F", line:"#1C2E25", border:"#25392F", border2:"#385446", text:"#ECF6F0", text2:"#B2C9BD", sub:"#84A192", faint:"#5E7468", gold:"#16C98C", onGold:"#04130D", live:"#3BE5AD", shadow:"rgba(0,0,0,.5)", overlay:"rgba(4,10,8,0.8)" } },
+  { id: "cobalt-night", name: "Cobalt Night", tagline: "Ink navy, electric cobalt", cat: "Bold & Sleek", dark: true,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.05,
+    canvas: "radial-gradient(130% 100% at 78% -10%,#13234a,#090d18 55%)",
+    grad: "linear-gradient(135deg,#5372C7,#3A66EA 55%,#2A50D8)",
+    t: { bg:"#090D18", panel:"#131A2C", panel2:"#1B2440", line:"#222C46", border:"#2C3650", border2:"#3E4A6A", text:"#EFF3FC", text2:"#B5C2DA", sub:"#8B9CBB", faint:"#5F6F90", gold:"#3A66EA", onGold:"#FFFFFF", live:"#6A92FF", shadow:"rgba(0,0,0,.55)", overlay:"rgba(5,8,16,0.8)" } },
+  { id: "ultraviolet", name: "Ultraviolet", tagline: "Indigo black, violet beam", cat: "Bold & Sleek", dark: true,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.05,
+    canvas: "radial-gradient(130% 100% at 50% -10%,#241f55,#0b0a1a 60%)",
+    grad: "linear-gradient(135deg,#7465D1,#6D5CF0 52%,#4F3FD6)",
+    t: { bg:"#0B0A1A", panel:"#14132B", panel2:"#1C1B3A", line:"#221F44", border:"#2A2850", border2:"#3D3A6E", text:"#EFEDFB", text2:"#BDB8E0", sub:"#908AC0", faint:"#635D90", gold:"#6D5CF0", onGold:"#FFFFFF", live:"#8E7BFF", shadow:"rgba(0,0,0,.55)", overlay:"rgba(6,5,16,0.8)" } },
+  { id: "aubergine-orchid", name: "Aubergine Orchid", tagline: "Aubergine & orchid glow", cat: "Bold & Sleek", dark: true,
+    disp: "'Playfair Display', serif", body: "'Inter', sans-serif", grain: 0.055,
+    canvas: "radial-gradient(125% 95% at 20% -10%,#2b1442,#120a18 58%)",
+    grad: "linear-gradient(135deg,#E875DA,#C94FE0 50%,#9B4DFF)",
+    t: { bg:"#120A18", panel:"#1E1227", panel2:"#281834", line:"#2D1B3B", border:"#392447", border2:"#553466", text:"#F4ECF8", text2:"#CDB8DA", sub:"#A186B2", faint:"#816C90", gold:"#C94FE0", onGold:"#1B0820", live:"#E875DA", shadow:"rgba(0,0,0,.55)", overlay:"rgba(9,5,14,0.8)" } },
+  { id: "cyan", name: "Cyan", tagline: "Deep sea & electric cyan", cat: "Bold & Sleek", dark: true,
+    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.05,
+    canvas: "radial-gradient(130% 100% at 80% -10%,#0e3a45,#07131a 60%)",
+    grad: "linear-gradient(135deg,#3FE0EE,#15C0D6 52%,#0AA0C0)",
+    t: { bg:"#07131A", panel:"#0E1F29", panel2:"#152A36", line:"#1A323E", border:"#1F3B49", border2:"#305264", text:"#E6F6FB", text2:"#AECEDA", sub:"#80A6B4", faint:"#577684", gold:"#15C0D6", onGold:"#04161B", live:"#3FE0EE", shadow:"rgba(0,0,0,.5)", overlay:"rgba(4,11,15,0.8)" } },
 ];
-const THEME_CATS = ["Light", "Dark"];
+const THEME_CATS = ["Crisp & Minimal", "Bold & Sleek"];
 const THEME_IDS = THEMES.map((t) => t.id);
 const buildThemeCSS = () => THEMES.map((th) => {
   const v = th.t;
@@ -9139,7 +9137,7 @@ function OpenShopEditor({ onClose, onCreated }) {
       const { data: created, error } = await supabase.rpc("create_shop", { p_slug: effSlug, p_name: name.trim() });
       if (error || !created) { setErr(error ? error.message : "Couldn't open the shop."); setBusy(false); return; }
       // First full save — boots the shop with a clean config in the Electric identity.
-      const biz = { ...DEFAULT_BUSINESS, name: name.trim(), industry, theme: "electric", address: "", address2: "", cityZip: "", email: "", legalName: "", phones: [{ id: "ph1", label: "Main", number: "" }] };
+      const biz = { ...DEFAULT_BUSINESS, name: name.trim(), industry, theme: "cobalt", address: "", address2: "", cityZip: "", email: "", legalName: "", phones: [{ id: "ph1", label: "Main", number: "" }] };
       await supabase.from("shops").upsert({ id: created, name: name.trim(), settings: { ...biz, _categories: ["Services"] } });
       // Seed the industry starter menu.
       const menu = STARTER_MENUS[industry] || STARTER_MENUS.barber;
@@ -14046,7 +14044,7 @@ function AppearancePicker({ theme, setTheme }) {
 
   return (
     <div>
-      <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 22 }}>Each theme is a complete look — color, depth, and type together. Tap one to wear it everywhere.</div>
+      <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 22 }}>Each theme is a complete look — color, depth, and type together. Tap one to apply and save it instantly.</div>
 
       {THEME_CATS.map((cat) => (
         <div key={cat} style={{ marginBottom: 26 }}>
@@ -16098,7 +16096,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     {
       id: "theme", title: "Theme", icon: (THEMES.find((x) => x.id === theme)?.dark) ? Moon : Sun, category: "Business Setup",
       status: THEMES.find((x) => x.id === theme)?.name || "Theme", keywords: "theme appearance light dark mode color display look style vibe palette font accent barbershop tattoo spa salon",
-      editor: (<AppearancePicker theme={(form?.theme && THEME_IDS.includes(form.theme)) ? form.theme : theme} setTheme={(id) => setForm({ ...form, theme: id })} />),
+      editor: (<AppearancePicker theme={(form?.theme && THEME_IDS.includes(form.theme)) ? form.theme : theme} setTheme={(id) => { setForm({ ...form, theme: id }); setTheme(id); showToast("Theme saved"); }} />),
     },
     {
       id: "photos", title: "Display Preferences", icon: ImageIcon, category: "Calendar & Appointments",
