@@ -25,11 +25,18 @@ async function handler(req, res) {
 
   const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
   const TZ = process.env.SHOP_TZ || "America/Los_Angeles";
-  const mdFmt = new Intl.DateTimeFormat("en-US", { timeZone: TZ, month: "2-digit", day: "2-digit" });
-  const yrFmt = new Intl.DateTimeFormat("en-US", { timeZone: TZ, year: "numeric" });
   const today = new Date();
-  const todayMD = mdFmt.format(today);   // "MM/DD" in the shop's timezone
-  const year = yrFmt.format(today);
+  // Some serverless runtimes ship without the IANA timezone database and throw
+  // "RangeError: Invalid time zone specified" on a named zone. Try the shop tz; if it
+  // throws, fall back to UTC date parts (date-granular, so birthday matching is unaffected).
+  let todayMD, year;
+  try {
+    todayMD = new Intl.DateTimeFormat("en-US", { timeZone: TZ, month: "2-digit", day: "2-digit" }).format(today);
+    year = new Intl.DateTimeFormat("en-US", { timeZone: TZ, year: "numeric" }).format(today);
+  } catch (e) {
+    todayMD = String(today.getUTCMonth() + 1).padStart(2, "0") + "/" + String(today.getUTCDate()).padStart(2, "0");
+    year = String(today.getUTCFullYear());
+  }
 
   let checked = 0, sent = 0, failed = 0;
 

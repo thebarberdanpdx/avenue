@@ -20,20 +20,31 @@ const isSynced = (a) => !!a && (a.source === "sync" || a._synced);
 // ---- timezone-aware time helpers (must match the browser's local-tz computation) ----
 function localMins(iso, tz) {
   if (/Z$/.test(iso)) {
-    const f = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour12: false, hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(iso));
-    const h = (+f.find((p) => p.type === "hour").value) % 24;
-    const mi = +f.find((p) => p.type === "minute").value;
-    return h * 60 + mi;
+    try {
+      const f = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour12: false, hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(iso));
+      const h = (+f.find((p) => p.type === "hour").value) % 24;
+      const mi = +f.find((p) => p.type === "minute").value;
+      return h * 60 + mi;
+    } catch (e) {
+      // Runtime without the IANA tz database — best-effort UTC instead of crashing the whole sync.
+      const dt = new Date(iso);
+      return dt.getUTCHours() * 60 + dt.getUTCMinutes();
+    }
   }
   const m = iso.match(/T(\d{2}):(\d{2})/);
   return m ? (+m[1]) * 60 + (+m[2]) : 540;
 }
 function floatingToUTC(y, mo, d, h, mi, s, tz) {
   const guess = Date.UTC(y, mo - 1, d, h, mi, s || 0);
-  const shown = new Date(guess).toLocaleString("en-US", { timeZone: tz, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  const m = shown.match(/(\d+)\/(\d+)\/(\d+),?\s+(\d+):(\d+):(\d+)/);
-  const shownUTC = Date.UTC(+m[3], +m[1] - 1, +m[2], +m[4], +m[5], +m[6]);
-  return guess - (shownUTC - guess);
+  try {
+    const shown = new Date(guess).toLocaleString("en-US", { timeZone: tz, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const m = shown.match(/(\d+)\/(\d+)\/(\d+),?\s+(\d+):(\d+):(\d+)/);
+    const shownUTC = Date.UTC(+m[3], +m[1] - 1, +m[2], +m[4], +m[5], +m[6]);
+    return guess - (shownUTC - guess);
+  } catch (e) {
+    // Runtime without the IANA tz database — treat the floating time as UTC (no crash).
+    return guess;
+  }
 }
 function bookedForISO(iso, tz) {
   if (/Z$/.test(iso)) return new Date(iso).toISOString();
