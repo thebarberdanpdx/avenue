@@ -12924,7 +12924,6 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
   const isSyncedA = (a) => a && (a.source === "sync" || a._synced);
   const [busy, setBusy] = useState(false);
   const [blockNotice, setBlockNotice] = useState(null); // { count } when a feed's safety rail trips
-  const [doorNote, setDoorNote] = useState(null); // "apple" | "google" — inline explainer for the not-yet-live doors
   const [showAdd, setShowAdd] = useState(false); // add-a-calendar form open
   const [addProv, setAddProv] = useState("");
   const [addUrl, setAddUrl] = useState("");
@@ -13049,8 +13048,6 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
     if (showToast) showToast("Mirrored appointments cleared.");
   };
 
-  const doorBtn = { width: "100%", display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer", textAlign: "left" };
-  const noteBox = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", margin: "8px 0 4px", fontSize: 13, color: "var(--sub)", lineHeight: 1.55 };
   const smallBtn = { display: "flex", alignItems: "center", gap: 6, background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 9, padding: "9px 12px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: FONT_BODY };
   const selStyle = { width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 12px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY };
 
@@ -13112,22 +13109,11 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
               {staff.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          <button style={doorBtn} onClick={() => setDoorNote(doorNote === "apple" ? null : "apple")}>
-            <Smartphone size={20} style={{ color: "var(--gold)" }} /> Connect an iPhone Calendar <ChevronRight size={16} style={{ marginLeft: "auto", color: "var(--faint)" }} />
-          </button>
-          {doorNote === "apple" && <div style={noteBox}>Coming in the next Vero app update — it'll read the calendar already on the iPhone with one tap. For now, use the paste-a-link option below.</div>}
-          <div style={{ height: 10 }} />
-          <button style={doorBtn} onClick={() => setDoorNote(doorNote === "google" ? null : "google")}>
-            <Globe size={20} style={{ color: "var(--gold)" }} /> Connect Google Calendar <ChevronRight size={16} style={{ marginLeft: "auto", color: "var(--faint)" }} />
-          </button>
-          {doorNote === "google" && <div style={noteBox}>One-tap Google sign-in is being set up. Meanwhile paste Google's “secret address in iCal format” (Google Calendar → Settings → your calendar → Integrate) below.</div>}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0 14px" }}>
-            <div style={{ flex: 1, height: 1, background: "var(--line)" }} /><span style={{ fontSize: 12, color: "var(--faint)", letterSpacing: 1, textTransform: "uppercase" }}>or paste a link</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-          </div>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--sub)", marginBottom: 6 }}>Paste their calendar link</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "4px 6px 4px 14px" }}>
             <Link2 size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             <input value={addUrl} onChange={(e) => setAddUrl(e.target.value)} placeholder="Paste this person's calendar link" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, padding: "12px 0" }} />
-            <button onClick={addFeed} disabled={busy || !addUrl.trim() || !addProv} className="lift" style={{ background: (addUrl.trim() && addProv) ? "var(--gold)" : "var(--border2)", color: (addUrl.trim() && addProv) ? "var(--on-gold)" : "var(--faint)", border: "none", borderRadius: 9, padding: "10px 16px", fontSize: 14, fontWeight: 600, cursor: (addUrl.trim() && addProv) ? "pointer" : "default" }}>{busy ? "…" : "Add"}</button>
+            <button onClick={addFeed} disabled={busy} className="lift" style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 9, padding: "10px 16px", fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>{busy ? "…" : "Add"}</button>
           </div>
           <div style={{ background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", marginTop: 16 }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)", marginBottom: 10 }}>{isIOS ? "On your iPhone" : "How to get the link"}</div>
