@@ -16389,9 +16389,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     { id: "staff", section: "Your shop", label: "Team", icon: Users, desc: "Staff, access & pay", settings: ["staff", "staffpin"] },
     { id: "menu",  section: "What you sell", label: "Services & menu", icon: Scissors, desc: "What you offer & pricing", settings: ["servicesmenu"] },
     { id: "productscat", section: "What you sell", label: "Products", icon: Package, desc: "Retail you sell — haircare, skincare, merch", settings: ["products"] },
-    { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "Times, page & what clients can do", settings: ["avoidgaps", "autotiming", "anyonerouting", "newclients", "booking", "bookingwords", "website", "showprices", "rebook_usual", "family", "refphotos"], groups: [
+    { id: "book",  section: "Booking & money", label: "Online booking", tag: "How clients book you online", icon: Calendar, desc: "Times, page & what clients can do", settings: ["avoidgaps", "autotiming", "anyonerouting", "newclients", "booking", "bookingwords", "website", "reviews", "showprices", "rebook_usual", "family", "refphotos"], groups: [
       { label: "Times & availability", collapse: true, desc: "Booking times, smart timing & who gets the booking", ids: ["avoidgaps", "autotiming", "anyonerouting", "newclients"] },
-      { label: "Your booking page", ids: ["booking", "bookingwords", "website"] },
+      { label: "Your booking page", ids: ["booking", "bookingwords", "website", "reviews"] },
       { label: "What clients can do", ids: ["showprices", "rebook_usual", "family", "refphotos"] },
     ] },
     { id: "pay",   section: "Booking & money", label: "Payments & checkout", icon: CreditCard, desc: "Payments, tips, deposits & rebooking", settings: ["payments", "checkout", "tipping", "rebookco", "policy"], groups: [
