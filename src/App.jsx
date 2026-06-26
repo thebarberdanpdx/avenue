@@ -572,65 +572,47 @@ const FONT_BODY = "var(--font-body, 'Inter', -apple-system, sans-serif)";
 // and feel different, not just recolored.
 // ============================================================
 const THEMES = [
-  // Eleven themes across two lanes: CRISP & MINIMAL (light, one jewel accent) and
-  // BOLD & SLEEK (dark, vivid gradient). Each carries a painted `canvas`, a `grain`
-  // overlay on the full color ramp, plus its display/body fonts. --bg stays a FLAT base
-  // (for color-mix tints); --canvas is the painted background; --grain drives the overlay.
-  // ===== CRISP & MINIMAL — pristine light, one jewel accent =====
+  // Eight themes, two lanes: CRISP & MINIMAL (light) and BOLD & SLEEK (dark). Several model the
+  // feel of well-known booking apps (Square, Mangomint, Boulevard). Each carries a painted
+  // `canvas`, a `grain` overlay, the full color ramp, plus its display/body fonts. --bg stays a
+  // FLAT base (for color-mix tints); --canvas is the painted background; --grain drives the overlay.
+  // ===== CRISP & MINIMAL — pristine light =====
   { id: "studio", name: "Studio", tagline: "Editorial black & white", cat: "Crisp & Minimal", dark: false,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.03,
     canvas: "#FFFFFF",
     t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#FFFFFF", line:"#ECECEC", border:"#DCDCDC", border2:"#CFCFCF", text:"#0A0A0A", text2:"#2E2E2E", sub:"#6B6B6B", faint:"#AEAEAE", gold:"#0A0A0A", onGold:"#FFFFFF", shadow:"rgba(0,0,0,.07)", overlay:"rgba(0,0,0,0.3)" } },
-  { id: "cobalt", name: "Cobalt", tagline: "Porcelain & deep cobalt", cat: "Crisp & Minimal", dark: false,
+  { id: "slate", name: "Slate", tagline: "Simple, polished, neutral", cat: "Crisp & Minimal", dark: false,
+    disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.03,
+    canvas: "linear-gradient(176deg,#FAFBFC,#F0F2F6)",
+    t: { bg:"#F6F7F9", panel:"#FFFFFF", panel2:"#EDEFF3", line:"#E6E8ED", border:"#E0E3E8", border2:"#C8CDD5", text:"#161A20", text2:"#353B45", sub:"#59606B", faint:"#8A8F99", gold:"#4D6079", onGold:"#FFFFFF", shadow:"rgba(20,25,40,.07)", overlay:"rgba(20,22,28,0.4)" } },
+  { id: "square", name: "Square", tagline: "Flat white, neutral, blue", cat: "Crisp & Minimal", dark: false,
+    disp: "'Geist', sans-serif", body: "'Geist', sans-serif", grain: 0.02,
+    canvas: "#FFFFFF",
+    t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F4F5F7", line:"#ECEEF1", border:"#E2E5EA", border2:"#CBCFD7", text:"#0F1115", text2:"#33363D", sub:"#5C6068", faint:"#888D97", gold:"#0A5BE0", onGold:"#FFFFFF", shadow:"rgba(15,20,35,.07)", overlay:"rgba(15,17,21,0.4)" } },
+  { id: "lagoon", name: "Lagoon", tagline: "Navy ink, teal accent", cat: "Crisp & Minimal", dark: false,
+    disp: "'Poppins', sans-serif", body: "'Inter', sans-serif", grain: 0.035,
+    canvas: "linear-gradient(176deg,#FBFEFE,#EDF7F7)",
+    grad: "linear-gradient(135deg,#178285,#127A7E)",
+    t: { bg:"#F7FAFB", panel:"#FFFFFF", panel2:"#E8F4F4", line:"#DFEFEF", border:"#D2E8E8", border2:"#B2D6D6", text:"#1A1F4B", text2:"#3A406A", sub:"#5A6088", faint:"#838BA8", gold:"#148286", onGold:"#FFFFFF", shadow:"rgba(20,45,55,.08)", overlay:"rgba(16,22,40,0.42)" } },
+  { id: "maison", name: "Maison", tagline: "Warm off-white, near-black", cat: "Crisp & Minimal", dark: false,
     disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.04,
-    canvas: "linear-gradient(176deg,#FBFCFE,#F2F6FB)",
-    t: { bg:"#F6F8FB", panel:"#FFFFFF", panel2:"#EFF3F9", line:"#E9EEF5", border:"#DEE5EF", border2:"#C7D1E0", text:"#0E1320", text2:"#38414F", sub:"#555F76", faint:"#8792A8", gold:"#1B54C9", onGold:"#FFFFFF", shadow:"rgba(20,35,70,.08)", overlay:"rgba(14,19,32,0.38)" } },
-  { id: "emerald", name: "Emerald", tagline: "Snow & jewel green", cat: "Crisp & Minimal", dark: false,
-    disp: "'Fraunces', serif", body: "'Inter', sans-serif", grain: 0.04,
-    canvas: "linear-gradient(176deg,#FAFDFB,#F0F7F3)",
-    t: { bg:"#F5F9F6", panel:"#FFFFFF", panel2:"#ECF4EF", line:"#E6EFE9", border:"#D9E6DF", border2:"#BFD3C8", text:"#0B1611", text2:"#324139", sub:"#51655B", faint:"#7E9389", gold:"#0C7A54", onGold:"#FFFFFF", shadow:"rgba(15,55,40,.08)", overlay:"rgba(11,22,17,0.38)" } },
-  { id: "plum", name: "Plum", tagline: "Porcelain & rich violet", cat: "Crisp & Minimal", dark: false,
-    disp: "'Playfair Display', serif", body: "'Inter', sans-serif", grain: 0.04,
-    canvas: "linear-gradient(176deg,#FCFAFD,#F4EFF8)",
-    t: { bg:"#F9F7FB", panel:"#FFFFFF", panel2:"#F2EDF6", line:"#EDE6F2", border:"#E1D7EA", border2:"#C9B9D8", text:"#150F1C", text2:"#3D3247", sub:"#5F5370", faint:"#9990A6", gold:"#6A28C4", onGold:"#FFFFFF", shadow:"rgba(60,30,110,.09)", overlay:"rgba(21,15,28,0.38)" } },
-  { id: "rose", name: "Rose", tagline: "Porcelain & raspberry", cat: "Crisp & Minimal", dark: false,
-    disp: "'Playfair Display', serif", body: "'Inter', sans-serif", grain: 0.04,
-    canvas: "linear-gradient(176deg,#FDFAFC,#F8EFF3)",
-    t: { bg:"#FBF7F9", panel:"#FFFFFF", panel2:"#F7EDF1", line:"#F1E5EB", border:"#EEDCE4", border2:"#DCC0CD", text:"#1C0F15", text2:"#45323A", sub:"#6E5560", faint:"#9C8390", gold:"#C01651", onGold:"#FFFFFF", shadow:"rgba(120,20,60,.09)", overlay:"rgba(28,15,21,0.38)" } },
-  { id: "steel", name: "Steel", tagline: "Porcelain & steel blue", cat: "Crisp & Minimal", dark: false,
-    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.04,
-    canvas: "linear-gradient(176deg,#FBFCFD,#F1F4F6)",
-    t: { bg:"#F7F8F9", panel:"#FFFFFF", panel2:"#EFF1F3", line:"#E8EBEE", border:"#E0E3E7", border2:"#C8CDD3", text:"#14181C", text2:"#3A4046", sub:"#5A6066", faint:"#8C949C", gold:"#33536E", onGold:"#FFFFFF", shadow:"rgba(30,45,60,.08)", overlay:"rgba(20,24,28,0.38)" } },
+    canvas: "linear-gradient(176deg,#FCFAF7,#F4EFE8)",
+    t: { bg:"#FAF8F5", panel:"#FFFFFF", panel2:"#F3EEE7", line:"#ECE6DD", border:"#E4DDD2", border2:"#CFC5B6", text:"#1A1714", text2:"#423C34", sub:"#6A6258", faint:"#968C7C", gold:"#1E1B17", onGold:"#FAF8F5", shadow:"rgba(40,30,15,.08)", overlay:"rgba(26,23,20,0.42)" } },
   // ===== BOLD & SLEEK — deep, dramatic dark themes =====
   { id: "noir", name: "Noir", tagline: "Midnight, lit in platinum", cat: "Bold & Sleek", dark: true,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.08,
     canvas: "linear-gradient(176deg,#121211,#0B0B0A)",
     t: { bg:"#0E0E0D", panel:"#181817", panel2:"#211F1E", line:"#262523", border:"#333230", border2:"#4A4843", text:"#F2F0EC", text2:"#D6D3CC", sub:"#9A988F", faint:"#5C5A54", gold:"#F2F0EC", onGold:"#0A0A0A", shadow:"rgba(0,0,0,.6)", overlay:"rgba(0,0,0,0.85)" } },
-  { id: "emerald-noir", name: "Emerald Noir", tagline: "Deep emerald, electric mint", cat: "Bold & Sleek", dark: true,
-    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.055,
-    canvas: "radial-gradient(130% 100% at 80% -10%,#0e3a2c,#07120e 60%)",
-    grad: "linear-gradient(135deg,#3BE5AD,#12C088 52%,#059E6C)",
-    t: { bg:"#07120E", panel:"#0F1D17", panel2:"#17271F", line:"#1C2E25", border:"#25392F", border2:"#385446", text:"#ECF6F0", text2:"#B2C9BD", sub:"#84A192", faint:"#5E7468", gold:"#16C98C", onGold:"#04130D", live:"#3BE5AD", shadow:"rgba(0,0,0,.5)", overlay:"rgba(4,10,8,0.8)" } },
   { id: "cobalt-night", name: "Cobalt Night", tagline: "Ink navy, electric cobalt", cat: "Bold & Sleek", dark: true,
     disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.05,
     canvas: "radial-gradient(130% 100% at 78% -10%,#13234a,#090d18 55%)",
     grad: "linear-gradient(135deg,#5372C7,#3A66EA 55%,#2A50D8)",
     t: { bg:"#090D18", panel:"#131A2C", panel2:"#1B2440", line:"#222C46", border:"#2C3650", border2:"#3E4A6A", text:"#EFF3FC", text2:"#B5C2DA", sub:"#8B9CBB", faint:"#5F6F90", gold:"#3A66EA", onGold:"#FFFFFF", live:"#6A92FF", shadow:"rgba(0,0,0,.55)", overlay:"rgba(5,8,16,0.8)" } },
-  { id: "ultraviolet", name: "Ultraviolet", tagline: "Indigo black, violet beam", cat: "Bold & Sleek", dark: true,
-    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.05,
-    canvas: "radial-gradient(130% 100% at 50% -10%,#241f55,#0b0a1a 60%)",
-    grad: "linear-gradient(135deg,#7465D1,#6D5CF0 52%,#4F3FD6)",
-    t: { bg:"#0B0A1A", panel:"#14132B", panel2:"#1C1B3A", line:"#221F44", border:"#2A2850", border2:"#3D3A6E", text:"#EFEDFB", text2:"#BDB8E0", sub:"#908AC0", faint:"#635D90", gold:"#6D5CF0", onGold:"#FFFFFF", live:"#8E7BFF", shadow:"rgba(0,0,0,.55)", overlay:"rgba(6,5,16,0.8)" } },
   { id: "aubergine-orchid", name: "Aubergine Orchid", tagline: "Aubergine & orchid glow", cat: "Bold & Sleek", dark: true,
     disp: "'Playfair Display', serif", body: "'Inter', sans-serif", grain: 0.055,
     canvas: "radial-gradient(125% 95% at 20% -10%,#2b1442,#120a18 58%)",
     grad: "linear-gradient(135deg,#E875DA,#C94FE0 50%,#9B4DFF)",
     t: { bg:"#120A18", panel:"#1E1227", panel2:"#281834", line:"#2D1B3B", border:"#392447", border2:"#553466", text:"#F4ECF8", text2:"#CDB8DA", sub:"#A186B2", faint:"#816C90", gold:"#C94FE0", onGold:"#1B0820", live:"#E875DA", shadow:"rgba(0,0,0,.55)", overlay:"rgba(9,5,14,0.8)" } },
-  { id: "cyan", name: "Cyan", tagline: "Deep sea & electric cyan", cat: "Bold & Sleek", dark: true,
-    disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.05,
-    canvas: "radial-gradient(130% 100% at 80% -10%,#0e3a45,#07131a 60%)",
-    grad: "linear-gradient(135deg,#3FE0EE,#15C0D6 52%,#0AA0C0)",
-    t: { bg:"#07131A", panel:"#0E1F29", panel2:"#152A36", line:"#1A323E", border:"#1F3B49", border2:"#305264", text:"#E6F6FB", text2:"#AECEDA", sub:"#80A6B4", faint:"#577684", gold:"#15C0D6", onGold:"#04161B", live:"#3FE0EE", shadow:"rgba(0,0,0,.5)", overlay:"rgba(4,11,15,0.8)" } },
 ];
 const THEME_CATS = ["Crisp & Minimal", "Bold & Sleek"];
 const THEME_IDS = THEMES.map((t) => t.id);
@@ -9137,7 +9119,7 @@ function OpenShopEditor({ onClose, onCreated }) {
       const { data: created, error } = await supabase.rpc("create_shop", { p_slug: effSlug, p_name: name.trim() });
       if (error || !created) { setErr(error ? error.message : "Couldn't open the shop."); setBusy(false); return; }
       // First full save — boots the shop with a clean config in the Electric identity.
-      const biz = { ...DEFAULT_BUSINESS, name: name.trim(), industry, theme: "cobalt", address: "", address2: "", cityZip: "", email: "", legalName: "", phones: [{ id: "ph1", label: "Main", number: "" }] };
+      const biz = { ...DEFAULT_BUSINESS, name: name.trim(), industry, theme: "slate", address: "", address2: "", cityZip: "", email: "", legalName: "", phones: [{ id: "ph1", label: "Main", number: "" }] };
       await supabase.from("shops").upsert({ id: created, name: name.trim(), settings: { ...biz, _categories: ["Services"] } });
       // Seed the industry starter menu.
       const menu = STARTER_MENUS[industry] || STARTER_MENUS.barber;
