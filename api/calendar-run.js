@@ -61,86 +61,126 @@ const splitSummary = (s) => {
 
 import { safeFetch } from "../lib/safeFetch.js";
 
-async function syncShop(supabase, shop) {
-  const { data: shopRow } = await supabase.from("shops").select("settings,name").eq("id", shop).maybeSingle();
-  const settings = (shopRow && shopRow.settings) || {};
-  const cfg = settings.calSync || {};
-  if (!cfg.url || cfg.paused) return { shop, skipped: true };
-  const tz = cfg.tz || DEFAULT_TZ;
-  const providers = (settings._providers || []).filter((p) => p && p.id !== "anyone"); // usually absent; matching falls back below
-  const defaultProviderId = (providers[0] || {}).id || null;
+// A feed id is derived from its URL so it's stable across staff re-assignment.
+// MUST match feedIdFor in src/App.jsx.
+const feedIdFor = (url) => "f" + Math.abs(hashStr(String(url || "").trim().replace(/^webcal:\/\//i, "https://"))).toString(36);
 
-  // Fetch + parse the feed.
-  const url = cfg.url.replace(/^webcal:\/\//i, "https://");
-  let events;
-  try {
-    const r = await safeFetch(url, { headers: { Accept: "text/calendar, */*" } });
-    if (!r.ok) throw new Error("status " + r.status);
-    const text = await r.text();
-    if (!/BEGIN:VCALENDAR/i.test(text)) throw new Error("not a calendar");
-    events = parseICS(text);
-  } catch (e) {
-    await writeCfg(supabase, shop, shopRow, { lastSyncAt: Date.now(), lastError: "Couldn't read the feed." });
-    return { shop, error: "fetch", detail: String(e.message || e) };
-  }
-
-  // Existing synced appts.
-  const { data: rows } = await supabase.from("appointments").select("id,data").eq("shop_id", shop);
-  const existing = (rows || []).map((r) => r.data).filter(Boolean);
-  const existingSynced = existing.filter(isSynced);
-  const byUid = new Map();
-  for (const a of existingSynced) if (a.syncUid) byUid.set(a.syncUid, a);
-
-  const incoming = (events || []).filter((e) => e && e.uid && !e.cancelled && !e.allDay);
-  const incomingUids = new Set(incoming.map((e) => e.uid));
-
-  let added = 0, moved = 0;
-  const keep = [];
-  for (const ev of incoming) {
-    const ex = byUid.get(ev.uid);
+// Reconcile ONE feed (one staff member's calendar) into the appt list. Mirrors
+// reconcileFeed() in src/App.jsx: forces every event onto feed.providerId, tags syncFeed,
+// claims legacy untagged rows by UID, and scopes its safety rail to its own appts only.
+function reconcileFeedServer(currentAppts, events, opts) {
+  const providerId = opts.providerId || null;
+  const feedId = opts.feedId;
+  const tz = opts.tz || DEFAULT_TZ;
+  const toAppt = (ev, ex) => {
     const { name, service } = splitSummary(ev.summary);
     const start = localMins(ev.start, tz);
     let end = ev.end ? localMins(ev.end, tz) : null;
     if (end == null || end <= start) end = start + 30;
-    const appt = {
-      id: ex ? ex.id : ("sync_" + hashStr(ev.uid).toString(36)),
-      source: "sync", _synced: true, syncUid: ev.uid,
-      providerId: ex ? ex.providerId : defaultProviderId,
+    return {
+      id: ex ? ex.id : ("sync_" + feedId + "_" + hashStr(ev.uid).toString(36)),
+      source: "sync", _synced: true, syncUid: ev.uid, syncFeed: feedId,
+      providerId,
       clientId: null, serviceId: ex ? ex.serviceId : null,
       start, end, bookedFor: bookedForISO(ev.start, tz),
       status: "confirmed", name, title: service || "Appointment", serviceName: service || "",
       price: 0, phone: "", hasPhotos: false, photos: 0, hasNote: false, vip: false,
     };
+  };
+  const incoming = (events || []).filter((e) => e && e.uid && !e.cancelled && !e.allDay);
+  const incomingUids = new Set(incoming.map((e) => e.uid));
+  const incomingByUid = new Map(); for (const e of incoming) incomingByUid.set(e.uid, e);
+  const allSynced = (currentAppts || []).filter(isSynced);
+  const mine = allSynced.filter((a) => a.syncFeed === feedId || (a.syncFeed == null && a.syncUid && incomingUids.has(a.syncUid)));
+  const mineSet = new Set(mine);
+  const rest = (currentAppts || []).filter((a) => !mineSet.has(a));
+  const byUid = new Map(); for (const a of mine) if (a.syncUid) byUid.set(a.syncUid, a);
+  let added = 0, moved = 0; const kept = [];
+  for (const e of incoming) {
+    const ex = byUid.get(e.uid);
+    const appt = toAppt(e, ex);
     if (!ex) added++;
-    else if (ex.start !== appt.start || ex.end !== appt.end || ex.bookedFor !== appt.bookedFor || ex.title !== appt.title) moved++;
-    keep.push(appt);
+    else if (ex.start !== appt.start || ex.end !== appt.end || ex.bookedFor !== appt.bookedFor || ex.title !== appt.title || ex.providerId !== appt.providerId) moved++;
+    kept.push(appt);
   }
-  const toDelete = existingSynced.filter((a) => a.syncUid && !incomingUids.has(a.syncUid)).map((a) => String(a.id));
-
-  // Safety rail: empty/glitchy feed must never wipe the mirror.
-  const emptyFeed = incoming.length === 0 && existingSynced.length > 0;
-  const tooMany = toDelete.length > Math.max(5, Math.ceil(existingSynced.length * 0.34));
+  const toCancel = mine.filter((a) => a.syncUid && !incomingUids.has(a.syncUid));
+  const emptyFeed = incoming.length === 0 && mine.length > 0;
+  const tooMany = toCancel.length > Math.max(5, Math.ceil(mine.length * 0.34));
   if (emptyFeed || tooMany) {
-    await writeCfg(supabase, shop, shopRow, { lastSyncAt: Date.now(), lastError: "Feed looked wrong — kept existing appointments.", lastBlockedCount: toDelete.length });
-    return { shop, blocked: true, blockedCount: toDelete.length };
+    const safe = mine.map((a) => { const e = incomingByUid.get(a.syncUid); return e ? toAppt(e, a) : a; });
+    const brandNew = kept.filter((a) => !byUid.has(a.syncUid));
+    return { next: [...rest, ...safe, ...brandNew], changes: { added, moved, cancelled: 0 }, blocked: true, blockedCount: toCancel.length };
+  }
+  return { next: [...rest, ...kept], changes: { added, moved, cancelled: toCancel.length }, blocked: false, blockedCount: 0 };
+}
+
+async function syncShop(supabase, shop) {
+  const { data: shopRow } = await supabase.from("shops").select("settings,name").eq("id", shop).maybeSingle();
+  const settings = (shopRow && shopRow.settings) || {};
+  const cfg = settings.calSync || {};
+  const tz = cfg.tz || DEFAULT_TZ;
+  // New shape: cfg.feeds [{id,providerId,url,paused}]. Legacy: a single cfg.url assigned to
+  // the first staff member (best effort) until the owner migrates via the app.
+  const legacyProvider = (((settings._providers || []).filter((p) => p && p.id !== "anyone")[0]) || {}).id || null;
+  let feeds = Array.isArray(cfg.feeds)
+    ? cfg.feeds
+    : (cfg.url ? [{ id: feedIdFor(cfg.url), providerId: legacyProvider, url: cfg.url, paused: cfg.paused }] : []);
+  const active = feeds.filter((f) => f && f.url && f.providerId && !f.paused);
+  if (!active.length) return { shop, skipped: true };
+
+  // Load all appts once; thread them through every feed's reconcile.
+  const { data: rows } = await supabase.from("appointments").select("id,data").eq("shop_id", shop);
+  let working = (rows || []).map((r) => r.data).filter(Boolean);
+  const existingSyncedIds = (rows || []).filter((r) => isSynced(r.data)).map((r) => String(r.id));
+
+  let totalAdded = 0, totalMoved = 0, blockedAny = 0;
+  const perFeed = {};
+  for (const f of active) {
+    const url = f.url.replace(/^webcal:\/\//i, "https://");
+    let events;
+    try {
+      const r = await safeFetch(url, { headers: { Accept: "text/calendar, */*" } });
+      if (!r.ok) throw new Error("status " + r.status);
+      const text = await r.text();
+      if (!/BEGIN:VCALENDAR/i.test(text)) throw new Error("not a calendar");
+      events = parseICS(text);
+    } catch (e) {
+      perFeed[f.id] = { error: "Couldn't read the feed." };
+      continue; // leave this feed's existing appts untouched
+    }
+    const res = reconcileFeedServer(working, events, { providerId: f.providerId, feedId: f.id, tz });
+    working = res.next;
+    totalAdded += res.changes.added; totalMoved += res.changes.moved;
+    if (res.blocked) blockedAny += res.blockedCount;
+    perFeed[f.id] = { changes: res.changes, blocked: res.blocked, blockedCount: res.blockedCount };
   }
 
-  if (keep.length) {
-    const upRows = keep.map((a) => ({ id: String(a.id), shop_id: shop, data: a }));
+  // Persist: upsert every synced appt now in `working`; delete synced rows no longer present.
+  const desiredSynced = working.filter(isSynced);
+  const keepIds = new Set(desiredSynced.map((a) => String(a.id)));
+  if (desiredSynced.length) {
+    const upRows = desiredSynced.map((a) => ({ id: String(a.id), shop_id: shop, data: a }));
     const { error: upErr } = await supabase.from("appointments").upsert(upRows);
     if (upErr) return { shop, error: "upsert", detail: upErr.message };
   }
+  const toDelete = existingSyncedIds.filter((id) => !keepIds.has(id));
   let removed = 0;
   if (toDelete.length) {
     const { error: delErr } = await supabase.from("appointments").delete().eq("shop_id", shop).in("id", toDelete);
     if (delErr) return { shop, error: "delete", detail: delErr.message };
     removed = toDelete.length;
   }
-  const changes = { added, moved, cancelled: removed };
-  await writeCfg(supabase, shop, shopRow, { lastSyncAt: Date.now(), lastError: null, lastBlockedCount: 0, lastChanges: changes, connectedVia: cfg.connectedVia || "link" });
-  return { shop, ok: true, total: keep.length, ...changes };
+  const changes = { added: totalAdded, moved: totalMoved, cancelled: removed };
+  // Stamp per-feed status back onto the config (migrates legacy url -> feeds, clears url).
+  const nextFeeds = feeds.map((f) => {
+    const rr = perFeed[f.id];
+    if (!rr) return f;
+    return { ...f, lastError: rr.error || null, lastChanges: rr.error ? f.lastChanges : rr.changes, lastBlockedCount: rr.blocked ? rr.blockedCount : 0, lastSyncAt: Date.now() };
+  });
+  await writeCfg(supabase, shop, shopRow, { feeds: nextFeeds, url: "", lastSyncAt: Date.now(), lastError: null, lastChanges: changes });
+  if (blockedAny) return { shop, blocked: true, blockedCount: blockedAny, ...changes };
+  return { shop, ok: true, total: desiredSynced.length, ...changes };
 }
-
 async function writeCfg(supabase, shop, shopRow, patch) {
   const settings = (shopRow && shopRow.settings) || {};
   settings.calSync = { ...(settings.calSync || {}), ...patch };
@@ -169,7 +209,7 @@ async function handler(req, res) {
     else {
       // every shop with a connected, non-paused calendar
       const { data } = await supabase.from("shops").select("id,settings");
-      shops = (data || []).filter((s) => { const c = s.settings && s.settings.calSync; return c && c.url && !c.paused; }).map((s) => s.id);
+      shops = (data || []).filter((s) => { const c = s.settings && s.settings.calSync; if (!c) return false; if (Array.isArray(c.feeds)) return c.feeds.some((f) => f && f.url && f.providerId && !f.paused); return c.url && !c.paused; }).map((s) => s.id);
     }
     const results = [];
     for (const shop of shops) results.push(await syncShop(supabase, shop));

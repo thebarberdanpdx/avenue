@@ -12820,14 +12820,22 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
 // The "brain": take the events read from a calendar feed and reconcile them into
 // Vero's appointment list — add new ones, move changed ones, drop cancelled ones —
 // WITHOUT ever touching native (non-synced) appointments or firing a notification.
-// Synced appointments carry source:"sync" + a syncUid so re-running is idempotent.
+// A feed id is derived from its URL so it's stable across provider re-assignment.
+// One imported calendar = one feed = one staff member. Mirror in api/calendar-run.js.
+const feedIdFor = (url) => "f" + Math.abs(hashStr(String(url || "").trim().replace(/^webcal:\/\//i, "https://"))).toString(36);
+
+// Reconcile ONE feed (one staff member's imported calendar) into the appointment list.
+// Every event from this feed is attributed to feed.providerId — no name-guessing — and
+// tagged with syncFeed so feeds never touch each other's appointments. Legacy synced
+// appts (from the old single-feed era, no syncFeed) are CLAIMED by UID so re-attributing
+// them to the right staff reuses the same rows instead of duplicating.
 //
 // Returns { next, changes:{added,moved,cancelled}, blocked, blockedCount }.
-//   `blocked` is the safety rail: if a feed comes back empty or wants to remove a
-//   suspicious number of appointments at once, we change NOTHING and flag it.
-function reconcileCalendarSync(currentAppts, events, opts = {}) {
-  const providers = (opts.providers || []).filter((p) => p && p.id !== "anyone");
-  const defaultProviderId = (providers[0] || {}).id || null;
+//   `blocked` is the safety rail: if this feed comes back empty or wants to remove a
+//   suspicious number of its own appointments at once, we change NOTHING and flag it.
+function reconcileFeed(currentAppts, events, opts = {}) {
+  const providerId = opts.providerId || null;
+  const feedId = opts.feedId || (opts.url ? feedIdFor(opts.url) : null);
   const services = opts.services || [];
 
   // Best-effort split of a calendar title like "Greg Kuhns - Haircut" into name + service.
@@ -12837,11 +12845,6 @@ function reconcileCalendarSync(currentAppts, events, opts = {}) {
     if (parts.length >= 2) return { name: parts[0].trim(), service: parts.slice(1).join(" - ").trim() };
     return { name: raw || "Client", service: "" };
   };
-  const matchProvider = (summary) => {
-    const t = (summary || "").toLowerCase();
-    const hit = providers.find((p) => { const f = (p.name || "").toLowerCase().split(" ")[0]; return f && t.includes(f); });
-    return hit ? hit.id : defaultProviderId;
-  };
   const matchService = (svcName) => {
     const t = (svcName || "").toLowerCase();
     if (!t) return null;
@@ -12850,7 +12853,7 @@ function reconcileCalendarSync(currentAppts, events, opts = {}) {
   };
   const minsOf = (iso) => { const d = new Date(iso); return isNaN(d) ? null : d.getHours() * 60 + d.getMinutes(); };
 
-  // Build the desired Vero appointment for one feed event.
+  // Build the desired Vero appointment for one feed event — always under this feed's staff.
   const toAppt = (ev, existing) => {
     const { name, service } = splitSummary(ev.summary);
     const startMin = minsOf(ev.start);
@@ -12859,9 +12862,9 @@ function reconcileCalendarSync(currentAppts, events, opts = {}) {
     if (endMin == null || endMin <= startMin) endMin = startMin + 30;
     const bf = new Date(ev.start);
     return {
-      id: existing ? existing.id : ("sync_" + Math.abs(hashStr(ev.uid)).toString(36)),
-      source: "sync", _synced: true, syncUid: ev.uid,
-      providerId: existing ? existing.providerId : matchProvider(ev.summary),
+      id: existing ? existing.id : ("sync_" + feedId + "_" + Math.abs(hashStr(ev.uid)).toString(36)),
+      source: "sync", _synced: true, syncUid: ev.uid, syncFeed: feedId,
+      providerId, // the staff member this whole calendar belongs to
       clientId: null, serviceId: matchService(service),
       start: startMin, end: endMin, bookedFor: isNaN(bf) ? null : bf.toISOString(),
       status: "confirmed", name, title: service || "Appointment", serviceName: service || "",
@@ -12872,11 +12875,16 @@ function reconcileCalendarSync(currentAppts, events, opts = {}) {
   const incoming = (events || []).filter((e) => e && e.uid && !e.cancelled && !e.allDay);
   const incomingByUid = new Map();
   for (const e of incoming) incomingByUid.set(e.uid, e);
+  const incomingUids = new Set(incoming.map((e) => e.uid));
 
-  const synced = (currentAppts || []).filter((a) => a && (a.source === "sync" || a._synced));
-  const others = (currentAppts || []).filter((a) => !(a && (a.source === "sync" || a._synced)));
+  const allSynced = (currentAppts || []).filter((a) => a && (a.source === "sync" || a._synced));
+  // "mine" = appts already tagged to this feed, PLUS legacy untagged synced appts whose
+  // UID this feed supplies (so the old mis-attributed rows get reclaimed, not duplicated).
+  const mine = allSynced.filter((a) => a.syncFeed === feedId || (a.syncFeed == null && a.syncUid && incomingUids.has(a.syncUid)));
+  const mineSet = new Set(mine);
+  const rest = (currentAppts || []).filter((a) => !mineSet.has(a)); // everything else preserved verbatim
   const syncedByUid = new Map();
-  for (const a of synced) if (a.syncUid) syncedByUid.set(a.syncUid, a);
+  for (const a of mine) if (a.syncUid) syncedByUid.set(a.syncUid, a);
 
   let added = 0, moved = 0;
   const kept = [];
@@ -12886,219 +12894,260 @@ function reconcileCalendarSync(currentAppts, events, opts = {}) {
     if (!appt) continue;
     if (!existing) { added++; kept.push(appt); }
     else {
-      if (existing.start !== appt.start || existing.bookedFor !== appt.bookedFor || existing.end !== appt.end || existing.title !== appt.title) moved++;
+      if (existing.start !== appt.start || existing.bookedFor !== appt.bookedFor || existing.end !== appt.end || existing.title !== appt.title || existing.providerId !== appt.providerId) moved++;
       kept.push(appt);
     }
   }
-  // Synced appts whose feed event vanished → candidates for removal.
-  const toCancel = synced.filter((a) => a.syncUid && !incomingByUid.has(a.syncUid));
+  // This feed's appts whose event vanished → candidates for removal (scoped to this feed only).
+  const toCancel = mine.filter((a) => a.syncUid && !incomingByUid.has(a.syncUid));
 
-  // Safety rail: never let a bad/empty feed wipe the calendar.
-  const emptyFeed = incoming.length === 0 && synced.length > 0;
-  const threshold = Math.max(5, Math.ceil(synced.length * 0.34));
+  // Safety rail: never let a bad/empty feed wipe its own mirror.
+  const emptyFeed = incoming.length === 0 && mine.length > 0;
+  const threshold = Math.max(5, Math.ceil(mine.length * 0.34));
   const tooMany = toCancel.length > threshold;
   if (emptyFeed || tooMany) {
-    // Apply nothing destructive; keep existing synced appts as-is, still add brand-new ones.
-    const safeNext = [...others, ...synced.map((a) => { const e = incomingByUid.get(a.syncUid); return e ? (toAppt(e, a) || a) : a; }),
+    // Apply nothing destructive; keep this feed's existing appts as-is, still add brand-new ones.
+    const safeNext = [...rest, ...mine.map((a) => { const e = incomingByUid.get(a.syncUid); return e ? (toAppt(e, a) || a) : a; }),
       ...kept.filter((a) => !syncedByUid.has(a.syncUid))];
     return { next: safeNext, changes: { added, moved, cancelled: 0 }, blocked: true, blockedCount: toCancel.length };
   }
 
-  const next = [...others, ...kept];
+  const next = [...rest, ...kept];
   return { next, changes: { added, moved, cancelled: toCancel.length }, blocked: false, blockedCount: 0 };
 }
 
-// "Sync a calendar" door — paste a calendar link (Apple/Google buttons live here too).
-// Connecting turns this same screen into the live Sync panel the owner watches.
+// "Sync calendars" door — mirror each staff member's outside calendar (Mangomint, Apple,
+// Google) into Vero. One calendar per person, each tagged to that staff member so feeds
+// never mix and everyone can see everyone on Vero's calendar.
 function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], setAppts, business, setBusiness, showToast }) {
   const cfg = (business && business.calSync) || {};
-  const connected = !!cfg.url;
-  const [urlInput, setUrlInput] = useState(cfg.url || "");
+  const isSyncedA = (a) => a && (a.source === "sync" || a._synced);
   const [busy, setBusy] = useState(false);
-  const [blockNotice, setBlockNotice] = useState(null); // { count } when the safety rail trips
+  const [blockNotice, setBlockNotice] = useState(null); // { count } when a feed's safety rail trips
   const [doorNote, setDoorNote] = useState(null); // "apple" | "google" — inline explainer for the not-yet-live doors
-  const [confirmDisconnect, setConfirmDisconnect] = useState(false); // remove-sync choice (keep vs clear mirrored appts)
+  const [showAdd, setShowAdd] = useState(false); // add-a-calendar form open
+  const [addProv, setAddProv] = useState("");
+  const [addUrl, setAddUrl] = useState("");
+  const [confirmRemove, setConfirmRemove] = useState(null); // feed id pending remove confirmation
   const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent || "");
 
-  const saveCfg = (patch) => setBusiness((b) => ({ ...(b || {}), calSync: { ...((b && b.calSync) || {}), ...patch } }));
+  // Staff who can own a calendar (no "anyone", no archived).
+  const staff = (providers || []).filter((p) => p && p.id !== "anyone" && !p.archived);
+  const provName = (pid) => { const p = (providers || []).find((x) => x.id === pid); return p ? p.name : null; };
 
-  const runSync = async (rawUrl, opts = {}) => {
-    const url = (rawUrl || "").trim().replace(/^webcal:\/\//i, "https://");
-    if (!url) return;
+  // Current feeds. Migrate the old single-feed shape ({url,...}) into one unassigned feed so an
+  // existing connection keeps working and just needs a staff member picked (the old bug: every
+  // imported appt landed on the first staff member because there was nowhere to say whose it was).
+  const feeds = useMemo(() => {
+    if (Array.isArray(cfg.feeds)) return cfg.feeds;
+    if (cfg.url) return [{ id: feedIdFor(cfg.url), providerId: null, url: cfg.url, paused: !!cfg.paused, lastChanges: cfg.lastChanges, lastError: cfg.lastError, lastBlockedCount: cfg.lastBlockedCount, lastSyncAt: cfg.lastSyncAt }];
+    return [];
+  }, [cfg]);
+
+  const saveFeeds = (nextFeeds, extra = {}) => setBusiness((b) => ({ ...(b || {}), calSync: { ...((b && b.calSync) || {}), feeds: nextFeeds, url: "", ...extra } }));
+  const serverConfig = async (patch) => { try { return fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: await authedHeaders(), body: JSON.stringify({ shop: shopId, mode: "config", calSync: patch }) }); } catch (e) { return null; } };
+
+  const syncedCount = (appts || []).filter(isSyncedA).length;
+  const feedCount = (id) => (appts || []).filter((a) => isSyncedA(a) && a.syncFeed === id).length;
+  const ago = (ts) => { if (!ts) return "never"; const s = Math.round((Date.now() - ts) / 1000); if (s < 60) return "just now"; const m = Math.round(s / 60); if (m < 60) return `${m} min ago`; const h = Math.round(m / 60); if (h < 24) return `${h} hr ago`; return `${Math.round(h / 24)} d ago`; };
+
+  // Sync every assigned, non-paused feed in one pass (threaded so feeds never clobber each other).
+  const runAll = async (opts = {}) => {
     if (busy) return;
+    const active = feeds.filter((f) => f.url && f.providerId && !f.paused);
+    if (!active.length) { if (!opts.quiet && showToast) showToast("Assign each calendar to a staff member first."); return; }
     setBusy(true); setBlockNotice(null);
     try {
-      const r = await fetch(API_BASE + "/api/calendar-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) { saveCfg({ url, lastSyncAt: Date.now(), lastError: data.error || "Couldn't read the calendar." }); if (showToast) showToast(data.error || "Couldn't read that calendar."); return; }
-      const result = reconcileCalendarSync(appts, data.events || [], { providers, services });
-      const syncedNext = (result.next || []).filter((a) => a && (a.source === "sync" || a._synced));
+      let working = appts || [];
+      const byFeed = {};
+      let blockedCount = null;
+      for (const f of active) {
+        try {
+          const r = await fetch(API_BASE + "/api/calendar-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: f.url }) });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) { byFeed[f.id] = { error: data.error || "Couldn't read the calendar." }; continue; }
+          const result = reconcileFeed(working, data.events || [], { providerId: f.providerId, feedId: f.id, services });
+          working = result.next;
+          byFeed[f.id] = { changes: result.changes, blocked: result.blocked, blockedCount: result.blockedCount };
+          if (result.blocked) blockedCount = result.blockedCount;
+        } catch (e) { byFeed[f.id] = { error: "network" }; }
+      }
+      const syncedNext = working.filter(isSyncedA);
       let tz; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
-      const calSyncPatch = { url, connectedVia: cfg.connectedVia || "link", lastChanges: result.changes, lastBlockedCount: result.blocked ? result.blockedCount : 0, ...(tz ? { tz } : {}) };
-      // Persist through the SERVER (service key) — this is what actually saves, bypassing the
-      // client's save-gate which can silently block writes when an initial load errored.
+      const nextFeeds = feeds.map((f) => { const rr = byFeed[f.id]; if (!rr) return f; return { ...f, lastChanges: rr.changes || f.lastChanges, lastError: rr.error || null, lastBlockedCount: rr.blocked ? rr.blockedCount : 0, lastSyncAt: Date.now() }; });
+      const calSyncPatch = { feeds: nextFeeds, url: "", lastSyncAt: Date.now(), ...(tz ? { tz } : {}) };
+      // Persist through the SERVER (service key) — bypasses the client save-gate which can
+      // silently block writes when an initial load errored.
       let serverOk = false, serverErr = null;
       try {
         const pr = await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: await authedHeaders(), body: JSON.stringify({ shop: shopId, mode: "sync", syncedAppts: syncedNext, calSync: calSyncPatch }) });
-        const pdata = await pr.json().catch(() => ({}));
-        serverOk = pr.ok && pdata.ok; serverErr = pdata.error || null;
+        const pd = await pr.json().catch(() => ({})); serverOk = pr.ok && pd.ok; serverErr = pd.error || null;
       } catch (e) { serverErr = "network"; }
-      setAppts(result.next); // local display (server is the source of truth for persistence)
-      saveCfg({ ...calSyncPatch, lastSyncAt: Date.now(), lastError: serverOk ? null : (serverErr ? "Couldn't save to server — will retry." : null) });
-      if (result.blocked) {
-        setBlockNotice({ count: result.blockedCount });
-        if (showToast) showToast(`Sync paused a big change — ${result.blockedCount} would have been removed. Tap Sync now to confirm.`);
-        return;
-      }
+      setAppts(working);
+      saveFeeds(nextFeeds, { lastSyncAt: Date.now() });
+      if (blockedCount != null) { setBlockNotice({ count: blockedCount }); if (showToast) showToast(`Held off a big change — ${blockedCount} would have been removed. Tap Sync now to confirm.`); return; }
       if (!opts.quiet && showToast) {
-        const c = result.changes;
+        const tot = Object.values(byFeed).reduce((n, r) => n + (r.changes ? (r.changes.added + r.changes.moved + r.changes.cancelled) : 0), 0);
+        const anyErr = Object.values(byFeed).some((r) => r.error);
         if (!serverOk) showToast("Synced on-screen, but the server save failed — check connection and tap Sync again.");
-        else showToast(c.added + c.moved + c.cancelled === 0 ? "Already up to date." : `Synced — added ${c.added}, moved ${c.moved}, removed ${c.cancelled}.`);
+        else if (anyErr) showToast("Synced, but one calendar couldn't be read. Check its link.");
+        else showToast(tot === 0 ? "Already up to date." : "Calendars synced.");
       }
     } catch (e) {
-      saveCfg({ lastSyncAt: Date.now(), lastError: "Network error — will retry." });
-      if (showToast && !opts.quiet) showToast("Couldn't reach the calendar. Check your connection.");
+      if (showToast && !opts.quiet) showToast("Couldn't reach the calendars. Check your connection.");
     } finally { setBusy(false); }
   };
 
-  // Auto-poll every 6 min while connected, not paused, and the dashboard is open.
+  // Auto-poll every minute while any feed is assigned, not paused, and the dashboard is open.
+  const activeKey = feeds.filter((f) => f.url && f.providerId && !f.paused).map((f) => f.id).join(",");
   useEffect(() => {
-    if (!connected || cfg.paused) return;
-    const id = setInterval(() => { runSync(cfg.url, { quiet: true }); }, 60 * 1000);
+    if (!activeKey) return;
+    const id = setInterval(() => { runAll({ quiet: true }); }, 60 * 1000);
     return () => clearInterval(id);
-  }, [connected, cfg.paused, cfg.url]); // eslint-disable-line
+  }, [activeKey]); // eslint-disable-line
 
-  // Persist a config-only change (pause/resume, keep-disconnect) through the server.
-  const serverConfig = async (patch) => { try { return fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: await authedHeaders(), body: JSON.stringify({ shop: shopId, mode: "config", calSync: patch }) }); } catch (e) { return null; } };
-  const connect = () => { const u = urlInput.trim(); if (!u) { if (showToast) showToast("Paste your calendar link first."); return; } saveCfg({ url: u.replace(/^webcal:\/\//i, "https://"), connectedVia: "link", paused: false }); runSync(u); };
-  // Stop syncing. `removeAppts` also pulls the mirrored appointments back off Vero's calendar (server-side).
-  const disconnect = async (removeAppts) => {
-    if (removeAppts) {
-      setAppts((cur) => (cur || []).filter((a) => !(a && (a.source === "sync" || a._synced))));
-      try { await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: await authedHeaders(), body: JSON.stringify({ shop: shopId, mode: "clear" }) }); } catch (e) {}
-    } else {
-      serverConfig({ url: "", connectedVia: null, paused: false, lastChanges: null, lastError: null });
-    }
-    saveCfg({ url: "", connectedVia: null, paused: false, lastChanges: null, lastError: null });
-    setUrlInput(""); setConfirmDisconnect(false);
-    if (showToast) showToast(removeAppts ? "Sync removed and mirrored appointments cleared." : "Sync stopped. Mirrored appointments left on your calendar.");
+  const addFeed = () => {
+    const url = (addUrl || "").trim().replace(/^webcal:\/\//i, "https://");
+    if (!url) { if (showToast) showToast("Paste the calendar link first."); return; }
+    if (!addProv) { if (showToast) showToast("Pick which staff member this calendar is for."); return; }
+    const id = feedIdFor(url);
+    if (feeds.some((f) => f.id === id)) { if (showToast) showToast("That calendar link is already added."); return; }
+    const nextFeeds = [...feeds, { id, providerId: addProv, url, paused: false }];
+    saveFeeds(nextFeeds);
+    setAddUrl(""); setAddProv(""); setShowAdd(false);
+    setTimeout(() => runAll(), 0);
   };
-  const togglePause = () => { const p = !cfg.paused; saveCfg({ paused: p }); serverConfig({ paused: p }); if (!p) runSync(cfg.url); };
 
-  const ago = (ts) => { if (!ts) return "never"; const s = Math.round((Date.now() - ts) / 1000); if (s < 60) return "just now"; const m = Math.round(s / 60); if (m < 60) return `${m} min ago`; const h = Math.round(m / 60); if (h < 24) return `${h} hr ago`; return `${Math.round(h / 24)} d ago`; };
-  const syncedCount = (appts || []).filter((a) => a && (a.source === "sync" || a._synced)).length;
+  const setFeedProvider = (id, pid) => { const nf = feeds.map((f) => f.id === id ? { ...f, providerId: pid || null } : f); saveFeeds(nf); if (pid) setTimeout(() => runAll(), 0); };
+  const togglePauseFeed = (id) => { const f = feeds.find((x) => x.id === id); const nf = feeds.map((x) => x.id === id ? { ...x, paused: !x.paused } : x); saveFeeds(nf); serverConfig({ feeds: nf }); if (f && f.paused) setTimeout(() => runAll(), 0); };
+
+  const removeFeed = async (id) => {
+    const nf = feeds.filter((f) => f.id !== id);
+    const working = (appts || []).filter((a) => !(isSyncedA(a) && a.syncFeed === id));
+    const syncedNext = working.filter(isSyncedA);
+    setAppts(working); saveFeeds(nf); setConfirmRemove(null);
+    try {
+      if (!nf.length || syncedNext.length === 0) {
+        // No synced appts left to anchor a "sync" call (the server's empty-set rail would block it),
+        // so wipe all synced + url with "clear", then re-save any remaining feeds.
+        await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: await authedHeaders(), body: JSON.stringify({ shop: shopId, mode: "clear" }) });
+        if (nf.length) await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: await authedHeaders(), body: JSON.stringify({ shop: shopId, mode: "config", calSync: { feeds: nf, url: "" } }) });
+      } else {
+        await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: await authedHeaders(), body: JSON.stringify({ shop: shopId, mode: "sync", syncedAppts: syncedNext, calSync: { feeds: nf, url: "" } }) });
+      }
+    } catch (e) {}
+    if (showToast) showToast("Calendar removed.");
+  };
+
+  const clearLeftover = async () => {
+    setAppts((cur) => (cur || []).filter((a) => !isSyncedA(a)));
+    try { await fetch(API_BASE + "/api/calendar-pull", { method: "POST", headers: await authedHeaders(), body: JSON.stringify({ shop: shopId, mode: "clear" }) }); } catch (e) {}
+    if (showToast) showToast("Mirrored appointments cleared.");
+  };
 
   const doorBtn = { width: "100%", display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer", textAlign: "left" };
+  const noteBox = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", margin: "8px 0 4px", fontSize: 13, color: "var(--sub)", lineHeight: 1.55 };
+  const smallBtn = { display: "flex", alignItems: "center", gap: 6, background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 9, padding: "9px 12px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: FONT_BODY };
+  const selStyle = { width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 12px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY };
 
-  // ---- Connected: the live Sync panel ----
-  if (connected) {
-    const c = cfg.lastChanges || { added: 0, moved: 0, cancelled: 0 };
-    return (
-      <div>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 14, padding: 16, marginBottom: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
-            <span style={{ width: 9, height: 9, borderRadius: 9, background: cfg.paused ? "var(--faint)" : "#5E8C61", flexShrink: 0 }} />
-            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{cfg.paused ? "Sync paused" : "Synced"}</span>
-            <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--faint)" }}>{cfg.lastError ? "needs attention" : `${ago(cfg.lastSyncAt)}`}</span>
-          </div>
-          <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5 }}>
-            {syncedCount} appointment{syncedCount === 1 ? "" : "s"} mirrored{cfg.paused ? "" : " · checks every minute while open"}.
-            {cfg.lastError ? <><br /><span style={{ color: "#c0392b" }}>{cfg.lastError}</span></> : null}
-          </div>
-          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 7 }}>Last check: added {c.added} · moved {c.moved} · removed {c.cancelled}</div>
-        </div>
-
-        {blockNotice && (
-          <div style={{ display: "flex", gap: 10, background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
-            <AlertTriangle size={18} style={{ color: "#c0392b", flexShrink: 0, marginTop: 1 }} />
-            <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>I held off — this sync wanted to remove <strong>{blockNotice.count}</strong> appointments at once, which usually means a feed glitch, not real cancellations. Nothing was deleted. If those really were cancelled, tap <strong>Sync now</strong> again to apply.</div>
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-          <button onClick={() => runSync(cfg.url)} disabled={busy} className="lift" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: 13, fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}><RotateCw size={16} />{busy ? "Syncing…" : "Sync now"}</button>
-          <button onClick={togglePause} disabled={busy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 11, padding: 13, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>{cfg.paused ? <><Play size={15} /> Resume</> : <><Pause size={15} /> Pause</>}</button>
-        </div>
-        {confirmDisconnect ? (
-          <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: 12, background: "var(--panel)", marginTop: 4 }}>
-            <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.5, marginBottom: 12 }}>Stop syncing this calendar. Keep the {syncedCount} mirrored appointment{syncedCount === 1 ? "" : "s"} on your calendar, or remove them too?</div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => disconnect(false)} style={{ flex: 1, background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, fontSize: 13.5, fontWeight: 500, cursor: "pointer" }}>Keep them</button>
-              <button onClick={() => disconnect(true)} style={{ flex: 1, background: "color-mix(in srgb, #c0392b 14%, var(--panel))", color: "var(--text)", border: "1px solid color-mix(in srgb, #c0392b 40%, transparent)", borderRadius: 10, padding: 12, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Remove them</button>
-            </div>
-            <button onClick={() => setConfirmDisconnect(false)} style={{ width: "100%", background: "transparent", color: "var(--sub)", border: "none", padding: "10px 0 2px", fontSize: 13, cursor: "pointer" }}>Cancel</button>
-          </div>
-        ) : (
-          <button onClick={() => setConfirmDisconnect(true)} style={{ width: "100%", background: "transparent", color: "var(--sub)", border: "none", padding: 10, fontSize: 13, cursor: "pointer" }}>Disconnect calendar</button>
-        )}
-        <p style={{ color: "var(--faint)", fontSize: 12, lineHeight: 1.5, marginTop: 8, textAlign: "center" }}>Clients are never notified about mirrored appointments. Vero won't double-book over them.</p>
-      </div>
-    );
-  }
-
-  // ---- Not connected yet: the three doors + instructions ----
   return (
     <div>
-      {/* Leftover cleanup: mirrored appts can linger after a disconnect — offer to clear them even when not connected. */}
-      {syncedCount > 0 && (
-        confirmDisconnect ? (
-          <div style={{ padding: 14, border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, background: "var(--panel)", marginBottom: 16 }}>
-            <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.5, marginBottom: 12 }}>Remove the {syncedCount} mirrored appointment{syncedCount === 1 ? "" : "s"} left on your calendar from an earlier sync? This won't touch any appointment you booked in Vero.</div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => disconnect(true)} style={{ flex: 1, background: "#c0392b", color: "#fff", border: "none", borderRadius: 10, padding: 12, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Remove them</button>
-              <button onClick={() => setConfirmDisconnect(false)} style={{ flex: 1, background: "transparent", color: "var(--sub)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, fontSize: 13.5, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
-            <div style={{ flex: 1, fontSize: 13, color: "var(--sub)", lineHeight: 1.45 }}><strong style={{ color: "var(--text)" }}>{syncedCount} mirrored appointment{syncedCount === 1 ? "" : "s"}</strong> from a previous sync are still on your calendar.</div>
-            <button onClick={() => setConfirmDisconnect(true)} style={{ flexShrink: 0, background: "transparent", color: "#c0392b", border: "1px solid color-mix(in srgb, #c0392b 45%, var(--border))", borderRadius: 9, padding: "9px 13px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Remove</button>
-          </div>
-        )
-      )}
-      <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, margin: "0 0 16px" }}>Mirror your existing calendar into Vero. Future appointments flow in automatically — cancellations and reschedules adjust on their own, and <strong>clients are never notified</strong>.</p>
-
-      <button style={doorBtn} onClick={() => setDoorNote(doorNote === "apple" ? null : "apple")}>
-        <Smartphone size={20} style={{ color: "var(--gold)" }} /> Connect my iPhone Calendar <ChevronRight size={16} style={{ marginLeft: "auto", color: "var(--faint)" }} />
-      </button>
-      {doorNote === "apple" && (
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", margin: "8px 0 4px", fontSize: 13, color: "var(--sub)", lineHeight: 1.55 }}>
-          Coming in the next Vero app update — it'll read the Mangomint calendar already on your iPhone with one tap (“Allow”). No link to copy. For now, use the paste-a-link option below.
+      {blockNotice && (
+        <div style={{ display: "flex", gap: 10, background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
+          <AlertTriangle size={18} style={{ color: "#c0392b", flexShrink: 0, marginTop: 1 }} />
+          <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.5 }}>I held off — a sync wanted to remove <strong>{blockNotice.count}</strong> appointments at once, which usually means a feed glitch, not real cancellations. Nothing was deleted. If those really were cancelled, tap <strong>Sync now</strong> again.</div>
         </div>
       )}
 
-      <div style={{ height: 10 }} />
-      <button style={doorBtn} onClick={() => setDoorNote(doorNote === "google" ? null : "google")}>
-        <Globe size={20} style={{ color: "var(--gold)" }} /> Connect Google Calendar <ChevronRight size={16} style={{ marginLeft: "auto", color: "var(--faint)" }} />
-      </button>
-      {doorNote === "google" && (
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", margin: "8px 0 4px", fontSize: 13, color: "var(--sub)", lineHeight: 1.55 }}>
-          One-tap Google sign-in is being set up. In the meantime, your Google calendar has a “secret address in iCal format” link (Google Calendar → Settings → your calendar → Integrate) you can paste below.
+      {feeds.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          {feeds.map((f) => {
+            const n = feedCount(f.id);
+            const unassigned = !f.providerId;
+            return (
+              <div key={f.id} style={{ background: "var(--panel)", border: "1px solid " + (unassigned ? "color-mix(in srgb,#c0392b 35%,var(--border))" : "var(--border2)"), borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 9, background: f.paused ? "var(--faint)" : (unassigned ? "#c0392b" : "#5E8C61"), flexShrink: 0 }} />
+                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17 }}>{provName(f.providerId) || "Unassigned calendar"}</span>
+                  <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--faint)" }}>{f.paused ? "paused" : ago(f.lastSyncAt)}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 12.5, color: "var(--sub)", flexShrink: 0 }}>Whose calendar:</span>
+                  <select value={f.providerId || ""} onChange={(e) => setFeedProvider(f.id, e.target.value)} style={{ ...selStyle, padding: "8px 10px", fontSize: 13.5 }}>
+                    <option value="">Choose staff…</option>
+                    {staff.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5 }}>
+                  {unassigned
+                    ? <span style={{ color: "#c0392b" }}>Pick a staff member so these appointments show under the right name.</span>
+                    : <>{n} appointment{n === 1 ? "" : "s"} mirrored{f.paused ? "" : " · checks every minute while open"}.{f.lastError ? <><br /><span style={{ color: "#c0392b" }}>{f.lastError}</span></> : null}</>}
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button onClick={() => togglePauseFeed(f.id)} style={smallBtn}>{f.paused ? <><Play size={13} /> Resume</> : <><Pause size={13} /> Pause</>}</button>
+                  {confirmRemove === f.id
+                    ? <><button onClick={() => removeFeed(f.id)} style={{ ...smallBtn, color: "#fff", background: "#c0392b", border: "none" }}><Trash2 size={13} /> Remove for good</button><button onClick={() => setConfirmRemove(null)} style={smallBtn}>Cancel</button></>
+                    : <button onClick={() => setConfirmRemove(f.id)} style={smallBtn}><Trash2 size={13} /> Remove</button>}
+                </div>
+              </div>
+            );
+          })}
+          <button onClick={() => runAll()} disabled={busy} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: 13, fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}><RotateCw size={16} />{busy ? "Syncing…" : "Sync now"}</button>
         </div>
       )}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0 14px" }}>
-        <div style={{ flex: 1, height: 1, background: "var(--line)" }} /><span style={{ fontSize: 12, color: "var(--faint)", letterSpacing: 1, textTransform: "uppercase" }}>or paste a link</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-      </div>
+      {!showAdd ? (
+        <button onClick={() => setShowAdd(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", border: "1px dashed var(--border2)", borderRadius: 12, padding: 13, color: "var(--text)", fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}><Plus size={16} /> {feeds.length ? "Add another calendar" : "Connect a calendar"}</button>
+      ) : (
+        <div style={{ border: "1px solid var(--border2)", borderRadius: 14, padding: 16 }}>
+          <p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.55, margin: "0 0 14px" }}>Mirror one staff member's outside calendar into Vero — <strong>one calendar per person</strong>. Add each person's so you all see each other. Future appointments flow in automatically and <strong>clients are never notified</strong>.</p>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--sub)", marginBottom: 6 }}>Whose calendar is this?</div>
+            <select value={addProv} onChange={(e) => setAddProv(e.target.value)} style={selStyle}>
+              <option value="">Choose staff…</option>
+              {staff.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <button style={doorBtn} onClick={() => setDoorNote(doorNote === "apple" ? null : "apple")}>
+            <Smartphone size={20} style={{ color: "var(--gold)" }} /> Connect an iPhone Calendar <ChevronRight size={16} style={{ marginLeft: "auto", color: "var(--faint)" }} />
+          </button>
+          {doorNote === "apple" && <div style={noteBox}>Coming in the next Vero app update — it'll read the calendar already on the iPhone with one tap. For now, use the paste-a-link option below.</div>}
+          <div style={{ height: 10 }} />
+          <button style={doorBtn} onClick={() => setDoorNote(doorNote === "google" ? null : "google")}>
+            <Globe size={20} style={{ color: "var(--gold)" }} /> Connect Google Calendar <ChevronRight size={16} style={{ marginLeft: "auto", color: "var(--faint)" }} />
+          </button>
+          {doorNote === "google" && <div style={noteBox}>One-tap Google sign-in is being set up. Meanwhile paste Google's “secret address in iCal format” (Google Calendar → Settings → your calendar → Integrate) below.</div>}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0 14px" }}>
+            <div style={{ flex: 1, height: 1, background: "var(--line)" }} /><span style={{ fontSize: 12, color: "var(--faint)", letterSpacing: 1, textTransform: "uppercase" }}>or paste a link</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "4px 6px 4px 14px" }}>
+            <Link2 size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+            <input value={addUrl} onChange={(e) => setAddUrl(e.target.value)} placeholder="Paste this person's calendar link" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, padding: "12px 0" }} />
+            <button onClick={addFeed} disabled={busy || !addUrl.trim() || !addProv} className="lift" style={{ background: (addUrl.trim() && addProv) ? "var(--gold)" : "var(--border2)", color: (addUrl.trim() && addProv) ? "var(--on-gold)" : "var(--faint)", border: "none", borderRadius: 9, padding: "10px 16px", fontSize: 14, fontWeight: 600, cursor: (addUrl.trim() && addProv) ? "pointer" : "default" }}>{busy ? "…" : "Add"}</button>
+          </div>
+          <div style={{ background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", marginTop: 16 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)", marginBottom: 10 }}>{isIOS ? "On your iPhone" : "How to get the link"}</div>
+            <ol style={{ margin: 0, paddingLeft: 18, color: "var(--sub)", fontSize: 13.5, lineHeight: 1.7 }}>
+              <li>In Mangomint, open <strong>that staff member's Calendar → Sync / Subscribe</strong> and copy the link. <span style={{ color: "var(--faint)" }}>(Mangomint support will send it if you ask.)</span></li>
+              <li>Pick the staff member above, then {isIOS ? "double-tap → Paste" : "press and hold → Paste"} the link.</li>
+              <li>Tap <strong>Add</strong>. Repeat for each person so you all see each other.</li>
+            </ol>
+          </div>
+          <button onClick={() => { setShowAdd(false); setAddUrl(""); setAddProv(""); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", border: "none", padding: "12px 0 2px", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+        </div>
+      )}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "4px 6px 4px 14px" }}>
-        <Link2 size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
-        <input value={urlInput} onChange={(e) => setUrlInput(e.target.value)} placeholder="Paste your calendar link here" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, padding: "12px 0" }} />
-        <button onClick={connect} disabled={busy || !urlInput.trim()} className="lift" style={{ background: urlInput.trim() ? "var(--gold)" : "var(--border2)", color: urlInput.trim() ? "var(--on-gold)" : "var(--faint)", border: "none", borderRadius: 9, padding: "10px 16px", fontSize: 14, fontWeight: 600, cursor: urlInput.trim() ? "pointer" : "default" }}>{busy ? "…" : "Sync"}</button>
-      </div>
+      {feeds.length === 0 && syncedCount > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "12px 14px", marginTop: 14 }}>
+          <div style={{ flex: 1, fontSize: 13, color: "var(--sub)", lineHeight: 1.45 }}><strong style={{ color: "var(--text)" }}>{syncedCount} mirrored appointment{syncedCount === 1 ? "" : "s"}</strong> from a previous sync are still on your calendar.</div>
+          <button onClick={clearLeftover} style={{ flexShrink: 0, background: "transparent", color: "#c0392b", border: "1px solid color-mix(in srgb,#c0392b 45%,var(--border))", borderRadius: 9, padding: "9px 13px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Remove</button>
+        </div>
+      )}
 
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", marginTop: 18 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)", marginBottom: 10 }}>{isIOS ? "On your iPhone" : "How to get your link"}</div>
-        <ol style={{ margin: 0, paddingLeft: 18, color: "var(--sub)", fontSize: 13.5, lineHeight: 1.7 }}>
-          <li>In Mangomint, open <strong>Calendar → Sync / Subscribe</strong> and copy the calendar link. <span style={{ color: "var(--faint)" }}>(Can't find it? Mangomint support will send it if you ask — that's all we need.)</span></li>
-          <li>Come back here, tap the box above, {isIOS ? "double-tap → Paste" : "press and hold → Paste"}.</li>
-          <li>Tap <strong>Sync</strong>. Watch the “Synced ✓” panel appear.</li>
-        </ol>
-      </div>
+      <p style={{ color: "var(--faint)", fontSize: 12, lineHeight: 1.5, marginTop: 14, textAlign: "center" }}>Clients are never notified about mirrored appointments. Vero won't double-book over them. Everyone sees each connected calendar on Vero's calendar.</p>
     </div>
   );
 }
-
 // Wraps the two migration doors (spreadsheet + calendar) behind one toggle inside the Import card.
 function ImportHub(props) {
   const [mode, setMode] = useState("file"); // "file" | "calendar"
