@@ -8,7 +8,7 @@ import {
   Settings, Image as ImageIcon, Lock, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
   BarChart3, TrendingUp, Palette, Globe, HelpCircle, BookOpen, Search, LifeBuoy, Scissors, Package,
-  Smartphone, Link2, AlertTriangle, Pause, Play, RotateCw, UserPlus
+  Smartphone, Link2, AlertTriangle, Pause, Play, RotateCw, UserPlus, Star
 } from "lucide-react";
 
 // ============================================================
@@ -314,6 +314,12 @@ const DEFAULT_BUSINESS = {
   // ---- Staff push alerts: which appointment events push the team's iOS app. Read by
   //      fireStaffPush (the real gate). Default all on = preserves prior always-push behavior. ----
   staffAlerts: { newBooking: true, rescheduled: true, checkedIn: true, emailStaffOnBooking: true, bookingAlertScope: "assigned" },
+  // ---- Customer reviews: after-visit review requests + internal moderation + storefront social proof.
+  //      enabled = master off until the owner sets it up. afterVisit = only ask once a client has
+  //      come this many times (returning clients leave more, more honest reviews). autoApprove=false
+  //      means every review waits for owner approval before it can show publicly (owner's requirement).
+  //      googleReviewUrl (optional) is offered to EVERY reviewer the same way (compliant — no star-gating). ----
+  reviews: { enabled: false, afterVisit: 2, channel: "both", oncePerClient: true, googleReviewUrl: "", autoApprove: false, showOnStorefront: true, body: "" },
   // ---- Locations: off by default; turns on for multi-location businesses ----
   multiLocation: false,
   locations: [
@@ -1270,10 +1276,11 @@ function App() {
     const hash = window.location.hash.toLowerCase();
     if (path === "/book" || path === "/client" || hash === "#book" || hash === "#client") return "client";
     if (path === "/manage" && new URLSearchParams(window.location.search).get("t")) return "managetoken";
+    if (path === "/review" && new URLSearchParams(window.location.search).get("t")) return "reviewtoken";
     // Pretty shop URL — gotvero.com/<slug> is that shop's PUBLIC booking page.
     // (Staff reach a shop's dashboard via ?shop=<slug> or <slug>#staff; root stays the dashboard.)
     const seg0 = path.split("/").filter(Boolean)[0];
-    if (seg0 && !["book", "client", "manage", "terms", "privacy", "preview", "index.html"].includes(seg0) && hash !== "#staff") return "client";
+    if (seg0 && !["book", "client", "manage", "review", "terms", "privacy", "preview", "index.html"].includes(seg0) && hash !== "#staff") return "client";
     return "shop";
   });
   const [clientNonce, setClientNonce] = useState(0); // bump to restart the booking flow fresh
@@ -1371,7 +1378,7 @@ function App() {
     const h = window.location.hash.toLowerCase();
     const path = window.location.pathname.toLowerCase().replace(/\/+$/, "");
     const wantsBooking = path === "/book" || path === "/client" || h === "#book" || h === "#client"
-      || (() => { const s = path.split("/").filter(Boolean)[0]; return !!s && !["book", "client", "manage", "terms", "privacy", "preview", "index.html"].includes(s) && h !== "#staff"; })();
+      || (() => { const s = path.split("/").filter(Boolean)[0]; return !!s && !["book", "client", "manage", "review", "terms", "privacy", "preview", "index.html"].includes(s) && h !== "#staff"; })();
     if (wantsBooking) {
       // Client booking link: clear any leftover staff-login intent so it can't pull the
       // booking page into the dashboard, then show booking.
@@ -1427,6 +1434,7 @@ function App() {
     { id: "w1", name: "Andre Foster", phone: "503-555-0277", provider: "Dan", day: "This week", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 3 * 3600e3).toLocaleString() },
     { id: "w2", name: "Sam Rivera", phone: "503-555-0291", provider: "Dan", day: "Any day", when: "midday", service: "Haircut", photos: 0, at: new Date(Date.now() - 1 * 3600e3).toLocaleString() },
   ]);
+  const [reviews, setReviews] = useState([]); // customer reviews (pending/published/declined); public submissions land here via RPC
   const [business, setBusiness] = useState(DEFAULT_BUSINESS);
   const [services, setServices] = useState(DEFAULT_SERVICES);
   const [categories, setCategories] = useState(["Services"]); // ordered list of category names
@@ -1502,7 +1510,7 @@ function App() {
       const seg = url.pathname.split('/').filter(Boolean)[0];
       if (seg) {
         const s = seg.toLowerCase();
-        if (!['book', 'client', 'staff', 'manage', 'terms', 'privacy', 'preview', 'index.html'].includes(s)) {
+        if (!['book', 'client', 'staff', 'manage', 'review', 'terms', 'privacy', 'preview', 'index.html'].includes(s)) {
           return s.replace(/[^a-z0-9-]/g, '') || FALLBACK;
         }
       }
@@ -1803,7 +1811,7 @@ function App() {
   // Full barber records (with PINs) and the waitlist (client phone numbers) load ONLY for signed-in
   // staff — overwriting the sanitized public baseline. For public visitors the waitlist stays empty.
   useEffect(() => {
-    if (!session) { lastRemoteRef.current.waitlist = []; setWaitlist([]); return; }
+    if (!session) { lastRemoteRef.current.waitlist = []; setWaitlist([]); lastRemoteRef.current.reviews = []; setReviews([]); return; }
     let alive = true;
     (async () => {
       const provBusy = () => { const s = savingRef.current.providers; return providersDirtyRef.current || (s && (s.running || s.queued)); };
@@ -1816,6 +1824,9 @@ function App() {
       }
       const wl = await supabase.from('waitlist').select('data').eq('shop_id', SHOP_ID);
       if (alive && !wl.error && Array.isArray(wl.data)) { const list = wl.data.map((r) => r.data); lastRemoteRef.current.waitlist = list; setWaitlist(list); }
+      // Reviews hold client names + comments, so (like waitlist) they load ONLY for signed-in staff.
+      // The 'reviews' table may not exist yet (owner hasn't run the SQL) — a load error is harmless.
+      try { const rv = await supabase.from('reviews').select('data').eq('shop_id', SHOP_ID); if (alive && !rv.error && Array.isArray(rv.data)) { const list = rv.data.map((r) => r.data); lastRemoteRef.current.reviews = list; setReviews(list); } } catch (e) {}
     })();
     return () => { alive = false; };
   }, [session]);
@@ -1868,6 +1879,7 @@ function App() {
   useEffect(() => { if (!loadedRef.current || !session) return; if (clients === lastRemoteRef.current.clients) return; lastSaveAt.current.clients = Date.now(); const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (appts === lastRemoteRef.current.appointments) return; lastSaveAt.current.appointments = Date.now(); const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; lastSaveAt.current.waitlist = Date.now(); const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (reviews === lastRemoteRef.current.reviews) return; lastSaveAt.current.reviews = Date.now(); const t = setTimeout(() => { syncList('reviews', reviews); }, 800); return () => clearTimeout(t); }, [reviews]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (services === lastRemoteRef.current.services) return; lastSaveAt.current.services = Date.now(); const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
   useEffect(() => { if (!loadedRef.current || !session) return; if (providers === lastRemoteRef.current.providers) return; lastSaveAt.current.providers = Date.now(); providersDirtyRef.current = true; const t = setTimeout(() => { syncList('providers', providers).finally(() => { providersDirtyRef.current = false; }); }, 800); return () => clearTimeout(t); }, [providers]);
 
@@ -2093,10 +2105,11 @@ function App() {
         : <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} />)}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={goBooking} />}
       {view === "managetoken" && <ManageByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} providers={providers} services={services} onExit={goBooking} />}
+      {view === "reviewtoken" && <ReviewByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} onExit={goBooking} />}
       {view === "shop" && (session
         ? (masterMode
           ? <MasterDashboard authEmail={session?.user?.email || null} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} />
-          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} />)
+          : <ShopDashboard authEmail={session?.user?.email || null} shopId={SHOP_ID} business={business} setBusiness={setBusiness} services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} setProviders={setProviders} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} theme={theme} setTheme={setTheme} dataLoaded={dataLoaded} recoveryCode={SHOP_PASSWORD} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} deepLinkApptId={pendingApptId} onDeepLinkHandled={() => setPendingApptId(null)} onSignOutAccount={async () => { try { await supabase.auth.signOut(); } catch (e) {} setView("shop"); }} onExit={() => { setView("shop"); }} />)
         : <StaffLogin authReady={authReady} onBack={() => { try { localStorage.removeItem("vero_login_intent"); } catch (e) {} goBooking(); }} />)}
     </div>
   );
@@ -2785,6 +2798,39 @@ function fireStaffNotify({ shopId, appt, business }) {
   } catch (e) {}
 }
 
+// Default after-visit review-request wording (owner can override in Settings → Customer Reviews).
+const DEFAULT_REVIEW_BODY = "Thanks for coming in, {client}! How was your visit with {provider}? We'd love a quick review — it only takes a second and it really helps {business}.\n\n{review link}";
+
+// Ask a client for a review after a completed/paid visit. Fire-and-forget via /api/notify
+// (email now, SMS once SMS_LIVE flips — same channel rules as every other message). Gated by:
+// reviews.enabled, the visit-count threshold (visitNo), per-client opt-out, and having contact info.
+// COMPLIANCE: this asks EVERY eligible client the same way — no filtering by predicted sentiment.
+function fireReviewRequest({ appt, business, providers, client, contact, visitNo }) {
+  try {
+    if (!appt || !business) return;
+    const cfg = business.reviews || {};
+    if (!cfg.enabled) return;
+    if (client && client.reviewOptOut) return;
+    if ((visitNo || 0) < (cfg.afterVisit || 2)) return;
+    if (!appt.manageToken || typeof window === "undefined") return;
+    const email = ((contact && contact.email) || "").trim();
+    const phone = ((contact && contact.phone) || "").trim();
+    if (!email && !phone) return;
+    const prov = (providers || []).find((p) => p.id === appt.providerId) || {};
+    const ctx = {
+      client: String((client && client.name) || appt.name || "there").split(" ")[0],
+      business: business.name || "your shop",
+      service: appt.serviceName || appt.title || "your visit",
+      provider: prov.name || appt.providerName || "your barber",
+      reviewUrl: `${window.location.origin}/review?t=${appt.manageToken}`,
+    };
+    fetch(API_BASE + "/api/notify", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: cfg.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: `${business.name}: How was your visit?`, template: cfg.body || DEFAULT_REVIEW_BODY, context: ctx }),
+    }).catch(() => {});
+  } catch (e) {}
+}
+
 // Horizontally-scrollable example-photo strip shown under a service while booking,
 // so clients can see what the service looks like before they pick it. Tap a photo
 // to open it full-screen. Lightweight — only renders when the service has photos.
@@ -2911,6 +2957,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [matched, setMatched] = useState(null);
   const [myAppts, setMyAppts] = useState([]); // a verified returning client's OWN bookings (via get_client_appointments) — RLS-safe; replaces reading the full appts list
   const [showHome, setShowHome] = useState(false); // logged-in returning client's home (their info, next/recent visits, family) — the landing after verify + return-to after booking
+  // Published reviews for storefront social proof (public RPC, no PII). Empty if reviews off / none yet / RPC not created.
+  const [pubReviews, setPubReviews] = useState([]);
+  useEffect(() => {
+    if (!shopId || business?.reviews?.showOnStorefront === false) { setPubReviews([]); return; }
+    let alive = true;
+    (async () => { try { const { data, error } = await supabase.rpc("get_published_reviews", { p_shop: shopId }); if (alive && !error && Array.isArray(data)) setPubReviews(data); } catch (e) {} })();
+    return () => { alive = false; };
+  }, [shopId, business?.reviews?.showOnStorefront]);
+  const reviewAgg = useMemo(() => { const n = pubReviews.length; const avg = n ? (pubReviews.reduce((s, r) => s + (r.rating || 0), 0) / n) : 0; return { n, avg }; }, [pubReviews]);
   // ── Stay logged in ──────────────────────────────────────────────────────────
   // Persist a verified returning client for this shop so they stay logged in across
   // reloads AND any in-session remounts (the booking flow remounts via clientNonce).
@@ -3796,6 +3851,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 4, fontWeight: 600, color: "var(--text2)", textTransform: "uppercase", marginBottom: 16 }}>Welcome to</div>
               <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 40, fontWeight: 500, lineHeight: 1.06, letterSpacing: "-0.5px", margin: "0 0 14px", color: "var(--text)" }}>{business.name}</h1>
               <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 16.5, fontWeight: 400, lineHeight: 1.5, margin: "0 auto", maxWidth: 340 }}>Glad you're here. Let's find you a time.</p>
+              {reviewAgg.n >= 1 && (
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 16, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 999, padding: "7px 15px" }}>
+                  <span style={{ display: "flex", gap: 1.5 }}>{[1, 2, 3, 4, 5].map((n) => <Star key={n} size={14} style={{ color: "var(--gold)", fill: n <= Math.round(reviewAgg.avg) ? "var(--gold)" : "transparent" }} />)}</span>
+                  <span style={{ fontSize: 13.5, color: "var(--text2)", fontWeight: 500 }}>{reviewAgg.avg.toFixed(1)} · {reviewAgg.n} review{reviewAgg.n === 1 ? "" : "s"}</span>
+                </div>
+              )}
             </div>
             <div style={{ display: "grid", gap: 14 }}>
               <button onClick={() => { setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} className="wel-card wel-prime">
@@ -3813,6 +3874,24 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <span className="wel-ar">&#8594;</span>
               </button>
             </div>
+            {pubReviews.length > 0 && (() => {
+              const feat = pubReviews.filter((r) => r.featured);
+              const picks = (feat.length ? feat : pubReviews).slice(0, 3);
+              return (
+                <div style={{ marginTop: 30 }}>
+                  <div style={{ textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 2.5, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 14 }}>What clients say</div>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {picks.map((r, i) => (
+                      <div key={i} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px" }}>
+                        <div style={{ display: "flex", gap: 2, marginBottom: 7 }}>{[1, 2, 3, 4, 5].map((n) => <Star key={n} size={13} style={{ color: "var(--gold)", fill: n <= (r.rating || 0) ? "var(--gold)" : "transparent" }} />)}</div>
+                        {r.comment ? <div style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--text2)" }}>“{r.comment}”</div> : null}
+                        <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 8 }}>— {r.displayName || "A client"}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -5815,6 +5894,102 @@ function ManageStandalone({ business, appts, setAppts, providers, services, onEx
 // MANAGE APPOINTMENT — client self-service (phone confirm, no login)
 // Reschedule / cancel allowed only before the policy deadline.
 // ============================================================
+// Public review page (gotvero.com/review?t=TOKEN) — where a client lands from the after-visit ask.
+// Token possession scopes to exactly ONE appointment (same model as ManageByToken). Single capture
+// (stars + comment), then a thank-you that offers the SAME Google link to EVERYONE regardless of
+// rating — no star-gating (Google policy + FTC compliant). The submission writes via a SECURITY
+// DEFINER RPC (submit_review_by_token); the review lands as "pending" for the owner to approve.
+function ReviewByToken({ token, shopId, business, onExit }) {
+  const [phase, setPhase] = useState("loading"); // loading | view | done | already | error
+  const [info, setInfo] = useState(null);         // { provider, service, date, google }
+  const [rating, setRating] = useState(0);
+  const [hover, setHover] = useState(0);
+  const [comment, setComment] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [google, setGoogle] = useState("");
+
+  useEffect(() => {
+    if (!token) { setPhase("error"); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase.rpc("review_lookup_by_token", { p_token: token });
+        if (!alive) return;
+        if (error || !data || !data.ok) { setPhase("error"); return; }
+        setInfo(data); setGoogle(data.google || "");
+        setPhase(data.already ? "already" : "view");
+      } catch (e) { if (alive) setPhase("error"); }
+    })();
+    return () => { alive = false; };
+  }, [token]);
+
+  const submit = async () => {
+    if (!rating || busy) return;
+    setBusy(true); setErr("");
+    try {
+      const { data, error } = await supabase.rpc("submit_review_by_token", { p_token: token, p_rating: rating, p_comment: comment.trim(), p_name: name.trim() });
+      if (error || !data || !data.ok) {
+        if (data && data.already) { setPhase("already"); return; }
+        setErr("Sorry, we couldn't save that — please try again."); setBusy(false); return;
+      }
+      if (data.google) setGoogle(data.google);
+      setPhase("done");
+    } catch (e) { setErr("Sorry, we couldn't save that — please try again."); setBusy(false); }
+  };
+
+  const biz = (business && business.name) || "our shop";
+  const wrap = { minHeight: "100vh", background: "var(--bg)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px", fontFamily: "'Jost', sans-serif" };
+  const card = { width: "100%", maxWidth: 440, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "30px 24px", textAlign: "center", boxShadow: "0 10px 40px rgba(0,0,0,0.10)" };
+  const btnPrimary = { display: "inline-block", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: "13px 24px", fontSize: 15, fontWeight: 600, textDecoration: "none", cursor: "pointer", fontFamily: "'Jost', sans-serif" };
+  const linkBtn = { background: "none", border: "none", color: "var(--sub)", textDecoration: "underline", cursor: "pointer", fontSize: 13, marginTop: 16, fontFamily: "'Jost', sans-serif" };
+
+  if (phase === "loading") return (<div style={wrap}><div style={{ color: "var(--sub)" }}>Loading…</div></div>);
+
+  if (phase === "error") return (<div style={wrap}><div style={card}>
+    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, marginBottom: 10 }}>{biz}</div>
+    <p style={{ color: "var(--sub)", lineHeight: 1.55, marginBottom: google ? 18 : 6 }}>This review link has expired or is no longer valid.{google ? " You can still leave us a review on Google:" : ""}</p>
+    {google ? <a href={google} target="_blank" rel="noopener noreferrer" style={btnPrimary}>Review us on Google</a> : null}
+    <div><button onClick={onExit} style={linkBtn}>Go to {biz}</button></div>
+  </div></div>);
+
+  if (phase === "already") return (<div style={wrap}><div style={card}>
+    <CheckCircle2 size={42} style={{ color: "var(--gold)", marginBottom: 12 }} />
+    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, marginBottom: 8 }}>Thank you!</div>
+    <p style={{ color: "var(--sub)", lineHeight: 1.55, marginBottom: google ? 18 : 0 }}>You've already shared your feedback for this visit — we appreciate it.</p>
+    {google ? <a href={google} target="_blank" rel="noopener noreferrer" style={btnPrimary}>Review us on Google</a> : null}
+  </div></div>);
+
+  if (phase === "done") return (<div style={wrap}><div style={card}>
+    <CheckCircle2 size={42} style={{ color: "var(--gold)", marginBottom: 12 }} />
+    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 8 }}>Thanks{name ? `, ${name.split(" ")[0]}` : ""}!</div>
+    <p style={{ color: "var(--sub)", lineHeight: 1.55, marginBottom: google ? 20 : 0 }}>Your feedback goes straight to {biz}. We really appreciate you taking a moment.</p>
+    {google ? (<div style={{ borderTop: "1px solid var(--line)", paddingTop: 20 }}>
+      <p style={{ color: "var(--text)", fontSize: 14.5, lineHeight: 1.5, marginBottom: 14 }}>Mind sharing it on Google too? It helps other clients find us.</p>
+      <a href={google} target="_blank" rel="noopener noreferrer" style={btnPrimary}>Post on Google</a>
+    </div>) : null}
+  </div></div>);
+
+  return (<div style={wrap}><div style={card}>
+    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--sub)", marginBottom: 16 }}>{biz}</div>
+    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, lineHeight: 1.18, marginBottom: 6 }}>How was your visit?</div>
+    <p style={{ color: "var(--sub)", fontSize: 14.5, marginBottom: 22 }}>{(info && (info.provider || info.service)) ? <>{info.service || "Your visit"}{info.provider ? ` with ${info.provider}` : ""}{info.date ? ` · ${info.date}` : ""}</> : "We'd love your honest feedback."}</p>
+    <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 22 }}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button key={n} type="button" onClick={() => setRating(n)} onMouseEnter={() => setHover(n)} onMouseLeave={() => setHover(0)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, lineHeight: 0 }} aria-label={`${n} star${n > 1 ? "s" : ""}`}>
+          <Star size={40} style={{ color: (hover || rating) >= n ? "var(--gold)" : "var(--border2)", fill: (hover || rating) >= n ? "var(--gold)" : "transparent", transition: "color .12s, fill .12s" }} />
+        </button>
+      ))}
+    </div>
+    <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Tell us what stood out (optional)" rows={4} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", fontSize: 15, color: "var(--text)", fontFamily: "'Jost', sans-serif", resize: "vertical", marginBottom: 12 }} />
+    <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name (shown with your review)" style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", fontSize: 15, color: "var(--text)", fontFamily: "'Jost', sans-serif", marginBottom: 16 }} />
+    {err ? <p style={{ color: "#C0392B", fontSize: 13, marginBottom: 12 }}>{err}</p> : null}
+    <button type="button" onClick={submit} disabled={!rating || busy} style={{ ...btnPrimary, width: "100%", boxSizing: "border-box", opacity: (!rating || busy) ? 0.5 : 1, cursor: (!rating || busy) ? "default" : "pointer" }}>{busy ? "Sending…" : "Share your feedback"}</button>
+    <p style={{ color: "var(--faint)", fontSize: 11.5, marginTop: 14, lineHeight: 1.4 }}>Your review goes to {biz} and may be featured after they review it.</p>
+  </div></div>);
+}
+
 // Client-facing manage page opened from the private link in a confirmation/reminder
 // (gotvero.com/manage?t=CODE). Looks up the one appointment by its code via a public RPC,
 // then lets the client reschedule (through the real computeFreeSlots engine, honoring every
@@ -9204,7 +9379,7 @@ function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
   );
 }
 
-function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled }) {
+function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled }) {
   const [tab, setTab] = useState("pulse");
   const [rebookSeed, setRebookSeed] = useState(null); // { clientId, serviceId, providerId } → opens the new-appointment form prefilled on the calendar
   const [pulseOpenApptId, setPulseOpenApptId] = useState(null); // tapping a Pulse card → open that appt's sheet on the calendar (reuses the deep-link path)
@@ -9494,7 +9669,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "messages" && <MessagesView key={`messages-${tabNonce}`} clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
-        {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView key={`settings-${tabNonce}`} business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} onSignOutAccount={onSignOutAccount} authEmail={authEmail} /></ErrorBoundary>}
+        {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView key={`settings-${tabNonce}`} business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} onSignOutAccount={onSignOutAccount} authEmail={authEmail} /></ErrorBoundary>}
       </div>
 
       {/* fixed bottom tab bar — anchors to viewport bottom. transform:translateZ(0) puts it on its own GPU layer so iOS Safari doesn't let it drift during scroll/overscroll. */}
@@ -14024,6 +14199,83 @@ function RebookCheckoutEditor({ r, onChange }) {
   );
 }
 
+// Settings → Customer Reviews. Two halves: (1) config (buffered to form + committed immediately,
+// like Discounts) and (2) moderation of the actual reviews (acts on the live reviews list directly,
+// persisted by its own save effect). Approve = publish (eligible for the storefront); Hide = declined.
+function ReviewsManager({ value = {}, onChange, reviews = [], setReviews, showToast }) {
+  const cfg = value || {};
+  const set = (patch) => onChange && onChange(patch);
+  const [tab, setTab] = useState("pending"); // pending | published | all
+  const fmtD = (iso) => { try { return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" }); } catch (e) { return ""; } };
+  const setStatus = (id, status) => { if (!setReviews) return; setReviews((cur) => (cur || []).map((r) => r.id === id ? { ...r, status, publishedAt: status === "published" ? new Date().toISOString() : (r.publishedAt || null) } : r)); if (showToast) showToast(status === "published" ? "Review published." : status === "declined" ? "Review hidden." : "Moved back to pending."); };
+  const toggleFeatured = (id) => { if (!setReviews) return; setReviews((cur) => (cur || []).map((r) => r.id === id ? { ...r, featured: !r.featured } : r)); };
+  const revBtn = (primary) => ({ background: primary ? "var(--gold)" : "var(--panel)", color: primary ? "var(--on-gold)" : "var(--text)", border: primary ? "none" : "1px solid var(--border)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: FONT_BODY });
+
+  const list = (reviews || []).slice().sort((a, b) => (new Date(b.createdAt || 0)) - (new Date(a.createdAt || 0)));
+  const pendingCount = list.filter((r) => (r.status || "pending") === "pending").length;
+  const published = list.filter((r) => r.status === "published");
+  const avg = published.length ? (published.reduce((s, r) => s + (r.rating || 0), 0) / published.length) : 0;
+  const shown = list.filter((r) => tab === "all" ? true : (tab === "pending" ? (r.status || "pending") === "pending" : r.status === "published"));
+
+  return (<div>
+    <ToggleSetting label="Ask clients for a review after they pay" desc="Vero emails the invite after checkout — and texts too, once your number's approved." on={cfg.enabled === true} onToggle={(v) => set({ enabled: v })} />
+    {cfg.enabled && (<div style={{ marginTop: 18, display: "grid", gap: 20 }}>
+      <div>
+        <div style={{ fontSize: 14.5, fontWeight: 500, marginBottom: 3 }}>Only ask after the client's…</div>
+        <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 10 }}>Returning clients leave more — and more honest — reviews.</div>
+        <Stepper value={cfg.afterVisit || 2} onChange={(v) => set({ afterVisit: Math.max(1, v) })} min={1} max={10} suffix={(cfg.afterVisit || 2) === 1 ? "visit" : "+ visits"} />
+      </div>
+      <div>
+        <div style={{ fontSize: 14.5, fontWeight: 500, marginBottom: 8 }}>Send by</div>
+        <Segmented options={[{ value: "email", label: "Email" }, { value: "text", label: "Text" }, { value: "both", label: "Both" }]} value={cfg.channel || "both"} onChange={(v) => set({ channel: v })} />
+        <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 6 }}>Texts start automatically once your number is approved — email is used until then.</div>
+      </div>
+      <ToggleSetting label="Only ask each client once" desc="Never re-ask someone who's already been invited." on={cfg.oncePerClient !== false} onToggle={(v) => set({ oncePerClient: v })} />
+      <div>
+        <div style={{ fontSize: 14.5, fontWeight: 500, marginBottom: 3 }}>Google review link (optional)</div>
+        <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 10 }}>After they review, every client is invited to also post on Google. Paste your "write a review" link.</div>
+        <input value={cfg.googleReviewUrl || ""} onChange={(e) => set({ googleReviewUrl: e.target.value })} placeholder="https://g.page/r/…/review" style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", fontSize: 14.5, color: "var(--text)", fontFamily: FONT_BODY }} />
+      </div>
+      <ToggleSetting label="Show ratings & reviews on my booking page" desc="Display your star rating and featured testimonials to people booking online." on={cfg.showOnStorefront !== false} onToggle={(v) => set({ showOnStorefront: v })} />
+      <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5, background: "var(--panel2)", borderRadius: 10, padding: "12px 14px" }}>Every review comes to you privately first — nothing shows publicly until you publish it below. The Google invite is shown to <b>every</b> reviewer the same way, which keeps you compliant with Google's review rules.</div>
+    </div>)}
+
+    <div style={{ marginTop: 26, borderTop: "1px solid var(--line)", paddingTop: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19 }}>Your reviews</div>
+        {published.length ? <div style={{ fontSize: 13, color: "var(--sub)" }}><Star size={13} style={{ fill: "var(--gold)", color: "var(--gold)", verticalAlign: "-2px" }} /> {avg.toFixed(1)} · {published.length} live</div> : null}
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <Segmented options={[{ value: "pending", label: `To approve${pendingCount ? ` (${pendingCount})` : ""}` }, { value: "published", label: "Published" }, { value: "all", label: "All" }]} value={tab} onChange={setTab} />
+      </div>
+      {shown.length === 0 ? (
+        <div style={{ textAlign: "center", color: "var(--faint)", fontSize: 14, padding: "26px 0" }}>{tab === "pending" ? "No reviews waiting — new ones land here." : "Nothing here yet."}</div>
+      ) : (
+        <div style={{ display: "grid", gap: 12 }}>
+          {shown.map((r) => {
+            const status = r.status || "pending";
+            return (<div key={r.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 15px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
+                <div style={{ display: "flex", gap: 2 }}>{[1, 2, 3, 4, 5].map((n) => <Star key={n} size={15} style={{ color: "var(--gold)", fill: n <= (r.rating || 0) ? "var(--gold)" : "transparent" }} />)}</div>
+                <div style={{ fontSize: 11.5, color: "var(--faint)" }}>{fmtD(r.createdAt)}</div>
+              </div>
+              {r.comment ? <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.5, marginBottom: 6 }}>“{r.comment}”</div> : <div style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", marginBottom: 6 }}>No comment left.</div>}
+              <div style={{ fontSize: 12.5, color: "var(--sub)", marginBottom: 11 }}>— {r.displayName || "A client"}{r.providerName ? ` · with ${r.providerName}` : ""}{status === "published" ? " · live" : status === "declined" ? " · hidden" : ""}</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {status !== "published" && <button onClick={() => setStatus(r.id, "published")} style={revBtn(true)}>Publish</button>}
+                {status === "published" && <button onClick={() => setStatus(r.id, "pending")} style={revBtn(false)}>Unpublish</button>}
+                {status === "published" && <button onClick={() => toggleFeatured(r.id)} style={revBtn(false)}>{r.featured ? "★ Featured" : "Feature"}</button>}
+                {status !== "declined" && <button onClick={() => setStatus(r.id, "declined")} style={revBtn(false)}>Hide</button>}
+                {status === "declined" && <button onClick={() => setStatus(r.id, "pending")} style={revBtn(false)}>Restore</button>}
+              </div>
+            </div>);
+          })}
+        </div>
+      )}
+    </div>
+  </div>);
+}
+
 // Create / manage reusable discount presets (business.discounts). Each: { id, name, type, value }.
 // Applied at checkout or to any appointment. % is off the service subtotal; $ is a flat amount.
 function DiscountsEditor({ discounts = [], onChange }) {
@@ -15722,7 +15974,7 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
   );
 }
 
-function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary, shopId, setAppts, setClients, waitlist, setWaitlist, onSignOutAccount, authEmail }) {
+function SettingsView({ business, setBusiness, providers, setProviders, services, setServices, categories, setCategories, appts, clients, theme, setTheme, me, showToast, cutLibrary, setCutLibrary, shopId, setAppts, setClients, waitlist, setWaitlist, reviews, setReviews, onSignOutAccount, authEmail }) {
   // Fill in any missing top-level settings from the defaults so a sparse/older saved blob can't
   // crash a card that reads a nested field (a single absent key used to white-screen the whole page).
   const baseBiz = { ...DEFAULT_BUSINESS, ...(business || {}) };
@@ -16086,6 +16338,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       status: (form.discounts || []).length ? `${(form.discounts || []).length} discount${(form.discounts || []).length === 1 ? "" : "s"}` : "None yet",
       keywords: "discount discounts coupon promo percent dollar off deal comp first responder student senior loyalty markdown",
       editor: <DiscountsEditor discounts={form.discounts || []} onChange={(next) => { setForm((f) => ({ ...f, discounts: next })); setBusiness((b) => ({ ...(b || {}), discounts: next })); }} />,
+    },
+    {
+      id: "reviews", title: "Customer Reviews", icon: Star, category: "Online Booking",
+      explain: <>After a client's visit, Vero can automatically ask them for a review. Every review comes to you <em>privately first</em> — you choose which ones appear on your booking page as star ratings and testimonials. Returning clients leave the most (and most honest) reviews, so you can wait until someone's been in a few times before asking. Social proof on your booking page is one of the biggest things that turns a browser into a booking.</>,
+      status: (() => { const pend = (reviews || []).filter((r) => (r.status || "pending") === "pending").length; return (form.reviews?.enabled ? "On" : "Off") + (pend ? ` · ${pend} to approve` : ""); })(),
+      keywords: "reviews review testimonials ratings stars feedback google reputation social proof after visit ask request publish approve moderate booking page",
+      editor: <ReviewsManager value={form.reviews || {}} onChange={(next) => { setForm((f) => ({ ...f, reviews: { ...(f.reviews || {}), ...next } })); setBusiness((b) => ({ ...(b || {}), reviews: { ...((b && b.reviews) || {}), ...next } })); }} reviews={reviews} setReviews={setReviews} showToast={showToast} />,
     },
     {
       id: "booking", title: "Booking page rules", fullBleed: true, subtitle: "Lead time, deposit & card requirements", icon: Calendar, category: "Online Booking",
@@ -17735,6 +17994,16 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       return done;
     });
     setCheckout(null);
+    // After-visit review request (gated by Settings → Customer Reviews + visit count). Fire-and-forget.
+    try {
+      const src = appts.find((a) => a.id === id);
+      if (src && src.clientId && business?.reviews?.enabled) {
+        const client = clients.find((c) => c.id === src.clientId);
+        const priorDone = appts.filter((a) => a.clientId === src.clientId && a.status === "done" && a.id !== id).length;
+        const visitNo = Math.max(priorDone + 1, (client && client.visits) || 0);
+        fireReviewRequest({ appt: src, business, providers, client, contact: { email: (client && client.email) || src.email, phone: (client && client.phone) || src.phone, smsOptOut: client && client.smsOptOut }, visitNo });
+      }
+    } catch (e) {}
   };
   const updateAppt = (id, patch) => { setAppts((cur) => cur.map((a) => a.id === id ? { ...a, ...patch } : a)); setOpen((o) => o && o.id === id ? { ...o, ...patch } : o); };
   // When a slot frees up, find waitlisted clients whose requested window + barber
