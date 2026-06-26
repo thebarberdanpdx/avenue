@@ -16394,8 +16394,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       { label: "Your booking page", ids: ["booking", "bookingwords", "website", "reviews"] },
       { label: "What clients can do", ids: ["showprices", "rebook_usual", "family", "refphotos"] },
     ] },
-    { id: "pay",   section: "Booking & money", label: "Payments & checkout", icon: CreditCard, desc: "Payments, tips, deposits & rebooking", settings: ["payments", "checkout", "tipping", "rebookco", "policy"], groups: [
-      { label: "Payments & tips", collapse: true, desc: "Payments, checkout, tipping & rebooking", ids: ["payments", "checkout", "tipping", "rebookco"] },
+    { id: "pay",   section: "Booking & money", label: "Payments & checkout", icon: CreditCard, desc: "Payments, tips, deposits & rebooking", settings: ["payments", "checkout", "tipping", "rebookco", "discounts", "policy"], groups: [
+      { label: "Payments & tips", collapse: true, desc: "Payments, checkout, tipping, discounts & rebooking", ids: ["payments", "checkout", "tipping", "rebookco", "discounts"] },
       { label: "Deposits & no-shows", ids: ["policy"] },
     ] },
     { id: "dayof", section: "Running the day", label: "Your day", icon: Clock, desc: "Calendar & running your day", settings: ["calendarsettings", "photos", "waitlist", "waitingroom", "runninglate", "overduebuffer"], groups: [
