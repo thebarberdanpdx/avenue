@@ -1,6 +1,8 @@
 # 👋 START HERE — Session Handoff (for Dan + a fresh Claude session)
 
-_Last updated: 2026-06-25 (Vonage re-review RESUBMITTED — consent checkbox deployed + form verified & sent; email deliverability FIXED; iOS still live on TestFlight)_
+_Last updated: 2026-06-25 (BIG session — all LIVE: Customer Reviews feature · reminder timer ON (CRON_SECRET rotated) · calendar-sync + timezone-crash bugs fixed · Vonage re-review RESUBMITTED · email deliverability FIXED · settings cards re-filed. iOS still live on TestFlight.)_
+
+> 🧭 **Reviews + Discounts settings placement (2026-06-25):** new settings cards inherit a `category` but ALSO must be added to the nav group lists in the `CATS` array (~`src/App.jsx:16387+`) or the safety-net dumps them under "Reports & data". Reviews now under Online booking → "Your booking page"; Discounts under Payments & checkout → "Payments & tips" (commits `28bbb22`/`0d2605b`).
 
 **New session? Read this file + `HARDENING-SHOP.md`, then continue Track A. Dan should not have to re-explain anything.**
 
