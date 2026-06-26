@@ -10,8 +10,8 @@ _Last updated: 2026-06-25 (Vonage re-review RESUBMITTED — consent checkbox dep
 
 ---
 
-## ⭐ LATEST SESSION — 2026-06-25 (later): Customer Reviews feature BUILT (needs SQL + deploy)
-Full v1 of a customer-review feature (Dan's ask, designed w/ subagents for usefulness + marketability). **Code complete, compiles, ship-check passes — NOT deployed yet, and it needs a one-time Supabase SQL run to come alive.**
+## ⭐ LATEST SESSION — 2026-06-25 (later): Customer Reviews feature — ✅ LIVE + reminder timer ON
+Full v1 of a customer-review feature (Dan's ask, designed w/ subagents for usefulness + marketability). **DEPLOYED & verified live** (commit `23845d5`): reviews RPCs respond (`get_published_reviews`→`[]`, `review_lookup_by_token`→`{ok:false}`), SQL run in Supabase, frontend shipped. Reminder timer also turned ON (see below). **CRON_SECRET was ROTATED** this session (old value was unreadable/"Sensitive" in Vercel) — new value lives in Vercel env + a GitHub repo secret named `CRON_SECRET`; verified: `/api/send-reminders?key=<new>`→200, wrong key→401.
 
 **What it does:** after a paid visit, Vero asks the client for a review (email now, SMS once `SMS_LIVE`); the client rates + comments on a public page (`/review?t=TOKEN`); the review lands **pending** in the owner's dashboard; the owner publishes the ones they want; published/featured reviews show as a **star rating + testimonials on the booking landing** (step 0) — the conversion win. Every reviewer is offered the SAME optional Google link (no star-gating — **deliberately compliant** with Google policy + the new FTC rule; building the gating version is illegal/bannable, so we didn't).
 
@@ -19,15 +19,15 @@ Full v1 of a customer-review feature (Dan's ask, designed w/ subagents for usefu
 
 **Where it lives in code (all `src/App.jsx` unless noted):** `DEFAULT_BUSINESS.reviews` (defaults) · `DEFAULT_REVIEW_BODY` + `fireReviewRequest()` (sender, mirrors `fireApptNotify`) · trigger in `finishCheckout` (gated by visit count) · `reviews` state + session-keyed load + `syncList('reviews')` save (mirrors waitlist) · `ReviewByToken` public page + route `reviewtoken` (`/review?t=`) · `ReviewsManager` settings card (threaded `reviews/setReviews` through ShopDashboard→SettingsView) · storefront social proof in ClientFlow step 0 (`pubReviews` via `get_published_reviews`) · `{review link}` tag in `lib/messaging.js`.
 
-**⚠️ TO ACTIVATE — run `db/reviews-2026-06-25.sql` in Supabase SQL Editor** (creates the `reviews` table with RLS *cloned from waitlist*, + 3 SECURITY DEFINER RPCs: `review_lookup_by_token`, `submit_review_by_token`, `get_published_reviews`). Until it's run: the review page shows a graceful "link expired" fallback, the storefront shows no reviews, and moderation is empty — nothing breaks. After SQL + deploy, verify live: enable in Settings, complete a returning client's checkout → review email → submit → approve → see it on the booking page.
+**✅ ACTIVATED — `db/reviews-2026-06-25.sql` run in Supabase** (reviews table w/ RLS cloned from waitlist + 3 RPCs, all verified live). **Still to do (live test, needs Dan signed in):** Settings → Online Booking → "Customer Reviews" → turn on + set the after-visit number + (optional) paste a Google review link; then complete a returning client's checkout → review email → submit on `/review?t=` → approve in the same card → see it on the booking landing. (Couldn't be Claude-tested end-to-end — needs an owner session + a real checkout.)
 
 **Not yet (v2 backlog):** delayed send + reminder nudge (needs a cron — Vercel 2-cron limit), per-barber rating analytics, QR/in-shop link, public owner replies, realtime so new reviews appear without a refresh.
 
 ### ⏰ Reminder timer (send-reminders) — wired via GitHub Actions (needs 1 secret + push)
 The `send-reminders` cron was built but unscheduled (Vercel Hobby = 2 daily crons only). Added `.github/workflows/send-reminders.yml` — pings `https://gotvero.com/api/send-reminders?key=${{ secrets.CRON_SECRET }}` **every 15 min** (mirrors the existing `calendar-sync.yml` pattern; endpoint is idempotent via message_log). Email reminders fire as soon as it's live; SMS reminders auto-start when `SMS_LIVE=true` (Vonage).
 - **🐞 Found + fixed a regression:** `calendar-sync.yml` was pinging `api/calendar-run` with **no** `CRON_SECRET` → it's returned **401 since the 2026-06-23 cron lock** (verified live: wrong-key probe → 401). So the 24/7 calendar mirror silently degraded to once-daily (the Vercel cron, which Vercel auto-auths). Added `?key=${{ secrets.CRON_SECRET }}` to that workflow too.
-- **TO ACTIVATE (Dan):** add a GitHub **repository secret** `CRON_SECRET` (repo → Settings → Secrets and variables → Actions → New repository secret), value = the **same CRON_SECRET that's in Vercel env**. Then push to main (activates both workflows). Until the secret is added, the workflow runs go red (401) — harmless.
-- **Pre-launch note:** once live, email reminders start firing for any upcoming appointment that has an email + an enabled reminder. Fine with demo data (fake emails bounce harmlessly), just don't be surprised.
+- **✅ ACTIVATED:** GitHub `CRON_SECRET` repo secret added + pushed. Endpoint verified (`send-reminders?key=<new>`→200, `checked:22 sent:0`; `calendar-run?key=<new>`→200). The only thing not Claude-verifiable (no `gh` CLI here): that Dan's pasted GitHub secret is character-perfect — confirm by glancing at the repo's **Actions** tab for a green check on `send-reminders` / `calendar-sync` (red = re-enter the secret).
+- **Pre-launch note:** reminders now fire for any upcoming appt with an email + enabled reminder. First live run sent 0 (demo data has no real emails), so no surprise sends. SMS reminders stay off until `SMS_LIVE=true`.
 
 ---
 
