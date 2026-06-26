@@ -17992,15 +17992,23 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   // On first render, center the selected/today button in the day strip so it sits in the middle
   // (not jammed against the left edge); past days are still reachable by scrolling left.
   // useLayoutEffect runs after DOM commit but before paint, so the user never sees the strip jump.
-  useLayoutEffect(() => {
+  // Scroll the strip so the SELECTED day's week (Sunday at the left edge) is in view.
+  // Runs on mount (instant) and whenever the selected date changes (smooth) — so tapping
+  // "Today", or picking any date, always brings the strip to that week with today/selected shown.
+  const didStripMount = useRef(false);
+  const scrollStripToWeek = (behavior) => {
     const strip = dayStripRef.current;
     if (!strip) return;
-    const todayBtn = strip.querySelector('[data-today="1"]');
-    if (todayBtn) {
-      const centered = todayBtn.offsetLeft - strip.offsetLeft - (strip.clientWidth / 2) + (todayBtn.offsetWidth / 2);
-      strip.scrollLeft = Math.max(0, centered);
-    }
-  }, []);
+    const sel = strip.querySelector('[data-sel="1"]') || strip.querySelector('[data-today="1"]');
+    if (!sel) return;
+    const dow = selectedDate.getDay();            // 0 = Sunday
+    const cellW = sel.offsetWidth + 6;            // cell width + flex gap
+    const left = sel.offsetLeft - strip.offsetLeft - dow * cellW - 2; // back up to the week's Sunday
+    try { strip.scrollTo({ left: Math.max(0, left), behavior: behavior || "auto" }); }
+    catch (e) { strip.scrollLeft = Math.max(0, left); }
+  };
+  useLayoutEffect(() => { scrollStripToWeek("auto"); didStripMount.current = true; }, []);
+  useEffect(() => { if (didStripMount.current) scrollStripToWeek("smooth"); }, [dayOffset]); // eslint-disable-line
 
   const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts((cur) => cur.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } setTimeout(() => handleFreedSlot(freed), 350); } };
   // open checkout instead of silently completing
@@ -18693,6 +18701,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           <button onClick={() => { const pid = (orderedStaff[0] || allStaff[0] || providers[0]).id; setNewApptSlot({ providerId: pid, start: nextFreeSlot(pid) }); }} style={{ background: "var(--text)", color: "var(--bg)", padding: "0 18px", height: 42, borderRadius: 13, fontSize: 13, fontWeight: 500, letterSpacing: 1.2, textTransform: "uppercase", fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 7 }}><Plus size={16} strokeWidth={2} /> New</button>
           <button onClick={() => setRegisterOpen(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 16px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 400, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 6 }}><DollarSign size={15} style={{ color: "var(--text2)" }} /> Sale</button>
           <div style={{ flex: 1, minWidth: 8 }} />
+          {!sameDay(selectedDate.toISOString(), today) && <button onClick={() => setDayOffset(0)} style={{ background: "var(--panel)", color: "var(--gold)", border: "1px solid var(--border)", padding: "0 14px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY }}>Today</button>}
           <button onClick={() => setCalMenuOpen(true)} aria-label="More actions" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 42, height: 42, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><MoreHorizontal size={18} />{waitlist.length > 0 && <span style={{ position: "absolute", top: 8, right: 8, width: 7, height: 7, borderRadius: "50%", background: "var(--text)" }} />}</button>
         </div>
       </div>
@@ -18705,17 +18714,17 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       </Sheet>
 
       {/* Scrollable multi-week day strip — swipe horizontally, tap to pick. Includes 14 days back so barbers can look up past visits. */}
-      <div ref={dayStripRef} style={{ display: "flex", gap: 6, marginBottom: 24, padding: "4px 2px", overflowX: "auto", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+      <div ref={dayStripRef} style={{ display: "flex", gap: 6, marginBottom: 24, padding: "4px 2px", overflowX: "auto", scrollSnapType: "x proximity", WebkitOverflowScrolling: "touch" }}>
         {Array.from({ length: 14 + 28 }, (_, i) => { // 14 days back + 28 days ahead; today sits at index 14 and is pre-scrolled into view on mount
           const offset = i - 14;
           const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + offset);
           const isSelected = d.toDateString() === selectedDate.toDateString();
           const isToday = offset === 0;
           return (
-            <button key={offset} data-today={isToday ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: "start", textAlign: "center", padding: "12px 4px 14px", borderRadius: 14, background: isSelected ? "var(--text)" : "transparent", color: isSelected ? "var(--bg)" : "var(--sub)", border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.8 : 0.55 }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 400, lineHeight: 1 }}>{d.getDate()}</div>
-              {!isSelected && isToday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "var(--text)" }} />}
+            <button key={offset} data-today={isToday ? "1" : undefined} data-sel={isSelected ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: d.getDay() === 0 ? "start" : "none", textAlign: "center", padding: "12px 4px 14px", borderRadius: 14, background: isSelected ? "var(--gold)" : (isToday ? "var(--wash)" : "transparent"), color: isSelected ? "var(--on-gold)" : (isToday ? "var(--gold)" : "var(--sub)"), border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.85 : (isToday ? 0.8 : 0.55) }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: isSelected || isToday ? 500 : 400, lineHeight: 1 }}>{d.getDate()}</div>
+              {!isSelected && isToday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "var(--gold)" }} />}
             </button>
           );
         })}
