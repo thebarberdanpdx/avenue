@@ -14,4 +14,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger calendar sync
-        run: curl -fsS --max-time 60 "https://gotvero.com/api/calendar-run" -o /dev/null -w "calendar-run HTTP %{http_code}\n"
+        # Sends the CRON_SECRET — the endpoint returns 401 without it since the 2026-06-23 cron lock.
+        run: curl -fsS --max-time 60 "https://gotvero.com/api/calendar-run?key=${{ secrets.CRON_SECRET }}" -o /dev/null -w "calendar-run HTTP %{http_code}\n"

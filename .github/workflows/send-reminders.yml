@@ -1,0 +1,24 @@
+# Free 24/7 appointment-reminder pinger.
+#
+# Vercel Hobby only allows DAILY cron, but reminders ("2 days before", "1 day
+# before", "3 hours before", "15 min before") need frequent checks — so this
+# GitHub Action pings the send-reminders endpoint every 15 minutes. The endpoint
+# is idempotent (message_log), so overlapping/late runs never double-send.
+#
+# REQUIRES the `CRON_SECRET` repository secret to match CRON_SECRET in Vercel env
+# (the endpoint returns 401 without it). Add it once: GitHub repo → Settings →
+# Secrets and variables → Actions → New repository secret → name CRON_SECRET.
+#
+# Email reminders send as soon as this is live; text reminders begin automatically
+# once SMS_LIVE is "true" in Vercel (after the Vonage number is approved).
+name: send-reminders
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes (GitHub may delay under load)
+  workflow_dispatch: {}        # allow manual runs from the Actions tab
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger reminder send
+        run: curl -fsS --max-time 120 "https://gotvero.com/api/send-reminders?key=${{ secrets.CRON_SECRET }}" -o /dev/null -w "send-reminders HTTP %{http_code}\n"

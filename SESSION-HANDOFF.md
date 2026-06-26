@@ -1,12 +1,75 @@
 # 👋 START HERE — Session Handoff (for Dan + a fresh Claude session)
 
-_Last updated: 2026-06-24 (evening — **the iOS app is LIVE on TestFlight**; Dan + Heather both running it)_
+_Last updated: 2026-06-25 (Vonage re-review RESUBMITTED — consent checkbox deployed + form verified & sent; email deliverability FIXED; iOS still live on TestFlight)_
 
 **New session? Read this file + `HARDENING-SHOP.md`, then continue Track A. Dan should not have to re-explain anything.**
 
 > 👉 **The clean, plain-English list of everything STILL TO DO is [`TODO.md`](TODO.md)** — start there for "what's left."
 
 > 🔄 **This handoff is a LIVING doc, updated by EVERY session — Dan runs more than one Claude session at a time.** Each session must log what it shipped here so nothing drifts out of date and Dan never re-explains. Two active workstreams as of 2026-06-24: **(1) launch / security + iOS** (the "🚀 LATEST SESSION" block just below) and **(2) the UI "Mangomint polish" pass** (the "🎨 UI polish pass" section further down — client booking flow done & live; owner dashboard is next). Finished work in any session? Add it here before you stop.
+
+---
+
+## ⭐ LATEST SESSION — 2026-06-25 (later): Customer Reviews feature BUILT (needs SQL + deploy)
+Full v1 of a customer-review feature (Dan's ask, designed w/ subagents for usefulness + marketability). **Code complete, compiles, ship-check passes — NOT deployed yet, and it needs a one-time Supabase SQL run to come alive.**
+
+**What it does:** after a paid visit, Vero asks the client for a review (email now, SMS once `SMS_LIVE`); the client rates + comments on a public page (`/review?t=TOKEN`); the review lands **pending** in the owner's dashboard; the owner publishes the ones they want; published/featured reviews show as a **star rating + testimonials on the booking landing** (step 0) — the conversion win. Every reviewer is offered the SAME optional Google link (no star-gating — **deliberately compliant** with Google policy + the new FTC rule; building the gating version is illegal/bannable, so we didn't).
+
+**Owner controls (Settings → Online Booking → "Customer Reviews"):** master on/off · **ask after the Nth visit** (default 2) · email/text/both · only-ask-once · Google review link · show-on-booking-page · plus the moderation list (Publish / Unpublish / Feature / Hide) right in the same card. Config persists immediately (like Discounts).
+
+**Where it lives in code (all `src/App.jsx` unless noted):** `DEFAULT_BUSINESS.reviews` (defaults) · `DEFAULT_REVIEW_BODY` + `fireReviewRequest()` (sender, mirrors `fireApptNotify`) · trigger in `finishCheckout` (gated by visit count) · `reviews` state + session-keyed load + `syncList('reviews')` save (mirrors waitlist) · `ReviewByToken` public page + route `reviewtoken` (`/review?t=`) · `ReviewsManager` settings card (threaded `reviews/setReviews` through ShopDashboard→SettingsView) · storefront social proof in ClientFlow step 0 (`pubReviews` via `get_published_reviews`) · `{review link}` tag in `lib/messaging.js`.
+
+**⚠️ TO ACTIVATE — run `db/reviews-2026-06-25.sql` in Supabase SQL Editor** (creates the `reviews` table with RLS *cloned from waitlist*, + 3 SECURITY DEFINER RPCs: `review_lookup_by_token`, `submit_review_by_token`, `get_published_reviews`). Until it's run: the review page shows a graceful "link expired" fallback, the storefront shows no reviews, and moderation is empty — nothing breaks. After SQL + deploy, verify live: enable in Settings, complete a returning client's checkout → review email → submit → approve → see it on the booking page.
+
+**Not yet (v2 backlog):** delayed send + reminder nudge (needs a cron — Vercel 2-cron limit), per-barber rating analytics, QR/in-shop link, public owner replies, realtime so new reviews appear without a refresh.
+
+### ⏰ Reminder timer (send-reminders) — wired via GitHub Actions (needs 1 secret + push)
+The `send-reminders` cron was built but unscheduled (Vercel Hobby = 2 daily crons only). Added `.github/workflows/send-reminders.yml` — pings `https://gotvero.com/api/send-reminders?key=${{ secrets.CRON_SECRET }}` **every 15 min** (mirrors the existing `calendar-sync.yml` pattern; endpoint is idempotent via message_log). Email reminders fire as soon as it's live; SMS reminders auto-start when `SMS_LIVE=true` (Vonage).
+- **🐞 Found + fixed a regression:** `calendar-sync.yml` was pinging `api/calendar-run` with **no** `CRON_SECRET` → it's returned **401 since the 2026-06-23 cron lock** (verified live: wrong-key probe → 401). So the 24/7 calendar mirror silently degraded to once-daily (the Vercel cron, which Vercel auto-auths). Added `?key=${{ secrets.CRON_SECRET }}` to that workflow too.
+- **TO ACTIVATE (Dan):** add a GitHub **repository secret** `CRON_SECRET` (repo → Settings → Secrets and variables → Actions → New repository secret), value = the **same CRON_SECRET that's in Vercel env**. Then push to main (activates both workflows). Until the secret is added, the workflow runs go red (401) — harmless.
+- **Pre-launch note:** once live, email reminders start firing for any upcoming appointment that has an email + an enabled reminder. Fine with demo data (fake emails bounce harmlessly), just don't be surprised.
+
+---
+
+## 📧 EARLIER SESSION — 2026-06-25: email deliverability FIXED + Vonage re-review (consent checkbox HALF-DONE)
+
+### Business email — `contact@sanctuarybarberco.com` (Microsoft 365 via GoDaddy; **DNS lives at StellarWP** `my.stellarwp.com`, domain registered at GoDaddy)
+- **Problem:** every outbound email bounced as spam (550 5.7.350). Root cause: the SPF record only authorized GoDaddy (`secureserver.net`), not Microsoft 365.
+- **FIXED — all 3 email "trust badges" now live & verified by dig:**
+  - **SPF** → `v=spf1 include:secureserver.net include:spf.protection.outlook.com -all`
+  - **DMARC** → TXT `_dmarc` = `v=DMARC1; p=none;`
+  - **DKIM** → enabled in Microsoft Defender (`security.microsoft.com/dkimv2`) + `selector1._domainkey` / `selector2._domainkey` CNAMEs at StellarWP → status "Signing DKIM signatures."
+- **What's left is TIME, not config.** Brand-new domain → Gmail/etc. still flag "very low reputation" for a day or a few. **Receiving works NOW** (so Vonage/anyone can email Dan). **For urgent SENDS in the meantime, use the Gmail `sanctuarybarberco@gmail.com`.** Re-test sending ~1–2 days out. Nothing more to configure.
+
+### Vonage toll-free RE-REVIEW — ✅ RESUBMITTED 2026-06-25 (awaiting carrier re-review)
+**Both requirements met and the form was re-submitted ("Update").** What was verified before sending (triple-checked w/ subagents + live tests):
+- **EIN doc** uploaded to Google Drive, sharing set to **"Anyone with the link" — confirmed PUBLIC** (curl 200 + PDF). Link: `https://drive.google.com/file/d/11rF-AZFV7iPdLEBGp8shx6KYBbIaD7OT/view` (see [[vonage-ein-doc-link]]).
+- **Opt-In Consent Link** on the form = `https://gotvero.com/book?optin=1&shop=avenue-phi` (NOT the privacy policy — that's what got bounced). Verified live: loads the real Sanctuary shop + the unchecked checkbox.
+- **Form fields** all match the CP575 (name/address/EIN). Address entered as `2077 NE Town Center Dr. Suite 120` to match the letter. Help Confirmation Message added.
+- **Additional Information** field explains the two domains + that **Vero (gotvero.com) is the new booking app launching once the number is approved**, and sanctuarybarberco.com is the company site. ⚠️ NOTE: Dan's live website still routes "Book Now" to **Mangomint** (his current system) — he switches the public site to Vero only AFTER the number is approved. The Vonage wording was crafted so the Mangomint site doesn't contradict the application.
+- **Next:** wait for Vonage. On approval, `SMS_LIVE` flips on → confirmations/reminders send. STILL TO BUILD before/at SMS go-live: STOP/HELP opt-out handler (TCPA), and schedule the `send-reminders` cron.
+
+(Original bounce wanted TWO things — kept for reference:)
+
+**1. Official business document — ✅ READY, Dan just uploads it.** They want an official doc showing legal business name + BRN (e.g. CP575/EIN letter). Dan HAS the ideal one:
+   - **`Ein info.pdf`** (in iCloud `~/Library/Mobile Documents/com~apple~CloudDocs/`) = **IRS CP575** showing **SANCTUARY BARBER CO**, **EIN 26-1451457**, Beaverton OR. ✅
+   - Action: Dan uploads it to **Google Drive → "Anyone with the link" → replies to Vonage with the link**. BRN/Tax ID if asked = **26-1451457**.
+   - ⚠️ **DO NOT use the copies in `~/Downloads/` (`e0389126…`, `f34a6409…`) — those show "IRVING SUBS AND CHEESE SHOP" (Dan's OLD business).** Same-named file exists in two places; the iCloud ones are the correct (Sanctuary) ones.
+   - Backup doc if ever needed: `COE_6601678.pdf` (Oregon Certificate of Existence, BRN 6601678) — valid but the EIN letter is stronger.
+
+**2. SMS consent CHECKBOX on the booking page — ✅ DONE & DEPLOYED (2026-06-25, commit `fb4fd00`).** Live on gotvero.com booking confirm step (step 7). Unchecked by default, optional (booking works either way), exact Vonage wording, links to sanctuarybarberco.com/privacy-policy. Records `smsConsent`+`smsConsentAt` on the new client. Uses "reminders **via SMS** from…" so the locked phrase count stays exactly 4. Reviewer deep link (jumps straight to the checkbox): **`https://gotvero.com/book?optin=1&shop=avenue-phi`**.
+   - **What Dan must put in the Vonage form:** (a) **Opt-In Consent Link** = the reviewer deep link above (NOT the privacy policy — that's what they bounced); (b) **Additional Information** = the EIN Google Drive link ([[vonage-ein-doc-link]]); (c) everything else on the form already matches his CP575 (verified: DAN MICHAELS / SANCTUARY BARBER CO / 2077 NE Town Center Dr Suite 120, Beaverton OR 97006 / EIN 26-1451457).
+   - Original build notes (kept for reference):
+**Vonage requires consent **captured via a checkbox** (not only in Terms/Privacy), **NOT pre-checked**, and **optional** (booking must still work if unchecked). Exact wording to use:
+   > ☐ By checking this box, I agree to receive **appointment reminders via SMS from Sanctuary Barber Co**. Message and data rates may apply. Message frequency varies. Text HELP for help or STOP to opt out. [privacy policy link]
+
+   **Build notes — pick up here (all line #s as of this session):**
+   - Add the checkbox on the booking **confirm step**, right after the phone field + existing consent `<p>` at **`src/App.jsx:5396–5399`** (inside `ClientFlow`). (Main new-booker path; other phone-consent spots at 4903 / 5253 / 6098 if you want it everywhere.)
+   - Add state `const [smsConsent, setSmsConsent] = useState(false)` near `const [phone, setPhone]` (~**line 2902**). The `Check` icon **is already imported** (used 53×) — fine to use for the tick.
+   - **OPTIONAL** = do NOT gate the Continue/Book button on `smsConsent`.
+   - Persist it: store `smsConsent` (+ a timestamp) on the new client object built at **`src/App.jsx:3446`** (`const newClient = {…}`).
+   - ⚠️ The wording above does NOT contain the locked phrase **"reminders from Sanctuary Barber Co"** (it says "reminders **via SMS** from…"), so the must-be-exactly-**4** count stays 4. Keep it 4. Run `npm run ship-check` before deploy.
+   - Once BOTH are done, Vonage said they'll prioritize the re-review.
 
 ---
 
