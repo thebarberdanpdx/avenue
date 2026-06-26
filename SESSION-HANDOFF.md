@@ -4,6 +4,12 @@ _Last updated: 2026-06-25 (BIG session — all LIVE: Customer Reviews feature ·
 
 > 🧭 **Reviews + Discounts settings placement (2026-06-25):** new settings cards inherit a `category` but ALSO must be added to the nav group lists in the `CATS` array (~`src/App.jsx:16387+`) or the safety-net dumps them under "Reports & data". Reviews now under Online booking → "Your booking page"; Discounts under Payments & checkout → "Payments & tips" (commits `28bbb22`/`0d2605b`).
 
+## 🗓️ LATEST SESSION — 2026-06-25 (later): Calendar import → per-staff feeds — ✅ LIVE
+Fixed the "imported appointments all show under the owner's name" crossup + made calendar import multi-staff (commit `e83ed28`, deployed). Root cause: import was single-feed and guessed the provider from the event title, falling back to `providers[0]` (the owner) when no staff name was in the title — so Heather's whole Mangomint calendar landed under Dan. Now: **one imported calendar per staff member**, each with an explicit "whose calendar is this?" picker; every event is forced onto that staff member.
+- `calSync.feeds[]` replaces the single `calSync.url` (auto-migrates the old connection to one **Unassigned** feed). `reconcileFeed` (was `reconcileCalendarSync`) is per-feed, tags appts with `syncFeed`, and CLAIMS legacy untagged rows by UID so re-attribution reuses rows (no duplicates). `api/calendar-run.js` cron mirrors it exactly; each feed keeps its own anti-wipe rail; feeds never delete each other. Verified with a migration+multi-feed simulation (all cases pass).
+- **👉 Dan's one-time step:** Settings → Import Data → Calendar → the existing connection shows as **"Unassigned calendar"** → pick **Heather** → it re-attributes her appts to her. Then **Add another calendar** for Dan's own Mangomint (pick Dan). They see each other on Vero's calendar (owner sees all staff; staff can unhide others). See [[calendar-sync-feature]].
+- ⚠️ STILL OWED: Dan reported a Sentry JavaScript error alongside the crossup but hasn't pasted the text yet — get it and confirm it's gone (may have been attribution-related).
+
 ## 🎨 LATEST SESSION — 2026-06-25 (later): Theme gallery redesign — ✅ LIVE
 Replaced the whole theme set (Dan: all but Studio/Noir were "garbage", earlier batch "terrible — too muddy/earthy, colors cheap"). Now **12 art-directed themes in two lanes** (commit `2d44b86`, deployed to gotvero.com):
 - **Crisp & Minimal** (light, one jewel accent): Studio, Cobalt, Emerald, Plum, Rose, Steel
