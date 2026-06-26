@@ -18864,6 +18864,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 const blkBorder = `1px solid ${isBlock ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`}`;
                 const blkLeft = `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : accent)}`;
                 const blkShadow = isDragging ? "var(--shadow-lg)" : "var(--shadow-sm)";
+                // Background for the end-time chip pinned to the block's bottom edge (matches the
+                // tile fill so it cleanly masks any text behind it).
+                const endBg = (isBlock || isDone) ? "var(--panel2)" : tint;
                 // Horizontal lane positioning — full width when alone, split into N equal lanes when overlapping.
                 const laneCount = a._laneCount || 1;
                 const lane = a._lane || 0;
@@ -18879,8 +18882,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: isDone ? (mono ? 0.55 : 0.7) : 1, border: blkBorder, borderLeft: blkLeft, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: blkShadow, transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
                     {/* name — always one line, never wraps or collides */}
                     <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: isNew ? 44 : 14 }}>{apptDisplayName(a, clients)}</span>
-                    {/* time range — shown once room exists */}
-                    {height > 34 && <span style={{ fontSize: 12, color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fmtTime(liveStart)} – {fmtTime(liveStart + (a.end - a.start))}</span>}
+                    {/* Top line: when the tile is tall enough to pin the end time to the bottom edge,
+                        show just the start here; otherwise show the full start–end range inline. */}
+                    {height > 34 && <span style={{ fontSize: 12, color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{height > 40 ? fmtTime(liveStart) : `${fmtTime(liveStart)} – ${fmtTime(liveStart + (a.end - a.start))}`}</span>}
                     {/* service name */}
                     {height > 58 && <div style={{ fontSize: 12.5, color: text2On, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.title}</div>}
                     {/* add-on detail only on tall blocks */}
@@ -18892,6 +18896,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                       {a.vip && <span style={{ fontSize: 13, color: darkBlock ? "#fff" : accent }}>★</span>}
                     </div>
                     )}
+                    {/* end time pinned to the block's bottom edge — readable at a glance even when
+                        the appointment ends off the grid lines (e.g. 9:45, 10:20). */}
+                    {height > 40 && <span style={{ position: "absolute", bottom: 0, left: 0, fontSize: 10.5, fontWeight: 600, color: subOn, lineHeight: 1, padding: "2px 7px 3px 11px", background: endBg, borderRadius: "0 8px 0 11px", pointerEvents: "none", maxWidth: "75%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fmtTime(liveStart + (a.end - a.start))}</span>}
                     {/* NEW tag — top-right; name reserves room for it so they never overlap */}
                     {isNew && <span style={{ position: "absolute", top: 6, right: 7, fontSize: 9, fontWeight: 700, letterSpacing: 0.8, color: darkBlock ? "#fff" : "var(--gold)", border: `1px solid ${darkBlock ? "rgba(255,255,255,0.6)" : "var(--gold)"}`, borderRadius: 4, padding: "1px 4px", lineHeight: 1.3, background: "var(--wash)" }}>NEW</span>}
                   </div>
