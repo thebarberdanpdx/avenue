@@ -12952,9 +12952,13 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
   const ago = (ts) => { if (!ts) return "never"; const s = Math.round((Date.now() - ts) / 1000); if (s < 60) return "just now"; const m = Math.round(s / 60); if (m < 60) return `${m} min ago`; const h = Math.round(m / 60); if (h < 24) return `${h} hr ago`; return `${Math.round(h / 24)} d ago`; };
 
   // Sync every assigned, non-paused feed in one pass (threaded so feeds never clobber each other).
-  const runAll = async (opts = {}) => {
+  // `feedList` lets callers that JUST changed feeds (add/assign/resume) pass the fresh list,
+  // so this never reads a stale closure and never saves back an out-of-date set (that bug
+  // made a newly-added second calendar vanish the moment the first one auto-synced).
+  const runAll = async (opts = {}, feedList) => {
     if (busy) return;
-    const active = feeds.filter((f) => f.url && f.providerId && !f.paused);
+    const allFeeds = feedList || feeds;
+    const active = allFeeds.filter((f) => f.url && f.providerId && !f.paused);
     if (!active.length) { if (!opts.quiet && showToast) showToast("Assign each calendar to a staff member first."); return; }
     setBusy(true); setBlockNotice(null);
     try {
@@ -12974,7 +12978,7 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
       }
       const syncedNext = working.filter(isSyncedA);
       let tz; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
-      const nextFeeds = feeds.map((f) => { const rr = byFeed[f.id]; if (!rr) return f; return { ...f, lastChanges: rr.changes || f.lastChanges, lastError: rr.error || null, lastBlockedCount: rr.blocked ? rr.blockedCount : 0, lastSyncAt: Date.now() }; });
+      const nextFeeds = allFeeds.map((f) => { const rr = byFeed[f.id]; if (!rr) return f; return { ...f, lastChanges: rr.changes || f.lastChanges, lastError: rr.error || null, lastBlockedCount: rr.blocked ? rr.blockedCount : 0, lastSyncAt: Date.now() }; });
       const calSyncPatch = { feeds: nextFeeds, url: "", lastSyncAt: Date.now(), ...(tz ? { tz } : {}) };
       // Persist through the SERVER (service key) — bypasses the client save-gate which can
       // silently block writes when an initial load errored.
@@ -13015,11 +13019,11 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
     const nextFeeds = [...feeds, { id, providerId: addProv, url, paused: false }];
     saveFeeds(nextFeeds);
     setAddUrl(""); setAddProv(""); setShowAdd(false);
-    setTimeout(() => runAll(), 0);
+    setTimeout(() => runAll({}, nextFeeds), 0);
   };
 
-  const setFeedProvider = (id, pid) => { const nf = feeds.map((f) => f.id === id ? { ...f, providerId: pid || null } : f); saveFeeds(nf); if (pid) setTimeout(() => runAll(), 0); };
-  const togglePauseFeed = (id) => { const f = feeds.find((x) => x.id === id); const nf = feeds.map((x) => x.id === id ? { ...x, paused: !x.paused } : x); saveFeeds(nf); serverConfig({ feeds: nf }); if (f && f.paused) setTimeout(() => runAll(), 0); };
+  const setFeedProvider = (id, pid) => { const nf = feeds.map((f) => f.id === id ? { ...f, providerId: pid || null } : f); saveFeeds(nf); if (pid) setTimeout(() => runAll({}, nf), 0); };
+  const togglePauseFeed = (id) => { const f = feeds.find((x) => x.id === id); const nf = feeds.map((x) => x.id === id ? { ...x, paused: !x.paused } : x); saveFeeds(nf); serverConfig({ feeds: nf }); if (f && f.paused) setTimeout(() => runAll({}, nf), 0); };
 
   const removeFeed = async (id) => {
     const nf = feeds.filter((f) => f.id !== id);
