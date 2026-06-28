@@ -2618,11 +2618,18 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
     busy.forEach(([bs, be]) => { if (cursor < bs) runs.push([cursor, bs]); cursor = Math.max(cursor, be); });
     if (cursor < dayEnd) runs.push([cursor, dayEnd]);
     if (timeMode === "pack") {
-      runs.forEach(([rs, re]) => { for (let t = rs; t + durMin <= re; t += durMin) candidates.add(t); });
+      // Flush on BOTH sides: tile back-to-back from the open edge AND offer the slot that ends
+      // exactly when the next appt / day-close starts, so bookings always touch an existing one.
+      runs.forEach(([rs, re]) => {
+        for (let t = rs; t + durMin <= re; t += durMin) candidates.add(t);   // flush after the previous appt
+        if (re - durMin >= rs) candidates.add(re - durMin);                  // flush before the next appt
+      });
     } else {
-      // openTight: a clean clock grid filtered so each placement leaves 0 or >= minGap on each
-      // side, plus the flush anchors (right after / right before an appt, day open / close).
-      const step = gridMin;
+      // openTight: offer starts spaced by the BOOKED SERVICE's own length within each open run —
+      // a 45-min cut tiles in 45-min steps, a 70-min in 70-min steps — so consecutive bookings
+      // never strand a sub-service sliver (the old fixed clock grid did, e.g. 45 on a 30 grid).
+      // Each placement must still leave 0 or >= minGap on each side, so no unsellable gap survives.
+      const step = durMin;
       runs.forEach(([rs, re]) => {
         if (re - rs < durMin) return;
         const tryAdd = (t) => {
@@ -2630,9 +2637,8 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
           const lr = t - rs, rr = re - (t + durMin);
           if ((lr === 0 || lr >= minGap) && (rr === 0 || rr >= minGap)) candidates.add(t);
         };
-        tryAdd(rs);            // flush after previous appt / day start
-        tryAdd(re - durMin);   // flush before next appt / day end
-        for (let t = Math.ceil(rs / step) * step; t + durMin <= re; t += step) tryAdd(t);
+        for (let t = rs; t + durMin <= re; t += step) tryAdd(t);  // tile from the open edge by service length
+        tryAdd(re - durMin);                                      // flush before next appt / day close
       });
     }
   }
