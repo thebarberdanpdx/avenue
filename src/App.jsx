@@ -2603,9 +2603,29 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
   const baseMode = (provStyle === "openTight" || provStyle === "grid" || provStyle === "pack") ? provStyle : shopMode;
   const timeMode = gold ? "pack" : baseMode;
   const gridMin = Math.max(5, Number(bk.gridMin) || 30);
-  // Shortest sellable service = the floor for an "unfillable" gap in open & tight.
+  // Smallest gap worth keeping (the floor for an "unsellable" sliver in open & tight).
+  // Owner-set via business.booking.minGap; falls back to the shortest service on the menu.
   const svcDurs = (services || []).map((s) => Number(s && s.duration)).filter((n) => n > 0);
-  const minGap = svcDurs.length ? Math.min(...svcDurs) : Math.min(durMin, 30);
+  const minGap = Math.max(5, Number(bk.minGap) || (svcDurs.length ? Math.min(...svcDurs) : Math.min(durMin, 30)));
+  // Awkward-gap policy (open & tight): a run that fits the service but can only be booked by
+  // stranding a sub-minGap sliver is HELD (hidden) while the day is far off — giving a service
+  // that fills it cleanly time to book — then RELEASED (offered flush) as the date nears, so a
+  // chair is never left empty. business.booking.gapHold picks how close that release happens.
+  const startOfDayMs = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); };
+  const daysUntil = Math.round((startOfDayMs(date) - startOfDayMs(new Date())) / 86400000);
+  const releaseAwkward = (() => {
+    switch (bk.gapHold) {
+      case "off": return true;            // always offer the slot (capture the booking)
+      case "always": return false;        // always hold the block (never offer a sliver-maker)
+      case "sameday": return daysUntil <= 0;
+      case "d1": return daysUntil <= 1;
+      case "d3": return daysUntil <= 3;
+      default: return daysUntil <= 2;     // recommended: release within 2 days
+    }
+  })();
+  // A run is only worth holding if some service could still fill it cleanly (0 or >= minGap leftover);
+  // if nothing on the menu fits it cleanly, there's nothing to wait for — offer it right away.
+  const cleanFitExists = (L) => svcDurs.some((d) => d <= L && (L - d === 0 || L - d >= minGap));
   const candidates = new Set();
 
   if (timeMode === "grid") {
@@ -2628,17 +2648,23 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
       // openTight: offer starts spaced by the BOOKED SERVICE's own length within each open run —
       // a 45-min cut tiles in 45-min steps, a 70-min in 70-min steps — so consecutive bookings
       // never strand a sub-service sliver (the old fixed clock grid did, e.g. 45 on a 30 grid).
-      // Each placement must still leave 0 or >= minGap on each side, so no unsellable gap survives.
+      // A "clean" placement leaves 0 or >= minGap on each side. If a run physically fits the
+      // service but admits NO clean placement, hold it (hidden) or release a single minimal-harm
+      // flush start (sliver pinned against the right edge) per the awkward-gap policy above.
       const step = durMin;
       runs.forEach(([rs, re]) => {
-        if (re - rs < durMin) return;
-        const tryAdd = (t) => {
-          if (t < rs || t + durMin > re) return;
+        const L = re - rs;
+        if (L < durMin) return;
+        const isClean = (t) => {
+          if (t < rs || t + durMin > re) return false;
           const lr = t - rs, rr = re - (t + durMin);
-          if ((lr === 0 || lr >= minGap) && (rr === 0 || rr >= minGap)) candidates.add(t);
+          return (lr === 0 || lr >= minGap) && (rr === 0 || rr >= minGap);
         };
-        for (let t = rs; t + durMin <= re; t += step) tryAdd(t);  // tile from the open edge by service length
-        tryAdd(re - durMin);                                      // flush before next appt / day close
+        const hits = [];
+        for (let t = rs; t + durMin <= re; t += step) if (isClean(t)) hits.push(t);  // tile from the open edge
+        if (isClean(re - durMin)) hits.push(re - durMin);                            // flush before next appt / day close
+        if (hits.length) hits.forEach((t) => candidates.add(t));
+        else if (releaseAwkward || !cleanFitExists(L)) candidates.add(rs);           // capture the booking, sliver to the right
       });
     }
   }
