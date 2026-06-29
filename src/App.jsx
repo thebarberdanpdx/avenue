@@ -14536,6 +14536,7 @@ function BookingTimesEditor({ b, onChange }) {
   const gridMin = Math.max(5, Number(b.gridMin) || 30);
   const PRESETS = [5, 10, 15, 30, 60];
   const [customOpen, setCustomOpen] = useState(!PRESETS.includes(gridMin));
+  const [adv, setAdv] = useState(mode === "grid");
   const fakeOn = b.fakeIt != null ? !!b.fakeIt : !!b.curated;
   const PCTS = [25, 50, 75];
   const pct = PCTS.includes(Number(b.fakeItPct)) ? Number(b.fakeItPct) : 50;
@@ -14549,45 +14550,75 @@ function BookingTimesEditor({ b, onChange }) {
       desc: "When someone books you online, Clean grid shows plain clock times at the spacing you pick — like every 15 or 30 minutes. Simple and tidy, but it can leave unused time between bookings." },
   ];
   const chip = (sel) => ({ flex: "0 0 auto", padding: "8px 14px", borderRadius: 30, border: `1.5px solid ${sel ? "var(--gold)" : "var(--border)"}`, background: sel ? "var(--tint)" : "var(--panel)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 13, fontWeight: sel ? 600 : 500, cursor: "pointer" });
+  const REGIMES = [
+    { v: "openTight", q: "I've got open chairs to fill", sub: "Shows clients lots of times so more of them book — but quietly skips any that would leave a gap too small to use." },
+    { v: "pack", q: "I'm booked solid — I turn people away", sub: "Packs every booking right up against another, so there's no wasted time between clients." },
+  ];
+  const radioEl = (on) => (<span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>);
+  const modeCards = (
+    <div style={{ display: "grid", gap: 9 }}>
+      {modes.map((m) => {
+        const on = mode === m.v;
+        return (
+          <button key={m.v} onClick={() => onChange({ timeMode: m.v, avoidGaps: m.v !== "grid" })} style={{ width: "100%", textAlign: "left", background: on ? "var(--tint2)" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: "15px 16px", cursor: "pointer" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{m.label}</span>
+                {m.rec && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--on-gold)", background: "var(--gold)", borderRadius: 20, padding: "2px 7px" }}>RECOMMENDED</span>}
+              </div>
+              {radioEl(on)}
+            </div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 6 }}>{m.desc}</div>
+            {on && m.v === "grid" && (
+              <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 13, paddingTop: 13, borderTop: "1px solid color-mix(in srgb, var(--gold) 18%, var(--border))" }}>
+                <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--faint)", fontWeight: 700, marginBottom: 9 }}>SHOW TIMES EVERY</div>
+                <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                  {PRESETS.map((g) => { const sel = !customOpen && gridMin === g; return (
+                    <button key={g} onClick={(e) => { e.stopPropagation(); setCustomOpen(false); onChange({ gridMin: g }); }} style={chip(sel)}>{g === 60 ? "1 hour" : `${g} min`}</button>
+                  ); })}
+                  <button onClick={(e) => { e.stopPropagation(); setCustomOpen(true); }} style={chip(customOpen)}>Custom</button>
+                </div>
+                {customOpen && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 11, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 13px" }}>
+                    <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 600 }}>Custom spacing</span>
+                    <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+                      <input type="number" min="5" max="240" value={gridMin} onChange={(e) => { const v = Math.max(5, Math.min(240, Number(e.target.value) || 5)); onChange({ gridMin: v }); }} style={{ width: 66, textAlign: "right", fontSize: 16, fontWeight: 600, color: "var(--text)", background: "var(--panel2)", border: "1.5px solid var(--gold)", borderRadius: 9, padding: "8px 10px", fontFamily: "inherit" }} />
+                      <span style={{ fontSize: 12, color: "var(--faint)" }}>min</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
   return (
     <div>
-      <div style={{ display: "grid", gap: 9 }}>
-        {modes.map((m) => {
-          const on = mode === m.v;
-          return (
-            <button key={m.v} onClick={() => onChange({ timeMode: m.v, avoidGaps: m.v !== "grid" })} style={{ width: "100%", textAlign: "left", background: on ? "var(--tint2)" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: "15px 16px", cursor: "pointer" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{m.label}</span>
-                  {m.rec && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--on-gold)", background: "var(--gold)", borderRadius: 20, padding: "2px 7px" }}>RECOMMENDED</span>}
+      {!adv ? (
+        <>
+          <div style={{ fontSize: 15.5, fontWeight: 600, color: "var(--text)" }}>How busy are you these days?</div>
+          <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginTop: 4, marginBottom: 13 }}>Pick the one that sounds like you — Vero sets up your booking times the best way for it.</div>
+          <div style={{ display: "grid", gap: 9 }}>
+            {REGIMES.map((r) => { const on = mode === r.v; return (
+              <button key={r.v} onClick={() => onChange({ timeMode: r.v, avoidGaps: true })} style={{ width: "100%", textAlign: "left", background: on ? "var(--tint2)" : "var(--panel2)", border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: "15px 16px", cursor: "pointer" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <span style={{ fontSize: 15.5, fontWeight: 600, color: "var(--text)" }}>{r.q}</span>
+                  {radioEl(on)}
                 </div>
-                <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
-              </div>
-              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 6 }}>{m.desc}</div>
-              {on && m.v === "grid" && (
-                <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 13, paddingTop: 13, borderTop: "1px solid color-mix(in srgb, var(--gold) 18%, var(--border))" }}>
-                  <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--faint)", fontWeight: 700, marginBottom: 9 }}>SHOW TIMES EVERY</div>
-                  <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-                    {PRESETS.map((g) => { const sel = !customOpen && gridMin === g; return (
-                      <button key={g} onClick={(e) => { e.stopPropagation(); setCustomOpen(false); onChange({ gridMin: g }); }} style={chip(sel)}>{g === 60 ? "1 hour" : `${g} min`}</button>
-                    ); })}
-                    <button onClick={(e) => { e.stopPropagation(); setCustomOpen(true); }} style={chip(customOpen)}>Custom</button>
-                  </div>
-                  {customOpen && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 11, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 13px" }}>
-                      <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 600 }}>Custom spacing</span>
-                      <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-                        <input type="number" min="5" max="240" value={gridMin} onChange={(e) => { const v = Math.max(5, Math.min(240, Number(e.target.value) || 5)); onChange({ gridMin: v }); }} style={{ width: 66, textAlign: "right", fontSize: 16, fontWeight: 600, color: "var(--text)", background: "var(--panel2)", border: "1.5px solid var(--gold)", borderRadius: 9, padding: "8px 10px", fontFamily: "inherit" }} />
-                        <span style={{ fontSize: 12, color: "var(--faint)" }}>min</span>
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
+                <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginTop: 6 }}>{r.sub}</div>
+              </button>
+            ); })}
+          </div>
+          <button onClick={() => setAdv(true)} style={{ marginTop: 14, background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>Choose the method myself ›</button>
+        </>
+      ) : (
+        <>
+          <button onClick={() => setAdv(false)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, fontWeight: 500, cursor: "pointer", padding: 0, marginBottom: 14 }}>‹ Back to simple setup</button>
+          {modeCards}
+        </>
+      )}
       <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
         <ToggleSetting
           label="Fake It Filter"
