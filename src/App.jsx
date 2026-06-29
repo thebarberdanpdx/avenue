@@ -4826,6 +4826,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const withName = prov ? prov.name : (resolved ? resolved.name : null);
           const dayLbl = selectedDate ? (() => { const r = relativeDate(selectedDate); return r.includes(",") ? r : `${r}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`; })() : null;
           const svcMin = waDurFor(prov ? prov.id : (waReal[0]?.id || "dan"));
+          // For a service with no add-ons there's no add-on page to reveal the price on, so show it
+          // here once a time is chosen (the service is confirmed by now). Client-aware via lineTotal.
+          const noAddons = !((draft.addonGroups || []).length);
+          const previewLT = lineTotal({ service: draft, addons: draftAddons, cutType, beardType, provider: (prov || resolved || waReal[0] || { id: "dan" }) });
           const commit = () => {
             const provFinal = prov || resolved || waReal[0];
             const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: provFinal, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") };
@@ -4882,7 +4886,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
               <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
                 {ready && (
-                  <div style={{ fontSize: 15.5, color: "var(--text)", marginBottom: 14 }}><span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{dayLbl}</span> · {fmtTime(slot)}{withName ? ` with ${withName}` : ""}</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 14 }}>
+                    <span style={{ fontSize: 15.5, color: "var(--text)" }}><span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>{dayLbl}</span> · {fmtTime(slot)}{withName ? ` with ${withName}` : ""}</span>
+                    {noAddons && <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, flexShrink: 0 }}>${previewLT.price}</span>}
+                  </div>
                 )}
                 <button disabled={!ready} onClick={commit} style={{ width: "100%", background: ready ? "var(--text)" : "var(--panel2)", color: ready ? "var(--bg)" : "var(--faint)", border: "none", textAlign: "center", padding: 15, borderRadius: 2, fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", cursor: ready ? "pointer" : "default" }}>Continue</button>
               </div>
