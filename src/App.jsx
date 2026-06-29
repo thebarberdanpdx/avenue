@@ -3141,6 +3141,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (entry.service.cutTypes && entry.cutType) {
       p = cutStylePrice(entry.service, provId, entry.cutType);
       m = cutStyleDuration(dc, entry.service, provId, entry.cutType);
+    } else if (entry.service.cutTypes && entry.service.cutTypes.length && entry.service.booking && entry.service.booking.holdLongest) {
+      // No cut type locked yet — reserve the LONGEST cut's length so the chair never runs over.
+      m = Math.max(m, ...entry.service.cutTypes.map((ct) => cutStyleDuration(dc, entry.service, provId, ct.id)));
     }
     if (entry.service.beardTypes && entry.beardType) {
       const bt = entry.service.beardTypes.find((b) => b.id === entry.beardType);
@@ -4078,6 +4081,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     {ct.popular && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text)", fontWeight: 600 }}>Most common</span>}
                   </span>
                   {showPrices && <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, color: "var(--text)", marginTop: 6 }}>${ct.price}</span>}
+                  {draft?.booking?.showTypeTimes && (() => { const m = ct.duration != null ? ct.duration : (Number(draft.duration) || 0) + (Number(ct.min) || 0); return m ? <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 4 }}>{m} min</span> : null; })()}
                 </span>
                 <ChevronRight size={18} style={{ color: "var(--text)", flexShrink: 0 }} />
               </button>
@@ -10468,6 +10472,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           {bookingRow("Require a card", "requireCard", "Hold a card on file to book — your no-show protection.")}
           {bookingRow("Require payment at booking", "requirePayment", "Charge the full amount when booking online.")}
           {bookingRow("Require read & confirm", "requireConfirm", "Make clients confirm they've read this service's description before they can continue — cuts down on wrong-service bookings.")}
+          {(form.cutTypes || []).length > 0 && bookingRow("Show each cut's time", "showTypeTimes", "Show how long each cut type takes (e.g. fade · 50 min) in the picker — so clients see that a longer cut costs more time before they choose. Stops a fade getting booked as a regular cut.")}
+          {(form.cutTypes || []).length > 0 && bookingRow("Hold the longest cut's time when unsure", "holdLongest", "If a booking doesn't lock in a cut type, reserve the longest cut's length so the chair never runs over. You can free the slack if it ends short.")}
           {bookingRow("Quick confirmation sheet", "confirmSheet", "Pop a centered “one quick check” with this service’s details so clients confirm the right pick before continuing.")}
         </div>
       </div>
