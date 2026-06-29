@@ -10991,6 +10991,58 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           };
           const isCombo = !!form.isCombo || (form.comboOf || []).length > 0;
           const legacyCuts = (form.cutTypes || []).length > 0; // services from the old cut-styles model
+          // One-tap migration off cut styles: turn this service's cut styles into their own
+          // standalone services (each with its own price + time, per-barber overrides folded in),
+          // then archive the original so old bookings still resolve but it leaves the menu.
+          const splitCutStyles = () => {
+            const src = services.find((s) => s.id === editing) || form;
+            const cuts = (src.cutTypes || []).filter(Boolean);
+            if (!cuts.length) return;
+            const names = cuts.map((c) => c.label).filter(Boolean).join(", ");
+            if (typeof window !== "undefined" && !window.confirm(`Split "${src.name}" into ${cuts.length} separate services (${names})?\n\nEach keeps its own price and time. "${src.name}" is archived (hidden from your menu) so past bookings still work.`)) return;
+            const baseDur = Math.max(5, Math.min(600, Number(src.duration) || 30));
+            const basePrice = Number(src.price) || 0;
+            const made = cuts.map((ct, i) => {
+              const staff = {};
+              Object.keys(src.staff || {}).forEach((pid) => {
+                const e = src.staff[pid] || {};
+                const cutDur = (e.cutDur && e.cutDur[ct.id] != null) ? Number(e.cutDur[ct.id]) : null;
+                const cutPrice = (e.cutPrice && e.cutPrice[ct.id] != null) ? Number(e.cutPrice[ct.id]) : null;
+                const baseE = (e.duration != null && e.duration !== "") ? Number(e.duration) : baseDur;
+                const dur = cutDur != null ? cutDur : baseE + (Number(ct.min) || 0);
+                staff[pid] = {
+                  on: e.on !== false,
+                  duration: Math.max(5, Math.min(600, dur)),
+                  price: cutPrice != null ? cutPrice : ((e.price != null && e.price !== "") ? Number(e.price) : null),
+                };
+              });
+              const price = ct.price != null ? Number(ct.price) : basePrice;
+              const photos = Array.isArray(ct.images) ? ct.images.filter(Boolean) : [];
+              const svc = {
+                ...src,
+                id: `${src.id}_${ct.id}_${Date.now().toString(36)}${i}`,
+                name: ct.label || src.name,
+                price: Math.min(100000, price),
+                duration: Math.max(5, Math.min(600, baseDur + (Number(ct.min) || 0))),
+                staff,
+                photos: photos.length ? photos : (Array.isArray(src.photos) ? src.photos : []),
+                photo: photos[0] || src.photo || "",
+                booking: { ...defaultBooking(), ...(src.booking || {}), description: ct.desc || (src.booking || {}).description || "" },
+                usesCutStyles: false,
+                archived: false,
+              };
+              delete svc.cutTypes;
+              return svc;
+            });
+            setServices((prev) => {
+              const idx = prev.findIndex((s) => s.id === src.id);
+              if (idx === -1) return [...prev, ...made];
+              const archivedOrig = { ...prev[idx], archived: true };
+              return [...prev.slice(0, idx), archivedOrig, ...made, ...prev.slice(idx + 1)];
+            });
+            setEditing(null); setSection(null);
+            showToast(`Split into ${made.length} services.`);
+          };
           // Goldie-clean outlined fields: a notched floating label over a rounded outline.
           const fldBox = { position: "relative", border: "1.5px solid var(--border)", borderRadius: 15, padding: "19px 16px 14px", marginBottom: 14, background: "var(--panel)" };
           const fldLbl = { position: "absolute", top: -8, left: 13, background: "var(--bg)", padding: "0 6px", fontSize: 12, color: "var(--sub)", fontWeight: 500, fontFamily: FONT_BODY };
@@ -11083,6 +11135,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                         <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "4px 0 4px" }}>Cut styles (legacy)</div>
                         <p style={{ fontSize: 12.5, color: "var(--faint)", margin: "0 0 6px", lineHeight: 1.45 }}>Cut styles are being retired — make each cut its own service instead. This stays so existing bookings keep working.</p>
                         <DrillRow icon={<Scissors size={18} />} label="Cut styles" sub={`${cutCount} style${cutCount === 1 ? "" : "s"}`} target="cutstyles" />
+                        <button onClick={splitCutStyles} className="lift" style={{ width: "100%", boxSizing: "border-box", marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "13px 16px", borderRadius: 13, border: "1.5px solid var(--border)", background: "var(--panel)", color: "var(--text)", fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>
+                          <Scissors size={16} /> Split into separate services
+                        </button>
+                        <p style={{ fontSize: 11.5, color: "var(--faint)", margin: "7px 2px 0", lineHeight: 1.45 }}>Makes each cut its own service (keeps its price &amp; time), then archives this one. One tap — finishes the move off cut styles.</p>
                       </>
                     )}
                     <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "16px 0 10px" }}>Combo</div>
