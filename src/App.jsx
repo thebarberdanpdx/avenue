@@ -2603,9 +2603,29 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
   const baseMode = (provStyle === "openTight" || provStyle === "grid" || provStyle === "pack") ? provStyle : shopMode;
   const timeMode = gold ? "pack" : baseMode;
   const gridMin = Math.max(5, Number(bk.gridMin) || 30);
-  // Shortest sellable service = the floor for an "unfillable" gap in open & tight.
+  // Smallest gap worth keeping (the floor for an "unsellable" sliver in open & tight).
+  // Owner-set via business.booking.minGap; falls back to the shortest service on the menu.
   const svcDurs = (services || []).map((s) => Number(s && s.duration)).filter((n) => n > 0);
-  const minGap = svcDurs.length ? Math.min(...svcDurs) : Math.min(durMin, 30);
+  const minGap = Math.max(5, Number(bk.minGap) || 40);
+  // Awkward-gap policy (open & tight): a run that fits the service but can only be booked by
+  // stranding a sub-minGap sliver is HELD (hidden) while the day is far off — giving a service
+  // that fills it cleanly time to book — then RELEASED (offered flush) as the date nears, so a
+  // chair is never left empty. business.booking.gapHold picks how close that release happens.
+  const startOfDayMs = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); };
+  const daysUntil = Math.round((startOfDayMs(date) - startOfDayMs(new Date())) / 86400000);
+  const releaseAwkward = (() => {
+    switch (bk.gapHold) {
+      case "off": return true;            // always offer the slot (capture the booking)
+      case "always": return false;        // always hold the block (never offer a sliver-maker)
+      case "sameday": return daysUntil <= 0;
+      case "d1": return daysUntil <= 1;
+      case "d3": return daysUntil <= 3;
+      default: return daysUntil <= 2;     // recommended: release within 2 days
+    }
+  })();
+  // A run is only worth holding if some service could still fill it cleanly (0 or >= minGap leftover);
+  // if nothing on the menu fits it cleanly, there's nothing to wait for — offer it right away.
+  const cleanFitExists = (L) => svcDurs.some((d) => d <= L && (L - d === 0 || L - d >= minGap));
   const candidates = new Set();
 
   if (timeMode === "grid") {
@@ -2618,21 +2638,33 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
     busy.forEach(([bs, be]) => { if (cursor < bs) runs.push([cursor, bs]); cursor = Math.max(cursor, be); });
     if (cursor < dayEnd) runs.push([cursor, dayEnd]);
     if (timeMode === "pack") {
-      runs.forEach(([rs, re]) => { for (let t = rs; t + durMin <= re; t += durMin) candidates.add(t); });
-    } else {
-      // openTight: a clean clock grid filtered so each placement leaves 0 or >= minGap on each
-      // side, plus the flush anchors (right after / right before an appt, day open / close).
-      const step = gridMin;
+      // Flush on BOTH sides: tile back-to-back from the open edge AND offer the slot that ends
+      // exactly when the next appt / day-close starts, so bookings always touch an existing one.
       runs.forEach(([rs, re]) => {
-        if (re - rs < durMin) return;
-        const tryAdd = (t) => {
-          if (t < rs || t + durMin > re) return;
+        for (let t = rs; t + durMin <= re; t += durMin) candidates.add(t);   // flush after the previous appt
+        if (re - durMin >= rs) candidates.add(re - durMin);                  // flush before the next appt
+      });
+    } else {
+      // openTight: offer starts spaced by the BOOKED SERVICE's own length within each open run —
+      // a 45-min cut tiles in 45-min steps, a 70-min in 70-min steps — so consecutive bookings
+      // never strand a sub-service sliver (the old fixed clock grid did, e.g. 45 on a 30 grid).
+      // A "clean" placement leaves 0 or >= minGap on each side. If a run physically fits the
+      // service but admits NO clean placement, hold it (hidden) or release a single minimal-harm
+      // flush start (sliver pinned against the right edge) per the awkward-gap policy above.
+      const step = durMin;
+      runs.forEach(([rs, re]) => {
+        const L = re - rs;
+        if (L < durMin) return;
+        const isClean = (t) => {
+          if (t < rs || t + durMin > re) return false;
           const lr = t - rs, rr = re - (t + durMin);
-          if ((lr === 0 || lr >= minGap) && (rr === 0 || rr >= minGap)) candidates.add(t);
+          return (lr === 0 || lr >= minGap) && (rr === 0 || rr >= minGap);
         };
-        tryAdd(rs);            // flush after previous appt / day start
-        tryAdd(re - durMin);   // flush before next appt / day end
-        for (let t = Math.ceil(rs / step) * step; t + durMin <= re; t += step) tryAdd(t);
+        const hits = [];
+        for (let t = rs; t + durMin <= re; t += step) if (isClean(t)) hits.push(t);  // tile from the open edge
+        if (isClean(re - durMin)) hits.push(re - durMin);                            // flush before next appt / day close
+        if (hits.length) hits.forEach((t) => candidates.add(t));
+        else if (releaseAwkward || !cleanFitExists(L)) candidates.add(rs);           // capture the booking, sliver to the right
       });
     }
   }
@@ -14507,6 +14539,25 @@ function BookingTimesEditor({ b, onChange }) {
       example: "With a cut ending at 11:45, the only morning time offered is 11:45 — the second one client gets up, the next sits down. Best for your busiest days when you want to cram in every cut." },
   ];
   const chip = (sel) => ({ flex: "0 0 auto", padding: "8px 14px", borderRadius: 30, border: `1.5px solid ${sel ? "var(--gold)" : "var(--border)"}`, background: sel ? "var(--tint)" : "var(--panel)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 13, fontWeight: sel ? 600 : 500, cursor: "pointer" });
+  // Awkward-gap policy controls — only meaningful in Open & tight (writes booking.gapHold + booking.minGap).
+  const HOLD_STOPS = [
+    { v: "always", label: "Always\nhold", egl: "always hold", eg: "Vero never offers a gap it can't fill cleanly. That empty 1:00–2:00 hour stays hidden from haircut bookings — saved only for a booking that fits it, like a cut-and-beard. Strictest on gaps, but the hour can sit empty." },
+    { v: "d3", label: "3 days", egl: "3 days", eg: "Vero holds that empty 1:00–2:00 hour for a clean-fit booking until 3 days before the day. Still empty then? It starts offering 1:00 for a haircut. Leans toward keeping clean hours." },
+    { v: "d2", label: "2 days", rec: true, egl: "2 days", eg: "You've an empty 1:00–2:00 hour Friday and a client wants a 45-min cut. Vero holds it for a clean-fit booking until 48 hours before — still empty then, it offers 1:00 and fills your chair. Best balance for most shops." },
+    { v: "d1", label: "1 day", egl: "1 day", eg: "Vero holds that empty 1:00–2:00 hour until the day before. On that morning, if it's still empty, a haircut client is offered 1:00. Leans toward filling chairs." },
+    { v: "off", label: "Always\noffer", egl: "always offer", eg: "Vero never holds a gap — a haircut client is offered 1:00 right away, even weeks out. Fills the chair fastest, but you'll see more small 15-min slivers." },
+  ];
+  const hold = b.gapHold || "d2";
+  const holdIdx = Math.max(0, HOLD_STOPS.findIndex((s) => s.v === hold));
+  const holdStop = HOLD_STOPS[holdIdx];
+  const FLOORS = [30, 40, 45, 60];
+  const floor = Number(b.minGap) || 40;
+  const FLOOR_EG = {
+    30: "A cut would leave a 30-minute hole before your next client. At 30 min, Vero treats that as just sellable and will offer the time — good if you regularly book a 30-min service.",
+    40: "A cut would leave a 35-minute hole before your next client. At 40 min, Vero treats that as too short to sell and won't offer the time. Drop it to 30 and it would — betting you can fill it with a quick service.",
+    45: "Any leftover under 45 minutes is treated as unsellable, so Vero only keeps gaps big enough for a full haircut. Tightest of the common choices.",
+    60: "Vero only keeps gaps of an hour or more. Use this if your shortest real service is long — anything less is treated as a dead sliver.",
+  };
   return (
     <div>
       <div style={{ display: "grid", gap: 9 }}>
@@ -14569,6 +14620,47 @@ function BookingTimesEditor({ b, onChange }) {
           </div>
         )}
       </div>
+      {mode === "openTight" && (
+        <>
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Holding awkward gaps</div>
+            <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginTop: 4 }}>When the only way to book a gap leaves a sliver too short to sell, Vero holds it for a booking that fits cleanly — then opens it as the day nears, so a chair is never left empty.</div>
+            <div style={{ margin: "26px 9px 0", position: "relative", height: 4, background: "var(--border)", borderRadius: 4 }}>
+              <div style={{ position: "absolute", left: 0, top: 0, height: 4, borderRadius: 4, background: "var(--gold)", width: `${(holdIdx / (HOLD_STOPS.length - 1)) * 100}%` }} />
+              <div style={{ position: "absolute", left: 0, top: -8, width: "100%", display: "flex", justifyContent: "space-between" }}>
+                {HOLD_STOPS.map((s, i) => { const on = i === holdIdx; const filled = i <= holdIdx; return (
+                  <button key={s.v} onClick={() => onChange({ gapHold: s.v })} aria-label={s.label.replace("\n", " ")} style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${filled ? "var(--gold)" : "var(--border2)"}`, background: filled ? "var(--gold)" : "var(--panel)", boxShadow: on ? "0 0 0 4px var(--tint)" : "none", padding: 0, cursor: "pointer" }} />
+                ); })}
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 13 }}>
+              {HOLD_STOPS.map((s, i) => { const on = i === holdIdx; return (
+                <button key={s.v} onClick={() => onChange({ gapHold: s.v })} style={{ flex: 1, background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, lineHeight: 1.2, whiteSpace: "pre-line", color: on ? "var(--gold)" : "var(--sub)", fontWeight: on ? 700 : 500, textAlign: i === 0 ? "left" : i === HOLD_STOPS.length - 1 ? "right" : "center" }}>{s.label}</button>
+              ); })}
+            </div>
+            <div style={{ marginTop: 15, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
+              <div style={{ fontSize: 11, letterSpacing: 0.3, color: "var(--gold)", fontWeight: 600, marginBottom: 5, textTransform: "uppercase" }}>For example · {holdStop.egl}</div>
+              <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55 }}>{holdStop.eg}</div>
+            </div>
+          </div>
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Smallest gap worth keeping</div>
+            <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginTop: 4 }}>Vero won't strand a leftover shorter than this. Set it to the shortest service people actually book.</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 15 }}>
+              {FLOORS.map((n) => { const sel = floor === n; return (
+                <button key={n} onClick={() => onChange({ minGap: n })} style={{ position: "relative", flex: 1, padding: "12px 0", borderRadius: 11, border: `1.5px solid ${sel ? "var(--gold)" : "var(--border)"}`, background: sel ? "var(--tint)" : "var(--panel)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 15, fontWeight: sel ? 700 : 500, cursor: "pointer" }}>
+                  {n}<span style={{ fontSize: 11, fontWeight: 500 }}> min</span>
+                  {n === 40 && <span style={{ position: "absolute", top: -8, left: "50%", transform: "translateX(-50%)", fontSize: 8, letterSpacing: 0.5, fontWeight: 700, color: "var(--on-gold)", background: "var(--gold)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>RECOMMENDED</span>}
+                </button>
+              ); })}
+            </div>
+            <div style={{ marginTop: 15, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
+              <div style={{ fontSize: 11, letterSpacing: 0.3, color: "var(--gold)", fontWeight: 600, marginBottom: 5, textTransform: "uppercase" }}>For example · {floor} min</div>
+              <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55 }}>{FLOOR_EG[floor] || FLOOR_EG[40]}</div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
