@@ -4146,8 +4146,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
                         <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, textAlign: "center" }}>You picked</div>
                         <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 20, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, textAlign: "center", lineHeight: 1.1, color: "var(--text)", marginTop: 7 }}>{nm}</div>
-                        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 1, color: "var(--sub)", textAlign: "center", marginTop: 7 }}>{(pr != null && pr !== "") ? `$${pr}` : ""}{(pr != null && pr !== "") && du ? " · " : ""}{du ? `${du} min` : ""}</div>
-                        {d ? <><div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} /><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, lineHeight: 1.55, color: "var(--text)", textAlign: "center", fontWeight: 400, padding: "0 2px" }}>{d}</div></> : null}
+                          {d ? <><div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} /><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, lineHeight: 1.55, color: "var(--text)", textAlign: "center", fontWeight: 400, padding: "0 2px" }}>{d}</div></> : null}
                         <div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} />
                         <button onClick={() => confirmCut(ct, d)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 13, padding: 18, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer", marginTop: 2 }}>Yes — that's my cut</button>
                         <button onClick={() => setConfirmSheet(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13.5, fontWeight: 500, padding: "15px 0 2px", marginTop: 0, cursor: "pointer" }}>‹ Pick a different style</button>
@@ -4622,7 +4621,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
                       <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, textAlign: "center" }}>You picked</div>
                       <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 20, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, textAlign: "center", lineHeight: 1.1, color: "var(--text)", marginTop: 7 }}>{nm}</div>
-                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 1, color: "var(--sub)", textAlign: "center", marginTop: 7 }}>{(pr != null && pr !== "") ? `$${pr}` : ""}{(pr != null && pr !== "") && du ? " · " : ""}{du ? `${du} min` : ""}</div>
                       {d ? <><div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} /><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, lineHeight: 1.55, color: "var(--text)", textAlign: "center", fontWeight: 400, padding: "0 2px" }}>{d}</div></> : null}
                       <div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} />
                       <button onClick={proceed} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 13, padding: 18, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer", marginTop: 2 }}>Yes — that's my cut</button>
@@ -4845,7 +4843,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const cell = (on) => ({ textAlign: "center", padding: "15px 4px", border: `1px solid ${on ? "var(--text)" : "var(--border)"}`, background: on ? "var(--text)" : "var(--panel)", color: on ? "var(--bg)" : "var(--text)", borderRadius: 2, fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" });
           return (
             <div className="fade-up" style={{ color: "var(--text)", paddingTop: 4 }}>
-              <div style={{ fontSize: 12.5, letterSpacing: 0.5, color: "var(--sub)", marginBottom: 10 }}>{describeEntry({ service: draft, addons: draftAddons, cutType, beardType })} · {svcMin} min</div>
               <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px", margin: "0 0 24px" }}>Who &amp; when</h2>
 
               <div style={{ display: "flex", gap: 28, borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
