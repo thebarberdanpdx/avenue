@@ -3962,6 +3962,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" };
           const rowBtn = { width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "19px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" };
           const metaFor = (svc) => {
+            if (business && business.bookingStep && business.bookingStep.quietMenu) return ""; // quiet menu: names only on the list
             // Categories (services with options chosen after) show no price/time here — those depend on the option picked next.
             if (svc.usesCutStyles !== false && svc.cutTypes && svc.cutTypes.length > 0) return "";
             let priceStr = "";
@@ -4200,6 +4201,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             else { setCart((c) => (c.length ? c.map((e, i) => i === 0 ? { service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} } : e) : [{ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }])); startAddons({ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }); }
           };
           const metaFor = (svc) => {
+            if (business && business.bookingStep && business.bookingStep.quietMenu) return ""; // quiet menu: names only on the list
             // Categories (services with options chosen after) show no price/time here — those depend on the option picked next.
             if (svc.usesCutStyles !== false && svc.cutTypes && svc.cutTypes.length > 0) return "";
             let priceStr = "";
@@ -16464,6 +16466,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       toggle: { on: (form.bookingStep || {}).showPrices === true, set: (v) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), showPrices: v } }) },
       keywords: "price prices show display total cost amount add-on style money hide booking flow running total reveal",
       editor: <ToggleSetting label="Show prices while booking" desc="When on, clients see each style and add-on's price, plus a running total as they choose add-ons. When off, no prices appear during booking (today's default)." on={(form.bookingStep || {}).showPrices === true} onToggle={(v) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), showPrices: v } })} />,
+    },
+    {
+      id: "quietmenu", title: "Quiet Menu", icon: List, category: "Online Booking",
+      status: ((form.bookingStep || {}).quietMenu === true) ? "On — names only on the menu" : "Off — shows price & time",
+      toggle: { on: (form.bookingStep || {}).quietMenu === true, set: (v) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), quietMenu: v } }) },
+      keywords: "quiet menu hide prices durations time names only services list minimal premium reflex pick",
+      editor: <ToggleSetting label="Names only on the services page" desc="Hide prices and durations on the first services list, so clients open a service to see what's included and what it costs. Stops them reflex-picking the cheapest or shortest option." on={(form.bookingStep || {}).quietMenu === true} onToggle={(v) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), quietMenu: v } })} />,
     },
     {
       id: "messages", fullBleed: true, title: "Automated Messages", icon: MessageSquare, category: "Automated Messages",
