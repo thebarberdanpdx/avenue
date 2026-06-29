@@ -10944,7 +10944,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   if (editing) {
     const drill = section === "cutstyles" || section === "addons" || section === "staff" || section === "photos" || section === "timerules" || section === "booking";
     return (
-      <div className="appt-screen" style={{ paddingBottom: 40 }}>
+      <div className="appt-screen" style={{ paddingBottom: 40, textAlign: "left" }}>
         {picker && <PhotoPicker onClose={() => setPicker(null)} onPick={(id) => {
           if (picker.target === "service") setForm({ ...form, photo: id });
           else if (picker.target === "gallery") addPhoto(id);
@@ -10993,7 +10993,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           return (
             <>
               {backBar("SERVICES", () => setEditing(null))}
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, letterSpacing: "-0.6px", margin: "2px 0 20px" }}>{editing === "new" ? "New service" : "Edit service"}</h2>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600, letterSpacing: "-0.4px", margin: "2px 0 18px", textAlign: "left" }}>{editing === "new" ? "New service" : "Edit service"}</h2>
 
               {/* Name */}
               <div style={fldBox}>
@@ -11034,8 +11034,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 </div>
                 <div style={{ ...fldBox, flex: 1, minWidth: 0 }}>
                   <label style={fldLbl}>Duration</label>
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <input type="number" inputMode="numeric" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="50" style={fldInput} />
+                  <div style={{ display: "flex", alignItems: "baseline" }}>
+                    <input type="number" inputMode="numeric" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="50" style={{ ...fldInput, width: "auto", flex: "0 1 auto", minWidth: 0 }} size={3} />
                     <span style={{ color: "var(--sub)", fontSize: 15, marginLeft: 4 }}>min</span>
                   </div>
                 </div>
