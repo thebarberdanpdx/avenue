@@ -1119,6 +1119,56 @@ const addonDuration = (service, providerId, group) => {
   if (se && se.addonDur && group && se.addonDur[group.id] != null) return Number(se.addonDur[group.id]) || 0;
   return Number(group && group.item && group.item.min) || 0;
 };
+// One-time, non-destructive migration OFF the retired cut-styles model. Any active service that
+// still carries cut styles becomes one STANDALONE service per style — each with that style's own
+// price + time (per-barber cutPrice/cutDur overrides folded into flat staff price/duration; the
+// style's extra minutes added onto the base), its description, photos, add-ons and booking rules
+// carried over, and cut styles turned off. The original is KEPT but ARCHIVED so past bookings still
+// resolve their service; it just leaves the active menu. Idempotent — archived originals and
+// usesCutStyles===false services never re-trigger, so this is a no-op once everything is split.
+// Returns the SAME array reference when nothing needs splitting (lets callers cheaply detect a change).
+const splitCutStyleServices = (list) => {
+  if (!Array.isArray(list) || !list.length) return list;
+  const needs = list.some((s) => s && !s.archived && s.usesCutStyles !== false && (s.cutTypes || []).length > 0);
+  if (!needs) return list;
+  const out = [];
+  list.forEach((s) => {
+    if (!s || s.archived || s.usesCutStyles === false || !(s.cutTypes || []).length) { out.push(s); return; }
+    const baseDur = Math.max(5, Math.min(600, Number(s.duration) || 30));
+    const basePrice = Number(s.price) || 0;
+    (s.cutTypes || []).filter(Boolean).forEach((ct, i) => {
+      const staff = {};
+      Object.keys(s.staff || {}).forEach((pid) => {
+        const e = s.staff[pid] || {};
+        const cutDur = (e.cutDur && e.cutDur[ct.id] != null) ? Number(e.cutDur[ct.id]) : null;
+        const cutPrice = (e.cutPrice && e.cutPrice[ct.id] != null) ? Number(e.cutPrice[ct.id]) : null;
+        const baseE = (e.duration != null && e.duration !== "") ? Number(e.duration) : baseDur;
+        staff[pid] = {
+          on: e.on !== false,
+          duration: Math.max(5, Math.min(600, cutDur != null ? cutDur : baseE + (Number(ct.min) || 0))),
+          price: cutPrice != null ? cutPrice : ((e.price != null && e.price !== "") ? Number(e.price) : null),
+        };
+      });
+      const photos = Array.isArray(ct.images) ? ct.images.filter(Boolean) : [];
+      const svc = {
+        ...s,
+        id: `${s.id}_${ct.id}_${Date.now().toString(36)}${i}`,
+        name: ct.label || s.name,
+        price: Math.min(100000, ct.price != null ? Number(ct.price) : basePrice),
+        duration: Math.max(5, Math.min(600, baseDur + (Number(ct.min) || 0))),
+        staff,
+        photos: photos.length ? photos : (Array.isArray(s.photos) ? s.photos : []),
+        photo: photos[0] || s.photo || "",
+        booking: { ...(s.booking || {}), description: ct.desc || (s.booking || {}).description || "" },
+        usesCutStyles: false,
+      };
+      delete svc.cutTypes;
+      out.push(svc);
+    });
+    out.push({ ...s, archived: true }); // keep the original (archived) so old appointments still resolve
+  });
+  return out;
+};
 // Time-of-day pricing: apply the first matching priced rule for a service at a given
 // provider / day-of-week / start-minute. Falls back to the normal price when nothing matches.
 const priceWithTimeRules = (service, providerId, dateObj, startMin) => {
@@ -1752,9 +1802,13 @@ function App() {
           return s;
         });
         setCutLibrary(lib);
-        // Persist linkage only when services were loaded AND something changed. We deliberately leave
-        // lastRemoteRef.services as the pre-link array so the save effect sees a diff and writes once.
-        if (linkChanged && sv && sv.length) setServices(linkedSvc);
+        // Finish the move off cut styles: auto-split any remaining cut-style service into its own
+        // standalone services (one per cut), archiving the original. Non-destructive + idempotent.
+        const splitSvc = splitCutStyleServices(linkedSvc);
+        const didSplit = splitSvc !== linkedSvc;
+        // Persist when services were loaded AND linkage or the split changed something. We deliberately
+        // leave lastRemoteRef.services as the pre-change array so the save effect sees a diff and writes once.
+        if ((linkChanged || didSplit) && sv && sv.length) setServices(splitSvc);
       }
 
       // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
