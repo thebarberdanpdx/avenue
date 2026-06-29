@@ -4903,6 +4903,58 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const cell = (on) => ({ textAlign: "center", padding: "15px 4px", border: `1px solid ${on ? "var(--text)" : "var(--border)"}`, background: on ? "var(--text)" : "var(--panel)", color: on ? "var(--bg)" : "var(--text)", borderRadius: 2, fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" });
           return (
             <div className="fade-up" style={{ color: "var(--text)", paddingTop: 4 }}>
+              {/* "Does this look right?" — same confirm gate as the step-6 path, but this merged
+                  single-person who&when screen holds the pick in `draft` (goWhoWhen moved it out of
+                  the cart), so it sources from draft/previewLT. Overlay only; times render underneath. */}
+              {!confirmChecked && (
+                <Sheet open onClose={() => setConfirmChecked(true)} align="bottom" maxWidth={460}>
+                  <div style={{ width: 38, height: 5, borderRadius: 9, background: "var(--border2)", margin: "0 auto 14px" }} />
+                  <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 5px" }}>Does this look right?</h2>
+                  <p style={{ fontSize: 13.5, color: "var(--sub)", margin: "0 0 16px", lineHeight: 1.45 }}>Quick check so we hold the right time for you.</p>
+                  {(() => {
+                    const desc = draft.booking && draft.booking.description;
+                    const picks = (draft.addonGroups || []).map((g) => {
+                      const sel = draftAddons && draftAddons[g.id]; if (!sel) return null;
+                      if (g.type === "choice") { const o = (g.options || []).find((x) => x.id === sel); return o ? { name: o.label, desc: "", price: Number(o.price) || 0 } : null; }
+                      if (g.type === "addon") { const it = g.item || {}; return { name: it.name, desc: it.desc || "", price: it.addsPrice !== false ? (Number(it.price) || 0) : 0 }; }
+                      return null;
+                    }).filter(Boolean);
+                    return (
+                      <>
+                        <div style={{ border: "1.5px solid var(--border)", borderRadius: 16, padding: 16 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+                            <span style={{ fontSize: 18, fontWeight: 600 }}>{draft.name}</span>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--sub)", flexShrink: 0 }}>${previewLT.price} · {previewLT.min} min</span>
+                          </div>
+                          {desc ? <p style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55, margin: "10px 0 0" }}>{desc}</p> : null}
+                        </div>
+                        {picks.length > 0 && (
+                          <div style={{ marginTop: 6 }}>
+                            {picks.map((p, i) => (
+                              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "13px 2px", borderBottom: "1px solid var(--line)" }}>
+                                <Check size={16} style={{ color: "var(--text)", flexShrink: 0, marginTop: 2 }} />
+                                <span style={{ flex: 1, minWidth: 0 }}>
+                                  <span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>{p.name}</span>
+                                  {p.desc ? <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{p.desc}</span> : null}
+                                </span>
+                                {p.price ? <span style={{ fontSize: 13.5, fontWeight: 600, flexShrink: 0 }}>+${p.price}</span> : null}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "18px 2px 14px" }}>
+                    <span style={{ fontSize: 14, color: "var(--sub)", fontWeight: 500 }}>Total</span>
+                    <span style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.3px" }}>${previewLT.price} · {previewLT.min} min</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 11 }}>
+                    <button onClick={() => { setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); }} style={{ flex: 1, background: "transparent", border: "1.5px solid var(--border2)", color: "var(--text)", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: "'Jost', sans-serif", cursor: "pointer" }}>Change</button>
+                    <button onClick={() => setConfirmChecked(true)} style={{ flex: 1.4, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: "'Jost', sans-serif", cursor: "pointer" }}>Yes — pick a time</button>
+                  </div>
+                </Sheet>
+              )}
               <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px", margin: "0 0 24px" }}>Who &amp; when</h2>
 
               <div style={{ display: "flex", gap: 28, borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
