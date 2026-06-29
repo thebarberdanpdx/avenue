@@ -665,12 +665,12 @@ function Sheet({ open, onClose, children, align = "top", maxWidth = 520 }) {
   // Rendered through a portal to document.body so a transformed ancestor (animations) can't
   // trap the position:fixed overlay and cut off scrolling.
   return createPortal((
-    <div onClick={onClose} className="sheet-overlay" style={{ position: "fixed", inset: 0, background: "var(--overlay)", backdropFilter: "blur(3px) saturate(1.08)", WebkitBackdropFilter: "blur(3px) saturate(1.08)", zIndex: 2000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: justify, padding: align === "center" ? "20px" : "0", boxSizing: "border-box" }}>
+    <div onClick={onClose} className="sheet-overlay" style={{ position: "fixed", top: 0, left: 0, right: 0, height: "100dvh", background: "var(--overlay)", backdropFilter: "blur(3px) saturate(1.08)", WebkitBackdropFilter: "blur(3px) saturate(1.08)", zIndex: 2000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: justify, padding: align === "center" ? "20px" : "0", boxSizing: "border-box" }}>
       <div onClick={(e) => e.stopPropagation()} className={animClass} style={{
         width: "100%", maxWidth, background: "var(--bg)",
         borderRadius: align === "top" ? "0 0 22px 22px" : (align === "center" ? 22 : "22px 22px 0 0"),
         paddingTop: align === "top" ? "calc(env(safe-area-inset-top) + 16px)" : 20,
-        maxHeight: align === "center" ? "85vh" : "92vh",
+        maxHeight: align === "center" ? "85dvh" : "92dvh",
         display: "flex", flexDirection: "column",
         boxShadow: "0 20px 60px rgba(0,0,0,0.4)", boxSizing: "border-box", overflow: "hidden",
       }}>
@@ -4322,8 +4322,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const heading = group.label || (item.name ? `Want ${item.name}?` : "One more thing?");
           const desc = item.desc || "";
           return (
-            <div onClick={() => { if (!req && !isChoice) answerAddon(group, false); }} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-              <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 480, borderRadius: "22px 22px 0 0", padding: "24px 26px calc(30px + env(safe-area-inset-bottom))", boxShadow: "0 -12px 40px rgba(0,0,0,0.18)", maxHeight: "88vh", overflowY: "auto" }}>
+            <div onClick={() => { if (!req && !isChoice) answerAddon(group, false); }} style={{ position: "fixed", top: 0, left: 0, right: 0, height: "100dvh", background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 480, borderRadius: "22px 22px 0 0", padding: "24px 26px calc(30px + env(safe-area-inset-bottom))", boxShadow: "0 -12px 40px rgba(0,0,0,0.18)", maxHeight: "88dvh", overflowY: "auto" }}>
                 <div style={{ width: 38, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 16px" }} />
                 {/* Service is confirmed by now — reveal its price (plus a running total as add-ons are chosen). */}
                 <div style={{ textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginBottom: 16 }}>{entry.service.name} · <span style={{ color: "var(--text)", fontWeight: 600 }}>${lineTotal(entry).price}</span></div>
