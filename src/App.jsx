@@ -10048,6 +10048,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const setPopularCut = (i) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).map((c, idx) => ({ ...c, popular: idx === i ? !c.popular : false })) }));
   const addCut = () => setForm((f) => ({ ...f, cutTypes: [...(f.cutTypes || []), { id: "ct" + Date.now(), label: "", desc: "", price: "" }] }));
   const removeCut = (i) => setForm((f) => ({ ...f, cutTypes: (f.cutTypes || []).filter((_, idx) => idx !== i) }));
+  // Reorder the offered cut styles — this array's order is exactly the order clients see at booking.
+  const moveCut = (i, dir) => setForm((f) => { const arr = [...(f.cutTypes || [])]; const j = i + dir; if (j < 0 || j >= arr.length) return f; const t = arr[i]; arr[i] = arr[j]; arr[j] = t; return { ...f, cutTypes: arr }; });
   // ---- cut styles: a service "offers" styles from the shared library; price & time stay per-service ----
   const cutNorm = (s) => (s || "").trim().toLowerCase();
   const styleMatch = (c, entry) => (c.libId ? c.libId === entry.id : cutNorm(c.label) === cutNorm(entry.label));
@@ -10068,28 +10070,56 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     const du = (ct.duration === "" || ct.duration == null) ? (form.duration || 45) : ct.duration;
     return `Offered · $${pr} · ${du} min`;
   };
+  // Offered styles come first, in the SERVICE's own cutTypes order (the order clients see while
+  // booking) so the owner can arrange it with the arrows. Library styles not offered here follow,
+  // available to add.
+  const offeredEntries = (form.cutTypes || []).map((c) => (cutLibrary || []).find((e) => styleMatch(c, e))).filter(Boolean);
+  const offeredIds = new Set(offeredEntries.map((e) => e.id));
+  const restEntries = (cutLibrary || []).filter((e) => !offeredIds.has(e.id));
+  const styleRow = (entry, idx, count, reorderable) => {
+    const ct = (form.cutTypes || []).find((c) => styleMatch(c, entry));
+    const ci = ct ? (form.cutTypes || []).findIndex((c) => styleMatch(c, entry)) : -1;
+    const img = (entry.images || []).filter(Boolean)[0];
+    return (
+      <div key={entry.id} style={{ display: "flex", alignItems: "center", gap: 4, borderTop: idx ? "1px solid var(--line)" : "none", minWidth: 0 }}>
+        <button onClick={() => setEditStyleId(entry.id)} className="lift" style={{ flex: 1, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 13, padding: "13px 4px 13px 15px", background: "transparent", color: "var(--text)", textAlign: "left", minWidth: 0 }}>
+          <span style={{ width: 44, height: 44, borderRadius: 11, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--line)" }}>{img ? <img src={imgUrl(img, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={17} style={{ color: "var(--faint)" }} />}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 15.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.label}{ct && ct.popular ? <span style={{ marginLeft: 7, fontSize: 9.5, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700, color: "var(--bg)", background: "var(--text)", borderRadius: 20, padding: "2px 7px", verticalAlign: "middle" }}>Common</span> : null}</span>
+            <span style={{ display: "block", fontSize: 12.5, color: ct ? "var(--sub)" : "var(--faint)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{styleSummary(entry)}</span>
+          </span>
+        </button>
+        {reorderable && count > 1 ? (
+          <div style={{ display: "flex", flexShrink: 0 }}>
+            <button onClick={() => moveCut(ci, -1)} disabled={ci <= 0} aria-label="Move up" style={{ background: "none", border: "none", color: ci <= 0 ? "var(--faint)" : "var(--sub)", padding: "4px 3px", cursor: ci <= 0 ? "default" : "pointer", opacity: ci <= 0 ? 0.35 : 1, display: "flex" }}><ChevronUp size={18} /></button>
+            <button onClick={() => moveCut(ci, 1)} disabled={ci >= count - 1} aria-label="Move down" style={{ background: "none", border: "none", color: ci >= count - 1 ? "var(--faint)" : "var(--sub)", padding: "4px 3px", cursor: ci >= count - 1 ? "default" : "pointer", opacity: ci >= count - 1 ? 0.35 : 1, display: "flex" }}><ChevronDown size={18} /></button>
+          </div>
+        ) : null}
+        <button onClick={() => setEditStyleId(entry.id)} aria-label="Edit style" style={{ background: "none", border: "none", padding: "4px 12px 4px 4px", cursor: "pointer", display: "flex", flexShrink: 0 }}><ChevronRight size={18} style={{ color: "var(--faint)" }} /></button>
+      </div>
+    );
+  };
   const cutStylesList = (
     <>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The cuts clients can pick for this service. Tap one to set its price, time, photos and per-staff pricing.</p>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The cuts clients can pick for this service, shown in the order below — use the arrows to set the order they see. Tap one to set its price, time, photos and per-staff pricing.</p>
       {(cutLibrary || []).length === 0 ? (
         <div style={{ ...cardStyle, color: "var(--sub)", fontSize: 15, lineHeight: 1.5, marginBottom: 14 }}>No cut styles yet. Tap "New style" to create your first.</div>
       ) : (
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
-          {(cutLibrary || []).map((entry, idx) => {
-            const ct = (form.cutTypes || []).find((c) => styleMatch(c, entry));
-            const img = (entry.images || []).filter(Boolean)[0];
-            return (
-              <button key={entry.id} onClick={() => setEditStyleId(entry.id)} className="lift" style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 13, padding: "13px 15px", background: "var(--panel)", color: "var(--text)", textAlign: "left", borderTop: idx ? "1px solid var(--line)" : "none", minWidth: 0 }}>
-                <span style={{ width: 44, height: 44, borderRadius: 11, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--line)" }}>{img ? <img src={imgUrl(img, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={17} style={{ color: "var(--faint)" }} />}</span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 15.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.label}{ct && ct.popular ? <span style={{ marginLeft: 7, fontSize: 9.5, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700, color: "var(--bg)", background: "var(--text)", borderRadius: 20, padding: "2px 7px", verticalAlign: "middle" }}>Common</span> : null}</span>
-                  <span style={{ display: "block", fontSize: 12.5, color: ct ? "var(--sub)" : "var(--faint)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{styleSummary(entry)}</span>
-                </span>
-                <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
-              </button>
-            );
-          })}
-        </div>
+        <>
+          {offeredEntries.length > 0 && (
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
+              {offeredEntries.map((entry, idx) => styleRow(entry, idx, offeredEntries.length, true))}
+            </div>
+          )}
+          {restEntries.length > 0 && (
+            <>
+              <SectionLbl style={{ margin: "0 2px 8px" }}>{offeredEntries.length > 0 ? "Add another style" : "Choose styles to offer"}</SectionLbl>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
+                {restEntries.map((entry, idx) => styleRow(entry, idx, restEntries.length, false))}
+              </div>
+            </>
+          )}
+        </>
       )}
       <button onClick={() => { const id = "lib_" + Date.now(); setCutLibrary([...(cutLibrary || []), { id, label: "New style", desc: "", images: [], color: null }]); setEditStyleId(id); }} style={addTileStyle}><Plus size={18} /> New style</button>
     </>
