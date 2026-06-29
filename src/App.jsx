@@ -11040,11 +11040,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   </div>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 7, flexWrap: "wrap", margin: "0 0 4px" }}>
-                {[15, 30, 45, 60, 90].map((m) => { const on = String(form.duration) === String(m); return (
-                  <button key={m} onClick={() => setForm({ ...form, duration: m })} style={{ background: on ? "var(--text)" : "transparent", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, color: on ? "var(--bg)" : "var(--text)", padding: "6px 13px", borderRadius: 20, fontSize: 13, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }}>{m}m</button>
-                ); })}
-              </div>
 
               {/* Description — shown to clients, leads them to the right pick */}
               <div style={{ ...fldBox, marginTop: 18 }}>
@@ -11194,13 +11189,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
   return (
     <div className="fade-up" style={{ paddingBottom: 90 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, letterSpacing: "-0.4px", margin: 0 }}>Services</h2>
-        {menuTab === "services" && <button onClick={() => setEditMode((v) => !v)} style={{ background: "none", color: "var(--gold)", fontSize: 15.5, fontWeight: editMode ? 600 : 500, padding: "6px 2px" }}>{editMode ? "Done" : "Reorder"}</button>}
-      </div>
-
-      {/* two-tab switch */}
-      <div style={{ display: "flex", gap: 6, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 13, padding: 4, margin: "12px 0 18px" }}>
+      {/* two-tab switch (the screen is already titled "Services & Menu" by the settings shell) */}
+      <div style={{ display: "flex", gap: 6, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 13, padding: 4, margin: "4px 0 18px" }}>
         {[{ id: "services", label: "Services" }, { id: "addons", label: "Add-ons" }].map((t) => { const on = menuTab === t.id; return (
           <button key={t.id} onClick={() => { setMenuTab(t.id); setEditMode(false); }} style={{ flex: 1, padding: "10px 6px", borderRadius: 10, border: "none", background: on ? "var(--panel)" : "transparent", color: on ? "var(--text)" : "var(--sub)", fontFamily: FONT_BODY, fontSize: 14, fontWeight: on ? 600 : 500, boxShadow: on ? "var(--shadow-sm)" : "none", cursor: "pointer", transition: "background .15s ease, color .15s ease" }}>{t.label}</button>
         ); })}
@@ -11211,16 +11201,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
       {/* ---- SERVICES TAB ---- */}
       {menuTab === "services" && (<>
-        {/* search */}
-        <div style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 26, padding: "11px 16px", marginBottom: 14 }}>
-          <Search size={17} style={{ color: "var(--faint)", flexShrink: 0 }} />
-          <input value={menuSearch} onChange={(e) => setMenuSearch(e.target.value)} placeholder="Search services" style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY }} />
-          {menuSearch && <button onClick={() => setMenuSearch("")} style={{ background: "none", border: "none", color: "var(--faint)", display: "flex", padding: 0, cursor: "pointer" }}><X size={16} /></button>}
-        </div>
-
-        {/* + New category (centered text button) */}
-        <div style={{ textAlign: "center", marginBottom: 18 }}>
-          <button onClick={() => setCatSheet(true)} style={{ background: "none", border: "none", color: "var(--gold)", fontFamily: FONT_BODY, fontSize: 14.5, fontWeight: 600, padding: "4px 8px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Plus size={16} /> New category</button>
+        {/* one clean actions row — add a category (left), reorder (right) */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <button onClick={() => setCatSheet(true)} style={{ background: "none", border: "none", color: "var(--gold)", fontFamily: FONT_BODY, fontSize: 14.5, fontWeight: 600, padding: "4px 2px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Plus size={16} /> New category</button>
+          <button onClick={() => setEditMode((v) => !v)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 14.5, fontWeight: editMode ? 600 : 500, padding: "4px 2px", cursor: "pointer" }}>{editMode ? "Done" : "Reorder"}</button>
         </div>
         <CategorySheet open={catSheet} onClose={() => setCatSheet(false)} categories={categories} setCategories={setCategories} services={services} setServices={setServices} showToast={showToast} />
 
