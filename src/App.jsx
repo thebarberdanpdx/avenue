@@ -3112,6 +3112,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     reader.readAsDataURL(file);
   };
   const [descConfirmed, setDescConfirmed] = useState(false); // service-description read-confirm (per-service booking.requireConfirm)
+  // "Does this look right?" gate shown when entering the times step. Resets whenever the cart
+  // changes (a different service/add-ons) so a re-pick is re-confirmed. Additive & non-blocking:
+  // it overlays the times screen, which always renders underneath.
+  const [confirmChecked, setConfirmChecked] = useState(false);
+  useEffect(() => { setConfirmChecked(false); }, [cart]);
   const [confirmSheet, setConfirmSheet] = useState(null); // cut-style confirm bottom sheet — holds the cut type being confirmed
   const [confirmReveal, setConfirmReveal] = useState(false); // two-beat reveal: heading holds alone, then body appears
   useEffect(() => {
@@ -5278,6 +5283,59 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* STEP 6 — date/time + waitlist */}
         {step === 6 && !showUsual && (
           <div className="fade-up">
+            {/* "Does this look right?" — confirm the service before picking a time, with a Change out.
+                Overlay only; the times screen renders underneath so a booking is never blocked. */}
+            {cart.length > 0 && !confirmChecked && (
+              <Sheet open onClose={() => setConfirmChecked(true)} align="bottom" maxWidth={460}>
+                <div style={{ width: 38, height: 5, borderRadius: 9, background: "var(--border2)", margin: "0 auto 14px" }} />
+                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 5px" }}>Does this look right?</h2>
+                <p style={{ fontSize: 13.5, color: "var(--sub)", margin: "0 0 16px", lineHeight: 1.45 }}>Quick check so we hold the right time for you.</p>
+                {(() => {
+                  const e = cart[0]; if (!e || !e.service) return null;
+                  const lt = lineTotal(e);
+                  const desc = e.service.booking && e.service.booking.description;
+                  const picks = (e.service.addonGroups || []).map((g) => {
+                    const sel = e.addons && e.addons[g.id]; if (!sel) return null;
+                    if (g.type === "choice") { const o = (g.options || []).find((x) => x.id === sel); return o ? { name: o.label, desc: "", price: Number(o.price) || 0 } : null; }
+                    if (g.type === "addon") { const it = g.item || {}; return { name: it.name, desc: it.desc || "", price: it.addsPrice !== false ? (Number(it.price) || 0) : 0 }; }
+                    return null;
+                  }).filter(Boolean);
+                  return (
+                    <>
+                      <div style={{ border: "1.5px solid var(--border)", borderRadius: 16, padding: 16 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+                          <span style={{ fontSize: 18, fontWeight: 600 }}>{e.service.name}</span>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--sub)", flexShrink: 0 }}>${lt.price} · {lt.min} min</span>
+                        </div>
+                        {desc ? <p style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55, margin: "10px 0 0" }}>{desc}</p> : null}
+                      </div>
+                      {picks.length > 0 && (
+                        <div style={{ marginTop: 6 }}>
+                          {picks.map((p, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "13px 2px", borderBottom: "1px solid var(--line)" }}>
+                              <Check size={16} style={{ color: "var(--text)", flexShrink: 0, marginTop: 2 }} />
+                              <span style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>{p.name}</span>
+                                {p.desc ? <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{p.desc}</span> : null}
+                              </span>
+                              {p.price ? <span style={{ fontSize: 13.5, fontWeight: 600, flexShrink: 0 }}>+${p.price}</span> : null}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "18px 2px 14px" }}>
+                  <span style={{ fontSize: 14, color: "var(--sub)", fontWeight: 500 }}>Total{provider && provider.id !== "anyone" ? ` · with ${provider.name.split(" ")[0]}` : ""}</span>
+                  <span style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.3px" }}>${cartAdjTotal} · {effMin} min</span>
+                </div>
+                <div style={{ display: "flex", gap: 11 }}>
+                  <button onClick={() => setStep(1)} style={{ flex: 1, background: "transparent", border: "1.5px solid var(--border2)", color: "var(--text)", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: "'Jost', sans-serif", cursor: "pointer" }}>Change</button>
+                  <button onClick={() => setConfirmChecked(true)} style={{ flex: 1.4, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 13, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: "'Jost', sans-serif", cursor: "pointer" }}>Yes — pick a time</button>
+                </div>
+              </Sheet>
+            )}
             {slotConflict && (
               <div style={{ background: "rgba(176,141,87,0.10)", border: "1px solid rgba(176,141,87,0.30)", borderRadius: 12, padding: "13px 16px", marginBottom: 18, display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <AlertCircle size={17} style={{ color: "var(--text)", flexShrink: 0, marginTop: 1 }} />
