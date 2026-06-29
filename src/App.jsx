@@ -1119,6 +1119,56 @@ const addonDuration = (service, providerId, group) => {
   if (se && se.addonDur && group && se.addonDur[group.id] != null) return Number(se.addonDur[group.id]) || 0;
   return Number(group && group.item && group.item.min) || 0;
 };
+// One-time, non-destructive migration OFF the retired cut-styles model. Any active service that
+// still carries cut styles becomes one STANDALONE service per style — each with that style's own
+// price + time (per-barber cutPrice/cutDur overrides folded into flat staff price/duration; the
+// style's extra minutes added onto the base), its description, photos, add-ons and booking rules
+// carried over, and cut styles turned off. The original is KEPT but ARCHIVED so past bookings still
+// resolve their service; it just leaves the active menu. Idempotent — archived originals and
+// usesCutStyles===false services never re-trigger, so this is a no-op once everything is split.
+// Returns the SAME array reference when nothing needs splitting (lets callers cheaply detect a change).
+const splitCutStyleServices = (list) => {
+  if (!Array.isArray(list) || !list.length) return list;
+  const needs = list.some((s) => s && !s.archived && s.usesCutStyles !== false && (s.cutTypes || []).length > 0);
+  if (!needs) return list;
+  const out = [];
+  list.forEach((s) => {
+    if (!s || s.archived || s.usesCutStyles === false || !(s.cutTypes || []).length) { out.push(s); return; }
+    const baseDur = Math.max(5, Math.min(600, Number(s.duration) || 30));
+    const basePrice = Number(s.price) || 0;
+    (s.cutTypes || []).filter(Boolean).forEach((ct, i) => {
+      const staff = {};
+      Object.keys(s.staff || {}).forEach((pid) => {
+        const e = s.staff[pid] || {};
+        const cutDur = (e.cutDur && e.cutDur[ct.id] != null) ? Number(e.cutDur[ct.id]) : null;
+        const cutPrice = (e.cutPrice && e.cutPrice[ct.id] != null) ? Number(e.cutPrice[ct.id]) : null;
+        const baseE = (e.duration != null && e.duration !== "") ? Number(e.duration) : baseDur;
+        staff[pid] = {
+          on: e.on !== false,
+          duration: Math.max(5, Math.min(600, cutDur != null ? cutDur : baseE + (Number(ct.min) || 0))),
+          price: cutPrice != null ? cutPrice : ((e.price != null && e.price !== "") ? Number(e.price) : null),
+        };
+      });
+      const photos = Array.isArray(ct.images) ? ct.images.filter(Boolean) : [];
+      const svc = {
+        ...s,
+        id: `${s.id}_${ct.id}_${Date.now().toString(36)}${i}`,
+        name: ct.label || s.name,
+        price: Math.min(100000, ct.price != null ? Number(ct.price) : basePrice),
+        duration: Math.max(5, Math.min(600, baseDur + (Number(ct.min) || 0))),
+        staff,
+        photos: photos.length ? photos : (Array.isArray(s.photos) ? s.photos : []),
+        photo: photos[0] || s.photo || "",
+        booking: { ...(s.booking || {}), description: ct.desc || (s.booking || {}).description || "" },
+        usesCutStyles: false,
+      };
+      delete svc.cutTypes;
+      out.push(svc);
+    });
+    out.push({ ...s, archived: true }); // keep the original (archived) so old appointments still resolve
+  });
+  return out;
+};
 // Time-of-day pricing: apply the first matching priced rule for a service at a given
 // provider / day-of-week / start-minute. Falls back to the normal price when nothing matches.
 const priceWithTimeRules = (service, providerId, dateObj, startMin) => {
@@ -1752,9 +1802,13 @@ function App() {
           return s;
         });
         setCutLibrary(lib);
-        // Persist linkage only when services were loaded AND something changed. We deliberately leave
-        // lastRemoteRef.services as the pre-link array so the save effect sees a diff and writes once.
-        if (linkChanged && sv && sv.length) setServices(linkedSvc);
+        // Finish the move off cut styles: auto-split any remaining cut-style service into its own
+        // standalone services (one per cut), archiving the original. Non-destructive + idempotent.
+        const splitSvc = splitCutStyleServices(linkedSvc);
+        const didSplit = splitSvc !== linkedSvc;
+        // Persist when services were loaded AND linkage or the split changed something. We deliberately
+        // leave lastRemoteRef.services as the pre-change array so the save effect sees a diff and writes once.
+        if ((linkChanged || didSplit) && sv && sv.length) setServices(splitSvc);
       }
 
       // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
@@ -10991,58 +11045,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           };
           const isCombo = !!form.isCombo || (form.comboOf || []).length > 0;
           const legacyCuts = (form.cutTypes || []).length > 0; // services from the old cut-styles model
-          // One-tap migration off cut styles: turn this service's cut styles into their own
-          // standalone services (each with its own price + time, per-barber overrides folded in),
-          // then archive the original so old bookings still resolve but it leaves the menu.
-          const splitCutStyles = () => {
-            const src = services.find((s) => s.id === editing) || form;
-            const cuts = (src.cutTypes || []).filter(Boolean);
-            if (!cuts.length) return;
-            const names = cuts.map((c) => c.label).filter(Boolean).join(", ");
-            if (typeof window !== "undefined" && !window.confirm(`Split "${src.name}" into ${cuts.length} separate services (${names})?\n\nEach keeps its own price and time. "${src.name}" is archived (hidden from your menu) so past bookings still work.`)) return;
-            const baseDur = Math.max(5, Math.min(600, Number(src.duration) || 30));
-            const basePrice = Number(src.price) || 0;
-            const made = cuts.map((ct, i) => {
-              const staff = {};
-              Object.keys(src.staff || {}).forEach((pid) => {
-                const e = src.staff[pid] || {};
-                const cutDur = (e.cutDur && e.cutDur[ct.id] != null) ? Number(e.cutDur[ct.id]) : null;
-                const cutPrice = (e.cutPrice && e.cutPrice[ct.id] != null) ? Number(e.cutPrice[ct.id]) : null;
-                const baseE = (e.duration != null && e.duration !== "") ? Number(e.duration) : baseDur;
-                const dur = cutDur != null ? cutDur : baseE + (Number(ct.min) || 0);
-                staff[pid] = {
-                  on: e.on !== false,
-                  duration: Math.max(5, Math.min(600, dur)),
-                  price: cutPrice != null ? cutPrice : ((e.price != null && e.price !== "") ? Number(e.price) : null),
-                };
-              });
-              const price = ct.price != null ? Number(ct.price) : basePrice;
-              const photos = Array.isArray(ct.images) ? ct.images.filter(Boolean) : [];
-              const svc = {
-                ...src,
-                id: `${src.id}_${ct.id}_${Date.now().toString(36)}${i}`,
-                name: ct.label || src.name,
-                price: Math.min(100000, price),
-                duration: Math.max(5, Math.min(600, baseDur + (Number(ct.min) || 0))),
-                staff,
-                photos: photos.length ? photos : (Array.isArray(src.photos) ? src.photos : []),
-                photo: photos[0] || src.photo || "",
-                booking: { ...defaultBooking(), ...(src.booking || {}), description: ct.desc || (src.booking || {}).description || "" },
-                usesCutStyles: false,
-                archived: false,
-              };
-              delete svc.cutTypes;
-              return svc;
-            });
-            setServices((prev) => {
-              const idx = prev.findIndex((s) => s.id === src.id);
-              if (idx === -1) return [...prev, ...made];
-              const archivedOrig = { ...prev[idx], archived: true };
-              return [...prev.slice(0, idx), archivedOrig, ...made, ...prev.slice(idx + 1)];
-            });
-            setEditing(null); setSection(null);
-            showToast(`Split into ${made.length} services.`);
-          };
           // Goldie-clean outlined fields: a notched floating label over a rounded outline.
           const fldBox = { position: "relative", border: "1.5px solid var(--border)", borderRadius: 15, padding: "19px 16px 14px", marginBottom: 14, background: "var(--panel)" };
           const fldLbl = { position: "absolute", top: -8, left: 13, background: "var(--bg)", padding: "0 6px", fontSize: 12, color: "var(--sub)", fontWeight: 500, fontFamily: FONT_BODY };
@@ -11135,10 +11137,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                         <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "4px 0 4px" }}>Cut styles (legacy)</div>
                         <p style={{ fontSize: 12.5, color: "var(--faint)", margin: "0 0 6px", lineHeight: 1.45 }}>Cut styles are being retired — make each cut its own service instead. This stays so existing bookings keep working.</p>
                         <DrillRow icon={<Scissors size={18} />} label="Cut styles" sub={`${cutCount} style${cutCount === 1 ? "" : "s"}`} target="cutstyles" />
-                        <button onClick={splitCutStyles} className="lift" style={{ width: "100%", boxSizing: "border-box", marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "13px 16px", borderRadius: 13, border: "1.5px solid var(--border)", background: "var(--panel)", color: "var(--text)", fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>
-                          <Scissors size={16} /> Split into separate services
-                        </button>
-                        <p style={{ fontSize: 11.5, color: "var(--faint)", margin: "7px 2px 0", lineHeight: 1.45 }}>Makes each cut its own service (keeps its price &amp; time), then archives this one. One tap — finishes the move off cut styles.</p>
                       </>
                     )}
                     <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "16px 0 10px" }}>Combo</div>
