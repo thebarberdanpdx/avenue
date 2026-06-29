@@ -1111,6 +1111,14 @@ const cutStyleDuration = (client, service, providerId, ctId) => {
   const ct = ((service && service.cutTypes) || []).find((c) => c.id === ctId);
   return getDuration(client, service, providerId) + ((ct && ct.min) ? ct.min : 0);
 };
+// Per-add-on time cascade — how many minutes a chosen add-on adds for this barber.
+// per-barber override (staff.addonDur[groupId], absolute minutes) → the add-on's own item.min.
+// Mirrors cutDur so a master's "hot towel" can run longer than a junior's.
+const addonDuration = (service, providerId, group) => {
+  const se = getStaffEntry(service, providerId);
+  if (se && se.addonDur && group && se.addonDur[group.id] != null) return Number(se.addonDur[group.id]) || 0;
+  return Number(group && group.item && group.item.min) || 0;
+};
 // Time-of-day pricing: apply the first matching priced rule for a service at a given
 // provider / day-of-week / start-minute. Falls back to the normal price when nothing matches.
 const priceWithTimeRules = (service, providerId, dateObj, startMin) => {
@@ -3152,7 +3160,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     entry.service.addonGroups.forEach((g) => {
       const sel = entry.addons[g.id];
       if (g.type === "choice" && sel) { const opt = g.options.find((o) => o.id === sel); if (opt) { p += Number(opt.price) || 0; m += Number(opt.min) || 0; } }
-      if (g.type === "addon" && sel) { if (g.item.addsPrice !== false) p += Number(g.item.price) || 0; if (g.item.addsTime !== false) m += Number(g.item.min) || 0; }
+      if (g.type === "addon" && sel) { if (g.item.addsPrice !== false) p += Number(g.item.price) || 0; if (g.item.addsTime !== false) m += addonDuration(entry.service, provId, g); }
     });
     return { price: p, min: m };
   };
@@ -9916,6 +9924,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [advancedOpen, setAdvancedOpen] = useState(false); // single-page editor: Advanced expander
   const [picker, setPicker] = useState(null); // {target}
   const [stylePriceOpen, setStylePriceOpen] = useState({}); // {providerId: bool} — per-barber "prices per style" expander in Staff & pricing
+  const [addonTimeOpen, setAddonTimeOpen] = useState({}); // {providerId: bool} — per-barber "add-on times" expander in Staff & pricing
   const [editStyleId, setEditStyleId] = useState(null); // cut-styles drill: which style's own screen is open (null = the list)
   const [editMode, setEditMode] = useState(false); // list view: browse vs manage (reorder/delete/rename)
   const [catSheet, setCatSheet] = useState(false); // category manager sheet (add / rename / reorder / delete)
@@ -9960,6 +9969,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     if (val == null) delete cutDur[ctId]; else cutDur[ctId] = Number(val);
     return { ...f, staff: { ...f.staff, [pid]: { ...cur, cutDur } } };
   });
+  // Per-barber, per-add-on time override — staff[pid].addonDur[groupId] (absolute minutes).
+  // val === null clears it (deletes the key → falls back to the add-on's own "Adds time" value).
+  const setStaffAddonDur = (pid, gid, val) => setForm((f) => {
+    const cur = (f.staff && f.staff[pid]) || { on: true, duration: null, price: null };
+    const addonDur = { ...(cur.addonDur || {}) };
+    if (val == null) delete addonDur[gid]; else addonDur[gid] = Number(val);
+    return { ...f, staff: { ...f.staff, [pid]: { ...cur, addonDur } } };
+  });
   const setBooking = (patch) => setForm((f) => ({ ...f, booking: { ...(f.booking || defaultBooking()), ...patch } }));
 
   const openNew = () => { setForm({ ...blank, id: "svc-" + Date.now(), photos: [], staff: defaultStaffMap(), booking: defaultBooking() }); setSection(null); setEditing("new"); };
@@ -9980,6 +9997,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       // preserve per-cut-style overrides (shared with My Team → barber → Services)
       if (e.cutPrice && Object.keys(e.cutPrice).length) cleanStaff[pid].cutPrice = e.cutPrice; else delete cleanStaff[pid].cutPrice;
       if (e.cutDur && Object.keys(e.cutDur).length) cleanStaff[pid].cutDur = e.cutDur; else delete cleanStaff[pid].cutDur;
+      if (e.addonDur && Object.keys(e.addonDur).length) cleanStaff[pid].addonDur = e.addonDur; else delete cleanStaff[pid].addonDur;
     });
     const photos = Array.isArray(form.photos) ? form.photos.filter(Boolean) : [];
     const clean = { ...form, price: Math.min(100000, priceNum), duration: Math.max(5, Math.min(600, Number(form.duration) || 30)), staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false };
@@ -10239,6 +10257,9 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // ---- STAFF section ----
   // Per-style staff pricing only shows when this service actually uses cut styles.
   const hasStyles = (form.usesCutStyles !== false) && (form.cutTypes || []).length > 0;
+  // Add-ons that add time and so can have a per-barber time override (a master's hot-towel runs longer).
+  const timedAddons = (form.addonGroups || []).filter((g) => g && g.type === "addon" && (g.item ? g.item.addsTime !== false : true));
+  const hasAddonTimes = timedAddons.length > 0;
   const staffBody = (
     <>
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Everyone offers this by default. Turn someone off, or give them their own time and price. Blank = the service default ({form.duration || "—"} min · ${form.price || "—"}).</p>
@@ -10319,6 +10340,36 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                           );
                         })}
                         <p style={{ fontSize: 12, color: "var(--faint)", margin: "2px 2px 0", lineHeight: 1.45 }}>Blank uses the style's default. Mirrors My team → {p.name.split(" ")[0]} → Services.</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              {on && hasAddonTimes && (() => {
+                const open = !!addonTimeOpen[p.id];
+                return (
+                  <div style={{ marginTop: 12, borderTop: "1px solid var(--line)", paddingTop: 12, minWidth: 0 }}>
+                    <button onClick={() => setAddonTimeOpen((o) => ({ ...o, [p.id]: !o[p.id] }))} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--sub)", fontSize: 13.5, fontWeight: 500 }}>
+                      <span>Set add-on times</span>
+                      {open ? <ChevronUp size={16} style={{ color: "var(--faint)", flexShrink: 0 }} /> : <ChevronDown size={16} style={{ color: "var(--faint)", flexShrink: 0 }} />}
+                    </button>
+                    {open && (
+                      <div style={{ display: "grid", gap: 9, marginTop: 12 }}>
+                        {timedAddons.map((g) => {
+                          const se = form.staff[p.id] || {};
+                          const dv = (se.addonDur && se.addonDur[g.id] != null) ? se.addonDur[g.id] : "";
+                          const def = Number(g.item && g.item.min) || 0;
+                          return (
+                            <div key={g.id} style={{ minWidth: 0 }}>
+                              <SectionLbl style={{ margin: "0 2px 6px" }}>{(g.item && g.item.name) || g.label || "Add-on"}</SectionLbl>
+                              <div style={{ ...moneyWrap }}>
+                                <input type="number" inputMode="numeric" value={dv} placeholder={String(def)} onChange={(ev) => setStaffAddonDur(p.id, g.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, minWidth: 0, padding: "11px 12px", paddingLeft: 14 }} />
+                                <span style={unitSuffix}>min</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <p style={{ fontSize: 12, color: "var(--faint)", margin: "2px 2px 0", lineHeight: 1.45 }}>Extra minutes this barber needs for each add-on. Blank uses the add-on's default time.</p>
                       </div>
                     )}
                   </div>
