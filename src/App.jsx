@@ -2569,6 +2569,15 @@ function curateStarts(starts, n, date) {
   return Array.from(new Set(out)).sort((a, b) => a - b);
 }
 
+// "Fake It Filter": hide a percentage of openings so a quiet day looks busy. Given the total real
+// openings, returns how many to keep visible. Off → keep them all. (Migrates the old curated flag.)
+function fakeItKeep(total, bk) {
+  const on = (bk && bk.fakeIt != null) ? !!bk.fakeIt : !!(bk && bk.curated);
+  if (!on) return total;
+  const p = [25, 50, 75].includes(Number(bk && bk.fakeItPct)) ? Number(bk.fakeItPct) : 50;
+  return Math.max(1, Math.round(total * (100 - p) / 100));
+}
+
 function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], business = {}, gold = false, services = [] }) {
   if (!prov || prov.id === "anyone") prov = providers.find((p) => p.id === "dan") || providers[1] || providers[0];
   if (!prov || !date || !durMin) return [];
@@ -2638,11 +2647,13 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
     busy.forEach(([bs, be]) => { if (cursor < bs) runs.push([cursor, bs]); cursor = Math.max(cursor, be); });
     if (cursor < dayEnd) runs.push([cursor, dayEnd]);
     if (timeMode === "pack") {
-      // Flush on BOTH sides: tile back-to-back from the open edge AND offer the slot that ends
-      // exactly when the next appt / day-close starts, so bookings always touch an existing one.
+      // Anchor-only: offer just the times that touch something — flush against the start of an open
+      // run (day open / right after an appt or block) and flush against its end (day close / right
+      // before the next appt). Nothing free-floating in between, so a booking always touches an edge.
       runs.forEach(([rs, re]) => {
-        for (let t = rs; t + durMin <= re; t += durMin) candidates.add(t);   // flush after the previous appt
-        if (re - durMin >= rs) candidates.add(re - durMin);                  // flush before the next appt
+        if (re - rs < durMin) return;
+        candidates.add(rs);            // flush after the previous appt / day open
+        candidates.add(re - durMin);   // flush before the next appt / day close
       });
     } else {
       // openTight: offer starts spaced by the BOOKED SERVICE's own length within each open run —
@@ -3307,7 +3318,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     const prov = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]);
     let avail = freeSlotsFor(prov, selectedDate, effMin || 30, 15).filter((t) => !slotBlockedByRules(prov.id, selectedDate, t));
     const bk = business?.booking || {};
-    if (bk.curated) avail = curateStarts(avail, Math.max(1, Number(bk.curatedN) || 6), selectedDate);
+    if (bk.fakeIt != null ? bk.fakeIt : bk.curated) avail = curateStarts(avail, fakeItKeep(avail.length, bk), selectedDate);
     return avail;
   }, [selectedDate, provider, providers, cartMin, appts, isMultiPerson, groupSlots, cart, business]);
   const slotIsSameTime = isMultiPerson && groupSlots && slot != null && groupSlots.sameTime.includes(slot);
@@ -3355,7 +3366,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       const p = waReal.find((x) => x.id === pid);
       list = p ? freeSlotsFor(p, d, waDurFor(pid), 15).filter((t) => !waBlocked(pid, d, t)) : [];
     }
-    return bk.curated ? curateStarts(list, Math.max(1, Number(bk.curatedN) || 6), d) : list;
+    return (bk.fakeIt != null ? bk.fakeIt : bk.curated) ? curateStarts(list, fakeItKeep(list.length, bk), d) : list;
   };
   // On entry / barber-tab switch: keep the current date if that barber has openings,
   // otherwise jump to their soonest open day; keep the chosen slot if still free, else first slot.
@@ -14518,46 +14529,26 @@ function NoShowEditor({ b, policy, onBooking, onPolicy }) {
 }
 
 // Booking-times engine UI: the shop picks how clients are offered times.
-// Writes business.booking.timeMode (openTight|grid|pack) + gridMin + curated/curatedN.
+// Writes business.booking.timeMode (openTight|grid|pack) + gridMin + fakeIt/fakeItPct.
 function BookingTimesEditor({ b, onChange }) {
   const norm = (m) => (m === "smart" ? "openTight" : m === "all" ? "grid" : m);
   const mode = norm(b.timeMode) || (b.avoidGaps === false ? "grid" : "openTight");
   const gridMin = Math.max(5, Number(b.gridMin) || 30);
   const PRESETS = [5, 10, 15, 30, 60];
   const [customOpen, setCustomOpen] = useState(!PRESETS.includes(gridMin));
-  const curated = !!b.curated;
-  const curatedN = Math.max(1, Number(b.curatedN) || 6);
+  const fakeOn = b.fakeIt != null ? !!b.fakeIt : !!b.curated;
+  const PCTS = [25, 50, 75];
+  const pct = PCTS.includes(Number(b.fakeItPct)) ? Number(b.fakeItPct) : 50;
+  const shownEg = Math.max(1, Math.round(12 * (100 - pct) / 100));
   const modes = [
     { v: "openTight", label: "Open & tight", rec: true,
-      desc: "Plenty of choice, but you're never left twiddling your thumbs — Vero hides only the times that would strand a dead gap too short to book anyone into.",
-      example: "Say you've a cut at 11:00. A client is offered 10:30 — they finish right as your 11 o'clock sits down — but not 10:15, which would leave a useless 15 minutes you can't sell. They still see a full list; you never get stranded." },
-    { v: "grid", label: "Clean grid",
-      desc: "Every opening on a clean clock, at the interval you choose. Maximum control and choice.",
-      example: "Clients see round times like 9:00, 9:30, 10:00 — every opening at your chosen spacing. Set it as fine as 5 minutes for total control, or wider to keep the list short." },
+      desc: "When someone books you online, they see a list of available times. Open & tight shows them lots of times to choose from, but quietly skips any time that would leave you with a chunk too short to use." },
     { v: "pack", label: "Packed",
-      desc: "Back-to-back only — every booking touches another. Zero gaps, fewest options.",
-      example: "With a cut ending at 11:45, the only morning time offered is 11:45 — the second one client gets up, the next sits down. Best for your busiest days when you want to cram in every cut." },
+      desc: "When someone books you online, Packed only shows times that sit right against your other appointments — the start or end of your day, or just before or after an existing booking. It keeps everything back-to-back, with no time left empty between clients." },
+    { v: "grid", label: "Clean grid",
+      desc: "When someone books you online, Clean grid shows plain clock times at the spacing you pick — like every 15 or 30 minutes. Simple and tidy, but it can leave unused time between bookings." },
   ];
   const chip = (sel) => ({ flex: "0 0 auto", padding: "8px 14px", borderRadius: 30, border: `1.5px solid ${sel ? "var(--gold)" : "var(--border)"}`, background: sel ? "var(--tint)" : "var(--panel)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 13, fontWeight: sel ? 600 : 500, cursor: "pointer" });
-  // Awkward-gap policy controls — only meaningful in Open & tight (writes booking.gapHold + booking.minGap).
-  const HOLD_STOPS = [
-    { v: "always", label: "Always\nhold", egl: "always hold", eg: "Vero never offers a gap it can't fill cleanly. That empty 1:00–2:00 hour stays hidden from haircut bookings — saved only for a booking that fits it, like a cut-and-beard. Strictest on gaps, but the hour can sit empty." },
-    { v: "d3", label: "3 days", egl: "3 days", eg: "Vero holds that empty 1:00–2:00 hour for a clean-fit booking until 3 days before the day. Still empty then? It starts offering 1:00 for a haircut. Leans toward keeping clean hours." },
-    { v: "d2", label: "2 days", rec: true, egl: "2 days", eg: "You've an empty 1:00–2:00 hour Friday and a client wants a 45-min cut. Vero holds it for a clean-fit booking until 48 hours before — still empty then, it offers 1:00 and fills your chair. Best balance for most shops." },
-    { v: "d1", label: "1 day", egl: "1 day", eg: "Vero holds that empty 1:00–2:00 hour until the day before. On that morning, if it's still empty, a haircut client is offered 1:00. Leans toward filling chairs." },
-    { v: "off", label: "Always\noffer", egl: "always offer", eg: "Vero never holds a gap — a haircut client is offered 1:00 right away, even weeks out. Fills the chair fastest, but you'll see more small 15-min slivers." },
-  ];
-  const hold = b.gapHold || "d2";
-  const holdIdx = Math.max(0, HOLD_STOPS.findIndex((s) => s.v === hold));
-  const holdStop = HOLD_STOPS[holdIdx];
-  const FLOORS = [30, 40, 45, 60];
-  const floor = Number(b.minGap) || 40;
-  const FLOOR_EG = {
-    30: "A cut would leave a 30-minute hole before your next client. At 30 min, Vero treats that as just sellable and will offer the time — good if you regularly book a 30-min service.",
-    40: "A cut would leave a 35-minute hole before your next client. At 40 min, Vero treats that as too short to sell and won't offer the time. Drop it to 30 and it would — betting you can fill it with a quick service.",
-    45: "Any leftover under 45 minutes is treated as unsellable, so Vero only keeps gaps big enough for a full haircut. Tightest of the common choices.",
-    60: "Vero only keeps gaps of an hour or more. Use this if your shortest real service is long — anything less is treated as a dead sliver.",
-  };
   return (
     <div>
       <div style={{ display: "grid", gap: 9 }}>
@@ -14572,15 +14563,10 @@ function BookingTimesEditor({ b, onChange }) {
                 </div>
                 <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
               </div>
-              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 5 }}>{m.desc}</div>
-              {on && (
-                <div style={{ marginTop: 12, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
-                  <div style={{ fontSize: 11, letterSpacing: 0.3, color: "var(--gold)", fontWeight: 600, marginBottom: 5 }}>For example</div>
-                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55 }}>{m.example}</div>
-                </div>
-              )}
+              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 6 }}>{m.desc}</div>
               {on && m.v === "grid" && (
-                <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 12 }}>
+                <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 13, paddingTop: 13, borderTop: "1px solid color-mix(in srgb, var(--gold) 18%, var(--border))" }}>
+                  <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--faint)", fontWeight: 700, marginBottom: 9 }}>SHOW TIMES EVERY</div>
                   <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
                     {PRESETS.map((g) => { const sel = !customOpen && gridMin === g; return (
                       <button key={g} onClick={(e) => { e.stopPropagation(); setCustomOpen(false); onChange({ gridMin: g }); }} style={chip(sel)}>{g === 60 ? "1 hour" : `${g} min`}</button>
@@ -14589,7 +14575,7 @@ function BookingTimesEditor({ b, onChange }) {
                   </div>
                   {customOpen && (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 11, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 13px" }}>
-                      <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 600 }}>Custom interval</span>
+                      <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 600 }}>Custom spacing</span>
                       <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
                         <input type="number" min="5" max="240" value={gridMin} onChange={(e) => { const v = Math.max(5, Math.min(240, Number(e.target.value) || 5)); onChange({ gridMin: v }); }} style={{ width: 66, textAlign: "right", fontSize: 16, fontWeight: 600, color: "var(--text)", background: "var(--panel2)", border: "1.5px solid var(--gold)", borderRadius: 9, padding: "8px 10px", fontFamily: "inherit" }} />
                         <span style={{ fontSize: 12, color: "var(--faint)" }}>min</span>
@@ -14604,63 +14590,23 @@ function BookingTimesEditor({ b, onChange }) {
       </div>
       <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
         <ToggleSetting
-          label="Curated availability"
-          desc="Show only a few of your open times, spread across the day, so a quiet day still looks in-demand. Every time shown is real and bookable."
-          on={curated}
-          onToggle={(v) => onChange({ curated: v })}
+          label="Fake It Filter"
+          desc="Hides some of your real openings so a slow day looks busy. Clients see fewer times to pick from."
+          on={fakeOn}
+          onToggle={(v) => onChange({ fakeIt: v })}
         />
-        {curated && (
+        {fakeOn && (
           <div style={{ marginTop: 13 }}>
-            <div style={{ fontSize: 11.5, letterSpacing: 1, color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>SHOW ABOUT</div>
+            <div style={{ fontSize: 11.5, letterSpacing: 1, color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>HIDE</div>
             <div style={{ display: "flex", gap: 8 }}>
-              {[3, 6, 8].map((n) => { const sel = curatedN === n; return (
-                <button key={n} onClick={() => onChange({ curatedN: n })} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: `1.5px solid ${sel ? "var(--gold)" : "var(--border)"}`, background: sel ? "var(--tint)" : "var(--panel)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: sel ? 600 : 400, cursor: "pointer" }}>{n} openings</button>
+              {PCTS.map((n) => { const sel = pct === n; return (
+                <button key={n} onClick={() => onChange({ fakeItPct: n })} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: `1.5px solid ${sel ? "var(--gold)" : "var(--border)"}`, background: sel ? "var(--tint)" : "var(--panel)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: sel ? 700 : 400, cursor: "pointer" }}>{n}%</button>
               ); })}
             </div>
+            <div style={{ marginTop: 13, fontSize: 13, color: "var(--text2)", lineHeight: 1.5, background: "var(--tint)", borderRadius: 10, padding: "10px 12px" }}>If you have <strong style={{ fontWeight: 600 }}>12</strong> open times today, clients see about <strong style={{ fontWeight: 600 }}>{shownEg}</strong>.</div>
           </div>
         )}
       </div>
-      {mode === "openTight" && (
-        <>
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Holding awkward gaps</div>
-            <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginTop: 4 }}>When the only way to book a gap leaves a sliver too short to sell, Vero holds it for a booking that fits cleanly — then opens it as the day nears, so a chair is never left empty.</div>
-            <div style={{ margin: "26px 9px 0", position: "relative", height: 4, background: "var(--border)", borderRadius: 4 }}>
-              <div style={{ position: "absolute", left: 0, top: 0, height: 4, borderRadius: 4, background: "var(--gold)", width: `${(holdIdx / (HOLD_STOPS.length - 1)) * 100}%` }} />
-              <div style={{ position: "absolute", left: 0, top: -8, width: "100%", display: "flex", justifyContent: "space-between" }}>
-                {HOLD_STOPS.map((s, i) => { const on = i === holdIdx; const filled = i <= holdIdx; return (
-                  <button key={s.v} onClick={() => onChange({ gapHold: s.v })} aria-label={s.label.replace("\n", " ")} style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${filled ? "var(--gold)" : "var(--border2)"}`, background: filled ? "var(--gold)" : "var(--panel)", boxShadow: on ? "0 0 0 4px var(--tint)" : "none", padding: 0, cursor: "pointer" }} />
-                ); })}
-              </div>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 13 }}>
-              {HOLD_STOPS.map((s, i) => { const on = i === holdIdx; return (
-                <button key={s.v} onClick={() => onChange({ gapHold: s.v })} style={{ flex: 1, background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, lineHeight: 1.2, whiteSpace: "pre-line", color: on ? "var(--gold)" : "var(--sub)", fontWeight: on ? 700 : 500, textAlign: i === 0 ? "left" : i === HOLD_STOPS.length - 1 ? "right" : "center" }}>{s.label}</button>
-              ); })}
-            </div>
-            <div style={{ marginTop: 15, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
-              <div style={{ fontSize: 11, letterSpacing: 0.3, color: "var(--gold)", fontWeight: 600, marginBottom: 5, textTransform: "uppercase" }}>For example · {holdStop.egl}</div>
-              <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55 }}>{holdStop.eg}</div>
-            </div>
-          </div>
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Smallest gap worth keeping</div>
-            <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginTop: 4 }}>Vero won't strand a leftover shorter than this. Set it to the shortest service people actually book.</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 15 }}>
-              {FLOORS.map((n) => { const sel = floor === n; return (
-                <button key={n} onClick={() => onChange({ minGap: n })} style={{ position: "relative", flex: 1, padding: "12px 0", borderRadius: 11, border: `1.5px solid ${sel ? "var(--gold)" : "var(--border)"}`, background: sel ? "var(--tint)" : "var(--panel)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 15, fontWeight: sel ? 700 : 500, cursor: "pointer" }}>
-                  {n}<span style={{ fontSize: 11, fontWeight: 500 }}> min</span>
-                  {n === 40 && <span style={{ position: "absolute", top: -8, left: "50%", transform: "translateX(-50%)", fontSize: 8, letterSpacing: 0.5, fontWeight: 700, color: "var(--on-gold)", background: "var(--gold)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>RECOMMENDED</span>}
-                </button>
-              ); })}
-            </div>
-            <div style={{ marginTop: 15, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
-              <div style={{ fontSize: 11, letterSpacing: 0.3, color: "var(--gold)", fontWeight: 600, marginBottom: 5, textTransform: "uppercase" }}>For example · {floor} min</div>
-              <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55 }}>{FLOOR_EG[floor] || FLOOR_EG[40]}</div>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }
@@ -16292,9 +16238,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       ),
     },
     {
-      id: "avoidgaps", title: "Booking Times", smart: true, subtitle: "How clients get offered times", icon: Clock, category: "Online Booking",
-      explain: <>This is the brain behind which times a client sees when they book online. Pick one way of working and Vero handles the rest: a clean clock grid, times shaped around how long each service actually takes (Smart Timing), times packed tight against your existing appointments so you have no dead gaps, or every possible opening for maximum choice. Most shops want Smart Timing — it quietly keeps your day full without you thinking about it.</>,
-      status: (() => { const bk = form.booking || {}; const norm = (x) => (x === "smart" ? "openTight" : x === "all" ? "grid" : x); const m = norm(bk.timeMode) || (bk.avoidGaps === false ? "grid" : "openTight"); const base = { openTight: "Open & tight", grid: `Clean grid · ${bk.gridMin || 30}m`, pack: "Packed" }[m] || "Open & tight"; return bk.curated ? `${base} · curated` : base; })(),
+      id: "avoidgaps", title: "Booking Times", subtitle: "How clients get offered times", icon: Clock, category: "Online Booking",
+      explain: <>This decides which times a client sees when they book online. <b>Open &amp; tight</b> (recommended) shows lots of times but skips any that would leave a chunk of your day too short to use. <b>Packed</b> keeps bookings back-to-back against your other appointments. <b>Clean grid</b> shows plain clock times at a spacing you choose.</>,
+      status: (() => { const bk = form.booking || {}; const norm = (x) => (x === "smart" ? "openTight" : x === "all" ? "grid" : x); const m = norm(bk.timeMode) || (bk.avoidGaps === false ? "grid" : "openTight"); const base = { openTight: "Open & tight", grid: `Clean grid · ${bk.gridMin || 30}m`, pack: "Packed" }[m] || "Open & tight"; return (bk.fakeIt != null ? bk.fakeIt : bk.curated) ? `${base} · Fake It` : base; })(),
       keywords: "booking times slots offered grid increment smart timing pack tight avoid gaps back to back fill dead time show all choice availability how clients book engine mode",
       editor: <BookingTimesEditor b={form.booking || DEFAULT_BOOKING} onChange={(bk) => setForm({ ...form, booking: { ...(form.booking || {}), ...bk } })} />,
     },
