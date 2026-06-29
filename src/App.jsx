@@ -3970,13 +3970,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.3, color: "var(--text)" };
           const rowBtn = { width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: "1px solid var(--line)", padding: "19px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "var(--text)", cursor: "pointer" };
           const metaFor = (svc) => {
-            if (business && business.bookingStep && business.bookingStep.quietMenu) return ""; // quiet menu: names only on the list
-            // Categories (services with options chosen after) show no price/time here — those depend on the option picked next.
-            if (svc.usesCutStyles !== false && svc.cutTypes && svc.cutTypes.length > 0) return "";
-            let priceStr = "";
-            if (svc.price !== "" && svc.price != null && !isNaN(Number(svc.price)) && Number(svc.price) > 0) priceStr = "$" + Number(svc.price);
-            const durStr = (svc.duration != null && !isNaN(Number(svc.duration)) && Number(svc.duration) > 0) ? Number(svc.duration) + " min" : "";
-            return [durStr, priceStr].filter(Boolean).join(" · ");
+            // New model: the list shows what a service IS (its description), never price or time.
+            // Numbers appear only after a service is chosen — and are personalized for returning
+            // clients — so people pick the right service instead of the cheapest-looking one.
+            return (svc.booking && svc.booking.description) ? String(svc.booking.description).trim() : "";
           };
 
           if (showCats) {
@@ -4015,7 +4012,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <button onClick={() => { setTapSel(svc.id); setTimeout(() => selectService(svc), 165); }} className={"svc-tile" + (tapSel === svc.id ? " sel" : "")}>
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span className="svc-name" style={{ display: "block" }}>{svc.name}</span>
-                        {metaFor(svc) ? <span className="svc-meta" style={{ display: "block" }}>{metaFor(svc)}</span> : null}
+                        {metaFor(svc) ? <span className="svc-meta" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.4 }}>{metaFor(svc)}</span> : null}
                       </span>
                       <span className="svc-ar">&#8594;</span>
                     </button>
@@ -4209,13 +4206,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             else { setCart((c) => (c.length ? c.map((e, i) => i === 0 ? { service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} } : e) : [{ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }])); startAddons({ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }); }
           };
           const metaFor = (svc) => {
-            if (business && business.bookingStep && business.bookingStep.quietMenu) return ""; // quiet menu: names only on the list
-            // Categories (services with options chosen after) show no price/time here — those depend on the option picked next.
-            if (svc.usesCutStyles !== false && svc.cutTypes && svc.cutTypes.length > 0) return "";
-            let priceStr = "";
-            if (svc.price !== "" && svc.price != null && !isNaN(Number(svc.price)) && Number(svc.price) > 0) priceStr = "$" + Number(svc.price);
-            const durStr = (svc.duration != null && !isNaN(Number(svc.duration)) && Number(svc.duration) > 0) ? Number(svc.duration) + " min" : "";
-            return [durStr, priceStr].filter(Boolean).join(" · ");
+            // New model: the list shows what a service IS (its description), never price or time.
+            // Numbers appear only after a service is chosen — and are personalized for returning
+            // clients — so people pick the right service instead of the cheapest-looking one.
+            return (svc.booking && svc.booking.description) ? String(svc.booking.description).trim() : "";
           };
           const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.12, letterSpacing: "-0.4px", color: "var(--text)", margin: 0 };
           const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55 };
@@ -4245,7 +4239,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         <button onClick={() => { setTapSel(svc.id); setTimeout(() => pickGuidedService(svc), 165); }} className={"svc-tile" + (tapSel === svc.id ? " sel" : "")}>
                           <span style={{ flex: 1, minWidth: 0 }}>
                             <span className="svc-name" style={{ display: "block" }}>{svc.name}</span>
-                            {metaFor(svc) ? <span className="svc-meta" style={{ display: "block" }}>{metaFor(svc)}</span> : null}
+                            {metaFor(svc) ? <span className="svc-meta" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.4 }}>{metaFor(svc)}</span> : null}
                           </span>
                           <span className="svc-ar">&#8594;</span>
                         </button>
@@ -10932,79 +10926,87 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             showToast(form.archived ? "Service restored." : "Service archived.");
           };
           const isCombo = !!form.isCombo || (form.comboOf || []).length > 0;
+          const legacyCuts = (form.cutTypes || []).length > 0; // services from the old cut-styles model
+          // Goldie-clean outlined fields: a notched floating label over a rounded outline.
+          const fldBox = { position: "relative", border: "1.5px solid var(--border)", borderRadius: 15, padding: "19px 16px 14px", marginBottom: 14, background: "var(--panel)" };
+          const fldLbl = { position: "absolute", top: -8, left: 13, background: "var(--bg)", padding: "0 6px", fontSize: 12, color: "var(--sub)", fontWeight: 500, fontFamily: FONT_BODY };
+          const fldInput = { width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: 0, color: "var(--text)", fontSize: 18, fontWeight: 500, fontFamily: FONT_BODY };
+          const secH = { fontSize: 22, fontWeight: 600, letterSpacing: "-0.5px", margin: "26px 0 16px", fontFamily: FONT_DISPLAY };
           return (
             <>
               {backBar("SERVICES", () => setEditing(null))}
-              <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "2px 2px 7px" }}>{editing === "new" ? "New service" : "Service"}</div>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={editing === "new" ? "New service" : "Service name"} style={{ width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 600, letterSpacing: "-1px", lineHeight: 1.05, color: "var(--text)", padding: 0 }} />
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, letterSpacing: "-0.6px", margin: "2px 0 20px" }}>{editing === "new" ? "New service" : "Edit service"}</h2>
 
-              {/* Price & time — the hero */}
-              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "18px 2px", margin: "16px 0 0" }}>
-                <div style={{ minWidth: 0 }}>
-                  <span style={microLbl}>Price</span>
-                  <span style={{ display: "flex", alignItems: "baseline" }}>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 25, fontWeight: 600, color: "var(--sub)", marginRight: 1 }}>$</span>
-                    <input type="number" inputMode="decimal" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="42" style={{ width: 104, border: "none", outline: "none", background: "transparent", fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, letterSpacing: "-1px", color: "var(--text)", padding: 0 }} />
-                  </span>
-                </div>
-                <div style={{ textAlign: "right", minWidth: 0 }}>
-                  <span style={{ ...microLbl, textAlign: "right" }}>Time</span>
-                  <span style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end" }}>
-                    <input type="number" inputMode="numeric" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="45" style={{ width: 60, border: "none", outline: "none", background: "transparent", fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, letterSpacing: "-1px", color: "var(--text)", padding: 0, textAlign: "right" }} />
-                    <span style={{ fontSize: 16, color: "var(--sub)", marginLeft: 5, fontWeight: 500 }}>min</span>
-                  </span>
+              {/* Name */}
+              <div style={fldBox}>
+                <label style={fldLbl}>Name</label>
+                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Skin Fade" style={fldInput} />
+              </div>
+
+              {/* Category */}
+              <div style={fldBox}>
+                <label style={fldLbl}>Category</label>
+                <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                  <select value={form.category || cats[0]} onChange={(e) => setForm({ ...form, category: e.target.value })} style={{ ...fldInput, appearance: "none", WebkitAppearance: "none", paddingRight: 24, cursor: "pointer" }}>
+                    {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <ChevronDown size={18} style={{ color: "var(--faint)", position: "absolute", right: 0, pointerEvents: "none" }} />
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 7, flexWrap: "wrap", margin: "14px 0 4px" }}>
+
+              {/* Color */}
+              <button onClick={() => setColorOpen(true)} style={{ ...fldBox, width: "100%", boxSizing: "border-box", textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <label style={fldLbl}>Color</label>
+                <span style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                  <span style={{ width: 22, height: 22, borderRadius: "50%", background: hexById(form.color), flexShrink: 0 }} />
+                  <span style={{ ...fldInput, width: "auto", color: "var(--sub)", fontSize: 15 }}>Calendar color</span>
+                </span>
+                <ChevronRight size={18} style={{ color: "var(--faint)" }} />
+              </button>
+
+              {/* Price & duration */}
+              <h3 style={secH}>Price &amp; duration</h3>
+              <div style={{ display: "flex", gap: 13 }}>
+                <div style={{ ...fldBox, flex: 1, minWidth: 0 }}>
+                  <label style={fldLbl}>Price</label>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <span style={{ color: "var(--sub)", fontSize: 18, marginRight: 2 }}>$</span>
+                    <input type="number" inputMode="decimal" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="47" style={fldInput} />
+                  </div>
+                </div>
+                <div style={{ ...fldBox, flex: 1, minWidth: 0 }}>
+                  <label style={fldLbl}>Duration</label>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <input type="number" inputMode="numeric" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="50" style={fldInput} />
+                    <span style={{ color: "var(--sub)", fontSize: 15, marginLeft: 4 }}>min</span>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 7, flexWrap: "wrap", margin: "0 0 4px" }}>
                 {[15, 30, 45, 60, 90].map((m) => { const on = String(form.duration) === String(m); return (
                   <button key={m} onClick={() => setForm({ ...form, duration: m })} style={{ background: on ? "var(--text)" : "transparent", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, color: on ? "var(--bg)" : "var(--text)", padding: "6px 13px", borderRadius: 20, fontSize: 13, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }}>{m}m</button>
                 ); })}
               </div>
 
-              {/* Details */}
-              <SectionLbl style={{ margin: "26px 2px 0" }}>Details</SectionLbl>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 4px", borderTop: "1px solid var(--line)" }}>
-                  <span style={{ fontSize: 15.5, fontWeight: 500 }}>Category</span>
-                  <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                    <select value={form.category || cats[0]} onChange={(e) => setForm({ ...form, category: e.target.value })} style={{ appearance: "none", WebkitAppearance: "none", border: "none", background: "transparent", color: "var(--sub)", fontSize: 15, fontFamily: FONT_BODY, paddingRight: 20, cursor: "pointer", textAlignLast: "right" }}>
-                      {cats.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <ChevronDown size={16} style={{ color: "var(--faint)", position: "absolute", right: 0, pointerEvents: "none" }} />
-                  </div>
-                </div>
-                {!(usesCutStyles && form.cutTypes && form.cutTypes.length > 0) && (
-                  <button onClick={() => setColorOpen(true)} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 4px", borderTop: "1px solid var(--line)", background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
-                    <span style={{ fontSize: 15.5, fontWeight: 500, color: "var(--text)" }}>Calendar color</span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ width: 18, height: 18, borderRadius: "50%", background: hexById(form.color), flexShrink: 0 }} />
-                      <ChevronRight size={16} style={{ color: "var(--faint)" }} />
-                    </span>
-                  </button>
-                )}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 4px", borderTop: "1px solid var(--line)" }}>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>This service has cut styles</span>
-                    <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{usesCutStyles ? "Clients pick a style (e.g. fade) when booking." : "Plain service — no style picker at booking."}</span>
-                  </span>
-                  <Toggle on={usesCutStyles} onClick={() => setForm({ ...form, usesCutStyles: !usesCutStyles })} />
-                </div>
-                {usesCutStyles && <DrillRow icon={<Scissors size={18} />} label="Cut styles" sub={cutCount ? `${cutCount} style${cutCount === 1 ? "" : "s"}` : "None yet"} target="cutstyles" />}
-                <DrillRow icon={<Plus size={18} />} label="Add-ons & questions" sub={addonCount ? `${addonCount} added` : "None yet"} target="addons" />
-                <DrillRow icon={<Users size={18} />} label="Staff & pricing" sub={anyStaffOverride ? `${staffList.filter((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); }).length} custom` : `${offeringCount === staffList.length ? "All staff" : offeringCount + " of " + staffList.length} · default`} target="staff" />
-                <DrillRow icon={<ImageIcon size={18} />} label="Photos" sub={photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "None yet"} target="photos" />
+              {/* Description — shown to clients, leads them to the right pick */}
+              <div style={{ ...fldBox, marginTop: 18 }}>
+                <label style={fldLbl}>Description</label>
+                <textarea value={(form.booking || {}).description || ""} onChange={(e) => setBooking({ description: e.target.value })} rows={3} placeholder="What this service is — shown to clients so they pick the right one." style={{ ...fldInput, resize: "vertical", lineHeight: 1.5, minHeight: 56 }} />
               </div>
 
-              {/* When clients book */}
-              <SectionLbl style={{ margin: "26px 2px 0" }}>When clients book</SectionLbl>
+              {/* Online booking */}
+              <h3 style={secH}>Online booking</h3>
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 4px", borderTop: "1px solid var(--line)" }}>
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Show on online booking</span>
+                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Available for online booking</span>
                     <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{live ? "Clients can book this service themselves." : "Internal only — hidden from your booking page."}</span>
                   </span>
                   <Toggle on={live} onClick={() => setBooking({ available: live === false })} />
                 </div>
+                <DrillRow icon={<Plus size={18} />} label="Add-ons & questions" sub={addonCount ? `${addonCount} added` : "None yet"} target="addons" />
+                <DrillRow icon={<Users size={18} />} label="Staff & pricing" sub={anyStaffOverride ? `${staffList.filter((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); }).length} custom` : `${offeringCount === staffList.length ? "All staff" : offeringCount + " of " + staffList.length} · default`} target="staff" />
+                <DrillRow icon={<ImageIcon size={18} />} label="Photos" sub={photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "None yet"} target="photos" />
                 <DrillRow icon={<Clock size={18} />} label="Hours & pricing" sub={(form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Always available · standard price"} target="timerules" />
                 <DrillRow icon={<Calendar size={18} />} label="Booking rules" sub={`${(form.booking || {}).whoCanBook === "returning" ? "Returning only" : "Everyone"}${(form.booking || {}).requireCard ? " · card held" : ""}`} target="booking" />
               </div>
@@ -11017,7 +11019,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 </button>
                 {advancedOpen && (
                   <div style={{ padding: "0 4px 16px" }}>
-                    <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "4px 0 10px" }}>Combo</div>
+                    {legacyCuts && (
+                      <>
+                        <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "4px 0 4px" }}>Cut styles (legacy)</div>
+                        <p style={{ fontSize: 12.5, color: "var(--faint)", margin: "0 0 6px", lineHeight: 1.45 }}>Cut styles are being retired — make each cut its own service instead. This stays so existing bookings keep working.</p>
+                        <DrillRow icon={<Scissors size={18} />} label="Cut styles" sub={`${cutCount} style${cutCount === 1 ? "" : "s"}`} target="cutstyles" />
+                      </>
+                    )}
+                    <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "16px 0 10px" }}>Combo</div>
                     {comboBody}
                   </div>
                 )}
