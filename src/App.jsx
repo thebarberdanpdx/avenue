@@ -2556,17 +2556,22 @@ function resolveAnyone(providers, appts, dateObj, startMin, durMin, business) {
 // ============================================================
 // Curated availability: surface only ~n real openings, spread evenly across the day and
 // rotated by date so a quiet day looks in-demand without ever faking a slot. Display-only.
-function curateStarts(starts, n, date) {
+function curateStarts(starts, n, date, keep) {
   if (!Array.isArray(starts) || starts.length <= n) return starts;
+  // Always retain the "keep" starts (the gap-clean / flush times the engine worked to find), then
+  // spread-fill the rest of the quota across the day so we never trim away a back-to-back slot.
+  const keepSet = new Set((keep || []).filter((k) => starts.includes(k)));
   const sorted = [...starts].sort((a, b) => a - b);
   const seed = date ? (date.getFullYear() * 372 + (date.getMonth() + 1) * 31 + date.getDate()) : 0;
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const lo = Math.floor((i * sorted.length) / n), hi = Math.floor(((i + 1) * sorted.length) / n);
+  const pool = sorted.filter((s) => !keepSet.has(s));
+  const quota = Math.max(0, n - keepSet.size);
+  const out = new Set(keepSet);
+  for (let i = 0; i < quota && pool.length; i++) {
+    const lo = Math.floor((i * pool.length) / quota), hi = Math.floor(((i + 1) * pool.length) / quota);
     const span = Math.max(1, hi - lo);
-    out.push(sorted[lo + ((seed + i) % span)]);
+    out.add(pool[lo + ((seed + i) % span)]);
   }
-  return Array.from(new Set(out)).sort((a, b) => a - b);
+  return Array.from(out).sort((a, b) => a - b);
 }
 
 // "Fake It Filter": hide a percentage of openings so a quiet day looks busy. Given the total real
@@ -2641,10 +2646,13 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
     const step = gridMin;
     for (let t = Math.ceil(h.start / step) * step; t + durMin <= dayEnd; t += step) candidates.add(t);
   } else {
-    // open runs between busy blocks (and the day's edges)
+    // Open runs between busy blocks (and the day's edges). Pad each appointment by its buffers
+    // first, so a run's edges are the genuinely bookable region — otherwise a "flush" slot would
+    // land inside a buffer zone and get silently dropped by noClash when buffers are set.
+    const blocked = busy.map(([bs, be]) => [bs - bufBefore, be + bufAfter]).sort((a, b) => a[0] - b[0]);
     const runs = [];
     let cursor = h.start;
-    busy.forEach(([bs, be]) => { if (cursor < bs) runs.push([cursor, bs]); cursor = Math.max(cursor, be); });
+    blocked.forEach(([bs, be]) => { if (cursor < bs) runs.push([cursor, bs]); cursor = Math.max(cursor, be); });
     if (cursor < dayEnd) runs.push([cursor, dayEnd]);
     if (timeMode === "pack") {
       // Anchor-only: offer just the times that touch something — flush against the start of an open
@@ -2683,7 +2691,7 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
   const out = [];
   candidates.forEach((t) => {
     if (t < earliest || t < h.start || t + durMin > dayEnd || !noClash(t)) return;
-    const best = t === h.start || (t + durMin) === dayEnd || busy.some(([bs, be]) => be === t || bs === (t + durMin));
+    const best = t === h.start || (t + durMin) === dayEnd || busy.some(([bs, be]) => (be + bufAfter) === t || (bs - bufBefore) === (t + durMin));
     out.push({ start: t, best });
   });
   return out.sort((a, b) => a.start - b.start);
@@ -3316,9 +3324,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       return groupSlots.sequential.map((s) => s.start);
     }
     const prov = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]);
-    let avail = freeSlotsFor(prov, selectedDate, effMin || 30, 15).filter((t) => !slotBlockedByRules(prov.id, selectedDate, t));
+    const raw = computeFreeSlots({ prov, date: selectedDate, durMin: effMin || 30, providers, appts, business, services });
+    let avail = raw.map((s) => s.start).filter((t) => !slotBlockedByRules(prov.id, selectedDate, t));
     const bk = business?.booking || {};
-    if (bk.fakeIt != null ? bk.fakeIt : bk.curated) avail = curateStarts(avail, fakeItKeep(avail.length, bk), selectedDate);
+    if (bk.fakeIt != null ? bk.fakeIt : bk.curated) {
+      const keepBest = raw.filter((s) => s.best).map((s) => s.start);
+      avail = curateStarts(avail, fakeItKeep(avail.length, bk), selectedDate, keepBest);
+    }
     return avail;
   }, [selectedDate, provider, providers, cartMin, appts, isMultiPerson, groupSlots, cart, business]);
   const slotIsSameTime = isMultiPerson && groupSlots && slot != null && groupSlots.sameTime.includes(slot);
@@ -17624,7 +17636,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   // flush against an existing appointment flagged "best" (no gap left in the day).
   const sameDayLocal = (iso, ref) => { if (!iso || !ref) return false; const a = new Date(iso); return a.getFullYear() === ref.getFullYear() && a.getMonth() === ref.getMonth() && a.getDate() === ref.getDate(); };
   const provObj = providers.find((p) => p.id === provId);
-  const apptDur = service ? ((service.staff && service.staff[provId] && service.staff[provId].duration) || service.duration || 30) : 30;
+  const apptDur = service ? getDuration(client, service, provId) : 30;
   const slotDate = selectedDate || new Date();
   const dow = slotDate.getDay();
   const wh = (provObj && provObj.hours && provObj.hours[dow]) || { on: true, start: 6 * 60, end: 21 * 60 };
