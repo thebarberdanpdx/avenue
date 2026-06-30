@@ -4259,7 +4259,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             // New model: the list shows what a service IS (its description), never price or time.
             // Numbers appear only after a service is chosen — and are personalized for returning
             // clients — so people pick the right service instead of the cheapest-looking one.
-            return (svc.booking && svc.booking.description) ? String(svc.booking.description).trim() : "";
+            return ""; // list shows the service NAME only; the full description appears on the next screen
           };
 
           if (showCats) {
@@ -4494,7 +4494,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             // New model: the list shows what a service IS (its description), never price or time.
             // Numbers appear only after a service is chosen — and are personalized for returning
             // clients — so people pick the right service instead of the cheapest-looking one.
-            return (svc.booking && svc.booking.description) ? String(svc.booking.description).trim() : "";
+            return ""; // list shows the service NAME only; the full description appears on the next screen
           };
           const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.12, letterSpacing: "-0.4px", color: "var(--text)", margin: 0 };
           const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55 };
@@ -17447,7 +17447,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           ? <div>{active.editor}</div>
           : <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: "22px 18px" }}>{active.editor}</div>}
 
-        {hasChanges && (
+        {hasChanges && active.id !== "servicesmenu" && (
           <button onClick={() => save(`${active.title} saved.`)} style={{ width: "100%", marginTop: 30, background: "var(--text)", color: "var(--bg)", padding: 16, fontSize: 13, fontWeight: 500, letterSpacing: "1.5px", textTransform: "uppercase", borderRadius: 14, border: "none", fontFamily: FONT_BODY }}>Save changes</button>
         )}
       </div>
