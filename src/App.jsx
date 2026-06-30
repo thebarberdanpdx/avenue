@@ -10875,33 +10875,43 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           const opts = g.options || [];
           const setOpt = (oi, patch) => setGroup(i, { options: opts.map((x, k) => k === oi ? { ...x, ...patch } : x) });
           const req = g.required !== false;
+          // notched money field (matches the Goldie outlined look used across Settings)
+          const moneyField = (lbl, prefix, suffix, val, onCh, ph) => (
+            <div style={{ ...G_BOX, flex: 1, minWidth: 0, marginBottom: 0, display: "flex", alignItems: "center" }}>
+              <label style={G_LBL}>{lbl}</label>
+              {prefix && <span style={{ color: "var(--sub)", fontSize: 16, marginRight: 3 }}>{prefix}</span>}
+              <input type="number" inputMode={prefix ? "decimal" : "numeric"} value={val ?? ""} onChange={(e) => onCh(e.target.value === "" ? 0 : Number(e.target.value))} placeholder={ph} style={{ ...G_INPUT, minWidth: 0 }} />
+              {suffix && <span style={{ color: "var(--sub)", fontSize: 14, marginLeft: 4 }}>{suffix}</span>}
+            </div>
+          );
           return (
-            <div key={i} style={{ ...cardStyle, marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div key={i} style={{ ...cardStyle, marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                 <span style={{ fontSize: 10.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Question</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   {reorder}
                   <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", border: "none", color: "#c0392b", flexShrink: 0, display: "flex", padding: 4, cursor: "pointer" }}><Trash2 size={16} /></button>
                 </div>
               </div>
-              <SectionLbl style={{ margin: "0 2px 8px" }}>Question clients see</SectionLbl>
-              <input value={g.label || ""} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="e.g. Choose your cut" style={{ ...inpStyle, fontWeight: 500 }} />
-              <SectionLbl style={{ margin: "16px 2px 8px" }}>Answers</SectionLbl>
+              <GField label="Question clients see" value={g.label} onChange={(v) => setGroup(i, { label: v })} placeholder="e.g. Choose your cut" />
+              <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--sub)", fontWeight: 700, margin: "18px 2px 4px" }}>Answers</div>
               {opts.map((o, oi) => (
-                <div key={o.id || oi} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 8, background: "var(--panel)" }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <input value={o.label || ""} onChange={(e) => setOpt(oi, { label: e.target.value })} placeholder="Answer (e.g. Skin fade)" style={{ ...inpStyle, fontWeight: 600 }} />
-                    {opts.length > 1 && <button onClick={() => setGroup(i, { options: opts.filter((_, k) => k !== oi) })} style={{ background: "none", border: "none", color: "#c0392b", padding: 4, flexShrink: 0, cursor: "pointer" }}><Trash2 size={15} /></button>}
+                <div key={o.id || oi} style={{ padding: "16px 0 18px", borderBottom: "1px solid var(--line)" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                    <span style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Answer {oi + 1}</span>
+                    {opts.length > 1 && <button onClick={() => setGroup(i, { options: opts.filter((_, k) => k !== oi) })} style={{ background: "none", border: "none", color: "#c0392b", padding: 4, flexShrink: 0, cursor: "pointer", display: "flex" }}><Trash2 size={15} /></button>}
                   </div>
-                  <input value={o.desc || ""} onChange={(e) => setOpt(oi, { desc: e.target.value })} placeholder="Short note shown under it (optional)" style={{ ...inpStyle, marginTop: 8, fontSize: 14 }} />
-                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <div style={{ ...moneyWrap, flex: 1, minWidth: 0 }}><span style={moneyPrefix}>$</span><input type="number" inputMode="decimal" value={o.price ?? ""} onChange={(e) => setOpt(oi, { price: e.target.value === "" ? 0 : Number(e.target.value) })} placeholder="0" style={{ ...moneyInput, minWidth: 0 }} /></div>
-                    <div style={{ ...moneyWrap, flex: 1, minWidth: 0 }}><input type="number" inputMode="numeric" value={o.min ?? ""} onChange={(e) => setOpt(oi, { min: e.target.value === "" ? 0 : Number(e.target.value) })} placeholder="0" style={{ ...moneyInput, minWidth: 0, paddingLeft: 12 }} /><span style={unitSuffix}>min</span></div>
+                  <GField label="Shown to client" value={o.label} onChange={(v) => setOpt(oi, { label: v })} placeholder="e.g. Skin fade" />
+                  <GField label="Note under it (optional)" value={o.desc} onChange={(v) => setOpt(oi, { desc: v })} placeholder="A short line of detail" />
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {moneyField("Extra charge", "$", null, o.price, (n) => setOpt(oi, { price: n }), "0")}
+                    {moneyField("Extra time", null, "min", o.min, (n) => setOpt(oi, { min: n }), "0")}
                   </div>
                 </div>
               ))}
-              <button onClick={() => setGroup(i, { options: [...opts, { id: "o" + Date.now(), label: "", desc: "", price: 0, min: 0 }] })} style={{ ...addTileStyle, width: "100%", padding: "11px 10px", marginBottom: 10 }}><Plus size={15} /> Add an answer</button>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "12px 0 0", borderTop: "1px solid var(--line)" }}>
+              <button onClick={() => setGroup(i, { options: [...opts, { id: "o" + Date.now(), label: "", desc: "", price: 0, min: 0 }] })} style={{ ...addTileStyle, width: "100%", padding: "12px 10px", margin: "16px 0 14px" }}><Plus size={15} /> Add an answer</button>
+              <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, margin: "0 0 14px" }}>Clients don't see these amounts on the question screen — they only change the running total on the add-on page.</p>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "14px 0 0", borderTop: "1px solid var(--line)" }}>
                 <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15, fontWeight: 500 }}>Must answer</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>They can't continue until they pick one.</span></span>
                 <span onClick={() => setGroup(i, { required: !req })} style={{ cursor: "pointer" }}>{pillSwitch(req)}</span>
               </div>
