@@ -4928,8 +4928,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div className="fade-up" style={{ color: "var(--text)", paddingTop: 4 }}>
               {/* "Does this look right?" — same confirm gate as the step-6 path, but this merged
                   single-person who&when screen holds the pick in `draft` (goWhoWhen moved it out of
-                  the cart), so it sources from draft/previewLT. Overlay only; times render underneath. */}
-              {!confirmChecked && (
+                  the cart), so it sources from draft/previewLT. Overlay only; times render underneath.
+                  Per-service: only when this service has "Require read & confirm" turned on. */}
+              {!confirmChecked && draft?.booking?.requireConfirm && (
                 <Sheet open onClose={() => setConfirmChecked(true)} align="bottom" maxWidth={460}>
                   <div style={{ width: 38, height: 5, borderRadius: 9, background: "var(--border2)", margin: "0 auto 14px" }} />
                   <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 5px" }}>Does this look right?</h2>
@@ -5419,8 +5420,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {step === 6 && !showUsual && (
           <div className="fade-up">
             {/* "Does this look right?" — confirm the service before picking a time, with a Change out.
-                Overlay only; the times screen renders underneath so a booking is never blocked. */}
-            {cart.length > 0 && !confirmChecked && (
+                Overlay only; the times screen renders underneath so a booking is never blocked.
+                Per-service: only when this service has "Require read & confirm" turned on. */}
+            {cart.length > 0 && !confirmChecked && cart[0]?.service?.booking?.requireConfirm && (
               <Sheet open onClose={() => setConfirmChecked(true)} align="bottom" maxWidth={460}>
                 <div style={{ width: 38, height: 5, borderRadius: 9, background: "var(--border2)", margin: "0 auto 14px" }} />
                 <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 5px" }}>Does this look right?</h2>
@@ -10744,7 +10746,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           {bookingRow("Require read & confirm", "requireConfirm", "Make clients confirm they've read this service's description before they can continue — cuts down on wrong-service bookings.")}
           {(form.cutTypes || []).length > 0 && bookingRow("Show each cut's time", "showTypeTimes", "Show how long each cut type takes (e.g. fade · 50 min) in the picker — so clients see that a longer cut costs more time before they choose. Stops a fade getting booked as a regular cut.")}
           {(form.cutTypes || []).length > 0 && bookingRow("Hold the longest cut's time when unsure", "holdLongest", "If a booking doesn't lock in a cut type, reserve the longest cut's length so the chair never runs over. You can free the slack if it ends short.")}
-          {bookingRow("Quick confirmation sheet", "confirmSheet", "Pop a centered “one quick check” with this service’s details so clients confirm the right pick before continuing.")}
+          {(form.cutTypes || []).length > 0 && bookingRow("Quick confirmation sheet", "confirmSheet", "Pop a centered “one quick check” with this service’s details so clients confirm the right pick before continuing.")}
         </div>
       </div>
 
