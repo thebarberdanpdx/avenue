@@ -3961,6 +3961,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const apptWhen = (a) => { try { return a && a.bookedFor ? new Date(a.bookedFor) : null; } catch (e) { return null; } };
   const provFirst = (id) => { const p = providers.find((x) => x.id === id); return p ? p.name.split(" ")[0] : "your staff member"; };
   const svcLabel = (a) => a.serviceName || (services.find((s) => s.id === a.serviceId) || {}).name || "Appointment";
+  // Has this client (or the active family member) booked this provider for this service before?
+  // Powers the "Booked before" badge on the barber picker (matches the Mangomint highlight).
+  const bookedProvBefore = (providerId, serviceId) => {
+    if (!matched || !providerId || providerId === "anyone") return false;
+    const memberId = activeMember ? activeMember.id : null;
+    return (myAppts || []).some((a) => a.providerId === providerId && a.serviceId === serviceId
+      && a.status !== "cancelled" && a.status !== "block"
+      && (memberId ? a.familyMemberId === memberId : !a.familyMemberId));
+  };
+  // Current price of a past service for THIS client (per-client price first, then the live menu price).
+  const svcCurrentPrice = (a) => {
+    const svc = services.find((s) => s.id === a.serviceId);
+    if (!svc) return null;
+    const cp = matched && matched.customPrices ? matched.customPrices[svc.id] : null;
+    if (cp != null && cp !== "") return Number(cp);
+    return getPrice(svc, a.providerId);
+  };
   const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const fmtHomeDate = (a) => { const d = apptWhen(a); if (!d) return ""; return `${DOW[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
   const fmtHomeShort = (a) => { const d = apptWhen(a); if (!d) return ""; return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
@@ -3987,6 +4004,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       : (myAppts || []).filter((a) => a.clientId === matched.id && !a.familyMemberId && a.serviceId && a.status !== "block" && a.status !== "cancelled");
     if (apptsFor.length && business?.bookUsual?.enabled !== false) setShowUsual(true); else setStep(1);
   };
+  // One-tap "Book again" of a specific past service from the home screen. Rebuilds the cart entry
+  // (service + the add-ons/cut chosen last time + same provider), sets the person context, and drops
+  // the client straight onto the time picker. Everything stays editable from there.
+  const bookAgain = (a) => {
+    const svc = services.find((s) => s.id === a.serviceId);
+    if (!svc) return;
+    const memberId = a.familyMemberId || null;
+    const member = memberId ? (matched.family || []).find((m) => m.id === memberId) : null;
+    setShowHome(false); setHomeAction(null); setReschedPrev(null); setShowUsual(false);
+    setGroupPeople([member ? { id: member.id, name: member.name, note: member.note, isMember: true } : { id: null, name: matched.name, isMember: false }]);
+    setGroupMode(null); setWizardIdx(0);
+    setBookingFor(member ? "member" : "self"); setActiveMember(member || null);
+    const line = a.lineItems && a.lineItems[0] ? a.lineItems[0] : null;
+    const prov = providers.find((p) => p.id === a.providerId) || null;
+    setCart([{ service: svc, addons: line && line.addons ? line.addons : {}, cutType: line ? line.cutType || null : null, beardType: line ? line.beardType || null : null, provider: prov, forMemberId: memberId, forName: member ? member.name : matched.name }]);
+    setCameFromUsual(true); setStep(6);
+  };
   const bookFromHome = () => {
     setShowHome(false); setHomeAction(null); setReschedPrev(null);
     setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false);
@@ -4012,7 +4046,18 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     const upcoming = live.filter((a) => { const d = apptWhen(a); return d && d.getTime() >= now - 2 * 3600 * 1000; }).sort((a, b) => (a.bookedFor || "").localeCompare(b.bookedFor || ""));
     const nextVisit = upcoming[0] || null;
     const past = (myAppts || []).filter((a) => a.serviceId && a.status !== "block" && a.status !== "cancelled" && (!nextVisit || a.id !== nextVisit.id) && (() => { const d = apptWhen(a); return d && d.getTime() < now - 2 * 3600 * 1000; })()).sort((a, b) => (b.bookedFor || "").localeCompare(a.bookedFor || ""));
-    const visits = showAllVisits ? past : past.slice(0, 3);
+    // Distinct past services (per person), newest first, with a visit count — the "Book again" list.
+    // `past` is already sorted newest-first, so the first time we see a service is its most recent visit.
+    const pastServices = (() => {
+      const map = new Map();
+      past.forEach((a) => {
+        const key = a.serviceId + "|" + (a.familyMemberId || "");
+        if (!map.has(key)) map.set(key, { appt: a, count: 0 });
+        map.get(key).count++;
+      });
+      return Array.from(map.values());
+    })();
+    const shownServices = showAllVisits ? pastServices : pastServices.slice(0, 3);
     const family = matched.family || [];
     const people = [{ id: null, name: matched.name, isMember: false }, ...family.map((m) => ({ id: m.id, name: m.name, note: m.note || "", isMember: true }))];
     return (
@@ -4066,17 +4111,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
             {past.length > 0 && (
               <>
-                <div style={lblStyle}>Recent visits</div>
+                <div style={lblStyle}>Book again</div>
                 <div style={{ border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
-                  {visits.map((a, i) => (
-                    <div key={a.id || i} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "13px 18px", borderTop: i ? "1px solid var(--line)" : "none" }}>
-                      <span style={{ fontFamily: "'Fraunces', serif", fontSize: 14, color: "var(--text)", width: 56, flexShrink: 0 }}>{fmtHomeShort(a)}</span>
-                      <span style={{ flex: 1, fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--text2)" }}>{svcLabel(a)}{a.familyMemberId ? ` · ${personLabel(a)}` : ""}</span>
-                      <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)" }}>{provFirst(a.providerId)}</span>
-                    </div>
-                  ))}
-                  {past.length > 3 && (
-                    <button onClick={() => setShowAllVisits((v) => !v)} style={{ width: "100%", background: "transparent", borderTop: "1px solid var(--line)", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: 13, fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", letterSpacing: 0.3, cursor: "pointer" }}>{showAllVisits ? "Show less" : `See all ${past.length} visits \u2192`}</button>
+                  {shownServices.map(({ appt: a, count }, i) => {
+                    const price = svcCurrentPrice(a);
+                    return (
+                      <button key={(a.serviceId || "") + (a.familyMemberId || "") + i} onClick={() => bookAgain(a)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderTop: i ? "1px solid var(--line)" : "none", borderLeft: "none", borderRight: "none", borderBottom: "none", background: "transparent", textAlign: "left", cursor: "pointer" }}>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{svcLabel(a)}{a.familyMemberId ? ` · ${personLabel(a)}` : ""}</span>
+                          <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 3 }}>Last {fmtHomeShort(a)} · booked {count} time{count === 1 ? "" : "s"}</span>
+                        </span>
+                        {price != null && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--text)", flexShrink: 0 }}>${price}</span>}
+                        <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 600, letterSpacing: 0.3, color: "var(--text)", flexShrink: 0, borderBottom: "1px solid var(--text)", paddingBottom: 1 }}>Book again</span>
+                      </button>
+                    );
+                  })}
+                  {pastServices.length > 3 && (
+                    <button onClick={() => setShowAllVisits((v) => !v)} style={{ width: "100%", background: "transparent", borderTop: "1px solid var(--line)", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: 13, fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", letterSpacing: 0.3, cursor: "pointer" }}>{showAllVisits ? "Show less" : `See all ${pastServices.length} services \u2192`}</button>
                   )}
                 </div>
               </>
@@ -5068,7 +5119,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{p.name}</div>
-                            {p.role && <div style={{ fontSize: 12, color: "var(--faint)", letterSpacing: 1.5, marginTop: 3, textTransform: "uppercase" }}>{p.role}</div>}
+                            {bookedProvBefore(p.id, draft.id)
+                              ? <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 5, background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", color: "var(--text)", fontSize: 10.5, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase", padding: "3px 9px", borderRadius: 20 }}><Check size={11} strokeWidth={3} /> Booked before</div>
+                              : (p.role && <div style={{ fontSize: 12, color: "var(--faint)", letterSpacing: 1.5, marginTop: 3, textTransform: "uppercase" }}>{p.role}</div>)}
                           </div>
                           <ChevronRight size={22} style={{ color: "var(--text)", flexShrink: 0 }} />
                         </div>
@@ -5202,13 +5255,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px", margin: "0 0 24px" }}>Who &amp; when</h2>
 
               <div style={{ display: "flex", gap: 28, borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
-                {waReal.map((p) => (
-                  <button key={p.id} onClick={() => setWaProvId(p.id)} style={tabStyle(pid === p.id)}>{p.name}</button>
-                ))}
+                {waReal.map((p) => { const seen = bookedProvBefore(p.id, draft.id); return (
+                  <button key={p.id} onClick={() => setWaProvId(p.id)} style={{ ...tabStyle(pid === p.id), display: "inline-flex", alignItems: "center", gap: 6 }}>{p.name}{seen && <span title="Booked before" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />}</button>
+                ); })}
                 {waReal.length > 1 && (
                   <button onClick={() => setWaProvId("anyone")} style={tabStyle(pid === "anyone")}>First Available</button>
                 )}
               </div>
+              {prov && bookedProvBefore(prov.id, draft.id) && (
+                <div style={{ display: "flex", alignItems: "center", gap: 7, margin: "-8px 0 20px", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}><Check size={13} strokeWidth={3} style={{ color: "var(--gold)" }} /> You've booked {prov.name.split(" ")[0]} before.</div>
+              )}
 
               <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 6, marginBottom: 22 }}>
                 {dateOptions.slice(0, 21).map((d, i) => { const on = selectedDate && d.toDateString() === selectedDate.toDateString(); return (
