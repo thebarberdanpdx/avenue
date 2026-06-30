@@ -1208,6 +1208,22 @@ const addonPriceFor = (service, providerId, group) => {
   if (se && se.addonPrice && group && se.addonPrice[group.id] != null) return Number(se.addonPrice[group.id]) || 0;
   return Number(group && group.item && group.item.price) || 0;
 };
+// Per-ANSWER overrides — a chosen question answer (e.g. "Skin fade") can take a barber more time / cost
+// more. per-barber override (staff.answerDur/answerPrice[groupId][optId]) → the answer's own min/price.
+// These only adjust the answer's EXTRA minutes; the base service length still comes from getDuration
+// (which respects a client's manually-entered customDuration first), so this never touches that.
+const answerDuration = (service, providerId, group, opt) => {
+  const se = getStaffEntry(service, providerId);
+  const g = se && se.answerDur && group && se.answerDur[group.id];
+  if (g && opt && g[opt.id] != null) return Number(g[opt.id]) || 0;
+  return Number(opt && opt.min) || 0;
+};
+const answerPriceFor = (service, providerId, group, opt) => {
+  const se = getStaffEntry(service, providerId);
+  const g = se && se.answerPrice && group && se.answerPrice[group.id];
+  if (g && opt && g[opt.id] != null) return Number(g[opt.id]) || 0;
+  return Number(opt && opt.price) || 0;
+};
 // One-time, non-destructive migration OFF the retired cut-styles model. Any active service that
 // still carries cut styles becomes one STANDALONE service per style — each with that style's own
 // price + time (per-barber cutPrice/cutDur overrides folded into flat staff price/duration; the
@@ -3370,7 +3386,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     }
     entry.service.addonGroups.forEach((g) => {
       const sel = entry.addons[g.id];
-      if (g.type === "choice" && sel) { const opt = g.options.find((o) => o.id === sel); if (opt) { p += Number(opt.price) || 0; m += Number(opt.min) || 0; } }
+      if (g.type === "choice" && sel) { const opt = g.options.find((o) => o.id === sel); if (opt) { p += answerPriceFor(entry.service, provId, g, opt); m += answerDuration(entry.service, provId, g, opt); } }
       if (g.type === "addon" && sel) { if (g.item.addsPrice !== false) p += addonPriceFor(entry.service, provId, g); if (g.item.addsTime !== false) m += addonDuration(entry.service, provId, g); }
     });
     return { price: p, min: m };
@@ -5931,15 +5947,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       return (
                         <>
                           {photoMode !== "off" && (<>
-                            <label style={{ fontSize: 13, color: "var(--faint)", display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>A quick photo
+                            <label style={{ fontSize: 13, color: "var(--faint)", display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>A quick selfie
                               <span style={{ fontSize: 9.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--bg)", background: photoRequired ? "var(--text)" : "var(--border2)", borderRadius: 4, padding: "2px 6px" }}>{photoRequired ? "REQUIRED" : "RECOMMENDED"}</span>
                             </label>
                             <div style={{ background: "color-mix(in srgb, var(--text) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--text) 28%, var(--border))", borderRadius: 12, padding: "13px 15px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
                               <Camera size={17} style={{ color: "var(--text)", flexShrink: 0, marginTop: 2 }} />
-                              <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text2)" }}>Add a photo of your hair now and the cut you're after. It helps {provider.name === "Anyone" ? "the team" : provider.name} see what they're working with and judge if they can fit you in — your odds go way up.</div>
+                              <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text2)" }}>{photoRequired ? "A selfie is required. " : ""}Send one of your hair right now, plus a photo of the look you're after. It lets {provider.name === "Anyone" ? "us" : provider.name} see how much work it'll take — and when we can see what's needed, there's a good chance we can fit you in.</div>
                             </div>
                             <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>{[0, 1, 2].map((i) => (<div key={i} style={{ flex: 1, aspectRatio: "1", borderRadius: 6, border: "1px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center", background: i < wlPhotos ? "color-mix(in srgb, var(--text) 12%, transparent)" : "transparent" }}>{i < wlPhotos ? <Check size={18} style={{ color: "var(--text)" }} /> : <Camera size={16} style={{ color: "var(--faint)" }} />}</div>))}</div>
-                            <button onClick={() => setWlPhotos(Math.min(3, wlPhotos + 1))} disabled={wlPhotos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: wlPhotos >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 13, letterSpacing: 1, borderRadius: 6, marginBottom: 20 }}>{wlPhotos >= 3 ? "MAXIMUM REACHED" : `ADD PHOTO (${wlPhotos}/3)`}</button>
+                            <button onClick={() => setWlPhotos(Math.min(3, wlPhotos + 1))} disabled={wlPhotos >= 3} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: wlPhotos >= 3 ? "var(--faint)" : "var(--text)", padding: 11, fontSize: 13, letterSpacing: 1, borderRadius: 6, marginBottom: 20 }}>{wlPhotos >= 3 ? "MAXIMUM REACHED" : `ADD SELFIE (${wlPhotos}/3)`}</button>
                           </>)}
 
                           <button className="lift" disabled={!ready} onClick={() => {
@@ -5950,7 +5966,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                             if (!isStaff) { try { supabase.rpc('join_waitlist', { p_shop: shopId, p_entry: wlEntry }); } catch (e) {} }
                             setWaitlistDone(true); setShowWaitlist(false);
                           }} style={{ width: "100%", background: ready ? "var(--text)" : "var(--border2)", color: ready ? "var(--bg)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
-                          {photoRequired && wlPhotos === 0 && wlName && phoneOk && daysOk && <div style={{ fontSize: 12.5, color: "var(--faint)", textAlign: "center", marginTop: 8 }}>Add at least one photo to join.</div>}
+                          {photoRequired && wlPhotos === 0 && wlName && phoneOk && daysOk && <div style={{ fontSize: 12.5, color: "var(--faint)", textAlign: "center", marginTop: 8 }}>Add a selfie to join.</div>}
                         </>
                       );
                     })()}
@@ -10418,6 +10434,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [picker, setPicker] = useState(null); // {target}
   const [stylePriceOpen, setStylePriceOpen] = useState({}); // {providerId: bool} — per-barber "prices per style" expander in Staff & pricing
   const [addonTimeOpen, setAddonTimeOpen] = useState({}); // {providerId: bool} — per-barber "add-on times" expander in Staff & pricing
+  const [answerTimeOpen, setAnswerTimeOpen] = useState({}); // {providerId: bool} — per-barber "question prices & times" expander
   const [editStyleId, setEditStyleId] = useState(null); // cut-styles drill: which style's own screen is open (null = the list)
   const [editMode, setEditMode] = useState(false); // list view: browse vs manage (reorder/delete/rename)
   const [catSheet, setCatSheet] = useState(false); // category manager sheet (add / rename / reorder / delete)
@@ -10480,6 +10497,24 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     if (val == null || val === "") delete addonPrice[gid]; else addonPrice[gid] = Number(val);
     return { ...f, staff: { ...f.staff, [pid]: { ...cur, addonPrice } } };
   });
+  // Per-barber, per-ANSWER time override — staff[pid].answerDur[groupId][optId]. Blank clears (falls back to the answer's own min).
+  const setStaffAnswerDur = (pid, gid, oid, val) => setForm((f) => {
+    const cur = (f.staff && f.staff[pid]) || { on: true, duration: null, price: null };
+    const answerDur = { ...(cur.answerDur || {}) };
+    const grp = { ...(answerDur[gid] || {}) };
+    if (val == null || val === "") delete grp[oid]; else grp[oid] = Number(val);
+    if (Object.keys(grp).length) answerDur[gid] = grp; else delete answerDur[gid];
+    return { ...f, staff: { ...f.staff, [pid]: { ...cur, answerDur } } };
+  });
+  // Per-barber, per-ANSWER price override — staff[pid].answerPrice[groupId][optId]. Blank clears.
+  const setStaffAnswerPrice = (pid, gid, oid, val) => setForm((f) => {
+    const cur = (f.staff && f.staff[pid]) || { on: true, duration: null, price: null };
+    const answerPrice = { ...(cur.answerPrice || {}) };
+    const grp = { ...(answerPrice[gid] || {}) };
+    if (val == null || val === "") delete grp[oid]; else grp[oid] = Number(val);
+    if (Object.keys(grp).length) answerPrice[gid] = grp; else delete answerPrice[gid];
+    return { ...f, staff: { ...f.staff, [pid]: { ...cur, answerPrice } } };
+  });
   const setBooking = (patch) => setForm((f) => ({ ...f, booking: { ...(f.booking || defaultBooking()), ...patch } }));
 
   const openNew = () => { setSection(null); setTplPick(true); };
@@ -10507,6 +10542,9 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       if (e.cutPrice && Object.keys(e.cutPrice).length) cleanStaff[pid].cutPrice = e.cutPrice; else delete cleanStaff[pid].cutPrice;
       if (e.cutDur && Object.keys(e.cutDur).length) cleanStaff[pid].cutDur = e.cutDur; else delete cleanStaff[pid].cutDur;
       if (e.addonDur && Object.keys(e.addonDur).length) cleanStaff[pid].addonDur = e.addonDur; else delete cleanStaff[pid].addonDur;
+      if (e.addonPrice && Object.keys(e.addonPrice).length) cleanStaff[pid].addonPrice = e.addonPrice; else delete cleanStaff[pid].addonPrice;
+      if (e.answerDur && Object.keys(e.answerDur).length) cleanStaff[pid].answerDur = e.answerDur; else delete cleanStaff[pid].answerDur;
+      if (e.answerPrice && Object.keys(e.answerPrice).length) cleanStaff[pid].answerPrice = e.answerPrice; else delete cleanStaff[pid].answerPrice;
     });
     const photos = Array.isArray(form.photos) ? form.photos.filter(Boolean) : [];
     const clean = { ...form, price: Math.min(100000, priceNum), duration: Math.max(5, Math.min(600, Number(form.duration) || 30)), staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false };
@@ -10799,6 +10837,9 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // Add-ons that add time and so can have a per-barber time override (a master's hot-towel runs longer).
   const timedAddons = (form.addonGroups || []).filter((g) => g && g.type === "addon" && (g.item ? g.item.addsTime !== false : true));
   const hasAddonTimes = timedAddons.length > 0;
+  // Questions (e.g. "Choose your cut") whose answers can take a barber more/less time or cost more.
+  const questionGroups = (form.addonGroups || []).filter((g) => g && g.type !== "addon" && (g.options || []).length > 0);
+  const hasQuestions = questionGroups.length > 0;
   const staffBody = (
     <>
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Everyone offers this by default. Turn someone off, or give them their own time and price. Blank = the service default ({form.duration || "—"} min · ${form.price || "—"}).</p>
@@ -10917,6 +10958,49 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                           );
                         })}
                         <p style={{ fontSize: 12, color: "var(--faint)", margin: "2px 2px 0", lineHeight: 1.45 }}>This barber's price and extra time for each add-on. Blank uses the add-on's default.</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              {on && hasQuestions && (() => {
+                const open = !!answerTimeOpen[p.id];
+                return (
+                  <div style={{ marginTop: 12, borderTop: "1px solid var(--line)", paddingTop: 12, minWidth: 0 }}>
+                    <button onClick={() => setAnswerTimeOpen((o) => ({ ...o, [p.id]: !o[p.id] }))} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--sub)", fontSize: 13.5, fontWeight: 500 }}>
+                      <span>Set question prices &amp; times</span>
+                      {open ? <ChevronUp size={16} style={{ color: "var(--faint)", flexShrink: 0 }} /> : <ChevronDown size={16} style={{ color: "var(--faint)", flexShrink: 0 }} />}
+                    </button>
+                    {open && (
+                      <div style={{ display: "grid", gap: 14, marginTop: 12 }}>
+                        {questionGroups.map((g) => (
+                          <div key={g.id} style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 11.5, letterSpacing: 0.4, color: "var(--text)", fontWeight: 600, margin: "0 2px 8px" }}>{g.label || "Question"}</div>
+                            <div style={{ display: "grid", gap: 9 }}>
+                              {(g.options || []).map((o) => {
+                                const se = form.staff[p.id] || {};
+                                const pv = (se.answerPrice && se.answerPrice[g.id] && se.answerPrice[g.id][o.id] != null) ? se.answerPrice[g.id][o.id] : "";
+                                const dv = (se.answerDur && se.answerDur[g.id] && se.answerDur[g.id][o.id] != null) ? se.answerDur[g.id][o.id] : "";
+                                return (
+                                  <div key={o.id} style={{ minWidth: 0 }}>
+                                    <SectionLbl style={{ margin: "0 2px 6px" }}>{o.label || "Answer"}</SectionLbl>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                      <div style={{ ...moneyWrap, flex: 1, minWidth: 0 }}>
+                                        <span style={moneyPrefix}>$</span>
+                                        <input type="number" inputMode="decimal" value={pv} placeholder={String(Number(o.price) || 0)} onChange={(ev) => setStaffAnswerPrice(p.id, g.id, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, minWidth: 0, padding: "11px 12px" }} />
+                                      </div>
+                                      <div style={{ ...moneyWrap, flex: 1, minWidth: 0 }}>
+                                        <input type="number" inputMode="numeric" value={dv} placeholder={String(Number(o.min) || 0)} onChange={(ev) => setStaffAnswerDur(p.id, g.id, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, minWidth: 0, padding: "11px 12px", paddingLeft: 14 }} />
+                                        <span style={unitSuffix}>min</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                        <p style={{ fontSize: 12, color: "var(--faint)", margin: "2px 2px 0", lineHeight: 1.45 }}>This barber's price and extra time for each answer. Blank uses the answer's default. This never changes a client's manually-set duration.</p>
                       </div>
                     )}
                   </div>
