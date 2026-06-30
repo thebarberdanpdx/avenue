@@ -18725,9 +18725,16 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     if (!strip) return;
     const sel = strip.querySelector('[data-sel="1"]') || strip.querySelector('[data-today="1"]');
     if (!sel) return;
-    const dow = selectedDate.getDay();            // 0 = Sunday
-    const cellW = sel.offsetWidth + 6;            // cell width + flex gap
-    const left = sel.offsetLeft - strip.offsetLeft - dow * cellW - 2; // back up to the week's Sunday
+    const pos = sel.offsetLeft - strip.offsetLeft;  // selected cell's position within the strip
+    let left;
+    if (dayOffset === 0) {
+      // Today selected → "normal" view: align the current week (Sunday at the left edge).
+      const cellW = sel.offsetWidth + 6;            // cell width + flex gap
+      left = pos - selectedDate.getDay() * cellW - 2;
+    } else {
+      // A future/other day picked → center that day in the strip.
+      left = pos - strip.clientWidth / 2 + sel.offsetWidth / 2;
+    }
     try { strip.scrollTo({ left: Math.max(0, left), behavior: behavior || "auto" }); }
     catch (e) { strip.scrollLeft = Math.max(0, left); }
   };
