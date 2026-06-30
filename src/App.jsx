@@ -10768,18 +10768,22 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           <button onClick={() => showToast("Link copied.")} style={{ background: "none", color: "var(--sub)" }}><Copy size={16} /></button>
         </div>
       </div>
-      <div style={{ marginTop: 16 }}>
-        <FieldLabel>Booking page description</FieldLabel>
-        <textarea value={b.description} onChange={(e) => setBooking({ description: e.target.value })} rows={4} placeholder="Describe this service for clients booking online…" style={{ ...inputStyle, resize: "vertical", lineHeight: 1.55 }} />
+      <div style={{ ...G_BOX, background: "var(--bg)", marginTop: 16, marginBottom: 0 }}>
+        <label style={G_LBL_ON("var(--bg)")}>Booking page description</label>
+        <textarea value={b.description || ""} onChange={(e) => setBooking({ description: e.target.value })} rows={4} placeholder="Describe this service for clients booking online…" style={{ ...G_INPUT, resize: "vertical", lineHeight: 1.55, minHeight: 70 }} />
       </div>
 
       {b.confirmSheet && (
         <>
-          <div style={{ marginTop: 18 }}>
-            <FieldLabel>Confirmation sheet question</FieldLabel>
-            <input type="text" value={b.confirmHeading != null ? b.confirmHeading : "One quick check"} onChange={(e) => setBooking({ confirmHeading: e.target.value })} placeholder="One quick check" style={{ ...inputStyle }} />
-            <div style={{ height: 9 }} />
-            <textarea value={b.confirmSubtext != null ? b.confirmSubtext : "So we set aside the right amount of time."} onChange={(e) => setBooking({ confirmSubtext: e.target.value })} rows={2} placeholder="So we set aside the right amount of time." style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
+          <div style={{ marginTop: 14 }}>
+            <div style={{ ...G_BOX, background: "var(--bg)", marginBottom: 9 }}>
+              <label style={G_LBL_ON("var(--bg)")}>Confirmation sheet question</label>
+              <input type="text" value={b.confirmHeading != null ? b.confirmHeading : "One quick check"} onChange={(e) => setBooking({ confirmHeading: e.target.value })} placeholder="One quick check" style={G_INPUT} />
+            </div>
+            <div style={{ ...G_BOX, background: "var(--bg)", marginBottom: 0 }}>
+              <label style={G_LBL_ON("var(--bg)")}>Sub-line</label>
+              <textarea value={b.confirmSubtext != null ? b.confirmSubtext : "So we set aside the right amount of time."} onChange={(e) => setBooking({ confirmSubtext: e.target.value })} rows={2} placeholder="So we set aside the right amount of time." style={{ ...G_INPUT, resize: "vertical", lineHeight: 1.5 }} />
+            </div>
             <div style={{ fontSize: 12, color: "var(--faint)", margin: "7px 2px 0", lineHeight: 1.45 }}>Shown big at the top of the sheet. The service name, price, and description appear below it.</div>
           </div>
         </>
@@ -12087,9 +12091,9 @@ function LocationsEditor({ business, setForm, onBackRef }) {
   const addLoc = () => { const id = "loc" + Date.now(); setForm({ ...business, locations: [...locations, { id, name: "New Location", address: "", cityZip: "", phone: "", hours: "Mon–Fri · 9–5" }] }); setOpenId(id); };
   const removeLoc = (id) => { if (typeof window !== "undefined" && !window.confirm("Remove this location?")) return; setForm({ ...business, locations: locations.filter((l) => l.id !== id) }); setOpenId(null); };
   const F = ({ label, val, on, first }) => (
-    <div style={{ marginTop: first ? 0 : 14 }}>
-      <label style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, display: "block", marginBottom: 6 }}>{label}</label>
-      <input value={val} onChange={(e) => on(e.target.value)} style={inputStyle} />
+    <div style={{ ...G_BOX, marginTop: first ? 0 : 13, marginBottom: 0 }}>
+      <label style={G_LBL}>{label}</label>
+      <input value={val || ""} onChange={(e) => on(e.target.value)} style={G_INPUT} />
     </div>
   );
   const open = openId ? locations.find((l) => l.id === openId) : null;
@@ -13703,11 +13707,11 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           {editingDetails ? (
             <div style={{ padding: "8px 0 4px" }}>
               <div style={{ display: "grid", gap: 15 }}>
-                <div><FieldLabel>Name</FieldLabel><input value={detailsDraft ? detailsDraft.name : person.name} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), name: e.target.value }))} style={inputStyle} /></div>
-                <div><FieldLabel>Role / title</FieldLabel><input value={detailsDraft ? detailsDraft.role : (person.role || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), role: e.target.value }))} style={inputStyle} /></div>
-                <div><FieldLabel>Email</FieldLabel><input value={detailsDraft ? detailsDraft.email : (person.email || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), email: e.target.value }))} inputMode="email" autoCapitalize="none" style={inputStyle} /></div>
-                <div><FieldLabel>Phone</FieldLabel><input value={detailsDraft ? detailsDraft.phone : (person.phone || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), phone: formatPhone(e.target.value) }))} inputMode="tel" placeholder="(503) 555-0142" style={inputStyle} /></div>
-                <div><FieldLabel>User type</FieldLabel><Segmented options={[{ value: "Admin", label: "Admin" }, { value: "Staff", label: "Staff" }, { value: "Front Desk", label: "Front desk" }]} value={ut} onChange={(v) => patch(person.id, { userType: v })} /></div>
+                <div style={G_BOX}><label style={G_LBL}>Name</label><input value={detailsDraft ? detailsDraft.name : person.name} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), name: e.target.value }))} style={G_INPUT} /></div>
+                <div style={G_BOX}><label style={G_LBL}>Role / title</label><input value={detailsDraft ? detailsDraft.role : (person.role || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), role: e.target.value }))} style={G_INPUT} /></div>
+                <div style={G_BOX}><label style={G_LBL}>Email</label><input value={detailsDraft ? detailsDraft.email : (person.email || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), email: e.target.value }))} inputMode="email" autoCapitalize="none" style={G_INPUT} /></div>
+                <div style={G_BOX}><label style={G_LBL}>Phone</label><input value={detailsDraft ? detailsDraft.phone : (person.phone || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), phone: formatPhone(e.target.value) }))} inputMode="tel" placeholder="(503) 555-0142" style={G_INPUT} /></div>
+                <div><div style={{ fontSize: 12.5, color: "var(--sub)", fontWeight: 500, margin: "0 0 7px" }}>User type</div><Segmented options={[{ value: "Admin", label: "Admin" }, { value: "Staff", label: "Staff" }, { value: "Front Desk", label: "Front desk" }]} value={ut} onChange={(v) => patch(person.id, { userType: v })} /></div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)", marginTop: 8 }}>
                 <span style={{ fontSize: 15.5, fontWeight: 500 }}>Is a service provider</span><Toggle on={person.isProvider !== false} onClick={() => patch(person.id, { isProvider: !(person.isProvider !== false) })} />
@@ -14822,8 +14826,10 @@ function NoShowEditor({ b, policy, onBooking, onPolicy }) {
 
       {/* Policy text */}
       <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18, marginTop: 18 }}>
-        <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 7 }}>Policy clients agree to</div>
-        <textarea value={policy} onChange={(e) => onPolicy(e.target.value)} rows={5} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
+        <div style={{ ...G_BOX, marginBottom: 0 }}>
+          <label style={G_LBL}>Policy clients agree to</label>
+          <textarea value={policy || ""} onChange={(e) => onPolicy(e.target.value)} rows={5} style={{ ...G_INPUT, resize: "vertical", lineHeight: 1.6, minHeight: 90 }} />
+        </div>
         <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 8 }}>Shown on the booking screen for clients to agree to. Write it to match your own rules and your state's regulations.</p>
       </div>
     </div>
