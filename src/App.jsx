@@ -3168,7 +3168,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [codeError, setCodeError] = useState(false);
   const [pendingMatch, setPendingMatch] = useState(null); // the client we found, awaiting code verify
   const [clientEmail, setClientEmail] = useState("");      // email login: address entered on "I've been here before"
-  const [usePhone, setUsePhone] = useState(false);         // legacy phone path — kept intact (10DLC consent surface) until SMS is live
+  const [usePhone, setUsePhone] = useState(true);          // returning clients verify by TEXT first; email is the fallback ("Use my email instead")
   const [emailMasked, setEmailMasked] = useState("");      // masked address shown on the code screen
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginNoMatch, setLoginNoMatch] = useState(null);  // null | "nomatch" | "error"
@@ -4031,6 +4031,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setShowHome(false); setMatched(null); setMyAppts([]); setShowAllVisits(false); setHomeAction(null); setReschedPrev(null);
     setBookingFor(null); setActiveMember(null); setCart([]); setShowWhoFor(false); setShowUsual(false);
     setSimpleStep(null); setSimpleCat(null); setSimplePref(null); setStep(0);
+    setUsePhone(true); setShowCodeEntry(false); setCodeEntry(""); setClientEmail(""); setLoginNoMatch(null);
   };
   const doCancelAppt = (appt) => {
     try { supabase.rpc("cancel_my_appointment", { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(appt.id) }).catch(() => {}); } catch (e) {}
@@ -5427,6 +5428,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               setLoginBusy(false);
             }} style={{ width: "100%", background: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "transparent" : "var(--text)", color: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "var(--faint)" : "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) ? "1px solid var(--border)" : "none", cursor: "pointer" }}>{loginBusy ? "Sending…" : "Email my code →"}</button>
             <p style={{ textAlign: "center", marginTop: 16 }}>
+              <button onClick={() => { setUsePhone(true); setLoginNoMatch(null); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>Text me a code instead</button>
+            </p>
+            <p style={{ textAlign: "center", marginTop: 2 }}>
               <button onClick={() => { setStep(0); setSimpleStep("what"); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>First time here? Book as a new client</button>
             </p>
           </div>
@@ -5442,10 +5446,28 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
               By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text)", textDecoration: "underline" }}>terms</a>.
             </p>
-            <p style={{ color: "var(--faint)", fontSize: 14, marginBottom: 22 }}>Try <span style={{ color: "var(--text)", cursor: "pointer" }} onClick={() => setPhone("503-555-0142")}>503-555-0142</span> (returning client Marcus).</p>
-            <button className="lift" disabled={phone.replace(/\D/g, "").length < 10} onClick={async () => { const digits = phone.replace(/\D/g, ""); let found = null; try { const { data, error } = await supabase.rpc("lookup_client_by_phone", { p_shop: SHOP_ID, p_phone: phone }); if (!error && data) found = data; } catch (e) {} if (!found) found = clients.find((c) => (c.phone || "").replace(/\D/g, "") === digits) || null; if (found && found.blocked) { setBlockedNotice(true); return; } setPendingMatch(found); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true); }} style={{ width: "100%", background: phone.replace(/\D/g, "").length < 10 ? "transparent" : "var(--text)", color: phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: phone.replace(/\D/g, "").length < 10 ? "1px solid var(--border)" : "none", cursor: "pointer" }}>Text me a code →</button>
+            {loginNoMatch === "error" && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Couldn't send the text — give it another try in a moment, or use your email below.</p>}
+            {loginNoMatch === "throttled" && (
+              <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", marginBottom: 16, fontSize: 14, lineHeight: 1.5, color: "var(--text)" }}>
+                Too many code requests just now. Please wait a few minutes and try again.
+              </div>
+            )}
+            <button className="lift" disabled={loginBusy || phone.replace(/\D/g, "").length < 10} onClick={async () => {
+              setLoginBusy(true); setLoginNoMatch(null);
+              try {
+                const res = await fetch(API_BASE + "/api/client-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, phone }) });
+                const out = await res.json().catch(() => ({}));
+                if (res.ok && out && out.ok) {
+                  // Uniform: always advance to the code screen (anti-enumeration — we never
+                  // reveal here whether the number is on file).
+                  setPendingMatch(null); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true);
+                } else if (res.status === 429) { setLoginNoMatch("throttled"); }
+                else { setLoginNoMatch("error"); }
+              } catch (e) { setLoginNoMatch("error"); }
+              setLoginBusy(false);
+            }} style={{ width: "100%", background: loginBusy || phone.replace(/\D/g, "").length < 10 ? "transparent" : "var(--text)", color: loginBusy || phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: loginBusy || phone.replace(/\D/g, "").length < 10 ? "1px solid var(--border)" : "none", cursor: "pointer" }}>{loginBusy ? "Sending…" : "Text me a code →"}</button>
             <p style={{ textAlign: "center", marginTop: 14 }}>
-              <button onClick={() => setUsePhone(false)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>Use my email instead</button>
+              <button onClick={() => { setUsePhone(false); setLoginNoMatch(null); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>Didn't get it? Use my email instead</button>
             </p>
           </div>
         )}
@@ -5512,13 +5534,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           <div className="fade-up">
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Verify</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 10px", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Enter your code</h2>
-            <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 8, fontWeight: 400, lineHeight: 1.5 }}>{usePhone ? <>We sent a 6-digit code to <strong>{phone}</strong>.</> : <>We emailed a 6-digit code to <strong>{emailMasked}</strong>. It's good for 10 minutes.</>}</p>
-            {usePhone && <p style={{ color: "var(--faint)", fontSize: 13, marginBottom: 24, fontWeight: 300 }}>Texting isn't live yet — enter any 6 digits to continue for now.</p>}
-            {!usePhone && <div style={{ marginBottom: 16 }} />}
+            <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 8, fontWeight: 400, lineHeight: 1.5 }}>{usePhone ? <>We texted a 6-digit code to <strong>{phone}</strong>. It's good for 10 minutes.</> : <>We emailed a 6-digit code to <strong>{emailMasked}</strong>. It's good for 10 minutes.</>}</p>
+            <div style={{ marginBottom: 16 }} />
             <input autoFocus inputMode="numeric" value={codeEntry} onChange={(e) => { setCodeEntry(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(false); }} placeholder="• • • • • •" style={{ ...inputStyle, textAlign: "center", fontSize: 28, letterSpacing: 8, marginBottom: codeError ? 8 : 18 }} />
-            {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>{usePhone ? "Enter all 6 digits." : (codeEntry.length < 6 ? "Enter all 6 digits." : "That code didn't match — check the email and try again.")}</p>}
-            <button className="lift" disabled={loginBusy} onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } let found = pendingMatch; if (!usePhone) { setLoginBusy(true); try { const { data, error } = await supabase.rpc("verify_client_code", { p_shop: shopId, p_email: clientEmail.trim().toLowerCase(), p_code: codeEntry }); setLoginBusy(false); if (error || !data) { setCodeError(true); return; } found = data; } catch (e) { setLoginBusy(false); setCodeError(true); return; } } const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); setShowAllVisits(false); setShowHome(true); } else { if (cart.length === 0) { setStep(0); setSimpleStep("what"); } else { setStep(6); } } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
-            <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6 }}>{usePhone ? "Use a different number" : "Use a different email"}</button>
+            {codeError && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>{codeEntry.length < 6 ? "Enter all 6 digits." : `That code didn't match — check the ${usePhone ? "text" : "email"} and try again.`}</p>}
+            <button className="lift" disabled={loginBusy} onClick={async () => { if (codeEntry.length < 6) { setCodeError(true); return; } let found = null; setLoginBusy(true); try { const { data, error } = usePhone ? await supabase.rpc("verify_client_code_phone", { p_shop: shopId, p_phone: phone, p_code: codeEntry }) : await supabase.rpc("verify_client_code", { p_shop: shopId, p_email: clientEmail.trim().toLowerCase(), p_code: codeEntry }); setLoginBusy(false); if (error || !data) { setCodeError(true); return; } found = data; } catch (e) { setLoginBusy(false); setCodeError(true); return; } const ct = business?.booking?.clientType || "all"; if (ct === "returning" && !found) { setShowCodeEntry(false); setClientTypeBlock("returning_only"); return; } if (ct === "new" && found) { setShowCodeEntry(false); setClientTypeBlock("new_only"); return; } setMatched(found); setShowCodeEntry(false); if (found) { let list = []; try { const { data } = await supabase.rpc('get_client_appointments', { p_shop: shopId, p_client_id: found.id }); list = Array.isArray(data) ? data : []; } catch (e) {} setMyAppts(list); setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setShowSchedChoice(false); setShowWizardIntro(false); setShowAllVisits(false); setShowHome(true); } else { if (cart.length === 0) { setStep(0); setSimpleStep("what"); } else { setStep(6); } } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 12, border: "none", cursor: "pointer" }}>Verify →</button>
+            <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); setCodeError(false); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 6, cursor: "pointer" }}>{usePhone ? "Use a different number" : "Use a different email"}</button>
+            {usePhone && <button onClick={() => { setShowCodeEntry(false); setCodeEntry(""); setCodeError(false); setUsePhone(false); setLoginNoMatch(null); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 6, cursor: "pointer" }}>Didn't get the text? Use my email instead</button>}
           </div>
         )}
 
