@@ -10742,18 +10742,41 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           </div>
         ) : null;
         if (g.type !== "addon") {
-          // Yes/No choice
+          // Multi-option question (e.g. "Choose your cut" → Standard / Skin fade). Each answer can
+          // carry its own note, extra price, and extra time. Shown on the cut screen before add-ons.
+          const opts = g.options || [];
+          const setOpt = (oi, patch) => setGroup(i, { options: opts.map((x, k) => k === oi ? { ...x, ...patch } : x) });
+          const req = g.required !== false;
           return (
             <div key={i} style={{ ...cardStyle, marginBottom: 12 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <span style={{ fontSize: 10.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Yes / No question</span>
+                <span style={{ fontSize: 10.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Question</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   {reorder}
                   <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", border: "none", color: "#c0392b", flexShrink: 0, display: "flex", padding: 4, cursor: "pointer" }}><Trash2 size={16} /></button>
                 </div>
               </div>
-              <input value={g.label} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="Yes/No question (e.g. Skin fade?)" style={inpStyle} />
-              <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 10, lineHeight: 1.4 }}>Clients answer yes or no while booking.</p>
+              <SectionLbl style={{ margin: "0 2px 8px" }}>Question clients see</SectionLbl>
+              <input value={g.label || ""} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="e.g. Choose your cut" style={{ ...inpStyle, fontWeight: 500 }} />
+              <SectionLbl style={{ margin: "16px 2px 8px" }}>Answers</SectionLbl>
+              {opts.map((o, oi) => (
+                <div key={o.id || oi} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 8, background: "var(--panel)" }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input value={o.label || ""} onChange={(e) => setOpt(oi, { label: e.target.value })} placeholder="Answer (e.g. Skin fade)" style={{ ...inpStyle, fontWeight: 600 }} />
+                    {opts.length > 1 && <button onClick={() => setGroup(i, { options: opts.filter((_, k) => k !== oi) })} style={{ background: "none", border: "none", color: "#c0392b", padding: 4, flexShrink: 0, cursor: "pointer" }}><Trash2 size={15} /></button>}
+                  </div>
+                  <input value={o.desc || ""} onChange={(e) => setOpt(oi, { desc: e.target.value })} placeholder="Short note shown under it (optional)" style={{ ...inpStyle, marginTop: 8, fontSize: 14 }} />
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <div style={{ ...moneyWrap, flex: 1, minWidth: 0 }}><span style={moneyPrefix}>$</span><input type="number" inputMode="decimal" value={o.price ?? ""} onChange={(e) => setOpt(oi, { price: e.target.value === "" ? 0 : Number(e.target.value) })} placeholder="0" style={{ ...moneyInput, minWidth: 0 }} /></div>
+                    <div style={{ ...moneyWrap, flex: 1, minWidth: 0 }}><input type="number" inputMode="numeric" value={o.min ?? ""} onChange={(e) => setOpt(oi, { min: e.target.value === "" ? 0 : Number(e.target.value) })} placeholder="0" style={{ ...moneyInput, minWidth: 0, paddingLeft: 12 }} /><span style={unitSuffix}>min</span></div>
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => setGroup(i, { options: [...opts, { id: "o" + Date.now(), label: "", desc: "", price: 0, min: 0 }] })} style={{ ...addTileStyle, width: "100%", padding: "11px 10px", marginBottom: 10 }}><Plus size={15} /> Add an answer</button>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "12px 0 0", borderTop: "1px solid var(--line)" }}>
+                <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15, fontWeight: 500 }}>Must answer</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>They can't continue until they pick one.</span></span>
+                <span onClick={() => setGroup(i, { required: !req })} style={{ cursor: "pointer" }}>{pillSwitch(req)}</span>
+              </div>
             </div>
           );
         }
