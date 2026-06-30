@@ -10332,6 +10332,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [section, setSection] = useState(null); // legacy section nav (kept for read-only ViewCard "Edit" deep-links; main editor is single-page now)
   const [advancedOpen, setAdvancedOpen] = useState(false); // single-page editor: Advanced expander
   const [tplPick, setTplPick] = useState(false); // new-service: show starter-template picker before the blank form
+  const [shareQ, setShareQ] = useState(null); // { i, sel: {serviceId:bool} } — "use this question on other services" sheet
   const [picker, setPicker] = useState(null); // {target}
   const [stylePriceOpen, setStylePriceOpen] = useState({}); // {providerId: bool} — per-barber "prices per style" expander in Staff & pricing
   const [addonTimeOpen, setAddonTimeOpen] = useState({}); // {providerId: bool} — per-barber "add-on times" expander in Staff & pricing
@@ -10343,6 +10344,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     if (!onBackRef) return;
     let pop = null;
     if (catSheet) pop = () => { setCatSheet(false); return true; };
+    else if (shareQ != null) pop = () => { setShareQ(null); return true; };
     else if (tplPick) pop = () => { setTplPick(false); return true; };
     else if (editing && section === "cutstyles" && editStyleId) pop = () => { setEditStyleId(null); return true; };
     else if (editing && section) pop = () => { setSection(null); return true; };
@@ -10350,7 +10352,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     else if (menuTab !== "services") pop = () => { setMenuTab("services"); return true; };
     onBackRef.current = pop;
     return () => { if (onBackRef) onBackRef.current = null; };
-  }, [editing, section, catSheet, menuTab, editStyleId, tplPick]);
+  }, [editing, section, catSheet, menuTab, editStyleId, tplPick, shareQ]);
   // Always start the cut-styles drill on the list, not a stale style.
   useEffect(() => { if (section !== "cutstyles") setEditStyleId(null); }, [section]);
   const cats = (categories && categories.length) ? categories : ["Services"];
@@ -10850,6 +10852,23 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const setItem = (i, patch) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => idx === i ? { ...x, item: { ...(x.item || {}), ...patch } } : x) }));
   const featureOnly = (i) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => ({ ...x, featured: idx === i ? !x.featured : false })) }));
   const moveGroupTyped = (i, dir) => setForm((f) => { const arr = [...f.addonGroups]; const isQ = arr[i].type !== "addon"; let j = i + dir; while (j >= 0 && j < arr.length && (arr[j].type !== "addon") !== isQ) j += dir; if (j < 0 || j >= arr.length) return f; const t = arr[i]; arr[i] = arr[j]; arr[j] = t; return { ...f, addonGroups: arr }; });
+  // Copy a question (deep clone, fresh ids) into the chosen other services. It's a one-time copy —
+  // each service then owns its own editable version. Skips services that already have a question
+  // with the same label so re-running doesn't pile up duplicates.
+  const copyQuestionToServices = (group, targetIds) => {
+    const fresh = () => { const g = JSON.parse(JSON.stringify(group)); g.id = "q" + Date.now() + Math.floor(Math.random() * 1000); (g.options || []).forEach((o, k) => { o.id = "o" + Date.now() + "_" + k; }); return g; };
+    const lbl = (group.label || "").trim().toLowerCase();
+    let added = 0;
+    setServices((list) => list.map((s) => {
+      if (!targetIds[s.id]) return s;
+      const groups = s.addonGroups || [];
+      if (lbl && groups.some((x) => x.type !== "addon" && (x.label || "").trim().toLowerCase() === lbl)) return s; // already has it
+      added++;
+      return { ...s, addonGroups: [...groups, fresh()] };
+    }));
+    setShareQ(null);
+    showToast(added ? `Added to ${added} service${added > 1 ? "s" : ""}.` : "Those services already have this question.");
+  };
   // Add-ons (type "addon") and Questions (type "choice") are separate sections in the editor but
   // share one addonGroups array. renderGroups filters by kind, keeps the real array index for
   // edits, and reorders only among same-kind neighbours.
@@ -10877,8 +10896,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           const req = g.required !== false;
           // notched money field (matches the Goldie outlined look used across Settings)
           const moneyField = (lbl, prefix, suffix, val, onCh, ph) => (
-            <div style={{ ...G_BOX, flex: 1, minWidth: 0, marginBottom: 0, display: "flex", alignItems: "center" }}>
-              <label style={G_LBL}>{lbl}</label>
+            <div style={{ ...G_BOX_ON("var(--panel2)"), flex: 1, minWidth: 0, marginBottom: 0, display: "flex", alignItems: "center" }}>
+              <label style={G_LBL_ON("var(--panel2)")}>{lbl}</label>
               {prefix && <span style={{ color: "var(--sub)", fontSize: 16, marginRight: 3 }}>{prefix}</span>}
               <input type="number" inputMode={prefix ? "decimal" : "numeric"} value={val ?? ""} onChange={(e) => onCh(e.target.value === "" ? 0 : Number(e.target.value))} placeholder={ph} style={{ ...G_INPUT, minWidth: 0 }} />
               {suffix && <span style={{ color: "var(--sub)", fontSize: 14, marginLeft: 4 }}>{suffix}</span>}
@@ -10894,27 +10913,31 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 </div>
               </div>
               <GField label="Question clients see" value={g.label} onChange={(v) => setGroup(i, { label: v })} placeholder="e.g. Choose your cut" />
-              <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--sub)", fontWeight: 700, margin: "18px 2px 4px" }}>Answers</div>
+              <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--sub)", fontWeight: 700, margin: "20px 2px 12px" }}>Answers</div>
               {opts.map((o, oi) => (
-                <div key={o.id || oi} style={{ padding: "16px 0 18px", borderBottom: "1px solid var(--line)" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                    <span style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Answer {oi + 1}</span>
+                <div key={o.id || oi} style={{ border: "1px solid var(--border)", borderRadius: 16, padding: "12px 14px 16px", marginBottom: 14, background: "var(--panel2)", boxShadow: "var(--shadow-sm)" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                      <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--text)", color: "var(--bg)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{oi + 1}</span>
+                      <span style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--sub)", fontWeight: 700 }}>Answer</span>
+                    </span>
                     {opts.length > 1 && <button onClick={() => setGroup(i, { options: opts.filter((_, k) => k !== oi) })} style={{ background: "none", border: "none", color: "#c0392b", padding: 4, flexShrink: 0, cursor: "pointer", display: "flex" }}><Trash2 size={15} /></button>}
                   </div>
-                  <GField label="Shown to client" value={o.label} onChange={(v) => setOpt(oi, { label: v })} placeholder="e.g. Skin fade" />
-                  <GField label="Note under it (optional)" value={o.desc} onChange={(v) => setOpt(oi, { desc: v })} placeholder="A short line of detail" />
+                  <GField label="Shown to client" value={o.label} onChange={(v) => setOpt(oi, { label: v })} placeholder="e.g. Skin fade" bg="var(--panel2)" />
+                  <GField label="Note under it (optional)" value={o.desc} onChange={(v) => setOpt(oi, { desc: v })} placeholder="A short line of detail" bg="var(--panel2)" />
                   <div style={{ display: "flex", gap: 10 }}>
                     {moneyField("Extra charge", "$", null, o.price, (n) => setOpt(oi, { price: n }), "0")}
                     {moneyField("Extra time", null, "min", o.min, (n) => setOpt(oi, { min: n }), "0")}
                   </div>
                 </div>
               ))}
-              <button onClick={() => setGroup(i, { options: [...opts, { id: "o" + Date.now(), label: "", desc: "", price: 0, min: 0 }] })} style={{ ...addTileStyle, width: "100%", padding: "12px 10px", margin: "16px 0 14px" }}><Plus size={15} /> Add an answer</button>
-              <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, margin: "0 0 14px" }}>Clients don't see these amounts on the question screen — they only change the running total on the add-on page.</p>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "14px 0 0", borderTop: "1px solid var(--line)" }}>
+              <button onClick={() => setGroup(i, { options: [...opts, { id: "o" + Date.now(), label: "", desc: "", price: 0, min: 0 }] })} style={{ ...addTileStyle, width: "100%", padding: "12px 10px", margin: "2px 0 14px" }}><Plus size={15} /> Add an answer</button>
+              <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, margin: "0 0 16px" }}>Clients don't see these amounts on the question screen — they only change the running total on the add-on page.</p>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "14px 0 16px", borderTop: "1px solid var(--line)" }}>
                 <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15, fontWeight: 500 }}>Must answer</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>They can't continue until they pick one.</span></span>
                 <span onClick={() => setGroup(i, { required: !req })} style={{ cursor: "pointer" }}>{pillSwitch(req)}</span>
               </div>
+              <button onClick={() => setShareQ({ i, sel: {} })} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", border: "1.5px solid var(--border)", color: "var(--text)", padding: "12px 14px", fontSize: 14, fontWeight: 600, borderRadius: 12, cursor: "pointer", fontFamily: FONT_BODY, borderTop: "1px solid var(--line)" }}><Copy size={16} /> Use this question on other services</button>
             </div>
           );
         }
@@ -11425,6 +11448,31 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             </div>
           </Sheet>
         )}
+
+        {/* ---- "use this question on other services" picker ---- */}
+        {shareQ != null && (() => {
+          const grp = form.addonGroups[shareQ.i];
+          if (!grp) return null;
+          const others = (services || []).filter((s) => s.id !== form.id);
+          const sel = shareQ.sel || {};
+          const chosen = others.filter((s) => sel[s.id]).length;
+          return (
+            <Sheet open onClose={() => setShareQ(null)} align="bottom" maxWidth={460}>
+              <div style={{ width: 38, height: 5, borderRadius: 9, background: "var(--border2)", margin: "0 auto 14px" }} />
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontWeight: 500, fontSize: 23, letterSpacing: "-0.3px", margin: "0 0 4px" }}>Use on other services</h2>
+              <p style={{ fontSize: 13.5, color: "var(--sub)", margin: "0 0 18px", lineHeight: 1.5 }}>Add a copy of <b style={{ color: "var(--text)" }}>“{grp.label || "this question"}”</b> to the services you pick. Each gets its own copy you can edit or re-price separately.</p>
+              {others.length === 0 ? (
+                <p style={{ fontSize: 14, color: "var(--faint)", margin: "0 0 8px" }}>You don't have any other services yet.</p>
+              ) : others.map((s) => { const on = !!sel[s.id]; return (
+                <button key={s.id} onClick={() => setShareQ((q) => ({ ...q, sel: { ...q.sel, [s.id]: !on } }))} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, background: on ? "color-mix(in srgb, var(--text) 6%, var(--panel))" : "var(--panel)", border: `1.5px solid ${on ? "var(--text)" : "var(--border)"}`, borderRadius: 13, padding: "14px 15px", marginBottom: 10, color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
+                  <span style={{ width: 22, height: 22, borderRadius: 6, border: `1.5px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={14} style={{ color: "var(--bg)" }} strokeWidth={3.5} />}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 15.5, fontWeight: 500 }}>{s.name}{s.archived ? <span style={{ color: "var(--faint)", fontWeight: 400 }}> · archived</span> : ""}</span>
+                </button>
+              ); })}
+              <button disabled={!chosen} onClick={() => copyQuestionToServices(grp, sel)} style={{ width: "100%", marginTop: 8, background: chosen ? "var(--text)" : "var(--panel2)", color: chosen ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 13, padding: 16, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: chosen ? "pointer" : "default" }}>{chosen ? `Add to ${chosen} service${chosen > 1 ? "s" : ""}` : "Pick a service"}</button>
+            </Sheet>
+          );
+        })()}
 
         {/* ---- drill-in sub-screens ---- */}
         {drill ? (
