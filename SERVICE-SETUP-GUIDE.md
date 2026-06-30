@@ -11,9 +11,24 @@ A service uses this flow as soon as it has **a Question on it**. (No question + 
 
 ---
 
-## How to set one up
+## The fast way — start from a template
 
-**Settings → Services & Menu → tap a service (or "New service").**
+**Settings → Services & Menu → "New service".** You'll get a list of ready-made starters so you never build one from a blank screen:
+
+- **Haircut** — a cut with the required "Choose your cut" question (standard vs. an upgrade) and an optional add-on already wired in. The full flow.
+- **Haircut + Beard** — same flow, cut + beard.
+- **Service with a question** — any service plus one required question with two answers. Use it when an answer changes the price or the time you need.
+- **Service with add-ons** — any service plus one optional paid extra.
+- **Basic service** — just name, price, time. No questions, no add-ons.
+- **Start from scratch** — a blank form.
+
+Tap one, and the editor opens already filled in. **Just rename it, set your price, and tweak the wording — then Save.** Everything is editable; the template is only a head start.
+
+---
+
+## How to set one up by hand
+
+**Settings → Services & Menu → "New service" → Start from scratch.**
 
 1. **Basics** — name, price, time, color.
 2. **Description** — write what the cut is, in your own words. This is the "Read this first" block. Keep it short and human. End with something like *"If that's not what you're after, tap Change and pick the one that fits."*

@@ -539,6 +539,90 @@ const DEFAULT_SERVICES = [
   { id: "shave", name: "Straight Razor Shave", category: "Services", price: 30, duration: 30, color: "slate", photo: "photo-1596728325488-58c87691e9af", staff: { dan: { on: true, duration: null, price: null }, heather: { on: false, duration: null, price: null } }, addonGroups: [] },
 ];
 
+// ============================================================
+// SERVICE STARTER TEMPLATES — for brand-new shops.
+// Tapping "New service" offers these one-tap blueprints so an owner who
+// has never set one up gets a fully-wired example (description + a required
+// question and/or an optional add-on) that they just rename and re-price.
+// Each builder returns the editable parts of a service form (name, price,
+// duration, color, description, addonGroups). openNew() merges in a fresh
+// id + staff map. Kept generic (no shop-specific copy) so any business fits.
+// ============================================================
+const SERVICE_TEMPLATES = [
+  {
+    id: "tpl-cut",
+    title: "Haircut",
+    blurb: "A cut with a required “Choose your cut” question (standard vs. an upgrade) and an optional add-on. The full guided flow.",
+    build: () => ({
+      name: "Haircut", price: 40, duration: 45, color: "gold", usesCutStyles: false,
+      booking: { available: true, description: "Tell your clients what this cut is in your own words. Keep it short and human — what they get, who it’s for, and what it isn’t. If that’s not what they’re after, they can tap Change and pick another service." },
+      addonGroups: [
+        { id: "cutchoice", label: "Choose your cut", type: "choice", required: true, options: [
+          { id: "standard", label: "Standard cut", desc: "Your everyday cut.", price: 0, min: 0 },
+          { id: "upgrade", label: "Skin fade or specialty style", desc: "Takes a little longer.", price: 5, min: 10 },
+        ] },
+        { id: "addon1", label: "Add something extra?", type: "addon", item: {
+          name: "Hot towel finish", price: 10, min: 10, desc: "A hot towel and clean line-up to finish.",
+        } },
+      ],
+    }),
+  },
+  {
+    id: "tpl-cutbeard",
+    title: "Haircut + Beard",
+    blurb: "Cut and beard together, with the same required “Choose your cut” question. Rename and re-price to fit your shop.",
+    build: () => ({
+      name: "Haircut + Beard", price: 55, duration: 60, color: "gold", usesCutStyles: false,
+      booking: { available: true, description: "Cut and beard, dialed in together. Say what they get and who it’s for in your own words. If that’s not what they’re after, they can tap Change and pick another service." },
+      addonGroups: [
+        { id: "cutchoice", label: "Choose your cut", type: "choice", required: true, options: [
+          { id: "standard", label: "Standard cut", desc: "Your everyday cut.", price: 0, min: 0 },
+          { id: "upgrade", label: "Skin fade or specialty style", desc: "Takes a little longer.", price: 5, min: 10 },
+        ] },
+      ],
+    }),
+  },
+  {
+    id: "tpl-question",
+    title: "Service with a question",
+    blurb: "Any service plus one required question with two answers. Use this when an answer changes the price or the time you need.",
+    build: () => ({
+      name: "", price: "", duration: "", color: "sage", usesCutStyles: false,
+      booking: { available: true, description: "Describe this service in your own words — what it is and who it’s for." },
+      addonGroups: [
+        { id: "q1", label: "Your question", type: "choice", required: true, options: [
+          { id: "a", label: "First answer", desc: "Add a short note.", price: 0, min: 0 },
+          { id: "b", label: "Second answer", desc: "Add a short note.", price: 0, min: 0 },
+        ] },
+      ],
+    }),
+  },
+  {
+    id: "tpl-addon",
+    title: "Service with add-ons",
+    blurb: "Any service plus one optional paid extra clients can tap to add. No questions.",
+    build: () => ({
+      name: "", price: "", duration: "", color: "clay", usesCutStyles: false,
+      booking: { available: true, description: "Describe this service in your own words — what it is and who it’s for." },
+      addonGroups: [
+        { id: "addon1", label: "Add something extra?", type: "addon", item: {
+          name: "Add-on name", price: 10, min: 10, desc: "What this extra is.",
+        } },
+      ],
+    }),
+  },
+  {
+    id: "tpl-basic",
+    title: "Basic service",
+    blurb: "Just a name, price and time. No questions, no add-ons — clients go straight to picking a time.",
+    build: () => ({
+      name: "", price: "", duration: "", color: "slate", usesCutStyles: false,
+      booking: { available: true, description: "" },
+      addonGroups: [],
+    }),
+  },
+];
+
 const CLIENTS = [
   { id: "c1", name: "Marcus Webb", phone: "503-555-0142", provider: "dan", visits: 14, cadenceDays: 21, lastVisit: (() => { const d = new Date(); d.setDate(d.getDate() - 28); return d.toISOString(); })(), photo: "photo-1500648767791-00dcc994a43e", gallery: [{ id: "g1", photo: "photo-1503951914875-452162b0f3f1", note: "Skin fade #2, scissor top", date: (() => { const d = new Date(); d.setDate(d.getDate() - 28); return d.toISOString(); })() }, { id: "g2", photo: "photo-1605497788044-5a32c7078486", note: "Tighter on the sides this time", date: (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString(); })() }], customDurations: { cut: 35, cutbeard: 50 }, notes: "Skin fade #2 on sides, scissor on top. Black coffee.", messages: [{ from: "client", text: "Running about 5 min late!", time: "11:42 AM" }, { from: "shop", text: "No problem Marcus, see you soon.", time: "11:43 AM" }] },
   { id: "c2", name: "Tariq Allen", phone: "503-555-0188", provider: "dan", visits: 6, cadenceDays: 28, lastVisit: (() => { const d = new Date(); d.setDate(d.getDate() - 10); return d.toISOString(); })(), gallery: [{ id: "g3", photo: "photo-1621607512214-68297480165e", note: "Tight taper + beard line-up", date: (() => { const d = new Date(); d.setDate(d.getDate() - 14); return d.toISOString(); })() }], customDurations: { cut: 45 }, notes: "Tight taper. Prefers minimal small talk.", messages: [] },
@@ -10247,6 +10331,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [editing, setEditing] = useState(null); // service id or "new"
   const [section, setSection] = useState(null); // legacy section nav (kept for read-only ViewCard "Edit" deep-links; main editor is single-page now)
   const [advancedOpen, setAdvancedOpen] = useState(false); // single-page editor: Advanced expander
+  const [tplPick, setTplPick] = useState(false); // new-service: show starter-template picker before the blank form
   const [picker, setPicker] = useState(null); // {target}
   const [stylePriceOpen, setStylePriceOpen] = useState({}); // {providerId: bool} — per-barber "prices per style" expander in Staff & pricing
   const [addonTimeOpen, setAddonTimeOpen] = useState({}); // {providerId: bool} — per-barber "add-on times" expander in Staff & pricing
@@ -10258,13 +10343,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     if (!onBackRef) return;
     let pop = null;
     if (catSheet) pop = () => { setCatSheet(false); return true; };
+    else if (tplPick) pop = () => { setTplPick(false); return true; };
     else if (editing && section === "cutstyles" && editStyleId) pop = () => { setEditStyleId(null); return true; };
     else if (editing && section) pop = () => { setSection(null); return true; };
     else if (editing) pop = () => { setEditing(null); return true; };
     else if (menuTab !== "services") pop = () => { setMenuTab("services"); return true; };
     onBackRef.current = pop;
     return () => { if (onBackRef) onBackRef.current = null; };
-  }, [editing, section, catSheet, menuTab, editStyleId]);
+  }, [editing, section, catSheet, menuTab, editStyleId, tplPick]);
   // Always start the cut-styles drill on the list, not a stale style.
   useEffect(() => { if (section !== "cutstyles") setEditStyleId(null); }, [section]);
   const cats = (categories && categories.length) ? categories : ["Services"];
@@ -10311,7 +10397,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   });
   const setBooking = (patch) => setForm((f) => ({ ...f, booking: { ...(f.booking || defaultBooking()), ...patch } }));
 
-  const openNew = () => { setForm({ ...blank, id: "svc-" + Date.now(), photos: [], staff: defaultStaffMap(), booking: defaultBooking() }); setSection(null); setEditing("new"); };
+  const openNew = () => { setSection(null); setTplPick(true); };
+  // Build a brand-new service form from a starter template (or blank if none).
+  const startFromTemplate = (tpl) => {
+    const seed = tpl ? tpl.build() : {};
+    const f = { ...blank, ...seed, id: "svc-" + Date.now(), photos: [], staff: defaultStaffMap(), booking: { ...defaultBooking(), ...(seed.booking || {}) } };
+    setForm(f); setTplPick(false); setSection(null); setEditing("new");
+  };
   const openEdit = (s) => { const copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; copy.photos = copy.photos || (copy.photo ? [copy.photo] : []); copy.usesCutStyles = (copy.usesCutStyles !== undefined) ? (copy.usesCutStyles !== false) : ((copy.cutTypes || []).length > 0); setForm(copy); setSection(null); setEditing(s.id); };
   const save = () => {
     const priceNum = Number(form.price);
@@ -11277,6 +11369,27 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       <SaveBar />
     </>
   );
+
+  // ---- starter-template picker (brand-new service) ----
+  if (tplPick) {
+    return (
+      <div className="appt-screen" style={{ paddingBottom: 48, textAlign: "left" }}>
+        {backBar("SERVICES", () => setTplPick(false))}
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 600, letterSpacing: "-0.4px", margin: "2px 0 4px" }}>Add a service</h2>
+        <p style={{ fontSize: 14, color: "var(--sub)", margin: "0 0 20px", lineHeight: 1.5 }}>Start from a ready-made example, then just rename it and set your price. You can change everything after.</p>
+        {SERVICE_TEMPLATES.map((tpl) => (
+          <button key={tpl.id} onClick={() => startFromTemplate(tpl)} className="lift" style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1.5px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginBottom: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 16, fontWeight: 600, color: "var(--text)", fontFamily: FONT_BODY }}>{tpl.title}</span>
+              <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 4, lineHeight: 1.45 }}>{tpl.blurb}</span>
+            </span>
+            <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+          </button>
+        ))}
+        <button onClick={() => startFromTemplate(null)} style={{ width: "100%", background: "transparent", border: "1.5px dashed var(--border2)", color: "var(--text)", padding: "14px 16px", fontSize: 14.5, fontWeight: 500, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, marginTop: 8, cursor: "pointer", fontFamily: FONT_BODY }}><Plus size={18} /> Start from scratch</button>
+      </div>
+    );
+  }
 
   // ---- full-page service editor ----
   if (editing) {
