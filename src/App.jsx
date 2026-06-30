@@ -10893,6 +10893,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           // carry its own note, extra price, and extra time. Shown on the cut screen before add-ons.
           const opts = g.options || [];
           const setOpt = (oi, patch) => setGroup(i, { options: opts.map((x, k) => k === oi ? { ...x, ...patch } : x) });
+          const moveOpt = (oi, dir) => { const j = oi + dir; if (j < 0 || j >= opts.length) return; const arr = [...opts]; const t = arr[oi]; arr[oi] = arr[j]; arr[j] = t; setGroup(i, { options: arr }); };
           const req = g.required !== false;
           // notched money field (matches the Goldie outlined look used across Settings)
           const moneyField = (lbl, prefix, suffix, val, onCh, ph) => (
@@ -10921,7 +10922,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                       <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--text)", color: "var(--bg)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{oi + 1}</span>
                       <span style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--sub)", fontWeight: 700 }}>Answer</span>
                     </span>
-                    {opts.length > 1 && <button onClick={() => setGroup(i, { options: opts.filter((_, k) => k !== oi) })} style={{ background: "none", border: "none", color: "#c0392b", padding: 4, flexShrink: 0, cursor: "pointer", display: "flex" }}><Trash2 size={15} /></button>}
+                    <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                      {opts.length > 1 && (
+                        <>
+                          <button onClick={() => moveOpt(oi, -1)} disabled={oi === 0} style={{ background: "none", border: "none", color: oi === 0 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: oi === 0 ? "default" : "pointer", opacity: oi === 0 ? 0.35 : 1, display: "flex" }}><ChevronUp size={18} /></button>
+                          <button onClick={() => moveOpt(oi, 1)} disabled={oi === opts.length - 1} style={{ background: "none", border: "none", color: oi === opts.length - 1 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: oi === opts.length - 1 ? "default" : "pointer", opacity: oi === opts.length - 1 ? 0.35 : 1, display: "flex" }}><ChevronDown size={18} /></button>
+                          <button onClick={() => setGroup(i, { options: opts.filter((_, k) => k !== oi) })} style={{ background: "none", border: "none", color: "#c0392b", padding: 4, cursor: "pointer", display: "flex" }}><Trash2 size={15} /></button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <GField label="Shown to client" value={o.label} onChange={(v) => setOpt(oi, { label: v })} placeholder="e.g. Skin fade" bg="var(--panel2)" />
                   <GField label="Note under it (optional)" value={o.desc} onChange={(v) => setOpt(oi, { desc: v })} placeholder="A short line of detail" bg="var(--panel2)" />
