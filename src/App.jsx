@@ -10414,6 +10414,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [advancedOpen, setAdvancedOpen] = useState(false); // single-page editor: Advanced expander
   const [tplPick, setTplPick] = useState(false); // new-service: show starter-template picker before the blank form
   const [shareQ, setShareQ] = useState(null); // { i, sel: {serviceId:bool} } — "use this question on other services" sheet
+  const [pickAddon, setPickAddon] = useState(false); // "add an add-on from another service" picker sheet
   const [picker, setPicker] = useState(null); // {target}
   const [stylePriceOpen, setStylePriceOpen] = useState({}); // {providerId: bool} — per-barber "prices per style" expander in Staff & pricing
   const [addonTimeOpen, setAddonTimeOpen] = useState({}); // {providerId: bool} — per-barber "add-on times" expander in Staff & pricing
@@ -10425,6 +10426,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     if (!onBackRef) return;
     let pop = null;
     if (catSheet) pop = () => { setCatSheet(false); return true; };
+    else if (pickAddon) pop = () => { setPickAddon(false); return true; };
     else if (shareQ != null) pop = () => { setShareQ(null); return true; };
     else if (tplPick) pop = () => { setTplPick(false); return true; };
     else if (editing && section === "cutstyles" && editStyleId) pop = () => { setEditStyleId(null); return true; };
@@ -10433,7 +10435,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     else if (menuTab !== "services") pop = () => { setMenuTab("services"); return true; };
     onBackRef.current = pop;
     return () => { if (onBackRef) onBackRef.current = null; };
-  }, [editing, section, catSheet, menuTab, editStyleId, tplPick, shareQ]);
+  }, [editing, section, catSheet, menuTab, editStyleId, tplPick, shareQ, pickAddon]);
   // Always start the cut-styles drill on the list, not a stale style.
   useEffect(() => { if (section !== "cutstyles") setEditStyleId(null); }, [section]);
   const cats = (categories && categories.length) ? categories : ["Services"];
@@ -10950,6 +10952,29 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     setShareQ(null);
     showToast(added ? `Added to ${added} service${added > 1 ? "s" : ""}.` : "Those services already have this question.");
   };
+  // Add-ons used on OTHER services — for "add an add-on from another service". Deduped by add-on
+  // name so the same extra (e.g. "Hot Towel") shows once even if it's on several services.
+  const otherAddons = (() => {
+    const seen = new Set(); const out = [];
+    (services || []).forEach((s) => {
+      if (s.id === form.id) return;
+      (s.addonGroups || []).forEach((g) => {
+        if (g.type !== "addon") return;
+        const nm = ((g.item && g.item.name) || g.label || "").trim().toLowerCase();
+        if (!nm || seen.has(nm)) return;
+        seen.add(nm); out.push({ group: g, from: s.name });
+      });
+    });
+    return out;
+  })();
+  // Copy an existing add-on (deep clone, fresh id) onto this service.
+  const addAddonFromOther = (g) => {
+    const copy = JSON.parse(JSON.stringify(g));
+    copy.id = "g" + Date.now() + Math.floor(Math.random() * 1000);
+    setForm((f) => ({ ...f, addonGroups: [...f.addonGroups, copy] }));
+    setPickAddon(false);
+    showToast(`Added "${(g.item && g.item.name) || g.label || "add-on"}".`);
+  };
   // Add-ons (type "addon") and Questions (type "choice") are separate sections in the editor but
   // share one addonGroups array. renderGroups filters by kind, keeps the real array index for
   // edits, and reorders only among same-kind neighbours.
@@ -11101,7 +11126,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         );
       })}
       {kind === "addon"
-        ? <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "addon", photo: "", featured: false, item: { name: "", desc: "", addsPrice: true, price: 5, addsTime: true, min: 10 } }] })} style={{ ...addTileStyle, width: "100%", padding: "14px 10px" }}><Plus size={17} /> Add an add-on</button>
+        ? <>
+            <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "addon", photo: "", featured: false, item: { name: "", desc: "", addsPrice: true, price: 5, addsTime: true, min: 10 } }] })} style={{ ...addTileStyle, width: "100%", padding: "14px 10px" }}><Plus size={17} /> Add an add-on</button>
+            {otherAddons.length > 0 && <button onClick={() => setPickAddon(true)} style={{ ...addTileStyle, width: "100%", padding: "12px 10px", marginTop: 10, borderStyle: "solid", fontSize: 14 }}><Copy size={16} /> Add from another service</button>}
+          </>
         : <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "choice", photo: "", options: [{ id: "yes", label: "Yes", price: 5, min: 0 }, { id: "no", label: "No", price: 0, min: 0 }] }] })} style={{ ...addTileStyle, width: "100%", padding: "14px 10px" }}><Plus size={17} /> Add a question</button>}
     </>
     );
@@ -11563,6 +11591,26 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             </Sheet>
           );
         })()}
+
+        {/* ---- "add an add-on from another service" picker ---- */}
+        {pickAddon && (
+          <Sheet open onClose={() => setPickAddon(false)} align="bottom" maxWidth={460}>
+            <div style={{ width: 38, height: 5, borderRadius: 9, background: "var(--border2)", margin: "0 auto 14px" }} />
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontWeight: 500, fontSize: 23, letterSpacing: "-0.3px", margin: "0 0 4px" }}>Add from another service</h2>
+            <p style={{ fontSize: 13.5, color: "var(--sub)", margin: "0 0 18px", lineHeight: 1.5 }}>Tap an add-on you already use elsewhere to drop a copy onto this service. You can edit or re-price it after.</p>
+            {otherAddons.length === 0 ? (
+              <p style={{ fontSize: 14, color: "var(--faint)", margin: "0 0 8px" }}>No add-ons on your other services yet.</p>
+            ) : otherAddons.map(({ group: g, from }, i) => { const it = g.item || {}; return (
+              <button key={(it.name || g.label || "") + i} onClick={() => addAddonFromOther(g)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, background: "var(--panel)", border: "1.5px solid var(--border)", borderRadius: 13, padding: "14px 15px", marginBottom: 10, color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 15.5, fontWeight: 600 }}>{it.name || g.label || "Add-on"}</span>
+                  <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>{it.addsPrice !== false && it.price ? `+$${it.price}` : ""}{it.addsTime !== false && it.min ? `${it.price ? " · " : ""}+${it.min} min` : ""} · from {from}</span>
+                </span>
+                <Plus size={18} style={{ color: "var(--text)", flexShrink: 0 }} />
+              </button>
+            ); })}
+          </Sheet>
+        )}
 
         {/* ---- drill-in sub-screens ---- */}
         {drill ? (
