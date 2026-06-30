@@ -16332,19 +16332,27 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const cancel = () => { editorBack.current = null; setForm(business); setOpenCard(null); };
   const goBack = () => { if (editorBack.current && editorBack.current()) return; cancel(); };
 
+  // Goldie-clean outlined field: a notched floating label over a rounded outline. The notch
+  // background is var(--panel) to match the card wrapper these render inside. ALL-CAPS call-site
+  // labels are softened to sentence case so the floating label reads cleanly.
+  const gFldBox = { position: "relative", border: "1.5px solid var(--border)", borderRadius: 15, padding: "18px 16px 13px", marginBottom: 14, background: "var(--panel)" };
+  const gFldLbl = { position: "absolute", top: -8, left: 13, background: "var(--panel)", padding: "0 6px", fontSize: 12, color: "var(--sub)", fontWeight: 500, fontFamily: FONT_BODY };
+  const gFldInput = { width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: 0, color: "var(--text)", fontSize: 17, fontWeight: 500, fontFamily: FONT_BODY };
+  const niceLabel = (s) => (s == null ? "" : (() => { const t = String(s); return /[a-z]/.test(t) ? t : (t.charAt(0) + t.slice(1).toLowerCase()); })());
+
   const field = (label, key, multiline) => (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 11.5, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600, marginBottom: 8 }}>{label}</div>
+    <div style={gFldBox}>
+      <label style={gFldLbl}>{niceLabel(label)}</label>
       {multiline
-        ? <textarea value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} rows={5} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
-        : <input value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} style={inputStyle} />}
+        ? <textarea value={form[key] || ""} onChange={(e) => setForm({ ...form, [key]: e.target.value })} rows={4} style={{ ...gFldInput, resize: "vertical", lineHeight: 1.5, minHeight: 52 }} />
+        : <input value={form[key] || ""} onChange={(e) => setForm({ ...form, [key]: e.target.value })} style={gFldInput} />}
     </div>
   );
 
   const bword = (label, key, placeholder) => (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 11.5, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600, marginBottom: 8 }}>{label}</div>
-      <input value={(form.bookingStep && form.bookingStep[key]) || ""} placeholder={placeholder || ""} onChange={(e) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), [key]: e.target.value } })} style={inputStyle} />
+    <div style={gFldBox}>
+      <label style={gFldLbl}>{niceLabel(label)}</label>
+      <input value={(form.bookingStep && form.bookingStep[key]) || ""} placeholder={placeholder || ""} onChange={(e) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), [key]: e.target.value } })} style={gFldInput} />
     </div>
   );
 
