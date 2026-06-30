@@ -10606,15 +10606,24 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const setGroup = (i, patch) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => idx === i ? { ...x, ...patch } : x) }));
   const setItem = (i, patch) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => idx === i ? { ...x, item: { ...(x.item || {}), ...patch } } : x) }));
   const featureOnly = (i) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => ({ ...x, featured: idx === i ? !x.featured : false })) }));
-  const moveGroup = (i, dir) => setForm((f) => { const arr = [...f.addonGroups]; const j = i + dir; if (j < 0 || j >= arr.length) return f; const t = arr[i]; arr[i] = arr[j]; arr[j] = t; return { ...f, addonGroups: arr }; });
-  const customizationsBody = (
+  const moveGroupTyped = (i, dir) => setForm((f) => { const arr = [...f.addonGroups]; const isQ = arr[i].type !== "addon"; let j = i + dir; while (j >= 0 && j < arr.length && (arr[j].type !== "addon") !== isQ) j += dir; if (j < 0 || j >= arr.length) return f; const t = arr[i]; arr[i] = arr[j]; arr[j] = t; return { ...f, addonGroups: arr }; });
+  // Add-ons (type "addon") and Questions (type "choice") are separate sections in the editor but
+  // share one addonGroups array. renderGroups filters by kind, keeps the real array index for
+  // edits, and reorders only among same-kind neighbours.
+  const renderGroups = (kind) => {
+    const matches = (g) => kind === "addon" ? g.type === "addon" : g.type !== "addon";
+    const count = form.addonGroups.filter(matches).length;
+    return (
     <>
-      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>Extras and questions clients see while booking, shown in the order below — use the arrows to reorder. Each one can add price, time, or both.</p>
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>{kind === "addon" ? "Paid extras clients can add while booking — each can add price, time, or both. Shown in the order below." : "Quick questions clients answer while booking (e.g. “Skin fade?”). Shown in the order below."}</p>
       {form.addonGroups.map((g, i) => {
-        const reorder = form.addonGroups.length > 1 ? (
+        if (!matches(g)) return null;
+        const hasPrev = form.addonGroups.some((x, k) => k < i && matches(x));
+        const hasNext = form.addonGroups.some((x, k) => k > i && matches(x));
+        const reorder = count > 1 ? (
           <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-            <button onClick={() => moveGroup(i, -1)} disabled={i === 0} style={{ background: "none", border: "none", color: i === 0 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: i === 0 ? "default" : "pointer", opacity: i === 0 ? 0.35 : 1 }}><ChevronUp size={18} /></button>
-            <button onClick={() => moveGroup(i, 1)} disabled={i === form.addonGroups.length - 1} style={{ background: "none", border: "none", color: i === form.addonGroups.length - 1 ? "var(--faint)" : "var(--sub)", padding: 4, cursor: i === form.addonGroups.length - 1 ? "default" : "pointer", opacity: i === form.addonGroups.length - 1 ? 0.35 : 1 }}><ChevronDown size={18} /></button>
+            <button onClick={() => moveGroupTyped(i, -1)} disabled={!hasPrev} style={{ background: "none", border: "none", color: !hasPrev ? "var(--faint)" : "var(--sub)", padding: 4, cursor: !hasPrev ? "default" : "pointer", opacity: !hasPrev ? 0.35 : 1 }}><ChevronUp size={18} /></button>
+            <button onClick={() => moveGroupTyped(i, 1)} disabled={!hasNext} style={{ background: "none", border: "none", color: !hasNext ? "var(--faint)" : "var(--sub)", padding: 4, cursor: !hasNext ? "default" : "pointer", opacity: !hasNext ? 0.35 : 1 }}><ChevronDown size={18} /></button>
           </div>
         ) : null;
         if (g.type !== "addon") {
@@ -10702,12 +10711,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           </div>
         );
       })}
-      <div style={{ display: "flex", gap: 10, marginBottom: 4 }}>
-        <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "choice", photo: "", options: [{ id: "yes", label: "Yes", price: 5, min: 0 }, { id: "no", label: "No", price: 0, min: 0 }] }] })} style={{ ...addTileStyle, flex: 1, padding: "13px 10px" }}><Plus size={17} /> Question</button>
-        <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "addon", photo: "", featured: false, item: { name: "", desc: "", addsPrice: true, price: 5, addsTime: true, min: 10 } }] })} style={{ ...addTileStyle, flex: 1, padding: "13px 10px" }}><Plus size={17} /> Add-on</button>
-      </div>
+      {kind === "addon"
+        ? <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "addon", photo: "", featured: false, item: { name: "", desc: "", addsPrice: true, price: 5, addsTime: true, min: 10 } }] })} style={{ ...addTileStyle, width: "100%", padding: "14px 10px" }}><Plus size={17} /> Add an add-on</button>
+        : <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "choice", photo: "", options: [{ id: "yes", label: "Yes", price: 5, min: 0 }, { id: "no", label: "No", price: 0, min: 0 }] }] })} style={{ ...addTileStyle, width: "100%", padding: "14px 10px" }}><Plus size={17} /> Add a question</button>}
     </>
-  );
+    );
+  };
+  const addonsBody = renderGroups("addon");
+  const questionsBody = renderGroups("choice");
 
   // ---- ONLINE BOOKING section ----
   const b = form.booking || defaultBooking();
@@ -10994,6 +11005,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // Whether this service uses cut styles. undefined (legacy) → ON if it already has styles.
   const usesCutStyles = (form.usesCutStyles !== undefined) ? (form.usesCutStyles !== false) : (cutCount > 0);
   const addonCount = (form.addonGroups || []).length;
+  const addonOnlyCount = (form.addonGroups || []).filter((g) => g && g.type === "addon").length;
+  const questionCount = (form.addonGroups || []).filter((g) => g && g.type !== "addon").length;
   const offeringCount = staffList.filter((p) => form.staff[p.id]?.on !== false).length;
   const anyStaffOverride = staffList.some((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); });
   const photoCount = photos.length;
@@ -11057,12 +11070,22 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     );
   })();
 
-  // ---- drill-in: ADD-ONS & QUESTIONS (rebuilt header, reuse customizationsBody) ----
+  // ---- drill-in: ADD-ONS (paid extras only) ----
   const addonsScreen = (
     <>
       {backBar((form.name || "SERVICE").toUpperCase(), () => setSection(null))}
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Add-ons &amp; questions</h2>
-      {customizationsBody}
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Add-ons</h2>
+      {addonsBody}
+      <SaveBar />
+    </>
+  );
+
+  // ---- drill-in: QUESTIONS (booking questions only — separate from add-ons) ----
+  const questionsScreen = (
+    <>
+      {backBar((form.name || "SERVICE").toUpperCase(), () => setSection(null))}
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Questions</h2>
+      {questionsBody}
       <SaveBar />
     </>
   );
@@ -11079,7 +11102,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
   // ---- full-page service editor ----
   if (editing) {
-    const drill = section === "cutstyles" || section === "addons" || section === "staff" || section === "photos" || section === "timerules" || section === "booking";
+    const drill = section === "cutstyles" || section === "addons" || section === "questions" || section === "staff" || section === "photos" || section === "timerules" || section === "booking";
     return (
       <div className="appt-screen" style={{ paddingBottom: 40, textAlign: "left" }}>
         {picker && <PhotoPicker onClose={() => setPicker(null)} onPick={(id) => {
@@ -11107,6 +11130,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           section === "photos" ? photosScreen
             : section === "cutstyles" ? cutstylesScreen
             : section === "addons" ? addonsScreen
+            : section === "questions" ? questionsScreen
             : section === "timerules" ? timeRulesSection
             : section === "booking" ? bookingSection
             : staffScreen
@@ -11194,7 +11218,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   </span>
                   <Toggle on={live} onClick={() => setBooking({ available: live === false })} />
                 </div>
-                <DrillRow icon={<Plus size={18} />} label="Add-ons & questions" sub={addonCount ? `${addonCount} added` : "None yet"} target="addons" />
+                <DrillRow icon={<Plus size={18} />} label="Add-ons" sub={addonOnlyCount ? `${addonOnlyCount} added` : "None yet"} target="addons" />
+                <DrillRow icon={<HelpCircle size={18} />} label="Questions" sub={questionCount ? `${questionCount} added` : "None yet"} target="questions" />
                 <DrillRow icon={<Users size={18} />} label="Staff & pricing" sub={anyStaffOverride ? `${staffList.filter((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); }).length} custom` : `${offeringCount === staffList.length ? "All staff" : offeringCount + " of " + staffList.length} · default`} target="staff" />
                 <DrillRow icon={<ImageIcon size={18} />} label="Photos" sub={photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "None yet"} target="photos" />
                 <DrillRow icon={<Clock size={18} />} label="Hours & pricing" sub={(form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Always available · standard price"} target="timerules" />
