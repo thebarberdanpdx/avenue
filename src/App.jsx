@@ -1207,6 +1207,29 @@ const apptDisplayName = (a, clients = []) => {
 };
 const inputStyle = { width: "100%", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY };
 
+// ---- Goldie-clean settings form kit (shared across every settings editor) ----
+// Outlined field with a notched floating label. The label's notch background must match
+// whatever sits behind the field — default var(--panel); pass G_LBL_ON("var(--panel2)") when
+// a field sits inside a panel2 card. G_SEC = left-aligned bold section header. G_HINT = muted help text.
+const G_BOX = { position: "relative", border: "1.5px solid var(--border)", borderRadius: 14, padding: "17px 15px 12px", marginBottom: 13, background: "var(--panel)" };
+const G_BOX_ON = (bg) => ({ ...G_BOX, background: bg });
+const G_LBL = { position: "absolute", top: -8, left: 12, background: "var(--panel)", padding: "0 6px", fontSize: 11.5, color: "var(--sub)", fontWeight: 500, fontFamily: FONT_BODY };
+const G_LBL_ON = (bg) => ({ ...G_LBL, background: bg });
+const G_INPUT = { width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: 0, color: "var(--text)", fontSize: 16.5, fontWeight: 500, fontFamily: FONT_BODY };
+const G_SEC = { fontSize: 18, fontWeight: 700, letterSpacing: "-0.3px", margin: "22px 0 12px", fontFamily: FONT_DISPLAY };
+const G_HINT = { fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 };
+// Goldie-clean outlined field component for editors that take (value,onChange).
+function GField({ label, value, onChange, placeholder, multiline, bg, inputMode, type, rows = 4 }) {
+  return (
+    <div style={bg ? G_BOX_ON(bg) : G_BOX}>
+      <label style={bg ? G_LBL_ON(bg) : G_LBL}>{label}</label>
+      {multiline
+        ? <textarea value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{ ...G_INPUT, resize: "vertical", lineHeight: 1.5, minHeight: 50 }} />
+        : <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} inputMode={inputMode} type={type} style={G_INPUT} />}
+    </div>
+  );
+}
+
 // ============================================================
 // ============================================================================
 // STAFF LOGIN — magic-link sign-in for the dashboard ONLY. Clients never see this.
@@ -12480,14 +12503,20 @@ function PhoneNumbersEditor({ phones, onChange }) {
   const removePhone = (id) => onChange(list.filter((p) => p.id !== id));
   return (
     <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>Numbers clients can reach you at. Label them however you like (Main, Booking, Texts).</p>
+      <p style={G_HINT}>Numbers clients can reach you at. Label them however you like (Main, Booking, Texts).</p>
       {list.map((p) => (
         <div key={p.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 14, marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <input value={p.label} onChange={(e) => setPhone(p.id, { label: e.target.value })} placeholder="Label (e.g. Main)" style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 14, letterSpacing: 1, fontFamily: FONT_BODY, fontWeight: 600 }} />
-            <button onClick={() => removePhone(p.id)} style={{ background: "none", color: "var(--faint)" }}><Trash2 size={16} /></button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11 }}>
+            <div style={{ ...G_BOX_ON("var(--panel2)"), flex: 1, marginBottom: 0 }}>
+              <label style={G_LBL_ON("var(--panel2)")}>Label</label>
+              <input value={p.label} onChange={(e) => setPhone(p.id, { label: e.target.value })} placeholder="Main" style={G_INPUT} />
+            </div>
+            <button onClick={() => removePhone(p.id)} style={{ background: "none", color: "var(--faint)", padding: "0 4px" }}><Trash2 size={18} /></button>
           </div>
-          <input value={p.number} onChange={(e) => setPhone(p.id, { number: formatPhone(e.target.value) })} inputMode="tel" placeholder="(555) 000-0000" style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+          <div style={{ ...G_BOX_ON("var(--panel2)"), marginBottom: 0 }}>
+            <label style={G_LBL_ON("var(--panel2)")}>Number</label>
+            <input value={p.number} onChange={(e) => setPhone(p.id, { number: formatPhone(e.target.value) })} inputMode="tel" placeholder="(555) 000-0000" style={G_INPUT} />
+          </div>
         </div>
       ))}
       <button className="lift" onClick={addPhone} style={{ width: "100%", background: "transparent", boxShadow: "none", border: "1px dashed var(--border2)", color: "var(--gold)", borderRadius: 12, padding: 14, fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Plus size={16} /> Add phone number</button>
@@ -16332,19 +16361,27 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const cancel = () => { editorBack.current = null; setForm(business); setOpenCard(null); };
   const goBack = () => { if (editorBack.current && editorBack.current()) return; cancel(); };
 
+  // Goldie-clean outlined field: a notched floating label over a rounded outline. The notch
+  // background is var(--panel) to match the card wrapper these render inside. ALL-CAPS call-site
+  // labels are softened to sentence case so the floating label reads cleanly.
+  const gFldBox = { position: "relative", border: "1.5px solid var(--border)", borderRadius: 15, padding: "18px 16px 13px", marginBottom: 14, background: "var(--panel)" };
+  const gFldLbl = { position: "absolute", top: -8, left: 13, background: "var(--panel)", padding: "0 6px", fontSize: 12, color: "var(--sub)", fontWeight: 500, fontFamily: FONT_BODY };
+  const gFldInput = { width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: 0, color: "var(--text)", fontSize: 17, fontWeight: 500, fontFamily: FONT_BODY };
+  const niceLabel = (s) => (s == null ? "" : (() => { const t = String(s); return /[a-z]/.test(t) ? t : (t.charAt(0) + t.slice(1).toLowerCase()); })());
+
   const field = (label, key, multiline) => (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 11.5, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600, marginBottom: 8 }}>{label}</div>
+    <div style={gFldBox}>
+      <label style={gFldLbl}>{niceLabel(label)}</label>
       {multiline
-        ? <textarea value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} rows={5} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
-        : <input value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} style={inputStyle} />}
+        ? <textarea value={form[key] || ""} onChange={(e) => setForm({ ...form, [key]: e.target.value })} rows={4} style={{ ...gFldInput, resize: "vertical", lineHeight: 1.5, minHeight: 52 }} />
+        : <input value={form[key] || ""} onChange={(e) => setForm({ ...form, [key]: e.target.value })} style={gFldInput} />}
     </div>
   );
 
   const bword = (label, key, placeholder) => (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 11.5, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600, marginBottom: 8 }}>{label}</div>
-      <input value={(form.bookingStep && form.bookingStep[key]) || ""} placeholder={placeholder || ""} onChange={(e) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), [key]: e.target.value } })} style={inputStyle} />
+    <div style={gFldBox}>
+      <label style={gFldLbl}>{niceLabel(label)}</label>
+      <input value={(form.bookingStep && form.bookingStep[key]) || ""} placeholder={placeholder || ""} onChange={(e) => setForm({ ...form, bookingStep: { ...(form.bookingStep || {}), [key]: e.target.value } })} style={gFldInput} />
     </div>
   );
 
@@ -16872,14 +16909,14 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   if (active) {
     const Icon = active.icon;
     return (
-      <div className="appt-screen" style={{ width: "100%", padding: "16px 6px 40px" }}>
-        <button onClick={goBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 400, marginBottom: 26, padding: 0, letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> {(() => { const c = CATS.find((x) => x.id === openCat); return c ? c.label : "Settings"; })()}</button>
-        <div style={{ marginBottom: 30 }}>
+      <div className="appt-screen" style={{ width: "100%", padding: "16px 6px 40px", textAlign: "left" }}>
+        <button onClick={goBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 400, marginBottom: 16, padding: 0, letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> {(() => { const c = CATS.find((x) => x.id === openCat); return c ? c.label : "Settings"; })()}</button>
+        <div style={{ marginBottom: 22 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.6px" }}>{active.title}</h2>
-            {active.smart && <span style={{ fontFamily: "'Fraunces', serif", fontSize: 12, fontStyle: "italic", letterSpacing: "0.2px", color: "var(--faint)" }}>learns</span>}
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 600, lineHeight: 1.12, letterSpacing: "-0.4px", margin: 0 }}>{active.title}</h2>
+            {active.smart && <span style={{ fontFamily: FONT_DISPLAY, fontSize: 12, fontStyle: "italic", letterSpacing: "0.2px", color: "var(--faint)" }}>learns</span>}
           </div>
-          {(active.subtitle || active.status) && <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{active.subtitle || active.status}</div>}
+          {(active.subtitle || active.status) && <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 400, marginTop: 5, lineHeight: 1.4 }}>{active.subtitle || active.status}</div>}
         </div>
 
         {active.fullBleed
@@ -16944,12 +16981,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   };
 
   return (
-    <div className="fade-up" style={{ width: "100%", padding: "12px 6px" }}>
+    <div className="fade-up" style={{ width: "100%", padding: "12px 6px", textAlign: "left" }}>
       {/* Masthead + search — only on the Settings home, not on a drilled-in sub-page */}
       {!openCat && !openGroup && (<>
-      <div style={{ marginBottom: 22, paddingTop: 8 }}>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 40, fontWeight: 400, lineHeight: 0.98, letterSpacing: "-0.8px" }}>Settings</h2>
-        <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 13 }}>Your shop, your booking, your day</div>
+      <div style={{ marginBottom: 20, paddingTop: 8 }}>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, lineHeight: 1.1, letterSpacing: "-0.5px", margin: 0 }}>Settings</h2>
+        <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 400, marginTop: 5, lineHeight: 1.4 }}>Your shop, your booking, your day</div>
       </div>
 
       <div style={{ position: "relative", marginBottom: 12 }}>
@@ -17051,11 +17088,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         </div>
       ) : openGroup ? (
         // GROUP SCREEN — a collapsed group's settings on their own focused screen
-        <div className="appt-screen">
-          <button onClick={() => setOpenGroup(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 400, marginBottom: 26, padding: 0, border: "none", letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> {openGroup.catLabel}</button>
-          <div style={{ marginBottom: 30 }}>
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 0.98 }}>{openGroup.label}</h2>
-            {openGroup.desc && <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{openGroup.desc}</div>}
+        <div className="appt-screen" style={{ textAlign: "left" }}>
+          <button onClick={() => setOpenGroup(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 400, marginBottom: 16, padding: 0, border: "none", letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> {openGroup.catLabel}</button>
+          <div style={{ marginBottom: 22 }}>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 600, letterSpacing: "-0.4px", lineHeight: 1.12, margin: 0 }}>{openGroup.label}</h2>
+            {openGroup.desc && <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 400, marginTop: 5, lineHeight: 1.4 }}>{openGroup.desc}</div>}
           </div>
           <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
             {openGroup.ids.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean).map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
@@ -17067,11 +17104,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           const cat = CATS.find((c) => c.id === openCat);
           const catCards = cat.settings.map((sid) => cards.find((c) => c.id === sid)).filter(Boolean);
           return (
-            <div className="appt-screen">
-              <button onClick={() => setOpenCat(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 400, marginBottom: 26, padding: 0, border: "none", letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> Settings</button>
-              <div style={{ marginBottom: 30 }}>
-                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 0.98 }}>{cat.label}</h2>
-                <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{cat.desc}</div>
+            <div className="appt-screen" style={{ textAlign: "left" }}>
+              <button onClick={() => setOpenCat(null)} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 400, marginBottom: 16, padding: 0, border: "none", letterSpacing: "0.2px" }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300 }}>‹</span> Settings</button>
+              <div style={{ marginBottom: 22 }}>
+                <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 600, letterSpacing: "-0.4px", lineHeight: 1.12, margin: 0 }}>{cat.label}</h2>
+                <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 400, marginTop: 5, lineHeight: 1.4 }}>{cat.desc}</div>
               </div>
               {cat.groups ? (
                 cat.groups.map((g) => {
