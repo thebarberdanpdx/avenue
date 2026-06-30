@@ -522,20 +522,17 @@ const DEFAULT_SERVICES = [
   {
     id: "cutbeard", name: "Haircut + Beard", category: "Services", price: 58, duration: 60, color: "gold", photo: "photo-1621607512214-68297480165e",
     staff: { dan: { on: true, duration: 50, price: null }, heather: { on: true, duration: 60, price: null } },
-    cutTypes: [
-      { id: "standard", label: "Standard Haircut", desc: "Sides and back have at least SOME hair visible all the way down — even very short stubble or fuzz counts. This is the right pick if you can see hair anywhere on the sides, even faded down close. Includes any taper, low fade, mid fade, or high fade where some hair remains at the bottom edge. The DEFAULT pick unless truly bald scalp is visible. Beard is shaped to match.", price: 58, min: 0, images: ["photo-1503951914875-452162b0f3f1", "photo-1622286342621-4bd786c2447c"] },
-      { id: "skinfade", label: "Skin Fade", desc: "ONLY pick this if the bottom of the sides/back is shaved COMPLETELY BALD with zero hair — no stubble, no fuzz, just smooth bare scalp like a clean shave. If you can see ANY hair stubble or short fuzz at the bottom edge, it is NOT a skin fade — pick Standard Haircut instead. When in doubt, do not pick this one. Beard is shaped to match.", price: 63, min: 5, images: ["photo-1605497788044-5a32c7078486", "photo-1599351431202-1e0f0137899a"] },
-      { id: "scissor", label: "Precision Scissor Cut", desc: "Hair is cut with scissors ONLY — no clippers used anywhere. No fading, no tapering, no buzzed sections. Sides have similar density to the top, just scissor-shaped shorter. Beard is shaped naturally.", price: 61, min: 5, images: ["photo-1621607512214-68297480165e", "photo-1503951914875-452162b0f3f1"] },
-    ],
+    usesCutStyles: false,
+    booking: { available: true, description: "Your cut and your beard, dialed in together. We keep some length and clean up the sides without going down to bare skin, then shape the beard to match. Best for keeping your usual look sharp, not a big change. If that is not what you are after, tap Change and pick the one that fits." },
     addonGroups: [
-      { id: "hottowel", label: "Hot Towel / Straight Razor Finish", type: "addon", photo: "photo-1493256338651-d82f7acb2b38", item: {
-        name: "Hot Towel & Straight Razor", price: 5, min: 10,
-        desc: "A hot towel treatment finished with a straight-razor line-up.",
+      { id: "cutchoice", label: "Choose your cut", type: "choice", required: true, options: [
+        { id: "standard", label: "Standard cut", desc: "Some length kept, nothing taken down to the skin.", price: 0, min: 0 },
+        { id: "skinfade", label: "Skin fade or specialty style", desc: "Faded down close to the skin.", price: 5, min: 10 },
+      ] },
+      { id: "hottowel", label: "Hot towel finish?", type: "addon", photo: "photo-1493256338651-d82f7acb2b38", item: {
+        name: "Hot Towel & Straight Razor", price: 10, min: 10,
+        desc: "A hot towel treatment finished with a straight-razor line up.",
       }},
-    ],
-    beardTypes: [
-      { id: "standard", label: "Standard beard", desc: "Full or short, kept neat.", min: 0, images: ["photo-1517832606299-7ae9b720a186"] },
-      { id: "big", label: "Big beard", desc: "Long, needs shaping — a little more time.", min: 10, images: ["photo-1522556189639-b150ed9c4330"] },
     ],
   },
   { id: "beard", name: "Beard Trim", category: "Services", price: 35, duration: 30, color: "clay", photo: "photo-1517832606299-7ae9b720a186", staff: { dan: { on: true, duration: null, price: null }, heather: { on: true, duration: null, price: null } }, addonGroups: [] },
@@ -1175,6 +1172,42 @@ const splitCutStyleServices = (list) => {
     });
     out.push({ ...s, archived: true }); // keep the original (archived) so old appointments still resolve
   });
+  return out;
+};
+// One-time consolidation onto the "Haircut + Choose-your-cut question" model (replaces the earlier
+// split-into-separate-services experiment, which Dan reversed). Removes the split-created child
+// services (ids like cut_skinfade_xyz) and (re)builds clean "Haircut" + "Haircut + Beard" services
+// that use the new two-screen flow: a required "Choose your cut" question (Standard / Skin fade) plus
+// the existing add-ons and a friendly description. Idempotent — once consolidated (no split children,
+// no cutTypes on the base services) it returns the same list and never touches a hand-edited menu.
+const CONSOLIDATE_CUT_DESC = "Your regular cut. We keep some length and clean up the sides without going down to bare skin. It is about keeping you looking your best, not a big change or trying something new. If that is not what you are after, tap Change and pick the one that fits.";
+const consolidateHaircutMenu = (list) => {
+  if (!Array.isArray(list) || !list.length) return list;
+  const isSplitChild = (s) => s && /^cut(beard)?_[^_]+_[a-z0-9]+$/i.test(String(s.id || ""));
+  const hasSplitChildren = list.some(isSplitChild);
+  const baseNeedsConvert = list.some((s) => s && (s.id === "cut" || s.id === "cutbeard") && (s.cutTypes || []).length > 0);
+  if (!hasSplitChildren && !baseNeedsConvert) return list; // already on the new model — leave it alone
+  const cutQuestion = () => ({ id: "cutchoice", label: "Choose your cut", type: "choice", required: true, options: [
+    { id: "standard", label: "Standard cut", desc: "Some length kept, nothing taken down to the skin.", price: 0, min: 0 },
+    { id: "skinfade", label: "Skin fade or specialty style", desc: "Faded down close to the skin.", price: 5, min: 10 },
+  ] });
+  const facial = { id: "facial", label: "Want a facial?", type: "addon", photo: "photo-1570172619644-dfd03ed5d881", item: { name: "The Gentleman's Facial", price: 30, min: 20, desc: "Steam, deep cleansing, exfoliation, and hydration, finished with a 24K Gold Collagen mask." } };
+  const hottowel = { id: "hottowel", label: "Hot towel finish?", type: "addon", photo: "photo-1493256338651-d82f7acb2b38", item: { name: "Hot Towel & Straight Razor", price: 10, min: 10, desc: "A hot towel treatment finished with a straight-razor line up." } };
+  const build = (id, name, price, dur, color, extras) => {
+    const base = list.find((s) => s.id === id) || { id, name, category: "Services", price, duration: dur, color, photo: "", staff: { dan: { on: true, duration: null, price: null } } };
+    const out = { ...base, name: base.name || name, category: base.category || "Services", price: base.price || price, duration: base.duration || dur, color: base.color || color, archived: false, usesCutStyles: false, booking: { ...(base.booking || {}), available: true, description: (base.booking && base.booking.description) || CONSOLIDATE_CUT_DESC }, addonGroups: [cutQuestion(), ...extras] };
+    delete out.cutTypes; delete out.beardTypes;
+    return out;
+  };
+  const newCut = build("cut", "Haircut", 42, 45, "gold", [facial]);
+  const newCutBeard = build("cutbeard", "Haircut + Beard", 58, 60, "gold", [hottowel]);
+  const out = []; let inserted = false;
+  list.forEach((s) => {
+    if (isSplitChild(s)) return;                       // drop the split-created junk
+    if (s.id === "cut" || s.id === "cutbeard") { if (!inserted) { out.push(newCut, newCutBeard); inserted = true; } return; }
+    out.push(s);
+  });
+  if (!inserted) out.unshift(newCut, newCutBeard);
   return out;
 };
 // Time-of-day pricing: apply the first matching priced rule for a service at a given
@@ -1833,13 +1866,13 @@ function App() {
           return s;
         });
         setCutLibrary(lib);
-        // Finish the move off cut styles: auto-split any remaining cut-style service into its own
-        // standalone services (one per cut), archiving the original. Non-destructive + idempotent.
-        const splitSvc = splitCutStyleServices(linkedSvc);
-        const didSplit = splitSvc !== linkedSvc;
-        // Persist when services were loaded AND linkage or the split changed something. We deliberately
-        // leave lastRemoteRef.services as the pre-change array so the save effect sees a diff and writes once.
-        if ((linkChanged || didSplit) && sv && sv.length) setServices(splitSvc);
+        // Consolidate onto the "Haircut + Choose-your-cut question" model: remove the earlier
+        // split-created services and (re)build clean Haircut / Haircut + Beard. Idempotent.
+        const consolidated = consolidateHaircutMenu(linkedSvc);
+        const didConsolidate = consolidated !== linkedSvc;
+        // Persist when services were loaded AND linkage or the consolidation changed something. We
+        // leave lastRemoteRef.services as the pre-change array so the save effect writes once.
+        if ((linkChanged || didConsolidate) && sv && sv.length) setServices(consolidated);
       }
 
       // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
@@ -4069,8 +4102,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             const groups = svc.addonGroups || [];
             const hasChoices = groups.some((g) => g.type === "choice");
             const hasExtras = groups.some((g) => g.type === "addon");
-            if (hasCuts) { setSimpleStep("cut"); }
-            else if (hasChoices || hasExtras) { setCutFlow({ phase: hasChoices ? "cut" : "addons" }); }
+            // A question (choice group) puts the service on the new two-screen flow — that's how any
+            // service is converted. Legacy cut-style services keep the old flow until a question is added.
+            if (hasChoices) { setCutFlow({ phase: "cut" }); }
+            else if (hasCuts) { setSimpleStep("cut"); }
+            else if (hasExtras) { setCutFlow({ phase: "addons" }); }
             else { startAddons({ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }); }
           };
           const liveCats = cats.filter((c) => inCat(c).length > 0);
@@ -11286,6 +11322,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             setEditing(null); setSection(null);
             showToast(form.archived ? "Service restored." : "Service archived.");
           };
+          const deleteSvc = () => {
+            if (editing === "new") return;
+            if (typeof window !== "undefined" && !window.confirm(`Permanently delete "${form.name}"? This can't be undone — if you might want it back later, use Archive instead. (Past bookings keep their saved details.)`)) return;
+            setServices(services.filter((s) => s.id !== editing));
+            setEditing(null); setSection(null);
+            showToast(`"${form.name}" deleted.`);
+          };
           const isCombo = !!form.isCombo || (form.comboOf || []).length > 0;
           const legacyCuts = (form.cutTypes || []).length > 0; // services from the old cut-styles model
           // Goldie-clean outlined fields: a notched floating label over a rounded outline.
@@ -11391,8 +11434,9 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
               <SaveBar />
               {editing !== "new" && (
-                <div style={{ textAlign: "center", padding: "10px 0 4px" }}>
-                  <button onClick={archiveSvc} style={{ background: "none", border: "none", color: form.archived ? "var(--gold)" : "#C2703D", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 4, padding: 8, cursor: "pointer" }}>{form.archived ? "Restore service" : "Archive service"}</button>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 22, padding: "10px 0 4px" }}>
+                  <button onClick={archiveSvc} style={{ background: "none", border: "none", color: form.archived ? "var(--gold)" : "var(--text2)", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 4, padding: 8, cursor: "pointer" }}>{form.archived ? "Restore service" : "Archive service"}</button>
+                  <button onClick={deleteSvc} style={{ background: "none", border: "none", color: "#C2392B", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 4, padding: 8, cursor: "pointer" }}>Delete forever</button>
                 </div>
               )}
             </>
