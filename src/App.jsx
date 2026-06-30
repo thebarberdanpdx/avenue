@@ -506,12 +506,13 @@ const DEFAULT_SERVICES = [
   {
     id: "cut", name: "Haircut", category: "Services", price: 42, duration: 45, color: "gold", photo: "photo-1503951914875-452162b0f3f1",
     staff: { dan: { on: true, duration: 35, price: null }, heather: { on: true, duration: 45, price: null } },
-    cutTypes: [
-      { id: "standard", label: "Standard Haircut", desc: "Sides and back have at least SOME hair visible all the way down — even very short stubble or fuzz counts as hair. This is the right pick if you can see hair anywhere on the sides, no matter how short, even faded down close. Includes any taper, low fade, mid fade, or high fade where some hair remains at the bottom edge. The DEFAULT pick unless you can see truly bald scalp.", price: 42, min: 0, images: ["photo-1503951914875-452162b0f3f1", "photo-1622286342621-4bd786c2447c"] },
-      { id: "skinfade", label: "Skin Fade", desc: "ONLY pick this if the bottom of the sides/back is shaved COMPLETELY BALD with zero hair — no stubble, no fuzz, just smooth bare scalp like a clean shave. The skin should look the same as a shaved face. If you can see ANY hair stubble or short fuzz at the bottom edge (even very short), it is NOT a skin fade — pick Standard Haircut instead. When in doubt, do not pick this one.", price: 47, min: 5, images: ["photo-1605497788044-5a32c7078486", "photo-1599351431202-1e0f0137899a"] },
-      { id: "scissor", label: "Precision Scissor Cut", desc: "Hair is cut with scissors ONLY — no clippers used anywhere. No fading, no tapering, no buzzed sections. The sides have hair of similar length/density to the top, just shaped shorter with scissors. Looks soft and textured throughout, never sharply faded or buzzed.", price: 45, min: 5, images: ["photo-1621607512214-68297480165e", "photo-1503951914875-452162b0f3f1"] },
-    ],
+    usesCutStyles: false,
+    booking: { available: true, description: "Your regular cut. We keep some length and clean up the sides without going down to bare skin. It is about keeping you looking your best, not a big change or trying something new. If that is not what you are after, tap Change and pick the one that fits." },
     addonGroups: [
+      { id: "cutchoice", label: "Choose your cut", type: "choice", required: true, options: [
+        { id: "standard", label: "Standard cut", desc: "Some length kept, nothing taken down to the skin.", price: 0, min: 0 },
+        { id: "skinfade", label: "Skin fade or specialty style", desc: "Faded down close to the skin.", price: 5, min: 10 },
+      ] },
       { id: "facial", label: "Want a facial?", type: "addon", photo: "photo-1570172619644-dfd03ed5d881", item: {
         name: "The Gentleman's Facial", price: 30, min: 20,
         desc: "A rejuvenating facial featuring steam, deep cleansing, exfoliation, and hydration, finished with a 24K Gold Collagen mask.",
@@ -1118,6 +1119,13 @@ const addonDuration = (service, providerId, group) => {
   const se = getStaffEntry(service, providerId);
   if (se && se.addonDur && group && se.addonDur[group.id] != null) return Number(se.addonDur[group.id]) || 0;
   return Number(group && group.item && group.item.min) || 0;
+};
+// Per-add-on PRICE cascade — what a chosen add-on costs for this barber.
+// per-barber override (staff.addonPrice[groupId]) → the add-on's own item.price. Mirrors addonDuration.
+const addonPriceFor = (service, providerId, group) => {
+  const se = getStaffEntry(service, providerId);
+  if (se && se.addonPrice && group && se.addonPrice[group.id] != null) return Number(se.addonPrice[group.id]) || 0;
+  return Number(group && group.item && group.item.price) || 0;
 };
 // One-time, non-destructive migration OFF the retired cut-styles model. Any active service that
 // still carries cut styles becomes one STANDALONE service per style — each with that style's own
@@ -3204,6 +3212,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   }, [confirmSheet]);
   const [cutConfirm, setCutConfirm] = useState(null); // { at, text } logged onto the booking when the client taps "Yes, this is my cut"
   const [addonFlow, setAddonFlow] = useState(null); // { idx } — active add-on bottom-sheet sequence (one sheet per type:"addon" group)
+  // Two-screen "Mangomint" flow for a standalone service that carries upgrades: a "cut" screen
+  // (prominent description + required choice questions, NO prices) then an "addons" screen
+  // (optional extras + running total). Only entered from selectService for services with groups.
+  const [cutFlow, setCutFlow] = useState(null); // null | { phase: "cut" | "addons" }
   const [clientNote, setClientNote] = useState(""); // optional note for the barber — rides the appt, the push, and the feed
   const [personalizeOpen, setPersonalizeOpen] = useState(business?.bookingPhotos?.mode === "required"); // combined note+photo card; open by default only when photos are required
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
@@ -3242,7 +3254,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     entry.service.addonGroups.forEach((g) => {
       const sel = entry.addons[g.id];
       if (g.type === "choice" && sel) { const opt = g.options.find((o) => o.id === sel); if (opt) { p += Number(opt.price) || 0; m += Number(opt.min) || 0; } }
-      if (g.type === "addon" && sel) { if (g.item.addsPrice !== false) p += Number(g.item.price) || 0; if (g.item.addsTime !== false) m += addonDuration(entry.service, provId, g); }
+      if (g.type === "addon" && sel) { if (g.item.addsPrice !== false) p += addonPriceFor(entry.service, provId, g); if (g.item.addsTime !== false) m += addonDuration(entry.service, provId, g); }
     });
     return { price: p, min: m };
   };
@@ -3487,7 +3499,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (slot == null || !slots.includes(slot)) setSlot(slots.length ? slots[0] : null);
   }, [wwMerged, waProvId]);
 
-  const back = () => { setShowWaitlist(false); setTapSel(null); if (confirmSheet) { setConfirmSheet(null); return; } if (addonFlow) { setAddonFlow(null); if (draft && draft.cutTypes && draft.cutTypes.length) { setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "type"); setStep(2); } else { setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setStep(1); } return; } if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "finish") { setSimpleStep("what"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { if (matched) { setShowHome(true); return; } setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); if (matched) { setShowHome(true); return; } setStep(5); return; } if (step <= 0) { if (matched) { setShowHome(true); return; } return onExit(); } if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 3) { if (simpleChange !== null && draft) { const anyone = providers.find((p) => p.id === "anyone") || providers[0]; const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: anyone, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }; setCart([entry]); const hasFinish = (draft.addonGroups || []).some((g) => g.type === "addon"); setStep(0); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (draft && draft.cutTypes && draft.cutTypes.length) { setCutType(null); setBeardType(null); setCutPhase("type"); setStep(2); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setStep(6); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); setTapSel(null); if (cutFlow && cutFlow.phase === "addons") { setCutFlow({ phase: "cut" }); return; } if (cutFlow) { setCutFlow(null); return; } if (confirmSheet) { setConfirmSheet(null); return; } if (addonFlow) { setAddonFlow(null); if (draft && draft.cutTypes && draft.cutTypes.length) { setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "type"); setStep(2); } else { setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setStep(1); } return; } if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "finish") { setSimpleStep("what"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { if (matched) { setShowHome(true); return; } setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); if (matched) { setShowHome(true); return; } setStep(5); return; } if (step <= 0) { if (matched) { setShowHome(true); return; } return onExit(); } if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 3) { if (simpleChange !== null && draft) { const anyone = providers.find((p) => p.id === "anyone") || providers[0]; const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: anyone, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }; setCart([entry]); const hasFinish = (draft.addonGroups || []).some((g) => g.type === "addon"); setStep(0); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (draft && draft.cutTypes && draft.cutTypes.length) { setCutType(null); setBeardType(null); setCutPhase("type"); setStep(2); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setStep(6); return; } setStep(step - 1); };
 
   // Simple/quick flow hand-off: instead of the old "Anyone in particular?" + time picker,
   // pop the quick-flow entry back into draft state and land on the merged Who & When.
@@ -3541,6 +3553,18 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     putEntry(updated);
     advanceAddon(updated);
   };
+
+  // ---- Two-screen "cut + add-ons" flow (cutFlow) ----
+  // Pick a choice option (e.g. skin fade vs standard) on the cut screen — single-select per group.
+  const pickChoice = (group, optionId) => { const cur = cart[0] || {}; putEntry({ ...cur, addons: { ...(cur.addons || {}), [group.id]: optionId } }); };
+  // Toggle an optional add-on on the add-ons screen.
+  const toggleExtra = (group) => { const cur = cart[0] || {}; const a = { ...(cur.addons || {}) }; if (a[group.id]) delete a[group.id]; else a[group.id] = true; putEntry({ ...cur, addons: a }); };
+  const choiceGroupsOf = (svc) => (svc?.addonGroups || []).filter((g) => g.type === "choice");
+  const extraGroupsOf = (svc) => (svc?.addonGroups || []).filter((g) => g.type === "addon");
+  // All required choice groups must be answered before leaving the cut screen.
+  const cutChoicesReady = () => { const e = cart[0]; if (!e) return false; return choiceGroupsOf(e.service).every((g) => g.required === false || (e.addons || {})[g.id]); };
+  const cutFlowFinish = () => { const e = cart[0]; setCutFlow(null); if (e) goWhoWhen(e); };
+  const cutFlowNext = () => { const e = cart[0]; if (e && extraGroupsOf(e.service).length) setCutFlow({ phase: "addons" }); else cutFlowFinish(); };
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -4025,7 +4049,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
         {/* ============ SIMPLE FIRST-TIMER FLOW ============ */}
         {/* SIMPLE · WHAT — one clean question: what are you here for? */}
-        {simpleStep === "what" && (() => {
+        {simpleStep === "what" && !cutFlow && (() => {
           const cats = (categories && categories.length) ? categories : ["Services"];
           const visible = (s) => !s.archived && !s.hidden;
           const inCat = (cat) => services.filter((s) => visible(s) && (s.category || cats[0]) === cat);
@@ -4040,8 +4064,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             setAddonFlow(null);
             const anyoneProv = providers.find((p) => p.id === "anyone") || providers[0];
             setCart([{ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }]);
+            setCutFlow(null);
             const hasCuts = svc.usesCutStyles !== false && svc.cutTypes && svc.cutTypes.length > 0;
+            const groups = svc.addonGroups || [];
+            const hasChoices = groups.some((g) => g.type === "choice");
+            const hasExtras = groups.some((g) => g.type === "addon");
             if (hasCuts) { setSimpleStep("cut"); }
+            else if (hasChoices || hasExtras) { setCutFlow({ phase: hasChoices ? "cut" : "addons" }); }
             else { startAddons({ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }); }
           };
           const liveCats = cats.filter((c) => inCat(c).length > 0);
@@ -4327,6 +4356,77 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       </div>
                     ))}
               </div>
+            </div>
+          );
+        })()}
+
+        {/* ===== SCREEN 1 — the cut: prominent description + required choice(s), NO prices ===== */}
+        {cutFlow && cutFlow.phase === "cut" && cart[0] && (() => {
+          const e = cart[0]; const svc = e.service;
+          const desc = (svc.booking && svc.booking.description) || "";
+          const choices = choiceGroupsOf(svc);
+          const ready = cutChoicesReady();
+          return (
+            <div className="fade-up" style={{ paddingBottom: 28 }}>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: "-0.3px", margin: "2px 0 0" }}>{svc.name}</h2>
+              {desc && (
+                <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
+                  <div style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text)", fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><span style={{ width: 16, height: 1.5, background: "var(--text)" }} />Read this first</div>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17.5, lineHeight: 1.5, color: "var(--text2)", letterSpacing: "-0.1px", whiteSpace: "pre-line" }}>{desc}</div>
+                </div>
+              )}
+              {choices.map((g) => (
+                <div key={g.id} style={{ marginTop: 24 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 13 }}>
+                    <span style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--sub)", fontWeight: 600 }}>{g.label || "Choose your cut"}</span>
+                    {g.required !== false && <span style={{ fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Required</span>}
+                  </div>
+                  {(g.options || []).map((o) => { const on = (e.addons || {})[g.id] === o.id; return (
+                    <button key={o.id} onClick={() => pickChoice(g, o.id)} style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left", padding: 16, borderRadius: 14, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 7%, var(--panel))" : "var(--panel)", marginBottom: 11, cursor: "pointer" }}>
+                      <span style={{ width: 22, height: 22, borderRadius: "50%", border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3.5} />}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: "block", fontSize: 15.5, fontWeight: 600, color: "var(--text)" }}>{o.label}</span>
+                        {o.desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{o.desc}</span>}
+                      </span>
+                    </button>
+                  ); })}
+                </div>
+              ))}
+              <button className="lift" disabled={!ready} onClick={cutFlowNext} style={{ width: "100%", marginTop: 24, background: ready ? "var(--text)" : "var(--panel2)", color: ready ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 14, padding: 17, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: ready ? "pointer" : "default" }}>Continue</button>
+            </div>
+          );
+        })()}
+
+        {/* ===== SCREEN 2 — optional add-ons + running total ===== */}
+        {cutFlow && cutFlow.phase === "addons" && cart[0] && (() => {
+          const e = cart[0]; const svc = e.service;
+          const provId = e.provider && e.provider.id !== "anyone" ? e.provider.id : "dan";
+          const extras = extraGroupsOf(svc);
+          const lt = lineTotal(e);
+          const picked = choiceGroupsOf(svc).map((g) => { const o = (g.options || []).find((x) => x.id === (e.addons || {})[g.id]); return o && o.label; }).filter(Boolean);
+          return (
+            <div className="fade-up" style={{ paddingBottom: 28 }}>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: "-0.3px", margin: "2px 0 2px" }}>Anything else?</h2>
+              <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 20 }}>{[svc.name, ...picked].join(" · ")}</div>
+              <div style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, marginBottom: 13 }}>Optional add-ons</div>
+              {extras.map((g) => { const it = g.item || {}; const on = !!(e.addons || {})[g.id]; const price = addonPriceFor(svc, provId, g); const min = addonDuration(svc, provId, g); return (
+                <button key={g.id} onClick={() => toggleExtra(g)} style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left", padding: 16, borderRadius: 14, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 7%, var(--panel))" : "var(--panel)", marginBottom: 11, cursor: "pointer" }}>
+                  <span style={{ width: 22, height: 22, borderRadius: "50%", border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3.5} />}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 600, color: "var(--text)" }}>{it.name || g.label}</span>
+                    {it.desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{it.desc}</span>}
+                  </span>
+                  <span style={{ textAlign: "right", flexShrink: 0 }}>
+                    {it.addsPrice !== false && price > 0 && <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>+${price}</span>}
+                    {it.addsTime !== false && min > 0 && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>+{min} min</span>}
+                  </span>
+                </button>
+              ); })}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 22 }}>
+                <span style={{ fontSize: 14, color: "var(--sub)" }}>Your total so far</span>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>${lt.price} · {lt.min} min</span>
+              </div>
+              <button className="lift" onClick={cutFlowFinish} style={{ width: "100%", marginTop: 16, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 14, padding: 17, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Continue&nbsp;&nbsp;·&nbsp;&nbsp;${lt.price}&nbsp;&nbsp;·&nbsp;&nbsp;{lt.min} min</button>
             </div>
           );
         })()}
@@ -10166,6 +10266,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     if (val == null) delete addonDur[gid]; else addonDur[gid] = Number(val);
     return { ...f, staff: { ...f.staff, [pid]: { ...cur, addonDur } } };
   });
+  // Per-barber, per-add-on PRICE override — staff[pid].addonPrice[groupId]. null clears (falls back to the add-on's own price).
+  const setStaffAddonPrice = (pid, gid, val) => setForm((f) => {
+    const cur = (f.staff && f.staff[pid]) || { on: true, duration: null, price: null };
+    const addonPrice = { ...(cur.addonPrice || {}) };
+    if (val == null || val === "") delete addonPrice[gid]; else addonPrice[gid] = Number(val);
+    return { ...f, staff: { ...f.staff, [pid]: { ...cur, addonPrice } } };
+  });
   const setBooking = (patch) => setForm((f) => ({ ...f, booking: { ...(f.booking || defaultBooking()), ...patch } }));
 
   const openNew = () => { setForm({ ...blank, id: "svc-" + Date.now(), photos: [], staff: defaultStaffMap(), booking: defaultBooking() }); setSection(null); setEditing("new"); };
@@ -10569,7 +10676,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 return (
                   <div style={{ marginTop: 12, borderTop: "1px solid var(--line)", paddingTop: 12, minWidth: 0 }}>
                     <button onClick={() => setAddonTimeOpen((o) => ({ ...o, [p.id]: !o[p.id] }))} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--sub)", fontSize: 13.5, fontWeight: 500 }}>
-                      <span>Set add-on times</span>
+                      <span>Set add-on prices &amp; times</span>
                       {open ? <ChevronUp size={16} style={{ color: "var(--faint)", flexShrink: 0 }} /> : <ChevronDown size={16} style={{ color: "var(--faint)", flexShrink: 0 }} />}
                     </button>
                     {open && (
@@ -10577,18 +10684,26 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                         {timedAddons.map((g) => {
                           const se = form.staff[p.id] || {};
                           const dv = (se.addonDur && se.addonDur[g.id] != null) ? se.addonDur[g.id] : "";
+                          const pv = (se.addonPrice && se.addonPrice[g.id] != null) ? se.addonPrice[g.id] : "";
                           const def = Number(g.item && g.item.min) || 0;
+                          const defP = Number(g.item && g.item.price) || 0;
                           return (
                             <div key={g.id} style={{ minWidth: 0 }}>
                               <SectionLbl style={{ margin: "0 2px 6px" }}>{(g.item && g.item.name) || g.label || "Add-on"}</SectionLbl>
-                              <div style={{ ...moneyWrap }}>
-                                <input type="number" inputMode="numeric" value={dv} placeholder={String(def)} onChange={(ev) => setStaffAddonDur(p.id, g.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, minWidth: 0, padding: "11px 12px", paddingLeft: 14 }} />
-                                <span style={unitSuffix}>min</span>
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <div style={{ ...moneyWrap, flex: 1, minWidth: 0 }}>
+                                  <span style={moneyPrefix}>$</span>
+                                  <input type="number" inputMode="decimal" value={pv} placeholder={String(defP)} onChange={(ev) => setStaffAddonPrice(p.id, g.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, minWidth: 0, padding: "11px 12px" }} />
+                                </div>
+                                <div style={{ ...moneyWrap, flex: 1, minWidth: 0 }}>
+                                  <input type="number" inputMode="numeric" value={dv} placeholder={String(def)} onChange={(ev) => setStaffAddonDur(p.id, g.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, minWidth: 0, padding: "11px 12px", paddingLeft: 14 }} />
+                                  <span style={unitSuffix}>min</span>
+                                </div>
                               </div>
                             </div>
                           );
                         })}
-                        <p style={{ fontSize: 12, color: "var(--faint)", margin: "2px 2px 0", lineHeight: 1.45 }}>Extra minutes this barber needs for each add-on. Blank uses the add-on's default time.</p>
+                        <p style={{ fontSize: 12, color: "var(--faint)", margin: "2px 2px 0", lineHeight: 1.45 }}>This barber's price and extra time for each add-on. Blank uses the add-on's default.</p>
                       </div>
                     )}
                   </div>
