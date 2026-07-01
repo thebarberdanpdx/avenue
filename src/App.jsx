@@ -3834,6 +3834,32 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const cutChoicesReady = () => { const e = cart[0]; if (!e) return false; return choiceGroupsOf(e.service).every((g) => g.required === false || (e.addons || {})[g.id]); };
   const cutFlowFinish = () => { const e = cart[0]; setCutFlow(null); if (e) goWhoWhen(e); };
   const cutFlowNext = () => { const e = cart[0]; if (e && extraGroupsOf(e.service).length) setCutFlow({ phase: "addons" }); else cutFlowFinish(); };
+  // Cut screen reveals its questions/add-ons one at a time; as each is answered we scroll the
+  // newly revealed step into view so "the screen drops to the next question."
+  const cutLastRef = useRef(null);
+  const cutRevealSeen = useRef("");
+  const cutRevealSig = (() => {
+    const e = cart[0];
+    if (!cutFlow || cutFlow.phase !== "cut" || !e || !e.service) return "";
+    const gs = [...choiceGroupsOf(e.service), ...extraGroupsOf(e.service)];
+    let n = 0;
+    for (const g of gs) {
+      const resolved = g.type === "choice"
+        ? (!!(e.addons || {})[g.id] || g.required === false)
+        : (g.required !== true ? true : (!!(e.addons || {})[g.id] || !!(e.declined || {})[g.id]));
+      if (resolved) n++; else break;
+    }
+    return n + "/" + gs.length;
+  })();
+  useEffect(() => {
+    if (!cutRevealSig) { cutRevealSeen.current = ""; return; }
+    if (cutRevealSeen.current === "") { cutRevealSeen.current = cutRevealSig; return; } // don't scroll on first paint
+    if (cutRevealSeen.current !== cutRevealSig) {
+      cutRevealSeen.current = cutRevealSig;
+      const t = setTimeout(() => { try { cutLastRef.current && cutLastRef.current.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 90);
+      return () => clearTimeout(t);
+    }
+  }, [cutRevealSig]);
 
   const Stepper = ({ active }) => { const labels = ["Service", "Date", "Confirm"]; return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
@@ -4701,27 +4727,34 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const provId = e.provider && e.provider.id !== "anyone" ? e.provider.id : "dan";
           const choices = choiceGroupsOf(svc);
           const extras = extraGroupsOf(svc);
-          const lt = lineTotal(e);
-          const ready = cutChoicesReady();
-          const dc = activeMember || matched;
-          const cp = dc && dc.customPrices ? dc.customPrices[svc.id] : null;
-          const basePrice = (cp != null && cp !== "") ? Number(cp) : (Number(svc.price) || 0);
+          // Questions first, then add-ons — one guided list, revealed a step at a time.
+          const ordered = [...choices, ...extras];
+          const isResolved = (g) => g.type === "choice"
+            ? (!!(e.addons || {})[g.id] || g.required === false)
+            : (g.required !== true ? true : (!!(e.addons || {})[g.id] || !!(e.declined || {})[g.id]));
+          // Show every group up to and including the first one still awaiting an answer.
+          const firstOpen = ordered.findIndex((g) => !isResolved(g));
+          const shown = firstOpen === -1 ? ordered : ordered.slice(0, firstOpen + 1);
+          const ready = ordered.every(isResolved);
           const radio = (on) => <span style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${on ? "var(--text)" : "var(--border2)"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--text)" }} />}</span>;
-          const rowBtn = { display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", padding: "12px 2px", background: "none", border: "none", borderBottom: "1px solid var(--line)", cursor: "pointer" };
-          const qHead = { fontFamily: FONT_BODY, fontSize: 15, fontWeight: 700, color: "var(--text)", margin: "22px 0 4px" };
-          return (
-            <div className="fade-up" style={{ paddingBottom: 28, textAlign: "left" }}>
-              {/* picked service · price · change */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "var(--panel2)", borderRadius: 12, padding: "12px 14px" }}>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 17, fontWeight: 600 }}>{svc.name}</span>
-                  <button onClick={() => { setCutFlow(null); setCart([]); }} style={{ background: "none", border: "none", padding: 0, marginTop: 2, fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>Change</button>
-                </span>
-              </div>
-              {choices.map((g) => (
-                <div key={g.id}>
+          const rowBtn = { display: "flex", alignItems: "center", gap: 13, width: "100%", textAlign: "left", padding: "16px 2px", background: "none", border: "none", borderBottom: "1px solid var(--line)", cursor: "pointer" };
+          const qHead = { fontFamily: FONT_BODY, fontSize: 16, fontWeight: 700, letterSpacing: "-0.2px", color: "var(--text)", margin: "0 0 8px" };
+          const moreInfo = (name, desc, photos) => <span onClick={(ev) => { ev.stopPropagation(); setConfIdx(0); setPickConfirm({ name, desc: desc || "", photos: photos || [] }); }} style={{ flexShrink: 0, fontSize: 13, fontWeight: 500, color: "var(--text)", textDecoration: "underline", textUnderlineOffset: 2, whiteSpace: "nowrap", cursor: "pointer" }}>more info</span>;
+          const answerRequired = (g, yes) => {
+            const cur = cart[0] || {};
+            const a = { ...(cur.addons || {}) }; const dec = { ...(cur.declined || {}) };
+            if (yes) { a[g.id] = true; delete dec[g.id]; } else { delete a[g.id]; dec[g.id] = true; }
+            putEntry({ ...cur, addons: a, declined: dec });
+            if (yes) { const it = g.item || {}; const ph = g.photo ? [g.photo] : []; if ((it.desc && String(it.desc).trim()) || ph.length) { setConfIdx(0); setPickConfirm({ name: it.name || g.label, desc: it.desc || "", photos: ph }); } }
+          };
+          const renderGroup = (g, idx) => {
+            const gap = idx === 0 ? 26 : 32;
+            const refFn = idx === shown.length - 1 ? (el) => { cutLastRef.current = el; } : null;
+            if (g.type === "choice") {
+              return (
+                <div key={g.id} ref={refFn} className="fade-up" style={{ marginTop: gap }}>
                   <div style={qHead}>{g.label || "Choose your cut"}</div>
-                  {(g.options || []).map((o) => { const on = (e.addons || {})[g.id] === o.id; const oPrice = answerPriceFor(svc, provId, g, o); return (
+                  {(g.options || []).map((o) => { const on = (e.addons || {})[g.id] === o.id; return (
                     <button key={o.id} onClick={() => pickChoice(g, o.id)} style={rowBtn}>
                       {radio(on)}
                       <span style={{ flex: 1, minWidth: 0 }}>
@@ -4729,41 +4762,51 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         {o.desc && (
                           <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
                             <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.desc}</span>
-                            <span onClick={(ev) => { ev.stopPropagation(); setConfIdx(0); setPickConfirm({ name: o.label, desc: o.desc || "", photos: (Array.isArray(o.photos) ? o.photos : []).filter(Boolean) }); }} style={{ flexShrink: 0, fontSize: 13, fontWeight: 500, color: "var(--text)", textDecoration: "underline", textUnderlineOffset: 2, whiteSpace: "nowrap", cursor: "pointer" }}>more info</span>
+                            {moreInfo(o.label, o.desc, (Array.isArray(o.photos) ? o.photos : []).filter(Boolean))}
                           </span>
                         )}
                       </span>
                     </button>
                   ); })}
                 </div>
-              ))}
-
-              {extras.map((g) => { const it = g.item || {}; const on = !!(e.addons || {})[g.id]; const price = addonPriceFor(svc, provId, g); const min = addonDuration(svc, provId, g); const req = g.required === true; return (
-                <div key={g.id}>
-                  <div style={qHead}>{g.label || (it.name ? `Add ${it.name}?` : "Add-on")}</div>
-                  {/* Optional add-on: one tappable row (tap to add, tap again to remove). Required: Yes / No thanks. */}
-                  <button onClick={() => { if (req) { if (!on) toggleExtra(g); } else toggleExtra(g); }} style={rowBtn}>
-                    {radio(on)}
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Yes{it.name ? ` — ${it.name}` : ""}</span>
-                      {it.desc && (
-                        <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
-                          <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>
-                          <span onClick={(ev) => { ev.stopPropagation(); setConfIdx(0); setPickConfirm({ name: it.name || g.label, desc: it.desc || "", photos: g.photo ? [g.photo] : [] }); }} style={{ flexShrink: 0, fontSize: 13, fontWeight: 500, color: "var(--text)", textDecoration: "underline", textUnderlineOffset: 2, whiteSpace: "nowrap", cursor: "pointer" }}>more info</span>
-                        </span>
-                      )}
-                    </span>
+              );
+            }
+            const it = g.item || {}; const on = !!(e.addons || {})[g.id]; const req = g.required === true; const declined = !!(e.declined || {})[g.id];
+            return (
+              <div key={g.id} ref={refFn} className="fade-up" style={{ marginTop: gap }}>
+                <div style={qHead}>{g.label || (it.name ? `Add ${it.name}?` : "Add-on")}</div>
+                <button onClick={() => { if (req) answerRequired(g, true); else toggleExtra(g); }} style={rowBtn}>
+                  {radio(on)}
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Yes{it.name ? ` — ${it.name}` : ""}</span>
+                    {it.desc && (
+                      <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>
+                        {moreInfo(it.name || g.label, it.desc, g.photo ? [g.photo] : [])}
+                      </span>
+                    )}
+                  </span>
+                </button>
+                {req && (
+                  <button onClick={() => answerRequired(g, false)} style={rowBtn}>
+                    {radio(declined)}
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 15.5, fontWeight: 500 }}>No thanks</span>
                   </button>
-                  {req && (
-                    <button onClick={() => { if (on) toggleExtra(g); }} style={rowBtn}>
-                      {radio(!on)}
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 500 }}>No thanks</span>
-                    </button>
-                  )}
-                </div>
-              ); })}
-
-              <button className="lift" disabled={!ready} onClick={cutFlowFinish} style={{ width: "100%", marginTop: 24, background: ready ? "var(--text)" : "var(--panel2)", color: ready ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 12, padding: 15, fontSize: 14.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: ready ? "pointer" : "default" }}>{ready ? "Continue" : "Pick your options"}</button>
+                )}
+              </div>
+            );
+          };
+          return (
+            <div className="fade-up" style={{ paddingBottom: 28, textAlign: "left" }}>
+              {/* picked service · change */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "var(--panel2)", borderRadius: 12, padding: "12px 14px" }}>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 17, fontWeight: 600 }}>{svc.name}</span>
+                  <button onClick={() => { setCutFlow(null); setCart([]); }} style={{ background: "none", border: "none", padding: 0, marginTop: 2, fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>Change</button>
+                </span>
+              </div>
+              {shown.map((g, idx) => renderGroup(g, idx))}
+              <button className="lift" disabled={!ready} onClick={cutFlowFinish} style={{ width: "100%", marginTop: 34, background: ready ? "var(--text)" : "var(--panel2)", color: ready ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 12, padding: 15, fontSize: 14.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: ready ? "pointer" : "default" }}>{ready ? "Continue" : "Pick your options"}</button>
             </div>
           );
         })()}
