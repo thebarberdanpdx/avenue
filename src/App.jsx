@@ -10482,7 +10482,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} />}
         {tab === "messages" && <MessagesView key={`messages-${tabNonce}`} clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} />}
-        {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
+        {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
         {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView key={`settings-${tabNonce}`} business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} onSignOutAccount={onSignOutAccount} authEmail={authEmail} /></ErrorBoundary>}
       </div>
 
@@ -12162,13 +12162,16 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     <div className="fade-up" style={{ paddingBottom: 90 }}>
       {/* two-tab switch (the screen is already titled "Services & Menu" by the settings shell) */}
       <div style={{ display: "flex", gap: 6, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 13, padding: 4, margin: "4px 0 18px" }}>
-        {[{ id: "services", label: "Services" }, { id: "addons", label: "Add-ons" }].map((t) => { const on = menuTab === t.id; return (
+        {[{ id: "services", label: "Services" }, { id: "addons", label: "Add-ons" }, { id: "questions", label: "Questions" }].map((t) => { const on = menuTab === t.id; return (
           <button key={t.id} onClick={() => { setMenuTab(t.id); setEditMode(false); }} style={{ flex: 1, padding: "10px 6px", borderRadius: 10, border: "none", background: on ? "var(--panel)" : "transparent", color: on ? "var(--text)" : "var(--sub)", fontFamily: FONT_BODY, fontSize: 14, fontWeight: on ? 600 : 500, boxShadow: on ? "var(--shadow-sm)" : "none", cursor: "pointer", transition: "background .15s ease, color .15s ease" }}>{t.label}</button>
         ); })}
       </div>
 
       {/* ---- ADD-ONS TAB ---- */}
       {menuTab === "addons" && <AddOnsEditor services={services} setServices={setServices} business={business} setBusiness={setBusiness} showToast={showToast} />}
+
+      {/* ---- QUESTIONS TAB ---- */}
+      {menuTab === "questions" && <QuestionsEditor services={services} setServices={setServices} business={business} setBusiness={setBusiness} showToast={showToast} />}
 
       {/* ---- SERVICES TAB ---- */}
       {menuTab === "services" && (<>
@@ -16846,6 +16849,148 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast 
         </div>
       )}
       <button className="lift" onClick={() => { setForm(blank()); setEditing("new"); }} style={{ width: "100%", background: "transparent", border: "1.5px dashed var(--border2)", color: "var(--text)", padding: "14px 16px", fontSize: 14.5, fontWeight: 500, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, marginTop: 20, cursor: "pointer" }}><Plus size={18} /> Add an add-on</button>
+    </div>
+  );
+}
+
+// ============================================================
+// QUESTIONS LIBRARY — reusable multi-answer questions (e.g. "Choose your cut")
+// stored on business.questionsLibrary[]. Same "build once, attach to any service"
+// model as AddOnsEditor: each question carries a `services` list and is materialized
+// onto those services' addonGroups as a type:"choice" group id-prefixed "libq-".
+// ============================================================
+function QuestionsEditor({ services, setServices, business, setBusiness, showToast }) {
+  const lib = business.questionsLibrary || [];
+  const [editing, setEditing] = useState(null); // question id or "new"
+  const [form, setForm] = useState(null);
+  const svcList = (services || []);
+  const svcName = (id) => (svcList.find((s) => s.id === id) || {}).name || id;
+  const newOpt = () => ({ id: "o-" + Date.now() + "-" + Math.floor(Math.random() * 1000), label: "", desc: "", price: "", min: "" });
+  const blank = () => ({ id: "q-" + Date.now(), label: "", options: [newOpt(), newOpt()], required: true, services: [] });
+
+  // Write each library question onto the services it's attached to (as a choice group), replacing
+  // only the questions we own ("libq-"). Add-ons ("lib-") and hand-built groups are left untouched.
+  const materialize = (nextLib) => {
+    setServices(svcList.map((s) => {
+      const keep = (s.addonGroups || []).filter((g) => !String(g.id || "").startsWith("libq-"));
+      const mine = nextLib.filter((q) => (q.services || []).includes(s.id)).map((q) => ({
+        id: "libq-" + q.id, type: "choice", label: q.label, required: !!q.required,
+        options: (q.options || []).map((o) => ({ id: o.id, label: o.label, desc: o.desc || "", price: Number(o.price) || 0, min: Number(o.min) || 0, photos: Array.isArray(o.photos) ? o.photos : [] })),
+      }));
+      return { ...s, addonGroups: [...mine, ...keep] };
+    }));
+  };
+
+  const save = () => {
+    if (!(form.label || "").trim()) { showToast("Give the question a name."); return; }
+    const opts = (form.options || []).filter((o) => (o.label || "").trim()).map((o) => ({ ...o, label: o.label.trim(), desc: o.desc || "", price: Number(o.price) || 0, min: Number(o.min) || 0 }));
+    if (opts.length < 2) { showToast("Add at least two answers."); return; }
+    const clean = { ...form, label: form.label.trim(), options: opts };
+    const nextLib = editing === "new" ? [...lib, clean] : lib.map((q) => (q.id === editing ? clean : q));
+    setBusiness({ ...business, questionsLibrary: nextLib });
+    materialize(nextLib);
+    setEditing(null); setForm(null); showToast(`Saved "${clean.label}".`);
+  };
+  const remove = () => {
+    const nextLib = lib.filter((q) => q.id !== editing);
+    setBusiness({ ...business, questionsLibrary: nextLib });
+    materialize(nextLib);
+    setEditing(null); setForm(null); showToast("Question removed.");
+  };
+  const toggleSvc = (id) => setForm((f) => ({ ...f, services: (f.services || []).includes(id) ? f.services.filter((x) => x !== id) : [...(f.services || []), id] }));
+  const setOpt = (oi, patch) => setForm((f) => ({ ...f, options: f.options.map((o, i) => (i === oi ? { ...o, ...patch } : o)) }));
+  const addOpt = () => setForm((f) => ({ ...f, options: [...(f.options || []), newOpt()] }));
+  const removeOpt = (oi) => setForm((f) => ({ ...f, options: f.options.filter((_, i) => i !== oi) }));
+
+  const aoInp = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+  const aoSectionLbl = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 2px 10px" };
+  const aoMoneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)" };
+  const aoMoneyInput = { flex: 1, border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+
+  if (editing && form) {
+    return (
+      <div className="fade-up" style={{ paddingBottom: 40 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
+          <button onClick={() => { setEditing(null); setForm(null); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px" }}>{editing === "new" ? "New question" : form.label || "Question"}</h2>
+        </div>
+
+        <div style={aoSectionLbl}>Question</div>
+        <input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="e.g. Choose your cut" style={aoInp} />
+
+        <div style={aoSectionLbl}>Answers</div>
+        {(form.options || []).map((o, oi) => (
+          <div key={o.id} style={{ border: "1px solid var(--border)", borderRadius: 16, padding: 16, marginBottom: 12, background: "var(--panel)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <input value={o.label} onChange={(e) => setOpt(oi, { label: e.target.value })} placeholder={`Answer ${oi + 1} — e.g. Skin fade`} style={{ ...aoInp, fontWeight: 500 }} />
+              {(form.options || []).length > 2 && <button onClick={() => removeOpt(oi)} aria-label="Remove answer" style={{ flexShrink: 0, width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={16} /></button>}
+            </div>
+            <textarea value={o.desc} onChange={(e) => setOpt(oi, { desc: e.target.value })} placeholder="Description clients read (optional)" rows={2} style={{ ...aoInp, marginTop: 10, resize: "vertical", minHeight: 56, lineHeight: 1.5 }} />
+            <div style={{ display: "flex", gap: 12, marginTop: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ ...aoSectionLbl, margin: "0 2px 6px" }}>Extra price</div>
+                <div style={aoMoneyWrap}>
+                  <span style={{ padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 }}>$</span>
+                  <input type="number" inputMode="decimal" value={o.price} onChange={(e) => setOpt(oi, { price: e.target.value })} placeholder="0" style={aoMoneyInput} />
+                </div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ ...aoSectionLbl, margin: "0 2px 6px" }}>Extra time</div>
+                <div style={aoMoneyWrap}>
+                  <input type="number" inputMode="numeric" value={o.min} onChange={(e) => setOpt(oi, { min: e.target.value })} placeholder="0" style={{ ...aoMoneyInput, paddingLeft: 16 }} />
+                  <span style={{ padding: "0 16px 0 0", color: "var(--sub)", fontSize: 14 }}>min</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        <button onClick={addOpt} style={{ width: "100%", background: "transparent", border: "1.5px dashed var(--border2)", color: "var(--text)", padding: "12px 16px", fontSize: 14, fontWeight: 500, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer" }}><Plus size={16} /> Add another answer</button>
+
+        <div style={aoSectionLbl}>Asked on</div>
+        {svcList.length === 0 && <p style={{ fontSize: 14, color: "var(--faint)", padding: "12px 0" }}>No services yet.</p>}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {svcList.map((s) => {
+            const on = (form.services || []).includes(s.id);
+            return (
+              <button key={s.id} onClick={() => toggleSvc(s.id)} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: on ? "var(--text)" : "transparent", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, color: on ? "var(--bg)" : "var(--text)", padding: "9px 15px", borderRadius: 22, fontSize: 14, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer" }}>
+                {on && <Check size={15} />}{s.name}
+              </button>
+            );
+          })}
+        </div>
+
+        <div onClick={() => setForm({ ...form, required: !form.required })} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 26, padding: "16px 18px", border: "1px solid var(--border)", borderRadius: 14, cursor: "pointer" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14.5, fontWeight: 500 }}>Must answer to book</div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>Client must pick an answer before continuing.</div>
+          </div>
+          <span style={{ width: 50, height: 29, borderRadius: 29, background: form.required ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0, transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: form.required ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+        </div>
+
+        <button className="lift" onClick={save} style={{ width: "100%", marginTop: 30, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 14, padding: 17, fontSize: 14, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>{editing === "new" ? "Add question" : "Save question"}</button>
+        {editing !== "new" && <button onClick={remove} style={{ width: "100%", background: "transparent", border: "1px solid #c0392b", color: "#c0392b", fontSize: 14, fontWeight: 500, padding: 15, marginTop: 12, borderRadius: 14, cursor: "pointer" }}>Remove this question</button>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fade-up">
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 8 }}>Build once, attach to any service. Clients pick an answer while booking — required ones must be answered before they can continue.</p>
+      {lib.length === 0 && <p style={{ fontSize: 14.5, color: "var(--faint)", padding: "26px 0", textAlign: "center", fontStyle: "italic" }}>No questions yet.</p>}
+      {lib.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 4 }}>
+          {lib.map((q) => (
+            <button key={q.id} onClick={() => { setForm(JSON.parse(JSON.stringify(q))); setEditing(q.id); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "16px 18px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500 }}>{q.label}</span>
+                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 4, letterSpacing: 0.2 }}>{(q.options || []).length} answer{(q.options || []).length === 1 ? "" : "s"}{q.required ? " · required" : ""} · {(q.services || []).length ? (q.services || []).map(svcName).join(", ") : "Not attached yet"}</span>
+              </span>
+              <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+            </button>
+          ))}
+        </div>
+      )}
+      <button className="lift" onClick={() => { setForm(blank()); setEditing("new"); }} style={{ width: "100%", background: "transparent", border: "1.5px dashed var(--border2)", color: "var(--text)", padding: "14px 16px", fontSize: 14.5, fontWeight: 500, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, marginTop: 20, cursor: "pointer" }}><Plus size={18} /> Add a question</button>
     </div>
   );
 }
