@@ -17261,6 +17261,12 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: (<AppearancePicker theme={theme} setTheme={(id) => { setTheme(id); showToast("Saved — this is your theme."); }} />),
     },
     {
+      id: "calsync", title: "Sync outside calendars", icon: Calendar, category: "Calendar & Appointments",
+      status: (() => { const f = (business?.calSync?.feeds) || []; const n = f.filter((x) => x && x.url && x.providerId && !x.paused).length; return n ? `${n} calendar${n === 1 ? "" : "s"} connected` : "Mirror Google, Apple, Mangomint…"; })(),
+      keywords: "calendar ical sync subscribe import feed mirror google apple mangomint square booksy vagaro glossgenius boulevard outside external staff per barber heather dan availability",
+      editor: <CalendarSyncTool shopId={shopId} providers={providers} services={services} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} showToast={showToast} />,
+    },
+    {
       id: "photos", title: "Display Preferences", icon: ImageIcon, category: "Calendar & Appointments",
       status: (() => { const bits = []; const rs = form.calendarRowSize || "L"; bits.push(`Row size ${rs}`); if (form.showAddonPhotos) bits.push("photos on"); return bits.join(" · "); })(),
       keywords: "photos images add-ons menu pictures display preferences calendar week start day begins sunday monday first day row size height calendar large small zoom",
@@ -17565,8 +17571,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       { label: "Payments & tips", collapse: true, desc: "Payments, checkout, tipping, discounts & rebooking", ids: ["payments", "checkout", "tipping", "rebookco", "discounts"] },
       { label: "Deposits & no-shows", ids: ["policy"] },
     ] },
-    { id: "dayof", section: "Running the day", label: "Your day", icon: Clock, desc: "Calendar & running your day", settings: ["calendarsettings", "photos", "waitlist", "waitingroom", "runninglate", "overduebuffer"], groups: [
+    { id: "dayof", section: "Running the day", label: "Your day", icon: Clock, desc: "Calendar & running your day", settings: ["calendarsettings", "photos", "calsync", "waitlist", "waitingroom", "runninglate", "overduebuffer"], groups: [
       { label: "Calendar view", collapse: true, desc: "Row size, hours & what shows on the calendar", ids: ["calendarsettings", "photos"] },
+      { label: "Sync outside calendars", desc: "Mirror each barber's Google / Apple / Mangomint calendar", ids: ["calsync"] },
       { label: "During the day", collapse: true, desc: "Waitlist, waiting room, late & overdue alerts", ids: ["waitlist", "waitingroom", "runninglate", "overduebuffer"] },
     ] },
     { id: "msg",   section: "Running the day", label: "Messages & alerts", icon: Bell, desc: "Client texts & staff alerts", settings: ["messages", "notifications"], groups: [
