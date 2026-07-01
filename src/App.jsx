@@ -4563,7 +4563,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {cutFlow && cutFlow.phase === "cut" && cart[0] && (() => {
           const e = cart[0]; const svc = e.service;
           const provId = e.provider && e.provider.id !== "anyone" ? e.provider.id : "dan";
-          const desc = (svc.booking && svc.booking.description) || "";
           const choices = choiceGroupsOf(svc);
           const extras = extraGroupsOf(svc);
           const lt = lineTotal(e);
@@ -4584,8 +4583,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </span>
                 <span style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, flexShrink: 0 }}>${basePrice}</span>
               </div>
-              {desc ? <p style={{ fontFamily: FONT_BODY, fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 0", whiteSpace: "pre-line" }}>{desc}</p> : null}
-
               {choices.map((g) => (
                 <div key={g.id}>
                   <div style={qHead}>{g.label || "Choose your cut"}</div>
