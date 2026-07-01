@@ -4386,7 +4386,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const onWelcome = step === 0 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && !addingMember;
   return (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: "var(--bg)" }}>
-      <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px", overflowX: "hidden" }}>
+      <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px", overflowX: "clip" }}>
         {!onWelcome && (business.logoText || (business.name && business.name.trim())) && (
           <div style={{ textAlign: "center", padding: "2px 0 16px", marginBottom: 14, borderBottom: "1px solid var(--line)" }}>
             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, letterSpacing: 2, lineHeight: 1.1, textTransform: "uppercase", color: "var(--text)" }}>{business.logoText || business.name}</div>
