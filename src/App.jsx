@@ -11547,10 +11547,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   })();
 
   // ---- drill-in: ADD-ONS (paid extras only) ----
+  const previewBooking = () => { try { window.open(window.location.origin + "/book", "_blank"); } catch (e) {} };
   const addonsScreen = (
     <>
       {backBar((form.name || "SERVICE").toUpperCase(), () => setSection(null))}
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Add-ons</h2>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 6px" }}>Add-ons</h2>
+      <button onClick={previewBooking} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, padding: "0 0 16px", cursor: "pointer" }}><Globe size={15} /> Preview booking page <span style={{ fontSize: 12, color: "var(--faint)" }}>↗</span></button>
       {addonsBody}
       <SaveBar />
     </>
