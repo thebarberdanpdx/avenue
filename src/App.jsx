@@ -11334,7 +11334,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           {bookingRow("Require home address", "requireAddress", "For in-home or mobile services.")}
           {bookingRow("Require a card", "requireCard", "Hold a card on file to book — your no-show protection.")}
           {bookingRow("Require payment at booking", "requirePayment", "Charge the full amount when booking online.")}
-          {bookingRow("Require read & confirm", "requireConfirm", "Make clients confirm they've read this service's description before they can continue — cuts down on wrong-service bookings.")}
           {(form.cutTypes || []).length > 0 && bookingRow("Show each cut's time", "showTypeTimes", "Show how long each cut type takes (e.g. fade · 50 min) in the picker — so clients see that a longer cut costs more time before they choose. Stops a fade getting booked as a regular cut.")}
           {(form.cutTypes || []).length > 0 && bookingRow("Hold the longest cut's time when unsure", "holdLongest", "If a booking doesn't lock in a cut type, reserve the longest cut's length so the chair never runs over. You can free the slack if it ends short.")}
           {(form.cutTypes || []).length > 0 && bookingRow("Quick confirmation sheet", "confirmSheet", "Pop a centered “one quick check” with this service’s details so clients confirm the right pick before continuing.")}
@@ -11348,11 +11347,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           <button onClick={() => showToast("Link copied.")} style={{ background: "none", color: "var(--sub)" }}><Copy size={16} /></button>
         </div>
       </div>
-      <div style={{ ...G_BOX, background: "var(--bg)", marginTop: 16, marginBottom: 0 }}>
-        <label style={G_LBL_ON("var(--bg)")}>Booking page description</label>
-        <textarea value={b.description || ""} onChange={(e) => setBooking({ description: e.target.value })} rows={4} placeholder="Describe this service for clients booking online…" style={{ ...G_INPUT, resize: "vertical", lineHeight: 1.55, minHeight: 70 }} />
-      </div>
-
       {b.confirmSheet && (
         <>
           <div style={{ marginTop: 14 }}>
