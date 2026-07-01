@@ -31,7 +31,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 // they're also called from the public booking page, where there is no login.
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const STAFF_ONLY = new Set(["charge", "refund", "connection_token"]);
+const STAFF_ONLY = new Set(["charge", "refund", "connection_token", "terminal_intent"]);
 
 // Reject a bad money amount before it ever reaches Stripe. `amount` is in
 // dollars. It must be a real number, greater than zero, and under a sane
@@ -248,6 +248,25 @@ async function handler(req, res) {
     if (action === "connection_token") {
       const ct = await stripe.terminal.connectionTokens.create();
       return res.status(200).json({ secret: ct.secret });
+    }
+
+    // --- Tap to Pay: card-present PaymentIntent -----------------------------
+    // Terminal charges an in-person (card_present) intent that the native SDK
+    // collects and confirms when the client taps their card/phone. `amount` is
+    // in dollars. Auto-captures so the sale completes on tap.
+    if (action === "terminal_intent") {
+      const { amount, description } = body;
+      if (!validAmount(amount)) {
+        return res.status(400).json({ error: "Invalid amount." });
+      }
+      const pi = await stripe.paymentIntents.create({
+        amount: Math.round(Number(amount) * 100),
+        currency: "usd",
+        payment_method_types: ["card_present"],
+        capture_method: "automatic",
+        description: description || "Vero — Tap to Pay",
+      });
+      return res.status(200).json({ clientSecret: pi.client_secret, id: pi.id });
     }
 
     return res.status(400).json({ error: "Unknown action." });

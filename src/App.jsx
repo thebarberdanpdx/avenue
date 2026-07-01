@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from './supabaseClient'
+import { tapToPayCharge } from './tapToPay'
 import * as Sentry from '@sentry/react'
 import {
   Calendar, Phone, Check, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MessageSquare, Bell, User, Camera,
@@ -20181,6 +20182,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [payBusy, setPayBusy] = useState(false);
   const [payErr, setPayErr] = useState("");
   const [pendingMethod, setPendingMethod] = useState(null); // chosen on the method screen; charged after tip
+  const [tapStatus, setTapStatus] = useState(""); // live status text while the Tap to Pay reader runs
   const [paidRec, setPaidRec] = useState(null);     // the ledger record written on success
   const [checkoutDiscount, setCheckoutDiscount] = useState(appt.discount || null); // applied discount preset (from the appt or chosen here)
   const [showDiscPick, setShowDiscPick] = useState(false);
@@ -20313,7 +20315,20 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     if (tipCfg.enabled && !reopen) { setStage("tipPick"); }
     else { if (m === "cof") setStage("charging"); executeCharge(m); }
   };
+  const runTapToPay = async () => {
+    setPayErr(""); setTapStatus("Starting…");
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess && sess.session && sess.session.access_token;
+      const res = await tapToPayCharge({ amount: chargeBase, description: `Vero — ${appt.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
+      recordSale(makeRec("card", { id: res && res.id }, chargeBase));
+      setStage("approved");
+    } catch (e) {
+      setPayErr((e && e.message) || "Tap to Pay didn't complete. Try again or pick another way.");
+    }
+  };
   const executeCharge = (m) => {
+    if (m === "tap") { setStage("tapPay"); runTapToPay(); return; }
     if (m === "card") { setStage("card"); return; }
     if (m === "cof") { payCardOnFile(); return; }
     // Anything else is a manual "mark as paid" method (cash + the owner's custom labels). The
@@ -20449,6 +20464,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       {payErr && <div style={{ background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{payErr}</div>}
       <div style={{ display: "grid", gap: 12 }}>
         {[
+          ...(IS_NATIVE ? [{ id: "tap", t: "Tap to Pay", s: "Tap the client's card or phone to this iPhone", dis: !liveMode }] : []),
           { id: "card", t: "Card reader", s: "Tap, chip, or key in", dis: !liveMode },
           { id: "cof", t: "Card on file", s: cofCard ? `${(cofCard.brand || "Card").charAt(0).toUpperCase() + (cofCard.brand || "card").slice(1)} ··${cofCard.last4}${scOn ? ` · +${scPct}% card fee` : ""}` : "No card saved", dis: !liveMode || !cofCard },
           // Owner-configured manual methods (Settings → Checkout); card-equivalents excluded since the
@@ -20511,6 +20527,27 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         <>
           <div style={{ width: 72, height: 72, borderRadius: "50%", border: "3px solid var(--line)", borderTopColor: "var(--gold)", marginBottom: 24, animation: "spin .8s linear infinite" }} />
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500 }}>Charging…</div>
+        </>
+      )}
+    </div>);
+
+  // ---------- Tap to Pay on iPhone (Stripe Terminal) ----------
+  if (stage === "tapPay") return screen(
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+      {payErr ? (
+        <>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 10 }}>That didn't go through</div>
+          <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5, maxWidth: 320, marginBottom: 22 }}>{payErr}</p>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => runTapToPay()} style={{ background: "var(--live, var(--gold))", color: "var(--on-gold)", border: "none", borderRadius: 13, padding: "13px 26px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}>Try again</button>
+            <button onClick={() => { setPayErr(""); setStage("method"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 26px", color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}>Pick another way</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", border: "3px solid var(--line)", borderTopColor: "var(--gold)", marginBottom: 24, animation: "spin .8s linear infinite" }} />
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500 }}>{tapStatus || "Getting ready…"}</div>
+          <p style={{ color: "var(--sub)", fontSize: 14, marginTop: 10, maxWidth: 300, lineHeight: 1.5 }}>Hold the client's card or phone near the top of your iPhone.</p>
         </>
       )}
     </div>);
