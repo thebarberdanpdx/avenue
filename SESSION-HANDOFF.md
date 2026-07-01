@@ -30,7 +30,7 @@ Big Dan-driven session, all shipped in small squash-merged PRs (#52–#79) → a
 3. **Book-for-someone-else + wrong-number verify** — real booking, confirm attendee gets texts + the verify prompt shows.
 
 ### 🟡 OPEN / UNRESOLVED
-- **Heather's blank calendar day:** iCal sync assigns every event to ONE barber (Dan). Fix needs a decision — **separate calendars** (add a 2nd feed for Heather) vs **one shared calendar** (can't split by barber). Dan hasn't answered.
+- ✅ **Heather's blank calendar day — RESOLVED by Dan.** Root cause was the iCal sync assigning all events to one barber; fixed by assigning each barber's calendar to their own feed. Also added a discoverable **Settings → Your day → "Sync outside calendars"** entry (was buried in Import Data).
 - **Per-user theme edge case:** keyed off `signedInAs`; if Heather's device is "signed in as" Dan she'll see his theme — tighten who's-who if reported.
 
 ### 🔧 Dan's Mac state
