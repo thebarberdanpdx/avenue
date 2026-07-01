@@ -10245,6 +10245,24 @@ function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
 
 function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled }) {
   const [tab, setTab] = useState("pulse");
+  // One-time: fold hand-built per-service questions/add-ons into the master libraries + de-dup
+  // (see consolidateBookingLibraries). Runs once per owner load after data is in; guarded by
+  // business._libConsolidated and a ref so it can't loop or re-run.
+  const consolidatedRef = useRef(false);
+  useEffect(() => {
+    if (consolidatedRef.current) return;
+    if (!dataLoaded || !business) return;
+    if (business._libConsolidated) { consolidatedRef.current = true; return; }
+    if (!Array.isArray(services) || services.length === 0) return;
+    consolidatedRef.current = true;
+    const result = consolidateBookingLibraries(services, business);
+    if (result) {
+      setServices(result.services);
+      setBusiness({ ...business, questionsLibrary: result.questionsLibrary, addOnsLibrary: result.addOnsLibrary, _libConsolidated: true });
+    } else {
+      setBusiness({ ...business, _libConsolidated: true });
+    }
+  }, [dataLoaded, services, business]);
   const [rebookSeed, setRebookSeed] = useState(null); // { clientId, serviceId, providerId } → opens the new-appointment form prefilled on the calendar
   const [pulseOpenApptId, setPulseOpenApptId] = useState(null); // tapping a Pulse card → open that appt's sheet on the calendar (reuses the deep-link path)
   const [activeClient, setActiveClient] = useState(null);
@@ -11319,6 +11337,23 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         if (kind === "all") entries.sort((a, b) => (a.g.type === "addon" ? 1 : 0) - (b.g.type === "addon" ? 1 : 0));
         return entries;
       })().map(({ g, i }) => {
+        // Library-managed groups (from the master Questions / Add-ons lists) are shown read-only here —
+        // edits happen only in Settings → Questions / Add-ons. Attach/detach = tick the service there.
+        const gid = String(g.id || "");
+        if (gid.startsWith("libq-") || gid.startsWith("lib-")) {
+          const isQ = gid.startsWith("libq-");
+          const label = isQ ? (g.label || "Question") : ((g.item && g.item.name) || g.label || "Add-on");
+          const sub = isQ ? `${(g.options || []).length} answer${(g.options || []).length === 1 ? "" : "s"} · from your Questions library` : "From your Add-ons library";
+          return (
+            <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", marginBottom: 12 }}>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{label}</span>
+                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{sub}</span>
+              </span>
+              <Lock size={15} style={{ color: "var(--faint)", flexShrink: 0 }} />
+            </div>
+          );
+        }
         // Reorder only swaps a group with its nearest SAME-KIND neighbour (questions render before
         // add-ons on the client screen regardless), so the arrows read correctly in the merged list.
         const isAddon = g.type === "addon";
@@ -17044,6 +17079,60 @@ function QuestionsEditor({ services, setServices, business, setBusiness, showToa
       <button className="lift" onClick={() => { setForm(blank()); setEditing("new"); }} style={{ width: "100%", background: "transparent", border: "1.5px dashed var(--border2)", color: "var(--text)", padding: "14px 16px", fontSize: 14.5, fontWeight: 500, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, marginTop: 20, cursor: "pointer" }}><Plus size={18} /> Add a question</button>
     </div>
   );
+}
+
+// ============================================================
+// ONE-TIME CONSOLIDATION — fold each service's hand-built questions (type "choice") and add-ons
+// (type "addon") into the master libraries (business.questionsLibrary / addOnsLibrary), merging
+// duplicates by name/answers, then re-materialize every service to reference the master lists only
+// (questions id-prefixed "libq-", add-ons "lib-"). Fixes duplicates (e.g. an old built-in add-on +
+// a library one) and makes the master lists the single source of truth. Idempotent (skips groups
+// already prefixed) and keeps a per-service `_preLib` backup of the original groups so it's reversible.
+// ============================================================
+function consolidateBookingLibraries(services, business) {
+  const norm = (s) => (s || "").toString().trim().toLowerCase();
+  const qSig = (g) => norm(g.label) + "||" + (g.options || []).map((o) => norm(o.label)).join(",");
+  const aSig = (g) => norm((g.item && g.item.name) || g.label);
+  const rid = () => Math.random().toString(36).slice(2, 9);
+  const qLib = (business.questionsLibrary || []).map((q) => ({ ...q, services: [...(q.services || [])] }));
+  const aLib = (business.addOnsLibrary || []).map((a) => ({ ...a, services: [...(a.services || [])] }));
+  const qIndex = {}; qLib.forEach((q) => { qIndex[norm(q.label) + "||" + (q.options || []).map((o) => norm(o.label)).join(",")] = q; });
+  const aIndex = {}; aLib.forEach((a) => { aIndex[norm(a.name)] = a; });
+  let touched = false;
+  (services || []).forEach((s) => {
+    (s.addonGroups || []).forEach((g) => {
+      const id = String(g.id || "");
+      if (g.type === "choice") {
+        if (id.startsWith("libq-")) return;
+        touched = true;
+        const sig = qSig(g);
+        let entry = qIndex[sig];
+        if (!entry) {
+          entry = { id: "q" + Date.now() + rid(), label: g.label || "Choose your cut", required: g.required !== false, services: [], options: (g.options || []).map((o) => ({ id: o.id || ("o" + rid()), label: o.label || "", desc: o.desc || "", price: Number(o.price) || 0, min: Number(o.min) || 0, photos: Array.isArray(o.photos) ? o.photos : [] })) };
+          qIndex[sig] = entry; qLib.push(entry);
+        }
+        if (!entry.services.includes(s.id)) entry.services.push(s.id);
+      } else {
+        if (id.startsWith("lib-")) return;
+        touched = true;
+        const it = g.item || {};
+        const sig = aSig(g);
+        let entry = aIndex[sig];
+        if (!entry) {
+          entry = { id: "ao" + Date.now() + rid(), name: it.name || g.label || "Add-on", price: Number(it.price) || 0, extraMin: Number(it.min) || 0, desc: it.desc || "", photo: g.photo || it.photo || "", required: !!g.required, services: [] };
+          aIndex[sig] = entry; aLib.push(entry);
+        }
+        if (!entry.services.includes(s.id)) entry.services.push(s.id);
+      }
+    });
+  });
+  if (!touched) return null; // everything already library-managed
+  const nextServices = (services || []).map((s) => {
+    const libQ = qLib.filter((q) => (q.services || []).includes(s.id)).map((q) => ({ id: "libq-" + q.id, type: "choice", label: q.label, required: !!q.required, options: (q.options || []).map((o) => ({ id: o.id, label: o.label, desc: o.desc || "", price: Number(o.price) || 0, min: Number(o.min) || 0, photos: Array.isArray(o.photos) ? o.photos : [] })) }));
+    const libA = aLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.name, photo: a.photo || "", required: !!a.required, item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 } }));
+    return { ...s, _preLib: (s._preLib || s.addonGroups || []), addonGroups: [...libQ, ...libA] };
+  });
+  return { services: nextServices, questionsLibrary: qLib, addOnsLibrary: aLib };
 }
 
 // ============================================================
