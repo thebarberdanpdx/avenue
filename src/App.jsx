@@ -12021,10 +12021,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                       {/* drag grip (far left) */}
                       {editMode
                         ? <span onTouchStart={touchStart(s.id, cat, inCat.map((x) => x.id))} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchEnd} style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none", flexShrink: 0, display: "flex", alignItems: "center", padding: "0 4px 0 12px", cursor: held ? "grabbing" : "grab" }}><GripVertical size={19} style={{ color: held ? "var(--gold)" : "var(--faint)" }} /></span>
-                        : <span style={{ width: 12, flexShrink: 0 }} />}
-                      {/* color bar — real services show their calendar color; categories (services with options) show none */}
-                      <span style={{ width: 4, alignSelf: "stretch", margin: "12px 0", borderRadius: 4, background: (s.usesCutStyles !== false && s.cutTypes && s.cutTypes.length > 0) ? "transparent" : hexById(s.color), flexShrink: 0 }} />
-                      {/* name + duration */}
+                        : <span style={{ width: 14, flexShrink: 0 }} />}
+                      {/* name + duration (calendar color bar intentionally not shown on this list) */}
                       {editMode ? (
                         <div style={{ flex: 1, minWidth: 0, padding: "12px 12px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
                           <div style={{ fontSize: 14.5, fontWeight: 500, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
@@ -12067,7 +12065,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", marginTop: 10 }}>
                   {arch.map((s, i) => (
                     <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
-                      <span style={{ width: 11, height: 11, borderRadius: "50%", background: (s.usesCutStyles !== false && s.cutTypes && s.cutTypes.length > 0) ? "transparent" : hexById(s.color), flexShrink: 0, opacity: 0.5 }} />
                       <button onClick={() => openEdit(s)} style={{ flex: 1, background: "none", textAlign: "left", color: "var(--sub)", minWidth: 0, padding: 0 }}>
                         <div style={{ fontSize: 16, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
                         <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>${s.price} · {s.duration} min</div>
