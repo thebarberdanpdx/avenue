@@ -11013,6 +11013,11 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // edits, and reorders only among same-kind neighbours.
   const renderGroups = (kind) => {
     const matches = (g) => kind === "all" ? true : (kind === "addon" ? g.type === "addon" : g.type !== "addon");
+    // Mangomint-clean shared bits: sentence-case gray label, italic helper, airy card + toggle row.
+    const qLbl = { fontSize: 13, color: "var(--sub)", fontWeight: 500, margin: "0 0 8px" };
+    const qHelp = { fontSize: 12.5, color: "var(--faint)", fontStyle: "italic", margin: "8px 2px 0", lineHeight: 1.45 };
+    const cardCln = { ...cardStyle, padding: 20, marginBottom: 14, borderRadius: 16 };
+    const togRow = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "18px 0", borderTop: "1px solid var(--line)" };
     return (
     <>
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>{kind === "all" ? "Paid extras and quick questions clients answer while booking. Shown in the order below." : (kind === "addon" ? "Paid extras clients can add while booking — each can add price, time, or both. Shown in the order below." : "Quick questions clients answer while booking (e.g. “Skin fade?”). Shown in the order below.")}</p>
@@ -11048,16 +11053,18 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             </div>
           );
           return (
-            <div key={i} style={{ ...cardStyle, marginBottom: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                <span style={{ fontSize: 10.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Question</span>
+            <div key={i} style={cardCln}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                <span style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Question</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   {reorder}
                   <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", border: "none", color: "#c0392b", flexShrink: 0, display: "flex", padding: 4, cursor: "pointer" }}><Trash2 size={16} /></button>
                 </div>
               </div>
-              <GField label="Question clients see" value={g.label} onChange={(v) => setGroup(i, { label: v })} placeholder="e.g. Choose your cut" />
-              <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--sub)", fontWeight: 700, margin: "20px 2px 12px" }}>Answers</div>
+              <div style={qLbl}>Prompt clients see</div>
+              <input value={g.label || ""} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="e.g. Choose your cut" style={{ ...inpStyle, fontWeight: 500 }} />
+              <p style={qHelp}>Shown to clients in online booking.</p>
+              <div style={{ ...qLbl, margin: "24px 0 12px" }}>Answers</div>
               {opts.map((o, oi) => (
                 <div key={o.id || oi} style={{ border: "1px solid var(--border)", borderRadius: 16, padding: "12px 14px 16px", marginBottom: 14, background: "var(--panel2)", boxShadow: "var(--shadow-sm)" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -11121,61 +11128,66 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         const addsPrice = it.addsPrice !== false;
         const addsTime = it.addsTime !== false;
         return (
-          <div key={i} style={{ ...cardStyle, marginBottom: 12, border: g.required ? "1.5px solid var(--text)" : "1px solid var(--border)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={{ fontSize: 10.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Add-on</span>
+          <div key={i} style={{ ...cardCln, border: g.required ? "1.5px solid var(--text)" : "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+              <span style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Add-on</span>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 {reorder}
                 <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", border: "none", color: "#c0392b", flexShrink: 0, display: "flex", padding: 4, cursor: "pointer" }}><Trash2 size={16} /></button>
               </div>
             </div>
 
-            <SectionLbl style={{ margin: "0 2px 8px" }}>Question clients see</SectionLbl>
+            <div style={qLbl}>Prompt clients see</div>
             <input value={g.label || ""} onChange={(e) => setGroup(i, { label: e.target.value })} placeholder="e.g. Want to finish with a hot towel?" style={{ ...inpStyle, fontWeight: 500 }} />
+            <p style={qHelp}>Shown to clients in online booking.</p>
 
-            <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 14 }}>
+            <div style={{ ...qLbl, marginTop: 22 }}>Add-on name</div>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <div style={{ position: "relative", flexShrink: 0 }}>
-                <div onClick={() => setPicker({ target: i })} title="Add or change photo" style={{ width: 58, height: 58, borderRadius: 14, overflow: "hidden", border: g.photo ? "1px solid var(--border)" : "1.5px dashed var(--border2)", background: "var(--panel2)", color: "var(--faint)", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>{g.photo ? <img src={imgUrl(g.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={18} />}</div>
+                <div onClick={() => setPicker({ target: i })} title="Add or change photo" style={{ width: 52, height: 52, borderRadius: 13, overflow: "hidden", border: g.photo ? "1px solid var(--border)" : "1.5px dashed var(--border2)", background: "var(--panel2)", color: "var(--faint)", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>{g.photo ? <img src={imgUrl(g.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={17} />}</div>
                 {g.photo && <div onClick={(e) => { e.stopPropagation(); setGroup(i, { photo: "" }); }} title="Remove photo" style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.65)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</div>}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <input value={it.name || ""} onChange={(e) => setItem(i, { name: e.target.value })} placeholder="Add-on name (e.g. Hot Towel Shave)" style={{ ...inpStyle, fontWeight: 600 }} />
+                <input value={it.name || ""} onChange={(e) => setItem(i, { name: e.target.value })} placeholder="e.g. Hot Towel Shave" style={{ ...inpStyle, fontWeight: 600 }} />
               </div>
             </div>
 
-            <textarea value={it.desc || ""} onChange={(e) => setItem(i, { desc: e.target.value })} placeholder="Short description (optional) — shown to clients" rows={2} style={{ ...inpStyle, resize: "vertical", marginTop: 12, lineHeight: 1.45, minHeight: 56 }} />
+            <div style={{ ...qLbl, marginTop: 22 }}>Description <span style={{ color: "var(--faint)", fontWeight: 400 }}>· optional</span></div>
+            <textarea value={it.desc || ""} onChange={(e) => setItem(i, { desc: e.target.value })} placeholder="A short line shown to clients" rows={2} style={{ ...inpStyle, resize: "vertical", lineHeight: 1.45, minHeight: 56 }} />
 
             {/* Adds to the price? */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)", marginTop: 12 }}>
-              <span style={{ fontSize: 14.5, fontWeight: 500 }}>Adds to the price</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                {addsPrice && (
-                  <div style={{ ...moneyWrap, width: 96 }}>
-                    <span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span>
-                    <input type="number" value={it.price ?? ""} onChange={(e) => setItem(i, { price: e.target.value })} placeholder="5" style={{ ...moneyInput, padding: "10px 12px", textAlign: "right", fontSize: 15, fontWeight: 500 }} />
-                  </div>
-                )}
-                <span onClick={() => setItem(i, { addsPrice: !addsPrice })} style={{ cursor: "pointer" }}>{pillSwitch(addsPrice)}</span>
-              </div>
+            <div style={{ ...togRow, marginTop: 24 }}>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 15, fontWeight: 600 }}>Adds to the price</span>
+                <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{addsPrice ? `Clients see +$${it.price || 0}` : "No extra charge"}</span>
+              </span>
+              {addsPrice && (
+                <div style={{ ...moneyWrap, width: 92 }}>
+                  <span style={{ padding: "0 0 0 12px", color: "var(--sub)", fontSize: 15 }}>$</span>
+                  <input type="number" value={it.price ?? ""} onChange={(e) => setItem(i, { price: e.target.value })} placeholder="5" style={{ ...moneyInput, padding: "11px 12px", textAlign: "right", fontSize: 15, fontWeight: 500 }} />
+                </div>
+              )}
+              <span onClick={() => setItem(i, { addsPrice: !addsPrice })} style={{ cursor: "pointer" }}>{pillSwitch(addsPrice)}</span>
             </div>
 
             {/* Adds time? */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)" }}>
-              <span style={{ fontSize: 14.5, fontWeight: 500 }}>Adds time</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                {addsTime && (
-                  <div style={{ ...moneyWrap, width: 104 }}>
-                    <input type="number" value={it.min ?? ""} onChange={(e) => setItem(i, { min: e.target.value })} placeholder="10" style={{ ...moneyInput, padding: "10px 8px 10px 12px", textAlign: "right", fontSize: 15, fontWeight: 500 }} />
-                    <span style={unitSuffix}>min</span>
-                  </div>
-                )}
-                <span onClick={() => setItem(i, { addsTime: !addsTime })} style={{ cursor: "pointer" }}>{pillSwitch(addsTime)}</span>
-              </div>
+            <div style={togRow}>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 15, fontWeight: 600 }}>Adds time</span>
+                <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{addsTime ? `Adds ${it.min || 0} min to the booking` : "No extra time"}</span>
+              </span>
+              {addsTime && (
+                <div style={{ ...moneyWrap, width: 100 }}>
+                  <input type="number" value={it.min ?? ""} onChange={(e) => setItem(i, { min: e.target.value })} placeholder="10" style={{ ...moneyInput, padding: "11px 8px 11px 12px", textAlign: "right", fontSize: 15, fontWeight: 500 }} />
+                  <span style={unitSuffix}>min</span>
+                </div>
+              )}
+              <span onClick={() => setItem(i, { addsTime: !addsTime })} style={{ cursor: "pointer" }}>{pillSwitch(addsTime)}</span>
             </div>
 
             {/* Optional vs required — required means clients must answer (No thanks still works) */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 0 0", borderTop: "1px solid var(--line)" }}>
-              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>When booking</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Required just means they must answer — "No thanks" still works.</span></span>
+            <div style={togRow}>
+              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15, fontWeight: 600 }}>When booking</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Required means they must answer — "No thanks" still works.</span></span>
               <div style={{ display: "flex", border: "1px solid var(--border2)", borderRadius: 10, overflow: "hidden", flexShrink: 0 }}>
                 {[{ v: false, l: "Optional" }, { v: true, l: "Required" }].map((o) => {
                   const on = !!g.required === o.v;
