@@ -31,7 +31,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 // they're also called from the public booking page, where there is no login.
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const STAFF_ONLY = new Set(["charge", "refund"]);
+const STAFF_ONLY = new Set(["charge", "refund", "connection_token"]);
 
 // Reject a bad money amount before it ever reaches Stripe. `amount` is in
 // dollars. It must be a real number, greater than zero, and under a sane
@@ -238,6 +238,16 @@ async function handler(req, res) {
       }
       const r = await stripe.refunds.create(params, idempotencyKey ? { idempotencyKey } : undefined); // dedupe retries of the same refund
       return res.status(200).json({ status: r.status, id: r.id, amount: (r.amount || 0) / 100 });
+    }
+
+    // --- Tap to Pay on iPhone: Terminal connection token --------------------
+    // The native Stripe Terminal SDK exchanges this short-lived token to connect
+    // the iPhone's built-in reader (Tap to Pay). Staff-only; moves no money.
+    // Requires Terminal enabled on the Stripe account AND the app's Apple
+    // "Tap to Pay on iPhone" entitlement + native SDK on the device.
+    if (action === "connection_token") {
+      const ct = await stripe.terminal.connectionTokens.create();
+      return res.status(200).json({ secret: ct.secret });
     }
 
     return res.status(400).json({ error: "Unknown action." });
