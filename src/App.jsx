@@ -11129,6 +11129,30 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                     {moneyField("Extra charge", "$", null, o.price, (n) => setOpt(oi, { price: n }), "0")}
                     {moneyField("Extra time", null, "min", o.min, (n) => setOpt(oi, { min: n }), "0")}
                   </div>
+                  {staffList.length > 0 && (
+                    <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                      <div style={{ fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: "var(--sub)", fontWeight: 700, marginBottom: 10 }}>Per barber (optional)</div>
+                      {staffList.map((p) => {
+                        const se = form.staff[p.id] || {};
+                        const pv = (se.answerPrice && se.answerPrice[g.id] && se.answerPrice[g.id][o.id] != null) ? se.answerPrice[g.id][o.id] : "";
+                        const dv = (se.answerDur && se.answerDur[g.id] && se.answerDur[g.id][o.id] != null) ? se.answerDur[g.id][o.id] : "";
+                        return (
+                          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+                            <span style={{ width: 62, flexShrink: 0, fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(p.name || "").split(" ")[0]}</span>
+                            <div style={{ ...G_BOX_ON("var(--panel2)"), flex: 1, minWidth: 0, marginBottom: 0, display: "flex", alignItems: "center", padding: "10px 12px" }}>
+                              <span style={{ color: "var(--sub)", fontSize: 15, marginRight: 3 }}>$</span>
+                              <input type="number" inputMode="decimal" value={pv} placeholder={String(Number(o.price) || 0)} onChange={(ev) => setStaffAnswerPrice(p.id, g.id, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...G_INPUT, minWidth: 0, fontSize: 15 }} />
+                            </div>
+                            <div style={{ ...G_BOX_ON("var(--panel2)"), flex: 1, minWidth: 0, marginBottom: 0, display: "flex", alignItems: "center", padding: "10px 12px" }}>
+                              <input type="number" inputMode="numeric" value={dv} placeholder={String(Number(o.min) || 0)} onChange={(ev) => setStaffAnswerDur(p.id, g.id, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...G_INPUT, minWidth: 0, fontSize: 15 }} />
+                              <span style={{ color: "var(--sub)", fontSize: 13, marginLeft: 3 }}>min</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.4, margin: "2px 0 0" }}>Blank uses the default above. This is {(staffList[0] && staffList[0].name.split(" ")[0]) || "each barber"}'s own price &amp; time for this answer.</p>
+                    </div>
+                  )}
                 </div>
               ))}
               <button onClick={() => setGroup(i, { options: [...opts, { id: "o" + Date.now(), label: "", desc: "", price: 0, min: 0 }] })} style={{ ...addTileStyle, width: "100%", padding: "12px 10px", margin: "2px 0 14px" }}><Plus size={15} /> Add an answer</button>
@@ -11207,6 +11231,30 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 })}
               </div>
             </div>
+            {staffList.length > 0 && (addsPrice || addsTime) && (
+              <div style={{ marginTop: 4, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+                <div style={{ fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: "var(--sub)", fontWeight: 700, marginBottom: 10 }}>Per barber (optional)</div>
+                {staffList.map((p) => {
+                  const se = form.staff[p.id] || {};
+                  const pv = (se.addonPrice && se.addonPrice[g.id] != null) ? se.addonPrice[g.id] : "";
+                  const dv = (se.addonDur && se.addonDur[g.id] != null) ? se.addonDur[g.id] : "";
+                  return (
+                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+                      <span style={{ width: 62, flexShrink: 0, fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(p.name || "").split(" ")[0]}</span>
+                      {addsPrice && <div style={{ ...G_BOX_ON("var(--panel)"), flex: 1, minWidth: 0, marginBottom: 0, display: "flex", alignItems: "center", padding: "10px 12px" }}>
+                        <span style={{ color: "var(--sub)", fontSize: 15, marginRight: 3 }}>$</span>
+                        <input type="number" inputMode="decimal" value={pv} placeholder={String(Number(it.price) || 0)} onChange={(ev) => setStaffAddonPrice(p.id, g.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...G_INPUT, minWidth: 0, fontSize: 15 }} />
+                      </div>}
+                      {addsTime && <div style={{ ...G_BOX_ON("var(--panel)"), flex: 1, minWidth: 0, marginBottom: 0, display: "flex", alignItems: "center", padding: "10px 12px" }}>
+                        <input type="number" inputMode="numeric" value={dv} placeholder={String(Number(it.min) || 0)} onChange={(ev) => setStaffAddonDur(p.id, g.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...G_INPUT, minWidth: 0, fontSize: 15 }} />
+                        <span style={{ color: "var(--sub)", fontSize: 13, marginLeft: 3 }}>min</span>
+                      </div>}
+                    </div>
+                  );
+                })}
+                <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.4, margin: "2px 0 0" }}>Blank uses the default above.</p>
+              </div>
+            )}
           </div>
         );
       })}
