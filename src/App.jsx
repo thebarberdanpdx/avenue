@@ -3350,6 +3350,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // (prominent description + required choice questions, NO prices) then an "addons" screen
   // (optional extras + running total). Only entered from selectService for services with groups.
   const [cutFlow, setCutFlow] = useState(null); // null | { phase: "cut" | "addons" }
+  const [pickConfirm, setPickConfirm] = useState(null); // { name, desc } — "just to confirm" sheet after picking an option/add-on that has a description
   // Owner "Preview booking page" deep-link: the dashboard opens /book?preview_svc=<id> in a new
   // tab and we jump straight to that service's questions/add-ons screen, so the owner sees exactly
   // what clients see. Applied once, after services load (they arrive async), then the param is
@@ -3710,9 +3711,21 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
   // ---- Two-screen "cut + add-ons" flow (cutFlow) ----
   // Pick a choice option (e.g. skin fade vs standard) on the cut screen — single-select per group.
-  const pickChoice = (group, optionId) => { const cur = cart[0] || {}; putEntry({ ...cur, addons: { ...(cur.addons || {}), [group.id]: optionId } }); };
+  const pickChoice = (group, optionId) => {
+    const cur = cart[0] || {};
+    putEntry({ ...cur, addons: { ...(cur.addons || {}), [group.id]: optionId } });
+    // Pop a "just to confirm" sheet with the full description of what they picked.
+    const opt = (group.options || []).find((o) => o.id === optionId);
+    if (opt && opt.desc && String(opt.desc).trim()) setPickConfirm({ name: opt.label, desc: opt.desc });
+  };
   // Toggle an optional add-on on the add-ons screen.
-  const toggleExtra = (group) => { const cur = cart[0] || {}; const a = { ...(cur.addons || {}) }; if (a[group.id]) delete a[group.id]; else a[group.id] = true; putEntry({ ...cur, addons: a }); };
+  const toggleExtra = (group) => {
+    const cur = cart[0] || {}; const a = { ...(cur.addons || {}) };
+    const turningOn = !a[group.id];
+    if (a[group.id]) delete a[group.id]; else a[group.id] = true;
+    putEntry({ ...cur, addons: a });
+    if (turningOn) { const it = group.item || {}; if (it.desc && String(it.desc).trim()) setPickConfirm({ name: it.name || group.label, desc: it.desc }); }
+  };
   const choiceGroupsOf = (svc) => (svc?.addonGroups || []).filter((g) => g.type === "choice");
   const extraGroupsOf = (svc) => (svc?.addonGroups || []).filter((g) => g.type === "addon");
   // All required choice groups must be answered before leaving the cut screen.
@@ -4620,20 +4633,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </div>
               ))}
 
-              {extras.map((g) => { const it = g.item || {}; const on = !!(e.addons || {})[g.id]; const price = addonPriceFor(svc, provId, g); const min = addonDuration(svc, provId, g); return (
+              {extras.map((g) => { const it = g.item || {}; const on = !!(e.addons || {})[g.id]; const price = addonPriceFor(svc, provId, g); const min = addonDuration(svc, provId, g); const req = g.required === true; return (
                 <div key={g.id}>
                   <div style={qHead}>{g.label || (it.name ? `Add ${it.name}?` : "Add-on")}</div>
-                  <button onClick={() => { if (!on) toggleExtra(g); }} style={rowBtn}>
+                  {/* Optional add-on: one tappable row (tap to add, tap again to remove). Required: Yes / No thanks. */}
+                  <button onClick={() => { if (req) { if (!on) toggleExtra(g); } else toggleExtra(g); }} style={rowBtn}>
                     {radio(on)}
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>Yes{it.name ? ` — ${it.name}` : ""}</span>
                       {it.desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{it.desc}</span>}
                     </span>
                   </button>
-                  <button onClick={() => { if (on) toggleExtra(g); }} style={rowBtn}>
-                    {radio(!on)}
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 500 }}>No thanks</span>
-                  </button>
+                  {req && (
+                    <button onClick={() => { if (on) toggleExtra(g); }} style={rowBtn}>
+                      {radio(!on)}
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 500 }}>No thanks</span>
+                    </button>
+                  )}
                 </div>
               ); })}
 
@@ -4641,6 +4657,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             </div>
           );
         })()}
+
+        {/* "Just to confirm" — full description of the option/add-on the client just picked. */}
+        {pickConfirm && (
+          <Sheet open onClose={() => setPickConfirm(null)} align="center" maxWidth={420}>
+            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 8px" }}>Just to confirm</h3>
+            {pickConfirm.name && <div style={{ fontSize: 15.5, fontWeight: 600, color: "var(--text)", margin: "0 0 8px" }}>{pickConfirm.name}</div>}
+            <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 22px", whiteSpace: "pre-wrap" }}>{pickConfirm.desc}</p>
+            <button className="lift" onClick={() => setPickConfirm(null)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>OK</button>
+          </Sheet>
+        )}
 
         {addonFlow && draft && (() => {
           const entry = cart[0];
