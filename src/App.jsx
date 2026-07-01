@@ -3165,6 +3165,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // ---- Guided consultation (auto-launches for brand-new clients) ----
   const [consult, setConsult] = useState(null); // null = off; otherwise { step, sides, bottom, condition } answers
   const [tapSel, setTapSel] = useState(null); // id of the service tile being tapped — turns it black briefly before advancing
+  const [svcInfo, setSvcInfo] = useState(null); // service id whose "more info" description is expanded in the list
   useEffect(() => { setTapSel(null); }, [simpleStep, step, simpleCat]);
   const [consultResult, setConsultResult] = useState(null); // resolved cut type id once finished
   const [cutHelperOpen, setCutHelperOpen] = useState(null); // "photo" | "notSure" | null — opens the helper sheet on Pick Your Cut
@@ -4259,9 +4260,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             const hasExtras = groups.some((g) => g.type === "addon");
             // A question (choice group) puts the service on the new two-screen flow — that's how any
             // service is converted. Legacy cut-style services keep the old flow until a question is added.
-            if (hasChoices) { setCutFlow({ phase: "cut" }); }
+            if (hasChoices || hasExtras) { setCutFlow({ phase: "cut" }); }
             else if (hasCuts) { setSimpleStep("cut"); }
-            else if (hasExtras) { setCutFlow({ phase: "addons" }); }
             else { startAddons({ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }); }
           };
           const liveCats = cats.filter((c) => inCat(c).length > 0);
@@ -4308,18 +4308,26 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <h2 style={{ ...HEAD, margin: 0 }}>{simpleCat ? "Pick your service" : "Book an appointment"}</h2>
                 <p style={{ ...LEAD, marginTop: 10 }}>{simpleCat ? ("Here's what we do in " + simpleCat + ".") : (bs.whatLead || "Start here — we'll walk you through the rest.")}</p>
               </div>
-              <div className="svc-menu">
-                {list.map((svc, i) => (
-                  <div key={svc.id} style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                    <button onClick={() => { setTapSel(svc.id); setTimeout(() => selectService(svc), 165); }} className={"svc-tile" + (tapSel === svc.id ? " sel" : "")}>
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        <span className="svc-name" style={{ display: "block" }}>{svc.name}</span>
-                        {metaFor(svc) ? <span className="svc-meta" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.4 }}>{metaFor(svc)}</span> : null}
-                      </span>
-                      <span className="svc-ar">&#8594;</span>
-                    </button>
-                  </div>
-                ))}
+              <div style={{ borderTop: "1px solid var(--line)", marginTop: 18 }}>
+                {list.map((svc) => {
+                  const dc = activeMember || matched;
+                  const cp = dc && dc.customPrices ? dc.customPrices[svc.id] : null;
+                  const price = (cp != null && cp !== "") ? Number(cp) : (Number(svc.price) || 0);
+                  const desc = (svc.booking && svc.booking.description) || "";
+                  const open = svcInfo === svc.id;
+                  return (
+                    <div key={svc.id} style={{ borderBottom: "1px solid var(--line)", background: tapSel === svc.id ? "var(--panel2)" : "transparent", transition: "background .15s" }}>
+                      <button onClick={() => { setTapSel(svc.id); setTimeout(() => selectService(svc), 165); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "none", border: "none", padding: "18px 4px", textAlign: "left", cursor: "pointer" }}>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: "var(--text)", letterSpacing: "-0.2px" }}>{svc.name}</span>
+                          {desc ? <span onClick={(e) => { e.stopPropagation(); setSvcInfo(open ? null : svc.id); }} style={{ display: "inline-block", marginTop: 6, fontFamily: FONT_BODY, fontSize: 13, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>{open ? "Less" : "More info"}</span> : null}
+                        </span>
+                        <span style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, color: "var(--text)", flexShrink: 0 }}>${price}</span>
+                      </button>
+                      {open && desc ? <div style={{ fontFamily: FONT_BODY, fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, padding: "0 4px 16px", whiteSpace: "pre-line" }}>{desc}</div> : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
@@ -4554,70 +4562,72 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* ===== SCREEN 1 — the cut: prominent description + required choice(s), NO prices ===== */}
         {cutFlow && cutFlow.phase === "cut" && cart[0] && (() => {
           const e = cart[0]; const svc = e.service;
+          const provId = e.provider && e.provider.id !== "anyone" ? e.provider.id : "dan";
           const desc = (svc.booking && svc.booking.description) || "";
           const choices = choiceGroupsOf(svc);
+          const extras = extraGroupsOf(svc);
+          const lt = lineTotal(e);
           const ready = cutChoicesReady();
+          const dc = activeMember || matched;
+          const cp = dc && dc.customPrices ? dc.customPrices[svc.id] : null;
+          const basePrice = (cp != null && cp !== "") ? Number(cp) : (Number(svc.price) || 0);
+          const radio = (on) => <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--text)" : "var(--border2)"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--text)" }} />}</span>;
+          const rowBtn = { display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left", padding: "15px 4px", background: "none", border: "none", borderBottom: "1px solid var(--line)", cursor: "pointer" };
+          const qHead = { fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, color: "var(--text)", margin: "26px 0 6px" };
           return (
-            <div className="fade-up" style={{ paddingBottom: 28 }}>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: "-0.3px", margin: "2px 0 0" }}>{svc.name}</h2>
-              {desc && (
-                <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
-                  <div style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text)", fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><span style={{ width: 16, height: 1.5, background: "var(--text)" }} />Read this first</div>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17.5, lineHeight: 1.5, color: "var(--text2)", letterSpacing: "-0.1px", whiteSpace: "pre-line" }}>{desc}</div>
-                </div>
-              )}
+            <div className="fade-up" style={{ paddingBottom: 28, textAlign: "left" }}>
+              {/* picked service · price · change */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "var(--panel2)", borderRadius: 14, padding: "14px 16px" }}>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500 }}>{svc.name}</span>
+                  <button onClick={() => { setCutFlow(null); setCart([]); }} style={{ background: "none", border: "none", padding: 0, marginTop: 3, fontFamily: FONT_BODY, fontSize: 13, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>Change</button>
+                </span>
+                <span style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, flexShrink: 0 }}>${basePrice}</span>
+              </div>
+              {desc ? <p style={{ fontFamily: FONT_BODY, fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 0", whiteSpace: "pre-line" }}>{desc}</p> : null}
+
               {choices.map((g) => (
-                <div key={g.id} style={{ marginTop: 24 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 13 }}>
-                    <span style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--sub)", fontWeight: 600 }}>{g.label || "Choose your cut"}</span>
-                    {g.required !== false && <span style={{ fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Required</span>}
-                  </div>
-                  {(g.options || []).map((o) => { const on = (e.addons || {})[g.id] === o.id; return (
-                    <button key={o.id} onClick={() => pickChoice(g, o.id)} style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left", padding: 16, borderRadius: 14, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 7%, var(--panel))" : "var(--panel)", marginBottom: 11, cursor: "pointer" }}>
-                      <span style={{ width: 22, height: 22, borderRadius: "50%", border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3.5} />}</span>
+                <div key={g.id}>
+                  <div style={qHead}>{g.label || "Choose your cut"}</div>
+                  {(g.options || []).map((o) => { const on = (e.addons || {})[g.id] === o.id; const oPrice = answerPriceFor(svc, provId, g, o); return (
+                    <button key={o.id} onClick={() => pickChoice(g, o.id)} style={rowBtn}>
+                      {radio(on)}
                       <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: "block", fontSize: 15.5, fontWeight: 600, color: "var(--text)" }}>{o.label}</span>
-                        {o.desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{o.desc}</span>}
+                        <span style={{ display: "block", fontSize: 15.5, fontWeight: 500, color: "var(--text)" }}>{o.label}</span>
+                        {o.desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{o.desc}</span>}
                       </span>
+                      {oPrice > 0 && <span style={{ fontSize: 15, fontWeight: 500, color: "var(--text)", flexShrink: 0 }}>+ ${oPrice}</span>}
                     </button>
                   ); })}
                 </div>
               ))}
-              <button className="lift" disabled={!ready} onClick={cutFlowNext} style={{ width: "100%", marginTop: 24, background: ready ? "var(--text)" : "var(--panel2)", color: ready ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 14, padding: 17, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: ready ? "pointer" : "default" }}>Continue</button>
-            </div>
-          );
-        })()}
 
-        {/* ===== SCREEN 2 — optional add-ons + running total ===== */}
-        {cutFlow && cutFlow.phase === "addons" && cart[0] && (() => {
-          const e = cart[0]; const svc = e.service;
-          const provId = e.provider && e.provider.id !== "anyone" ? e.provider.id : "dan";
-          const extras = extraGroupsOf(svc);
-          const lt = lineTotal(e);
-          const picked = choiceGroupsOf(svc).map((g) => { const o = (g.options || []).find((x) => x.id === (e.addons || {})[g.id]); return o && o.label; }).filter(Boolean);
-          return (
-            <div className="fade-up" style={{ paddingBottom: 28 }}>
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: "-0.3px", margin: "2px 0 2px" }}>Anything else?</h2>
-              <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 20 }}>{[svc.name, ...picked].join(" · ")}</div>
-              <div style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, marginBottom: 13 }}>Optional add-ons</div>
               {extras.map((g) => { const it = g.item || {}; const on = !!(e.addons || {})[g.id]; const price = addonPriceFor(svc, provId, g); const min = addonDuration(svc, provId, g); return (
-                <button key={g.id} onClick={() => toggleExtra(g)} style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left", padding: 16, borderRadius: 14, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--gold) 7%, var(--panel))" : "var(--panel)", marginBottom: 11, cursor: "pointer" }}>
-                  <span style={{ width: 22, height: 22, borderRadius: "50%", border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3.5} />}</span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 600, color: "var(--text)" }}>{it.name || g.label}</span>
-                    {it.desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{it.desc}</span>}
-                  </span>
-                  <span style={{ textAlign: "right", flexShrink: 0 }}>
-                    {it.addsPrice !== false && price > 0 && <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>+${price}</span>}
-                    {it.addsTime !== false && min > 0 && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>+{min} min</span>}
-                  </span>
-                </button>
+                <div key={g.id}>
+                  <div style={qHead}>{g.label || (it.name ? `Add ${it.name}?` : "Add-on")}</div>
+                  <button onClick={() => { if (!on) toggleExtra(g); }} style={rowBtn}>
+                    {radio(on)}
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Yes{it.name ? ` — ${it.name}` : ""}</span>
+                      {it.desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{it.desc}</span>}
+                    </span>
+                    <span style={{ textAlign: "right", flexShrink: 0 }}>
+                      {it.addsPrice !== false && price > 0 && <span style={{ display: "block", fontSize: 15, fontWeight: 500 }}>+ ${price}</span>}
+                      {it.addsTime !== false && min > 0 && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>+ {min} min</span>}
+                    </span>
+                  </button>
+                  <button onClick={() => { if (on) toggleExtra(g); }} style={rowBtn}>
+                    {radio(!on)}
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 15.5, fontWeight: 500 }}>No thanks</span>
+                  </button>
+                </div>
               ); })}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 22 }}>
-                <span style={{ fontSize: 14, color: "var(--sub)" }}>Your total so far</span>
-                <span style={{ fontSize: 15, fontWeight: 600 }}>${lt.price} · {lt.min} min</span>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", paddingTop: 16, marginTop: 26 }}>
+                <span style={{ fontSize: 14, color: "var(--sub)" }}>Total</span>
+                <span style={{ fontSize: 16, fontWeight: 600 }}>${lt.price} · {lt.min} min</span>
               </div>
-              <button className="lift" onClick={cutFlowFinish} style={{ width: "100%", marginTop: 16, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 14, padding: 17, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Continue&nbsp;&nbsp;·&nbsp;&nbsp;${lt.price}&nbsp;&nbsp;·&nbsp;&nbsp;{lt.min} min</button>
+              <button className="lift" disabled={!ready} onClick={cutFlowFinish} style={{ width: "100%", marginTop: 16, background: ready ? "var(--text)" : "var(--panel2)", color: ready ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 14, padding: 17, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: ready ? "pointer" : "default" }}>{ready ? `Continue  ·  $${lt.price}` : "Pick your options"}</button>
             </div>
           );
         })()}
