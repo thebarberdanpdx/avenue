@@ -894,22 +894,25 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
       card.on("change", (ev) => setErr(ev.error ? ev.error.message : ""));
       els.current = { stripe, card };
 
-      // Apple Pay / Google Pay (charge path only). The button only appears when the
+      // Apple Pay / Google Pay for BOTH paths: charging an amount, or saving a card on
+      // file with no charge (a $0 "pending" total). The button only appears when the
       // browser/device actually supports a wallet (Safari+Apple, Chrome+Google) on our
       // verified domain — everywhere else canMakePayment() is null and the card field
       // is the fallback, so this never breaks anyone who can't use it.
-      if (isPay) {
-        try {
-          const pr = stripe.paymentRequest({
-            country: "US", currency: "usd",
-            total: { label: "Booking deposit", amount: Math.round(Number(amount) * 100) },
-            requestPayerName: true, requestPayerEmail: true,
-          });
-          const prButton = elements.create("paymentRequestButton", { paymentRequest: pr, style: { paymentRequestButton: { type: "default", theme: "dark", height: "48px" } } });
-          const can = await pr.canMakePayment();
-          if (can && !dead && prBox.current) { prButton.mount(prBox.current); setWallet(true); els.current.prButton = prButton; }
-          pr.on("paymentmethod", async (ev) => {
-            try {
+      try {
+        const pr = stripe.paymentRequest({
+          country: "US", currency: "usd",
+          total: isPay
+            ? { label: "Booking deposit", amount: Math.round(Number(amount) * 100) }
+            : { label: "Card on file — held to reserve", amount: 0, pending: true },
+          requestPayerName: true, requestPayerEmail: true,
+        });
+        const prButton = elements.create("paymentRequestButton", { paymentRequest: pr, style: { paymentRequestButton: { type: "default", theme: "dark", height: "48px" } } });
+        const can = await pr.canMakePayment();
+        if (can && !dead && prBox.current) { prButton.mount(prBox.current); setWallet(true); els.current.prButton = prButton; }
+        pr.on("paymentmethod", async (ev) => {
+          try {
+            if (isPay) {
               const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit" });
               if (!intent.clientSecret) { ev.complete("fail"); setErr(intent.error || "Couldn't start the charge."); return; }
               const conf = await stripe.confirmCardPayment(intent.clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false });
@@ -921,10 +924,23 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
               }
               const c4 = (ev.paymentMethod && ev.paymentMethod.card) || {};
               if (!dead) { setResult({ paid: true, intentId: intent.id, last4: c4.last4 || "••••", brand: c4.brand }); setPhase("done"); }
-            } catch (e2) { try { ev.complete("fail"); } catch (_) {} setErr(e2.message || "Payment failed. Try the card field."); }
-          });
-        } catch (e) { /* wallet unavailable — card field remains */ }
-      }
+            } else {
+              // Save the wallet card on file — no charge now.
+              const setup = await stripeApi({ action: "setup", customerId: null, name: clientName, email: clientEmail, phone: clientPhone });
+              if (!setup.clientSecret) { ev.complete("fail"); setErr(setup.error || "Couldn't set up the card."); return; }
+              const conf = await stripe.confirmCardSetup(setup.clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false });
+              if (conf.error) { ev.complete("fail"); setErr(conf.error.message || "Couldn't save the card."); return; }
+              ev.complete("success");
+              if (conf.setupIntent && conf.setupIntent.status === "requires_action") {
+                const again = await stripe.confirmCardSetup(setup.clientSecret);
+                if (again.error) { setErr(again.error.message || "Card needs another step."); return; }
+              }
+              const c4 = (ev.paymentMethod && ev.paymentMethod.card) || {};
+              if (!dead) { setResult({ saved: true, pmId: ev.paymentMethod.id, stripeCustomerId: setup.customerId, last4: c4.last4 || "••••", brand: c4.brand }); setPhase("done"); }
+            }
+          } catch (e2) { try { ev.complete("fail"); } catch (_) {} setErr(e2.message || "Something went wrong. Try the card field."); }
+        });
+      } catch (e) { /* wallet unavailable — card field remains */ }
 
       // Fallback: if the 'ready' event is ever missed, enable the button shortly after mount.
       setTimeout(() => { if (!dead) setReady(true); }, 1200);
@@ -993,17 +1009,13 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
                 <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>We keep a card on file to hold your spot. You won't be charged unless you no-show or cancel late.</div>
               )}
 
-              {isPay && (
-                <>
-                  <div ref={prBox} style={{ marginTop: wallet ? 18 : 0 }} />
-                  {wallet && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
-                      <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-                      <span style={{ fontSize: 12, color: "var(--faint)" }}>or pay with card</span>
-                      <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-                    </div>
-                  )}
-                </>
+              <div ref={prBox} style={{ marginTop: wallet ? 18 : 0 }} />
+              {wallet && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
+                  <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                  <span style={{ fontSize: 12, color: "var(--faint)" }}>{isPay ? "or pay with card" : "or enter your card"}</span>
+                  <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                </div>
               )}
 
               <div style={{ marginTop: 18 }}>
