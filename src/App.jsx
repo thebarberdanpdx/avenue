@@ -4660,14 +4660,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
         {/* "Just to confirm" — full description of the option/add-on the client just picked. */}
         {pickConfirm && (
-          <Sheet open onClose={() => setPickConfirm(null)} align="center" maxWidth={420}>
-            <div style={{ display: "flex", flexDirection: "column", maxHeight: "76dvh" }}>
-              <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 8px", flexShrink: 0 }}>Just to confirm</h3>
-              {pickConfirm.name && <div style={{ fontSize: 15.5, fontWeight: 600, color: "var(--text)", margin: "0 0 8px", flexShrink: 0 }}>{pickConfirm.name}</div>}
-              <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: "1 1 auto", minHeight: 0, margin: "0 0 20px" }}>
-                <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.55, margin: 0, whiteSpace: "pre-wrap" }}>{pickConfirm.desc}</p>
+          <Sheet open onClose={() => setPickConfirm(null)} align="center" maxWidth={480}>
+            <div style={{ display: "flex", flexDirection: "column", maxHeight: "82dvh", padding: "8px 4px 4px" }}>
+              <div style={{ fontFamily: FONT_BODY, fontSize: 12, letterSpacing: 2.5, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, textAlign: "center", margin: "0 0 12px", flexShrink: 0 }}>Please Confirm</div>
+              {pickConfirm.name && <div style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.12, color: "var(--text)", textAlign: "center", margin: "0 0 16px", flexShrink: 0 }}>{pickConfirm.name}</div>}
+              <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: "0 1 auto", minHeight: 0, margin: "0 0 26px" }}>
+                <p style={{ fontSize: 16.5, color: "var(--text2)", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap", textAlign: "center" }}>{pickConfirm.desc}</p>
               </div>
-              <button className="lift" onClick={() => setPickConfirm(null)} style={{ flexShrink: 0, width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>OK</button>
+              <button className="lift" onClick={() => setPickConfirm(null)} style={{ flexShrink: 0, width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 13, padding: 17, fontSize: 16, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>OK</button>
             </div>
           </Sheet>
         )}
