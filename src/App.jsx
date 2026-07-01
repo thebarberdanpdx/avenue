@@ -3256,6 +3256,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [clientTypeBlock, setClientTypeBlock] = useState(null); // "returning_only" | "new_only" | null — set when shop's online booking is restricted to one type and this client is the other
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberNote, setNewMemberNote] = useState("");
+  const [newMemberPhone, setNewMemberPhone] = useState(""); // phone for the person you're booking for — their reminders/check-in go here
   const [cart, setCart] = useState([]);
   const [intakeFor, setIntakeFor] = useState(null); // service object when running first-time intake
   const [draft, setDraft] = useState(null);
@@ -3271,6 +3272,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [newEmail, setNewEmail] = useState(""); // first-timer email collected at the end (optional)
   const [emailConflict, setEmailConflict] = useState(false); // true when a first-timer's email already exists on file
   const [emailChecking, setEmailChecking] = useState(false);  // true while the inline email check is running
+  const [phoneConflict, setPhoneConflict] = useState(false); // true when a first-timer's phone already exists on file → verify by code
   // Derived full name — keeps older call sites that read `newName` working without rewrites.
   const newName = `${newFirst.trim()} ${newLast.trim()}`.trim();
   const [matched, setMatched] = useState(null);
@@ -3925,7 +3927,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         cutConfirmedAt: (pi === 0 && cutConfirm) ? cutConfirm.at : undefined,
         cutDescShown: (pi === 0 && cutConfirm) ? cutConfirm.text : undefined,
         deposit: (pi === 0 && cardInfo && cardInfo.paid && typeof cardInfo.amount === "number") ? cardInfo.amount : (pi === 0 && cardInfo && cardInfo.paid) ? (() => { const dep = (business.booking || {}).deposit || {}; return dep.mode === "fixed" ? Number(dep.amount || 0) : dep.mode === "percent" ? Math.round(cartAdjTotal * (Number(dep.amount || 0) / 100)) : 0; })() : 0,
-        phone: finalPhone,
+        phone: person.key === "self" ? finalPhone : ((((matched?.family || []).find((m) => m.id === person.key) || {}).phone || "").replace(/\D/g, "").length >= 10 ? ((matched?.family || []).find((m) => m.id === person.key) || {}).phone : finalPhone),
         groupId: isMultiPerson ? baseId : null,
         manageToken: makeManageToken(),
         wantsEarlier: wantEarlier,
@@ -5728,7 +5730,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </button>
                 );
               })}
-              <button onClick={() => { setNewMemberName(""); setNewMemberNote(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", color: "var(--text)", padding: "16px", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, borderRadius: 10, border: "1px dashed var(--border2)", textAlign: "left", display: "flex", alignItems: "center", gap: 10, marginBottom: 22, cursor: "pointer" }}>
+              <button onClick={() => { setNewMemberName(""); setNewMemberNote(""); setNewMemberPhone(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", color: "var(--text)", padding: "16px", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, borderRadius: 10, border: "1px dashed var(--border2)", textAlign: "left", display: "flex", alignItems: "center", gap: 10, marginBottom: 22, cursor: "pointer" }}>
                 <Plus size={18} /> <span>Someone new</span>
               </button>
               <button disabled={groupPeople.length === 0} onClick={continueGroup} style={{ width: "100%", background: groupPeople.length ? "var(--text)" : "transparent", color: groupPeople.length ? "var(--bg)" : "var(--faint)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: groupPeople.length ? "none" : "1px solid var(--border)", cursor: groupPeople.length ? "pointer" : "default" }}>
@@ -5747,9 +5749,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>First name</label>
             <input autoFocus value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="e.g. Leo" style={{ ...inputStyle, marginBottom: 16 }} />
             <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Note (optional)</label>
-            <input value={newMemberNote} onChange={(e) => setNewMemberNote(e.target.value)} placeholder="e.g. son, age 8" style={{ ...inputStyle, marginBottom: 22 }} />
+            <input value={newMemberNote} onChange={(e) => setNewMemberNote(e.target.value)} placeholder="e.g. son, age 8" style={{ ...inputStyle, marginBottom: 16 }} />
+            <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Their phone <span style={{ color: "var(--sub)" }}>(optional)</span></label>
+            <input value={newMemberPhone} onChange={(e) => setNewMemberPhone(e.target.value)} placeholder="Their mobile number" type="tel" inputMode="tel" autoComplete="off" style={{ ...inputStyle, marginBottom: 8 }} />
+            <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 22, lineHeight: 1.5 }}>If this is the person coming in, add their number — their reminders and check-in link go here, not to you. Leave blank to send everything to your own phone.</p>
             <button className="lift" disabled={!newMemberName.trim()} onClick={() => {
-              const member = { id: "fm" + Date.now(), name: newMemberName.trim(), note: newMemberNote.trim(), customDurations: {}, gallery: [], timeline: [] };
+              const member = { id: "fm" + Date.now(), name: newMemberName.trim(), note: newMemberNote.trim(), phone: newMemberPhone.replace(/\D/g, "").length >= 10 ? newMemberPhone.trim() : "", customDurations: {}, gallery: [], timeline: [] };
               supabase.rpc("append_family_member", { p_shop: SHOP_ID, p_client_id: matched.id, p_member: member }).then(({ error }) => { if (error) console.error('[vero] append_family_member failed:', error); }).catch(() => {});
               setMatched({ ...matched, family: [...(matched.family || []), member] });
               setGroupPeople((cur) => [...cur, { id: member.id, name: member.name, note: member.note, isMember: true }]);
@@ -6155,7 +6160,21 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </div>
                 </div>
               )}
-              <input placeholder="Phone number" type="tel" inputMode="tel" autoComplete="tel" style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input placeholder="Phone number" type="tel" inputMode="tel" autoComplete="tel" style={{ ...inputStyle, ...(phoneConflict ? { borderColor: "#C0392B", borderWidth: 1.5 } : {}) }} value={phone} onChange={(e) => { setPhone(e.target.value); if (phoneConflict) setPhoneConflict(false); }} onBlur={async () => {
+                const digits = phone.replace(/\D/g, "");
+                if (digits.length < 10 || matched) { setPhoneConflict(false); return; }
+                try { const { data } = await supabase.rpc("lookup_client_by_phone", { p_shop: shopId, p_phone: phone }); setPhoneConflict(!!(data && data.id)); }
+                catch (e) { setPhoneConflict(false); }
+              }} />
+              {phoneConflict && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 9, background: "color-mix(in srgb, #C0392B 9%, var(--panel))", border: "1px solid color-mix(in srgb, #C0392B 30%, var(--border))", borderRadius: 12, padding: "12px 14px", marginTop: -6, marginBottom: 12 }}>
+                  <AlertCircle size={17} style={{ color: "#C0392B", marginTop: 1, flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 9 }}>This number's already on file. Verify it's you with a quick text code to use your account — that keeps your history and avoids a duplicate.</div>
+                    <button onClick={() => { setPhoneConflict(false); setShowWhoFor(false); setShowUsual(false); setShowSchedChoice(false); setShowWizardIntro(false); setShowCodeEntry(false); setUsePhone(true); setLoginNoMatch(null); setStep(5); }} style={{ display: "inline-block", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 9, padding: "9px 16px", fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 0.8, fontWeight: 600, cursor: "pointer" }}>Verify &amp; sign in →</button>
+                  </div>
+                </div>
+              )}
               <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
                 By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text)", textDecoration: "underline" }}>terms</a>.
               </p>
