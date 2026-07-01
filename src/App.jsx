@@ -11012,16 +11012,20 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // share one addonGroups array. renderGroups filters by kind, keeps the real array index for
   // edits, and reorders only among same-kind neighbours.
   const renderGroups = (kind) => {
-    const matches = (g) => kind === "addon" ? g.type === "addon" : g.type !== "addon";
-    const count = form.addonGroups.filter(matches).length;
+    const matches = (g) => kind === "all" ? true : (kind === "addon" ? g.type === "addon" : g.type !== "addon");
     return (
     <>
-      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>{kind === "addon" ? "Paid extras clients can add while booking — each can add price, time, or both. Shown in the order below." : "Quick questions clients answer while booking (e.g. “Skin fade?”). Shown in the order below."}</p>
+      <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>{kind === "all" ? "Paid extras and quick questions clients answer while booking. Shown in the order below." : (kind === "addon" ? "Paid extras clients can add while booking — each can add price, time, or both. Shown in the order below." : "Quick questions clients answer while booking (e.g. “Skin fade?”). Shown in the order below.")}</p>
       {form.addonGroups.map((g, i) => {
         if (!matches(g)) return null;
-        const hasPrev = form.addonGroups.some((x, k) => k < i && matches(x));
-        const hasNext = form.addonGroups.some((x, k) => k > i && matches(x));
-        const reorder = count > 1 ? (
+        // Reorder only swaps a group with its nearest SAME-KIND neighbour (questions render before
+        // add-ons on the client screen regardless), so the arrows read correctly in the merged list.
+        const isAddon = g.type === "addon";
+        const sameKind = (x) => (x.type === "addon") === isAddon;
+        const kindCount = form.addonGroups.filter(sameKind).length;
+        const hasPrev = form.addonGroups.some((x, k) => k < i && sameKind(x));
+        const hasNext = form.addonGroups.some((x, k) => k > i && sameKind(x));
+        const reorder = kindCount > 1 ? (
           <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
             <button onClick={() => moveGroupTyped(i, -1)} disabled={!hasPrev} style={{ background: "none", border: "none", color: !hasPrev ? "var(--faint)" : "var(--sub)", padding: 4, cursor: !hasPrev ? "default" : "pointer", opacity: !hasPrev ? 0.35 : 1 }}><ChevronUp size={18} /></button>
             <button onClick={() => moveGroupTyped(i, 1)} disabled={!hasNext} style={{ background: "none", border: "none", color: !hasNext ? "var(--faint)" : "var(--sub)", padding: 4, cursor: !hasNext ? "default" : "pointer", opacity: !hasNext ? 0.35 : 1 }}><ChevronDown size={18} /></button>
@@ -11207,17 +11211,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           </div>
         );
       })}
-      {kind === "addon"
-        ? <>
-            <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "addon", photo: "", featured: false, item: { name: "", desc: "", addsPrice: true, price: 5, addsTime: true, min: 10 } }] })} style={{ ...addTileStyle, width: "100%", padding: "14px 10px" }}><Plus size={17} /> Add an add-on</button>
-            {otherAddons.length > 0 && <button onClick={() => setPickAddon(true)} style={{ ...addTileStyle, width: "100%", padding: "12px 10px", marginTop: 10, borderStyle: "solid", fontSize: 14 }}><Copy size={16} /> Add from another service</button>}
-          </>
-        : <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "choice", photo: "", options: [{ id: "yes", label: "Yes", price: 5, min: 0 }, { id: "no", label: "No", price: 0, min: 0 }] }] })} style={{ ...addTileStyle, width: "100%", padding: "14px 10px" }}><Plus size={17} /> Add a question</button>}
+      {kind !== "choice" && <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "addon", photo: "", featured: false, item: { name: "", desc: "", addsPrice: true, price: 5, addsTime: true, min: 10 } }] })} style={{ ...addTileStyle, width: "100%", padding: "14px 10px" }}><Plus size={17} /> Add an add-on</button>}
+      {kind !== "addon" && <button onClick={() => setForm({ ...form, addonGroups: [...form.addonGroups, { id: "g" + Date.now(), label: "", type: "choice", photo: "", options: [{ id: "yes", label: "Yes", price: 5, min: 0 }, { id: "no", label: "No", price: 0, min: 0 }] }] })} style={{ ...addTileStyle, width: "100%", padding: "14px 10px", marginTop: kind === "all" ? 10 : 0 }}><Plus size={17} /> Add a question</button>}
+      {kind !== "choice" && otherAddons.length > 0 && <button onClick={() => setPickAddon(true)} style={{ ...addTileStyle, width: "100%", padding: "12px 10px", marginTop: 10, borderStyle: "solid", fontSize: 14 }}><Copy size={16} /> Add from another service</button>}
     </>
     );
   };
-  const addonsBody = renderGroups("addon");
-  const questionsBody = renderGroups("choice");
+  const addonsBody = renderGroups("all"); // merged: add-ons + questions in one section
+  const questionsBody = renderGroups("choice"); // kept for the standalone Questions deep-link (legacy)
 
   // ---- ONLINE BOOKING section ----
   const b = form.booking || defaultBooking();
@@ -11739,8 +11740,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           const menuRows = [
             { target: "details", icon: <Scissors size={18} />, label: "Details", sub: `$${form.price || "—"} · ${form.duration || "—"} min · ${form.category || cats[0]}` },
             { target: "staff", icon: <Users size={18} />, label: "Staff", sub: staffSub },
-            { target: "addons", icon: <Plus size={18} />, label: "Add-ons", sub: addonOnlyCount ? `${addonOnlyCount} added` : "None yet" },
-            { target: "questions", icon: <HelpCircle size={18} />, label: "Questions", sub: questionCount ? `${questionCount} added` : "None yet" },
+            { target: "addons", icon: <Plus size={18} />, label: "Add-ons", sub: addonCount ? `${addonCount} added` : "None yet" },
             { target: "photos", icon: <ImageIcon size={18} />, label: "Photos", sub: photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "None yet" },
             { target: "booking", icon: <Calendar size={18} />, label: "Online Booking", sub: live ? `${(form.booking || {}).whoCanBook === "returning" ? "Returning only" : "Everyone"}${(form.booking || {}).requireCard ? " · card held" : ""}` : "Off — internal only" },
             { target: "timerules", icon: <Clock size={18} />, label: "Hours & pricing", sub: (form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Standard price, always available" },
