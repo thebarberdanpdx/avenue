@@ -11723,12 +11723,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const photoCount = photos.length;
 
   const DrillRow = ({ label, sub, target }) => (
-    <button onClick={() => setSection(target)} style={{ width: "100%", display: "flex", alignItems: "baseline", gap: 12, background: "var(--panel)", border: "none", padding: "15px 4px", textAlign: "left", cursor: "pointer", borderTop: "1px solid var(--line)" }}>
+    <button onClick={() => setSection(target)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "none", padding: "13px 4px", textAlign: "left", cursor: "pointer", borderTop: "1px solid var(--line)" }}>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px", color: "var(--text)" }}>{label}</span>
-        <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{sub}</span>
+        <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, letterSpacing: "-0.1px", color: "var(--text)" }}>{label}</span>
+        <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{sub}</span>
       </span>
-      <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+      <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
     </button>
   );
 
@@ -11962,14 +11962,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <div style={{ fontSize: 14.5, color: "var(--sub)", margin: "0 0 22px" }}>${form.price || "—"} · {form.duration || "—"} min{live ? "" : " · Internal"}</div>
 
               {/* section menu — each row drills into its own clean editor */}
-              <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden", marginBottom: 20 }}>
                 {menuRows.map((r, idx) => (
-                  <button key={r.target} onClick={() => setSection(r.target)} style={{ width: "100%", display: "flex", alignItems: "baseline", gap: 12, background: "var(--panel)", border: "none", borderTop: idx ? "1px solid var(--line)" : "none", padding: "17px 17px", minHeight: 60, textAlign: "left", cursor: "pointer" }}>
+                  <button key={r.target} onClick={() => setSection(r.target)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "none", borderTop: idx ? "1px solid var(--line)" : "none", padding: "13px 14px", minHeight: 62, textAlign: "left", cursor: "pointer" }}>
                     <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px", color: "var(--text)" }}>{r.label}</span>
-                      <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.sub}</span>
+                      <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, letterSpacing: "-0.1px", color: "var(--text)" }}>{r.label}</span>
+                      <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.sub}</span>
                     </span>
-                    <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                    <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
                   </button>
                 ))}
               </div>
