@@ -109,7 +109,9 @@ async function handler(req, res) {
   }
 
   const payload = {
-    aps: { alert: { title, body: finalBody }, sound: "default", badge: 1 },
+    // badge:0 shows the alert but leaves no lingering dot on the app icon, and clears any
+    // currently-stuck badge (the app has no unread-count model, so a persistent badge was noise).
+    aps: { alert: { title, body: finalBody }, sound: "default", badge: 0 },
     ...(data ? { data } : {}),
   };
 
