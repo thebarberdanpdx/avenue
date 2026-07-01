@@ -3257,6 +3257,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberNote, setNewMemberNote] = useState("");
   const [newMemberPhone, setNewMemberPhone] = useState(""); // phone for the person you're booking for — their reminders/check-in go here
+  const [newMemberConsent, setNewMemberConsent] = useState(false); // opt-in to text the person you're booking for (required when a phone is entered)
   const [cart, setCart] = useState([]);
   const [intakeFor, setIntakeFor] = useState(null); // service object when running first-time intake
   const [draft, setDraft] = useState(null);
@@ -5730,7 +5731,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </button>
                 );
               })}
-              <button onClick={() => { setNewMemberName(""); setNewMemberNote(""); setNewMemberPhone(""); setAddingMember(true); }} style={{ width: "100%", background: "transparent", color: "var(--text)", padding: "16px", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, borderRadius: 10, border: "1px dashed var(--border2)", textAlign: "left", display: "flex", alignItems: "center", gap: 10, marginBottom: 22, cursor: "pointer" }}>
+              <button onClick={() => { setNewMemberName(""); setNewMemberNote(""); setNewMemberPhone(""); setNewMemberConsent(false); setAddingMember(true); }} style={{ width: "100%", background: "transparent", color: "var(--text)", padding: "16px", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 500, borderRadius: 10, border: "1px dashed var(--border2)", textAlign: "left", display: "flex", alignItems: "center", gap: 10, marginBottom: 22, cursor: "pointer" }}>
                 <Plus size={18} /> <span>Someone new</span>
               </button>
               <button disabled={groupPeople.length === 0} onClick={continueGroup} style={{ width: "100%", background: groupPeople.length ? "var(--text)" : "transparent", color: groupPeople.length ? "var(--bg)" : "var(--faint)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: groupPeople.length ? "none" : "1px solid var(--border)", cursor: groupPeople.length ? "pointer" : "default" }}>
@@ -5752,14 +5753,26 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <input value={newMemberNote} onChange={(e) => setNewMemberNote(e.target.value)} placeholder="e.g. son, age 8" style={{ ...inputStyle, marginBottom: 16 }} />
             <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Their phone <span style={{ color: "var(--sub)" }}>(optional)</span></label>
             <input value={newMemberPhone} onChange={(e) => setNewMemberPhone(e.target.value)} placeholder="Their mobile number" type="tel" inputMode="tel" autoComplete="off" style={{ ...inputStyle, marginBottom: 8 }} />
-            <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 22, lineHeight: 1.5 }}>If this is the person coming in, add their number — their reminders and check-in link go here, not to you. Leave blank to send everything to your own phone.</p>
-            <button className="lift" disabled={!newMemberName.trim()} onClick={() => {
-              const member = { id: "fm" + Date.now(), name: newMemberName.trim(), note: newMemberNote.trim(), phone: newMemberPhone.replace(/\D/g, "").length >= 10 ? newMemberPhone.trim() : "", customDurations: {}, gallery: [], timeline: [] };
+            <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: newMemberPhone.replace(/\D/g, "").length >= 10 ? 14 : 22, lineHeight: 1.5 }}>If this is the person coming in, add their number — their reminders and check-in link go here, not to you. Leave blank to send everything to your own phone.</p>
+            {newMemberPhone.replace(/\D/g, "").length >= 10 && (
+              <button type="button" onClick={() => setNewMemberConsent(v => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", textAlign: "left", background: newMemberConsent ? "transparent" : "color-mix(in srgb, var(--gold) 6%, var(--panel))", border: `1px solid ${newMemberConsent ? "transparent" : "var(--border2)"}`, borderRadius: 12, padding: newMemberConsent ? 0 : "12px 12px", marginBottom: 22, cursor: "pointer" }}>
+                <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${newMemberConsent ? "var(--gold)" : "var(--text)"}`, background: newMemberConsent ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1 }}>{newMemberConsent && <Check size={14} style={{ color: "var(--on-gold)" }} />}</span>
+                <span style={{ color: newMemberConsent ? "var(--faint)" : "var(--text2)", fontSize: 12.5, lineHeight: 1.5 }}><b style={{ color: "var(--text)" }}>Required</b> — they agreed to get appointment reminders by text at this number from Sanctuary Barber Co. Msg &amp; data rates may apply. Reply STOP to opt out.</span>
+              </button>
+            )}
+            {(() => {
+              const memberPhoneOk = newMemberPhone.replace(/\D/g, "").length >= 10;
+              const ready = newMemberName.trim() && (!memberPhoneOk || newMemberConsent);
+              return (
+            <button className="lift" disabled={!ready} onClick={() => {
+              const member = { id: "fm" + Date.now(), name: newMemberName.trim(), note: newMemberNote.trim(), phone: memberPhoneOk ? newMemberPhone.trim() : "", smsConsent: memberPhoneOk ? true : undefined, smsConsentAt: memberPhoneOk ? new Date().toISOString() : undefined, customDurations: {}, gallery: [], timeline: [] };
               supabase.rpc("append_family_member", { p_shop: SHOP_ID, p_client_id: matched.id, p_member: member }).then(({ error }) => { if (error) console.error('[vero] append_family_member failed:', error); }).catch(() => {});
               setMatched({ ...matched, family: [...(matched.family || []), member] });
               setGroupPeople((cur) => [...cur, { id: member.id, name: member.name, note: member.note, isMember: true }]);
               setAddingMember(false); // back to the multi-select, now with this person added & selected
-            }} style={{ width: "100%", background: newMemberName.trim() ? "var(--text)" : "var(--border2)", color: newMemberName.trim() ? "var(--bg)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, border: "none" }}>ADD &amp; CONTINUE →</button>
+            }} style={{ width: "100%", background: ready ? "var(--text)" : "var(--border2)", color: ready ? "var(--bg)" : "var(--faint)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10, border: "none" }}>ADD &amp; CONTINUE →</button>
+              );
+            })()}
           </div>
         )}
 
