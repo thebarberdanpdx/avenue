@@ -3350,7 +3350,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // (prominent description + required choice questions, NO prices) then an "addons" screen
   // (optional extras + running total). Only entered from selectService for services with groups.
   const [cutFlow, setCutFlow] = useState(null); // null | { phase: "cut" | "addons" }
-  const [pickConfirm, setPickConfirm] = useState(null); // { name, desc } — "just to confirm" sheet after picking an option/add-on that has a description
+  const [pickConfirm, setPickConfirm] = useState(null); // { name, desc, photos[] } — confirm sheet after picking an option/add-on
+  const [confIdx, setConfIdx] = useState(0); // active photo in the confirm sheet carousel
   // Owner "Preview booking page" deep-link: the dashboard opens /book?preview_svc=<id> in a new
   // tab and we jump straight to that service's questions/add-ons screen, so the owner sees exactly
   // what clients see. Applied once, after services load (they arrive async), then the param is
@@ -3714,9 +3715,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const pickChoice = (group, optionId) => {
     const cur = cart[0] || {};
     putEntry({ ...cur, addons: { ...(cur.addons || {}), [group.id]: optionId } });
-    // Pop a "just to confirm" sheet with the full description of what they picked.
+    // Pop a "please confirm" sheet with the full description + example photos of what they picked.
     const opt = (group.options || []).find((o) => o.id === optionId);
-    if (opt && opt.desc && String(opt.desc).trim()) setPickConfirm({ name: opt.label, desc: opt.desc });
+    const photos = (opt && Array.isArray(opt.photos) ? opt.photos : []).filter(Boolean);
+    if (opt && ((opt.desc && String(opt.desc).trim()) || photos.length)) { setConfIdx(0); setPickConfirm({ name: opt.label, desc: opt.desc || "", photos }); }
   };
   // Toggle an optional add-on on the add-ons screen.
   const toggleExtra = (group) => {
@@ -3724,7 +3726,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     const turningOn = !a[group.id];
     if (a[group.id]) delete a[group.id]; else a[group.id] = true;
     putEntry({ ...cur, addons: a });
-    if (turningOn) { const it = group.item || {}; if (it.desc && String(it.desc).trim()) setPickConfirm({ name: it.name || group.label, desc: it.desc }); }
+    if (turningOn) { const it = group.item || {}; const photos = group.photo ? [group.photo] : []; if ((it.desc && String(it.desc).trim()) || photos.length) { setConfIdx(0); setPickConfirm({ name: it.name || group.label, desc: it.desc || "", photos }); } }
   };
   const choiceGroupsOf = (svc) => (svc?.addonGroups || []).filter((g) => g.type === "choice");
   const extraGroupsOf = (svc) => (svc?.addonGroups || []).filter((g) => g.type === "addon");
@@ -4662,11 +4664,27 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {pickConfirm && (
           <Sheet open onClose={() => setPickConfirm(null)} align="center" maxWidth={480}>
             <div style={{ display: "flex", flexDirection: "column", maxHeight: "82dvh", padding: "8px 4px 4px" }}>
+              {pickConfirm.photos && pickConfirm.photos.length > 0 && (
+                <div style={{ flexShrink: 0, margin: "0 0 18px" }}>
+                  <div onScroll={(ev) => { const el = ev.currentTarget; const idx = Math.round(el.scrollLeft / Math.max(1, el.clientWidth)); if (idx !== confIdx) setConfIdx(idx); }} style={{ display: "flex", overflowX: "auto", scrollSnapType: "x mandatory", borderRadius: 16, WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
+                    {pickConfirm.photos.map((pid) => (
+                      <img key={pid} src={imgUrl(pid, 700)} alt="" style={{ width: "100%", flexShrink: 0, scrollSnapAlign: "center", height: 190, objectFit: "cover", borderRadius: 16, display: "block" }} />
+                    ))}
+                  </div>
+                  {pickConfirm.photos.length > 1 && (
+                    <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 12 }}>
+                      {pickConfirm.photos.map((_, k) => <span key={k} style={{ width: 6, height: 6, borderRadius: "50%", background: k === confIdx ? "var(--text)" : "var(--border2)", transition: "background .15s" }} />)}
+                    </div>
+                  )}
+                </div>
+              )}
               <div style={{ fontFamily: FONT_BODY, fontSize: 12, letterSpacing: 2.5, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, textAlign: "center", margin: "0 0 12px", flexShrink: 0 }}>Please Confirm</div>
               {pickConfirm.name && <div style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.12, color: "var(--text)", textAlign: "center", margin: "0 0 16px", flexShrink: 0 }}>{pickConfirm.name}</div>}
-              <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: "0 1 auto", minHeight: 0, margin: "0 0 26px" }}>
-                <p style={{ fontSize: 16.5, color: "var(--text2)", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap", textAlign: "center" }}>{pickConfirm.desc}</p>
-              </div>
+              {pickConfirm.desc && String(pickConfirm.desc).trim() && (
+                <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: "0 1 auto", minHeight: 0, margin: "0 0 26px" }}>
+                  <p style={{ fontSize: 16.5, color: "var(--text2)", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap", textAlign: "center" }}>{pickConfirm.desc}</p>
+                </div>
+              )}
               <button className="lift" onClick={() => setPickConfirm(null)} style={{ flexShrink: 0, width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 13, padding: 17, fontSize: 16, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>OK</button>
             </div>
           </Sheet>
@@ -11123,6 +11141,22 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                     {moneyField("Extra charge", "$", null, o.price, (n) => setOpt(oi, { price: n }), "0")}
                     {moneyField("Extra time", null, "min", o.min, (n) => setOpt(oi, { min: n }), "0")}
                   </div>
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontSize: 12.5, color: "var(--sub)", fontWeight: 500, margin: "0 0 8px" }}>Example photos <span style={{ color: "var(--faint)", fontWeight: 400 }}>· up to 3, optional — shown on the confirm popup</span></div>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      {(o.photos || []).filter(Boolean).map((pid) => (
+                        <div key={pid} style={{ position: "relative", width: 66, height: 66, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel)", flexShrink: 0 }}>
+                          <img src={imgUrl(pid, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                          <div onClick={() => setOpt(oi, { photos: (o.photos || []).filter((x) => x !== pid) })} title="Remove photo" style={{ position: "absolute", top: 3, right: 3, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</div>
+                        </div>
+                      ))}
+                      {(o.photos || []).filter(Boolean).length < 3 && (
+                        <button onClick={() => setPicker({ target: { kind: "answer", gi: i, oi } })} style={{ width: 66, height: 66, borderRadius: 12, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 3, padding: 0, cursor: "pointer", flexShrink: 0 }}>
+                          <Plus size={17} /><span style={{ fontSize: 10, fontWeight: 600 }}>Add</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   {staffList.length > 0 && (
                     <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
                       <div style={{ fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: "var(--sub)", fontWeight: 700, marginBottom: 10 }}>Per barber (optional)</div>
@@ -11692,6 +11726,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           else if (picker.target === "gallery") addPhoto(id);
           else if (picker.target === "cut") setCut(picker.index, { images: [id] });
           else if (picker.target === "style") { const cur = Array.isArray(picker.entry.images) ? picker.entry.images.filter(Boolean) : []; if (!cur.includes(id) && cur.length < 3) setLibField(picker.entry, { images: [...cur, id] }); }
+          else if (picker.target && picker.target.kind === "answer") { const { gi, oi } = picker.target; setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((g, gidx) => gidx !== gi ? g : { ...g, options: (g.options || []).map((o, oidx) => { if (oidx !== oi) return o; const cur = Array.isArray(o.photos) ? o.photos.filter(Boolean) : []; return cur.includes(id) || cur.length >= 3 ? o : { ...o, photos: [...cur, id] }; }) }) })); }
           else setForm({ ...form, addonGroups: form.addonGroups.map((g, i) => i === picker.target ? { ...g, photo: id } : g) });
         }} />}
         {colorOpen && (
