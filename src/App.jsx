@@ -2299,10 +2299,10 @@ function App() {
         /* Booking flow: slide the whole screen horizontally — forward comes in from the right, back
            from the left (native-app feel). The panel moves as ONE unit, so the per-child vertical
            stagger above is suppressed while sliding. */
-        @keyframes bkSlideR { from { opacity: 0.4; transform: translateX(60%); } to { opacity: 1; transform: none; } }
-        @keyframes bkSlideL { from { opacity: 0.4; transform: translateX(-60%); } to { opacity: 1; transform: none; } }
-        .screen-swap.swap-fwd { animation: bkSlideR .5s cubic-bezier(.33,.68,.28,1) both; }
-        .screen-swap.swap-back { animation: bkSlideL .5s cubic-bezier(.33,.68,.28,1) both; }
+        @keyframes bkSlideR { from { transform: translateX(100%); } to { transform: none; } }
+        @keyframes bkSlideL { from { transform: translateX(-100%); } to { transform: none; } }
+        .screen-swap.swap-fwd { animation: bkSlideR .44s cubic-bezier(.4,0,.2,1) both; }
+        .screen-swap.swap-back { animation: bkSlideL .44s cubic-bezier(.4,0,.2,1) both; }
         .screen-swap.swap-fwd > *, .screen-swap.swap-back > *,
         .screen-swap.swap-fwd > * > *, .screen-swap.swap-back > * > * { animation: none !important; opacity: 1 !important; transform: none !important; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
@@ -3484,6 +3484,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [clientNote, setClientNote] = useState(""); // optional note for the barber — rides the appt, the push, and the feed
   const [personalizeOpen, setPersonalizeOpen] = useState(true); // combined note+photo card — open by default so the photo ask is obvious
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
+  const [bookedClientId, setBookedClientId] = useState(null); // client the booking is for (for post-booking photo/note attach)
+  const galleryCapturedRef = useRef(false); // guard so post-booking reference photos capture to the gallery only once
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
   const [waProvId, setWaProvId] = useState(null); // Who & When merged screen: selected barber tab ("anyone" = First free)
   const [booking, setBooking] = useState(false);   // true while the confirmed booking is being saved to the server
@@ -3888,6 +3890,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       {labels.map((l, i) => (<React.Fragment key={l}><span style={{ fontSize: 14, padding: "6px 16px", borderRadius: 20, background: active === i ? "var(--panel2)" : "transparent", color: active === i ? "var(--text)" : "var(--faint)", border: active === i ? "1px solid var(--border)" : "1px solid transparent" }}>{l}</span>{i < labels.length - 1 && <ChevronRight size={14} style={{ color: "var(--border2)" }} />}</React.Fragment>))}
     </div>); };
 
+  // Reference photos / note are now added on the post-booking "You're in" screen (like Mangomint).
+  // While on that screen, keep the booked appointment in sync with whatever the client attaches.
+  useEffect(() => {
+    if (step !== 8 || bookedId == null) return;
+    const note = clientNote.trim();
+    const pd = photos;
+    setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, note, hasNote: !!note, photos: pd.length, hasPhotos: pd.length > 0, photoData: pd } : a));
+  }, [step, bookedId, clientNote, photos]);
+  // Capture the attached reference photos onto the client's gallery once, when they leave the screen.
+  const captureBookingGallery = () => {
+    if (galleryCapturedRef.current || !photos.length || !bookedClientId) return;
+    galleryCapturedRef.current = true;
+    const baseTs = Date.now();
+    const entries = photos.map((p, i) => ({ id: "g" + baseTs + "_" + i, photo: p, note: "", date: new Date().toISOString(), source: "client" }));
+    setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, gallery: [...entries, ...(c.gallery || [])] } : c));
+  };
+
   // A signature of whichever screen is currently visible. When it changes, the
   // keyed wrapper below remounts the screen region, which RE-FIRES the entry
   // animation every time (without a changing key, React reuses the same DOM
@@ -4076,7 +4095,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     };
 
     // Staff/preview bookings persist through the dashboard's own save path — show success immediately.
-    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); captureClientPhotos(); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); fireStaffPush({ shopId, title: "New booking", appt: newAppts[0], event: "newBooking", business }); fireStaffNotify({ shopId, appt: newAppts[0], business }); setBookedId(baseId); setStep(8); return; }
+    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); captureClientPhotos(); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); fireStaffPush({ shopId, title: "New booking", appt: newAppts[0], event: "newBooking", business }); fireStaffNotify({ shopId, appt: newAppts[0], business }); setBookedId(baseId); setBookedClientId(clientId); galleryCapturedRef.current = false; setStep(8); return; }
     // Public booking: the slot is never held while saving, and the client is only told they're booked
     // once the server actually has it — so a failed save can never become a ghost booking.
     setBooking(true); setBookErr(false);
@@ -4117,7 +4136,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             fireStaffNotify({ shopId, appt: ap0, business });
           }
         } catch (e) {}
-        setBookedId(baseId); setStep(8);
+        setBookedId(baseId); setBookedClientId(clientId); galleryCapturedRef.current = false; setStep(8);
         // ---- Authoritative card-on-file persistence (single source of truth) ----
         // Runs after book_public so the client row exists, and re-applies the card LAST so
         // book_public's delete-then-insert can't clobber it. Works for new + returning clients.
@@ -4195,6 +4214,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setShowCodeEntry(false); setAddingMember(false); setBookingFor(null); setActiveMember(null);
     setCart([]); setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
     setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setBookedId(null); setCameFromUsual(false);
+    setPhotos([]); setClientNote(""); setSelfie(null); setBookedClientId(null); galleryCapturedRef.current = false;
     setConsult(null); setShowAllVisits(false); setHomeAction(null); setReschedPrev(null); setShowHome(true);
     refreshMyAppts();
   };
@@ -6338,84 +6358,30 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               </div>
             </div>
 
-            {/* ONE photo moment: a profile selfie first (save $5), then an optional inspiration
-                photo / note folded in beneath it — not two competing cards. */}
-            {(() => {
-              const showSelfie = !(matched && matched.photo);
-              const noteOn = business?.booking?.askNote !== false;
-              const photoOn = business?.bookingPhotos?.mode !== "off";
-              const photoReq = business?.bookingPhotos?.mode === "required";
-              const showExtras = noteOn || photoOn;
-              if (!showSelfie && !showExtras) return null;
-              const open = personalizeOpen || photoReq;
-              const barber = provider.name === "Anyone" ? "your barber" : provider.name;
-              return (
+            {/* Profile selfie ($5 off) — only when this client has no photo on file yet. The
+                inspiration photo / note moved to the post-booking "You're in" screen (less on this page). */}
+            {!(matched && matched.photo) && (
               <div style={{ background: "var(--panel)", border: `1px solid ${selfie ? "var(--gold)" : "var(--border)"}`, borderRadius: 16, padding: "18px", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
-                {showSelfie && (
-                  <>
-                    <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
-                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                      <button onClick={() => { if (!selfie && selfieRef.current) selfieRef.current.click(); }} style={{ position: "relative", width: 60, height: 60, borderRadius: "50%", flexShrink: 0, border: `2px ${selfie ? "solid" : "dashed"} ${selfie ? "var(--gold)" : "var(--border2)"}`, background: "var(--panel2)", overflow: "hidden", cursor: "pointer", padding: 0 }}>
-                        {selfie ? <img src={selfie} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={22} style={{ color: "var(--faint)" }} />}
-                      </button>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, lineHeight: 1.2 }}>Add a profile photo — save $5</div>
-                        <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{selfie ? "Looking good — $5 comes off this visit." : <>A quick <b style={{ color: "var(--text)" }}>selfie of you</b> so {barber} knows who to expect. It's your profile photo — <b style={{ color: "var(--text)" }}>not a haircut example.</b></>}</div>
-                      </div>
-                    </div>
-                    {selfie ? (
-                      <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-                        <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border2)", color: "var(--text)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Retake</button>
-                        <button onClick={() => setSelfie(null)} style={{ flex: 1, background: "none", border: "1px solid var(--border2)", color: "var(--sub)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Remove</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ width: "100%", marginTop: 14, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Camera size={16} /> Take a selfie &amp; save $5</button>
-                    )}
-                  </>
-                )}
-
-                {showSelfie && showExtras && <div style={{ height: 1, background: "var(--line)", margin: "16px 0" }} />}
-
-                {showExtras && (
-                  <>
-                    <button onClick={() => setPersonalizeOpen((o) => !o)} style={{ width: "100%", background: "none", border: "none", padding: 0, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer", color: "var(--text)" }}>
-                      <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                        <Plus size={17} style={{ color: "var(--text)", flexShrink: 0 }} />
-                        <span style={{ fontSize: 15, fontWeight: 600 }}>{noteOn && photoOn ? "Add an inspiration photo or note" : photoOn ? "Add an inspiration photo" : "Add a note"}</span>
-                      </span>
-                      <span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                        <span style={{ fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: photoReq ? "var(--text)" : "var(--faint)", fontWeight: 600 }}>{photoReq ? "Required" : "Optional"}</span>
-                        <ChevronDown size={18} style={{ color: "var(--text)", transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
-                      </span>
-                    </button>
-                    {!open && <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 6 }}>Show {barber} the look you're after, or leave a quick note.</p>}
-                    {open && (
-                      <div style={{ marginTop: 14 }}>
-                        {noteOn && (
-                          <>
-                            <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keeping length on top" rows={3} style={{ ...inputStyle, marginBottom: 0, resize: "none", minHeight: 72, lineHeight: 1.5, fontFamily: FONT_BODY }} />
-                            {clientNote.length > 0 && <div style={{ fontSize: 12, color: "var(--faint)", textAlign: "right", marginTop: 6 }}>{clientNote.length} / 200</div>}
-                          </>
-                        )}
-                        {photoOn && (
-                          <div style={{ marginTop: noteOn ? 16 : 0 }}>
-                            <p style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 12 }}>An inspiration photo — how your hair looks now or a style you want. It helps {barber} get it right. Up to 3.</p>
-                            <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
-                            <div style={{ display: "flex", gap: 8 }}>{[0, 1, 2].map((i) => { const src = photos[i]; return (
-                              <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 14, overflow: "hidden", border: `1px dashed ${src ? "var(--text)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: src ? "var(--panel2)" : "transparent", cursor: src ? "default" : "pointer" }}>
-                                {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={18} style={{ color: "var(--faint)" }} />}
-                              </div>
-                            ); })}</div>
-                            <p style={{ fontSize: 12, color: "var(--faint)", textAlign: "center", marginTop: 10 }}>Tap to add — take one now or pick from your library.</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </>
+                <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <button onClick={() => { if (!selfie && selfieRef.current) selfieRef.current.click(); }} style={{ position: "relative", width: 60, height: 60, borderRadius: "50%", flexShrink: 0, border: `2px ${selfie ? "solid" : "dashed"} ${selfie ? "var(--gold)" : "var(--border2)"}`, background: "var(--panel2)", overflow: "hidden", cursor: "pointer", padding: 0 }}>
+                    {selfie ? <img src={selfie} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={22} style={{ color: "var(--faint)" }} />}
+                  </button>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, lineHeight: 1.2 }}>Add a profile photo — save $5</div>
+                    <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{selfie ? "Looking good — $5 comes off this visit." : <>A quick <b style={{ color: "var(--text)" }}>selfie of you</b> so {provider.name === "Anyone" ? "your barber" : provider.name} knows who to expect. It's your profile photo — <b style={{ color: "var(--text)" }}>not a haircut example.</b></>}</div>
+                  </div>
+                </div>
+                {selfie ? (
+                  <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                    <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border2)", color: "var(--text)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Retake</button>
+                    <button onClick={() => setSelfie(null)} style={{ flex: 1, background: "none", border: "1px solid var(--border2)", color: "var(--sub)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Remove</button>
+                  </div>
+                ) : (
+                  <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ width: "100%", marginTop: 14, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Camera size={16} /> Take a selfie &amp; save $5</button>
                 )}
               </div>
-              );
-            })()}
+            )}
 
             {/* Cancellation policy — collapsed to an agree row with an expandable "Read it" */}
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "6px 18px", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
@@ -6570,7 +6536,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           </div>
         )}
 
-        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} provider={provider} selectedDate={selectedDate} slot={slot} photos={photos.length} onManage={() => setStep(9)} onExit={matched ? goClientHome : onExit} />}
+        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} provider={provider} selectedDate={selectedDate} slot={slot} photos={photos.length}
+          noteOn={business?.booking?.askNote !== false} photoOn={business?.bookingPhotos?.mode !== "off"}
+          clientNote={clientNote} setClientNote={setClientNote} photoList={photos} setPhotos={setPhotos} clientPhotoRef={clientPhotoRef} onPhotoPick={onPhotoPick}
+          onManage={() => { captureBookingGallery(); setStep(9); }} onExit={() => { captureBookingGallery(); (matched ? goClientHome : onExit)(); }} />}
 
         {step === 9 && <ManageAppointment business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} initialPhone={phone} dateOptions={dateOptions} onExit={onExit} showToast={(m) => {}} />}
         </div>
@@ -6677,7 +6646,7 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
   );
 }
 
-function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider, selectedDate, slot, photos, onManage, onExit }) {
+function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider, selectedDate, slot, photos, noteOn, photoOn, clientNote, setClientNote, photoList, setPhotos, clientPhotoRef, onPhotoPick, onManage, onExit }) {
   const relDate = relativeDate(selectedDate);
   const relPlus = relDate.includes(",") ? relDate : `${relDate}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
   return (
@@ -6711,6 +6680,30 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
           )}
         </div>
       </div>
+
+      {(noteOn || photoOn) && (
+        <div className="drift-in" style={{ border: "1px solid var(--line)", borderRadius: 12, padding: "18px 18px", marginBottom: 16 }}>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Help your barber — optional</div>
+          <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text2)", lineHeight: 1.5, margin: "0 0 14px" }}>{photoOn && noteOn ? "Share a reference photo or a quick note about the look you want." : photoOn ? "Share any reference or inspiration photos for your appointment." : "Leave a quick note about the look you want."}</p>
+          {noteOn && (
+            <>
+              <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keeping length on top" rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "13px 14px", color: "var(--text)", fontSize: 15, resize: "none", minHeight: 72, lineHeight: 1.5, fontFamily: FONT_BODY }} />
+              {clientNote.length > 0 && <div style={{ fontSize: 12, color: "var(--faint)", textAlign: "right", marginTop: 6 }}>{clientNote.length} / 200</div>}
+            </>
+          )}
+          {photoOn && (
+            <div style={{ marginTop: noteOn ? 14 : 0 }}>
+              <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
+              <div style={{ display: "flex", gap: 8 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
+                <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 14, overflow: "hidden", border: `1px dashed ${src ? "var(--text)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: src ? "var(--panel2)" : "transparent", cursor: src ? "default" : "pointer" }}>
+                  {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={18} style={{ color: "var(--faint)" }} />}
+                </div>
+              ); })}</div>
+              <p style={{ fontSize: 12, color: "var(--faint)", textAlign: "center", marginTop: 10 }}>Tap to add — up to 3.</p>
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ border: "1px solid var(--line)", borderRadius: 12, padding: "16px 18px", marginBottom: 24 }}>
         <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 8 }}>What's next</div>
