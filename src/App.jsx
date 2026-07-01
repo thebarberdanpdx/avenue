@@ -2305,9 +2305,10 @@ function App() {
         .screen-swap.swap-back { animation: bkSlideL .44s cubic-bezier(.4,0,.2,1) both; }
         .screen-swap.swap-fwd > *, .screen-swap.swap-back > *,
         .screen-swap.swap-fwd > * > *, .screen-swap.swap-back > * > * { animation: none !important; opacity: 1 !important; transform: none !important; }
-        /* Quiet guide: a newly-revealed booking question softly glows once (plus the normal fade-in). */
-        @keyframes cutGuide { 0% { background: color-mix(in srgb, var(--gold) 13%, transparent); } 70% { background: color-mix(in srgb, var(--gold) 9%, transparent); } 100% { background: transparent; } }
-        .cut-next-guide { animation: screenIn .3s var(--ease) both, cutGuide 1.8s ease-out both; }
+        /* Quiet guide: a newly-revealed booking question does ONE subtle blink — background fades a
+           soft wash in, then back out — to draw the eye. Plays alongside the normal fade-in. */
+        @keyframes cutGuide { 0%,100% { background: transparent; } 50% { background: color-mix(in srgb, var(--gold) 18%, transparent); } }
+        .cut-next-guide { animation: screenIn .3s var(--ease) both, cutGuide 1.2s ease-in-out .18s both; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
         /* Stop iOS Safari from rubber-band overscrolling past the top/bottom of the page,
            which was dragging the fixed bottom tab bar halfway up the viewport.
