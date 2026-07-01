@@ -1844,6 +1844,15 @@ function App() {
   // feed NEVER populates a signed-in owner's staff list (root cause of staff email/phone vanishing). DO NOT REMOVE.
   const hasStoredSession = () => { try { return Object.keys(localStorage).some((k) => /^sb-.*-auth-token$/.test(k)); } catch (e) { return false; } };
   const [saveFailed, setSaveFailed] = useState(false); // drives a banner if a save to the server errors out
+  // Only nag about a failed save if it STAYS failed for a few seconds — a transient blip that the
+  // next save fixes shouldn't flash the orange banner. Dismissible; auto-resets when a save succeeds.
+  const [showSaveBanner, setShowSaveBanner] = useState(false);
+  const [saveBannerDismissed, setSaveBannerDismissed] = useState(false);
+  useEffect(() => {
+    if (!saveFailed) { setShowSaveBanner(false); setSaveBannerDismissed(false); return; }
+    const t = setTimeout(() => setShowSaveBanner(true), 4500);
+    return () => clearTimeout(t);
+  }, [saveFailed]);
   const [loadIncomplete, setLoadIncomplete] = useState(false); // a load errored → saves are blocked; surface it instead of failing silently
 
   // Save a whole in-memory list to its shop-scoped table.
@@ -2336,10 +2345,11 @@ function App() {
         .vslot-sel::after { content:""; position:absolute; inset:0; background:linear-gradient(115deg, transparent 32%, rgba(255,255,255,.6) 50%, transparent 68%); transform:translateX(-130%); animation:slotSweep 3s ease-in-out infinite; pointer-events:none; }
       `}</style>
 
-      {saveFailed && session && (
-        <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#C2563F", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
-          <span>Couldn't save your last change to the server. It's still safe on this device — check your connection.</span>
+      {showSaveBanner && !saveBannerDismissed && session && (
+        <div role="alert" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 3000, background: "#C2563F", color: "#fff", padding: "calc(env(safe-area-inset-top, 0px) + 11px) 16px 11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13.5, fontFamily: FONT_BODY, lineHeight: 1.4, boxShadow: "0 4px 16px rgba(0,0,0,0.22)" }}>
+          <span style={{ flex: 1, minWidth: 0 }}>Couldn't save your last change to the server. It's still safe on this device — check your connection.</span>
           <button onClick={resaveAll} style={{ flexShrink: 0, background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 9, padding: "7px 14px", fontSize: 13, fontWeight: 600, letterSpacing: 0.5 }}>Retry</button>
+          <button onClick={() => setSaveBannerDismissed(true)} aria-label="Dismiss" style={{ flexShrink: 0, background: "none", border: "none", color: "#fff", padding: 4, display: "flex", cursor: "pointer" }}><X size={18} /></button>
         </div>
       )}
 
@@ -4409,8 +4419,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           return (
             <div className="fade-up">
               {simpleCat && <button onClick={() => setSimpleCat(null)} style={{ background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 600, padding: 0, marginBottom: 14, cursor: "pointer", letterSpacing: 0.3 }}>‹ {simpleCat}</button>}
-              <h2 style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.2px", margin: "0 0 2px", textAlign: "left" }}>{simpleCat ? simpleCat : "Book an appointment"}</h2>
-              <div style={{ borderTop: "1px solid var(--line)", marginTop: 14 }}>
+              {simpleCat && <h2 style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.2px", margin: "0 0 2px", textAlign: "left" }}>{simpleCat}</h2>}
+              <div style={{ borderTop: "1px solid var(--line)", marginTop: simpleCat ? 14 : 4 }}>
                 {list.map((svc) => {
                   const dc = activeMember || matched;
                   const cp = dc && dc.customPrices ? dc.customPrices[svc.id] : null;
