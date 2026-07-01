@@ -6271,9 +6271,17 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <span style={{ fontSize: 14.5, color: "var(--text)" }}>{(() => { const brand = cardInfo && cardInfo.brand ? cardInfo.brand.charAt(0).toUpperCase() + cardInfo.brand.slice(1) : "Card"; if (cardInfo && cardInfo.paid) return `Deposit paid · ${last4}`; if (cardInfo && cardInfo.onFile) return `${brand} ···· ${last4} · on file`; return `${brand} ···· ${last4} · added`; })()}</span>
                       <button onClick={() => { setCardOnFile(false); setCardInfo(null); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Change</button>
                     </div>
-                  ) : (
-                    <button onClick={() => setCardSheetOpen(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}><CreditCard size={17} style={{ color: "var(--text)" }} /> {depositAmt > 0 ? `Pay $${depositAmt} deposit` : "Add a card"}</button>
-                  )}
+                  ) : (() => {
+                    // Card / Apple Pay may ONLY open once name, phone, email & consent are set — otherwise
+                    // a one-tap wallet payment could commit a booking with no client details.
+                    const identityOk = agreed && smsConsent && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10;
+                    return (
+                      <>
+                        <button disabled={!identityOk} onClick={() => { if (identityOk) setCardSheetOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: identityOk ? "pointer" : "default", opacity: identityOk ? 1 : 0.5 }}><CreditCard size={17} style={{ color: "var(--text)" }} /> {depositAmt > 0 ? `Pay $${depositAmt} deposit` : "Add a card"}</button>
+                        {!identityOk && <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, marginTop: 8, textAlign: "center" }}>Add your name, phone &amp; email and check the box above first.</p>}
+                      </>
+                    );
+                  })()}
                   {!livePay && <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Secure card entry · test mode — no real charge yet.</p>}
                   {cardSheetOpen && <StripeCardSheet
                     live={livePay}
