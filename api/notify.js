@@ -87,7 +87,9 @@ async function handler(req, res) {
       const r = { id: p.id };
       try { if (pEmail) { await sendEmail({ to: pEmail, subject, text: textBody }); r.email = "sent"; } else r.email = "no-email"; }
       catch (e) { r.email = "error: " + e.message; }
-      try { if (SMS_LIVE && pPhone) { await sendSms({ to: pPhone, text: `${subject}\n${textBody}` }); r.sms = "sent"; } }
+      // SMS uses GSM-7; non-GSM characters (em/en dashes, curly quotes, ellipsis) get turned into
+      // "?" by carriers. Swap them for plain equivalents so the text reads clean.
+      try { if (SMS_LIVE && pPhone) { const gsmSafe = (s) => String(s).replace(/[—–]/g, "-").replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/…/g, "..."); await sendSms({ to: pPhone, text: gsmSafe(`${subject}\n${textBody}`) }); r.sms = "sent"; } }
       catch (e) { r.sms = "error: " + e.message; }
       sent.push(r);
     }
