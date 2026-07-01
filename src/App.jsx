@@ -2216,6 +2216,13 @@ function App() {
     return () => { try { if (channel) supabase.removeChannel(channel); } catch (e) { /* ignore */ } };
   }, [dataLoaded, SHOP_ID, session]);
 
+  // Client-facing surfaces ALWAYS render in the Studio look, whatever the shop/staff theme is —
+  // customers should see one consistent, on-brand storefront. Only the staff dashboard ("shop")
+  // uses the per-user theme. Client components style purely off CSS vars, so swapping the applied
+  // theme class is all that's needed.
+  const CLIENT_FACING_VIEWS = ["client", "manage", "managetoken", "reviewtoken", "terms", "privacy", "preview"];
+  const appliedTheme = CLIENT_FACING_VIEWS.includes(view) ? "studio" : theme;
+
   // Mirror the theme class onto <html> so CSS variables (--gold, --bg, --text, etc.) cascade
   // to portaled content too (booking form, conflict popup, etc. — these render under document.body,
   // outside the React tree's #app-root, so without this mirror they'd lose the theme.)
@@ -2223,11 +2230,11 @@ function App() {
     const el = document.documentElement;
     const stale = Array.from(el.classList).filter((c) => c.startsWith("theme-"));
     stale.forEach((c) => el.classList.remove(c));
-    el.classList.add(`theme-${theme}`);
-  }, [theme]);
+    el.classList.add(`theme-${appliedTheme}`);
+  }, [appliedTheme]);
 
   return (
-    <div id="app-root" className={`theme-${theme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--canvas, var(--bg))", color: "var(--text)", position: "relative" }}>
+    <div id="app-root" className={`theme-${appliedTheme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--canvas, var(--bg))", color: "var(--text)", position: "relative" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400;1,6..96,500&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Geist:wght@400;500;600;700&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Oswald:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
