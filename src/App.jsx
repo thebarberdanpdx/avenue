@@ -4174,9 +4174,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     );
   }
 
+  const onWelcome = step === 0 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && !addingMember;
   return (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: "var(--bg)" }}>
       <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
+        {!onWelcome && (business.logoText || (business.name && business.name.trim())) && (
+          <div style={{ textAlign: "center", padding: "2px 0 16px", marginBottom: 14, borderBottom: "1px solid var(--line)" }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, letterSpacing: 2, lineHeight: 1.1, textTransform: "uppercase", color: "var(--text)" }}>{business.logoText || business.name}</div>
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
           <button onClick={back} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}><ArrowLeft size={16} /> Back</button>
         </div>
@@ -4319,7 +4325,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                           <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{svc.name}</span>
                           {desc ? <span onClick={(e) => { e.stopPropagation(); setSvcInfo(open ? null : svc.id); }} style={{ display: "inline-block", marginTop: 3, fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>{open ? "Less" : "More info"}</span> : null}
                         </span>
-                        <span style={{ fontFamily: FONT_BODY, fontSize: 16, fontWeight: 600, color: "var(--text)", flexShrink: 0 }}>${price}</span>
+                        <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
                       </button>
                       {open && desc ? <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: "var(--text2)", lineHeight: 1.5, padding: "0 2px 14px", whiteSpace: "pre-line" }}>{desc}</div> : null}
                     </div>
@@ -4578,7 +4584,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 17, fontWeight: 600 }}>{svc.name}</span>
                   <button onClick={() => { setCutFlow(null); setCart([]); }} style={{ background: "none", border: "none", padding: 0, marginTop: 2, fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>Change</button>
                 </span>
-                <span style={{ fontFamily: FONT_BODY, fontSize: 16, fontWeight: 600, flexShrink: 0 }}>${basePrice}</span>
               </div>
               {choices.map((g) => (
                 <div key={g.id}>
@@ -4590,7 +4595,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, color: "var(--text)" }}>{o.label}</span>
                         {o.desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{o.desc}</span>}
                       </span>
-                      {oPrice > 0 && <span style={{ fontSize: 15, fontWeight: 500, color: "var(--text)", flexShrink: 0 }}>+ ${oPrice}</span>}
                     </button>
                   ); })}
                 </div>
@@ -4605,10 +4609,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>Yes{it.name ? ` — ${it.name}` : ""}</span>
                       {it.desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{it.desc}</span>}
                     </span>
-                    <span style={{ textAlign: "right", flexShrink: 0 }}>
-                      {it.addsPrice !== false && price > 0 && <span style={{ display: "block", fontSize: 15, fontWeight: 500 }}>+ ${price}</span>}
-                      {it.addsTime !== false && min > 0 && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>+ {min} min</span>}
-                    </span>
                   </button>
                   <button onClick={() => { if (on) toggleExtra(g); }} style={rowBtn}>
                     {radio(!on)}
@@ -4617,11 +4617,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </div>
               ); })}
 
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 20 }}>
-                <span style={{ fontSize: 13.5, color: "var(--sub)" }}>Total</span>
-                <span style={{ fontSize: 15, fontWeight: 600 }}>${lt.price} · {lt.min} min</span>
-              </div>
-              <button className="lift" disabled={!ready} onClick={cutFlowFinish} style={{ width: "100%", marginTop: 14, background: ready ? "var(--text)" : "var(--panel2)", color: ready ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 12, padding: 15, fontSize: 14.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: ready ? "pointer" : "default" }}>{ready ? `Continue  ·  $${lt.price}` : "Pick your options"}</button>
+              <button className="lift" disabled={!ready} onClick={cutFlowFinish} style={{ width: "100%", marginTop: 24, background: ready ? "var(--text)" : "var(--panel2)", color: ready ? "var(--bg)" : "var(--faint)", border: "none", borderRadius: 12, padding: 15, fontSize: 14.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: ready ? "pointer" : "default" }}>{ready ? "Continue" : "Pick your options"}</button>
             </div>
           );
         })()}
