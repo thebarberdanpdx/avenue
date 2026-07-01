@@ -5765,6 +5765,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const ready = newMemberName.trim() && (!memberPhoneOk || newMemberConsent);
               return (
             <button className="lift" disabled={!ready} onClick={() => {
+              if (!newMemberName.trim()) return;
+              if (memberPhoneOk && !newMemberConsent) return; // hard stop: a phone can't be saved without the opt-in box checked
               const member = { id: "fm" + Date.now(), name: newMemberName.trim(), note: newMemberNote.trim(), phone: memberPhoneOk ? newMemberPhone.trim() : "", smsConsent: memberPhoneOk ? true : undefined, smsConsentAt: memberPhoneOk ? new Date().toISOString() : undefined, customDurations: {}, gallery: [], timeline: [] };
               supabase.rpc("append_family_member", { p_shop: SHOP_ID, p_client_id: matched.id, p_member: member }).then(({ error }) => { if (error) console.error('[vero] append_family_member failed:', error); }).catch(() => {});
               setMatched({ ...matched, family: [...(matched.family || []), member] });
