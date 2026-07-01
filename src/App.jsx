@@ -4358,11 +4358,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <button onClick={() => { setTapSel(svc.id); setTimeout(() => selectService(svc), 165); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "none", border: "none", padding: "14px 2px", textAlign: "left", cursor: "pointer" }}>
                         <span style={{ flex: 1, minWidth: 0 }}>
                           <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{svc.name}</span>
-                          {desc ? <span onClick={(e) => { e.stopPropagation(); setSvcInfo(open ? null : svc.id); }} style={{ display: "inline-block", marginTop: 3, fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>{open ? "Less" : "More info"}</span> : null}
                         </span>
                         <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
                       </button>
-                      {open && desc ? <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: "var(--text2)", lineHeight: 1.5, padding: "0 2px 14px", whiteSpace: "pre-line" }}>{desc}</div> : null}
                     </div>
                   );
                 })}
