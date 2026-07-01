@@ -10772,18 +10772,18 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       <SectionLbl>Description <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--faint)" }}>· shown to clients</span></SectionLbl>
       <textarea value={(form.booking || {}).description || ""} onChange={(e) => setBooking({ description: e.target.value })} rows={3} placeholder="What this service is — helps clients pick the right one." style={{ ...inpStyle, resize: "vertical", lineHeight: 1.5, minHeight: 60 }} />
 
-      <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", gap: 12, marginTop: 18, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <SectionLbl>Price</SectionLbl>
           <div style={moneyWrap}>
             <span style={moneyPrefix}>$</span>
-            <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="42" style={moneyInput} />
+            <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="42" style={{ ...moneyInput, width: "100%" }} />
           </div>
         </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <SectionLbl>Duration</SectionLbl>
           <div style={moneyWrap}>
-            <input type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="45" style={{ ...moneyInput, paddingLeft: 16 }} />
+            <input type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="45" style={{ ...moneyInput, paddingLeft: 16, width: "100%" }} />
             <span style={unitSuffix}>min</span>
           </div>
         </div>
@@ -10924,87 +10924,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                           );
                         })}
                         <p style={{ fontSize: 12, color: "var(--faint)", margin: "2px 2px 0", lineHeight: 1.45 }}>Blank uses the style's default. Mirrors My team → {p.name.split(" ")[0]} → Services.</p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-              {on && hasAddonTimes && (() => {
-                const open = addonTimeOpen[p.id] !== false; // per-staff add-on pricing shows expanded by default
-                return (
-                  <div style={{ marginTop: 12, borderTop: "1px solid var(--line)", paddingTop: 12, minWidth: 0 }}>
-                    <button onClick={() => setAddonTimeOpen((o) => ({ ...o, [p.id]: !o[p.id] }))} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--sub)", fontSize: 13.5, fontWeight: 500 }}>
-                      <span>Set add-on prices &amp; times</span>
-                      {open ? <ChevronUp size={16} style={{ color: "var(--faint)", flexShrink: 0 }} /> : <ChevronDown size={16} style={{ color: "var(--faint)", flexShrink: 0 }} />}
-                    </button>
-                    {open && (
-                      <div style={{ display: "grid", gap: 9, marginTop: 12 }}>
-                        {timedAddons.map((g) => {
-                          const se = form.staff[p.id] || {};
-                          const dv = (se.addonDur && se.addonDur[g.id] != null) ? se.addonDur[g.id] : "";
-                          const pv = (se.addonPrice && se.addonPrice[g.id] != null) ? se.addonPrice[g.id] : "";
-                          const def = Number(g.item && g.item.min) || 0;
-                          const defP = Number(g.item && g.item.price) || 0;
-                          return (
-                            <div key={g.id} style={{ minWidth: 0 }}>
-                              <SectionLbl style={{ margin: "0 2px 6px" }}>{(g.item && g.item.name) || g.label || "Add-on"}</SectionLbl>
-                              <div style={{ display: "flex", gap: 8 }}>
-                                <div style={{ ...moneyWrap, flex: 1, minWidth: 0 }}>
-                                  <span style={moneyPrefix}>$</span>
-                                  <input type="number" inputMode="decimal" value={pv} placeholder={String(defP)} onChange={(ev) => setStaffAddonPrice(p.id, g.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, minWidth: 0, padding: "11px 12px" }} />
-                                </div>
-                                <div style={{ ...moneyWrap, flex: 1, minWidth: 0 }}>
-                                  <input type="number" inputMode="numeric" value={dv} placeholder={String(def)} onChange={(ev) => setStaffAddonDur(p.id, g.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, minWidth: 0, padding: "11px 12px", paddingLeft: 14 }} />
-                                  <span style={unitSuffix}>min</span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        <p style={{ fontSize: 12, color: "var(--faint)", margin: "2px 2px 0", lineHeight: 1.45 }}>This barber's price and extra time for each add-on. Blank uses the add-on's default.</p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-              {on && hasQuestions && (() => {
-                const open = answerTimeOpen[p.id] !== false; // per-staff answer pricing shows expanded by default
-                return (
-                  <div style={{ marginTop: 12, borderTop: "1px solid var(--line)", paddingTop: 12, minWidth: 0 }}>
-                    <button onClick={() => setAnswerTimeOpen((o) => ({ ...o, [p.id]: !o[p.id] }))} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--sub)", fontSize: 13.5, fontWeight: 500 }}>
-                      <span>Set question prices &amp; times</span>
-                      {open ? <ChevronUp size={16} style={{ color: "var(--faint)", flexShrink: 0 }} /> : <ChevronDown size={16} style={{ color: "var(--faint)", flexShrink: 0 }} />}
-                    </button>
-                    {open && (
-                      <div style={{ display: "grid", gap: 14, marginTop: 12 }}>
-                        {questionGroups.map((g) => (
-                          <div key={g.id} style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 11.5, letterSpacing: 0.4, color: "var(--text)", fontWeight: 600, margin: "0 2px 8px" }}>{g.label || "Question"}</div>
-                            <div style={{ display: "grid", gap: 9 }}>
-                              {(g.options || []).map((o) => {
-                                const se = form.staff[p.id] || {};
-                                const pv = (se.answerPrice && se.answerPrice[g.id] && se.answerPrice[g.id][o.id] != null) ? se.answerPrice[g.id][o.id] : "";
-                                const dv = (se.answerDur && se.answerDur[g.id] && se.answerDur[g.id][o.id] != null) ? se.answerDur[g.id][o.id] : "";
-                                return (
-                                  <div key={o.id} style={{ minWidth: 0 }}>
-                                    <SectionLbl style={{ margin: "0 2px 6px" }}>{o.label || "Answer"}</SectionLbl>
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                      <div style={{ ...moneyWrap, flex: 1, minWidth: 0 }}>
-                                        <span style={moneyPrefix}>$</span>
-                                        <input type="number" inputMode="decimal" value={pv} placeholder={String(Number(o.price) || 0)} onChange={(ev) => setStaffAnswerPrice(p.id, g.id, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, minWidth: 0, padding: "11px 12px" }} />
-                                      </div>
-                                      <div style={{ ...moneyWrap, flex: 1, minWidth: 0 }}>
-                                        <input type="number" inputMode="numeric" value={dv} placeholder={String(Number(o.min) || 0)} onChange={(ev) => setStaffAnswerDur(p.id, g.id, o.id, ev.target.value === "" ? null : ev.target.value)} style={{ ...moneyInput, minWidth: 0, padding: "11px 12px", paddingLeft: 14 }} />
-                                        <span style={unitSuffix}>min</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                        <p style={{ fontSize: 12, color: "var(--faint)", margin: "2px 2px 0", lineHeight: 1.45 }}>This barber's price and extra time for each answer. Blank uses the answer's default. This never changes a client's manually-set duration.</p>
                       </div>
                     )}
                   </div>
