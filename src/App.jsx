@@ -3350,6 +3350,26 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // (prominent description + required choice questions, NO prices) then an "addons" screen
   // (optional extras + running total). Only entered from selectService for services with groups.
   const [cutFlow, setCutFlow] = useState(null); // null | { phase: "cut" | "addons" }
+  // Owner "Preview booking page" deep-link: the dashboard opens /book?preview_svc=<id> in a new
+  // tab and we jump straight to that service's questions/add-ons screen, so the owner sees exactly
+  // what clients see. Applied once, after services load (they arrive async), then the param is
+  // scrubbed from the URL so a refresh doesn't re-trigger it.
+  const previewDoneRef = useRef(false);
+  useEffect(() => {
+    if (previewDoneRef.current) return;
+    let svcId = null;
+    try { svcId = new URL(window.location.href).searchParams.get("preview_svc"); } catch (e) {}
+    if (!svcId) return;
+    const svc = (services || []).find((s) => s.id === svcId);
+    if (!svc) return; // services may not be loaded yet — retry when they are
+    previewDoneRef.current = true;
+    try { const u = new URL(window.location.href); u.searchParams.delete("preview_svc"); window.history.replaceState(null, "", u.pathname + (u.search || "") + u.hash); } catch (e) {}
+    const anyoneProv = (providers || []).find((p) => p.id === "anyone") || (providers || [])[0];
+    setDraft(svc);
+    setCart([{ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }]);
+    setSimpleStep("what");
+    setCutFlow({ phase: "cut" });
+  }, [services, providers]);
   const [clientNote, setClientNote] = useState(""); // optional note for the barber — rides the appt, the push, and the feed
   const [personalizeOpen, setPersonalizeOpen] = useState(true); // combined note+photo card — open by default so the photo ask is obvious
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
@@ -10938,6 +10958,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   );
 
   // ---- CUSTOMIZATIONS section (add-on groups) ----
+  // Open the live client booking flow in a new tab, deep-linked straight to THIS service's
+  // questions/add-ons screen — so the owner sees exactly what a client sees while editing.
+  const previewBooking = () => { try { const base = window.location.origin + "/book"; window.open(form.id ? base + "?preview_svc=" + encodeURIComponent(form.id) : base, "_blank"); } catch (e) {} };
+  const previewLink = (
+    <button onClick={previewBooking} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", background: "transparent", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, padding: "12px 0 2px", marginTop: 4, borderTop: "1px solid var(--line)", cursor: "pointer", fontFamily: FONT_BODY }}><Globe size={15} /> See this on the booking page <span style={{ fontSize: 12, color: "var(--faint)" }}>↗</span></button>
+  );
   const setGroup = (i, patch) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => idx === i ? { ...x, ...patch } : x) }));
   const setItem = (i, patch) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => idx === i ? { ...x, item: { ...(x.item || {}), ...patch } } : x) }));
   const featureOnly = (i) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => ({ ...x, featured: idx === i ? !x.featured : false })) }));
@@ -11177,6 +11203,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.4, margin: "2px 0 0" }}>Blank uses the default above.</p>
               </div>
             )}
+            {previewLink}
           </div>
         );
       })}
@@ -11547,12 +11574,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   })();
 
   // ---- drill-in: ADD-ONS (paid extras only) ----
-  const previewBooking = () => { try { window.open(window.location.origin + "/book", "_blank"); } catch (e) {} };
   const addonsScreen = (
     <>
       {backBar((form.name || "SERVICE").toUpperCase(), () => setSection(null))}
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 6px" }}>Add-ons</h2>
-      <button onClick={previewBooking} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, padding: "0 0 16px", cursor: "pointer" }}><Globe size={15} /> Preview booking page <span style={{ fontSize: 12, color: "var(--faint)" }}>↗</span></button>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Add-ons</h2>
       {addonsBody}
       <SaveBar />
     </>
