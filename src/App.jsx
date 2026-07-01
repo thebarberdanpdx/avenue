@@ -11136,7 +11136,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                     </div>
                   </div>
                   <GField label="Shown to client" value={o.label} onChange={(v) => setOpt(oi, { label: v })} placeholder="e.g. Skin fade" bg="var(--panel2)" />
-                  <GField label="Note under it (optional)" value={o.desc} onChange={(v) => setOpt(oi, { desc: v })} placeholder="A short line of detail" bg="var(--panel2)" />
+                  <GField label="Note under it (optional)" value={o.desc} onChange={(v) => setOpt(oi, { desc: v })} placeholder="The full description clients read on the confirm popup" bg="var(--panel2)" multiline rows={3} />
                   <div style={{ display: "flex", gap: 10 }}>
                     {moneyField("Extra charge", "$", null, o.price, (n) => setOpt(oi, { price: n }), "0")}
                     {moneyField("Extra time", null, "min", o.min, (n) => setOpt(oi, { min: n }), "0")}
