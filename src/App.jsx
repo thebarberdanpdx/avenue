@@ -1728,9 +1728,27 @@ function App() {
     return Array.from(byKey.values());
   };
   const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
-  // Theme: stored on business.theme so it syncs across devices. Falls back to "studio" — Vero's clean light default — until loaded/set or if an old/unknown id is stored.
-  const theme = (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "studio";
-  const setTheme = (newTheme) => setBusiness((b) => ({ ...(b || {}), theme: newTheme }));
+  // Theme: PER staff member. Each signed-in person keeps their own theme — stored in
+  // business.userThemes keyed by their provider id (syncs across their devices) — falling back to
+  // the shop default (business.theme) → "studio". signedInUser mirrors the dashboard's
+  // "vero_signed_in_as" so the theme follows whoever is logged in on this device.
+  const [signedInUser, setSignedInUser] = useState(() => { try { return (typeof window !== "undefined" && window.localStorage.getItem("vero_signed_in_as")) || null; } catch (e) { return null; } });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sync = () => { try { setSignedInUser(window.localStorage.getItem("vero_signed_in_as") || null); } catch (e) {} };
+    window.addEventListener("vero-user-changed", sync);
+    window.addEventListener("storage", sync);
+    return () => { window.removeEventListener("vero-user-changed", sync); window.removeEventListener("storage", sync); };
+  }, []);
+  const userThemePref = signedInUser && business?.userThemes && business.userThemes[signedInUser];
+  const theme = (userThemePref && THEME_IDS.includes(userThemePref)) ? userThemePref
+              : (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "studio";
+  const setTheme = (newTheme) => setBusiness((b) => {
+    const nb = { ...(b || {}) };
+    if (signedInUser) nb.userThemes = { ...(nb.userThemes || {}), [signedInUser]: newTheme };
+    else nb.theme = newTheme; // no one identified yet → set the shop default
+    return nb;
+  });
 
   // ---- Supabase load + save (debounced) — shop-scoped tables (multi-tenant ready) ----
   // Every row is stamped with shop_id so additional shops never collide. For now there's
@@ -10211,6 +10229,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   useEffect(() => {
     if (typeof window !== "undefined" && signedInAs) {
       window.localStorage.setItem("vero_signed_in_as", signedInAs);
+      try { window.dispatchEvent(new Event("vero-user-changed")); } catch (e) {} // re-resolve the per-user theme
     }  }, [signedInAs]);
   // If the currently-signed-in provider gets deleted, fall back gracefully
   useEffect(() => {
@@ -15151,7 +15170,7 @@ function AppearancePicker({ theme, setTheme }) {
 
   return (
     <div>
-      <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 22 }}>Each theme is a complete look — color, depth, and type together. Tap one to apply and save it instantly.</div>
+      <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 22 }}>Each theme is a complete look — color, depth, and type together. Tap one to apply instantly. This is <b style={{ color: "var(--text)" }}>your</b> theme — it's saved to your login, so everyone on the team can pick their own.</div>
 
       {THEME_CATS.map((cat) => (
         <div key={cat} style={{ marginBottom: 26 }}>
@@ -17239,7 +17258,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     {
       id: "theme", title: "Theme", icon: (THEMES.find((x) => x.id === theme)?.dark) ? Moon : Sun, category: "Business Setup",
       status: THEMES.find((x) => x.id === theme)?.name || "Theme", keywords: "theme appearance light dark mode color display look style vibe palette font accent barbershop tattoo spa salon",
-      editor: (<AppearancePicker theme={(form?.theme && THEME_IDS.includes(form.theme)) ? form.theme : theme} setTheme={(id) => { setForm({ ...form, theme: id }); setTheme(id); showToast("Theme saved"); }} />),
+      editor: (<AppearancePicker theme={theme} setTheme={(id) => { setTheme(id); showToast("Saved — this is your theme."); }} />),
     },
     {
       id: "photos", title: "Display Preferences", icon: ImageIcon, category: "Calendar & Appointments",
