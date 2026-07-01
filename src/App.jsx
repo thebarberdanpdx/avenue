@@ -12950,7 +12950,20 @@ function MessagesEditor({ messages, onChange, business, onBackRef }) {
 
 function TippingEditor({ t, onChange }) {
   const set = (patch) => onChange({ ...t, ...patch });
-  const setPreset = (i, val) => { const presets = [...t.presets]; presets[i] = Math.max(0, Math.min(100, parseInt(val) || 0)); onChange({ ...t, presets }); };
+  // Local string buffer for the preset inputs so a field can be emptied and retyped
+  // (a controlled number field coerced to 0 every keystroke can never be cleared).
+  const [presetStr, setPresetStr] = useState(() => (t.presets || []).map((x) => String(x)));
+  const clampPct = (v) => Math.max(0, Math.min(100, parseInt(v, 10) || 0));
+  const editPreset = (i, raw) => {
+    const digits = raw.replace(/[^0-9]/g, "").slice(0, 3);
+    setPresetStr((arr) => { const next = [...arr]; next[i] = digits; return next; });
+    const presets = [...t.presets]; presets[i] = clampPct(digits); onChange({ ...t, presets });
+  };
+  const blurPreset = (i) => {
+    const n = clampPct(presetStr[i]);
+    setPresetStr((arr) => { const next = [...arr]; next[i] = String(n); return next; });
+    const presets = [...t.presets]; presets[i] = n; onChange({ ...t, presets });
+  };
   const sampleTotal = 50; // preview on a $50 ticket
   return (
     <div>
@@ -12964,7 +12977,7 @@ function TippingEditor({ t, onChange }) {
           <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
             {t.presets.map((p, i) => (
               <div key={i} style={{ flex: 1, position: "relative" }}>
-                <input type="number" value={p} onChange={(e) => setPreset(i, e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "13px 26px 13px 14px", color: "var(--text)", fontSize: 16, textAlign: "center", fontFamily: FONT_BODY }} />
+                <input type="text" inputMode="numeric" value={presetStr[i] ?? String(p)} onChange={(e) => editPreset(i, e.target.value)} onBlur={() => blurPreset(i)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "13px 26px 13px 14px", color: "var(--text)", fontSize: 16, textAlign: "center", fontFamily: FONT_BODY }} />
                 <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--sub)", fontSize: 15, pointerEvents: "none" }}>%</span>
               </div>
             ))}
