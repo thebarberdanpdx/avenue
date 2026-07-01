@@ -6230,18 +6230,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const hasFull = lbl.includes(",");
               const dateFull = `${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
               return (
-                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", textAlign: "center", margin: "10px 0 20px" }}>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, lineHeight: 1.2, color: "var(--text)" }}>{lbl} · {fmtTime(slot)}</div>
-                  <div style={{ fontSize: 13.5, color: "var(--text2)", marginTop: 4, lineHeight: 1.45 }}>{!hasFull ? `${dateFull} · ` : ""}{cart.map((e) => describeEntry(e)).join(" · ")} · ${selfie ? Math.max(0, cartAdjTotal - 5) : cartAdjTotal}{selfie ? " · $5 off" : ""} · with {provider.name}</div>
-                  <div style={{ height: 1, background: "var(--line)", margin: "13px 0" }} />
-                  <button onClick={() => setWantEarlier(!wantEarlier)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, width: "100%", textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-                    <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-                    <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>Notify me if an earlier spot opens up</span>
+                <div style={{ background: "var(--text)", borderRadius: 18, padding: "18px 20px", textAlign: "center", margin: "10px 0 24px", boxShadow: "0 14px 32px -16px rgba(0,0,0,0.5)" }}>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, lineHeight: 1.2, color: "var(--bg)" }}>{lbl} · {fmtTime(slot)}</div>
+                  <div style={{ fontSize: 13.5, color: "color-mix(in srgb, var(--bg) 72%, var(--text))", marginTop: 5, lineHeight: 1.45 }}>{!hasFull ? `${dateFull} · ` : ""}{cart.map((e) => describeEntry(e)).join(" · ")} · ${selfie ? Math.max(0, cartAdjTotal - 5) : cartAdjTotal}{selfie ? " · $5 off" : ""} · with {provider.name}</div>
+                  <div style={{ height: 1, background: "color-mix(in srgb, var(--bg) 22%, transparent)", margin: "14px 0" }} />
+                  <button onClick={() => setWantEarlier(!wantEarlier)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, width: "100%", textAlign: "left", cursor: "pointer" }}>
+                    <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--bg)" : "color-mix(in srgb, var(--bg) 28%, transparent)", position: "relative", flexShrink: 0, transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: wantEarlier ? "var(--text)" : "var(--bg)", transition: "left .2s" }} /></span>
+                    <span style={{ fontSize: 14.5, lineHeight: 1.3, color: "color-mix(in srgb, var(--bg) 88%, var(--text))" }}>Notify me if an earlier spot opens up</span>
                   </button>
                 </div>
               );
             })()}
 
+            <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 11px" }}>Your details</div>
             <div style={{ display: "grid", gap: 11, marginBottom: 20 }}>
               <div style={{ display: "flex", gap: 11 }}>
                 <input placeholder="First name" autoComplete="given-name" style={{ ...inputStyle, flex: 1 }} value={newFirst} onChange={(e) => setNewFirst(e.target.value)} />
@@ -6279,88 +6280,106 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </div>
                 </div>
               )}
-              <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
-                By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text)", textDecoration: "underline" }}>terms</a>.
-              </p>
-              {/* Vonage-required explicit SMS opt-in checkbox — REQUIRED to book (this is how clients get reminders). Never pre-checked. */}
-              <button type="button" onClick={() => setSmsConsent(v => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", textAlign: "left", background: smsConsent ? "transparent" : "color-mix(in srgb, var(--gold) 6%, var(--panel))", border: `1px solid ${smsConsent ? "transparent" : "var(--border2)"}`, borderRadius: 12, padding: smsConsent ? 0 : "12px 12px", marginBottom: 14, cursor: "pointer", transition: "background .15s, padding .15s" }}>
-                <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${smsConsent ? "var(--gold)" : "var(--text)"}`, background: smsConsent ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1, transition: "background .15s, border-color .15s" }}>
-                  {smsConsent && <Check size={14} style={{ color: "var(--on-gold)" }} />}
-                </span>
-                <span style={{ color: smsConsent ? "var(--faint)" : "var(--text2)", fontSize: 12.5, lineHeight: 1.5 }}>
-                  <b style={{ color: "var(--text)" }}>Required</b> — check to get your appointment reminders by text. I agree to receive appointment reminders via SMS from Sanctuary Barber Co. Message and data rates may apply. Message frequency varies. Text HELP for help or STOP to opt out. See our <a href="https://sanctuarybarberco.com/privacy-policy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a>.
-                </span>
-              </button>
+              {/* One SMS consent unit: the Vonage-required checkbox (never pre-checked) + the
+                  by-providing-your-number fine-print, wrapped as a single block instead of two
+                  separate paragraphs. Copy is carrier-vetted — do NOT reword; the locked SMS
+                  reminder phrase must stay present (ship-check enforces exactly 4x in App.jsx). */}
+              <div style={{ border: `1px solid ${smsConsent ? "var(--border)" : "var(--border2)"}`, background: smsConsent ? "var(--panel)" : "color-mix(in srgb, var(--gold) 6%, var(--panel))", borderRadius: 12, padding: "13px 14px", marginBottom: 14, transition: "background .15s" }}>
+                <button type="button" onClick={() => setSmsConsent(v => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                  <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${smsConsent ? "var(--gold)" : "var(--text)"}`, background: smsConsent ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1, transition: "background .15s, border-color .15s" }}>
+                    {smsConsent && <Check size={14} style={{ color: "var(--on-gold)" }} />}
+                  </span>
+                  <span style={{ color: smsConsent ? "var(--sub)" : "var(--text2)", fontSize: 12.5, lineHeight: 1.5 }}>
+                    <b style={{ color: "var(--text)" }}>Required</b> — check to get your appointment reminders by text. I agree to receive appointment reminders via SMS from Sanctuary Barber Co. Message and data rates may apply. Message frequency varies. Text HELP for help or STOP to opt out. See our <a href="https://sanctuarybarberco.com/privacy-policy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a>.
+                  </span>
+                </button>
+                <p style={{ color: "var(--faint)", fontSize: 11, margin: "10px 0 0", lineHeight: 1.5 }}>
+                  By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text2)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text2)", textDecoration: "underline" }}>terms</a>.
+                </p>
+              </div>
             </div>
 
-            {/* note + photo — combined into one collapsible card; opens to the note box and photo slots */}
-            {/* Profile selfie incentive — only when we have no photo of this client yet. A photo of
-                THEM for the profile, explicitly NOT a haircut inspiration pic; adds $5 off the visit. */}
-            {!(matched && matched.photo) && (
-              <div style={{ background: "var(--panel)", border: `1px solid ${selfie ? "var(--gold)" : "var(--border)"}`, borderRadius: 16, padding: "18px", marginBottom: 18 }}>
-                <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <button onClick={() => { if (!selfie && selfieRef.current) selfieRef.current.click(); }} style={{ position: "relative", width: 60, height: 60, borderRadius: "50%", flexShrink: 0, border: `2px ${selfie ? "solid" : "dashed"} ${selfie ? "var(--gold)" : "var(--border2)"}`, background: "var(--panel2)", overflow: "hidden", cursor: "pointer", padding: 0 }}>
-                    {selfie ? <img src={selfie} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={22} style={{ color: "var(--faint)" }} />}
-                  </button>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, lineHeight: 1.2 }}>Add a profile photo — save $5</div>
-                    <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{selfie ? "Looking good — $5 comes off this visit." : <>A quick <b style={{ color: "var(--text)" }}>selfie of you</b> so {provider.name === "Anyone" ? "your barber" : provider.name} knows who to expect. It's your profile photo — <b style={{ color: "var(--text)" }}>not a haircut example.</b></>}</div>
-                  </div>
-                </div>
-                {selfie ? (
-                  <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-                    <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border2)", color: "var(--text)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Retake</button>
-                    <button onClick={() => setSelfie(null)} style={{ flex: 1, background: "none", border: "1px solid var(--border2)", color: "var(--sub)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Remove</button>
-                  </div>
-                ) : (
-                  <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ width: "100%", marginTop: 14, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Camera size={16} /> Take a selfie &amp; save $5</button>
-                )}
-              </div>
-            )}
-            {(business?.booking?.askNote !== false || business?.bookingPhotos?.mode !== "off") && (() => {
+            {/* ONE photo moment: a profile selfie first (save $5), then an optional inspiration
+                photo / note folded in beneath it — not two competing cards. */}
+            {(() => {
+              const showSelfie = !(matched && matched.photo);
               const noteOn = business?.booking?.askNote !== false;
               const photoOn = business?.bookingPhotos?.mode !== "off";
               const photoReq = business?.bookingPhotos?.mode === "required";
-              const ttl = noteOn && photoOn ? "Add a note or photo" : photoOn ? "Add a photo" : "Add a note";
+              const showExtras = noteOn || photoOn;
+              if (!showSelfie && !showExtras) return null;
+              const open = personalizeOpen || photoReq;
+              const barber = provider.name === "Anyone" ? "your barber" : provider.name;
               return (
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginBottom: 18 }}>
-                <button onClick={() => setPersonalizeOpen((o) => !o)} style={{ width: "100%", background: "none", border: "none", padding: 0, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer", color: "var(--text)" }}>
-                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, lineHeight: 1.2 }}>{ttl}</span>
-                  <span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                    <span style={{ fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: photoReq ? "var(--text)" : "var(--faint)", fontWeight: 600 }}>{photoReq ? "Required" : "Optional"}</span>
-                    <ChevronDown size={18} style={{ color: "var(--text)", transform: personalizeOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
-                  </span>
-                </button>
-                {!personalizeOpen && <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginTop: 5 }}>A reference or a quick note gets your cut exactly right.</p>}
-                {personalizeOpen && (
-                  <div style={{ marginTop: 14 }}>
-                    {noteOn && (
-                      <>
-                        <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keeping length on top" rows={3} style={{ ...inputStyle, marginBottom: 0, resize: "none", minHeight: 72, lineHeight: 1.5, fontFamily: FONT_BODY }} />
-                        {clientNote.length > 0 && <div style={{ fontSize: 12, color: "var(--faint)", textAlign: "right", marginTop: 6 }}>{clientNote.length} / 200</div>}
-                      </>
+              <div style={{ background: "var(--panel)", border: `1px solid ${selfie ? "var(--gold)" : "var(--border)"}`, borderRadius: 16, padding: "18px", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
+                {showSelfie && (
+                  <>
+                    <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                      <button onClick={() => { if (!selfie && selfieRef.current) selfieRef.current.click(); }} style={{ position: "relative", width: 60, height: 60, borderRadius: "50%", flexShrink: 0, border: `2px ${selfie ? "solid" : "dashed"} ${selfie ? "var(--gold)" : "var(--border2)"}`, background: "var(--panel2)", overflow: "hidden", cursor: "pointer", padding: 0 }}>
+                        {selfie ? <img src={selfie} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={22} style={{ color: "var(--faint)" }} />}
+                      </button>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, lineHeight: 1.2 }}>Add a profile photo — save $5</div>
+                        <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{selfie ? "Looking good — $5 comes off this visit." : <>A quick <b style={{ color: "var(--text)" }}>selfie of you</b> so {barber} knows who to expect. It's your profile photo — <b style={{ color: "var(--text)" }}>not a haircut example.</b></>}</div>
+                      </div>
+                    </div>
+                    {selfie ? (
+                      <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                        <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border2)", color: "var(--text)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Retake</button>
+                        <button onClick={() => setSelfie(null)} style={{ flex: 1, background: "none", border: "1px solid var(--border2)", color: "var(--sub)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Remove</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ width: "100%", marginTop: 14, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Camera size={16} /> Take a selfie &amp; save $5</button>
                     )}
-                    {photoOn && (
-                      <div style={{ marginTop: noteOn ? 16 : 0 }}>
-                        <p style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 12 }}>Post a photo of your hair — how it looks now or a style you want. It helps {provider.name === "Anyone" ? "your barber" : provider.name} get it right. Up to 3.</p>
-                        <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
-                        <div style={{ display: "flex", gap: 8 }}>{[0, 1, 2].map((i) => { const src = photos[i]; return (
-                          <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 14, overflow: "hidden", border: `1px dashed ${src ? "var(--text)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: src ? "var(--panel2)" : "transparent", cursor: src ? "default" : "pointer" }}>
-                            {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={18} style={{ color: "var(--faint)" }} />}
+                  </>
+                )}
+
+                {showSelfie && showExtras && <div style={{ height: 1, background: "var(--line)", margin: "16px 0" }} />}
+
+                {showExtras && (
+                  <>
+                    <button onClick={() => setPersonalizeOpen((o) => !o)} style={{ width: "100%", background: "none", border: "none", padding: 0, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer", color: "var(--text)" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                        <Plus size={17} style={{ color: "var(--text)", flexShrink: 0 }} />
+                        <span style={{ fontSize: 15, fontWeight: 600 }}>{noteOn && photoOn ? "Add an inspiration photo or note" : photoOn ? "Add an inspiration photo" : "Add a note"}</span>
+                      </span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                        <span style={{ fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: photoReq ? "var(--text)" : "var(--faint)", fontWeight: 600 }}>{photoReq ? "Required" : "Optional"}</span>
+                        <ChevronDown size={18} style={{ color: "var(--text)", transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+                      </span>
+                    </button>
+                    {!open && <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 6 }}>Show {barber} the look you're after, or leave a quick note.</p>}
+                    {open && (
+                      <div style={{ marginTop: 14 }}>
+                        {noteOn && (
+                          <>
+                            <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keeping length on top" rows={3} style={{ ...inputStyle, marginBottom: 0, resize: "none", minHeight: 72, lineHeight: 1.5, fontFamily: FONT_BODY }} />
+                            {clientNote.length > 0 && <div style={{ fontSize: 12, color: "var(--faint)", textAlign: "right", marginTop: 6 }}>{clientNote.length} / 200</div>}
+                          </>
+                        )}
+                        {photoOn && (
+                          <div style={{ marginTop: noteOn ? 16 : 0 }}>
+                            <p style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 12 }}>An inspiration photo — how your hair looks now or a style you want. It helps {barber} get it right. Up to 3.</p>
+                            <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
+                            <div style={{ display: "flex", gap: 8 }}>{[0, 1, 2].map((i) => { const src = photos[i]; return (
+                              <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 14, overflow: "hidden", border: `1px dashed ${src ? "var(--text)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: src ? "var(--panel2)" : "transparent", cursor: src ? "default" : "pointer" }}>
+                                {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={18} style={{ color: "var(--faint)" }} />}
+                              </div>
+                            ); })}</div>
+                            <p style={{ fontSize: 12, color: "var(--faint)", textAlign: "center", marginTop: 10 }}>Tap to add — take one now or pick from your library.</p>
                           </div>
-                        ); })}</div>
-                        <p style={{ fontSize: 12, color: "var(--faint)", textAlign: "center", marginTop: 10 }}>Tap to add — take one now or pick from your library.</p>
+                        )}
                       </div>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
               );
             })()}
 
             {/* Cancellation policy — collapsed to an agree row with an expandable "Read it" */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "6px 18px", marginBottom: 18 }}>
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "6px 18px", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
                 <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, color: "var(--text)", cursor: "pointer", flex: 1, textAlign: "left" }}>
                   <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
@@ -6381,7 +6400,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const livePay = business.payments?.live === true;
               const last4 = (cardInfo && cardInfo.last4) || "••••";
               return (
-                <div style={{ background: "var(--panel)", border: `1px solid ${cardOnFile ? "color-mix(in srgb, var(--text) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16 }}>
+                <div style={{ background: "var(--panel)", border: `1px solid ${cardOnFile ? "color-mix(in srgb, var(--text) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16, boxShadow: "var(--shadow-sm)" }}>
                   <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--text)", fontWeight: 600, marginBottom: 6 }}>{depositAmt > 0 ? "DEPOSIT TO RESERVE" : "CARD TO RESERVE"}</div>
                   <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>
                     {depositAmt > 0
