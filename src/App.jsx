@@ -10834,8 +10834,9 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // ---- STAFF section ----
   // Per-style staff pricing only shows when this service actually uses cut styles.
   const hasStyles = (form.usesCutStyles !== false) && (form.cutTypes || []).length > 0;
-  // Add-ons that add time and so can have a per-barber time override (a master's hot-towel runs longer).
-  const timedAddons = (form.addonGroups || []).filter((g) => g && g.type === "addon" && (g.item ? g.item.addsTime !== false : true));
+  // Every add-on can carry a per-barber price and/or time override (a master's hot-towel costs more
+  // and runs longer). Show the editor for all add-ons, not only ones that add time.
+  const timedAddons = (form.addonGroups || []).filter((g) => g && g.type === "addon");
   const hasAddonTimes = timedAddons.length > 0;
   // Questions (e.g. "Choose your cut") whose answers can take a barber more/less time or cost more.
   const questionGroups = (form.addonGroups || []).filter((g) => g && g.type !== "addon" && (g.options || []).length > 0);
@@ -10926,7 +10927,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 );
               })()}
               {on && hasAddonTimes && (() => {
-                const open = !!addonTimeOpen[p.id];
+                const open = addonTimeOpen[p.id] !== false; // per-staff add-on pricing shows expanded by default
                 return (
                   <div style={{ marginTop: 12, borderTop: "1px solid var(--line)", paddingTop: 12, minWidth: 0 }}>
                     <button onClick={() => setAddonTimeOpen((o) => ({ ...o, [p.id]: !o[p.id] }))} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--sub)", fontSize: 13.5, fontWeight: 500 }}>
@@ -10964,7 +10965,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 );
               })()}
               {on && hasQuestions && (() => {
-                const open = !!answerTimeOpen[p.id];
+                const open = answerTimeOpen[p.id] !== false; // per-staff answer pricing shows expanded by default
                 return (
                   <div style={{ marginTop: 12, borderTop: "1px solid var(--line)", paddingTop: 12, minWidth: 0 }}>
                     <button onClick={() => setAnswerTimeOpen((o) => ({ ...o, [p.id]: !o[p.id] }))} style={{ width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--sub)", fontSize: 13.5, fontWeight: 500 }}>
