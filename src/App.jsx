@@ -4661,10 +4661,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* "Just to confirm" — full description of the option/add-on the client just picked. */}
         {pickConfirm && (
           <Sheet open onClose={() => setPickConfirm(null)} align="center" maxWidth={420}>
-            <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 8px" }}>Just to confirm</h3>
-            {pickConfirm.name && <div style={{ fontSize: 15.5, fontWeight: 600, color: "var(--text)", margin: "0 0 8px" }}>{pickConfirm.name}</div>}
-            <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 22px", whiteSpace: "pre-wrap" }}>{pickConfirm.desc}</p>
-            <button className="lift" onClick={() => setPickConfirm(null)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>OK</button>
+            <div style={{ display: "flex", flexDirection: "column", maxHeight: "76dvh" }}>
+              <h3 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 8px", flexShrink: 0 }}>Just to confirm</h3>
+              {pickConfirm.name && <div style={{ fontSize: 15.5, fontWeight: 600, color: "var(--text)", margin: "0 0 8px", flexShrink: 0 }}>{pickConfirm.name}</div>}
+              <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: "1 1 auto", minHeight: 0, margin: "0 0 20px" }}>
+                <p style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.55, margin: 0, whiteSpace: "pre-wrap" }}>{pickConfirm.desc}</p>
+              </div>
+              <button className="lift" onClick={() => setPickConfirm(null)} style={{ flexShrink: 0, width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>OK</button>
+            </div>
           </Sheet>
         )}
 
