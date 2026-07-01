@@ -1,12 +1,47 @@
 # 👋 START HERE — Session Handoff (for Dan + a fresh Claude session)
 
-_Last updated: 2026-06-29 (all LIVE on gotvero.com: **services + booking rebuilt** — cut styles scrapped, Goldie-clean service editor, descriptions lead the booking, money/time hidden until the correct service is chosen, "Does this look right?" confirm gate, and the launch checklist replaced with a guided "Ready to go live?" one. See the 2026-06-29 block directly below.)_
+_Last updated: 2026-07-01 (all LIVE on gotvero.com: **Mangomint-style service editor** (section menu, Questions merged into Add-ons), **"Please Confirm" booking sheet with per-answer photos**, **Apple Pay / Google Pay** at checkout + card-on-file, booking-integrity fixes (phone dedupe, book-for-someone-else → attendee's phone gets reminders, GSM-safe SMS), and **per-user themes**. **Tap to Pay on iPhone is code-complete but WAITING ON APPLE's entitlement approval.** **OPEN:** Heather's blank calendar day (iCal sync assigns all events to one barber — needs a separate-vs-shared-calendar decision). See the 2026-07-01 block directly below.)_
+
+_Prior: 2026-06-29 (all LIVE on gotvero.com: **services + booking rebuilt** — cut styles scrapped, Goldie-clean service editor, descriptions lead the booking, money/time hidden until the correct service is chosen, "Does this look right?" confirm gate, and the launch checklist replaced with a guided "Ready to go live?" one.)_
 
 _Prior: 2026-06-26 (all LIVE on gotvero.com: theme set now a curated 8 — Slate + 3 modeled on Square/Mangomint/Boulevard, save-on-tap · calendar import rebuilt to per-staff feeds — fixes the "everyone's appts under the owner's name" crossup + supports multiple calendars · calendar polish — appointment tiles show end time on the bottom edge, date strip snaps to today / Sunday-first / today highlighted, Add-a-calendar button fixed + coming-soon stubs removed. iOS still live on TestFlight. Prev 2026-06-25: Customer Reviews, reminder cron ON, Vonage re-review, email deliverability fixed.)_
 
 > 🧭 **Reviews + Discounts settings placement (2026-06-25):** new settings cards inherit a `category` but ALSO must be added to the nav group lists in the `CATS` array (~`src/App.jsx:16387+`) or the safety-net dumps them under "Reports & data". Reviews now under Online booking → "Your booking page"; Discounts under Payments & checkout → "Payments & tips" (commits `28bbb22`/`0d2605b`).
 
-## ✂️ LATEST SESSION — 2026-06-29: Services + booking flow REBUILT — ✅ LIVE
+## 🆕 LATEST SESSION — 2026-07-01: Mangomint editor, payments (Apple Pay + Tap to Pay), booking integrity, per-user theme
+
+Big Dan-driven session, all shipped in small squash-merged PRs (#52–#79) → auto-deployed. Benchmarks: **Mangomint** (editor + confirm sheet).
+
+### ✅ Shipped & LIVE
+- **Service editor → Mangomint section menu:** service opens to Details / Staff / Add-ons / Online Booking / Hours (`MenuEditor`, main form rewritten to a menu of `menuRows`). New **Details** drill (reuses `detailsBody` + description). **Questions merged into Add-ons** (`renderGroups("all")`). Cleaner airy add-on/question cards (`qLbl`/`qHelp`/`cardCln`/`togRow`). Answer note is multi-line. Removed: services-list color bars, client "More info" line, "Book an appointment" header, leftover read-and-confirm toggle, duplicate booking-page description. Single "preview in booking flow" link at bottom of Add-ons (deep-links via `/book?preview_svc=<id>` → `ClientFlow` effect).
+- **Booking "Please Confirm" sheet** (`pickConfirm` in `ClientFlow`): on picking an option/add-on with a description — centered title, full description, **example photos per answer** (`o.photos`, up to 3, swipeable carousel `confIdx`). Editor: per-answer "Example photos" picker (`picker.target = {kind:"answer",gi,oi}`). Optional add-ons show a **single tap row** (no "No thanks").
+- **Payments:** SMS consent required at checkout; card/Apple Pay sheet **gated behind name/phone/email** (fixed a leak where Apple Pay could book with an empty form → "Me"). **Apple Pay / Google Pay** on charge AND card-on-file paths (`StripeCardSheet`, Payment Request Button, native-safe). **Stripe Link disabled** in dashboard. SMS made **GSM-safe** (fixed "?" for em-dash) in `api/notify.js`.
+- **Booking integrity:** phone **dedupe** → "verify by code & sign in" when a number's on file (`phoneConflict`); **book-for-someone-else captures the attendee's phone** (member `phone` + consent; appt stamps member phone; `api/send-reminders.js` prefers `a.phone` for `familyMemberId` appts). Tip preset fields clearable. Save-error banner delayed 4.5s + dismissible.
+- **Per-user theme:** active theme resolves from `business.userThemes[<signedInAs providerId>]` → shop `business.theme` → `studio`. `setTheme` writes the current user's key; App re-resolves via a `vero-user-changed` event. Storefront still uses the shop default.
+
+### ⏳ WAITING ON — Apple (Tap to Pay on iPhone)
+- **Full code is DONE & merged** (plugin `@capacitor-community/stripe-terminal@^8.1.1`, `src/tapToPay.js`, `api/stripe.js` actions `connection_token` + `terminal_intent`, `ios/App/App/App.entitlements` proximity-reader entitlement, "Tap to Pay" method in `Checkout` — native + live only, gated on `IS_NATIVE`).
+- **Blocked on Apple's entitlement approval** — request submitted 2026-07-01 (bundle `com.gotvero.app`, "Employees within my organization," US, 0–99 iPhones). Approval days–weeks → email michaelsdan415@gmail.com.
+- When approved: Xcode → Signing & Capabilities resolves red error → build to iPhone → Checkout → Tap to Pay → accept Apple terms → tap. ⚠️ Likely needs **Apple Business Manager** for real "employees within my org" distribution (app is only on Dan's phone now).
+
+### 🔬 NEEDS DAN'S TESTING (shipped, unverifiable from the env)
+1. **Apple Pay / Google Pay** on iPhone Safari — a charging booking + a "card to reserve" ($0 Apple Pay display).
+2. **Enable Google Pay** in Stripe (still "Requires action").
+3. **Book-for-someone-else + wrong-number verify** — real booking, confirm attendee gets texts + the verify prompt shows.
+
+### 🟡 OPEN / UNRESOLVED
+- **Heather's blank calendar day:** iCal sync assigns every event to ONE barber (Dan). Fix needs a decision — **separate calendars** (add a 2nd feed for Heather) vs **one shared calendar** (can't split by barber). Dan hasn't answered.
+- **Per-user theme edge case:** keyed off `signedInAs`; if Heather's device is "signed in as" Dan she'll see his theme — tighten who's-who if reported.
+
+### 🔧 Dan's Mac state
+- Local `main` reset to `origin/main`; old 32 local commits preserved on branch **`backup-local`**. `npm install` + `npx cap sync` already run (stripe-terminal linked to iOS).
+
+### ⚠️ Environment note
+- Assistant env can't reach Supabase / gotvero.com / Stripe / a device. Web + booking verified via local Vite dev server + Chromium screenshots (no auth). **Payments, native app, and live dashboard = Dan tests.**
+
+---
+
+## ✂️ SESSION — 2026-06-29: Services + booking flow REBUILT — ✅ LIVE
 A big, Dan-driven redesign of the **services menu, the service editor, and the client booking flow**, shipped in small verified increments (PRs #8–#19, all squash-merged to `main` → auto-deployed). Dan reviewed each piece via rendered mockups before build; benchmarks were **Goldie** (editor look) and **MangoMint** (client flow simplicity).
 
 **The model changed — cut styles are SCRAPPED.** A service is now just **Category › Service › Add-ons › Questions**. Each cut (Scissor Cut, Skin Fade, Transformation) is meant to be its **own standalone service** with its own correct duration — which is what protects the schedule (no generic "Haircut" booked when they wanted a 50-min fade). Decision made together; Goldie has no cut-styles concept either.
