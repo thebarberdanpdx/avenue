@@ -2305,10 +2305,12 @@ function App() {
         .screen-swap.swap-back { animation: bkSlideL .44s cubic-bezier(.4,0,.2,1) both; }
         .screen-swap.swap-fwd > *, .screen-swap.swap-back > *,
         .screen-swap.swap-fwd > * > *, .screen-swap.swap-back > * > * { animation: none !important; opacity: 1 !important; transform: none !important; }
-        /* Quiet guide: a newly-revealed booking question does ONE subtle blink — background fades a
-           soft wash in, then back out — to draw the eye. Plays alongside the normal fade-in. */
-        @keyframes cutGuide { 0%,100% { background: transparent; } 50% { background: color-mix(in srgb, var(--gold) 18%, transparent); } }
-        .cut-next-guide { animation: screenIn .3s var(--ease) both, cutGuide 1.2s ease-in-out .18s both; }
+        /* Quiet guide: a newly-revealed booking question does ONE subtle blink — a soft wash fades
+           in, then back out. Runs on a ::after overlay so the slide's "animation:none" reset on the
+           screen's children (which move the panel as one unit) can't kill it. */
+        @keyframes cutBlink { 0%,100% { opacity: 0; } 50% { opacity: 1; } }
+        .cut-next-guide { position: relative; z-index: 0; }
+        .cut-next-guide::after { content: ""; position: absolute; inset: -6px -10px; border-radius: 16px; pointer-events: none; z-index: -1; background: color-mix(in srgb, var(--gold) 22%, transparent); opacity: 0; animation: cutBlink 1.15s ease-in-out .18s both; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
         /* Stop iOS Safari from rubber-band overscrolling past the top/bottom of the page,
            which was dragging the fixed bottom tab bar halfway up the viewport.
