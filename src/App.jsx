@@ -875,7 +875,9 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
   const [err, setErr] = useState("");
   const [result, setResult] = useState(null);
   const [ready, setReady] = useState(false); // true once the secure card field is mounted & tappable
+  const [wallet, setWallet] = useState(false); // true once an Apple Pay / Google Pay button is available & mounted
   const cardBox = useRef(null);
+  const prBox = useRef(null);
   const els = useRef(null);
 
   useEffect(() => {
@@ -891,10 +893,43 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
       card.on("ready", () => { if (!dead) setReady(true); });
       card.on("change", (ev) => setErr(ev.error ? ev.error.message : ""));
       els.current = { stripe, card };
+
+      // Apple Pay / Google Pay (charge path only). The button only appears when the
+      // browser/device actually supports a wallet (Safari+Apple, Chrome+Google) on our
+      // verified domain — everywhere else canMakePayment() is null and the card field
+      // is the fallback, so this never breaks anyone who can't use it.
+      if (isPay) {
+        try {
+          const pr = stripe.paymentRequest({
+            country: "US", currency: "usd",
+            total: { label: "Booking deposit", amount: Math.round(Number(amount) * 100) },
+            requestPayerName: true, requestPayerEmail: true,
+          });
+          const prButton = elements.create("paymentRequestButton", { paymentRequest: pr, style: { paymentRequestButton: { type: "default", theme: "dark", height: "48px" } } });
+          const can = await pr.canMakePayment();
+          if (can && !dead && prBox.current) { prButton.mount(prBox.current); setWallet(true); els.current.prButton = prButton; }
+          pr.on("paymentmethod", async (ev) => {
+            try {
+              const intent = await stripeApi({ action: "sale_intent", amount: Number(amount), description: "Booking deposit" });
+              if (!intent.clientSecret) { ev.complete("fail"); setErr(intent.error || "Couldn't start the charge."); return; }
+              const conf = await stripe.confirmCardPayment(intent.clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false });
+              if (conf.error) { ev.complete("fail"); setErr(conf.error.message || "Payment failed."); return; }
+              ev.complete("success");
+              if (conf.paymentIntent && conf.paymentIntent.status === "requires_action") {
+                const again = await stripe.confirmCardPayment(intent.clientSecret);
+                if (again.error) { setErr(again.error.message || "Payment needs another step."); return; }
+              }
+              const c4 = (ev.paymentMethod && ev.paymentMethod.card) || {};
+              if (!dead) { setResult({ paid: true, intentId: intent.id, last4: c4.last4 || "••••", brand: c4.brand }); setPhase("done"); }
+            } catch (e2) { try { ev.complete("fail"); } catch (_) {} setErr(e2.message || "Payment failed. Try the card field."); }
+          });
+        } catch (e) { /* wallet unavailable — card field remains */ }
+      }
+
       // Fallback: if the 'ready' event is ever missed, enable the button shortly after mount.
       setTimeout(() => { if (!dead) setReady(true); }, 1200);
     })();
-    return () => { dead = true; try { els.current && els.current.card.unmount(); } catch (e) {} };
+    return () => { dead = true; try { els.current && els.current.card.unmount(); } catch (e) {} try { els.current && els.current.prButton && els.current.prButton.unmount(); } catch (e) {} };
   }, []);
 
   const close = () => { setBusy(false); onClose && onClose(); };
@@ -956,6 +991,19 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
                 </>
               ) : (
                 <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>We keep a card on file to hold your spot. You won't be charged unless you no-show or cancel late.</div>
+              )}
+
+              {isPay && (
+                <>
+                  <div ref={prBox} style={{ marginTop: wallet ? 18 : 0 }} />
+                  {wallet && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
+                      <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                      <span style={{ fontSize: 12, color: "var(--faint)" }}>or pay with card</span>
+                      <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                    </div>
+                  )}
+                </>
               )}
 
               <div style={{ marginTop: 18 }}>
