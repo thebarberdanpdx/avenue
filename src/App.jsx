@@ -10522,7 +10522,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const startFromTemplate = (tpl) => {
     const seed = tpl ? tpl.build() : {};
     const f = { ...blank, ...seed, id: "svc-" + Date.now(), photos: [], staff: defaultStaffMap(), booking: { ...defaultBooking(), ...(seed.booking || {}) } };
-    setForm(f); setTplPick(false); setSection(null); setEditing("new");
+    setForm(f); setTplPick(false); setSection("details"); setEditing("new");
   };
   const openEdit = (s) => { const copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; copy.photos = copy.photos || (copy.photo ? [copy.photo] : []); copy.usesCutStyles = (copy.usesCutStyles !== undefined) ? (copy.usesCutStyles !== false) : ((copy.cutTypes || []).length > 0); setForm(copy); setSection(null); setEditing(s.id); };
   const save = () => {
@@ -10550,9 +10550,9 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     const clean = { ...form, price: Math.min(100000, priceNum), duration: Math.max(5, Math.min(600, Number(form.duration) || 30)), staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false };
     if (editing === "new") setServices([...services, clean]);
     else setServices(services.map((s) => (s.id === editing ? clean : s)));
-    // MangoMint pattern: for an existing service, saving a section lands back on the
-    // read-only service view; only a brand-new service exits to the list.
-    if (editing === "new") setEditing(null);
+    // MangoMint pattern: saving a section lands on the service's section menu. A brand-new
+    // service becomes a real one (editing → its id) so its menu opens with add-ons/staff ready.
+    if (editing === "new") setEditing(clean.id);
     setSection(null); showToast(`Saved "${form.name}".`);
   };
   const remove = (id) => { setServices(services.filter((s) => s.id !== id)); showToast("Service removed."); };
@@ -10769,7 +10769,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       <SectionLbl style={{ marginTop: 26 }}>Name</SectionLbl>
       <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Signature Cut" style={inpStyle} />
 
-      <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+      <SectionLbl>Description <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--faint)" }}>· shown to clients</span></SectionLbl>
+      <textarea value={(form.booking || {}).description || ""} onChange={(e) => setBooking({ description: e.target.value })} rows={3} placeholder="What this service is — helps clients pick the right one." style={{ ...inpStyle, resize: "vertical", lineHeight: 1.5, minHeight: 60 }} />
+
+      <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
         <div style={{ flex: 1 }}>
           <SectionLbl>Price</SectionLbl>
           <div style={moneyWrap}>
@@ -11644,6 +11647,16 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     </>
   );
 
+  // ---- drill-in: DETAILS (name, description, price, duration, category, color, photo) ----
+  const detailsScreen = (
+    <>
+      {backBar((form.name || "SERVICE").toUpperCase(), () => setSection(null))}
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Details</h2>
+      {detailsBody}
+      <SaveBar />
+    </>
+  );
+
   // ---- drill-in: STAFF & PRICING (rebuilt header, reuse staffBody) ----
   const staffScreen = (
     <>
@@ -11677,7 +11690,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
   // ---- full-page service editor ----
   if (editing) {
-    const drill = section === "cutstyles" || section === "addons" || section === "questions" || section === "staff" || section === "photos" || section === "timerules" || section === "booking";
+    const drill = section === "details" || section === "cutstyles" || section === "addons" || section === "questions" || section === "staff" || section === "photos" || section === "timerules" || section === "booking";
     return (
       <div className="appt-screen" style={{ paddingBottom: 40, textAlign: "left" }}>
         {picker && <PhotoPicker onClose={() => setPicker(null)} onPick={(id) => {
@@ -11747,7 +11760,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
         {/* ---- drill-in sub-screens ---- */}
         {drill ? (
-          section === "photos" ? photosScreen
+          section === "details" ? detailsScreen
+            : section === "photos" ? photosScreen
             : section === "cutstyles" ? cutstylesScreen
             : section === "addons" ? addonsScreen
             : section === "questions" ? questionsScreen
@@ -11773,88 +11787,42 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           };
           const isCombo = !!form.isCombo || (form.comboOf || []).length > 0;
           const legacyCuts = (form.cutTypes || []).length > 0; // services from the old cut-styles model
-          // Goldie-clean outlined fields: a notched floating label over a rounded outline.
-          const fldBox = { position: "relative", border: "1.5px solid var(--border)", borderRadius: 15, padding: "19px 16px 14px", marginBottom: 14, background: "var(--panel)" };
-          const fldLbl = { position: "absolute", top: -8, left: 13, background: "var(--bg)", padding: "0 6px", fontSize: 12, color: "var(--sub)", fontWeight: 500, fontFamily: FONT_BODY };
-          const fldInput = { width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: 0, color: "var(--text)", fontSize: 18, fontWeight: 500, fontFamily: FONT_BODY };
-          const secH = { fontSize: 22, fontWeight: 600, letterSpacing: "-0.5px", margin: "26px 0 16px", fontFamily: FONT_DISPLAY };
+          const staffSub = anyStaffOverride
+            ? `${staffList.filter((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); }).length} with custom pricing`
+            : (offeringCount === staffList.length ? "All staff · default pricing" : `${offeringCount} of ${staffList.length} · default pricing`);
+          const menuRows = [
+            { target: "details", icon: <Scissors size={18} />, label: "Details", sub: `$${form.price || "—"} · ${form.duration || "—"} min · ${form.category || cats[0]}` },
+            { target: "staff", icon: <Users size={18} />, label: "Staff", sub: staffSub },
+            { target: "addons", icon: <Plus size={18} />, label: "Add-ons", sub: addonOnlyCount ? `${addonOnlyCount} added` : "None yet" },
+            { target: "questions", icon: <HelpCircle size={18} />, label: "Questions", sub: questionCount ? `${questionCount} added` : "None yet" },
+            { target: "photos", icon: <ImageIcon size={18} />, label: "Photos", sub: photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "None yet" },
+            { target: "booking", icon: <Calendar size={18} />, label: "Online Booking", sub: live ? `${(form.booking || {}).whoCanBook === "returning" ? "Returning only" : "Everyone"}${(form.booking || {}).requireCard ? " · card held" : ""}` : "Off — internal only" },
+            { target: "timerules", icon: <Clock size={18} />, label: "Hours & pricing", sub: (form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Standard price, always available" },
+          ];
           return (
             <>
               {backBar("SERVICES", () => setEditing(null))}
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600, letterSpacing: "-0.4px", margin: "2px 0 18px", textAlign: "left" }}>{editing === "new" ? "New service" : "Edit service"}</h2>
+              {/* Mangomint-style service header: eyebrow + name + quick facts */}
+              <div style={{ fontSize: 11.5, letterSpacing: 1.8, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "2px 0 4px" }}>{editing === "new" ? "New service" : "Service"}</div>
+              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: "-0.4px", margin: "0 0 6px", lineHeight: 1.08, wordBreak: "break-word" }}>{form.name || "Untitled service"}</h2>
+              <div style={{ fontSize: 14.5, color: "var(--sub)", margin: "0 0 22px" }}>${form.price || "—"} · {form.duration || "—"} min{live ? "" : " · Internal"}</div>
 
-              {/* Name */}
-              <div style={fldBox}>
-                <label style={fldLbl}>Name</label>
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Skin Fade" style={fldInput} />
+              {/* section menu — each row drills into its own clean editor */}
+              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden", marginBottom: 20 }}>
+                {menuRows.map((r, idx) => (
+                  <button key={r.target} onClick={() => setSection(r.target)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, background: "var(--panel)", border: "none", borderTop: idx ? "1px solid var(--line)" : "none", padding: "16px 16px", textAlign: "left", cursor: "pointer" }}>
+                    <span style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "var(--text)" }}>{r.icon}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{r.label}</span>
+                      <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.sub}</span>
+                    </span>
+                    <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                  </button>
+                ))}
               </div>
 
-              {/* Category */}
-              <div style={fldBox}>
-                <label style={fldLbl}>Category</label>
-                <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                  <select value={form.category || cats[0]} onChange={(e) => setForm({ ...form, category: e.target.value })} style={{ ...fldInput, appearance: "none", WebkitAppearance: "none", paddingRight: 24, cursor: "pointer" }}>
-                    {cats.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  <ChevronDown size={18} style={{ color: "var(--faint)", position: "absolute", right: 0, pointerEvents: "none" }} />
-                </div>
-              </div>
-
-              {/* Color */}
-              <button onClick={() => setColorOpen(true)} style={{ ...fldBox, width: "100%", boxSizing: "border-box", textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <label style={fldLbl}>Color</label>
-                <span style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                  <span style={{ width: 22, height: 22, borderRadius: "50%", background: hexById(form.color), flexShrink: 0 }} />
-                  <span style={{ ...fldInput, width: "auto", color: "var(--sub)", fontSize: 15 }}>Calendar color</span>
-                </span>
-                <ChevronRight size={18} style={{ color: "var(--faint)" }} />
-              </button>
-
-              {/* Price & duration */}
-              <h3 style={secH}>Price &amp; duration</h3>
-              <div style={{ display: "flex", gap: 13 }}>
-                <div style={{ ...fldBox, flex: 1, minWidth: 0 }}>
-                  <label style={fldLbl}>Price</label>
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <span style={{ color: "var(--sub)", fontSize: 18, marginRight: 2 }}>$</span>
-                    <input type="number" inputMode="decimal" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="47" style={fldInput} />
-                  </div>
-                </div>
-                <div style={{ ...fldBox, flex: 1, minWidth: 0 }}>
-                  <label style={fldLbl}>Duration</label>
-                  <div style={{ display: "flex", alignItems: "baseline" }}>
-                    <input type="number" inputMode="numeric" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="50" style={{ ...fldInput, width: "auto", flex: "0 1 auto", minWidth: 0 }} size={3} />
-                    <span style={{ color: "var(--sub)", fontSize: 15, marginLeft: 4 }}>min</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Description — shown to clients, leads them to the right pick */}
-              <div style={{ ...fldBox, marginTop: 18 }}>
-                <label style={fldLbl}>Description</label>
-                <textarea value={(form.booking || {}).description || ""} onChange={(e) => setBooking({ description: e.target.value })} rows={3} placeholder="What this service is — shown to clients so they pick the right one." style={{ ...fldInput, resize: "vertical", lineHeight: 1.5, minHeight: 56 }} />
-              </div>
-
-              {/* Online booking */}
-              <h3 style={secH}>Online booking</h3>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "16px 4px", borderTop: "1px solid var(--line)" }}>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>Available for online booking</span>
-                    <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>{live ? "Clients can book this service themselves." : "Internal only — hidden from your booking page."}</span>
-                  </span>
-                  <Toggle on={live} onClick={() => setBooking({ available: live === false })} />
-                </div>
-                <DrillRow icon={<Plus size={18} />} label="Add-ons" sub={addonOnlyCount ? `${addonOnlyCount} added` : "None yet"} target="addons" />
-                <DrillRow icon={<HelpCircle size={18} />} label="Questions" sub={questionCount ? `${questionCount} added` : "None yet"} target="questions" />
-                <DrillRow icon={<Users size={18} />} label="Staff & pricing" sub={anyStaffOverride ? `${staffList.filter((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); }).length} custom` : `${offeringCount === staffList.length ? "All staff" : offeringCount + " of " + staffList.length} · default`} target="staff" />
-                <DrillRow icon={<ImageIcon size={18} />} label="Photos" sub={photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "None yet"} target="photos" />
-                <DrillRow icon={<Clock size={18} />} label="Hours & pricing" sub={(form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Always available · standard price"} target="timerules" />
-                <DrillRow icon={<Calendar size={18} />} label="Booking rules" sub={`${(form.booking || {}).whoCanBook === "returning" ? "Returning only" : "Everyone"}${(form.booking || {}).requireCard ? " · card held" : ""}`} target="booking" />
-              </div>
-
-              {/* Advanced (combo) */}
-              <div style={{ marginTop: 22, borderTop: "1px solid var(--line)" }}>
+              {/* Advanced (cut styles legacy + combo) */}
+              <div style={{ borderTop: "1px solid var(--line)" }}>
                 <button onClick={() => setAdvancedOpen((v) => !v)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "16px 4px", background: "transparent", border: "none", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
                   <span style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Advanced</span>
                   {advancedOpen ? <ChevronUp size={18} style={{ color: "var(--faint)" }} /> : <ChevronDown size={18} style={{ color: "var(--faint)" }} />}
@@ -11874,9 +11842,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 )}
               </div>
 
-              <SaveBar />
-              {editing !== "new" && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 22, padding: "10px 0 4px" }}>
+              {editing === "new" ? (
+                <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.5, margin: "22px 0 4px" }}>Open <b style={{ color: "var(--sub)" }}>Details</b> to name it and set a price — that saves the service.</p>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 22, padding: "22px 0 4px" }}>
                   <button onClick={archiveSvc} style={{ background: "none", border: "none", color: form.archived ? "var(--gold)" : "var(--text2)", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 4, padding: 8, cursor: "pointer" }}>{form.archived ? "Restore service" : "Archive service"}</button>
                   <button onClick={deleteSvc} style={{ background: "none", border: "none", color: "#C2392B", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 4, padding: 8, cursor: "pointer" }}>Delete forever</button>
                 </div>
