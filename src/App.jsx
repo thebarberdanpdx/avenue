@@ -2305,6 +2305,9 @@ function App() {
         .screen-swap.swap-back { animation: bkSlideL .44s cubic-bezier(.4,0,.2,1) both; }
         .screen-swap.swap-fwd > *, .screen-swap.swap-back > *,
         .screen-swap.swap-fwd > * > *, .screen-swap.swap-back > * > * { animation: none !important; opacity: 1 !important; transform: none !important; }
+        /* Quiet guide: a newly-revealed booking question softly glows once (plus the normal fade-in). */
+        @keyframes cutGuide { 0% { background: color-mix(in srgb, var(--gold) 13%, transparent); } 70% { background: color-mix(in srgb, var(--gold) 9%, transparent); } 100% { background: transparent; } }
+        .cut-next-guide { animation: screenIn .3s var(--ease) both, cutGuide 1.8s ease-out both; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
         /* Stop iOS Safari from rubber-band overscrolling past the top/bottom of the page,
            which was dragging the fixed bottom tab bar halfway up the viewport.
@@ -4808,10 +4811,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           };
           const renderGroup = (g, idx) => {
             const gap = idx === 0 ? 26 : 32;
-            const refFn = idx === shown.length - 1 ? (el) => { cutLastRef.current = el; } : null;
+            const isLast = idx === shown.length - 1;
+            const refFn = isLast ? (el) => { cutLastRef.current = el; } : null;
+            // Newly-revealed steps (anything past the first) get a one-time soft glow — a quiet nudge
+            // to answer the next thing. Plays once on mount (groups are keyed), not on every render.
+            const cls = "fade-up" + (isLast && idx > 0 ? " cut-next-guide" : "");
             if (g.type === "choice") {
               return (
-                <div key={g.id} ref={refFn} className="fade-up" style={{ marginTop: gap }}>
+                <div key={g.id} ref={refFn} className={cls} style={{ marginTop: gap, borderRadius: 16 }}>
                   <div style={qHead}>{g.label || "Choose your cut"}</div>
                   {(g.options || []).map((o) => { const on = (e.addons || {})[g.id] === o.id; return (
                     <button key={o.id} onClick={() => pickChoice(g, o.id)} style={rowBtn}>
@@ -4832,7 +4839,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             }
             const it = g.item || {}; const on = !!(e.addons || {})[g.id]; const req = g.required === true; const declined = !!(e.declined || {})[g.id];
             return (
-              <div key={g.id} ref={refFn} className="fade-up" style={{ marginTop: gap }}>
+              <div key={g.id} ref={refFn} className={cls} style={{ marginTop: gap, borderRadius: 16 }}>
                 <div style={qHead}>{g.label || (it.name ? `Add ${it.name}?` : "Add-on")}</div>
                 <button onClick={() => { if (req) answerRequired(g, true); else toggleExtra(g); }} style={rowBtn}>
                   {radio(on)}
