@@ -4725,8 +4725,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <button key={o.id} onClick={() => pickChoice(g, o.id)} style={rowBtn}>
                       {radio(on)}
                       <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, color: "var(--text)" }}>{o.label}</span>
-                        {o.desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{o.desc}</span>}
+                        <span style={{ display: "block", fontSize: 15.5, fontWeight: 500, color: "var(--text)" }}>{o.label}</span>
+                        {o.desc && (
+                          <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.desc}</span>
+                            <span onClick={(ev) => { ev.stopPropagation(); setConfIdx(0); setPickConfirm({ name: o.label, desc: o.desc || "", photos: (Array.isArray(o.photos) ? o.photos : []).filter(Boolean) }); }} style={{ flexShrink: 0, fontSize: 13, fontWeight: 500, color: "var(--text)", textDecoration: "underline", textUnderlineOffset: 2, whiteSpace: "nowrap", cursor: "pointer" }}>more info</span>
+                          </span>
+                        )}
                       </span>
                     </button>
                   ); })}
@@ -4740,8 +4745,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <button onClick={() => { if (req) { if (!on) toggleExtra(g); } else toggleExtra(g); }} style={rowBtn}>
                     {radio(on)}
                     <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>Yes{it.name ? ` — ${it.name}` : ""}</span>
-                      {it.desc && <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{it.desc}</span>}
+                      <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Yes{it.name ? ` — ${it.name}` : ""}</span>
+                      {it.desc && (
+                        <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
+                          <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>
+                          <span onClick={(ev) => { ev.stopPropagation(); setConfIdx(0); setPickConfirm({ name: it.name || g.label, desc: it.desc || "", photos: g.photo ? [g.photo] : [] }); }} style={{ flexShrink: 0, fontSize: 13, fontWeight: 500, color: "var(--text)", textDecoration: "underline", textUnderlineOffset: 2, whiteSpace: "nowrap", cursor: "pointer" }}>more info</span>
+                        </span>
+                      )}
                     </span>
                   </button>
                   {req && (
