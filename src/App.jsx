@@ -4455,11 +4455,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   const open = svcInfo === svc.id;
                   return (
                     <div key={svc.id} style={{ borderBottom: "1px solid var(--line)", background: tapSel === svc.id ? "var(--panel2)" : "transparent", transition: "background .15s" }}>
-                      <button onClick={() => { setTapSel(svc.id); setTimeout(() => selectService(svc), 165); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "none", border: "none", padding: "14px 2px", textAlign: "left", cursor: "pointer" }}>
+                      <button onClick={() => { setTapSel(svc.id); setTimeout(() => selectService(svc), 165); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "none", border: "none", padding: "18px 2px", textAlign: "left", cursor: "pointer" }}>
                         <span style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{svc.name}</span>
+                          <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, letterSpacing: "-0.3px", color: "var(--text)" }}>{svc.name}</span>
                         </span>
-                        <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                        <ChevronRight size={20} style={{ color: "var(--sub)", flexShrink: 0 }} />
                       </button>
                     </div>
                   );
@@ -11217,8 +11217,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     return (
     <>
       <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>{kind === "all" ? "Paid extras and quick questions clients answer while booking. Shown in the order below." : (kind === "addon" ? "Paid extras clients can add while booking — each can add price, time, or both. Shown in the order below." : "Quick questions clients answer while booking (e.g. “Skin fade?”). Shown in the order below.")}</p>
-      {form.addonGroups.map((g, i) => {
-        if (!matches(g)) return null;
+      {(() => {
+        // Keep each group's REAL array index (edits + reorder rely on it), but in the merged "all"
+        // view always list Questions before Add-ons — questions are always priority, matching the
+        // client booking screen. Stable sort preserves same-kind order.
+        const entries = form.addonGroups.map((g, i) => ({ g, i })).filter(({ g }) => matches(g));
+        if (kind === "all") entries.sort((a, b) => (a.g.type === "addon" ? 1 : 0) - (b.g.type === "addon" ? 1 : 0));
+        return entries;
+      })().map(({ g, i }) => {
         // Reorder only swaps a group with its nearest SAME-KIND neighbour (questions render before
         // add-ons on the client screen regardless), so the arrows read correctly in the merged list.
         const isAddon = g.type === "addon";
