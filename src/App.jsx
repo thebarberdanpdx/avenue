@@ -2299,10 +2299,10 @@ function App() {
         /* Booking flow: slide the whole screen horizontally — forward comes in from the right, back
            from the left (native-app feel). The panel moves as ONE unit, so the per-child vertical
            stagger above is suppressed while sliding. */
-        @keyframes bkSlideR { from { opacity: 0; transform: translateX(26%); } to { opacity: 1; transform: none; } }
-        @keyframes bkSlideL { from { opacity: 0; transform: translateX(-26%); } to { opacity: 1; transform: none; } }
-        .screen-swap.swap-fwd { animation: bkSlideR .33s cubic-bezier(.32,.72,0,1) both; }
-        .screen-swap.swap-back { animation: bkSlideL .33s cubic-bezier(.32,.72,0,1) both; }
+        @keyframes bkSlideR { from { opacity: 0.4; transform: translateX(60%); } to { opacity: 1; transform: none; } }
+        @keyframes bkSlideL { from { opacity: 0.4; transform: translateX(-60%); } to { opacity: 1; transform: none; } }
+        .screen-swap.swap-fwd { animation: bkSlideR .5s cubic-bezier(.33,.68,.28,1) both; }
+        .screen-swap.swap-back { animation: bkSlideL .5s cubic-bezier(.33,.68,.28,1) both; }
         .screen-swap.swap-fwd > *, .screen-swap.swap-back > *,
         .screen-swap.swap-fwd > * > *, .screen-swap.swap-back > * > * { animation: none !important; opacity: 1 !important; transform: none !important; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
@@ -3821,13 +3821,26 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
   // ---- Two-screen "cut + add-ons" flow (cutFlow) ----
   // Pick a choice option (e.g. skin fade vs standard) on the cut screen — single-select per group.
+  // If the option has a description/photos, we DON'T touch the screen yet — the "please confirm"
+  // sheet comes up first, and only once it closes do we record the pick (which reveals + scrolls to
+  // the next question). Nothing shifts in the background while the sheet is open.
   const pickChoice = (group, optionId) => {
-    const cur = cart[0] || {};
-    putEntry({ ...cur, addons: { ...(cur.addons || {}), [group.id]: optionId } });
-    // Pop a "please confirm" sheet with the full description + example photos of what they picked.
     const opt = (group.options || []).find((o) => o.id === optionId);
     const photos = (opt && Array.isArray(opt.photos) ? opt.photos : []).filter(Boolean);
-    if (opt && ((opt.desc && String(opt.desc).trim()) || photos.length)) { setConfIdx(0); setPickConfirm({ name: opt.label, desc: opt.desc || "", photos }); }
+    const hasInfo = !!(opt && ((opt.desc && String(opt.desc).trim()) || photos.length));
+    if (hasInfo) { setConfIdx(0); setPickConfirm({ name: opt.label, desc: opt.desc || "", photos, commit: { groupId: group.id, optionId } }); return; }
+    const cur = cart[0] || {};
+    putEntry({ ...cur, addons: { ...(cur.addons || {}), [group.id]: optionId } });
+  };
+  // Close the confirm sheet — and if it carried a pending pick, record it now (this is what advances
+  // the screen to the next question, AFTER the sheet is gone).
+  const closePickConfirm = () => {
+    const pc = pickConfirm;
+    setPickConfirm(null);
+    if (pc && pc.commit) {
+      const cur = cart[0] || {};
+      putEntry({ ...cur, addons: { ...(cur.addons || {}), [pc.commit.groupId]: pc.commit.optionId } });
+    }
   };
   // Toggle an optional add-on on the add-ons screen.
   const toggleExtra = (group) => {
@@ -3865,7 +3878,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (cutRevealSeen.current === "") { cutRevealSeen.current = cutRevealSig; return; } // don't scroll on first paint
     if (cutRevealSeen.current !== cutRevealSig) {
       cutRevealSeen.current = cutRevealSig;
-      const t = setTimeout(() => { try { cutLastRef.current && cutLastRef.current.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 90);
+      const t = setTimeout(() => { try { cutLastRef.current && cutLastRef.current.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 170);
       return () => clearTimeout(t);
     }
   }, [cutRevealSig]);
@@ -4839,7 +4852,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
         {/* "Just to confirm" — full description of the option/add-on the client just picked. */}
         {pickConfirm && (
-          <Sheet open onClose={() => setPickConfirm(null)} align="center" maxWidth={480}>
+          <Sheet open onClose={closePickConfirm} align="center" maxWidth={480}>
             <div style={{ display: "flex", flexDirection: "column", maxHeight: "82dvh", padding: "8px 4px 4px" }}>
               {pickConfirm.photos && pickConfirm.photos.length > 0 && (
                 <div style={{ flexShrink: 0, margin: "0 0 18px" }}>
@@ -4862,7 +4875,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <p style={{ fontSize: 16.5, color: "var(--text2)", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap", textAlign: "center" }}>{pickConfirm.desc}</p>
                 </div>
               )}
-              <button className="lift" onClick={() => setPickConfirm(null)} style={{ flexShrink: 0, width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 13, padding: 17, fontSize: 16, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>OK</button>
+              <button className="lift" onClick={closePickConfirm} style={{ flexShrink: 0, width: "100%", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 13, padding: 17, fontSize: 16, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>OK</button>
             </div>
           </Sheet>
         )}
