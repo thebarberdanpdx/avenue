@@ -959,6 +959,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
               )}
 
               <div style={{ marginTop: 18 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>Enter your card</div>
                 <div ref={cardBox} style={{ ...field, display: "block", paddingTop: 15 }} />
                 {err && <div style={{ color: "#B5564B", fontSize: 12.5, marginTop: 8, paddingLeft: 2 }}>{err}</div>}
               </div>
