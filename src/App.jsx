@@ -10961,8 +10961,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // Open the live client booking flow in a new tab, deep-linked straight to THIS service's
   // questions/add-ons screen — so the owner sees exactly what a client sees while editing.
   const previewBooking = () => { try { const base = window.location.origin + "/book"; window.open(form.id ? base + "?preview_svc=" + encodeURIComponent(form.id) : base, "_blank"); } catch (e) {} };
+  // Mangomint-style single link at the BOTTOM of the whole Add-ons screen.
   const previewLink = (
-    <button onClick={previewBooking} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", background: "transparent", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, padding: "12px 0 2px", marginTop: 4, borderTop: "1px solid var(--line)", cursor: "pointer", fontFamily: FONT_BODY }}><Globe size={15} /> See this on the booking page <span style={{ fontSize: 12, color: "var(--faint)" }}>↗</span></button>
+    <div style={{ borderTop: "1px solid var(--line)", marginTop: 24, paddingTop: 20 }}>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, margin: 0 }}>
+        <button onClick={previewBooking} style={{ background: "none", border: "none", padding: 0, color: "var(--gold)", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: FONT_BODY, textDecoration: "underline", textUnderlineOffset: 2 }}>Click here</button> to preview these in the booking flow.
+      </p>
+    </div>
   );
   const setGroup = (i, patch) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => idx === i ? { ...x, ...patch } : x) }));
   const setItem = (i, patch) => setForm((f) => ({ ...f, addonGroups: f.addonGroups.map((x, idx) => idx === i ? { ...x, item: { ...(x.item || {}), ...patch } } : x) }));
@@ -11219,7 +11224,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.4, margin: "2px 0 0" }}>Blank uses the default above.</p>
               </div>
             )}
-            {previewLink}
           </div>
         );
       })}
@@ -11592,6 +11596,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       {backBar((form.name || "SERVICE").toUpperCase(), () => setSection(null))}
       <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, letterSpacing: "-0.3px", margin: "0 0 16px" }}>Add-ons</h2>
       {addonsBody}
+      {previewLink}
       <SaveBar />
     </>
   );
