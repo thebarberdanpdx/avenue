@@ -89,7 +89,10 @@ async function handler(req, res) {
         arriveUrl: a.manageToken ? `${SITE}/manage?t=${a.manageToken}&a=1` : "",
       };
       const email = String(client.email || "").trim();
-      const phone = String(client.phone || a.phone || "").replace(/\D/g, "");
+      // Reminders + the check-in link go to the person ATTENDING. For a booking made on behalf of a
+      // family member, the appointment carries that member's own phone — prefer it over the account
+      // holder's number so the right person is reminded and can check in.
+      const phone = String((a.familyMemberId && a.phone ? a.phone : (client.phone || a.phone)) || "").replace(/\D/g, "");
       const smsOptOut = client.smsOptOut === true;
 
       for (const m of reminders) {
