@@ -4678,7 +4678,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         )}
 
         {/* STEP 1 — service picker (returning / family / add-another). Editorial tiles, no guided tour. */}
-        {step === 1 && (() => {
+        {step === 1 && !cutFlow && (() => {
           const visible = (s) => !s.archived && !s.hidden;
           const cats = (categories && categories.length) ? categories : ["Services"];
           const inCat = (cat) => services.filter((s) => visible(s) && (s.category || cats[0]) === cat);
@@ -4687,9 +4687,20 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             if (!svc) return;
             if (svc.firstTime && svc.intake) { setIntakeFor(svc); return; }
             setDraft(svc); setDraftAddons({}); setCutType(null); setBeardType(null);
+            setSimpleChange(null); setCutConfirm(null); setDescConfirmed(false); setConfirmSheet(null); setAddonFlow(null);
             const anyoneProv = providers.find((p) => p.id === "anyone") || providers[0];
-            if (svc.usesCutStyles !== false && svc.cutTypes && svc.cutTypes.length > 0) { setCutPhase("type"); setStep(2); }
-            else { setCart((c) => (c.length ? c.map((e, i) => i === 0 ? { service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} } : e) : [{ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }])); startAddons({ service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} }); }
+            const entry = { service: svc, provider: anyoneProv, cutType: null, beardType: null, addons: {} };
+            setCart([entry]);
+            setCutFlow(null);
+            // Same routing as the first-time flow: a question or add-on puts the service on the new
+            // inline cut screen; only true legacy cut-style services fall back to the old sheet path.
+            const hasCuts = svc.usesCutStyles !== false && svc.cutTypes && svc.cutTypes.length > 0;
+            const groups = svc.addonGroups || [];
+            const hasChoices = groups.some((g) => g.type === "choice");
+            const hasExtras = groups.some((g) => g.type === "addon");
+            if (hasChoices || hasExtras) { setCutFlow({ phase: "cut" }); }
+            else if (hasCuts) { setCutPhase("type"); setStep(2); }
+            else { startAddons(entry); }
           };
           const metaFor = (svc) => {
             // New model: the list shows what a service IS (its description), never price or time.
