@@ -3351,7 +3351,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // (optional extras + running total). Only entered from selectService for services with groups.
   const [cutFlow, setCutFlow] = useState(null); // null | { phase: "cut" | "addons" }
   const [clientNote, setClientNote] = useState(""); // optional note for the barber — rides the appt, the push, and the feed
-  const [personalizeOpen, setPersonalizeOpen] = useState(business?.bookingPhotos?.mode === "required"); // combined note+photo card; open by default only when photos are required
+  const [personalizeOpen, setPersonalizeOpen] = useState(true); // combined note+photo card — open by default so the photo ask is obvious
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
   const [waProvId, setWaProvId] = useState(null); // Who & When merged screen: selected barber tab ("anyone" = First free)
@@ -6032,13 +6032,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
                 By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text)", textDecoration: "underline" }}>terms</a>.
               </p>
-              {/* Vonage-required explicit SMS opt-in checkbox — NOT pre-checked, optional (booking works either way) */}
-              <button type="button" onClick={() => setSmsConsent(v => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, marginBottom: 14, cursor: "pointer" }}>
-                <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${smsConsent ? "var(--gold)" : "var(--border2)"}`, background: smsConsent ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1, transition: "background .15s, border-color .15s" }}>
+              {/* Vonage-required explicit SMS opt-in checkbox — REQUIRED to book (this is how clients get reminders). Never pre-checked. */}
+              <button type="button" onClick={() => setSmsConsent(v => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", textAlign: "left", background: smsConsent ? "transparent" : "color-mix(in srgb, var(--gold) 6%, var(--panel))", border: `1px solid ${smsConsent ? "transparent" : "var(--border2)"}`, borderRadius: 12, padding: smsConsent ? 0 : "12px 12px", marginBottom: 14, cursor: "pointer", transition: "background .15s, padding .15s" }}>
+                <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${smsConsent ? "var(--gold)" : "var(--text)"}`, background: smsConsent ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1, transition: "background .15s, border-color .15s" }}>
                   {smsConsent && <Check size={14} style={{ color: "var(--on-gold)" }} />}
                 </span>
-                <span style={{ color: "var(--faint)", fontSize: 12.5, lineHeight: 1.5 }}>
-                  By checking this box, I agree to receive appointment reminders via SMS from Sanctuary Barber Co. Message and data rates may apply. Message frequency varies. Text HELP for help or STOP to opt out. See our <a href="https://sanctuarybarberco.com/privacy-policy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a>.
+                <span style={{ color: smsConsent ? "var(--faint)" : "var(--text2)", fontSize: 12.5, lineHeight: 1.5 }}>
+                  <b style={{ color: "var(--text)" }}>Required</b> — check to get your appointment reminders by text. I agree to receive appointment reminders via SMS from Sanctuary Barber Co. Message and data rates may apply. Message frequency varies. Text HELP for help or STOP to opt out. See our <a href="https://sanctuarybarberco.com/privacy-policy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a>.
                 </span>
               </button>
             </div>
@@ -6093,14 +6093,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     )}
                     {photoOn && (
                       <div style={{ marginTop: noteOn ? 16 : 0 }}>
-                        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 12 }}>Up to 3 photos — a style you want, how your hair looks now, or anything that helps {provider.name === "Anyone" ? "your staff member" : provider.name}.</p>
+                        <p style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 12 }}>Post a photo of your hair — how it looks now or a style you want. It helps {provider.name === "Anyone" ? "your barber" : provider.name} get it right. Up to 3.</p>
                         <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
                         <div style={{ display: "flex", gap: 8 }}>{[0, 1, 2].map((i) => { const src = photos[i]; return (
                           <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 14, overflow: "hidden", border: `1px dashed ${src ? "var(--text)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: src ? "var(--panel2)" : "transparent", cursor: src ? "default" : "pointer" }}>
                             {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={18} style={{ color: "var(--faint)" }} />}
                           </div>
                         ); })}</div>
-                        <p style={{ fontSize: 12, color: "var(--faint)", textAlign: "center", marginTop: 10 }}>Tap a square to take a photo or choose from your library.</p>
+                        <p style={{ fontSize: 12, color: "var(--faint)", textAlign: "center", marginTop: 10 }}>Tap to add — take one now or pick from your library.</p>
                       </div>
                     )}
                   </div>
@@ -6167,7 +6167,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const bk = business.booking || {};
               const dep = bk.deposit || { mode: "none", amount: 0 };
               const needsCard = !!bk.requireCard || (dep.mode && dep.mode !== "none");
-              const baseOk = agreed && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10;
+              const baseOk = agreed && smsConsent && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10;
               const canLock = baseOk && (!needsCard || cardOnFile);
               return (
             <>
@@ -6181,7 +6181,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 return;
               }
               commitBooking(phone, newEmail);
-            }} style={{ width: "100%", background: canLock ? "var(--text)" : "transparent", color: canLock ? "var(--bg)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : `BOOK FOR ${relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate).split(",")[0].toUpperCase() + " " + MONTHS[selectedDate.getMonth()].toUpperCase() + " " + selectedDate.getDate() : relativeDate(selectedDate).toUpperCase()}`)}</button>
+            }} style={{ width: "100%", background: canLock ? "var(--text)" : "transparent", color: canLock ? "var(--bg)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (!smsConsent ? "AGREE TO TEXT REMINDERS ABOVE" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : `BOOK FOR ${relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate).split(",")[0].toUpperCase() + " " + MONTHS[selectedDate.getMonth()].toUpperCase() + " " + selectedDate.getDate() : relativeDate(selectedDate).toUpperCase()}`))}</button>
             {bookErr && <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "color-mix(in srgb, #c0392b 14%, var(--panel))", color: "var(--text)", fontSize: 13.5, lineHeight: 1.45, textAlign: "center" }}>Couldn't confirm your booking — check your connection and tap again. Your time wasn't held, so nothing's lost.</div>}
             </>
               );
