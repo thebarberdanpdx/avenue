@@ -2296,6 +2296,15 @@ function App() {
         .screen-swap > * > *:nth-child(1){animation-delay:.03s} .screen-swap > * > *:nth-child(2){animation-delay:.07s}
         .screen-swap > * > *:nth-child(3){animation-delay:.11s} .screen-swap > * > *:nth-child(4){animation-delay:.15s}
         .screen-swap > * > *:nth-child(5){animation-delay:.19s} .screen-swap > * > *:nth-child(6){animation-delay:.23s}
+        /* Booking flow: slide the whole screen horizontally — forward comes in from the right, back
+           from the left (native-app feel). The panel moves as ONE unit, so the per-child vertical
+           stagger above is suppressed while sliding. */
+        @keyframes bkSlideR { from { opacity: 0; transform: translateX(26%); } to { opacity: 1; transform: none; } }
+        @keyframes bkSlideL { from { opacity: 0; transform: translateX(-26%); } to { opacity: 1; transform: none; } }
+        .screen-swap.swap-fwd { animation: bkSlideR .33s cubic-bezier(.32,.72,0,1) both; }
+        .screen-swap.swap-back { animation: bkSlideL .33s cubic-bezier(.32,.72,0,1) both; }
+        .screen-swap.swap-fwd > *, .screen-swap.swap-back > *,
+        .screen-swap.swap-fwd > * > *, .screen-swap.swap-back > * > * { animation: none !important; opacity: 1 !important; transform: none !important; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
         /* Stop iOS Safari from rubber-band overscrolling past the top/bottom of the page,
            which was dragging the fixed bottom tab bar halfway up the viewport.
@@ -3882,8 +3891,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     intakeFor ? "intake" : "",
   ].join("|");
 
+  // Horizontal screen transitions: going forward (deeper step) slides the next screen in from the
+  // right; going back slides it in from the left. prevStepRef holds the step before this navigation
+  // (updated in the screenKey effect below), so slideDir is known when the wrapper remounts.
+  const prevStepRef = useRef(step);
+  const slideDir = step < prevStepRef.current ? "back" : "fwd";
+
   // Scroll to top whenever the user navigates to a new screen so the back button & business name stay visible
-  useEffect(() => { try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { window.scrollTo(0, 0); } }, [screenKey]);
+  useEffect(() => { prevStepRef.current = step; try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { window.scrollTo(0, 0); } }, [screenKey]);
 
   // Commits the booking with the resolved phone and email. Called either directly from LOCK IT IN
   // (no conflict) or from the conflict-confirmation sheet (after the user picks which to keep).
@@ -4338,7 +4353,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const onWelcome = step === 0 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && !addingMember;
   return (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: "var(--bg)" }}>
-      <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px" }}>
+      <div style={{ width: "100%", maxWidth: 480, padding: "24px 22px 60px", overflowX: "hidden" }}>
         {!onWelcome && (business.logoText || (business.name && business.name.trim())) && (
           <div style={{ textAlign: "center", padding: "2px 0 16px", marginBottom: 14, borderBottom: "1px solid var(--line)" }}>
             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, letterSpacing: 2, lineHeight: 1.1, textTransform: "uppercase", color: "var(--text)" }}>{business.logoText || business.name}</div>
@@ -4351,7 +4366,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {step === 6 && <Stepper active={1} />}
         {step >= 7 && <Stepper active={2} />}
 
-        <div key={screenKey} className="screen-swap">
+        <div key={screenKey} className={"screen-swap swap-" + slideDir}>
         {/* STEP 0 — WELCOME / front door */}
         {step === 0 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && !addingMember && (
           <div className="fade-up" style={{ minHeight: "62vh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "10px 4px 0" }}>
