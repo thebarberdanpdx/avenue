@@ -2216,6 +2216,13 @@ function App() {
     return () => { try { if (channel) supabase.removeChannel(channel); } catch (e) { /* ignore */ } };
   }, [dataLoaded, SHOP_ID, session]);
 
+  // Client-facing surfaces ALWAYS render in the Studio look, whatever the shop/staff theme is —
+  // customers should see one consistent, on-brand storefront. Only the staff dashboard ("shop")
+  // uses the per-user theme. Client components style purely off CSS vars, so swapping the applied
+  // theme class is all that's needed.
+  const CLIENT_FACING_VIEWS = ["client", "manage", "managetoken", "reviewtoken", "terms", "privacy", "preview"];
+  const appliedTheme = CLIENT_FACING_VIEWS.includes(view) ? "studio" : theme;
+
   // Mirror the theme class onto <html> so CSS variables (--gold, --bg, --text, etc.) cascade
   // to portaled content too (booking form, conflict popup, etc. — these render under document.body,
   // outside the React tree's #app-root, so without this mirror they'd lose the theme.)
@@ -2223,11 +2230,11 @@ function App() {
     const el = document.documentElement;
     const stale = Array.from(el.classList).filter((c) => c.startsWith("theme-"));
     stale.forEach((c) => el.classList.remove(c));
-    el.classList.add(`theme-${theme}`);
-  }, [theme]);
+    el.classList.add(`theme-${appliedTheme}`);
+  }, [appliedTheme]);
 
   return (
-    <div id="app-root" className={`theme-${theme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--canvas, var(--bg))", color: "var(--text)", position: "relative" }}>
+    <div id="app-root" className={`theme-${appliedTheme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--canvas, var(--bg))", color: "var(--text)", position: "relative" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400;1,6..96,500&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Geist:wght@400;500;600;700&family=Jost:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Oswald:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -10960,12 +10967,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // ---- DETAILS section ----
   const detailsBody = (
     <>
-      <button onClick={() => setPicker({ target: "service" })} className="lift" style={{ width: "100%", height: 168, borderRadius: 18, border: form.photo ? "1px solid var(--border)" : "1.5px dashed var(--border2)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 9, padding: 0, boxShadow: form.photo ? "var(--shadow-sm)" : "none" }}>
-        {form.photo ? <img src={imgUrl(form.photo, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <><ImageIcon size={26} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 14 }}>Add a photo</span></>}
-      </button>
-      {form.photo && <div style={{ textAlign: "center", marginTop: 8 }}><button onClick={() => setPicker({ target: "service" })} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 2, padding: 0, cursor: "pointer" }}>Change photo</button></div>}
-
-      <SectionLbl style={{ marginTop: 26 }}>Name</SectionLbl>
+      <SectionLbl>Name</SectionLbl>
       <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Signature Cut" style={inpStyle} />
 
       <SectionLbl>Description <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--faint)" }}>· shown to clients</span></SectionLbl>
@@ -11720,14 +11722,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const anyStaffOverride = staffList.some((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); });
   const photoCount = photos.length;
 
-  const DrillRow = ({ icon, label, sub, target }) => (
-    <button onClick={() => setSection(target)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, background: "var(--panel)", border: "none", padding: "15px 4px", textAlign: "left", cursor: "pointer", borderTop: "1px solid var(--line)" }}>
-      <span style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "var(--text)" }}>{icon}</span>
+  const DrillRow = ({ label, sub, target }) => (
+    <button onClick={() => setSection(target)} style={{ width: "100%", display: "flex", alignItems: "baseline", gap: 12, background: "var(--panel)", border: "none", padding: "15px 4px", textAlign: "left", cursor: "pointer", borderTop: "1px solid var(--line)" }}>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, color: "var(--text)" }}>{label}</span>
-        <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{sub}</span>
+        <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px", color: "var(--text)" }}>{label}</span>
+        <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{sub}</span>
       </span>
-      <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
+      <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
     </button>
   );
 
@@ -11945,12 +11946,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             ? `${staffList.filter((p) => { const e = form.staff[p.id] || {}; return e.on !== false && ((e.price != null && e.price !== "") || (e.duration != null && e.duration !== "")); }).length} with custom pricing`
             : (offeringCount === staffList.length ? "All staff · default pricing" : `${offeringCount} of ${staffList.length} · default pricing`);
           const menuRows = [
-            { target: "details", icon: <Scissors size={18} />, label: "Details", sub: `$${form.price || "—"} · ${form.duration || "—"} min · ${form.category || cats[0]}` },
-            { target: "staff", icon: <Users size={18} />, label: "Staff", sub: staffSub },
-            { target: "addons", icon: <Plus size={18} />, label: "Add-ons", sub: addonCount ? `${addonCount} added` : "None yet" },
-            { target: "photos", icon: <ImageIcon size={18} />, label: "Photos", sub: photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "None yet" },
-            { target: "booking", icon: <Calendar size={18} />, label: "Online Booking", sub: live ? `${(form.booking || {}).whoCanBook === "returning" ? "Returning only" : "Everyone"}${(form.booking || {}).requireCard ? " · card held" : ""}` : "Off — internal only" },
-            { target: "timerules", icon: <Clock size={18} />, label: "Hours & pricing", sub: (form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Standard price, always available" },
+            { target: "details", label: "Details", sub: `$${form.price || "—"} · ${form.duration || "—"} min · ${form.category || cats[0]}` },
+            { target: "staff", label: "Staff", sub: staffSub },
+            { target: "addons", label: "Add-ons", sub: addonCount ? `${addonCount} added` : "None yet" },
+            { target: "photos", label: "Photos", sub: photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : "None yet" },
+            { target: "booking", label: "Online Booking", sub: live ? `${(form.booking || {}).whoCanBook === "returning" ? "Returning only" : "Everyone"}${(form.booking || {}).requireCard ? " · card held" : ""}` : "Off — internal only" },
+            { target: "timerules", label: "Hours & pricing", sub: (form.timeRules || []).length ? `${(form.timeRules || []).length} rule${(form.timeRules || []).length === 1 ? "" : "s"}` : "Standard price, always available" },
           ];
           return (
             <>
@@ -11961,15 +11962,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <div style={{ fontSize: 14.5, color: "var(--sub)", margin: "0 0 22px" }}>${form.price || "—"} · {form.duration || "—"} min{live ? "" : " · Internal"}</div>
 
               {/* section menu — each row drills into its own clean editor */}
-              <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden", marginBottom: 20 }}>
+              <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
                 {menuRows.map((r, idx) => (
-                  <button key={r.target} onClick={() => setSection(r.target)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, background: "var(--panel)", border: "none", borderTop: idx ? "1px solid var(--line)" : "none", padding: "16px 16px", textAlign: "left", cursor: "pointer" }}>
-                    <span style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "var(--text)" }}>{r.icon}</span>
+                  <button key={r.target} onClick={() => setSection(r.target)} style={{ width: "100%", display: "flex", alignItems: "baseline", gap: 12, background: "var(--panel)", border: "none", borderTop: idx ? "1px solid var(--line)" : "none", padding: "17px 17px", minHeight: 60, textAlign: "left", cursor: "pointer" }}>
                     <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{r.label}</span>
-                      <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.sub}</span>
+                      <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px", color: "var(--text)" }}>{r.label}</span>
+                      <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.sub}</span>
                     </span>
-                    <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                    <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
                   </button>
                 ))}
               </div>
@@ -11986,7 +11986,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                       <>
                         <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "4px 0 4px" }}>Cut styles (legacy)</div>
                         <p style={{ fontSize: 12.5, color: "var(--faint)", margin: "0 0 6px", lineHeight: 1.45 }}>Cut styles are being retired — make each cut its own service instead. This stays so existing bookings keep working.</p>
-                        <DrillRow icon={<Scissors size={18} />} label="Cut styles" sub={`${cutCount} style${cutCount === 1 ? "" : "s"}`} target="cutstyles" />
+                        <DrillRow label="Cut styles" sub={`${cutCount} style${cutCount === 1 ? "" : "s"}`} target="cutstyles" />
                       </>
                     )}
                     <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "16px 0 10px" }}>Combo</div>
