@@ -4,9 +4,10 @@
 <dict>
 	<key>aps-environment</key>
 	<string>production</string>
-	<!-- Tap to Pay entitlement (com.apple.developer.proximity-reader.payment.acceptance)
-	     removed until Apple approves the Tap to Pay request (Case-ID 20814883) —
-	     with it present but ungranted, automatic signing fails and the build breaks.
-	     Re-add the key once Apple grants it. -->
+	<!-- Tap to Pay on iPhone — GRANTED by Apple 2026-07-02 (Case-ID 20814883),
+	     currently at development-distribution tier (registered test iPhones only).
+	     Full public distribution still needs the 3 flow videos + App Review checklist. -->
+	<key>com.apple.developer.proximity-reader.payment.acceptance</key>
+	<true/>
 </dict>
 </plist>
