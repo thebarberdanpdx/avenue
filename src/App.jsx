@@ -6231,28 +6231,20 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               );
             })()}
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 12 }}>Or pick another day</div>
-            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 22 }}>
-              {dateOptions.map((d, i) => {
-                const on = selectedDate && d.toDateString() === selectedDate.toDateString();
-                const isToday = d.toDateString() === new Date().toDateString();
-                return (
-                  <button key={i} onClick={() => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} style={{ flexShrink: 0, width: 58, padding: "10px 0", borderRadius: 10, background: on ? "var(--text)" : "transparent", border: "1px solid", borderColor: on ? "var(--text)" : (isToday ? "var(--text)" : "var(--line)"), color: on ? "var(--bg)" : "var(--text)", textAlign: "center", cursor: "pointer" }}>
-                    <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{DAYS[d.getDay()].slice(0, 3).toUpperCase()}</div>
-                    {isToday
-                      ? <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 600, color: on ? "var(--bg)" : "var(--text)", lineHeight: "24px" }}>Today</div>
-                      : <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, lineHeight: "24px" }}>{d.getDate()}</div>}
-                    <div style={{ fontSize: 10.5, letterSpacing: 0.5, opacity: 0.6, marginTop: 1 }}>{MONTHS[d.getMonth()].slice(0, 3)}</div>
-                  </button>
-                );
-              })}
-            </div>
+            {(() => { const calProv = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]); return (
+              <MonthCalendar selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0} />
+            ); })()}
             {selectedDate && !dateIsFull && (<>
               {/* Selected day as a clean heading — keeps day-of-week + date + days-away phrasing for clarity */}
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--text)", marginBottom: 3 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--text)", fontWeight: 500, marginBottom: 16 }}>{daysFromNow(selectedDate)}</div>
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
               {!isMultiPerson && bestSet.size > 0 && openSlots.length > bestSet.size && (<div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--sub)", marginBottom: 11 }}><span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />Highlighted times have no wait — you're seen right away</div>)}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{slotsReady ? openSlots.map((t) => { const on = slot === t; const isBest = bestSet.has(t); return (<button key={t} onClick={() => { setSlot(t); setSlotConflict(false); }} style={{ background: on ? "var(--text)" : isBest ? "color-mix(in srgb, var(--text) 13%, transparent)" : "transparent", border: `${on || isBest ? "1.5px" : "1px"} solid ${on || isBest ? "var(--text)" : "var(--border)"}`, borderRadius: 8, padding: "14px 4px", color: on ? "var(--bg)" : isBest ? "var(--text)" : "var(--text)", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: on || isBest ? 600 : 500, cursor: "pointer" }}>{fmtTime(t)}</button>); }) : [0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 8 }} />))}</div>
+              {slotsReady ? (
+                <GroupedTimes slots={openSlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} bestSet={bestSet} cell={(on, best) => ({ background: on ? "var(--text)" : best ? "color-mix(in srgb, var(--text) 13%, transparent)" : "transparent", border: `${on || best ? "1.5px" : "1px"} solid ${on || best ? "var(--text)" : "var(--border)"}`, borderRadius: 8, padding: "14px 4px", color: on ? "var(--bg)" : "var(--text)", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: on || best ? 600 : 500, cursor: "pointer" })} />
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{[0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 8 }} />))}</div>
+              )}
               {slot != null && <button onClick={() => setStep(7)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 24, border: "none", cursor: "pointer" }}>Continue →</button>}
             </>)}
 
