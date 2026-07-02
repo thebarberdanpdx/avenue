@@ -2310,7 +2310,7 @@ function App() {
            screen's children (which move the panel as one unit) can't kill it. */
         @keyframes cutBlink { 0%,100% { opacity: 0; } 50% { opacity: 1; } }
         .cut-next-guide { position: relative; z-index: 0; }
-        .cut-next-guide::after { content: ""; position: absolute; inset: -6px -10px; border-radius: 16px; pointer-events: none; z-index: -1; background: color-mix(in srgb, var(--gold) 11%, transparent); opacity: 0; animation: cutBlink 1.45s cubic-bezier(.4,0,.2,1) .18s both; }
+        .cut-next-guide::after { content: ""; position: absolute; inset: -26px -30px; border-radius: 26px; pointer-events: none; z-index: -1; background: radial-gradient(ellipse at center, transparent 44%, color-mix(in srgb, var(--gold) 15%, transparent) 100%); opacity: 0; animation: cutBlink 1.5s cubic-bezier(.4,0,.2,1) .18s both; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
         /* Stop iOS Safari from rubber-band overscrolling past the top/bottom of the page,
            which was dragging the fixed bottom tab bar halfway up the viewport.
