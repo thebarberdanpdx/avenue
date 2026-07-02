@@ -19145,7 +19145,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             return offering.length > 1 && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "22px 0 0" }}>
               {offering.map((p) => { const on = p.id === provId; return (
-                <button key={p.id} onClick={() => setProvId(p.id)} style={{ display: "flex", alignItems: "center", gap: 7, background: on ? "var(--tint)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14.5, fontWeight: on ? 600 : 400 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color || "var(--gold)" }} />{p.name}</button>
+                <button key={p.id} onClick={() => setProvId(p.id)} style={{ display: "flex", alignItems: "center", gap: 7, background: on ? "var(--tint)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{p.name}</button>
               ); })}
             </div>
             );
@@ -19470,7 +19470,6 @@ function ColumnOrderEditor({ providers, setProviders }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {staff.map((p, i) => (
         <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px" }}>
-          <span style={{ width: 11, height: 11, borderRadius: "50%", background: p.color, flexShrink: 0 }} />
           <span style={{ flex: 1, fontSize: 15 }}>{p.name}</span>
           <button onClick={() => move(p.id, -1)} disabled={i === 0} aria-label="Move up" style={{ background: "none", border: "none", padding: "4px 6px", color: i === 0 ? "var(--faint)" : "var(--sub)", opacity: i === 0 ? 0.4 : 1 }}><ChevronUp size={18} /></button>
           <button onClick={() => move(p.id, 1)} disabled={i === staff.length - 1} aria-label="Move down" style={{ background: "none", border: "none", padding: "4px 6px", color: i === staff.length - 1 ? "var(--faint)" : "var(--sub)", opacity: i === staff.length - 1 ? 0.4 : 1 }}><ChevronDown size={18} /></button>
@@ -20179,8 +20178,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 {allStaff.map((p) => {
                   const on = !hidden.includes(p.id);
                   return (
-                    <button key={p.id} onClick={() => toggleStaff(p.id)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? p.color : "var(--border)"}`, background: on ? p.color + "1F" : "transparent", color: on ? "var(--text)" : "var(--faint)", fontSize: 14 }}>
-                      <span style={{ width: 9, height: 9, borderRadius: "50%", background: on ? p.color : "var(--border2)" }} /> {p.name}
+                    <button key={p.id} onClick={() => toggleStaff(p.id)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint)" : "transparent", color: on ? "var(--text)" : "var(--faint)", fontSize: 14 }}>
+                      {p.name}
                     </button>
                   );
                 })}
