@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from './supabaseClient'
-import { tapToPayCharge } from './tapToPay'
+import { tapToPayCharge, cardReaderCharge } from './tapToPay'
 import * as Sentry from '@sentry/react'
 import {
   Calendar, Phone, Check, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MessageSquare, Bell, User, Camera,
@@ -20992,8 +20992,22 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       setPayErr((e && e.message) || "Tap to Pay didn't complete. Try again or pick another way.");
     }
   };
+  const runCardReader = async () => {
+    setPayErr(""); setTapStatus("Starting…");
+    try {
+      await ensureFreshSession(); // keep the staff JWT fresh so /api/stripe doesn't 401 and hang the reader
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess && sess.session && sess.session.access_token;
+      const res = await cardReaderCharge({ amount: chargeBase, description: `Vero — ${appt.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
+      recordSale(makeRec("card", { id: res && res.id }, chargeBase));
+      setStage("approved");
+    } catch (e) {
+      setPayErr((e && e.message) || "The reader didn't complete. Try again or pick another way.");
+    }
+  };
   const executeCharge = (m) => {
     if (m === "tap") { setStage("tapPay"); runTapToPay(); return; }
+    if (m === "reader") { setStage("tapPay"); runCardReader(); return; }
     if (m === "card") { setStage("card"); return; }
     if (m === "cof") { payCardOnFile(); return; }
     // Anything else is a manual "mark as paid" method (cash + the owner's custom labels). The
@@ -21138,16 +21152,16 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       </div>
       {!liveMode && <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5 }}>Payments are in test mode — card options are off. Flip Payments to Live in Checkout &amp; money.</div>}
       {payErr && <div style={{ background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{payErr}</div>}
-      {/* Mango-style payment grid: solid buttons, two columns. Account balance / Other aren't
-          methods this shop uses, so the grid is the card options + gift card + manual methods. */}
+      {/* Mango-style payment grid: solid buttons, two columns. Card options + manual methods. */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {[
           ...(IS_NATIVE ? [{ id: "tap", t: "Tap to Pay", dis: !liveMode }] : []),
+          ...(IS_NATIVE ? [{ id: "reader", t: "Card reader", sub: "Tap, insert, or swipe", dis: !liveMode }] : []),
           { id: "card", t: "Enter card manually", sub: "Type the card number", dis: !liveMode },
           { id: "cof", t: "Card on file", sub: cofCard ? `${(cofCard.brand || "Card").charAt(0).toUpperCase() + (cofCard.brand || "card").slice(1)} ··${cofCard.last4}` : (liveMode ? "No card saved" : ""), dis: !liveMode || !cofCard },
           // Owner-configured manual methods (Settings → Checkout); card-equivalents excluded since the
           // reader / card-on-file tiles above cover them. Falls back to Cash if none set.
-          ...(((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^card( on file)?$/i.test(s)).map((label) => ({ id: "m:" + label, t: label, dis: false }))),
+          ...(((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^(card( on file)?|venmo|zelle)$/i.test(s)).map((label) => ({ id: "m:" + label, t: label, dis: false }))),
         ].map((m) => (
           <button key={m.id} disabled={m.dis || payBusy} onClick={() => startMethod(m.id)} className={m.dis ? "" : "lift"} style={{ minHeight: 82, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, textAlign: "center", padding: "16px 12px", borderRadius: 16, border: m.dis ? "1px solid var(--border)" : "none", background: m.dis ? "var(--panel2)" : "var(--gold-grad, var(--gold))", color: m.dis ? "var(--faint)" : "var(--on-gold)", boxShadow: m.dis ? "none" : "var(--shadow-sm)", cursor: m.dis ? "default" : "pointer" }}>
             <span style={{ fontSize: 14.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", lineHeight: 1.15 }}>{m.t}</span>
@@ -21217,7 +21231,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 10 }}>That didn't go through</div>
           <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5, maxWidth: 320, marginBottom: 22 }}>{payErr}</p>
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => runTapToPay()} style={{ background: "var(--live, var(--gold))", color: "var(--on-gold)", border: "none", borderRadius: 13, padding: "13px 26px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}>Try again</button>
+            <button onClick={() => (pendingMethod === "reader" ? runCardReader() : runTapToPay())} style={{ background: "var(--live, var(--gold))", color: "var(--on-gold)", border: "none", borderRadius: 13, padding: "13px 26px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}>Try again</button>
             <button onClick={() => { setPayErr(""); setStage("method"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 26px", color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}>Pick another way</button>
           </div>
         </>
@@ -21225,7 +21239,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         <>
           <div style={{ width: 72, height: 72, borderRadius: "50%", border: "3px solid var(--line)", borderTopColor: "var(--gold)", marginBottom: 24, animation: "spin .8s linear infinite" }} />
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500 }}>{tapStatus || "Getting ready…"}</div>
-          <p style={{ color: "var(--sub)", fontSize: 14, marginTop: 10, maxWidth: 300, lineHeight: 1.5 }}>Hold the client's card or phone near the top of your iPhone.</p>
+          <p style={{ color: "var(--sub)", fontSize: 14, marginTop: 10, maxWidth: 300, lineHeight: 1.5 }}>{pendingMethod === "reader" ? "Follow the prompts on your card reader." : "Hold the client's card or phone near the top of your iPhone."}</p>
         </>
       )}
     </div>);
@@ -21854,7 +21868,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
   // The owner's manual "mark as paid" methods (Settings → Checkout). Cash gets the tendered/change
   // sheet; the rest (Venmo, Zelle, …) just record the sale under that label.
   // Exclude card-equivalents — the dedicated card reader / card-on-file buttons already cover those.
-  const manualMethods = (((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^card( on file)?$/i.test(s)));
+  const manualMethods = (((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^(card( on file)?|venmo|zelle)$/i.test(s)));
   const runTapToPay = async () => {
     setPayErr(""); setTapStatus("Starting…");
     try {
@@ -21869,8 +21883,23 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
       setPayErr((e && e.message) || "Tap to Pay didn't complete. Try again or pick another way.");
     }
   };
+  const runCardReader = async () => {
+    setPayErr(""); setTapStatus("Starting…");
+    try {
+      await ensureFreshSession();
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess && sess.session && sess.session.access_token;
+      const res = await cardReaderCharge({ amount: chargeTotal, description: `Vero sale — ${client?.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
+      recordSale({ method: "card", paymentIntentId: (res && res.id) || null });
+      setDone({ amount: chargeTotal, method: "card", change: 0 });
+      showToast(`Charged ${fm(chargeTotal)} to card.`);
+    } catch (e) {
+      setPayErr((e && e.message) || "The reader didn't complete. Try again or pick another way.");
+    }
+  };
   const executeMethod = (m) => {
     if (m === "tap") { setStage("tapPay"); runTapToPay(); return; }
+    if (m === "reader") { setStage("tapPay"); runCardReader(); return; }
     if (m === "card") { setPayMode("card"); return; }
     if (m === "onfile") { setPayMode("onfile"); return; }
     const label = m && m.startsWith("m:") ? m.slice(2) : m;
@@ -21987,6 +22016,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
             const ccOk = cc && (cc.paymentMethodId || cc.pmId) && cc.stripeCustomerId;
             const methods = [
               ...(IS_NATIVE ? [{ id: "tap", t: "Tap to Pay", s: "Tap the client's card or phone to this iPhone", dis: !liveMode }] : []),
+              ...(IS_NATIVE ? [{ id: "reader", t: "Card reader", s: "Tap, insert, or swipe on the reader", dis: !liveMode }] : []),
               { id: "card", t: "Enter card manually", s: "Type the card number", dis: !liveMode },
               { id: "onfile", t: "Card on file", s: ccOk ? `${cc.brand ? cc.brand.charAt(0).toUpperCase() + cc.brand.slice(1) : "Card"} ··${cc.last4 || "••••"}` : (client ? "No card saved" : "Attach a client first"), dis: !liveMode || !ccOk },
               ...manualMethods.map((label) => ({ id: "m:" + label, t: label, s: "Mark as paid", dis: false })),
@@ -22054,7 +22084,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
                   <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 10 }}>That didn't go through</div>
                   <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5, maxWidth: 320, marginBottom: 22 }}>{payErr}</p>
                   <div style={{ display: "flex", gap: 10 }}>
-                    <button onClick={() => runTapToPay()} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 13, padding: "13px 26px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}>Try again</button>
+                    <button onClick={() => (pendingMethod === "reader" ? runCardReader() : runTapToPay())} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 13, padding: "13px 26px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}>Try again</button>
                     <button onClick={() => { setPayErr(""); setStage("method"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 26px", color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}>Pick another way</button>
                   </div>
                 </>
@@ -22062,7 +22092,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
                 <>
                   <div style={{ width: 72, height: 72, borderRadius: "50%", border: "3px solid var(--line)", borderTopColor: "var(--gold)", marginBottom: 24, animation: "spin .8s linear infinite" }} />
                   <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500 }}>{tapStatus || "Getting ready…"}</div>
-                  <p style={{ color: "var(--sub)", fontSize: 14, marginTop: 10, maxWidth: 300, lineHeight: 1.5 }}>Hold the client's card or phone near the top of your iPhone.</p>
+                  <p style={{ color: "var(--sub)", fontSize: 14, marginTop: 10, maxWidth: 300, lineHeight: 1.5 }}>{pendingMethod === "reader" ? "Follow the prompts on your card reader." : "Hold the client's card or phone near the top of your iPhone."}</p>
                 </>
               )}
             </div>

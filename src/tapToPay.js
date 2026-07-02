@@ -74,7 +74,7 @@ async function postStripe(apiBase, authToken, payload, timeoutMs) {
 }
 
 // Ensure the SDK is initialized and the iPhone's Tap to Pay reader is connected.
-async function ensureConnected({ live, apiBase, authToken, onStatus }) {
+async function ensureConnected({ live, apiBase, authToken, onStatus, mode = "tap" }) {
   const { St, ConnectTypes, Events } = await loadPlugin();
   _creds = { apiBase, authToken }; // token listener reads the freshest creds on retries
 
@@ -115,23 +115,35 @@ async function ensureConnected({ live, apiBase, authToken, onStatus }) {
       _tokenError = null; // fresh slate for this connect attempt
       onStatus && onStatus("Finding reader…");
 
-      // Tap to Pay must connect the reader to a Stripe Terminal Location. Fetch it
-      // first — the native plugin force-unwraps this on connect, so it can't be nil.
+      // A Stripe Terminal Location is required — the native plugin force-unwraps it on connect
+      // (can't be nil), and Bluetooth/Internet readers are assigned to it. Fetch it first.
       let locationId;
       try {
         ({ location: locationId } = await postStripe(apiBase, authToken, { action: "terminal_location" }, TOKEN_TIMEOUT_MS));
       } catch (e) {
-        throw new Error("Couldn't set up Tap to Pay: " + ((e && e.message) || "no payment location."));
+        throw new Error("Couldn't set up the reader: " + ((e && e.message) || "no payment location."));
       }
-      if (!locationId) throw new Error("Tap to Pay isn't set up yet — create a Location in Stripe (Terminal → Locations).");
+      if (!locationId) throw new Error("Payments aren't set up yet — create a Location in Stripe (Terminal → Locations).");
 
-      let readers;
-      try {
-        ({ readers } = await St.discoverReaders({ type: ConnectTypes.TapToPay, locationId }));
-      } catch (e) {
-        throw new Error("Couldn't find a Tap to Pay reader: " + ((e && e.message) || "discovery failed."));
+      let readers = [];
+      if (mode === "reader") {
+        // Physical reader — model-agnostic: try internet-registered readers first (Stripe Reader
+        // S700, Verifone P400…), then fall back to a Bluetooth scan (WisePad 3, Stripe M2…). This
+        // way the exact model doesn't have to be known up front — whatever's registered/paired wins.
+        try { ({ readers } = await St.discoverReaders({ type: ConnectTypes.Internet, locationId })); } catch (e) { readers = []; }
+        if (!readers || !readers.length) {
+          onStatus && onStatus("Scanning for a reader…");
+          try { ({ readers } = await St.discoverReaders({ type: ConnectTypes.Bluetooth, locationId, timeout: 12 })); } catch (e) { readers = []; }
+        }
+        if (!readers || !readers.length) throw new Error("No card reader found. Make sure it's powered on, paired to this iPhone (or on the same network), and registered to your Stripe Location.");
+      } else {
+        try {
+          ({ readers } = await St.discoverReaders({ type: ConnectTypes.TapToPay, locationId }));
+        } catch (e) {
+          throw new Error("Couldn't find a Tap to Pay reader: " + ((e && e.message) || "discovery failed."));
+        }
+        if (!readers || !readers.length) throw new Error("Tap to Pay isn't available on this device.");
       }
-      if (!readers || !readers.length) throw new Error("Tap to Pay isn't available on this device.");
       onStatus && onStatus("Connecting…");
       try {
         await St.connectReader({ reader: readers[0], locationId, merchantDisplayName: MERCHANT });
@@ -177,6 +189,26 @@ export async function tapToPayCharge({ amount, description, live, apiBase, authT
   await St.collectPaymentMethod({ paymentIntent: intent.clientSecret });
   onStatus && onStatus("Processing…");
   // No timeout — never interrupt an in-flight charge confirmation.
+  await St.confirmPaymentIntent();
+  return { id: intent.id };
+}
+
+// Charge `amount` dollars on a paired PHYSICAL reader (Bluetooth or internet-connected).
+// Identical intent → collect → confirm flow as Tap to Pay; only reader discovery/connect differs
+// (handled by ensureConnected mode:"reader"). Resolves { id } on success; throws on failure/cancel.
+export async function cardReaderCharge({ amount, description, live, apiBase, authToken, onStatus }) {
+  const { St } = await ensureConnected({ live, apiBase, authToken, onStatus, mode: "reader" });
+  onStatus && onStatus("Starting…");
+  let intent;
+  try {
+    intent = await postStripe(apiBase, authToken, { action: "terminal_intent", amount, description }, INTENT_TIMEOUT_MS);
+  } catch (e) {
+    throw new Error("Couldn't start the charge: " + ((e && e.message) || "payment service error."));
+  }
+  if (!intent.clientSecret) throw new Error(intent.error || "Couldn't start the charge.");
+  onStatus && onStatus("Insert, tap, or swipe on the reader…");
+  await St.collectPaymentMethod({ paymentIntent: intent.clientSecret });
+  onStatus && onStatus("Processing…");
   await St.confirmPaymentIntent();
   return { id: intent.id };
 }
