@@ -20856,7 +20856,14 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const scPct = Number(scCfg.pct) > 0 ? Number(scCfg.pct) : 1.5;
   const cofTotal = scOn ? +(chargeBase * (1 + scPct / 100)).toFixed(2) : chargeBase;
   const liveMode = business?.payments?.live === true;
-  const cofCard = liveClient && liveClient.card && liveClient.card.paymentMethodId && liveClient.card.stripeCustomerId && !liveClient.card.simulated ? liveClient.card : null;
+  // Card on file is saved in one of two shapes: `card` (paymentMethodId) or the canonical
+  // booking shape `savedCard` (pmId). Accept BOTH and normalize — otherwise a client who saved
+  // a card at booking shows "No card saved" here even though the appointment sheet displays it.
+  const cofRaw = liveClient && (liveClient.card || liveClient.savedCard);
+  const cofPmId = cofRaw && (cofRaw.paymentMethodId || cofRaw.pmId);
+  const cofCard = cofRaw && cofPmId && cofRaw.stripeCustomerId && !cofRaw.simulated
+    ? { paymentMethodId: cofPmId, stripeCustomerId: cofRaw.stripeCustomerId, brand: cofRaw.brand, last4: cofRaw.last4 }
+    : null;
   const money = (n) => `$${n.toFixed(2)}`;
   const discountOn = rebookCfg.discountEnabled !== false && (rebookCfg.discount || 0) > 0;
   const discLabel = rebookCfg.discountType === "percent" ? `${rebookCfg.discount}%` : money(rebookCfg.discount);
@@ -21131,20 +21138,20 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       </div>
       {!liveMode && <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5 }}>Payments are in test mode — card options are off. Flip Payments to Live in Checkout &amp; money.</div>}
       {payErr && <div style={{ background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{payErr}</div>}
-      <div style={{ display: "grid", gap: 12 }}>
+      {/* Mango-style payment grid: solid buttons, two columns. Account balance / Other aren't
+          methods this shop uses, so the grid is the card options + gift card + manual methods. */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {[
-          ...(IS_NATIVE ? [{ id: "tap", t: "Tap to Pay", s: "Tap the client's card or phone to this iPhone", dis: !liveMode }] : []),
-          { id: "card", t: "Card reader", s: "Tap, chip, or key in", dis: !liveMode },
-          { id: "cof", t: "Card on file", s: cofCard ? `${(cofCard.brand || "Card").charAt(0).toUpperCase() + (cofCard.brand || "card").slice(1)} ··${cofCard.last4}${scOn ? ` · +${scPct}% card fee` : ""}` : "No card saved", dis: !liveMode || !cofCard },
-          // Gift cards — the option is shown now (with a "coming soon" note); redemption is wired later.
-          { id: "giftcard", t: "Gift card", s: "Pay with a gift card balance", dis: true, soon: true },
+          ...(IS_NATIVE ? [{ id: "tap", t: "Tap to Pay", dis: !liveMode }] : []),
+          { id: "card", t: "Enter card manually", sub: "Type the card number", dis: !liveMode },
+          { id: "cof", t: "Card on file", sub: cofCard ? `${(cofCard.brand || "Card").charAt(0).toUpperCase() + (cofCard.brand || "card").slice(1)} ··${cofCard.last4}` : (liveMode ? "No card saved" : ""), dis: !liveMode || !cofCard },
           // Owner-configured manual methods (Settings → Checkout); card-equivalents excluded since the
-          // reader / card-on-file rows above cover them. Falls back to Cash if none set.
-          ...(((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^card( on file)?$/i.test(s)).map((label) => ({ id: "m:" + label, t: label, s: "Mark as paid", dis: false }))),
+          // reader / card-on-file tiles above cover them. Falls back to Cash if none set.
+          ...(((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^card( on file)?$/i.test(s)).map((label) => ({ id: "m:" + label, t: label, dis: false }))),
         ].map((m) => (
-          <button key={m.id} disabled={m.dis || payBusy} onClick={() => startMethod(m.id)} className={m.dis ? "" : "lift"} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "21px 20px", color: "var(--text)", textAlign: "left", opacity: m.dis ? 0.45 : 1, cursor: m.dis ? "default" : "pointer", boxShadow: "var(--shadow-sm)" }}>
-            <span><span style={{ display: "block", fontSize: 17, fontWeight: 600 }}>{m.t}{m.soon && <span style={{ fontWeight: 500, fontSize: 13.5, color: "var(--faint)", marginLeft: 8 }}>(coming soon)</span>}</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{m.s}</span></span>
-            {!m.dis && <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />}
+          <button key={m.id} disabled={m.dis || payBusy} onClick={() => startMethod(m.id)} className={m.dis ? "" : "lift"} style={{ minHeight: 82, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, textAlign: "center", padding: "16px 12px", borderRadius: 16, border: m.dis ? "1px solid var(--border)" : "none", background: m.dis ? "var(--panel2)" : "var(--gold-grad, var(--gold))", color: m.dis ? "var(--faint)" : "var(--on-gold)", boxShadow: m.dis ? "none" : "var(--shadow-sm)", cursor: m.dis ? "default" : "pointer" }}>
+            <span style={{ fontSize: 14.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", lineHeight: 1.15 }}>{m.t}</span>
+            {(m.soon || m.sub) && <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.82 }}>{m.soon ? "coming soon" : m.sub}</span>}
           </button>
         ))}
       </div>
@@ -21980,9 +21987,8 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
             const ccOk = cc && (cc.paymentMethodId || cc.pmId) && cc.stripeCustomerId;
             const methods = [
               ...(IS_NATIVE ? [{ id: "tap", t: "Tap to Pay", s: "Tap the client's card or phone to this iPhone", dis: !liveMode }] : []),
-              { id: "card", t: "Card reader", s: "Tap, chip, or key in", dis: !liveMode },
+              { id: "card", t: "Enter card manually", s: "Type the card number", dis: !liveMode },
               { id: "onfile", t: "Card on file", s: ccOk ? `${cc.brand ? cc.brand.charAt(0).toUpperCase() + cc.brand.slice(1) : "Card"} ··${cc.last4 || "••••"}` : (client ? "No card saved" : "Attach a client first"), dis: !liveMode || !ccOk },
-              { id: "giftcard", t: "Gift card", s: "Pay with a gift card balance", dis: true, soon: true },
               ...manualMethods.map((label) => ({ id: "m:" + label, t: label, s: "Mark as paid", dis: false })),
             ];
             return (
