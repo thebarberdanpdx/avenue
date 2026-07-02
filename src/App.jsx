@@ -22407,23 +22407,29 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     if (!pm || !c.stripeCustomerId) return null;
     return { paymentMethodId: pm, stripeCustomerId: c.stripeCustomerId, brand: c.brand || null, last4: c.last4 || null, exp: c.exp || null };
   })();
-  // Pull the client's latest card on file — a card put on file by an online booking moments ago may
-  // not be in the dashboard's clients list yet (no realtime), which would hide it here and at checkout.
+  // Pull the client's latest profile from the server once — a card or selfie added by an online
+  // booking moments ago may not be in the dashboard's clients list yet (no realtime), which would
+  // hide the card on file and show initials instead of their photo. Fetched once per client here.
+  const freshPulledRef = useRef(new Set());
   useEffect(() => {
     const id = client?.id;
-    if (!id || !shopId || savedCard) return; // already have a usable card
+    if (!id || !shopId || !setClients) return;
+    if (freshPulledRef.current.has(id)) return;
+    freshPulledRef.current.add(id);
     let alive = true;
     (async () => {
       try {
         const { data } = await supabase.from("clients").select("data").eq("shop_id", shopId).eq("id", id).maybeSingle();
-        const fresh = data && data.data && data.data.savedCard;
-        if (alive && fresh && fresh.pmId && fresh.stripeCustomerId && setClients) {
-          setClients((list) => (list || []).map((c) => (c.id === id ? { ...c, savedCard: fresh } : c)));
-        }
+        const d = data && data.data;
+        if (!alive || !d) return;
+        const patch = {};
+        if (d.savedCard && d.savedCard.pmId && d.savedCard.stripeCustomerId) patch.savedCard = d.savedCard;
+        if (d.photo) patch.photo = d.photo;
+        if (Object.keys(patch).length) setClients((list) => (list || []).map((c) => (c.id === id ? { ...c, ...patch } : c)));
       } catch (e) {}
     })();
     return () => { alive = false; };
-  }, [client?.id, shopId, !!savedCard]);
+  }, [client?.id, shopId]);
   const saveCardToClient = (info) => {
     if (!client || !setClients) { showToast("Couldn't attach the card to this client."); return; }
     setClients((prev) => prev.map((c) => c.id === client.id ? { ...c, card: info } : c));
@@ -22695,7 +22701,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     const openProfile = () => { if (canOpen) { onClose(); onOpenClient(client); } };
                     return (
                       <>
-                        <button onClick={openProfile} disabled={!canOpen} style={{ width: 48, height: 48, borderRadius: "50%", background: client?.avatarColor || "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 600, flexShrink: 0, border: "none", padding: 0, cursor: canOpen ? "pointer" : "default" }}>{initials}</button>
+                        <button onClick={openProfile} disabled={!canOpen} style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden", background: client?.avatarColor || "var(--border2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 600, flexShrink: 0, border: "none", padding: 0, cursor: canOpen ? "pointer" : "default" }}>{client?.photo ? <img src={imgUrl(client.photo, 120)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials}</button>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <button onClick={openProfile} disabled={!canOpen} style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: canOpen ? "pointer" : "default", color: "inherit", display: "flex", alignItems: "center", gap: 5 }}>
                             <span style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.1, color: T.text }}>{apptDisplayName(appt, clients)}</span>
