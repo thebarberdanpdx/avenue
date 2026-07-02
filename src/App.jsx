@@ -20963,6 +20963,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     </div>
   );
   const goldBtn = { width: "100%", background: "var(--gold-grad, var(--gold))", color: "var(--on-gold)", padding: 17, fontSize: 14.5, fontWeight: 600, letterSpacing: 1.5, borderRadius: 16, border: "none", boxShadow: "var(--glow)", cursor: "pointer" };
+  // Mango-style quiet add links (circular + icon, uppercase label) used on the summary.
+  const addLinkStyle = { display: "flex", alignItems: "center", gap: 9, background: "none", border: "none", color: "var(--text2)", fontSize: 13, letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600, cursor: "pointer", padding: "4px 0", fontFamily: FONT_BODY };
+  const addPlusStyle = { width: 22, height: 22, borderRadius: "50%", border: "1.6px solid var(--faint)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
   const startMethod = (m) => {
     setPayErr("");
     setPendingMethod(m);
@@ -20995,27 +20998,50 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   // ---------- 1 · SALE (full screen, editable) ----------
   if (stage === "summary") return screen(
     <>
-      <Header title="Checkout" close onBack={onClose} />
-      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, letterSpacing: "-0.4px" }}>{appt.name || "Walk-in"}</div>
-      <div style={{ fontSize: 13.5, color: "var(--sub)", margin: "5px 0 22px" }}>{liveClient && liveClient.since ? `Client since ${liveClient.since}` : (provider ? `With ${provider.name}` : "")}</div>
-      {lines.map((l) => (
-        <div key={l.id} style={{ borderTop: "1px solid var(--line)", padding: "16px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+      {/* top bar — Mango-style: close · CHECKOUT · Pay */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 44, marginBottom: 8 }}>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text)", padding: 4, cursor: "pointer", width: 44, textAlign: "left" }}><X size={19} /></button>
+        <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>Checkout</span>
+        <button onClick={() => { if ((reopen ? balance : subtotal) > 0) { setPayErr(""); setStage("method"); } }} disabled={(reopen ? balance : subtotal) <= 0} style={{ background: "none", border: "none", color: (reopen ? balance : subtotal) > 0 ? "var(--gold)" : "var(--faint)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: (reopen ? balance : subtotal) > 0 ? "pointer" : "default", padding: 4, width: 44, textAlign: "right" }}>Pay</button>
+      </div>
+
+      {/* client header — avatar · name · client since */}
+      <div style={{ display: "flex", alignItems: "center", gap: 13, padding: "4px 0 2px" }}>
+        <Avatar size={52} initial={(appt.name || "?").charAt(0)} photo={liveClient?.photo} color={provider?.color || "var(--gold)"} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>{appt.name || "Walk-in"}</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>{liveClient && liveClient.since ? `Client since ${liveClient.since}` : (provider ? `With ${provider.name}` : "")}</div>
+        </div>
+      </div>
+
+      {lines.map((l) => {
+        const chipVals = l.id === "main" ? [appt.cutLabel, ...(Array.isArray(appt.addonLabels) ? appt.addonLabels : [])].filter(Boolean) : [];
+        return (
+        <div key={l.id} style={{ borderTop: "1px solid var(--line)", marginTop: 16, padding: "16px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 16.5, fontWeight: 500 }}>{l.name}</div>
-            <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 4 }}>{[l.id === "main" ? appt.cutLabel : null, l.withName ? `with ${l.withName}` : (l.id !== "main" ? "Added" : null)].filter(Boolean).join(" · ")}</div>
-            <div style={{ marginTop: 6, display: "flex", gap: 14 }}>
+            <div style={{ fontSize: 16.5, fontWeight: 600 }}>{l.name}</div>
+            {chipVals.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 8 }}>{chipVals.map((c, ci) => <span key={ci} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "6px 10px", fontSize: 12.5, color: "var(--text2)" }}>{c}</span>)}</div>}
+            <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 7 }}>{l.withName ? `with ${l.withName}` : (l.id !== "main" ? "Added" : (provider ? `with ${provider.name}` : ""))}</div>
+            <div style={{ marginTop: 8, display: "flex", gap: 14 }}>
               <button onClick={() => setEditLineId(editLineId === l.id ? null : l.id)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Edit price</button>
               {l.id !== "main" && <button onClick={() => setLines(lines.filter((x) => x.id !== l.id))} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Remove</button>}
             </div>
           </div>
           {editLineId === l.id
             ? <input autoFocus type="number" inputMode="decimal" defaultValue={l.price} onBlur={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setLines(lines.map((x) => x.id === l.id ? { ...x, price: v } : x)); setEditLineId(null); }} onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }} style={{ width: 92, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 10px", color: "var(--text)", fontSize: 16, textAlign: "right", fontFamily: FONT_BODY }} />
-            : <div style={{ fontSize: 16.5, flexShrink: 0 }}>{money(Number(l.price) || 0)}</div>}
+            : <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 500, flexShrink: 0 }}>{money(Number(l.price) || 0)}</div>}
         </div>
-      ))}
-      <div style={{ display: "flex", gap: 10, padding: "16px 0", borderTop: "1px solid var(--line)" }}>
-        <button onClick={() => setAddSheet(addSheet === "service" ? null : "service")} style={{ flex: 1, textAlign: "center", border: "1px solid var(--border)", background: "var(--panel)", borderRadius: 12, padding: 13, fontSize: 14, color: "var(--text2)", fontWeight: 500, cursor: "pointer" }}>+ Service</button>
-        <button onClick={() => { setProdName(""); setProdPrice(""); setAddSheet(addSheet === "product" ? null : "product"); }} style={{ flex: 1, textAlign: "center", border: "1px solid var(--border)", background: "var(--panel)", borderRadius: 12, padding: 13, fontSize: 14, color: "var(--text2)", fontWeight: 500, cursor: "pointer" }}>+ Product</button>
+      ); })}
+
+      {/* Mango-style add row */}
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: 26, flexWrap: "wrap" }}>
+          <button onClick={() => setAddSheet(addSheet === "service" ? null : "service")} style={addLinkStyle}><span style={addPlusStyle}><Plus size={12} strokeWidth={2.6} style={{ color: "var(--gold)" }} /></span>Add service</button>
+          <button onClick={() => { setProdName(""); setProdPrice(""); setAddSheet(addSheet === "product" ? null : "product"); }} style={addLinkStyle}><span style={addPlusStyle}><Plus size={12} strokeWidth={2.6} style={{ color: "var(--gold)" }} /></span>Add product</button>
+        </div>
+        {!reopen && <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+          <button onClick={() => setShowDiscPick(true)} style={addLinkStyle}><span style={addPlusStyle}><Plus size={12} strokeWidth={2.6} style={{ color: "var(--gold)" }} /></span>{checkoutDiscount ? "Discount" : "More"}</button>
+        </div>}
       </div>
       {addSheet === "service" && (
         <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16, maxHeight: 280, overflowY: "auto" }}>
@@ -21079,30 +21105,18 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           <span>Paid earlier</span><span>−{money(alreadyPaid)}</span>
         </div>
       )}
-      {!reopen && (
-        <div style={{ borderTop: "1px solid var(--line)", padding: "14px 2px 0" }}>
-          {checkoutDiscount ? (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 14.5 }}>
-              <button onClick={() => setShowDiscPick(true)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 14.5, fontWeight: 600, cursor: "pointer", padding: 0, textAlign: "left" }}>{checkoutDiscount.name} · change</button>
-              <span style={{ color: "var(--gold)" }}>−{money(discountAmt)}</span>
-            </div>
-          ) : (
-            <button onClick={() => setShowDiscPick(true)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", padding: 0, textDecoration: "underline", textUnderlineOffset: 3, fontFamily: FONT_BODY }}>+ Add a discount</button>
-          )}
+      {!reopen && checkoutDiscount && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", padding: "14px 2px 0", fontSize: 14.5 }}>
+          <button onClick={() => setShowDiscPick(true)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 14.5, fontWeight: 600, cursor: "pointer", padding: 0, textAlign: "left" }}>{checkoutDiscount.name} · change</button>
+          <span style={{ color: "var(--gold)" }}>−{money(discountAmt)}</span>
         </div>
       )}
       {showDiscPick && <DiscountPicker discounts={business?.discounts || []} current={checkoutDiscount} onPick={setCheckoutDiscount} onClose={() => setShowDiscPick(false)} />}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: reopen ? "none" : "1px solid var(--line)", padding: reopen ? "10px 2px 16px" : "18px 2px 16px" }}>
-        <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{reopen ? "Balance due" : "Total"}</span>
-        <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500 }}>{money(reopen ? balance : subtotal)}</span>
+      {/* Foot: Mango shows a running Subtotal here; the pay action lives in the top-right "Pay". */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", marginTop: 14, padding: "16px 2px 8px" }}>
+        <span style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{reopen ? "Balance due" : "Subtotal"}</span>
+        <span style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500 }}>{money(reopen ? balance : subtotal)}</span>
       </div>
-      {reopen ? (
-        <button className="lift" disabled={balance <= 0} onClick={() => { setPayErr(""); setStage("method"); }} style={{ ...goldBtn, opacity: balance <= 0 ? 0.45 : 1 }}>{balance > 0 ? `CHARGE BALANCE — ${money(balance)}` : "NOTHING OWED"}</button>
-      ) : (<>
-        {/* Card is the 99% path — go straight to it (tip comes next). Other methods sit one tap behind. */}
-        <button className="lift" onClick={() => startMethod("card")} style={goldBtn}>{`PAY BY CARD — ${money(subtotal)}`}</button>
-        <button onClick={() => { setPayErr(""); setStage("method"); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: "15px 0 2px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, fontFamily: FONT_BODY }}>Other ways to pay</button>
-      </>)}
     </>);
 
   // ---------- 2 · METHOD ----------
