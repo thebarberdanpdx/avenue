@@ -21161,7 +21161,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           { id: "cof", t: "Card on file", sub: cofCard ? `${(cofCard.brand || "Card").charAt(0).toUpperCase() + (cofCard.brand || "card").slice(1)} ··${cofCard.last4}` : (liveMode ? "No card saved" : ""), dis: !liveMode || !cofCard },
           // Owner-configured manual methods (Settings → Checkout); card-equivalents excluded since the
           // reader / card-on-file tiles above cover them. Falls back to Cash if none set.
-          ...(((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^card( on file)?$/i.test(s)).map((label) => ({ id: "m:" + label, t: label, dis: false }))),
+          ...(((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^(card( on file)?|venmo|zelle)$/i.test(s)).map((label) => ({ id: "m:" + label, t: label, dis: false }))),
         ].map((m) => (
           <button key={m.id} disabled={m.dis || payBusy} onClick={() => startMethod(m.id)} className={m.dis ? "" : "lift"} style={{ minHeight: 82, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, textAlign: "center", padding: "16px 12px", borderRadius: 16, border: m.dis ? "1px solid var(--border)" : "none", background: m.dis ? "var(--panel2)" : "var(--gold-grad, var(--gold))", color: m.dis ? "var(--faint)" : "var(--on-gold)", boxShadow: m.dis ? "none" : "var(--shadow-sm)", cursor: m.dis ? "default" : "pointer" }}>
             <span style={{ fontSize: 14.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", lineHeight: 1.15 }}>{m.t}</span>
@@ -21868,7 +21868,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
   // The owner's manual "mark as paid" methods (Settings → Checkout). Cash gets the tendered/change
   // sheet; the rest (Venmo, Zelle, …) just record the sale under that label.
   // Exclude card-equivalents — the dedicated card reader / card-on-file buttons already cover those.
-  const manualMethods = (((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^card( on file)?$/i.test(s)));
+  const manualMethods = (((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^(card( on file)?|venmo|zelle)$/i.test(s)));
   const runTapToPay = async () => {
     setPayErr(""); setTapStatus("Starting…");
     try {
