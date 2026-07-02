@@ -10859,6 +10859,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [editMode, setEditMode] = useState(false); // list view: browse vs manage (reorder/delete/rename)
   const [catSheet, setCatSheet] = useState(false); // category manager sheet (add / rename / reorder / delete)
   const [showArchived, setShowArchived] = useState(false); // list view: archived services collapse
+  const [libJump, setLibJump] = useState(null); // deep-link: library item id to auto-open after jumping to the Add-ons/Questions tab from a service's row
   useEffect(() => {
     if (!onBackRef) return;
     let pop = null;
@@ -11436,14 +11437,17 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           const isQ = gid.startsWith("libq-");
           const label = isQ ? (g.label || "Question") : ((g.item && g.item.name) || g.label || "Add-on");
           const sub = isQ ? `${(g.options || []).length} answer${(g.options || []).length === 1 ? "" : "s"} · from your Questions library` : "From your Add-ons library";
+          // Tapping jumps to the item's editor in the master Questions / Add-ons tab (edits live
+          // only there); the service editor closes so back lands on the hub, not a stale form.
+          const jump = () => { setEditing(null); setSection(null); setLibJump(gid.slice(isQ ? 5 : 4)); setMenuTab(isQ ? "questions" : "addons"); };
           return (
-            <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", marginBottom: 12 }}>
+            <button key={g.id} onClick={jump} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", marginBottom: 12, textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{label}</span>
-                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{sub}</span>
+                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{sub} · tap to edit</span>
               </span>
-              <Lock size={15} style={{ color: "var(--faint)", flexShrink: 0 }} />
-            </div>
+              <ChevronRight size={17} style={{ color: "var(--faint)", flexShrink: 0 }} />
+            </button>
           );
         }
         // Reorder only swaps a group with its nearest SAME-KIND neighbour (questions render before
@@ -12341,15 +12345,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       {/* two-tab switch (the screen is already titled "Services & Menu" by the settings shell) */}
       <div style={{ display: "flex", gap: 6, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 13, padding: 4, margin: "4px 0 18px" }}>
         {[{ id: "services", label: "Services" }, { id: "addons", label: "Add-ons" }, { id: "questions", label: "Questions" }].map((t) => { const on = menuTab === t.id; return (
-          <button key={t.id} onClick={() => { setMenuTab(t.id); setEditMode(false); }} style={{ flex: 1, padding: "10px 6px", borderRadius: 10, border: "none", background: on ? "var(--panel)" : "transparent", color: on ? "var(--text)" : "var(--sub)", fontFamily: FONT_BODY, fontSize: 14, fontWeight: on ? 600 : 500, boxShadow: on ? "var(--shadow-sm)" : "none", cursor: "pointer", transition: "background .15s ease, color .15s ease" }}>{t.label}</button>
+          <button key={t.id} onClick={() => { setMenuTab(t.id); setEditMode(false); setLibJump(null); }} style={{ flex: 1, padding: "10px 6px", borderRadius: 10, border: "none", background: on ? "var(--panel)" : "transparent", color: on ? "var(--text)" : "var(--sub)", fontFamily: FONT_BODY, fontSize: 14, fontWeight: on ? 600 : 500, boxShadow: on ? "var(--shadow-sm)" : "none", cursor: "pointer", transition: "background .15s ease, color .15s ease" }}>{t.label}</button>
         ); })}
       </div>
 
       {/* ---- ADD-ONS TAB ---- */}
-      {menuTab === "addons" && <AddOnsEditor services={services} setServices={setServices} business={business} setBusiness={setBusiness} showToast={showToast} />}
+      {menuTab === "addons" && <AddOnsEditor services={services} setServices={setServices} business={business} setBusiness={setBusiness} showToast={showToast} openId={libJump} onOpened={() => setLibJump(null)} />}
 
       {/* ---- QUESTIONS TAB ---- */}
-      {menuTab === "questions" && <QuestionsEditor services={services} setServices={setServices} business={business} setBusiness={setBusiness} showToast={showToast} />}
+      {menuTab === "questions" && <QuestionsEditor services={services} setServices={setServices} business={business} setBusiness={setBusiness} showToast={showToast} openId={libJump} onOpened={() => setLibJump(null)} />}
 
       {/* ---- SERVICES TAB ---- */}
       {menuTab === "services" && (<>
@@ -16903,11 +16907,18 @@ function MergeDuplicatesTool({ shopId, clients, setClients, appts, setAppts, sho
 // optionally make it a must-answer question during booking. Saving materializes each
 // add-on into the assigned services' addonGroups (id "lib-<id>") so the booking flow
 // keeps working unchanged; legacy per-service groups are left untouched.
-function AddOnsEditor({ services, setServices, business, setBusiness, showToast }) {
+function AddOnsEditor({ services, setServices, business, setBusiness, showToast, openId, onOpened }) {
   const lib = business.addOnsLibrary || [];
   const [editing, setEditing] = useState(null); // addon id or "new"
   const [form, setForm] = useState(null);
   const [picker, setPicker] = useState(false);
+  // Deep-link from a service's add-on row: open that add-on's editor straight away.
+  useEffect(() => {
+    if (!openId) return;
+    const item = lib.find((a) => a.id === openId);
+    if (item) { setForm(JSON.parse(JSON.stringify(item))); setEditing(item.id); }
+    onOpened && onOpened();
+  }, [openId]);
   const blank = () => ({ id: "ao-" + Date.now(), name: "", price: "", extraMin: "", desc: "", photo: "", required: false, services: [] });
   const svcList = (services || []);
   const svcName = (id) => (svcList.find((s) => s.id === id) || {}).name || id;
@@ -17037,10 +17048,17 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast 
 // model as AddOnsEditor: each question carries a `services` list and is materialized
 // onto those services' addonGroups as a type:"choice" group id-prefixed "libq-".
 // ============================================================
-function QuestionsEditor({ services, setServices, business, setBusiness, showToast }) {
+function QuestionsEditor({ services, setServices, business, setBusiness, showToast, openId, onOpened }) {
   const lib = business.questionsLibrary || [];
   const [editing, setEditing] = useState(null); // question id or "new"
   const [form, setForm] = useState(null);
+  // Deep-link from a service's question row: open that question's editor straight away.
+  useEffect(() => {
+    if (!openId) return;
+    const item = lib.find((q) => q.id === openId);
+    if (item) { setForm(JSON.parse(JSON.stringify(item))); setEditing(item.id); }
+    onOpened && onOpened();
+  }, [openId]);
   const svcList = (services || []);
   const svcName = (id) => (svcList.find((s) => s.id === id) || {}).name || id;
   const newOpt = () => ({ id: "o-" + Date.now() + "-" + Math.floor(Math.random() * 1000), label: "", desc: "", price: "", min: "" });
