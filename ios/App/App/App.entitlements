@@ -4,10 +4,13 @@
 <dict>
 	<key>aps-environment</key>
 	<string>production</string>
-	<!-- Tap to Pay on iPhone — GRANTED by Apple 2026-07-02 (Case-ID 20814883),
-	     currently at development-distribution tier (registered test iPhones only).
-	     Full public distribution still needs the 3 flow videos + App Review checklist. -->
-	<key>com.apple.developer.proximity-reader.payment.acceptance</key>
-	<true/>
+	<!-- Tap to Pay on iPhone — Apple GRANTED the request 2026-07-02 (Case-ID 20814883,
+	     dev-distribution tier), BUT as of 2026-07-02 the entitlement had NOT yet propagated
+	     to the com.gotvero.app App ID: automatic signing failed with "entitlement ...
+	     proximity-reader.payment.acceptance not found and could not be included in profile,"
+	     and "Tap to Pay on iPhone" did not appear under Xcode's + Capability. Temporarily
+	     removed again so the app builds. RE-ADD once the capability shows up under
+	     Signing & Capabilities → + Capability → "Tap to Pay on iPhone" (add it THAT way so
+	     Xcode registers it with the App ID, not by hand-editing this file). -->
 </dict>
 </plist>
