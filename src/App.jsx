@@ -19025,8 +19025,12 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   const [startMin, setStartMin] = useState(slot.start);
   const [q, setQ] = useState("");
   const [openSvc, setOpenSvc] = useState(false);
+  // Staff-picked options (cut choice / questions / add-ons) for the chosen service, same set the
+  // client sees online. { [groupId]: optionId (choice) | true (addon) }.
+  const [opts, setOpts] = useState({});
   // if the chosen service isn't offered by the current provider, switch to one who offers it
   useEffect(() => {
+    setOpts({}); // a fresh service starts with no options picked
     if (!service || !service.staff) return;
     if (provId === "anyone") return;
     if (service.staff[provId]?.on === false) {
@@ -19034,9 +19038,22 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
       if (firstOffering) setProvId(firstOffering.id);
     }
   }, [service]);
+  // price/time the picked options add — uses the same resolvers as online booking (per-barber
+  // overrides fall back to the option's own amount).
+  const optExtra = (() => {
+    let p = 0, m = 0;
+    if (service && Array.isArray(service.addonGroups)) {
+      service.addonGroups.forEach((g) => {
+        const sel = opts[g.id];
+        if (g.type === "choice" && sel) { const o = (g.options || []).find((x) => x.id === sel); if (o) { p += answerPriceFor(service, provId, g, o); m += answerDuration(service, provId, g, o); } }
+        else if (g.type === "addon" && sel) { const it = g.item || {}; if (it.addsPrice !== false) p += addonPriceFor(service, provId, g); if (it.addsTime !== false) m += addonDuration(service, provId, g); }
+      });
+    }
+    return { p, m };
+  })();
   const fmtHM = (m) => fmtTime(m);
-  const dur = service ? getDuration(client, service, provId) : 0;
-  const price = service ? priceWithTimeRules(service, provId, new Date(), startMin) : 0;
+  const dur = service ? getDuration(client, service, provId) + optExtra.m : 0;
+  const price = service ? priceWithTimeRules(service, provId, new Date(), startMin) + optExtra.p : 0;
   const canBook = service && (client || (walkIn && walkInFirst.trim() && walkInLast.trim() && walkInPhone.replace(/\D/g, "").length >= 10));
   const dateLabel = (() => { const d = selectedDate || new Date(); return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`; })();
   const stepTime = (delta) => setStartMin((m) => Math.max(6 * 60, Math.min(21 * 60, m + delta)));
@@ -19063,7 +19080,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   // flush against an existing appointment flagged "best" (no gap left in the day).
   const sameDayLocal = (iso, ref) => { if (!iso || !ref) return false; const a = new Date(iso); return a.getFullYear() === ref.getFullYear() && a.getMonth() === ref.getMonth() && a.getDate() === ref.getDate(); };
   const provObj = providers.find((p) => p.id === provId);
-  const apptDur = service ? getDuration(client, service, provId) : 30;
+  const apptDur = service ? getDuration(client, service, provId) + optExtra.m : 30;
   const slotDate = selectedDate || new Date();
   const dow = slotDate.getDay();
   const wh = (provObj && provObj.hours && provObj.hours[dow]) || { on: true, start: 6 * 60, end: 21 * 60 };
@@ -19227,6 +19244,43 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             )}
           </div>
 
+          {/* OPTIONS — cut choice / questions / add-ons, the same set clients pick online */}
+          {service && Array.isArray(service.addonGroups) && service.addonGroups.length > 0 && (
+            <div style={fieldWrap}>
+              <div style={{ fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 16 }}>Options</div>
+              {[...service.addonGroups].sort((a, b) => (a.type === "addon" ? 1 : 0) - (b.type === "addon" ? 1 : 0)).map((g) => {
+                if (g.type === "choice") {
+                  return (
+                    <div key={g.id} style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 9 }}>{g.label || "Choose one"}</div>
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {(g.options || []).map((o) => { const on = opts[g.id] === o.id; return (
+                          <button key={o.id} onClick={() => setOpts((m) => ({ ...m, [g.id]: on ? undefined : o.id }))} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: on ? "var(--tint)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 15px", color: "var(--text)", textAlign: "left" }}>
+                            <span style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                              <span style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--gold)" }} />}</span>
+                              <span style={{ fontSize: 15 }}>{o.label}</span>
+                            </span>
+                            <span style={{ fontSize: 13.5, color: "var(--sub)", flexShrink: 0 }}>{Number(o.price) > 0 ? `+ $${o.price}` : ""}{Number(o.min) > 0 ? ` · +${o.min}m` : ""}</span>
+                          </button>
+                        ); })}
+                      </div>
+                    </div>
+                  );
+                }
+                const it = g.item || {}; const on = !!opts[g.id];
+                return (
+                  <button key={g.id} onClick={() => setOpts((m) => ({ ...m, [g.id]: !on }))} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: on ? "var(--tint)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 15px", color: "var(--text)", textAlign: "left", marginBottom: 8 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                      <span style={{ width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} />}</span>
+                      <span style={{ fontSize: 15, fontWeight: 500 }}>{it.name || g.label}</span>
+                    </span>
+                    <span style={{ fontSize: 13.5, color: "var(--sub)", flexShrink: 0 }}>{Number(it.price) > 0 ? `+ $${it.price}` : ""}{Number(it.min) > 0 ? ` · +${it.min}m` : ""}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* NOTE */}
           <div style={fieldWrap}>
             <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note" style={{ width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 18, fontFamily: FONT_BODY }} />
@@ -19243,7 +19297,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
       {/* sticky footer — Cancel (left) and Book (right) pinned to the viewport bottom; safe-area padding keeps the iOS Safari toolbar from covering it */}
       <div style={{ flexShrink: 0, padding: "12px 18px max(18px, env(safe-area-inset-bottom))", background: "var(--bg)", borderTop: "1px solid var(--line)", display: "flex", gap: 10, boxSizing: "border-box" }}>
         <button onClick={onClose} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 15, letterSpacing: 1, borderRadius: 12 }}>CANCEL</button>
-        <button className="lift" onMouseDown={(e) => e.preventDefault()} onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note })} disabled={!canBook} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 12, border: "none", opacity: canBook ? 1 : 0.45 }}>BOOK</button>
+        <button className="lift" onMouseDown={(e) => e.preventDefault()} onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note, addons: opts })} disabled={!canBook} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 12, border: "none", opacity: canBook ? 1 : 0.45 }}>BOOK</button>
       </div>
 
       {/* time picker — fills the form from the top, always in view */}
@@ -19954,11 +20008,26 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
   // The actual save — runs after conflict has been resolved (no conflict, or provider chose to keep both).
   // Accepts an optional `overrideStart` so the conflict modal can slide the booking to the next free slot in one tap.
-  const commitAppt = ({ providerId, start, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note }, overrideStart = null) => {
+  // Totals for the options a staff member picked on the New Appointment form (cut choice /
+  // questions / add-ons), using the same resolvers as online booking so the price & time match.
+  const optionTotals = (service, providerId, addons) => {
+    let addMin = 0, addPrice = 0; const labels = [];
+    if (service && Array.isArray(service.addonGroups) && addons) {
+      service.addonGroups.forEach((g) => {
+        const sel = addons[g.id];
+        if (g.type === "choice" && sel) { const o = (g.options || []).find((x) => x.id === sel); if (o) { addPrice += answerPriceFor(service, providerId, g, o); addMin += answerDuration(service, providerId, g, o); labels.push(o.label); } }
+        else if (g.type === "addon" && sel) { const it = g.item || {}; if (it.addsPrice !== false) addPrice += addonPriceFor(service, providerId, g); if (it.addsTime !== false) addMin += addonDuration(service, providerId, g); labels.push(it.name || g.label); }
+      });
+    }
+    return { addMin, addPrice, labels };
+  };
+
+  const commitAppt = ({ providerId, start, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note, addons }, overrideStart = null) => {
     const useStart = overrideStart != null ? overrideStart : start;
     const id = "a" + Date.now() + Math.floor(Math.random() * 1000); // collision-proof string id
-    const dur = getDuration(client, service, providerId);
-    const price = priceWithTimeRules(service, providerId, selectedDate, useStart);
+    const ot = optionTotals(service, providerId, addons);
+    const dur = getDuration(client, service, providerId) + ot.addMin;
+    const price = priceWithTimeRules(service, providerId, selectedDate, useStart) + ot.addPrice;
     // Stamp the appointment with the day currently shown on the calendar, or it can't be placed on any date.
     const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(useStart / 60), useStart % 60, 0, 0);
 
@@ -19976,7 +20045,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       setClients((cur) => cur.map((c) => c.id === bookClient.id ? { ...c, lastActivity: new Date().toISOString() } : c));
     }
 
-    const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: service.name, serviceName: service.name, addonLabels: [], manageToken: makeManageToken(), detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), hasPhotos: false, photos: 0 };
+    const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: ot.labels.length ? `${service.name} · ${ot.labels.join(", ")}` : service.name, serviceName: service.name, addonLabels: ot.labels, lineItems: [{ serviceId: service.id, cutType: null, beardType: null, addons: addons || {} }], manageToken: makeManageToken(), detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), hasPhotos: false, photos: 0 };
     setAppts((cur) => [...cur, newAppt]);
     // Staff-created booking → fire the confirmation too (same engine as online bookings).
     fireApptNotify({ msgId: "booked", appt: newAppt, business, providers, contact: { email: (bookClient ? bookClient.email : walkInEmail) || "", phone: (bookClient ? bookClient.phone : walkInPhone) || "" }, subject: `${business.name}: Appointment confirmed` });
@@ -20000,7 +20069,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
   // commit a fully-formed appointment from the booking form — checks for conflict first
   const bookAppt = (data) => {
-    let dur = getDuration(data.client, data.service, data.providerId);
+    let dur = getDuration(data.client, data.service, data.providerId) + optionTotals(data.service, data.providerId, data.addons).addMin;
     if (!dur || isNaN(dur) || dur <= 0) dur = 30;     // bad/missing duration must never skip the check
     const end = data.start + dur;
     const conflicts = findConflicts(data.providerId, data.start, end);
