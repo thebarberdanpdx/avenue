@@ -6802,26 +6802,26 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
         <div className="success-bloom" style={{ width: 52, height: 52, borderRadius: "50%", border: "1.5px solid var(--text)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
           <Check size={24} style={{ color: "var(--text)" }} strokeWidth={2.5} />
         </div>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 10 }}>Booked</div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, lineHeight: 1.1, letterSpacing: "-0.4px", marginBottom: 10, color: "var(--text)" }}>You're in.</h2>
-        <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, lineHeight: 1.55, maxWidth: 340, margin: "0 auto", fontWeight: 400 }}>We'll text you a reminder closer to the day. See you soon.</p>
+        <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, letterSpacing: 2, fontWeight: 700, textTransform: "uppercase", color: "var(--sub)", marginBottom: 10 }}>Booked</div>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, lineHeight: 1.1, letterSpacing: "-0.4px", marginBottom: 12, color: "var(--text)" }}>You're in.</h2>
+        <p style={{ fontFamily: FONT_BODY, color: "var(--sub)", fontSize: 16.5, lineHeight: 1.55, maxWidth: 360, margin: "0 auto", fontWeight: 400 }}>We'll text you a reminder closer to the day. See you soon.</p>
       </div>
 
-      <div className="drift-in" style={{ border: "1px solid var(--line)", borderRadius: 12, padding: "20px 20px", marginBottom: 16 }}>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--text)", fontWeight: 600, textTransform: "uppercase", marginBottom: 12 }}>Your appointment</div>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.15, marginBottom: 5, color: "var(--text)" }}>{relPlus}</div>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, color: "var(--sub)", marginBottom: 16 }}>{fmtTime(slot)} · with {provider.name}</div>
-        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+      <div className="drift-in" style={{ border: "1.5px solid var(--border)", borderRadius: 16, padding: "24px 22px", marginBottom: 18 }}>
+        <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, letterSpacing: 1.8, color: "var(--text)", fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Your appointment</div>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.15, marginBottom: 6, color: "var(--text)" }}>{relPlus}</div>
+        <div style={{ fontFamily: FONT_BODY, fontSize: 17, color: "var(--sub)", marginBottom: 18 }}>{fmtTime(slot)} · with {provider.name}</div>
+        <div style={{ borderTop: "1.5px solid var(--line)", paddingTop: 16 }}>
           {cart.map((e, i) => (
-            <div key={i} style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text)", marginBottom: i < cart.length - 1 ? 6 : 0, lineHeight: 1.4 }}>{describeEntry(e)}</div>
+            <div key={i} style={{ fontFamily: FONT_BODY, fontSize: 17, fontWeight: 500, color: "var(--text)", marginBottom: i < cart.length - 1 ? 7 : 0, lineHeight: 1.4 }}>{describeEntry(e)}</div>
           ))}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
-            <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Total</span>
-            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: "var(--text)", fontWeight: 500 }}>${cartPrice}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 16, paddingTop: 16, borderTop: "1.5px solid var(--line)" }}>
+            <span style={{ fontFamily: FONT_BODY, fontSize: 12.5, letterSpacing: 1.8, color: "var(--sub)", fontWeight: 700, textTransform: "uppercase" }}>Total</span>
+            <span style={{ fontFamily: FONT_DISPLAY, fontSize: 26, color: "var(--text)", fontWeight: 500 }}>${cartPrice}</span>
           </div>
           {photos > 0 && (
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", display: "flex", alignItems: "center", gap: 8 }}>
-              <ImageIcon size={14} style={{ color: "var(--text)" }} />
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1.5px solid var(--line)", fontFamily: FONT_BODY, fontSize: 15, color: "var(--sub)", display: "flex", alignItems: "center", gap: 8 }}>
+              <ImageIcon size={15} style={{ color: "var(--text)" }} />
               <span>{photos} photo{photos > 1 ? "s" : ""} attached for your staff member</span>
             </div>
           )}
@@ -6829,32 +6829,32 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
       </div>
 
       {(noteOn || photoOn) && (
-        <div className="drift-in" style={{ border: "1px solid var(--line)", borderRadius: 12, padding: "18px 18px", marginBottom: 16 }}>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Help your barber — optional</div>
-          <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text2)", lineHeight: 1.5, margin: "0 0 14px" }}>{photoOn && noteOn ? "Share a reference photo or a quick note about the look you want." : photoOn ? "Share any reference or inspiration photos for your appointment." : "Leave a quick note about the look you want."}</p>
+        <div className="drift-in" style={{ border: "1.5px solid var(--border)", borderRadius: 16, padding: "24px 22px", marginBottom: 18 }}>
+          <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, letterSpacing: 1.8, color: "var(--sub)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>Optional</div>
+          <p style={{ fontFamily: FONT_BODY, fontSize: 17, color: "var(--text)", lineHeight: 1.5, margin: "0 0 16px", fontWeight: 500 }}>Leave a quick note or upload a few inspiration photos!</p>
           {noteOn && (
             <>
-              <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keeping length on top" rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "13px 14px", color: "var(--text)", fontSize: 15, resize: "none", minHeight: 72, lineHeight: 1.5, fontFamily: FONT_BODY }} />
-              {clientNote.length > 0 && <div style={{ fontSize: 12, color: "var(--faint)", textAlign: "right", marginTop: 6 }}>{clientNote.length} / 200</div>}
+              <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keeping length on top" rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1.5px solid var(--border2)", borderRadius: 14, padding: "15px 16px", color: "var(--text)", fontSize: 16.5, resize: "none", minHeight: 88, lineHeight: 1.5, fontFamily: FONT_BODY }} />
+              {clientNote.length > 0 && <div style={{ fontSize: 13, color: "var(--faint)", textAlign: "right", marginTop: 6 }}>{clientNote.length} / 200</div>}
             </>
           )}
           {photoOn && (
-            <div style={{ marginTop: noteOn ? 14 : 0 }}>
+            <div style={{ marginTop: noteOn ? 16 : 0 }}>
               <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
-              <div style={{ display: "flex", gap: 8 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
-                <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 14, overflow: "hidden", border: `1px dashed ${src ? "var(--text)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: src ? "var(--panel2)" : "transparent", cursor: src ? "default" : "pointer" }}>
-                  {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={18} style={{ color: "var(--faint)" }} />}
+              <div style={{ display: "flex", gap: 10 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
+                <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 14, overflow: "hidden", border: `1.5px dashed ${src ? "var(--text)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: src ? "var(--panel2)" : "transparent", cursor: src ? "default" : "pointer" }}>
+                  {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={20} style={{ color: "var(--faint)" }} />}
                 </div>
               ); })}</div>
-              <p style={{ fontSize: 12, color: "var(--faint)", textAlign: "center", marginTop: 10 }}>Tap to add — up to 3.</p>
+              <p style={{ fontSize: 13.5, color: "var(--sub)", textAlign: "center", marginTop: 12 }}>Tap to add — up to 3.</p>
             </div>
           )}
         </div>
       )}
 
-      <div style={{ border: "1px solid var(--line)", borderRadius: 12, padding: "16px 18px", marginBottom: 24 }}>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 1.8, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 8 }}>What's next</div>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text2)", lineHeight: 1.55 }}>
+      <div style={{ border: "1.5px solid var(--border)", borderRadius: 16, padding: "24px 22px", marginBottom: 24 }}>
+        <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, letterSpacing: 1.8, color: "var(--sub)", fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>What's next</div>
+        <div style={{ fontFamily: FONT_BODY, fontSize: 16, color: "var(--text2)", lineHeight: 1.6 }}>
           A confirmation is on its way to your phone and email. We'll send a reminder the day before. If anything changes, you can always reschedule or cancel below.
         </div>
       </div>
