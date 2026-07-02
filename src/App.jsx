@@ -6972,7 +6972,11 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
   const [newSlot, setNewSlot] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const windowHrs = business.cancelWindowHrs || 24;
+  // Change/cancel window = the notice the owner set in Settings (booking.leadTimeMin, in
+  // minutes). Convert to hours here. Legacy cancelWindowHrs kept as a fallback; default 24.
+  const windowHrs = (business?.booking?.leadTimeMin != null)
+    ? business.booking.leadTimeMin / 60
+    : (business.cancelWindowHrs || 24);
   // Arrival deep-link: the 15-minute reminder's check-in link adds ?a=1 so we open straight
   // onto the "I've arrived" screen.
   const arriveFlag = (() => { try { return new URLSearchParams(window.location.search).get("a") === "1"; } catch (e) { return false; } })();
@@ -7219,7 +7223,11 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
   const [newSlot, setNewSlot] = useState(null);
   const [cancelId, setCancelId] = useState(null);    // appt pending cancel confirm
 
-  const windowHrs = business.cancelWindowHrs || 24;
+  // Change/cancel window = the notice the owner set in Settings (booking.leadTimeMin, in
+  // minutes). Convert to hours here. Legacy cancelWindowHrs kept as a fallback; default 24.
+  const windowHrs = (business?.booking?.leadTimeMin != null)
+    ? business.booking.leadTimeMin / 60
+    : (business.cancelWindowHrs || 24);
   const digits = (s) => (s || "").replace(/\D/g, "");
   const mine = appts.filter((a) => digits(a.phone) === digits(phone) && a.status !== "cancelled" && a.bookedFor);
   // sort soonest first
@@ -19137,7 +19145,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             return offering.length > 1 && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "22px 0 0" }}>
               {offering.map((p) => { const on = p.id === provId; return (
-                <button key={p.id} onClick={() => setProvId(p.id)} style={{ display: "flex", alignItems: "center", gap: 7, background: on ? "var(--tint)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14.5, fontWeight: on ? 600 : 400 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color || "var(--gold)" }} />{p.name}</button>
+                <button key={p.id} onClick={() => setProvId(p.id)} style={{ display: "flex", alignItems: "center", gap: 7, background: on ? "var(--tint)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: "var(--text)", padding: "9px 16px", borderRadius: 22, fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{p.name}</button>
               ); })}
             </div>
             );
@@ -19212,7 +19220,6 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             <button onClick={() => setOpenSvc(!openSvc)} style={{ width: "100%", background: "none", display: "flex", alignItems: "center", justifyContent: "space-between", color: "var(--text)", textAlign: "left", padding: "26px 0" }}>
               {service ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-                  <span style={{ width: 11, height: 11, borderRadius: "50%", background: hexById(service.color) }} />
                   <div><div style={{ fontSize: 17, fontWeight: 500 }}>{service.name}</div><div style={{ fontSize: 14, color: "var(--sub)" }}>${price} · {dur} min</div></div>
                 </div>
               ) : (
@@ -19225,7 +19232,6 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
                 {services.map((s) => { const on = service && service.id === s.id; return (
                   <button key={s.id} onClick={() => { setService(s); setOpenSvc(false); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "var(--tint)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />
                       <div><div style={{ fontSize: 15.5, fontWeight: on ? 600 : 500 }}>{s.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>${getPrice(s, provId)} · {getDuration(client, s, provId)} min</div></div>
                     </div>
                     {on && <Check size={18} style={{ color: "var(--gold)" }} />}
@@ -19464,7 +19470,6 @@ function ColumnOrderEditor({ providers, setProviders }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {staff.map((p, i) => (
         <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px" }}>
-          <span style={{ width: 11, height: 11, borderRadius: "50%", background: p.color, flexShrink: 0 }} />
           <span style={{ flex: 1, fontSize: 15 }}>{p.name}</span>
           <button onClick={() => move(p.id, -1)} disabled={i === 0} aria-label="Move up" style={{ background: "none", border: "none", padding: "4px 6px", color: i === 0 ? "var(--faint)" : "var(--sub)", opacity: i === 0 ? 0.4 : 1 }}><ChevronUp size={18} /></button>
           <button onClick={() => move(p.id, 1)} disabled={i === staff.length - 1} aria-label="Move down" style={{ background: "none", border: "none", padding: "4px 6px", color: i === staff.length - 1 ? "var(--faint)" : "var(--sub)", opacity: i === staff.length - 1 ? 0.4 : 1 }}><ChevronDown size={18} /></button>
@@ -20173,8 +20178,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 {allStaff.map((p) => {
                   const on = !hidden.includes(p.id);
                   return (
-                    <button key={p.id} onClick={() => toggleStaff(p.id)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? p.color : "var(--border)"}`, background: on ? p.color + "1F" : "transparent", color: on ? "var(--text)" : "var(--faint)", fontSize: 14 }}>
-                      <span style={{ width: 9, height: 9, borderRadius: "50%", background: on ? p.color : "var(--border2)" }} /> {p.name}
+                    <button key={p.id} onClick={() => toggleStaff(p.id)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint)" : "transparent", color: on ? "var(--text)" : "var(--faint)", fontSize: 14 }}>
+                      {p.name}
                     </button>
                   );
                 })}
@@ -20958,6 +20963,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     </div>
   );
   const goldBtn = { width: "100%", background: "var(--gold-grad, var(--gold))", color: "var(--on-gold)", padding: 17, fontSize: 14.5, fontWeight: 600, letterSpacing: 1.5, borderRadius: 16, border: "none", boxShadow: "var(--glow)", cursor: "pointer" };
+  // Mango-style quiet add links (circular + icon, uppercase label) used on the summary.
+  const addLinkStyle = { display: "flex", alignItems: "center", gap: 9, background: "none", border: "none", color: "var(--text2)", fontSize: 13, letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600, cursor: "pointer", padding: "4px 0", fontFamily: FONT_BODY };
+  const addPlusStyle = { width: 22, height: 22, borderRadius: "50%", border: "1.6px solid var(--faint)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
   const startMethod = (m) => {
     setPayErr("");
     setPendingMethod(m);
@@ -20990,27 +20998,50 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   // ---------- 1 · SALE (full screen, editable) ----------
   if (stage === "summary") return screen(
     <>
-      <Header title="Checkout" close onBack={onClose} />
-      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, letterSpacing: "-0.4px" }}>{appt.name || "Walk-in"}</div>
-      <div style={{ fontSize: 13.5, color: "var(--sub)", margin: "5px 0 22px" }}>{liveClient && liveClient.since ? `Client since ${liveClient.since}` : (provider ? `With ${provider.name}` : "")}</div>
-      {lines.map((l) => (
-        <div key={l.id} style={{ borderTop: "1px solid var(--line)", padding: "16px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+      {/* top bar — Mango-style: close · CHECKOUT · Pay */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 44, marginBottom: 8 }}>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text)", padding: 4, cursor: "pointer", width: 44, textAlign: "left" }}><X size={19} /></button>
+        <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>Checkout</span>
+        <button onClick={() => { if ((reopen ? balance : subtotal) > 0) { setPayErr(""); setStage("method"); } }} disabled={(reopen ? balance : subtotal) <= 0} style={{ background: "none", border: "none", color: (reopen ? balance : subtotal) > 0 ? "var(--gold)" : "var(--faint)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: (reopen ? balance : subtotal) > 0 ? "pointer" : "default", padding: 4, width: 44, textAlign: "right" }}>Pay</button>
+      </div>
+
+      {/* client header — avatar · name · client since */}
+      <div style={{ display: "flex", alignItems: "center", gap: 13, padding: "4px 0 2px" }}>
+        <Avatar size={52} initial={(appt.name || "?").charAt(0)} photo={liveClient?.photo} color={provider?.color || "var(--gold)"} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>{appt.name || "Walk-in"}</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>{liveClient && liveClient.since ? `Client since ${liveClient.since}` : (provider ? `With ${provider.name}` : "")}</div>
+        </div>
+      </div>
+
+      {lines.map((l) => {
+        const chipVals = l.id === "main" ? [appt.cutLabel, ...(Array.isArray(appt.addonLabels) ? appt.addonLabels : [])].filter(Boolean) : [];
+        return (
+        <div key={l.id} style={{ borderTop: "1px solid var(--line)", marginTop: 16, padding: "16px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 16.5, fontWeight: 500 }}>{l.name}</div>
-            <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 4 }}>{[l.id === "main" ? appt.cutLabel : null, l.withName ? `with ${l.withName}` : (l.id !== "main" ? "Added" : null)].filter(Boolean).join(" · ")}</div>
-            <div style={{ marginTop: 6, display: "flex", gap: 14 }}>
+            <div style={{ fontSize: 16.5, fontWeight: 600 }}>{l.name}</div>
+            {chipVals.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 8 }}>{chipVals.map((c, ci) => <span key={ci} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "6px 10px", fontSize: 12.5, color: "var(--text2)" }}>{c}</span>)}</div>}
+            <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 7 }}>{l.withName ? `with ${l.withName}` : (l.id !== "main" ? "Added" : (provider ? `with ${provider.name}` : ""))}</div>
+            <div style={{ marginTop: 8, display: "flex", gap: 14 }}>
               <button onClick={() => setEditLineId(editLineId === l.id ? null : l.id)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Edit price</button>
               {l.id !== "main" && <button onClick={() => setLines(lines.filter((x) => x.id !== l.id))} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Remove</button>}
             </div>
           </div>
           {editLineId === l.id
             ? <input autoFocus type="number" inputMode="decimal" defaultValue={l.price} onBlur={(e) => { const v = Math.max(0, Number(e.target.value) || 0); setLines(lines.map((x) => x.id === l.id ? { ...x, price: v } : x)); setEditLineId(null); }} onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }} style={{ width: 92, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 10px", color: "var(--text)", fontSize: 16, textAlign: "right", fontFamily: FONT_BODY }} />
-            : <div style={{ fontSize: 16.5, flexShrink: 0 }}>{money(Number(l.price) || 0)}</div>}
+            : <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 500, flexShrink: 0 }}>{money(Number(l.price) || 0)}</div>}
         </div>
-      ))}
-      <div style={{ display: "flex", gap: 10, padding: "16px 0", borderTop: "1px solid var(--line)" }}>
-        <button onClick={() => setAddSheet(addSheet === "service" ? null : "service")} style={{ flex: 1, textAlign: "center", border: "1px solid var(--border)", background: "var(--panel)", borderRadius: 12, padding: 13, fontSize: 14, color: "var(--text2)", fontWeight: 500, cursor: "pointer" }}>+ Service</button>
-        <button onClick={() => { setProdName(""); setProdPrice(""); setAddSheet(addSheet === "product" ? null : "product"); }} style={{ flex: 1, textAlign: "center", border: "1px solid var(--border)", background: "var(--panel)", borderRadius: 12, padding: 13, fontSize: 14, color: "var(--text2)", fontWeight: 500, cursor: "pointer" }}>+ Product</button>
+      ); })}
+
+      {/* Mango-style add row */}
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: 26, flexWrap: "wrap" }}>
+          <button onClick={() => setAddSheet(addSheet === "service" ? null : "service")} style={addLinkStyle}><span style={addPlusStyle}><Plus size={12} strokeWidth={2.6} style={{ color: "var(--gold)" }} /></span>Add service</button>
+          <button onClick={() => { setProdName(""); setProdPrice(""); setAddSheet(addSheet === "product" ? null : "product"); }} style={addLinkStyle}><span style={addPlusStyle}><Plus size={12} strokeWidth={2.6} style={{ color: "var(--gold)" }} /></span>Add product</button>
+        </div>
+        {!reopen && <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+          <button onClick={() => setShowDiscPick(true)} style={addLinkStyle}><span style={addPlusStyle}><Plus size={12} strokeWidth={2.6} style={{ color: "var(--gold)" }} /></span>{checkoutDiscount ? "Discount" : "More"}</button>
+        </div>}
       </div>
       {addSheet === "service" && (
         <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16, maxHeight: 280, overflowY: "auto" }}>
@@ -21074,30 +21105,18 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           <span>Paid earlier</span><span>−{money(alreadyPaid)}</span>
         </div>
       )}
-      {!reopen && (
-        <div style={{ borderTop: "1px solid var(--line)", padding: "14px 2px 0" }}>
-          {checkoutDiscount ? (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 14.5 }}>
-              <button onClick={() => setShowDiscPick(true)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 14.5, fontWeight: 600, cursor: "pointer", padding: 0, textAlign: "left" }}>{checkoutDiscount.name} · change</button>
-              <span style={{ color: "var(--gold)" }}>−{money(discountAmt)}</span>
-            </div>
-          ) : (
-            <button onClick={() => setShowDiscPick(true)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", padding: 0, textDecoration: "underline", textUnderlineOffset: 3, fontFamily: FONT_BODY }}>+ Add a discount</button>
-          )}
+      {!reopen && checkoutDiscount && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", padding: "14px 2px 0", fontSize: 14.5 }}>
+          <button onClick={() => setShowDiscPick(true)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 14.5, fontWeight: 600, cursor: "pointer", padding: 0, textAlign: "left" }}>{checkoutDiscount.name} · change</button>
+          <span style={{ color: "var(--gold)" }}>−{money(discountAmt)}</span>
         </div>
       )}
       {showDiscPick && <DiscountPicker discounts={business?.discounts || []} current={checkoutDiscount} onPick={setCheckoutDiscount} onClose={() => setShowDiscPick(false)} />}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: reopen ? "none" : "1px solid var(--line)", padding: reopen ? "10px 2px 16px" : "18px 2px 16px" }}>
-        <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{reopen ? "Balance due" : "Total"}</span>
-        <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500 }}>{money(reopen ? balance : subtotal)}</span>
+      {/* Foot: Mango shows a running Subtotal here; the pay action lives in the top-right "Pay". */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", marginTop: 14, padding: "16px 2px 8px" }}>
+        <span style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{reopen ? "Balance due" : "Subtotal"}</span>
+        <span style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500 }}>{money(reopen ? balance : subtotal)}</span>
       </div>
-      {reopen ? (
-        <button className="lift" disabled={balance <= 0} onClick={() => { setPayErr(""); setStage("method"); }} style={{ ...goldBtn, opacity: balance <= 0 ? 0.45 : 1 }}>{balance > 0 ? `CHARGE BALANCE — ${money(balance)}` : "NOTHING OWED"}</button>
-      ) : (<>
-        {/* Card is the 99% path — go straight to it (tip comes next). Other methods sit one tap behind. */}
-        <button className="lift" onClick={() => startMethod("card")} style={goldBtn}>{`PAY BY CARD — ${money(subtotal)}`}</button>
-        <button onClick={() => { setPayErr(""); setStage("method"); }} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: "15px 0 2px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, fontFamily: FONT_BODY }}>Other ways to pay</button>
-      </>)}
     </>);
 
   // ---------- 2 · METHOD ----------
@@ -21117,12 +21136,14 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           ...(IS_NATIVE ? [{ id: "tap", t: "Tap to Pay", s: "Tap the client's card or phone to this iPhone", dis: !liveMode }] : []),
           { id: "card", t: "Card reader", s: "Tap, chip, or key in", dis: !liveMode },
           { id: "cof", t: "Card on file", s: cofCard ? `${(cofCard.brand || "Card").charAt(0).toUpperCase() + (cofCard.brand || "card").slice(1)} ··${cofCard.last4}${scOn ? ` · +${scPct}% card fee` : ""}` : "No card saved", dis: !liveMode || !cofCard },
+          // Gift cards — the option is shown now (with a "coming soon" note); redemption is wired later.
+          { id: "giftcard", t: "Gift card", s: "Pay with a gift card balance", dis: true, soon: true },
           // Owner-configured manual methods (Settings → Checkout); card-equivalents excluded since the
           // reader / card-on-file rows above cover them. Falls back to Cash if none set.
           ...(((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^card( on file)?$/i.test(s)).map((label) => ({ id: "m:" + label, t: label, s: "Mark as paid", dis: false }))),
         ].map((m) => (
           <button key={m.id} disabled={m.dis || payBusy} onClick={() => startMethod(m.id)} className={m.dis ? "" : "lift"} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "21px 20px", color: "var(--text)", textAlign: "left", opacity: m.dis ? 0.45 : 1, cursor: m.dis ? "default" : "pointer", boxShadow: "var(--shadow-sm)" }}>
-            <span><span style={{ display: "block", fontSize: 17, fontWeight: 600 }}>{m.t}</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{m.s}</span></span>
+            <span><span style={{ display: "block", fontSize: 17, fontWeight: 600 }}>{m.t}{m.soon && <span style={{ fontWeight: 500, fontSize: 13.5, color: "var(--faint)", marginLeft: 8 }}>(coming soon)</span>}</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{m.s}</span></span>
             {!m.dis && <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />}
           </button>
         ))}
@@ -21756,8 +21777,15 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
   const [done, setDone] = useState(null); // { amount, method, change }
   const [onfileBusy, setOnfileBusy] = useState(false);
   const [onfileErr, setOnfileErr] = useState("");
+  // Stepped flow that mirrors the appointment checkout: build → method → tip → (tapPay) → done.
+  const [stage, setStage] = useState("build");
+  const [pendingMethod, setPendingMethod] = useState(null);
+  const [tipPct, setTipPct] = useState(null);
+  const [customTip, setCustomTip] = useState(null);
+  const [tapStatus, setTapStatus] = useState("");
+  const [payErr, setPayErr] = useState("");
 
-  useEffect(() => { if (open) { setItems([]); setDiscount(""); setCustomOpen(false); setCName(""); setCPrice(""); setPayMode(null); setTendered(""); setClient(null); setClientPick(false); setClientQuery(""); setDone(null); setOnfileBusy(false); setOnfileErr(""); } }, [open]);
+  useEffect(() => { if (open) { setItems([]); setDiscount(""); setCustomOpen(false); setCName(""); setCPrice(""); setPayMode(null); setTendered(""); setClient(null); setClientPick(false); setClientQuery(""); setDone(null); setOnfileBusy(false); setOnfileErr(""); setStage("build"); setPendingMethod(null); setTipPct(null); setCustomTip(null); setTapStatus(""); setPayErr(""); } }, [open]);
 
   // A client can put a card on file by booking online moments before staff rings them up, so the
   // dashboard's clients list (loaded at app start, no realtime) may not carry it yet — which showed
@@ -21790,11 +21818,17 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
   const gross = items.reduce((s, x) => s + x.price * x.qty, 0);
   const disc = Math.min(gross, Math.max(0, parseFloat(String(discount).replace(/[^0-9.]/g, "")) || 0));
   const total = Math.round((gross - disc) * 100) / 100;
-  const changeDue = Math.max(0, Math.round(((parseFloat(String(tendered).replace(/[^0-9.]/g, "")) || 0) - total) * 100) / 100);
+  const liveMode = business?.payments?.live === true;
+  // Tip step mirrors the appointment checkout so the register rings up the same way.
+  const tipCfg = business?.tipping || { enabled: true, presets: [18, 20, 25], allowCustom: true, allowNoTip: true, smartDefault: 20 };
+  const tipAmt = !tipCfg.enabled ? 0 : (customTip != null ? Math.max(0, Math.round((Number(customTip) || 0) * 100) / 100) : Math.round(total * ((tipPct ?? 0) / 100) * 100) / 100);
+  const chargeTotal = Math.round((total + tipAmt) * 100) / 100;
+  const changeDue = Math.max(0, Math.round(((parseFloat(String(tendered).replace(/[^0-9.]/g, "")) || 0) - chargeTotal) * 100) / 100);
+  const goldBtn = { width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 14.5, fontWeight: 600, letterSpacing: 1.5, borderRadius: 16, border: "none", boxShadow: "var(--shadow-sm)", cursor: "pointer" };
 
   const recordSale = (extra) => {
     const sale = {
-      id: "sale_" + Date.now().toString(36), ts: Date.now(), amount: total, gross, discount: disc,
+      id: "sale_" + Date.now().toString(36), ts: Date.now(), amount: chargeTotal, tip: tipAmt, gross, discount: disc,
       items: items.map((x) => ({ name: x.name, price: x.price, qty: x.qty })),
       status: "paid", refunded: 0, type: "sale",
       clientId: client?.id || null, clientName: client?.name || "Walk-in",
@@ -21807,18 +21841,44 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
 
   const completeCash = () => {
     recordSale({ method: "cash" });
-    setDone({ amount: total, method: "cash", change: changeDue });
-    showToast(`Sale recorded — ${fm(total)} cash.`);
+    setDone({ amount: chargeTotal, method: "cash", change: changeDue });
+    showToast(`Sale recorded — ${fm(chargeTotal)} cash.`);
   };
   // The owner's manual "mark as paid" methods (Settings → Checkout). Cash gets the tendered/change
   // sheet; the rest (Venmo, Zelle, …) just record the sale under that label.
   // Exclude card-equivalents — the dedicated card reader / card-on-file buttons already cover those.
   const manualMethods = (((business && business.checkout && business.checkout.customMethods) || ["Cash"]).map((s) => String(s).trim()).filter(Boolean).filter((s) => !/^card( on file)?$/i.test(s)));
-  const payManual = (label) => {
-    if (String(label).toLowerCase() === "cash") { setTendered(String(total)); setPayMode("cash"); return; }
+  const runTapToPay = async () => {
+    setPayErr(""); setTapStatus("Starting…");
+    try {
+      await ensureFreshSession();
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess && sess.session && sess.session.access_token;
+      const res = await tapToPayCharge({ amount: chargeTotal, description: `Vero sale — ${client?.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
+      recordSale({ method: "card", paymentIntentId: (res && res.id) || null });
+      setDone({ amount: chargeTotal, method: "card", change: 0 });
+      showToast(`Charged ${fm(chargeTotal)} to card.`);
+    } catch (e) {
+      setPayErr((e && e.message) || "Tap to Pay didn't complete. Try again or pick another way.");
+    }
+  };
+  const executeMethod = (m) => {
+    if (m === "tap") { setStage("tapPay"); runTapToPay(); return; }
+    if (m === "card") { setPayMode("card"); return; }
+    if (m === "onfile") { setPayMode("onfile"); return; }
+    const label = m && m.startsWith("m:") ? m.slice(2) : m;
+    if (String(label).toLowerCase() === "cash") { setTendered(String(chargeTotal)); setPayMode("cash"); return; }
     recordSale({ method: label });
-    setDone({ amount: total, method: label, change: 0 });
-    showToast(`Sale recorded — ${fm(total)} · ${label}.`);
+    setDone({ amount: chargeTotal, method: label, change: 0 });
+    showToast(`Sale recorded — ${fm(chargeTotal)} · ${label}.`);
+  };
+  const startMethod = (m) => {
+    setPayErr("");
+    setPendingMethod(m);
+    if (tipCfg.enabled) {
+      setTipPct((p) => (p == null ? (tipCfg.smartDefault ?? (tipCfg.presets && tipCfg.presets[0]) ?? 20) : p));
+      setStage("tip");
+    } else { executeMethod(m); }
   };
 
   const matches = clientQuery.trim()
@@ -21834,100 +21894,179 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
           <div style={{ fontSize: 14.5, color: "var(--sub)" }}>{done.method === "cash" ? "Cash" : done.method === "card" ? "Card" : done.method}{client ? ` · ${client.name}` : ""}</div>
           {done.method === "cash" && done.change > 0 && <div style={{ fontSize: 18, color: "var(--text)", marginTop: 14, fontWeight: 600 }}>Change due: {fm(done.change)}</div>}
           <div style={{ display: "flex", gap: 10, marginTop: 28 }}>
-            <button onClick={() => { setItems([]); setDiscount(""); setPayMode(null); setTendered(""); setClient(null); setDone(null); }} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border2)", color: "var(--text)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14 }}>NEW SALE</button>
+            <button onClick={() => { setItems([]); setDiscount(""); setPayMode(null); setTendered(""); setClient(null); setDone(null); setStage("build"); setPendingMethod(null); setTipPct(null); setCustomTip(null); setPayErr(""); }} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border2)", color: "var(--text)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14 }}>NEW SALE</button>
             <button onClick={onClose} style={{ flex: 1, background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, border: "none" }}>DONE</button>
           </div>
         </div>
       ) : (
         <div style={{ padding: "2px 2px 12px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500 }}>New sale</div>
-            <button onClick={onClose} style={{ background: "var(--panel2)", border: "1px solid var(--border)", width: 38, height: 38, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={18} /></button>
-          </div>
-
-          {/* quick add */}
-          <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>QUICK ADD</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-            {services.slice(0, 8).map((s) => (
-              <button key={s.id} onClick={() => addItem(s.name, s.price)} style={{ background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 11, padding: "9px 13px", fontSize: 13.5, color: "var(--text)", display: "flex", alignItems: "center", gap: 7 }}>
-                <Plus size={13} strokeWidth={2.5} style={{ color: "var(--gold)" }} /> {s.name} <span style={{ color: "var(--sub)" }}>{fm(s.price)}</span>
-              </button>
-            ))}
-            <button onClick={() => setCustomOpen((v) => !v)} style={{ background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 11, padding: "9px 13px", fontSize: 13.5, color: "var(--text)" }}>+ Custom item</button>
-          </div>
-
-          {customOpen && (
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-              <input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Item name" style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "11px 13px", fontSize: 14.5, color: "var(--text)" }} />
-              <input value={cPrice} onChange={(e) => setCPrice(e.target.value)} inputMode="decimal" placeholder="$" style={{ width: 80, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "11px 13px", fontSize: 14.5, color: "var(--text)" }} />
-              <button onClick={() => { if (cName.trim() && parseFloat(cPrice) > 0) { addItem(cName.trim(), parseFloat(cPrice)); setCName(""); setCPrice(""); setCustomOpen(false); } }} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "0 16px", fontSize: 14, fontWeight: 600 }}>Add</button>
-            </div>
-          )}
-
-          {/* cart */}
-          {items.length === 0 ? (
-            <div style={{ textAlign: "center", color: "var(--sub)", padding: "26px 10px", fontSize: 14.5, background: "var(--panel2)", borderRadius: 14, marginBottom: 16 }}>Tap an item above to start the sale.</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-              {items.map((x) => (
-                <div key={x.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14.5, fontWeight: 500 }}>{x.name}</div>
-                    <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{fm(x.price)} each</div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <button onClick={() => setQty(x.id, -1)} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--text)", fontSize: 16, lineHeight: 1 }}>–</button>
-                    <span style={{ minWidth: 18, textAlign: "center", fontSize: 14.5, fontWeight: 600 }}>{x.qty}</span>
-                    <button onClick={() => setQty(x.id, 1)} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--text)", fontSize: 16, lineHeight: 1 }}>+</button>
-                  </div>
-                  <div style={{ minWidth: 56, textAlign: "right", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500 }}>{fm(x.price * x.qty)}</div>
-                  <button onClick={() => removeItem(x.id)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 2 }}><Trash2 size={15} /></button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {items.length > 0 && (
+          {/* ============ BUILD (cart) ============ */}
+          {stage === "build" && (
             <>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 2px", marginBottom: 6 }}>
-                <span style={{ fontSize: 14, color: "var(--sub)" }}>Discount</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ color: "var(--sub)" }}>$</span>
-                  <input value={discount} onChange={(e) => setDiscount(e.target.value)} inputMode="decimal" placeholder="0" style={{ width: 70, textAlign: "right", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 10px", fontSize: 14.5, color: "var(--text)" }} />
-                </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500 }}>New sale</div>
+                <button onClick={onClose} style={{ background: "var(--panel2)", border: "1px solid var(--border)", width: 38, height: 38, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={18} /></button>
               </div>
-              <button onClick={() => setClientPick(true)} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: "6px 2px", color: client ? "var(--text)" : "var(--sub)", fontSize: 14, display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <User size={15} style={{ color: "var(--gold)" }} /> {client ? client.name : "Attach a client (optional)"}{client && <span onClick={(e) => { e.stopPropagation(); setClient(null); }} style={{ marginLeft: "auto", color: "var(--faint)" }}><X size={15} /></span>}
+
+              {/* client — always available at the top, before or without items */}
+              <button onClick={() => setClientPick(true)} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "12px 14px", color: client ? "var(--text)" : "var(--sub)", fontSize: 14.5, display: "flex", alignItems: "center", gap: 9, marginBottom: 18 }}>
+                <User size={16} style={{ color: "var(--gold)" }} /> {client ? client.name : "Attach a client (optional)"}{client && <span onClick={(e) => { e.stopPropagation(); setClient(null); }} style={{ marginLeft: "auto", color: "var(--faint)" }}><X size={15} /></span>}
               </button>
 
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--border)", paddingTop: 14, marginBottom: 16 }}>
-                <span style={{ fontSize: 15, fontWeight: 600 }}>Total</span>
-                <span style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500 }}>{fm(total)}</span>
+              {/* quick add */}
+              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>QUICK ADD</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+                {services.slice(0, 8).map((s) => (
+                  <button key={s.id} onClick={() => addItem(s.name, s.price)} style={{ background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 11, padding: "9px 13px", fontSize: 13.5, color: "var(--text)", display: "flex", alignItems: "center", gap: 7 }}>
+                    <Plus size={13} strokeWidth={2.5} style={{ color: "var(--gold)" }} /> {s.name} <span style={{ color: "var(--sub)" }}>{fm(s.price)}</span>
+                  </button>
+                ))}
+                <button onClick={() => setCustomOpen((v) => !v)} style={{ background: "var(--panel2)", border: "1px dashed var(--border2)", borderRadius: 11, padding: "9px 13px", fontSize: 13.5, color: "var(--text)" }}>+ Custom item</button>
               </div>
 
-              {(() => {
-                const oc = client && (client.card || client.savedCard);
-                const ocPm = oc && (oc.paymentMethodId || oc.pmId);
-                const ocCust = oc && oc.stripeCustomerId;
-                if (!oc || !ocPm || !ocCust) return null;
-                return (
-                  <button onClick={() => setPayMode("onfile")} disabled={total <= 0} style={{ width: "100%", marginBottom: 10, background: "var(--panel)", border: "1px solid var(--text)", color: "var(--text)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: total <= 0 ? 0.5 : 1 }}><CreditCard size={16} /> {(oc.brand ? oc.brand.charAt(0).toUpperCase() + oc.brand.slice(1) : "Card")} ···· {oc.last4 || "••••"} ON FILE</button>
-                );
-              })()}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                {manualMethods.map((label) => (
-                  <button key={label} onClick={() => payManual(label)} disabled={total <= 0} style={{ flex: "1 1 28%", minWidth: 92, background: "var(--panel)", border: "1px solid var(--border2)", color: "var(--text)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: total <= 0 ? 0.5 : 1 }}>{String(label).toLowerCase() === "cash" && <DollarSign size={16} style={{ color: "var(--gold)" }} />} {label.toUpperCase()}</button>
-                ))}
-                <button onClick={() => setPayMode("card")} disabled={total <= 0} style={{ flex: "1 1 28%", minWidth: 92, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: total <= 0 ? 0.5 : 1 }}><CreditCard size={16} /> {(client && (client.card || client.savedCard)) ? "NEW CARD" : "CARD"}</button>
-              </div>
+              {customOpen && (
+                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                  <input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Item name" style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "11px 13px", fontSize: 14.5, color: "var(--text)" }} />
+                  <input value={cPrice} onChange={(e) => setCPrice(e.target.value)} inputMode="decimal" placeholder="$" style={{ width: 80, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "11px 13px", fontSize: 14.5, color: "var(--text)" }} />
+                  <button onClick={() => { if (cName.trim() && parseFloat(cPrice) > 0) { addItem(cName.trim(), parseFloat(cPrice)); setCName(""); setCPrice(""); setCustomOpen(false); } }} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "0 16px", fontSize: 14, fontWeight: 600 }}>Add</button>
+                </div>
+              )}
+
+              {/* cart */}
+              {items.length === 0 ? (
+                <div style={{ textAlign: "center", color: "var(--sub)", padding: "26px 10px", fontSize: 14.5, background: "var(--panel2)", borderRadius: 14, marginBottom: 16 }}>Tap an item above to start the sale.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+                  {items.map((x) => (
+                    <div key={x.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14.5, fontWeight: 500 }}>{x.name}</div>
+                        <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{fm(x.price)} each</div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <button onClick={() => setQty(x.id, -1)} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--text)", fontSize: 16, lineHeight: 1 }}>–</button>
+                        <span style={{ minWidth: 18, textAlign: "center", fontSize: 14.5, fontWeight: 600 }}>{x.qty}</span>
+                        <button onClick={() => setQty(x.id, 1)} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--text)", fontSize: 16, lineHeight: 1 }}>+</button>
+                      </div>
+                      <div style={{ minWidth: 56, textAlign: "right", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500 }}>{fm(x.price * x.qty)}</div>
+                      <button onClick={() => removeItem(x.id)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 2 }}><Trash2 size={15} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {items.length > 0 && (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 2px", marginBottom: 6 }}>
+                    <span style={{ fontSize: 14, color: "var(--sub)" }}>Discount</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ color: "var(--sub)" }}>$</span>
+                      <input value={discount} onChange={(e) => setDiscount(e.target.value)} inputMode="decimal" placeholder="0" style={{ width: 70, textAlign: "right", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "7px 10px", fontSize: 14.5, color: "var(--text)" }} />
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--border)", paddingTop: 14, marginBottom: 16 }}>
+                    <span style={{ fontSize: 15, fontWeight: 600 }}>Total</span>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500 }}>{fm(total)}</span>
+                  </div>
+                  <button onClick={() => setStage("method")} disabled={total <= 0} className="lift" style={{ ...goldBtn, opacity: total <= 0 ? 0.5 : 1 }}>{`CHARGE ${fm(total)}`}</button>
+                </>
+              )}
             </>
+          )}
+
+          {/* ============ METHOD ============ */}
+          {stage === "method" && (() => {
+            const cc = client && (client.card || client.savedCard);
+            const ccOk = cc && (cc.paymentMethodId || cc.pmId) && cc.stripeCustomerId;
+            const methods = [
+              ...(IS_NATIVE ? [{ id: "tap", t: "Tap to Pay", s: "Tap the client's card or phone to this iPhone", dis: !liveMode }] : []),
+              { id: "card", t: "Card reader", s: "Tap, chip, or key in", dis: !liveMode },
+              { id: "onfile", t: "Card on file", s: ccOk ? `${cc.brand ? cc.brand.charAt(0).toUpperCase() + cc.brand.slice(1) : "Card"} ··${cc.last4 || "••••"}` : (client ? "No card saved" : "Attach a client first"), dis: !liveMode || !ccOk },
+              { id: "giftcard", t: "Gift card", s: "Pay with a gift card balance", dis: true, soon: true },
+              ...manualMethods.map((label) => ({ id: "m:" + label, t: label, s: "Mark as paid", dis: false })),
+            ];
+            return (
+              <>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <button onClick={() => setStage("build")} style={{ background: "none", border: "none", color: "var(--sub)", padding: 4, display: "flex", alignItems: "center", gap: 4, fontSize: 14 }}><ChevronLeft size={20} /> Back</button>
+                  <button onClick={onClose} style={{ background: "var(--panel2)", border: "1px solid var(--border)", width: 34, height: 34, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={16} /></button>
+                </div>
+                <div style={{ textAlign: "center", margin: "6px 0 26px" }}>
+                  <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Charging</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1 }}>{fm(total)}</div>
+                  {tipCfg.enabled && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 9 }}>{client ? client.name : "Walk-in"} · tip comes next</div>}
+                </div>
+                {!liveMode && <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5 }}>Payments are in test mode — card options are off. Flip Payments to Live in Checkout &amp; money.</div>}
+                {payErr && <div style={{ background: "color-mix(in srgb, #c0392b 10%, var(--panel))", border: "1px solid color-mix(in srgb, #c0392b 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{payErr}</div>}
+                <div style={{ display: "grid", gap: 12 }}>
+                  {methods.map((m) => (
+                    <button key={m.id} disabled={m.dis} onClick={() => startMethod(m.id)} className={m.dis ? "" : "lift"} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, padding: "21px 20px", color: "var(--text)", textAlign: "left", opacity: m.dis ? 0.45 : 1, cursor: m.dis ? "default" : "pointer", boxShadow: "var(--shadow-sm)" }}>
+                      <span><span style={{ display: "block", fontSize: 17, fontWeight: 600 }}>{m.t}{m.soon && <span style={{ fontWeight: 500, fontSize: 13.5, color: "var(--faint)", marginLeft: 8 }}>(coming soon)</span>}</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{m.s}</span></span>
+                      {!m.dis && <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
+
+          {/* ============ TIP ============ */}
+          {stage === "tip" && (
+            <>
+              <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
+                <button onClick={() => setStage("method")} style={{ background: "none", border: "none", color: "var(--sub)", padding: 4, display: "flex", alignItems: "center", gap: 4, fontSize: 14 }}><ChevronLeft size={20} /> Back</button>
+              </div>
+              <div style={{ textAlign: "center", margin: "10px 0 26px" }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: "-0.4px" }}>Add a tip?</div>
+                <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 8 }}>on {fm(total)}{client ? ` · ${client.name}` : ""}</div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(3, (tipCfg.presets || [18, 20, 25]).length)}, 1fr)`, gap: 10 }}>
+                {(tipCfg.presets || [18, 20, 25]).map((p) => { const on = customTip == null && tipPct === p; return (
+                  <button key={p} onClick={() => { setTipPct(p); setCustomTip(null); }} className="lift" style={{ background: on ? "var(--gold)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 18, padding: "22px 0 18px", textAlign: "center", color: on ? "var(--on-gold)" : "var(--text)", cursor: "pointer", boxShadow: "var(--shadow-sm)" }}>
+                    <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 26 }}>{p}%</span>
+                    <span style={{ display: "block", fontSize: 12, color: on ? "var(--on-gold)" : "var(--faint)", marginTop: 5, opacity: on ? 0.75 : 1 }}>{fm(Math.round(total * p) / 100)}</span>
+                  </button>
+                ); })}
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                {tipCfg.allowCustom !== false && (
+                  customTip != null && customTip !== 0
+                    ? <input autoFocus type="number" inputMode="decimal" value={customTip} onChange={(e) => setCustomTip(e.target.value === "" ? 0.01 : Math.max(0, Math.min(100000, Number(e.target.value) || 0)))} style={{ flex: 1, background: "var(--panel2)", border: "1.5px solid var(--gold)", borderRadius: 14, padding: "14px 16px", color: "var(--text)", fontSize: 16, textAlign: "center", fontFamily: FONT_BODY }} />
+                    : <button onClick={() => setCustomTip(0.01)} style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 14, fontSize: 14.5, color: "var(--text2)", fontWeight: 500, cursor: "pointer" }}>Custom amount</button>
+                )}
+                {tipCfg.allowNoTip !== false && <button onClick={() => setCustomTip(0)} style={{ flex: 1, background: "var(--panel)", border: `1px solid ${customTip === 0 ? "var(--gold)" : "var(--border)"}`, borderRadius: 14, padding: 14, fontSize: 14.5, color: customTip === 0 ? "var(--gold)" : "var(--text2)", fontWeight: 500, cursor: "pointer" }}>No tip</button>}
+              </div>
+              <button onClick={() => executeMethod(pendingMethod)} className="lift" style={{ ...goldBtn, marginTop: 20 }}>{`CHARGE ${fm(chargeTotal)}`}</button>
+            </>
+          )}
+
+          {/* ============ TAP TO PAY ============ */}
+          {stage === "tapPay" && (
+            <div style={{ padding: "30px 8px 20px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", minHeight: 320 }}>
+              {payErr ? (
+                <>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 10 }}>That didn't go through</div>
+                  <p style={{ color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5, maxWidth: 320, marginBottom: 22 }}>{payErr}</p>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => runTapToPay()} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 13, padding: "13px 26px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}>Try again</button>
+                    <button onClick={() => { setPayErr(""); setStage("method"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 26px", color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}>Pick another way</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ width: 72, height: 72, borderRadius: "50%", border: "3px solid var(--line)", borderTopColor: "var(--gold)", marginBottom: 24, animation: "spin .8s linear infinite" }} />
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500 }}>{tapStatus || "Getting ready…"}</div>
+                  <p style={{ color: "var(--sub)", fontSize: 14, marginTop: 10, maxWidth: 300, lineHeight: 1.5 }}>Hold the client's card or phone near the top of your iPhone.</p>
+                </>
+              )}
+            </div>
           )}
 
           {/* cash sheet */}
           <Sheet open={payMode === "cash"} onClose={() => setPayMode(null)} align="center" maxWidth={380}>
             <div style={{ padding: "6px 4px 8px", textAlign: "center" }}>
               <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CASH</div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 16 }}>{fm(total)}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 16 }}>{fm(chargeTotal)}</div>
               <div style={{ textAlign: "left", fontSize: 12, letterSpacing: 1, color: "var(--sub)", marginBottom: 6 }}>AMOUNT TENDERED</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "12px 16px", marginBottom: 12 }}>
                 <span style={{ fontFamily: "'Fraunces', serif", fontSize: 24, color: "var(--sub)" }}>$</span>
@@ -21951,27 +22090,27 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
                 if (!ocPm || !ocCust) { setOnfileErr("No card on file for this client."); return; }
                 setOnfileBusy(true); setOnfileErr("");
                 try {
-                  const res = await stripeApi({ action: "charge", customerId: ocCust, paymentMethodId: ocPm, amount: total, description: `Vero sale — ${client?.name || "client"}` });
+                  const res = await stripeApi({ action: "charge", customerId: ocCust, paymentMethodId: ocPm, amount: chargeTotal, description: `Vero sale — ${client?.name || "client"}` });
                   if (res && res.status === "succeeded") {
                     recordSale({ method: "card", onFile: true, brand: oc.brand || null, last4: oc.last4 || null, paymentIntentId: res.id || null });
-                    setOnfileBusy(false); setPayMode(null); setDone({ amount: total, method: "card", change: 0 });
-                    showToast(`Charged ${fm(total)} to ${brand} ···· ${oc.last4}.`);
+                    setOnfileBusy(false); setPayMode(null); setDone({ amount: chargeTotal, method: "card", change: 0 });
+                    showToast(`Charged ${fm(chargeTotal)} to ${brand} ···· ${oc.last4}.`);
                   } else { setOnfileBusy(false); setOnfileErr((res && res.error) || "The charge didn't go through. Try another card."); }
                 } catch (e) { setOnfileBusy(false); setOnfileErr("Couldn't reach the card processor. Try again."); }
               };
               return (
                 <div style={{ padding: "6px 4px 8px", textAlign: "center" }}>
                   <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD ON FILE</div>
-                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 6 }}>{fm(total)}</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 6 }}>{fm(chargeTotal)}</div>
                   <div style={{ fontSize: 14, color: "var(--sub)", marginBottom: 18 }}>{brand} ···· {oc ? oc.last4 : "••••"} · {client?.name}</div>
                   {onfileErr && <div style={{ color: "#B5564B", fontSize: 13, marginBottom: 12 }}>{onfileErr}</div>}
-                  <button disabled={onfileBusy} onClick={chargeOnFile} style={{ width: "100%", background: onfileBusy ? "var(--border2)" : "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", cursor: onfileBusy ? "default" : "pointer" }}>{onfileBusy ? "CHARGING…" : `CHARGE ${fm(total)}`}</button>
+                  <button disabled={onfileBusy} onClick={chargeOnFile} style={{ width: "100%", background: onfileBusy ? "var(--border2)" : "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", cursor: onfileBusy ? "default" : "pointer" }}>{onfileBusy ? "CHARGING…" : `CHARGE ${fm(chargeTotal)}`}</button>
                   <button disabled={onfileBusy} onClick={() => setPayMode(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", cursor: onfileBusy ? "default" : "pointer" }}>Back</button>
                 </div>
               );
             })()}
           </Sheet>
-          <CardSaleSheet open={payMode === "card"} onClose={() => setPayMode(null)} amount={total} description={`Vero sale — ${client?.name || "walk-in"}`} onPaid={(info) => { recordSale({ method: "card", ...info }); setPayMode(null); setDone({ amount: total, method: "card", change: 0 }); showToast(`Charged ${fm(total)} to card.`); }} showToast={showToast} live={business.payments?.live === true} />
+          <CardSaleSheet open={payMode === "card"} onClose={() => setPayMode(null)} amount={chargeTotal} description={`Vero sale — ${client?.name || "walk-in"}`} onPaid={(info) => { recordSale({ method: "card", ...info }); setPayMode(null); setDone({ amount: chargeTotal, method: "card", change: 0 }); showToast(`Charged ${fm(chargeTotal)} to card.`); }} showToast={showToast} live={business.payments?.live === true} />
 
           {/* client picker */}
           <Sheet open={clientPick} onClose={() => setClientPick(false)} align="top" maxWidth={420}>
