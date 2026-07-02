@@ -31,7 +31,17 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 // they're also called from the public booking page, where there is no login.
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const STAFF_ONLY = new Set(["charge", "refund", "connection_token", "terminal_intent"]);
+const STAFF_ONLY = new Set(["charge", "refund", "connection_token", "terminal_intent", "terminal_location"]);
+
+// Tap to Pay on iPhone requires the reader to be tied to a Terminal Location.
+// Resolve one: prefer a pinned env id, else the account's first existing Location.
+// Returns null if the account has none (caller surfaces a clear "create one" error).
+async function terminalLocationId(stripe) {
+  const pinned = process.env.STRIPE_TERMINAL_LOCATION_ID || null;
+  if (pinned) return pinned;
+  const locs = await stripe.terminal.locations.list({ limit: 1 });
+  return locs.data && locs.data.length ? locs.data[0].id : null;
+}
 
 // Reject a bad money amount before it ever reaches Stripe. `amount` is in
 // dollars. It must be a real number, greater than zero, and under a sane
@@ -247,23 +257,29 @@ async function handler(req, res) {
     // "Tap to Pay on iPhone" entitlement + native SDK on the device.
     if (action === "connection_token") {
       // Tap to Pay on iPhone REQUIRES the reader to be tied to a Terminal Location.
-      // The native plugin's connectReader() can't pass a locationId, so the ONLY
-      // place to attach it is here, on the connection token. Without it, the reader
-      // connect / collect hangs after discovery.
-      let locationId = process.env.STRIPE_TERMINAL_LOCATION_ID || null;
+      // Scope the token to one so the native connect doesn't stall. (The client also
+      // passes the same location into discoverReaders — the plugin force-unwraps it.)
+      const locationId = await terminalLocationId(stripe);
       if (!locationId) {
-        // Fall back to the first Location on the account so it works even if the
-        // env var isn't set. (Set STRIPE_TERMINAL_LOCATION_ID in Vercel to pin it.)
-        const locs = await stripe.terminal.locations.list({ limit: 1 });
-        if (!locs.data || !locs.data.length) {
-          return res.status(400).json({
-            error: "No Stripe Terminal Location exists. Create one in the Stripe Dashboard (Terminal → Locations) before using Tap to Pay.",
-          });
-        }
-        locationId = locs.data[0].id;
+        return res.status(400).json({
+          error: "No Stripe Terminal Location exists. Create one in the Stripe Dashboard (Terminal → Locations) before using Tap to Pay.",
+        });
       }
       const ct = await stripe.terminal.connectionTokens.create({ location: locationId });
       return res.status(200).json({ secret: ct.secret, location: locationId });
+    }
+
+    // --- Tap to Pay: which Terminal Location to connect the reader to ----------
+    // The native plugin force-unwraps the locationId passed to discoverReaders, so
+    // the app fetches it here BEFORE discovering. Staff-only; moves no money.
+    if (action === "terminal_location") {
+      const locationId = await terminalLocationId(stripe);
+      if (!locationId) {
+        return res.status(400).json({
+          error: "No Stripe Terminal Location exists. Create one in the Stripe Dashboard (Terminal → Locations) before using Tap to Pay.",
+        });
+      }
+      return res.status(200).json({ location: locationId });
     }
 
     // --- Tap to Pay: card-present PaymentIntent -----------------------------

@@ -20967,6 +20967,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const runTapToPay = async () => {
     setPayErr(""); setTapStatus("Starting…");
     try {
+      await ensureFreshSession(); // iOS freezes the refresh timer when backgrounded — refresh so the staff JWT isn't stale (else /api/stripe 401s and the reader hangs)
       const { data: sess } = await supabase.auth.getSession();
       const token = sess && sess.session && sess.session.access_token;
       const res = await tapToPayCharge({ amount: chargeBase, description: `Vero — ${appt.name || "walk-in"}`, live: liveMode, apiBase: API_BASE, authToken: token, onStatus: setTapStatus });
