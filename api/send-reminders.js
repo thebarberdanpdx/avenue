@@ -33,6 +33,13 @@ async function handler(req, res) {
   const TZ = process.env.SHOP_TZ || "America/Los_Angeles";
   const now = Date.now();
   const HORIZON_MS = 3 * 24 * 60 * 60 * 1000; // look 3 days ahead — covers the 2-day reminder
+  // A reminder only fires within this window AFTER its scheduled send time. If a reminder's send
+  // time is staler than this, the appointment was booked after that reminder's lead window had
+  // already passed (e.g. a same-day booking) — so firing "2 days before" / "1 day before" now would
+  // be a nonsensical same-day catch-up. Skip those; only reminders whose lead time still applies go
+  // out. The window tolerates normal cron cadence / short delays; the appt-in-past guard above still
+  // stops anything from sending after the appointment itself.
+  const CATCHUP_MS = 6 * 60 * 60 * 1000; // 6 hours
 
   let checked = 0, sent = 0, failed = 0;
 
@@ -99,6 +106,7 @@ async function handler(req, res) {
         const off = parseOffsetMinutes(m.timing);
         const sendAt = apptMs - off * 60000;
         if (now < sendAt) continue; // not due yet (appt still future, so it'll catch a later run)
+        if (now - sendAt > CATCHUP_MS) continue; // window already lapsed when booked — don't send a stale, out-of-order reminder
 
         const logId = `${shop.id}__${row.id}__${m.id}`;
         const { data: already } = await supa.from("message_log").select("id").eq("id", logId).maybeSingle();
