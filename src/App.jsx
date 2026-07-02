@@ -4004,6 +4004,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // node between steps and the animation only plays once, on first load).
   const screenKey = [
     "s" + step,
+    cutFlow ? "cf" + cutFlow.phase : "",
     cutPhase,
     showWhoFor ? "who" : "",
     showUsual ? "usual" : "",
@@ -4015,13 +4016,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   ].join("|");
 
   // Horizontal screen transitions: going forward (deeper step) slides the next screen in from the
-  // right; going back slides it in from the left. prevStepRef holds the step before this navigation
-  // (updated in the screenKey effect below), so slideDir is known when the wrapper remounts.
-  const prevStepRef = useRef(step);
-  const slideDir = step < prevStepRef.current ? "back" : "fwd";
+  // right; going back slides it in from the left. flowPos is a monotonic position through the flow —
+  // the cut/add-on screens live "at" step 1 but logically sit between the service picker and step 3,
+  // so they get a fractional offset. That makes service → cut slide forward and "Change" slide back.
+  const flowPos = step + (cutFlow ? (cutFlow.phase === "addons" ? 0.2 : 0.1) : 0);
+  const prevStepRef = useRef(flowPos);
+  const slideDir = flowPos < prevStepRef.current ? "back" : "fwd";
 
   // Scroll to top whenever the user navigates to a new screen so the back button & business name stay visible
-  useEffect(() => { prevStepRef.current = step; try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { window.scrollTo(0, 0); } }, [screenKey]);
+  useEffect(() => { prevStepRef.current = flowPos; try { window.scrollTo({ top: 0, behavior: "instant" }); } catch (e) { window.scrollTo(0, 0); } }, [screenKey]);
 
   // Commits the booking with the resolved phone and email. Called either directly from LOCK IT IN
   // (no conflict) or from the conflict-confirmation sheet (after the user picks which to keep).
