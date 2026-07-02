@@ -19212,7 +19212,6 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             <button onClick={() => setOpenSvc(!openSvc)} style={{ width: "100%", background: "none", display: "flex", alignItems: "center", justifyContent: "space-between", color: "var(--text)", textAlign: "left", padding: "26px 0" }}>
               {service ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-                  <span style={{ width: 11, height: 11, borderRadius: "50%", background: hexById(service.color) }} />
                   <div><div style={{ fontSize: 17, fontWeight: 500 }}>{service.name}</div><div style={{ fontSize: 14, color: "var(--sub)" }}>${price} · {dur} min</div></div>
                 </div>
               ) : (
@@ -19225,7 +19224,6 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
                 {services.map((s) => { const on = service && service.id === s.id; return (
                   <button key={s.id} onClick={() => { setService(s); setOpenSvc(false); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "var(--tint)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: hexById(s.color), flexShrink: 0 }} />
                       <div><div style={{ fontSize: 15.5, fontWeight: on ? 600 : 500 }}>{s.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>${getPrice(s, provId)} · {getDuration(client, s, provId)} min</div></div>
                     </div>
                     {on && <Check size={18} style={{ color: "var(--gold)" }} />}
