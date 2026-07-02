@@ -3510,7 +3510,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // Profile selfie — a photo of the CLIENT for their profile (the $5-off incentive), entirely
   // separate from the reference/inspiration photos above. Becomes client.photo on save.
   const [selfie, setSelfie] = useState(null);
-  const selfieRef = useRef(null);
+  const selfieRef = useRef(null);  // front camera ("take a selfie")
+  const uploadRef = useRef(null);  // photo library ("upload a photo")
   const onSelfiePick = (e) => {
     const file = e.target.files && e.target.files[0]; if (e.target) e.target.value = "";
     if (!file) return;
@@ -4935,7 +4936,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <button onClick={() => { if (req) answerRequired(g, true); else toggleExtra(g); }} style={rowBtn}>
                   {radio(on)}
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Yes{it.name ? ` — ${it.name}` : ""}</span>
+                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>{g.yesLabel || `Yes${it.name ? ` — ${it.name}` : ""}`}</span>
                     {it.desc && (
                       <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
                         <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>
@@ -4947,7 +4948,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 {req && (
                   <button onClick={() => answerRequired(g, false)} style={rowBtn}>
                     {radio(declined)}
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 15.5, fontWeight: 500 }}>No thanks</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 15.5, fontWeight: 500 }}>{g.noLabel || "No thanks"}</span>
                   </button>
                 )}
               </div>
@@ -5038,8 +5039,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <div style={{ textAlign: "center", fontSize: 13.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text2)", fontWeight: 600, marginTop: 12 }}>{priceLabel}</div>
                     {desc ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 15, lineHeight: 1.55, color: "var(--sub)", fontWeight: 400, textAlign: "center", maxWidth: 300, margin: "16px auto 0" }}>{desc}</div> : null}
                     <div style={{ display: "flex", gap: 10, marginTop: 26 }}>
-                      <button onClick={() => answerAddon(group, false)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>No thanks</button>
-                      <button onClick={() => answerAddon(group, true)} style={{ flex: 1.2, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Yes, please</button>
+                      <button onClick={() => answerAddon(group, false)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>{group.noLabel || "No thanks"}</button>
+                      <button onClick={() => answerAddon(group, true)} style={{ flex: 1.2, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>{group.yesLabel || "Yes, please"}</button>
                     </div>
                   </>
                 )}
@@ -6454,23 +6455,28 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 inspiration photo / note moved to the post-booking "You're in" screen (less on this page). */}
             {!(matched && matched.photo) && (
               <div style={{ background: "var(--panel)", border: `1px solid ${selfie ? "var(--gold)" : "var(--border)"}`, borderRadius: 16, padding: "18px", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
+                {/* two pickers: camera (front) vs photo library — same handler */}
                 <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
+                <input ref={uploadRef} type="file" accept="image/*" onChange={onSelfiePick} style={{ display: "none" }} />
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <button onClick={() => { if (!selfie && selfieRef.current) selfieRef.current.click(); }} style={{ position: "relative", width: 60, height: 60, borderRadius: "50%", flexShrink: 0, border: `2px ${selfie ? "solid" : "dashed"} ${selfie ? "var(--gold)" : "var(--border2)"}`, background: "var(--panel2)", overflow: "hidden", cursor: "pointer", padding: 0 }}>
+                  <button onClick={() => { if (!selfie && uploadRef.current) uploadRef.current.click(); }} style={{ position: "relative", width: 60, height: 60, borderRadius: "50%", flexShrink: 0, border: `2px ${selfie ? "solid" : "dashed"} ${selfie ? "var(--gold)" : "var(--border2)"}`, background: "var(--panel2)", overflow: "hidden", cursor: "pointer", padding: 0 }}>
                     {selfie ? <img src={selfie} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={22} style={{ color: "var(--faint)" }} />}
                   </button>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, lineHeight: 1.2 }}>Add a profile photo — save $5</div>
-                    <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{selfie ? "Looking good — $5 comes off this visit." : <>A quick <b style={{ color: "var(--text)" }}>selfie of you</b> so {provider.name === "Anyone" ? "your barber" : provider.name} knows who to expect. It's your profile photo — <b style={{ color: "var(--text)" }}>not a haircut example.</b></>}</div>
+                    <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{selfie ? "Looking good — $5 comes off this visit." : <>We like to have a face to the name. <b style={{ color: "var(--text)" }}>Upload a photo of yourself or take a selfie!</b></>}</div>
                   </div>
                 </div>
                 {selfie ? (
                   <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-                    <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border2)", color: "var(--text)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Retake</button>
+                    <button onClick={() => uploadRef.current && uploadRef.current.click()} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border2)", color: "var(--text)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Change photo</button>
                     <button onClick={() => setSelfie(null)} style={{ flex: 1, background: "none", border: "1px solid var(--border2)", color: "var(--sub)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Remove</button>
                   </div>
                 ) : (
-                  <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ width: "100%", marginTop: 14, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Camera size={16} /> Take a selfie &amp; save $5</button>
+                  <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                    <button onClick={() => uploadRef.current && uploadRef.current.click()} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border2)", color: "var(--text)", padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><ImageIcon size={16} /> Upload a photo</button>
+                    <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Camera size={16} /> Take a selfie</button>
+                  </div>
                 )}
               </div>
             )}
@@ -10854,7 +10860,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const [picker, setPicker] = useState(null); // {target}
   const [stylePriceOpen, setStylePriceOpen] = useState({}); // {providerId: bool} — per-barber "prices per style" expander in Staff & pricing
   const [addonTimeOpen, setAddonTimeOpen] = useState({}); // {providerId: bool} — per-barber "add-on times" expander in Staff & pricing
-  const [answerTimeOpen, setAnswerTimeOpen] = useState({}); // {providerId: bool} — per-barber "question prices & times" expander
+  const [answerTimeOpen, setAnswerTimeOpen] = useState({}); // {groupId: bool} — "prices & times per barber" expander on library question/add-on rows
   const [editStyleId, setEditStyleId] = useState(null); // cut-styles drill: which style's own screen is open (null = the list)
   const [editMode, setEditMode] = useState(false); // list view: browse vs manage (reorder/delete/rename)
   const [catSheet, setCatSheet] = useState(false); // category manager sheet (add / rename / reorder / delete)
@@ -11440,14 +11446,75 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           // Tapping jumps to the item's editor in the master Questions / Add-ons tab (edits live
           // only there); the service editor closes so back lands on the hub, not a stale form.
           const jump = () => { setEditing(null); setSection(null); setLibJump(gid.slice(isQ ? 5 : 4)); setMenuTab(isQ ? "questions" : "addons"); };
+          /* per-barber-pricing-lock: library questions & add-ons keep per-barber price & time
+             overrides IN THE SERVICE EDITOR (staff[pid].answerPrice/answerDur[gid][optId] and
+             staff[pid].addonPrice/addonDur[gid]) — this regressed once when library groups became
+             read-only rows; ship-check fails the deploy if this block disappears. */
+          const it = g.item || {};
+          const pbOpen = !!answerTimeOpen[gid];
+          const pbMoney = (val, ph, onCh) => (
+            <div style={{ ...G_BOX_ON("var(--panel2)"), flex: 1, minWidth: 0, marginBottom: 0, display: "flex", alignItems: "center", padding: "10px 12px" }}>
+              <span style={{ color: "var(--sub)", fontSize: 15, marginRight: 3 }}>$</span>
+              <input type="number" inputMode="decimal" value={val} placeholder={ph} onChange={(ev) => onCh(ev.target.value === "" ? null : ev.target.value)} style={{ ...G_INPUT, minWidth: 0, fontSize: 15 }} />
+            </div>
+          );
+          const pbMin = (val, ph, onCh) => (
+            <div style={{ ...G_BOX_ON("var(--panel2)"), flex: 1, minWidth: 0, marginBottom: 0, display: "flex", alignItems: "center", padding: "10px 12px" }}>
+              <input type="number" inputMode="numeric" value={val} placeholder={ph} onChange={(ev) => onCh(ev.target.value === "" ? null : ev.target.value)} style={{ ...G_INPUT, minWidth: 0, fontSize: 15 }} />
+              <span style={{ color: "var(--sub)", fontSize: 13, marginLeft: 3 }}>min</span>
+            </div>
+          );
           return (
-            <button key={g.id} onClick={jump} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", marginBottom: 12, textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{label}</span>
-                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{sub} · tap to edit</span>
-              </span>
-              <ChevronRight size={17} style={{ color: "var(--faint)", flexShrink: 0 }} />
-            </button>
+            <div key={g.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, marginBottom: 12, overflow: "hidden" }}>
+              <button onClick={jump} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", padding: "14px 16px", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{label}</span>
+                  <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{sub} · tap to edit</span>
+                </span>
+                <ChevronRight size={17} style={{ color: "var(--faint)", flexShrink: 0 }} />
+              </button>
+              {staffList.length > 0 && (
+                <div style={{ borderTop: "1px solid var(--line)" }}>
+                  <button onClick={() => setAnswerTimeOpen((m) => ({ ...m, [gid]: !pbOpen }))} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "none", border: "none", padding: "12px 16px", cursor: "pointer", color: "var(--text)" }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>Prices &amp; times per barber</span>
+                    <ChevronDown size={16} style={{ color: "var(--faint)", transform: pbOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+                  </button>
+                  {pbOpen && (
+                    <div style={{ padding: "0 16px 14px" }}>
+                      {isQ ? (g.options || []).map((o) => (
+                        <div key={o.id} style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--sub)", margin: "4px 0 8px" }}>{o.label || "Answer"}</div>
+                          {staffList.map((p) => {
+                            const se = form.staff[p.id] || {};
+                            const pv = (se.answerPrice && se.answerPrice[gid] && se.answerPrice[gid][o.id] != null) ? se.answerPrice[gid][o.id] : "";
+                            const dv = (se.answerDur && se.answerDur[gid] && se.answerDur[gid][o.id] != null) ? se.answerDur[gid][o.id] : "";
+                            return (
+                              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+                                <span style={{ width: 62, flexShrink: 0, fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(p.name || "").split(" ")[0]}</span>
+                                {pbMoney(pv, String(Number(o.price) || 0), (v) => setStaffAnswerPrice(p.id, gid, o.id, v))}
+                                {pbMin(dv, String(Number(o.min) || 0), (v) => setStaffAnswerDur(p.id, gid, o.id, v))}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )) : staffList.map((p) => {
+                        const se = form.staff[p.id] || {};
+                        const pv = (se.addonPrice && se.addonPrice[gid] != null) ? se.addonPrice[gid] : "";
+                        const dv = (se.addonDur && se.addonDur[gid] != null) ? se.addonDur[gid] : "";
+                        return (
+                          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+                            <span style={{ width: 62, flexShrink: 0, fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(p.name || "").split(" ")[0]}</span>
+                            {pbMoney(pv, String(Number(it.price) || 0), (v) => setStaffAddonPrice(p.id, gid, v))}
+                            {pbMin(dv, String(Number(it.min) || 0), (v) => setStaffAddonDur(p.id, gid, v))}
+                          </div>
+                        );
+                      })}
+                      <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.4, margin: "2px 0 0" }}>Blank uses the standard price &amp; time. These overrides are just for this service.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           );
         }
         // Reorder only swaps a group with its nearest SAME-KIND neighbour (questions render before
@@ -16919,7 +16986,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
     if (item) { setForm(JSON.parse(JSON.stringify(item))); setEditing(item.id); }
     onOpened && onOpened();
   }, [openId]);
-  const blank = () => ({ id: "ao-" + Date.now(), name: "", price: "", extraMin: "", desc: "", photo: "", required: false, services: [] });
+  const blank = () => ({ id: "ao-" + Date.now(), name: "", price: "", extraMin: "", desc: "", photo: "", required: false, services: [], yesLabel: "", noLabel: "" });
   const svcList = (services || []);
   const svcName = (id) => (svcList.find((s) => s.id === id) || {}).name || id;
 
@@ -16928,6 +16995,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
       const keep = (s.addonGroups || []).filter((g) => !String(g.id || "").startsWith("lib-"));
       const mine = nextLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({
         id: "lib-" + a.id, type: "addon", label: a.name, photo: a.photo || "", required: !!a.required,
+        yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(),
         item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 },
       }));
       return { ...s, addonGroups: [...keep, ...mine] };
@@ -16991,6 +17059,13 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
 
         <div style={aoSectionLbl}>Description</div>
         <textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} placeholder="What the client gets — shown while they book." rows={3} style={{ ...aoInp, resize: "vertical", minHeight: 84, lineHeight: 1.55 }} />
+
+        <div style={aoSectionLbl}>Responses</div>
+        <div style={{ display: "grid", gap: 10 }}>
+          <input value={form.yesLabel || ""} onChange={(e) => setForm({ ...form, yesLabel: e.target.value })} placeholder={`Yes — ${form.name || "add it"}`} style={aoInp} />
+          <input value={form.noLabel || ""} onChange={(e) => setForm({ ...form, noLabel: e.target.value })} placeholder="No thanks" style={aoInp} />
+        </div>
+        <p style={{ fontSize: 12.5, color: "var(--faint)", fontStyle: "italic", margin: "8px 2px 0", lineHeight: 1.45 }}>What clients tap while booking. Leave blank to use the standard wording shown above.</p>
 
         <div style={aoSectionLbl}>Asked on</div>
         {svcList.length === 0 && <p style={{ fontSize: 14, color: "var(--faint)", padding: "12px 0" }}>No services yet.</p>}
@@ -17239,7 +17314,7 @@ function consolidateBookingLibraries(services, business) {
   if (!touched) return null; // everything already library-managed
   const nextServices = (services || []).map((s) => {
     const libQ = qLib.filter((q) => (q.services || []).includes(s.id)).map((q) => ({ id: "libq-" + q.id, type: "choice", label: q.label, required: !!q.required, options: (q.options || []).map((o) => ({ id: o.id, label: o.label, desc: o.desc || "", price: Number(o.price) || 0, min: Number(o.min) || 0, photos: Array.isArray(o.photos) ? o.photos : [] })) }));
-    const libA = aLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.name, photo: a.photo || "", required: !!a.required, item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 } }));
+    const libA = aLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.name, photo: a.photo || "", required: !!a.required, yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(), item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 } }));
     return { ...s, _preLib: (s._preLib || s.addonGroups || []), addonGroups: [...libQ, ...libA] };
   });
   return { services: nextServices, questionsLibrary: qLib, addOnsLibrary: aLib };
