@@ -6972,7 +6972,11 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
   const [newSlot, setNewSlot] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const windowHrs = business.cancelWindowHrs || 24;
+  // Change/cancel window = the notice the owner set in Settings (booking.leadTimeMin, in
+  // minutes). Convert to hours here. Legacy cancelWindowHrs kept as a fallback; default 24.
+  const windowHrs = (business?.booking?.leadTimeMin != null)
+    ? business.booking.leadTimeMin / 60
+    : (business.cancelWindowHrs || 24);
   // Arrival deep-link: the 15-minute reminder's check-in link adds ?a=1 so we open straight
   // onto the "I've arrived" screen.
   const arriveFlag = (() => { try { return new URLSearchParams(window.location.search).get("a") === "1"; } catch (e) { return false; } })();
@@ -7219,7 +7223,11 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
   const [newSlot, setNewSlot] = useState(null);
   const [cancelId, setCancelId] = useState(null);    // appt pending cancel confirm
 
-  const windowHrs = business.cancelWindowHrs || 24;
+  // Change/cancel window = the notice the owner set in Settings (booking.leadTimeMin, in
+  // minutes). Convert to hours here. Legacy cancelWindowHrs kept as a fallback; default 24.
+  const windowHrs = (business?.booking?.leadTimeMin != null)
+    ? business.booking.leadTimeMin / 60
+    : (business.cancelWindowHrs || 24);
   const digits = (s) => (s || "").replace(/\D/g, "");
   const mine = appts.filter((a) => digits(a.phone) === digits(phone) && a.status !== "cancelled" && a.bookedFor);
   // sort soonest first
