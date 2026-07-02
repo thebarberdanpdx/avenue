@@ -4935,7 +4935,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <button onClick={() => { if (req) answerRequired(g, true); else toggleExtra(g); }} style={rowBtn}>
                   {radio(on)}
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>Yes{it.name ? ` — ${it.name}` : ""}</span>
+                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>{g.yesLabel || `Yes${it.name ? ` — ${it.name}` : ""}`}</span>
                     {it.desc && (
                       <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
                         <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>
@@ -4947,7 +4947,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 {req && (
                   <button onClick={() => answerRequired(g, false)} style={rowBtn}>
                     {radio(declined)}
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 15.5, fontWeight: 500 }}>No thanks</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 15.5, fontWeight: 500 }}>{g.noLabel || "No thanks"}</span>
                   </button>
                 )}
               </div>
@@ -5038,8 +5038,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <div style={{ textAlign: "center", fontSize: 13.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text2)", fontWeight: 600, marginTop: 12 }}>{priceLabel}</div>
                     {desc ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 15, lineHeight: 1.55, color: "var(--sub)", fontWeight: 400, textAlign: "center", maxWidth: 300, margin: "16px auto 0" }}>{desc}</div> : null}
                     <div style={{ display: "flex", gap: 10, marginTop: 26 }}>
-                      <button onClick={() => answerAddon(group, false)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>No thanks</button>
-                      <button onClick={() => answerAddon(group, true)} style={{ flex: 1.2, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Yes, please</button>
+                      <button onClick={() => answerAddon(group, false)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>{group.noLabel || "No thanks"}</button>
+                      <button onClick={() => answerAddon(group, true)} style={{ flex: 1.2, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>{group.yesLabel || "Yes, please"}</button>
                     </div>
                   </>
                 )}
@@ -16919,7 +16919,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
     if (item) { setForm(JSON.parse(JSON.stringify(item))); setEditing(item.id); }
     onOpened && onOpened();
   }, [openId]);
-  const blank = () => ({ id: "ao-" + Date.now(), name: "", price: "", extraMin: "", desc: "", photo: "", required: false, services: [] });
+  const blank = () => ({ id: "ao-" + Date.now(), name: "", price: "", extraMin: "", desc: "", photo: "", required: false, services: [], yesLabel: "", noLabel: "" });
   const svcList = (services || []);
   const svcName = (id) => (svcList.find((s) => s.id === id) || {}).name || id;
 
@@ -16928,6 +16928,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
       const keep = (s.addonGroups || []).filter((g) => !String(g.id || "").startsWith("lib-"));
       const mine = nextLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({
         id: "lib-" + a.id, type: "addon", label: a.name, photo: a.photo || "", required: !!a.required,
+        yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(),
         item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 },
       }));
       return { ...s, addonGroups: [...keep, ...mine] };
@@ -16991,6 +16992,13 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
 
         <div style={aoSectionLbl}>Description</div>
         <textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} placeholder="What the client gets — shown while they book." rows={3} style={{ ...aoInp, resize: "vertical", minHeight: 84, lineHeight: 1.55 }} />
+
+        <div style={aoSectionLbl}>Responses</div>
+        <div style={{ display: "grid", gap: 10 }}>
+          <input value={form.yesLabel || ""} onChange={(e) => setForm({ ...form, yesLabel: e.target.value })} placeholder={`Yes — ${form.name || "add it"}`} style={aoInp} />
+          <input value={form.noLabel || ""} onChange={(e) => setForm({ ...form, noLabel: e.target.value })} placeholder="No thanks" style={aoInp} />
+        </div>
+        <p style={{ fontSize: 12.5, color: "var(--faint)", fontStyle: "italic", margin: "8px 2px 0", lineHeight: 1.45 }}>What clients tap while booking. Leave blank to use the standard wording shown above.</p>
 
         <div style={aoSectionLbl}>Asked on</div>
         {svcList.length === 0 && <p style={{ fontSize: 14, color: "var(--faint)", padding: "12px 0" }}>No services yet.</p>}
@@ -17239,7 +17247,7 @@ function consolidateBookingLibraries(services, business) {
   if (!touched) return null; // everything already library-managed
   const nextServices = (services || []).map((s) => {
     const libQ = qLib.filter((q) => (q.services || []).includes(s.id)).map((q) => ({ id: "libq-" + q.id, type: "choice", label: q.label, required: !!q.required, options: (q.options || []).map((o) => ({ id: o.id, label: o.label, desc: o.desc || "", price: Number(o.price) || 0, min: Number(o.min) || 0, photos: Array.isArray(o.photos) ? o.photos : [] })) }));
-    const libA = aLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.name, photo: a.photo || "", required: !!a.required, item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 } }));
+    const libA = aLib.filter((a) => (a.services || []).includes(s.id)).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.name, photo: a.photo || "", required: !!a.required, yesLabel: (a.yesLabel || "").trim(), noLabel: (a.noLabel || "").trim(), item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, addsPrice: true, min: Number(a.extraMin) || 0 } }));
     return { ...s, _preLib: (s._preLib || s.addonGroups || []), addonGroups: [...libQ, ...libA] };
   });
   return { services: nextServices, questionsLibrary: qLib, addOnsLibrary: aLib };
