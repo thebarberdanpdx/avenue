@@ -10350,7 +10350,11 @@ function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
 }
 
 function ShopDashboard({ authEmail, business, setBusiness, services, setServices, categories, setCategories, providers, setProviders, clients, setClients, appts, setAppts, waitlist, setWaitlist, reviews, setReviews, theme, setTheme, dataLoaded, recoveryCode, onSignOutAccount, onExit, cutLibrary, setCutLibrary, shopId, deepLinkApptId, onDeepLinkHandled }) {
-  const [tab, setTab] = useState("pulse");
+  // Remember where the owner/staff was so leaving the app and coming back (iOS reloads the webview
+  // on resume) restores the SAME screen instead of dumping them on the Pulse home. Persisted as
+  // { tab, pulseDetail, activeClientId } in localStorage; mirrors the vero_signed_in_as pattern.
+  const readSavedScreen = () => { if (typeof window === "undefined") return {}; try { return JSON.parse(window.localStorage.getItem("vero_dash_screen") || "null") || {}; } catch (e) { return {}; } };
+  const [tab, setTab] = useState(() => { const s = readSavedScreen(); return typeof s.tab === "string" ? s.tab : "pulse"; });
   // One-time: fold hand-built per-service questions/add-ons into the master libraries + de-dup
   // (see consolidateBookingLibraries). Runs once per owner load after data is in; guarded by
   // business._libConsolidated and a ref so it can't loop or re-run.
@@ -10372,7 +10376,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   const [rebookSeed, setRebookSeed] = useState(null); // { clientId, serviceId, providerId } → opens the new-appointment form prefilled on the calendar
   const [pulseOpenApptId, setPulseOpenApptId] = useState(null); // tapping a Pulse card → open that appt's sheet on the calendar (reuses the deep-link path)
   const [activeClient, setActiveClient] = useState(null);
-  const [pulseDetail, setPulseDetail] = useState(null); // null | "revenue" — drill-in from Pulse
+  const [pulseDetail, setPulseDetail] = useState(() => { const s = readSavedScreen(); return s.pulseDetail || null; }); // null | "revenue" — drill-in from Pulse (restored across relaunches)
   // ---- Dashboard navigation history ----
   // A "screen" at the dashboard level = { tab, pulseDetail, activeClient }. navStack remembers
   // where you've been so the corner back returns you to the EXACT previous screen (not a fixed
@@ -10484,6 +10488,25 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
   }, [authEmail, providers]);
   const me = providers.find((p) => p.id === signedInAs);
   const isOwner = me?.pulseRole === "owner";
+
+  // ---- Restore & remember the current screen across app relaunches (see readSavedScreen) ----
+  // activeClient is a live object, so we persist only its id and re-resolve from the loaded clients
+  // list once (a fresh object beats a stale snapshot). Runs a single time after clients arrive.
+  const screenRestoredRef = useRef(false);
+  useEffect(() => {
+    if (screenRestoredRef.current) return;
+    if (!clients || !clients.length) return;
+    screenRestoredRef.current = true;
+    const s = readSavedScreen();
+    if (s.activeClientId) { const c = clients.find((x) => x.id === s.activeClientId); if (c) setActiveClient(c); }
+  }, [clients]);
+  // Keep the saved screen current on every navigation.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try { window.localStorage.setItem("vero_dash_screen", JSON.stringify({ tab, pulseDetail, activeClientId: activeClient ? activeClient.id : null })); } catch (e) {}
+  }, [tab, pulseDetail, activeClient]);
+  // Never strand a non-owner on the owner-only Settings tab (e.g. a restored last-used tab).
+  useEffect(() => { if (tab === "settings" && me && !isOwner) setTab("pulse"); }, [tab, isOwner, me]);
 
   // ---- In-app appointment notifications ----------------------------------
   // One watcher over the synced appts list. Any appointment that newly appears, or
