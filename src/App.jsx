@@ -3226,6 +3226,79 @@ function ServicePhotoStrip({ photos }) {
   );
 }
 
+// Mango-style month calendar for the booking date step. `selectable(date)` decides which days can
+// be tapped (bookable days within the horizon); past days are always disabled.
+function MonthCalendar({ selectedDate, onPick, selectable }) {
+  const base = selectedDate || new Date();
+  const [ym, setYm] = useState({ y: base.getFullYear(), m: base.getMonth() });
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const first = new Date(ym.y, ym.m, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(ym.y, ym.m + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(ym.y, ym.m, d));
+  const DOW = ["S", "M", "T", "W", "T", "F", "S"];
+  const shift = (delta) => setYm((c) => { const nd = new Date(c.y, c.m + delta, 1); return { y: nd.getFullYear(), m: nd.getMonth() }; });
+  const canPrev = (ym.y > today.getFullYear()) || (ym.y === today.getFullYear() && ym.m > today.getMonth());
+  const arrow = { background: "none", border: "none", padding: 6, cursor: "pointer", display: "flex", alignItems: "center" };
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <button onClick={() => canPrev && shift(-1)} disabled={!canPrev} style={{ ...arrow, opacity: canPrev ? 1 : 0.3 }}><ChevronLeft size={20} style={{ color: "var(--text)" }} /></button>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, letterSpacing: "-0.2px" }}>{MONTHS[ym.m]} {ym.y}</div>
+        <button onClick={() => shift(1)} style={arrow}><ChevronRight size={20} style={{ color: "var(--text)" }} /></button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
+        {DOW.map((d, i) => <div key={i} style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.5, fontWeight: 600, color: "var(--faint)", padding: "4px 0" }}>{d}</div>)}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const on = selectedDate && d.toDateString() === selectedDate.toDateString();
+          const isPast = d < today;
+          const ok = !isPast && selectable(d);
+          return (
+            <button key={i} disabled={!ok} onClick={() => onPick(d)} style={{ aspectRatio: "1", borderRadius: "50%", border: "none", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : (ok ? "var(--text)" : "var(--faint)"), fontFamily: FONT_BODY, fontSize: 15, fontWeight: on ? 600 : 500, cursor: ok ? "pointer" : "default", opacity: ok ? 1 : 0.35 }}>{d.getDate()}</button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Times split into Morning / Afternoon / Evening collapsible sections (Mango-style).
+function GroupedTimes({ slots, selected, onPick, bestSet, cell }) {
+  const groups = [
+    { key: "MORNING", label: "Morning", list: slots.filter((t) => t < 720) },
+    { key: "AFTERNOON", label: "Afternoon", list: slots.filter((t) => t >= 720 && t < 1020) },
+    { key: "EVENING", label: "Evening", list: slots.filter((t) => t >= 1020) },
+  ].filter((g) => g.list.length);
+  const selGroup = groups.find((g) => g.list.includes(selected));
+  const [open, setOpen] = useState(selGroup ? selGroup.key : (groups[0] && groups[0].key));
+  return (
+    <div style={{ marginBottom: 24 }}>
+      {groups.map((g) => {
+        const isOpen = open === g.key;
+        const range = `${fmtTime(g.list[0])} – ${fmtTime(g.list[g.list.length - 1])}`;
+        return (
+          <div key={g.key} style={{ borderTop: "1px solid var(--line)" }}>
+            <button onClick={() => setOpen(isOpen ? null : g.key)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "none", border: "none", padding: "16px 2px", cursor: "pointer", color: "var(--text)", textAlign: "left" }}>
+              <span><span style={{ fontFamily: FONT_BODY, fontSize: 12.5, letterSpacing: 1.5, fontWeight: 700, textTransform: "uppercase" }}>{g.label}</span><span style={{ fontSize: 13.5, color: "var(--sub)", marginLeft: 10 }}>{range}</span></span>
+              <ChevronDown size={18} style={{ color: "var(--faint)", flexShrink: 0, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+            </button>
+            {isOpen && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7, padding: "0 0 18px" }}>
+                {g.list.map((t) => (<button key={t} onClick={() => onPick(t)} style={cell(selected === t, bestSet && bestSet.has(t))}>{fmtTime(t)}</button>))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit, onManage }) {
   const [step, setStep] = useState(0);
   const [bookingFor, setBookingFor] = useState(null); // null until chosen: "self" or "other"
@@ -5574,20 +5647,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <div style={{ display: "flex", alignItems: "center", gap: 7, margin: "-8px 0 20px", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}><Check size={13} strokeWidth={3} style={{ color: "var(--gold)" }} /> You've booked {prov.name.split(" ")[0]} before.</div>
               )}
 
-              <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 6, marginBottom: 22 }}>
-                {dateOptions.slice(0, 21).map((d, i) => { const on = selectedDate && d.toDateString() === selectedDate.toDateString(); return (
-                  <button key={i} onClick={() => { const sl = waSlotsFor(pid, d); setSelectedDate(d); setSlot(sl.length ? sl[0] : null); setSlotConflict(false); }} style={{ flexShrink: 0, minWidth: 62, textAlign: "center", padding: "12px 6px 10px", border: `1px solid ${on ? "var(--text)" : "var(--border)"}`, background: on ? "var(--text)" : "var(--panel)", borderRadius: 2, cursor: "pointer" }}>
-                    <div style={{ fontSize: 11, letterSpacing: 2, fontWeight: 500, color: on ? "var(--bg)" : (dayDiff(d) === 0 ? "var(--sub)" : "var(--faint)"), whiteSpace: "nowrap" }}>{stripLbl(d)}</div>
-                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, lineHeight: "26px", color: on ? "var(--bg)" : "var(--text)" }}>{d.getDate()}</div>
-                  </button>
-                ); })}
-              </div>
+              {(() => { const dateSet = new Set(dateOptions.map((d) => d.toDateString())); return (
+                <MonthCalendar selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => dateSet.has(d.toDateString())} />
+              ); })()}
 
-              {selectedDate && !dayFull && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7, marginBottom: 24 }}>
-                  {daySlots.map((t) => (<button key={t} onClick={() => { setSlot(t); setSlotConflict(false); }} style={cell(slot === t)}>{fmtTime(t)}</button>))}
-                </div>
-              )}
+              {selectedDate && !dayFull && (<>
+                <div style={{ fontFamily: FONT_BODY, fontSize: 12, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", color: "var(--text)", margin: "2px 2px 2px" }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
+                <GroupedTimes slots={daySlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} cell={cell} />
+                <button onClick={toWaitlist} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", padding: "2px 0 22px", color: "var(--sub)", fontSize: 13.5, lineHeight: 1.5, cursor: "pointer", fontFamily: FONT_BODY }}>Not seeing a time that works? <span style={{ color: "var(--text)", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>Join our waitlist</span></button>
+              </>)}
               {dayFull && (
                 <div style={{ margin: "6px 0 24px" }}>
                   <div style={{ fontSize: 15.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Fully booked that day — try another day, or someone else.</div>
