@@ -3296,7 +3296,7 @@ function GroupedTimes({ slots, selected, onPick, bestSet, cell }) {
         return (
           <div key={g.key} style={{ marginBottom: 6 }}>
             <button onClick={() => toggle(g.key)} style={{ width: "100%", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, background: "none", border: "none", padding: "12px 2px 11px", cursor: "pointer", color: "var(--text)", textAlign: "left" }}>
-              <span style={{ display: "flex", alignItems: "baseline" }}><span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500, letterSpacing: "-0.2px" }}>{g.label}</span><span style={{ fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", marginLeft: 9, fontWeight: 500 }}>{count} {count === 1 ? "time" : "times"}</span></span>
+              <span style={{ display: "flex", alignItems: "baseline" }}><span style={{ fontFamily: FONT_BODY, fontSize: 17, fontWeight: 700, letterSpacing: "-0.2px" }}>{g.label}</span><span style={{ fontFamily: FONT_BODY, fontSize: 13, color: "var(--sub)", marginLeft: 9, fontWeight: 500 }}>{count} {count === 1 ? "time" : "times"}</span></span>
               <ChevronDown size={17} style={{ color: "var(--faint)", flexShrink: 0, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
             </button>
             {isOpen && (
@@ -4890,9 +4890,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const firstOpen = ordered.findIndex((g) => !isResolved(g));
           const shown = firstOpen === -1 ? ordered : ordered.slice(0, firstOpen + 1);
           const ready = ordered.every(isResolved);
-          const radio = (on) => <span style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${on ? "var(--text)" : "var(--border2)"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--text)" }} />}</span>;
-          const rowBtn = { display: "flex", alignItems: "center", gap: 13, width: "100%", textAlign: "left", padding: "16px 2px", background: "none", border: "none", borderBottom: "1px solid var(--line)", cursor: "pointer" };
-          const qHead = { fontFamily: FONT_BODY, fontSize: 16, fontWeight: 700, letterSpacing: "-0.2px", color: "var(--text)", margin: "0 0 8px" };
+          // Sized to MATCH the services page (19px/600 rows, airy 18px padding) — the goal is one
+          // consistent, big, simple type scale through the whole flow.
+          const radio = (on) => <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--text)" : "var(--border2)"}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--text)" }} />}</span>;
+          const rowBtn = { display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left", padding: "18px 2px", background: "none", border: "none", borderBottom: "1px solid var(--line)", cursor: "pointer" };
+          const qHead = { fontFamily: FONT_BODY, fontSize: 20, fontWeight: 700, letterSpacing: "-0.3px", color: "var(--text)", margin: "0 0 8px" };
           const moreInfo = (name, desc, photos) => <span onClick={(ev) => { ev.stopPropagation(); setConfIdx(0); setPickConfirm({ name, desc: desc || "", photos: photos || [] }); }} style={{ flexShrink: 0, fontSize: 13, fontWeight: 500, color: "var(--text)", textDecoration: "underline", textUnderlineOffset: 2, whiteSpace: "nowrap", cursor: "pointer" }}>more info</span>;
           const answerRequired = (g, yes) => {
             const cur = cart[0] || {};
@@ -4916,10 +4918,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <button key={o.id} onClick={() => pickChoice(g, o.id)} style={rowBtn}>
                       {radio(on)}
                       <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: "block", fontSize: 15.5, fontWeight: 500, color: "var(--text)" }}>{o.label}</span>
+                        <span style={{ display: "block", fontSize: 17.5, fontWeight: 600, letterSpacing: "-0.2px", color: "var(--text)" }}>{o.label}</span>
                         {o.desc && (
-                          <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
-                            <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.desc}</span>
+                          <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 3 }}>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.desc}</span>
                             {moreInfo(o.label, o.desc, (Array.isArray(o.photos) ? o.photos : []).filter(Boolean))}
                           </span>
                         )}
@@ -4936,10 +4938,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <button onClick={() => { if (req) answerRequired(g, true); else toggleExtra(g); }} style={rowBtn}>
                   {radio(on)}
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontSize: 15.5, fontWeight: 500 }}>{g.yesLabel || `Yes${it.name ? ` — ${it.name}` : ""}`}</span>
+                    <span style={{ display: "block", fontSize: 17.5, fontWeight: 600, letterSpacing: "-0.2px" }}>{g.yesLabel || `Yes${it.name ? ` — ${it.name}` : ""}`}</span>
                     {it.desc && (
-                      <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
-                        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>
+                      <span style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 3 }}>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>
                         {moreInfo(it.name || g.label, it.desc, g.photo ? [g.photo] : [])}
                       </span>
                     )}
@@ -4948,7 +4950,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 {req && (
                   <button onClick={() => answerRequired(g, false)} style={rowBtn}>
                     {radio(declined)}
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 15.5, fontWeight: 500 }}>{g.noLabel || "No thanks"}</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 17.5, fontWeight: 600, letterSpacing: "-0.2px" }}>{g.noLabel || "No thanks"}</span>
                   </button>
                 )}
               </div>
@@ -4959,8 +4961,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               {/* picked service · change */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "var(--panel2)", borderRadius: 12, padding: "12px 14px" }}>
                 <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 17, fontWeight: 600 }}>{svc.name}</span>
-                  <button onClick={() => { setCutFlow(null); setCart([]); }} style={{ background: "none", border: "none", padding: 0, marginTop: 2, fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>Change</button>
+                  <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, letterSpacing: "-0.3px" }}>{svc.name}</span>
+                  <button onClick={() => { setCutFlow(null); setCart([]); }} style={{ background: "none", border: "none", padding: 0, marginTop: 2, fontFamily: FONT_BODY, fontSize: 13.5, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer" }}>Change</button>
                 </span>
               </div>
               {shown.map((g, idx) => renderGroup(g, idx))}
@@ -5661,7 +5663,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     {waReal.length > 1 && (
                       <button onClick={() => pick("anyone")} style={provRow}>
                         <span style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={20} style={{ color: "var(--sub)" }} /></span>
-                        <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>First available</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>Soonest across the team</span></span>
+                        <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 18, fontWeight: 600, letterSpacing: "-0.2px" }}>First available</span><span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>Soonest across the team</span></span>
                         <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
                       </button>
                     )}
@@ -5669,8 +5671,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <button key={p.id} onClick={() => pick(p.id)} style={provRow}>
                         <span style={{ width: 46, height: 46, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{p.photo ? <img src={imgUrl(p.photo, 120)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, color: "var(--sub)" }}>{(p.name || "?").charAt(0)}</span>}</span>
                         <span style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>{p.name}{seen && <span title="Booked before" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />}</span>
-                          <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>{seen ? "You've booked before" : soonLbl(p.id)}</span>
+                          <span style={{ fontFamily: FONT_BODY, fontSize: 18, fontWeight: 600, letterSpacing: "-0.2px", display: "flex", alignItems: "center", gap: 6 }}>{p.name}{seen && <span title="Booked before" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />}</span>
+                          <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{seen ? "You've booked before" : soonLbl(p.id)}</span>
                         </span>
                         <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
                       </button>
@@ -5691,8 +5693,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               )}
 
               {wwPhase === "when" && selectedDate && !dayFull && (<>
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, letterSpacing: "-0.3px", color: "var(--text)", margin: "6px 2px 2px" }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
-                <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", margin: "0 2px 14px" }}>{daySlots.length} {daySlots.length === 1 ? "opening" : "openings"}</div>
+                <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 700, letterSpacing: "-0.3px", color: "var(--text)", margin: "6px 2px 2px" }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
+                <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: "var(--sub)", margin: "0 2px 14px" }}>{daySlots.length} {daySlots.length === 1 ? "opening" : "openings"}</div>
                 <GroupedTimes key={"g-" + (pid || "any") + "-" + selectedDate.toDateString()} slots={daySlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} cell={cell} />
                 <button onClick={toWaitlist} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", padding: "2px 0 22px", color: "var(--sub)", fontSize: 13.5, lineHeight: 1.5, cursor: "pointer", fontFamily: FONT_BODY }}>Not seeing a time that works? <span style={{ color: "var(--text)", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>Join our waitlist</span></button>
               </>)}
@@ -6249,8 +6251,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             ); })()}
             {selectedDate && !dateIsFull && (<>
               {/* Selected day as a clean heading — keeps day-of-week + date + days-away phrasing for clarity */}
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, letterSpacing: "-0.3px", color: "var(--text)", marginBottom: 2 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
-              <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", marginBottom: 16 }}>{daysFromNow(selectedDate)}{openSlots.length ? ` · ${openSlots.length} ${openSlots.length === 1 ? "opening" : "openings"}` : ""}</div>
+              <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 700, letterSpacing: "-0.3px", color: "var(--text)", marginBottom: 2 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
+              <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: "var(--sub)", marginBottom: 16 }}>{daysFromNow(selectedDate)}{openSlots.length ? ` · ${openSlots.length} ${openSlots.length === 1 ? "opening" : "openings"}` : ""}</div>
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
               {!isMultiPerson && bestSet.size > 0 && openSlots.length > bestSet.size && (<div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--sub)", marginBottom: 11 }}><span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />Highlighted times have no wait — you're seen right away</div>)}
               {slotsReady ? (
