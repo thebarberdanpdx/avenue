@@ -290,25 +290,25 @@ const DEFAULT_BUSINESS = {
   // Merge tags {client} {provider} {service} {date} {time} {business} get filled in automatically.
   messages: [
     { id: "booked", label: "Appointment Booked", channel: "both", timing: "Right after booking", enabled: true,
-      body: "You're all set, {client} — we can't wait to see you.\n\n{appointment}\n\n{location}\n\nPlans change, and that's okay. You can reschedule or cancel anytime here:\n{cancel link}\n\nSee you soon,\n{business}" },
-    { id: "remind2d", label: "Reminder — 2 days before", channel: "email", timing: "2 days before", enabled: true,
-      body: "Hi {client} — just a couple of days until your {service} with {provider} at {business}. We're looking forward to seeing you on {date} at {time}.\n\nNeed to move it? No problem:\n{cancel link}" },
-    { id: "remind24h", label: "Reminder — 1 day before", channel: "text", timing: "1 day before", enabled: true,
+      body: "You're all set, {client} - we can't wait to see you.\n\n{appointment}\n\n{location}\n\nPlans change, and that's okay. You can reschedule or cancel anytime here:\n{cancel link}\n\nSee you soon,\n{business}" },
+    { id: "remind2d", label: "Reminder - 2 days before", channel: "email", timing: "2 days before", enabled: true,
+      body: "Hi {client} - just a couple of days until your {service} with {provider} at {business}. We're looking forward to seeing you on {date} at {time}.\n\nNeed to move it? No problem:\n{cancel link}" },
+    { id: "remind24h", label: "Reminder - 1 day before", channel: "text", timing: "1 day before", enabled: true,
       body: "See you tomorrow, {client}! {provider} has your {service} set for {time} at {business}. Looking forward to it.\n\n{cancel link}" },
-    { id: "remind3h", label: "Reminder — 3 hours before", channel: "text", timing: "3 hours before", enabled: true,
+    { id: "remind3h", label: "Reminder - 3 hours before", channel: "text", timing: "3 hours before", enabled: true,
       body: "Today's the day, {client}! {provider} will be ready for your {service} at {time}. Can't wait to see you.\n\n{cancel link}" },
-    { id: "checkin", label: "Reminder \u2014 15 minutes before", channel: "text", timing: "15 minutes before", enabled: true,
-      body: "Almost time, {client} \u2014 see you in about 15 minutes. {provider} is looking forward to your {service} at {business}.\n\nHere already? Let us know:\n{checkin link}" },
+    { id: "checkin", label: "Reminder - 15 minutes before", channel: "text", timing: "15 minutes before", enabled: true,
+      body: "Almost time, {client} - see you in about 15 minutes. {provider} is looking forward to your {service} at {business}.\n\nHere already? Let us know:\n{checkin link}" },
     { id: "canceled", label: "Appointment Canceled", channel: "both", timing: "When canceled", enabled: true,
-      body: "Your {service} on {date} at {time} has been canceled, {client}. We'd love to see you again — book anytime at {business}." },
+      body: "Your {service} on {date} at {time} has been canceled, {client}. We'd love to see you again - book anytime at {business}." },
     { id: "rescheduled", label: "Appointment Rescheduled", channel: "both", timing: "When rescheduled", enabled: true,
       body: "Updated! Your {service} with {provider} is now {date} at {time}. See you then, {client}." },
-    { id: "waitlist", label: "Waitlist — Slot Opened", channel: "text", timing: "When a slot opens", enabled: true,
-      body: "Good news {client} — a spot opened for your {service} with {provider} on {date} at {time}. Reply YES to grab it before someone else does!" },
+    { id: "waitlist", label: "Waitlist - Slot Opened", channel: "text", timing: "When a slot opens", enabled: true,
+      body: "Good news {client} - a spot opened for your {service} with {provider} on {date} at {time}. Reply YES to grab it before someone else does!" },
     { id: "deposit", label: "Deposit Received", channel: "both", timing: "When a deposit is taken", enabled: true,
-      body: "Thanks {client}! We've received your deposit for your {service} with {provider} on {date} at {time}. It goes toward your total — see you at {business}." },
+      body: "Thanks {client}! We've received your deposit for your {service} with {provider} on {date} at {time}. It goes toward your total - see you at {business}." },
     { id: "noshow", label: "Missed / Late Cancellation", channel: "both", timing: "On a no-show or late cancel", enabled: false,
-      body: "Hi {client}, we missed you for your {service} on {date}. Per our policy, a fee may apply. Questions? Just reply and we'll help. — {business}" },
+      body: "Hi {client}, we missed you for your {service} on {date}. Per our policy, a fee may apply. Questions? Just reply and we'll help. - {business}" },
     { id: "birthday", label: "Birthday message", channel: "email", timing: "On their birthday", enabled: false,
       body: "Happy birthday, {client}! Everyone at {business} hopes your day is a great one. Whenever you're ready for a fresh look, we'd love to see you in the chair." },
   ],
@@ -332,7 +332,7 @@ const DEFAULT_BUSINESS = {
 // Version-guarded so a shop's own later edits in Settings → Messages are never clobbered: once
 // msgCopyVersion reaches MSG_COPY_VERSION the migration is a no-op. Only the listed ids are touched
 // (label/timing/body); channel and every other message are left exactly as the shop has them.
-const MSG_COPY_VERSION = 3;
+const MSG_COPY_VERSION = 4;
 function migrateMessageCopy(biz) {
   try {
     if (!biz || (biz.msgCopyVersion || 0) >= MSG_COPY_VERSION) return biz;
@@ -347,6 +347,12 @@ function migrateMessageCopy(biz) {
     }
     // v3: make sure the birthday message template exists (additive — never clobbers edits).
     if (!messages.some((m) => m.id === "birthday") && def.birthday) messages.push(def.birthday);
+    // v4: swap long dashes (U+2014) for normal dashes in every message body. A long dash forces
+    //     a text into a costlier 70-char-per-message encoding; this roughly halves SMS cost. Any
+    //     custom wording the shop wrote is preserved — only the dash character changes.
+    if ((biz.msgCopyVersion || 0) < 4) {
+      messages = messages.map((m) => (m && typeof m.body === "string" && m.body.indexOf("—") !== -1) ? { ...m, body: m.body.replace(/—/g, "-") } : m);
+    }
     return { ...biz, messages, msgCopyVersion: MSG_COPY_VERSION };
   } catch (e) { return biz; }
 }
@@ -3226,45 +3232,47 @@ function ServicePhotoStrip({ photos }) {
   );
 }
 
-// Mango-style month calendar for the booking date step. `selectable(date)` decides which days can
-// be tapped (bookable days within the horizon); past days are always disabled.
-// Compact 2-week calendar for the booking date step. `selectable(date)` returns whether the day has
-// any openings; days that are booked out / unavailable (and past days) render greyed and disabled.
-function MonthCalendar({ selectedDate, onPick, selectable }) {
+// Horizontal scrolling date strip for the booking date step. Days scroll sideways (native-app feel)
+// and the arrows nudge the strip; each day shows its weekday, date, and a warm dot when it has
+// openings. `selectable(date)` decides which days can be tapped; past days and booked-out days
+// render dimmed + disabled. Same props as before so both booking call sites are unchanged.
+function DateStrip({ selectedDate, onPick, selectable }) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const sundayOf = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - x.getDay()); return x; };
-  const [weekStart, setWeekStart] = useState(sundayOf(selectedDate || today));
-  const days = Array.from({ length: 14 }, (_, i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate() + i); return d; });
-  const DOW = ["S", "M", "T", "W", "T", "F", "S"];
-  const shift = (delta) => setWeekStart((w) => { const nd = new Date(w); nd.setDate(w.getDate() + delta * 14); return nd; });
-  const canPrev = weekStart > sundayOf(today);
-  const mid = new Date(weekStart); mid.setDate(weekStart.getDate() + 6); // label off mid-window
-  const arrow = { background: "none", border: "none", padding: 8, cursor: "pointer", display: "flex", alignItems: "center", borderRadius: 8 };
+  const HORIZON = 90; // days out you can scroll to
+  const days = useMemo(() => Array.from({ length: HORIZON }, (_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i); return d; }), []);
+  const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const ITEM_W = 60;
+  const scrollRef = useRef(null);
+  const selRef = useRef(null);
+  const [headDate, setHeadDate] = useState(selectedDate || today);
+  const selKey = selectedDate ? selectedDate.toDateString() : "";
+  // keep the chosen day centered when it changes (e.g. picked from further out)
+  useEffect(() => { if (selRef.current) selRef.current.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }); }, [selKey]);
+  // month/year header tracks whatever's scrolled to the left edge
+  const onScroll = () => { const el = scrollRef.current; if (!el) return; const idx = Math.min(days.length - 1, Math.max(0, Math.round(el.scrollLeft / ITEM_W))); setHeadDate(days[idx]); };
+  const nudge = (dir) => { const el = scrollRef.current; if (el) el.scrollBy({ left: dir * ITEM_W * 4, behavior: "smooth" }); };
+  const arrow = { background: "none", border: "none", padding: 6, cursor: "pointer", display: "flex", alignItems: "center", borderRadius: 8, color: "var(--text)", flexShrink: 0 };
   return (
     <div style={{ border: "1.5px solid var(--border2)", borderRadius: 16, background: "var(--panel)", overflow: "hidden", boxShadow: "var(--shadow-sm)", marginBottom: 22 }}>
-      {/* header — two weeks at a time, arrows page by a fortnight */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 10px", borderBottom: "1px solid var(--line)" }}>
-        <button onClick={() => canPrev && shift(-1)} disabled={!canPrev} style={{ ...arrow, opacity: canPrev ? 1 : 0.3 }}><ChevronLeft size={19} style={{ color: "var(--text)" }} /></button>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 500, letterSpacing: "-0.2px" }}>{MONTHS[mid.getMonth()]} {mid.getFullYear()}</div>
-        <button onClick={() => shift(1)} style={arrow}><ChevronRight size={19} style={{ color: "var(--text)" }} /></button>
+      {/* header — month/year of the leftmost visible day, arrows nudge the strip */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 8px 2px" }}>
+        <button onClick={() => nudge(-1)} aria-label="Earlier dates" style={arrow}><ChevronLeft size={19} /></button>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 500, letterSpacing: "-0.2px" }}>{MONTHS[headDate.getMonth()]} {headDate.getFullYear()}</div>
+        <button onClick={() => nudge(1)} aria-label="Later dates" style={arrow}><ChevronRight size={19} /></button>
       </div>
-      {/* weekday labels */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: "1px solid var(--line)", background: "var(--panel2)" }}>
-        {DOW.map((d, i) => <div key={i} style={{ textAlign: "center", fontSize: 10.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--faint)", padding: "7px 0" }}>{d}</div>)}
-      </div>
-      {/* two week rows */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "7px 6px 9px" }}>
+      {/* the strip — scroll sideways to any future date */}
+      <div ref={scrollRef} onScroll={onScroll} style={{ display: "flex", overflowX: "auto", padding: "4px 8px 12px", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", scrollSnapType: "x proximity" }}>
         {days.map((d, i) => {
           const on = selectedDate && d.toDateString() === selectedDate.toDateString();
-          const isPast = d < today;
-          const ok = !isPast && selectable(d);
+          const ok = selectable(d);
           const isToday = d.toDateString() === today.toDateString();
           return (
-            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "3px 0" }}>
-              {/* bookable days get a warm dot so open dates read at a glance; unavailable days just dim (no strike-through — that read as "broken") */}
-              <button disabled={!ok} onClick={() => onPick(d)} style={{ width: 40, height: 40, borderRadius: "50%", border: (isToday && ok && !on) ? "1.5px solid var(--border2)" : "none", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : (ok ? "var(--text)" : "var(--faint)"), fontFamily: FONT_BODY, fontSize: 15, fontWeight: on ? 600 : 500, cursor: ok ? "pointer" : "default", opacity: ok ? 1 : 0.32 }}>{d.getDate()}</button>
-              <span style={{ width: 5, height: 5, borderRadius: "50%", marginTop: 3, background: (ok && !on) ? "var(--gold)" : "transparent" }} />
-            </div>
+            <button key={i} ref={on ? selRef : null} disabled={!ok} onClick={() => onPick(d)} style={{ flexShrink: 0, width: ITEM_W, scrollSnapAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "none", border: "none", padding: "4px 0", cursor: ok ? "pointer" : "default" }}>
+              <span style={{ fontFamily: FONT_BODY, fontSize: 11, fontWeight: 600, letterSpacing: 0.4, color: ok ? "var(--sub)" : "var(--faint)", opacity: ok ? 1 : 0.5 }}>{DOW[d.getDay()]}</span>
+              {/* bookable days get a warm dot; unavailable days just dim (no strike-through — that read as "broken") */}
+              <span style={{ width: 42, height: 42, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: (isToday && ok && !on) ? "1.5px solid var(--border2)" : "1.5px solid transparent", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : (ok ? "var(--text)" : "var(--faint)"), fontFamily: FONT_BODY, fontSize: 16, fontWeight: on ? 600 : 500, opacity: ok ? 1 : 0.35 }}>{d.getDate()}</span>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: (ok && !on) ? "var(--gold)" : "transparent" }} />
+            </button>
           );
         })}
       </div>
@@ -3272,55 +3280,6 @@ function MonthCalendar({ selectedDate, onPick, selectable }) {
   );
 }
 
-// One-week date strip (Mango-style, per Dan's mock): the SELECTED date is the header between
-// the paging arrows ("July 2026" is gone — the date appears exactly once on the page), weekday
-// labels sit over the day numbers, unavailable/past days fade, and "in N days" renders centered
-// under the strip so a client always knows how far out the appointment is.
-function WeekStrip({ selectedDate, onPick, selectable }) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const dayMs = 86400000;
-  const norm = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-  // 7-day window anchored on today; if the selected date is further out, open on its week.
-  const [weekStart, setWeekStart] = useState(() => {
-    const sel = selectedDate ? norm(selectedDate) : today;
-    const diff = Math.max(0, Math.round((sel - today) / dayMs));
-    const x = new Date(today); x.setDate(today.getDate() + Math.floor(diff / 7) * 7); return x;
-  });
-  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate() + i); return d; });
-  const canPrev = weekStart > today;
-  const shift = (dir) => setWeekStart((w) => { const nd = new Date(w); nd.setDate(w.getDate() + dir * 7); return nd < today ? new Date(today) : nd; });
-  const sel = selectedDate ? norm(selectedDate) : null;
-  const away = sel ? Math.round((sel - today) / dayMs) : null;
-  const awayLbl = away == null ? "" : away <= 0 ? "Today" : away === 1 ? "Tomorrow" : `in ${away} days`;
-  const arrow = (dis) => ({ background: "none", border: "none", padding: "6px 10px", cursor: dis ? "default" : "pointer", opacity: dis ? 0.3 : 1, display: "flex", alignItems: "center" });
-  return (
-    <div>
-      {/* the selected date IS the header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 0 4px" }}>
-        <button onClick={() => canPrev && shift(-1)} disabled={!canPrev} style={arrow(!canPrev)}><ChevronLeft size={20} style={{ color: "var(--text)" }} /></button>
-        <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 700, letterSpacing: "-0.3px", color: "var(--text)", textAlign: "center" }}>
-          {sel ? `${DAYS[sel.getDay()]}, ${MONTHS[sel.getMonth()]} ${sel.getDate()}` : "Pick a day"}
-        </div>
-        <button onClick={() => shift(1)} style={arrow(false)}><ChevronRight size={20} style={{ color: "var(--text)" }} /></button>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", textAlign: "center", padding: "6px 0 0" }}>
-        {days.map((d, i) => {
-          const on = sel && d.getTime() === sel.getTime();
-          const isPast = d < today;
-          const ok = !isPast && selectable(d);
-          return (
-            <button key={i} disabled={!ok} onClick={() => onPick(d)} style={{ background: "none", border: "none", padding: "2px 0", cursor: ok ? "pointer" : "default" }}>
-              <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 10.5, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: ok || on ? "var(--sub)" : "var(--faint)", opacity: ok || on ? 1 : 0.55 }}>{DAYS[d.getDay()].slice(0, 3)}</span>
-              <span style={{ width: 42, height: 42, margin: "7px auto 0", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_BODY, fontSize: 17, fontWeight: on ? 700 : ok ? 600 : 400, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : ok ? "var(--text)" : "var(--faint)", opacity: ok || on ? 1 : 0.45 }}>{d.getDate()}</span>
-            </button>
-          );
-        })}
-      </div>
-      {/* how far away — under the row of dates, said once */}
-      {awayLbl && <div style={{ textAlign: "center", fontFamily: FONT_BODY, fontSize: 13, color: "var(--sub)", marginTop: 10 }}>{awayLbl}</div>}
-    </div>
-  );
-}
 
 // Times split into Morning / Afternoon / Evening collapsible sections (Mango-style).
 function GroupedTimes({ slots, selected, onPick, bestSet, cell }) {
@@ -5739,7 +5698,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               )}
 
               {wwPhase === "when" && (
-                <WeekStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => waSlotsFor(pid, d).length > 0} />
+                <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => waSlotsFor(pid, d).length > 0} />
               )}
 
               {wwPhase === "when" && selectedDate && !dayFull && (<>
@@ -6296,7 +6255,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             })()}
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 12 }}>Or pick another day</div>
             {(() => { const calProv = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]); return (
-              <WeekStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0} />
+              <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0} />
             ); })()}
             {selectedDate && !dateIsFull && (<>
               <div style={{ height: 26 }} />
