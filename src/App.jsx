@@ -3272,6 +3272,56 @@ function MonthCalendar({ selectedDate, onPick, selectable }) {
   );
 }
 
+// One-week date strip (Mango-style, per Dan's mock): the SELECTED date is the header between
+// the paging arrows ("July 2026" is gone — the date appears exactly once on the page), weekday
+// labels sit over the day numbers, unavailable/past days fade, and "in N days" renders centered
+// under the strip so a client always knows how far out the appointment is.
+function WeekStrip({ selectedDate, onPick, selectable }) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const dayMs = 86400000;
+  const norm = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  // 7-day window anchored on today; if the selected date is further out, open on its week.
+  const [weekStart, setWeekStart] = useState(() => {
+    const sel = selectedDate ? norm(selectedDate) : today;
+    const diff = Math.max(0, Math.round((sel - today) / dayMs));
+    const x = new Date(today); x.setDate(today.getDate() + Math.floor(diff / 7) * 7); return x;
+  });
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate() + i); return d; });
+  const canPrev = weekStart > today;
+  const shift = (dir) => setWeekStart((w) => { const nd = new Date(w); nd.setDate(w.getDate() + dir * 7); return nd < today ? new Date(today) : nd; });
+  const sel = selectedDate ? norm(selectedDate) : null;
+  const away = sel ? Math.round((sel - today) / dayMs) : null;
+  const awayLbl = away == null ? "" : away <= 0 ? "Today" : away === 1 ? "Tomorrow" : `in ${away} days`;
+  const arrow = (dis) => ({ background: "none", border: "none", padding: "6px 10px", cursor: dis ? "default" : "pointer", opacity: dis ? 0.3 : 1, display: "flex", alignItems: "center" });
+  return (
+    <div>
+      {/* the selected date IS the header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 0 4px" }}>
+        <button onClick={() => canPrev && shift(-1)} disabled={!canPrev} style={arrow(!canPrev)}><ChevronLeft size={20} style={{ color: "var(--text)" }} /></button>
+        <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 700, letterSpacing: "-0.3px", color: "var(--text)", textAlign: "center" }}>
+          {sel ? `${DAYS[sel.getDay()]}, ${MONTHS[sel.getMonth()]} ${sel.getDate()}` : "Pick a day"}
+        </div>
+        <button onClick={() => shift(1)} style={arrow(false)}><ChevronRight size={20} style={{ color: "var(--text)" }} /></button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", textAlign: "center", padding: "6px 0 0" }}>
+        {days.map((d, i) => {
+          const on = sel && d.getTime() === sel.getTime();
+          const isPast = d < today;
+          const ok = !isPast && selectable(d);
+          return (
+            <button key={i} disabled={!ok} onClick={() => onPick(d)} style={{ background: "none", border: "none", padding: "2px 0", cursor: ok ? "pointer" : "default" }}>
+              <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 10.5, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: ok || on ? "var(--sub)" : "var(--faint)", opacity: ok || on ? 1 : 0.55 }}>{DAYS[d.getDay()].slice(0, 3)}</span>
+              <span style={{ width: 42, height: 42, margin: "7px auto 0", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_BODY, fontSize: 17, fontWeight: on ? 700 : ok ? 600 : 400, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : ok ? "var(--text)" : "var(--faint)", opacity: ok || on ? 1 : 0.45 }}>{d.getDate()}</span>
+            </button>
+          );
+        })}
+      </div>
+      {/* how far away — under the row of dates, said once */}
+      {awayLbl && <div style={{ textAlign: "center", fontFamily: FONT_BODY, fontSize: 13, color: "var(--sub)", marginTop: 10 }}>{awayLbl}</div>}
+    </div>
+  );
+}
+
 // Times split into Morning / Afternoon / Evening collapsible sections (Mango-style).
 function GroupedTimes({ slots, selected, onPick, bestSet, cell }) {
   const groups = [
@@ -5689,12 +5739,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               )}
 
               {wwPhase === "when" && (
-                <MonthCalendar selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => waSlotsFor(pid, d).length > 0} />
+                <WeekStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => waSlotsFor(pid, d).length > 0} />
               )}
 
               {wwPhase === "when" && selectedDate && !dayFull && (<>
-                <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 700, letterSpacing: "-0.3px", color: "var(--text)", margin: "6px 2px 2px" }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
-                <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: "var(--sub)", margin: "0 2px 14px" }}>{daySlots.length} {daySlots.length === 1 ? "opening" : "openings"}</div>
+                <div style={{ height: 26 }} />
                 <GroupedTimes key={"g-" + (pid || "any") + "-" + selectedDate.toDateString()} slots={daySlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} cell={cell} />
                 <button onClick={toWaitlist} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", padding: "2px 0 22px", color: "var(--sub)", fontSize: 13.5, lineHeight: 1.5, cursor: "pointer", fontFamily: FONT_BODY }}>Not seeing a time that works? <span style={{ color: "var(--text)", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>Join our waitlist</span></button>
               </>)}
@@ -6247,12 +6296,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             })()}
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 12 }}>Or pick another day</div>
             {(() => { const calProv = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]); return (
-              <MonthCalendar selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0} />
+              <WeekStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0} />
             ); })()}
             {selectedDate && !dateIsFull && (<>
-              {/* Selected day as a clean heading — keeps day-of-week + date + days-away phrasing for clarity */}
-              <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 700, letterSpacing: "-0.3px", color: "var(--text)", marginBottom: 2 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
-              <div style={{ fontFamily: FONT_BODY, fontSize: 13, color: "var(--sub)", marginBottom: 16 }}>{daysFromNow(selectedDate)}{openSlots.length ? ` · ${openSlots.length} ${openSlots.length === 1 ? "opening" : "openings"}` : ""}</div>
+              <div style={{ height: 26 }} />
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
               {!isMultiPerson && bestSet.size > 0 && openSlots.length > bestSet.size && (<div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--sub)", marginBottom: 11 }}><span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />Highlighted times have no wait — you're seen right away</div>)}
               {slotsReady ? (
