@@ -1,20 +1,15 @@
-# Production deploy — forces a Vercel production deploy on every push to main.
+# Production deploy — builds main on Vercel and PROMOTES it to production (gotvero.com).
 #
-# WHY THIS EXISTS: Vercel's own Git integration silently stopped promoting main
-# to production after 2026-07-01 (it kept building branch PREVIEWS, but the last
-# merges to main never became production — gotvero.com sat on an old build). This
-# workflow guarantees main -> production regardless of what the Vercel dashboard
-# decides to do, by hitting a Deploy Hook (a Vercel URL that triggers a
-# production build of the main branch).
+# WHY CLI, NOT A DEPLOY HOOK: the deploy hook only *triggered* a build and never took the
+# production domain — gotvero.com stayed frozen on an old manually-promoted build while
+# merged PRs piled up unshipped (proven 2026-07-02 by the verify step below). `vercel --prod`
+# is the same command that deploys from a laptop; it creates a PRODUCTION deployment and, with
+# auto-assign domains on, moves gotvero.com to it. Reliable promotion, every push.
 #
-# SETUP (one time, ~60 seconds):
-#   1. Vercel -> project "vero" -> Settings -> Git -> Deploy Hooks.
-#      Create hook: name "deploy-main", branch "main". Copy the URL it gives you.
-#   2. GitHub repo -> Settings -> Secrets and variables -> Actions ->
-#      New repository secret -> name VERCEL_DEPLOY_HOOK, paste the URL, save.
-#
-# After that, every merge to main fires the hook and gotvero.com updates on its
-# own. A single curl — no token, no project linking, nothing that can drift.
+# SETUP (one time, ~60 seconds) — add a Vercel access token as a repo secret:
+#   1. vercel.com -> Account Settings -> Tokens -> Create Token (name it github-deploy, no expiry).
+#   2. GitHub repo -> Settings -> Secrets and variables -> Actions -> New repository secret ->
+#      name VERCEL_TOKEN, paste the token, save.
 name: deploy
 on:
   push:
@@ -27,25 +22,32 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Fire the Vercel production deploy hook
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Require a Vercel token
         run: |
-          if [ -z "${{ secrets.VERCEL_DEPLOY_HOOK }}" ]; then
-            echo "::error::VERCEL_DEPLOY_HOOK secret is not set. Create a Deploy Hook in Vercel (Settings -> Git -> Deploy Hooks, branch main) and add its URL as a repo secret named VERCEL_DEPLOY_HOOK."
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "::error::VERCEL_TOKEN secret is not set. Create it at vercel.com -> Account Settings -> Tokens, then add it as repo secret VERCEL_TOKEN (Settings -> Secrets and variables -> Actions)."
             exit 1
           fi
-          curl -fsS -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}" -o /dev/null -w "Vercel deploy hook fired: HTTP %{http_code}\n"
-      # Confirm gotvero.com is ACTUALLY serving this commit — not just that the hook was accepted.
-      # /api/version reports the build's VERCEL_GIT_COMMIT_SHA (no-store). Poll until it matches
-      # this workflow's commit, or fail loudly so a stuck/failed production build can't look "shipped".
+      - name: Deploy to production (build on Vercel, promote to gotvero.com)
+        run: |
+          T="${{ secrets.VERCEL_TOKEN }}"
+          npx --yes vercel@latest link --yes --project=vero --scope=booking-app-s-projects --token="$T"
+          npx --yes vercel@latest --prod --yes --scope=booking-app-s-projects --token="$T"
+      # Prove gotvero.com is ACTUALLY serving this commit (not just that a deploy was requested).
+      # /api/version reports the build's VERCEL_GIT_COMMIT_SHA (no-store). Poll until it matches.
       - name: Verify gotvero.com is serving this commit
         run: |
           SHA="${{ github.sha }}"
-          echo "Waiting for https://gotvero.com/api/version to report $SHA …"
+          echo "Waiting for https://gotvero.com/api/version to report $SHA ..."
           for i in $(seq 1 24); do
             LIVE=$(curl -fsS --max-time 15 "https://gotvero.com/api/version" 2>/dev/null | sed -n 's/.*"sha":"\{0,1\}\([0-9a-f]\{7,40\}\)"\{0,1\}.*/\1/p' || true)
-            if [ "$LIVE" = "$SHA" ]; then echo "✅ gotvero.com is live on $SHA (attempt $i)"; exit 0; fi
-            echo "attempt $i/24: live=${LIVE:-<none>} — not yet, waiting 15s"
+            if [ "$LIVE" = "$SHA" ]; then echo "gotvero.com is live on $SHA (attempt $i)"; exit 0; fi
+            echo "attempt $i/24: live=${LIVE:-none} - not yet, waiting 15s"
             sleep 15
           done
-          echo "::error::gotvero.com did not report commit $SHA within ~6 minutes — the production build may have failed to go live. Check Vercel → vero → Deployments."
+          echo "::error::gotvero.com did not report commit $SHA within ~6 minutes - check Vercel -> vero -> Deployments."
           exit 1
