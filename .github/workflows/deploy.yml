@@ -1,0 +1,41 @@
+# Production deploy — pushes every merge to main live on Vercel (gotvero.com).
+#
+# WHY THIS EXISTS: the Vercel Git integration was building PREVIEWS for branches
+# but production wasn't updating on merges to main (2026-07-01: gotvero.com sat
+# on an old CLI deploy while five merged PRs never went live). This workflow
+# makes main → production unconditional, regardless of dashboard settings.
+#
+# REQUIRES one repository secret (add once):
+#   VERCEL_TOKEN — create at vercel.com → Account Settings → Tokens,
+#   then GitHub repo → Settings → Secrets and variables → Actions →
+#   New repository secret → name VERCEL_TOKEN, paste the token.
+#
+# The deploy uploads the source and Vercel builds it remotely (same as
+# `npx vercel --prod` from a laptop). `vercel link` pins the existing
+# project (vero / booking-app-s-projects) so it can never create a stray one.
+name: deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}   # allow manual "deploy now" from the Actions tab
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false   # let an in-flight deploy finish; queue the next
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fail fast if the token is missing
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "::error::VERCEL_TOKEN secret is not set. Add it: repo Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+      - name: Link to the existing Vercel project
+        run: npx vercel link --yes --project=vero --scope=booking-app-s-projects --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy to production
+        run: npx vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
