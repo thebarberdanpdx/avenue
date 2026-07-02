@@ -16940,7 +16940,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast 
   const aoInp = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
   const aoSectionLbl = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 2px 10px" };
   const aoMoneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)" };
-  const aoMoneyInput = { flex: 1, border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+  const aoMoneyInput = { flex: 1, minWidth: 0, width: "100%", border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
 
   if (editing && form) {
     return (
@@ -16959,14 +16959,14 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast 
         <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Hot Towel Finish" style={aoInp} />
 
         <div style={{ display: "flex", gap: 12 }}>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={aoSectionLbl}>Price</div>
             <div style={aoMoneyWrap}>
               <span style={{ padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 }}>$</span>
               <input type="number" inputMode="decimal" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="8" style={aoMoneyInput} />
             </div>
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={aoSectionLbl}>Extra time</div>
             <div style={aoMoneyWrap}>
               <input type="number" inputMode="numeric" value={form.extraMin} onChange={(e) => setForm({ ...form, extraMin: e.target.value })} placeholder="0" style={{ ...aoMoneyInput, paddingLeft: 16 }} />
@@ -17080,7 +17080,7 @@ function QuestionsEditor({ services, setServices, business, setBusiness, showToa
   const aoInp = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
   const aoSectionLbl = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 2px 10px" };
   const aoMoneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)" };
-  const aoMoneyInput = { flex: 1, border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
+  const aoMoneyInput = { flex: 1, minWidth: 0, width: "100%", border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
 
   if (editing && form) {
     return (
@@ -17102,14 +17102,14 @@ function QuestionsEditor({ services, setServices, business, setBusiness, showToa
             </div>
             <textarea value={o.desc} onChange={(e) => setOpt(oi, { desc: e.target.value })} placeholder="Description clients read (optional)" rows={2} style={{ ...aoInp, marginTop: 10, resize: "vertical", minHeight: 56, lineHeight: 1.5 }} />
             <div style={{ display: "flex", gap: 12, marginTop: 10 }}>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ ...aoSectionLbl, margin: "0 2px 6px" }}>Extra price</div>
                 <div style={aoMoneyWrap}>
                   <span style={{ padding: "0 0 0 16px", color: "var(--sub)", fontSize: 17 }}>$</span>
                   <input type="number" inputMode="decimal" value={o.price} onChange={(e) => setOpt(oi, { price: e.target.value })} placeholder="0" style={aoMoneyInput} />
                 </div>
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ ...aoSectionLbl, margin: "0 2px 6px" }}>Extra time</div>
                 <div style={aoMoneyWrap}>
                   <input type="number" inputMode="numeric" value={o.min} onChange={(e) => setOpt(oi, { min: e.target.value })} placeholder="0" style={{ ...aoMoneyInput, paddingLeft: 16 }} />
