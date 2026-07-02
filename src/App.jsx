@@ -3276,21 +3276,28 @@ function GroupedTimes({ slots, selected, onPick, bestSet, cell }) {
     { key: "AFTERNOON", label: "Afternoon", list: slots.filter((t) => t >= 720 && t < 1020) },
     { key: "EVENING", label: "Evening", list: slots.filter((t) => t >= 1020) },
   ].filter((g) => g.list.length);
+  // On a light day (few openings) show every section expanded — a new client shouldn't
+  // have to tap a collapsed section to discover the one afternoon slot. Busy days keep the
+  // accordion so the list stays scannable.
+  const expandAll = slots.length <= 10;
   const selGroup = groups.find((g) => g.list.includes(selected));
-  const [open, setOpen] = useState(selGroup ? selGroup.key : (groups[0] && groups[0].key));
+  const [open, setOpen] = useState(() =>
+    expandAll ? new Set(groups.map((g) => g.key)) : new Set([selGroup ? selGroup.key : (groups[0] && groups[0].key)])
+  );
+  const toggle = (k) => setOpen((cur) => { const n = new Set(cur); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   return (
     <div style={{ marginBottom: 24 }}>
       {groups.map((g) => {
-        const isOpen = open === g.key;
-        const range = `${fmtTime(g.list[0])} – ${fmtTime(g.list[g.list.length - 1])}`;
+        const isOpen = open.has(g.key);
+        const count = g.list.length;
         return (
-          <div key={g.key} style={{ borderTop: "1px solid var(--line)" }}>
-            <button onClick={() => setOpen(isOpen ? null : g.key)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "none", border: "none", padding: "16px 2px", cursor: "pointer", color: "var(--text)", textAlign: "left" }}>
-              <span><span style={{ fontFamily: FONT_BODY, fontSize: 12.5, letterSpacing: 1.5, fontWeight: 700, textTransform: "uppercase" }}>{g.label}</span><span style={{ fontSize: 13.5, color: "var(--sub)", marginLeft: 10 }}>{range}</span></span>
-              <ChevronDown size={18} style={{ color: "var(--faint)", flexShrink: 0, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+          <div key={g.key} style={{ marginBottom: 6 }}>
+            <button onClick={() => toggle(g.key)} style={{ width: "100%", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, background: "none", border: "none", padding: "12px 2px 11px", cursor: "pointer", color: "var(--text)", textAlign: "left" }}>
+              <span style={{ display: "flex", alignItems: "baseline" }}><span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500, letterSpacing: "-0.2px" }}>{g.label}</span><span style={{ fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", marginLeft: 9, fontWeight: 500 }}>{count} {count === 1 ? "time" : "times"}</span></span>
+              <ChevronDown size={17} style={{ color: "var(--faint)", flexShrink: 0, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
             </button>
             {isOpen && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7, padding: "0 0 18px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 9, padding: "0 0 6px" }}>
                 {g.list.map((t) => (<button key={t} onClick={() => onPick(t)} style={cell(selected === t, bestSet && bestSet.has(t))}>{fmtTime(t)}</button>))}
               </div>
             )}
@@ -5579,7 +5586,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           };
           const ready = selectedDate && slot != null;
           const tabStyle = (on) => ({ background: "none", border: "none", padding: "0 1px 12px", marginBottom: -1, fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: on ? "var(--text)" : "var(--sub)", borderBottom: on ? "2px solid var(--text)" : "2px solid transparent", cursor: "pointer" });
-          const cell = (on) => ({ textAlign: "center", padding: "15px 4px", border: `1px solid ${on ? "var(--text)" : "var(--border)"}`, background: on ? "var(--text)" : "var(--panel)", color: on ? "var(--bg)" : "var(--text)", borderRadius: 2, fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" });
+          const cell = (on) => ({ textAlign: "center", padding: "16px 6px", border: `1.5px solid ${on ? "var(--text)" : "var(--border)"}`, background: on ? "var(--text)" : "var(--panel)", color: on ? "var(--bg)" : "var(--text)", borderRadius: 13, fontSize: 15.5, fontWeight: on ? 700 : 500, fontFamily: FONT_BODY, cursor: "pointer" });
           return (
             <div className="fade-up" style={{ color: "var(--text)", paddingTop: 4 }}>
               {/* "Does this look right?" — same confirm gate as the step-6 path, but this merged
@@ -5677,7 +5684,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               )}
 
               {wwPhase === "when" && selectedDate && !dayFull && (<>
-                <div style={{ fontFamily: FONT_BODY, fontSize: 12, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", color: "var(--text)", margin: "2px 2px 2px" }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
+                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, letterSpacing: "-0.3px", color: "var(--text)", margin: "6px 2px 2px" }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
+                <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", margin: "0 2px 14px" }}>{daySlots.length} {daySlots.length === 1 ? "opening" : "openings"}</div>
                 <GroupedTimes slots={daySlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} cell={cell} />
                 <button onClick={toWaitlist} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", padding: "2px 0 22px", color: "var(--sub)", fontSize: 13.5, lineHeight: 1.5, cursor: "pointer", fontFamily: FONT_BODY }}>Not seeing a time that works? <span style={{ color: "var(--text)", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>Join our waitlist</span></button>
               </>)}
@@ -6234,12 +6242,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             ); })()}
             {selectedDate && !dateIsFull && (<>
               {/* Selected day as a clean heading — keeps day-of-week + date + days-away phrasing for clarity */}
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--text)", marginBottom: 3 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--text)", fontWeight: 500, marginBottom: 16 }}>{daysFromNow(selectedDate)}</div>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, letterSpacing: "-0.3px", color: "var(--text)", marginBottom: 2 }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
+              <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", marginBottom: 16 }}>{daysFromNow(selectedDate)}{openSlots.length ? ` · ${openSlots.length} ${openSlots.length === 1 ? "opening" : "openings"}` : ""}</div>
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
               {!isMultiPerson && bestSet.size > 0 && openSlots.length > bestSet.size && (<div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--sub)", marginBottom: 11 }}><span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />Highlighted times have no wait — you're seen right away</div>)}
               {slotsReady ? (
-                <GroupedTimes slots={openSlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} bestSet={bestSet} cell={(on, best) => ({ background: on ? "var(--text)" : best ? "color-mix(in srgb, var(--text) 13%, transparent)" : "transparent", border: `${on || best ? "1.5px" : "1px"} solid ${on || best ? "var(--text)" : "var(--border)"}`, borderRadius: 8, padding: "14px 4px", color: on ? "var(--bg)" : "var(--text)", fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: on || best ? 600 : 500, cursor: "pointer" })} />
+                <GroupedTimes slots={openSlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} bestSet={bestSet} cell={(on, best) => ({ background: on ? "var(--text)" : best ? "color-mix(in srgb, var(--text) 13%, transparent)" : "var(--panel)", border: `1.5px solid ${on || best ? "var(--text)" : "var(--border)"}`, borderRadius: 13, padding: "16px 6px", color: on ? "var(--bg)" : "var(--text)", fontFamily: FONT_BODY, fontSize: 15.5, fontWeight: on ? 700 : best ? 600 : 500, cursor: "pointer" })} />
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{[0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 8 }} />))}</div>
               )}
