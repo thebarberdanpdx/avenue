@@ -113,6 +113,7 @@ const GUARDS = [
   { needle: "table === 'providers' && rows.length", label: "staff email/phone save-backstop (never blank on save)" },
   { needle: "!hasStoredSession()", label: "staff email/phone load-gate (sanitized feed can't overwrite owner)" },
   { needle: "setTabNonce(", label: "bottom-tab tap resets to tab root" },
+  { needle: "per-barber-pricing-lock", label: "per-barber price/time overrides on library questions & add-ons (service editor)" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
