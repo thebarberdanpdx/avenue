@@ -20170,7 +20170,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           }}
         />
       </Sheet>
-      <RegisterView open={registerOpen} onClose={() => setRegisterOpen(false)} services={services} business={business} setBusiness={setBusiness} clients={clients} setClients={setClients} providers={providers} me={me} showToast={showToast} />
+      <RegisterView open={registerOpen} onClose={() => setRegisterOpen(false)} services={services} business={business} setBusiness={setBusiness} clients={clients} setClients={setClients} providers={providers} me={me} showToast={showToast} shopId={shopId} />
       {/* Calendar header — date headline + a clean action row. VISUAL ONLY; all handlers unchanged. */}
       <div style={{ marginTop: 10, marginBottom: 20 }}>
         <button onClick={() => setShowDatePicker(true)} aria-label="Pick a date" style={{ background: "none", border: "none", padding: 0, margin: "8px 0 14px", textAlign: "left", color: "inherit", cursor: "pointer", display: "block", width: "auto" }}>
@@ -21696,7 +21696,7 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
 
 // The register — ring up a walk-in sale (no client needed). Records into the
 // Payments ledger via business.sales.
-function RegisterView({ open, onClose, services, business, setBusiness, clients, setClients, providers, me, showToast }) {
+function RegisterView({ open, onClose, services, business, setBusiness, clients, setClients, providers, me, showToast, shopId }) {
   const [items, setItems] = useState([]);
   const [discount, setDiscount] = useState("");
   const [customOpen, setCustomOpen] = useState(false);
@@ -21712,6 +21712,29 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
   const [onfileErr, setOnfileErr] = useState("");
 
   useEffect(() => { if (open) { setItems([]); setDiscount(""); setCustomOpen(false); setCName(""); setCPrice(""); setPayMode(null); setTendered(""); setClient(null); setClientPick(false); setClientQuery(""); setDone(null); setOnfileBusy(false); setOnfileErr(""); } }, [open]);
+
+  // A client can put a card on file by booking online moments before staff rings them up, so the
+  // dashboard's clients list (loaded at app start, no realtime) may not carry it yet — which showed
+  // "No card saved" for a client who actually had one. Whenever a client is attached here, pull their
+  // latest saved card from the server so the on-file option is never stale.
+  useEffect(() => {
+    const id = client?.id;
+    if (!id || !shopId) return;
+    const cur = client.card || client.savedCard;
+    if (cur && (cur.pmId || cur.paymentMethodId) && cur.stripeCustomerId) return; // already have a chargeable card
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from("clients").select("data").eq("shop_id", shopId).eq("id", id).maybeSingle();
+        const fresh = data && data.data && data.data.savedCard;
+        if (alive && fresh && fresh.pmId && fresh.stripeCustomerId) {
+          setClient((c) => (c && c.id === id ? { ...c, savedCard: fresh } : c));
+          setClients((list) => (list || []).map((c) => (c.id === id ? { ...c, savedCard: fresh } : c)));
+        }
+      } catch (e) {}
+    })();
+    return () => { alive = false; };
+  }, [client?.id, shopId]);
 
   const fm = (n) => "$" + (Math.round((n || 0) * 100) / 100).toFixed(2);
   const addItem = (name, price) => setItems((it) => [...it, { id: "li_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, price: Number(price) || 0, qty: 1 }]);
@@ -22382,8 +22405,25 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     if (!c) return null;
     const pm = c.paymentMethodId || c.pmId;
     if (!pm || !c.stripeCustomerId) return null;
-    return { paymentMethodId: pm, stripeCustomerId: c.stripeCustomerId, brand: c.brand || null, last4: c.last4 || null };
+    return { paymentMethodId: pm, stripeCustomerId: c.stripeCustomerId, brand: c.brand || null, last4: c.last4 || null, exp: c.exp || null };
   })();
+  // Pull the client's latest card on file — a card put on file by an online booking moments ago may
+  // not be in the dashboard's clients list yet (no realtime), which would hide it here and at checkout.
+  useEffect(() => {
+    const id = client?.id;
+    if (!id || !shopId || savedCard) return; // already have a usable card
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from("clients").select("data").eq("shop_id", shopId).eq("id", id).maybeSingle();
+        const fresh = data && data.data && data.data.savedCard;
+        if (alive && fresh && fresh.pmId && fresh.stripeCustomerId && setClients) {
+          setClients((list) => (list || []).map((c) => (c.id === id ? { ...c, savedCard: fresh } : c)));
+        }
+      } catch (e) {}
+    })();
+    return () => { alive = false; };
+  }, [client?.id, shopId, !!savedCard]);
   const saveCardToClient = (info) => {
     if (!client || !setClients) { showToast("Couldn't attach the card to this client."); return; }
     setClients((prev) => prev.map((c) => c.id === client.id ? { ...c, card: info } : c));
@@ -22671,6 +22711,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
                   <DetailRow T={T} label="Phone" value={client?.phone ? <PhoneLink number={client.phone} /> : "—"} accent />
                   <DetailRow T={T} label="Email" value={client?.email ? <EmailLink email={client.email} /> : "—"} />
+                  <DetailRow T={T} label="Card" value={savedCard ? `${savedCard.brand ? savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1) : "Card"} ···· ${savedCard.last4 || "••••"}${savedCard.exp ? ` · Exp ${savedCard.exp}` : ""}` : "No card on file"} />
                   <DetailRow T={T} label="Credit" value={
                     canEditPrice ? (
                       <button onClick={() => setCardOpen(true)} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: savedCard ? T.text : "var(--gold)", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500 }}>
