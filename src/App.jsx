@@ -3241,25 +3241,30 @@ function MonthCalendar({ selectedDate, onPick, selectable }) {
   const DOW = ["S", "M", "T", "W", "T", "F", "S"];
   const shift = (delta) => setYm((c) => { const nd = new Date(c.y, c.m + delta, 1); return { y: nd.getFullYear(), m: nd.getMonth() }; });
   const canPrev = (ym.y > today.getFullYear()) || (ym.y === today.getFullYear() && ym.m > today.getMonth());
-  const arrow = { background: "none", border: "none", padding: 6, cursor: "pointer", display: "flex", alignItems: "center" };
+  const arrow = { background: "none", border: "none", padding: 8, cursor: "pointer", display: "flex", alignItems: "center", borderRadius: 8 };
   return (
-    <div style={{ marginBottom: 22 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <button onClick={() => canPrev && shift(-1)} disabled={!canPrev} style={{ ...arrow, opacity: canPrev ? 1 : 0.3 }}><ChevronLeft size={20} style={{ color: "var(--text)" }} /></button>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, letterSpacing: "-0.2px" }}>{MONTHS[ym.m]} {ym.y}</div>
-        <button onClick={() => shift(1)} style={arrow}><ChevronRight size={20} style={{ color: "var(--text)" }} /></button>
+    <div style={{ border: "1.5px solid var(--border2)", borderRadius: 16, background: "var(--panel)", overflow: "hidden", boxShadow: "var(--shadow-sm)", marginBottom: 22 }}>
+      {/* month header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 12px", borderBottom: "1px solid var(--line)" }}>
+        <button onClick={() => canPrev && shift(-1)} disabled={!canPrev} style={{ ...arrow, opacity: canPrev ? 1 : 0.3 }}><ChevronLeft size={19} style={{ color: "var(--text)" }} /></button>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500, letterSpacing: "-0.2px" }}>{MONTHS[ym.m]} {ym.y}</div>
+        <button onClick={() => shift(1)} style={arrow}><ChevronRight size={19} style={{ color: "var(--text)" }} /></button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
-        {DOW.map((d, i) => <div key={i} style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.5, fontWeight: 600, color: "var(--faint)", padding: "4px 0" }}>{d}</div>)}
+      {/* weekday labels */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: "1px solid var(--line)", background: "var(--panel2)" }}>
+        {DOW.map((d, i) => <div key={i} style={{ textAlign: "center", fontSize: 10.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--faint)", padding: "8px 0" }}>{d}</div>)}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+      {/* day grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "6px 6px 8px" }}>
         {cells.map((d, i) => {
           if (!d) return <div key={i} />;
           const on = selectedDate && d.toDateString() === selectedDate.toDateString();
           const isPast = d < today;
           const ok = !isPast && selectable(d);
           return (
-            <button key={i} disabled={!ok} onClick={() => onPick(d)} style={{ aspectRatio: "1", borderRadius: "50%", border: "none", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : (ok ? "var(--text)" : "var(--faint)"), fontFamily: FONT_BODY, fontSize: 15, fontWeight: on ? 600 : 500, cursor: ok ? "pointer" : "default", opacity: ok ? 1 : 0.35 }}>{d.getDate()}</button>
+            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "3px 0" }}>
+              <button disabled={!ok} onClick={() => onPick(d)} style={{ width: 38, height: 38, borderRadius: "50%", border: on ? "none" : "1px solid transparent", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : (ok ? "var(--text)" : "var(--faint)"), fontFamily: FONT_BODY, fontSize: 15, fontWeight: on ? 600 : 500, cursor: ok ? "pointer" : "default", opacity: ok ? 1 : 0.3 }}>{d.getDate()}</button>
+            </div>
           );
         })}
       </div>
@@ -3567,6 +3572,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const galleryCapturedRef = useRef(false); // guard so post-booking reference photos capture to the gallery only once
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
   const [waProvId, setWaProvId] = useState(null); // Who & When merged screen: selected barber tab ("anyone" = First free)
+  const [wwPhase, setWwPhase] = useState("provider"); // merged who&when: "provider" (pick barber) → "when" (date/time)
   const [booking, setBooking] = useState(false);   // true while the confirmed booking is being saved to the server
   const [pendingFinish, setPendingFinish] = useState(false); // set when card is saved → effect commits the booking once
   const [bookErr, setBookErr] = useState(false);   // true if that save failed — client is told to retry, nothing was held
@@ -3845,7 +3851,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     if (slot == null || !slots.includes(slot)) setSlot(slots.length ? slots[0] : null);
   }, [wwMerged, waProvId]);
 
-  const back = () => { setShowWaitlist(false); setTapSel(null); if (cutFlow && cutFlow.phase === "addons") { setCutFlow({ phase: "cut" }); return; } if (cutFlow) { setCutFlow(null); return; } if (confirmSheet) { setConfirmSheet(null); return; } if (addonFlow) { setAddonFlow(null); if (draft && draft.cutTypes && draft.cutTypes.length) { setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "type"); setStep(2); } else { setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setStep(1); } return; } if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "finish") { setSimpleStep("what"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { if (matched) { setShowHome(true); return; } setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); if (matched) { setShowHome(true); return; } setStep(5); return; } if (step <= 0) { if (matched) { setShowHome(true); return; } return onExit(); } if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 3) { if (simpleChange !== null && draft) { const anyone = providers.find((p) => p.id === "anyone") || providers[0]; const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: anyone, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }; setCart([entry]); const hasFinish = (draft.addonGroups || []).some((g) => g.type === "addon"); setStep(0); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (draft && draft.cutTypes && draft.cutTypes.length) { setCutType(null); setBeardType(null); setCutPhase("type"); setStep(2); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setStep(6); return; } setStep(step - 1); };
+  const back = () => { setShowWaitlist(false); setTapSel(null); if (wwMerged && wwPhase === "when") { setWwPhase("provider"); setSlot(null); return; } if (cutFlow && cutFlow.phase === "addons") { setCutFlow({ phase: "cut" }); return; } if (cutFlow) { setCutFlow(null); return; } if (confirmSheet) { setConfirmSheet(null); return; } if (addonFlow) { setAddonFlow(null); if (draft && draft.cutTypes && draft.cutTypes.length) { setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "type"); setStep(2); } else { setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setStep(1); } return; } if (simpleStep === "what" && simpleCat) { setSimpleCat(null); return; } if (simpleStep === "what") { setSimpleStep(null); setStep(0); return; } if (simpleStep === "cut") { setSimpleStep("what"); return; } if (simpleStep === "finish") { setSimpleStep("what"); return; } if (simpleStep === "who") { setSimpleStep("cut"); return; } if (showCodeEntry) { setShowCodeEntry(false); setCodeEntry(""); return; } if (showWizardIntro) { if (wizardIdx > 0) { setWizardIdx(wizardIdx - 1); return; } setShowWizardIntro(false); if (groupPeople.length > 1) { setShowSchedChoice(true); } else { setShowWhoFor(true); } return; } if (showSchedChoice) { setShowSchedChoice(false); setShowWhoFor(true); return; } if (addingMember) { setAddingMember(false); return; } if (showUsual) { setShowUsual(false); setCameFromUsual(false); if (business?.familyBooking?.enabled !== false && matched && (matched.family || []).length >= 0) { setShowWhoFor(true); } else { if (matched) { setShowHome(true); return; } setStep(5); } return; } if (showWhoFor) { setShowWhoFor(false); if (matched) { setShowHome(true); return; } setStep(5); return; } if (step <= 0) { if (matched) { setShowHome(true); return; } return onExit(); } if (step === 1 && guidedCat) { setGuidedCat(null); return; } if (step === 1) { setStep(0); return; } if (step === 2) { if (draft && draft.beardTypes && draft.beardTypes.length && cutPhase === "addons") { setCutPhase("beard"); setBeardType(null); return; } if (draft && draft.cutTypes && draft.cutTypes.length && (cutPhase === "addons" || cutPhase === "beard")) { setCutPhase("type"); setCutType(null); setBeardType(null); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 3) { if (simpleChange !== null && draft) { const anyone = providers.find((p) => p.id === "anyone") || providers[0]; const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: anyone, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") }; setCart([entry]); const hasFinish = (draft.addonGroups || []).some((g) => g.type === "addon"); setStep(0); setSimpleStep(hasFinish ? "finish" : "change"); return; } if (draft && draft.cutTypes && draft.cutTypes.length) { setCutType(null); setBeardType(null); setCutPhase("type"); setStep(2); return; } setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type"); setStep(1); return; } if (step === 5) { setShowCodeEntry(false); setStep(0); return; } if (step === 6) { if (simplePref !== null) { setStep(0); setSimpleStep("who"); return; } if (cameFromUsual) { setStep(5); setShowUsual(true); return; } setStep(4); return; } if (step === 7) { if (cameFromUsual) { setStep(5); setShowUsual(true); return; } if (simplePref !== null || groupPeople.length > 1 || people.length > 1 || cart.length === 0) { setStep(6); return; } const last = cart[cart.length - 1]; setCart(cart.slice(0, -1)); setDraft(last.service); setDraftAddons(last.addons || {}); setCutType(last.cutType || null); setBeardType(last.beardType || null); setStep(6); return; } setStep(step - 1); };
 
   // Simple/quick flow hand-off: instead of the old "Anyone in particular?" + time picker,
   // pop the quick-flow entry back into draft state and land on the merged Who & When.
@@ -3860,6 +3866,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     }
     setCutPhase("addons");
     setSimpleStep(null);
+    setWwPhase("provider"); setWaProvId(null); // land on the barber picker first (its own screen)
     setStep(3);
   };
 
@@ -5633,39 +5640,60 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </div>
                 </Sheet>
               )}
-              <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px", margin: "0 0 24px" }}>Who &amp; when</h2>
-
-              <div style={{ display: "flex", gap: 28, borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
-                {waReal.map((p) => { const seen = bookedProvBefore(p.id, draft.id); return (
-                  <button key={p.id} onClick={() => setWaProvId(p.id)} style={{ ...tabStyle(pid === p.id), display: "inline-flex", alignItems: "center", gap: 6 }}>{p.name}{seen && <span title="Booked before" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />}</button>
-                ); })}
-                {waReal.length > 1 && (
-                  <button onClick={() => setWaProvId("anyone")} style={tabStyle(pid === "anyone")}>First Available</button>
-                )}
-              </div>
-              {prov && bookedProvBefore(prov.id, draft.id) && (
-                <div style={{ display: "flex", alignItems: "center", gap: 7, margin: "-8px 0 20px", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}><Check size={13} strokeWidth={3} style={{ color: "var(--gold)" }} /> You've booked {prov.name.split(" ")[0]} before.</div>
+              {wwPhase === "provider" && (() => {
+                const provRow = { width: "100%", display: "flex", alignItems: "center", gap: 14, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, boxShadow: "var(--shadow-sm)", padding: "13px 15px", marginBottom: 10, color: "var(--text)", textAlign: "left", cursor: "pointer" };
+                const firstDayFor = (id) => dateOptions.find((d) => waSlotsFor(id, d).length > 0) || null;
+                const soonLbl = (id) => { const d = firstDayFor(id); if (!d) return "No openings ahead"; const r = relativeDate(d); return "Soonest · " + (r.includes(",") ? r : `${r}, ${MONTHS[d.getMonth()]} ${d.getDate()}`); };
+                const pick = (id) => { setWaProvId(id); setSelectedDate(firstDayFor(id)); setSlot(null); setSlotConflict(false); setWwPhase("when"); };
+                return (
+                  <>
+                    <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px", margin: "0 0 6px" }}>Who's cutting?</h2>
+                    <p style={{ fontFamily: FONT_BODY, fontSize: 14.5, color: "var(--sub)", margin: "0 0 22px", lineHeight: 1.5 }}>Pick your barber, or let us find the first opening.</p>
+                    {waReal.length > 1 && (
+                      <button onClick={() => pick("anyone")} style={provRow}>
+                        <span style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={20} style={{ color: "var(--sub)" }} /></span>
+                        <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>First available</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>Soonest across the team</span></span>
+                        <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                      </button>
+                    )}
+                    {waReal.map((p) => { const seen = bookedProvBefore(p.id, draft.id); return (
+                      <button key={p.id} onClick={() => pick(p.id)} style={provRow}>
+                        <span style={{ width: 46, height: 46, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{p.photo ? <img src={imgUrl(p.photo, 120)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, color: "var(--sub)" }}>{(p.name || "?").charAt(0)}</span>}</span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>{p.name}{seen && <span title="Booked before" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />}</span>
+                          <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>{seen ? "You've booked before" : soonLbl(p.id)}</span>
+                        </span>
+                        <ChevronRight size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
+                      </button>
+                    ); })}
+                  </>
+                );
+              })()}
+              {wwPhase === "when" && (
+                <button onClick={() => { setWwPhase("provider"); setSlot(null); }} style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 24, padding: "6px 12px 6px 7px", marginBottom: 18, cursor: "pointer", color: "var(--text)", fontFamily: FONT_BODY, fontSize: 13.5, fontWeight: 500 }}>
+                  <span style={{ width: 28, height: 28, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "center" }}>{prov && prov.photo ? <img src={imgUrl(prov.photo, 80)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Users size={15} style={{ color: "var(--sub)" }} />}</span>
+                  <span>with <b style={{ fontWeight: 600 }}>{prov ? prov.name.split(" ")[0] : "first available"}</b></span>
+                  <span style={{ color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2 }}>Change</span>
+                </button>
               )}
 
-              {(() => { const dateSet = new Set(dateOptions.map((d) => d.toDateString())); return (
+              {wwPhase === "when" && (() => { const dateSet = new Set(dateOptions.map((d) => d.toDateString())); return (
                 <MonthCalendar selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => dateSet.has(d.toDateString())} />
               ); })()}
 
-              {selectedDate && !dayFull && (<>
+              {wwPhase === "when" && selectedDate && !dayFull && (<>
                 <div style={{ fontFamily: FONT_BODY, fontSize: 12, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", color: "var(--text)", margin: "2px 2px 2px" }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
                 <GroupedTimes slots={daySlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} cell={cell} />
                 <button onClick={toWaitlist} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", padding: "2px 0 22px", color: "var(--sub)", fontSize: 13.5, lineHeight: 1.5, cursor: "pointer", fontFamily: FONT_BODY }}>Not seeing a time that works? <span style={{ color: "var(--text)", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>Join our waitlist</span></button>
               </>)}
-              {dayFull && (
+              {wwPhase === "when" && dayFull && (
                 <div style={{ margin: "6px 0 24px" }}>
                   <div style={{ fontSize: 15.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>Fully booked that day — try another day, or someone else.</div>
                   <button onClick={toWaitlist} style={{ background: "none", border: "none", padding: 0, color: "var(--text)", fontSize: 13.5, fontWeight: 500, letterSpacing: 0.5, textDecoration: "underline", textUnderlineOffset: 4, cursor: "pointer" }}>Join the waitlist</button>
                 </div>
               )}
-              {!selectedDate && (
-                <div style={{ fontSize: 15.5, color: "var(--sub)", lineHeight: 1.5, margin: "6px 0 24px" }}>No openings ahead{prov ? ` with ${prov.name}` : ""} — try someone else.</div>
-              )}
 
+              {wwPhase === "when" && (
               <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
                 {ready && (
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 14 }}>
@@ -5675,6 +5703,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 )}
                 <button disabled={!ready} onClick={commit} style={{ width: "100%", background: ready ? "var(--text)" : "var(--panel2)", color: ready ? "var(--bg)" : "var(--faint)", border: "none", textAlign: "center", padding: 15, borderRadius: 2, fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", cursor: ready ? "pointer" : "default" }}>Continue</button>
               </div>
+              )}
             </div>
           );
         })()}
