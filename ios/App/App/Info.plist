@@ -24,6 +24,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- Stripe Terminal / Tap to Pay on iPhone requires location access; iOS hard-crashes
+	     any app that touches location without this usage-description string. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Vero uses your location to enable secure in-person (Tap to Pay) card payments, as required by our payment processor.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
