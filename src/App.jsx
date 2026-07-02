@@ -3228,42 +3228,39 @@ function ServicePhotoStrip({ photos }) {
 
 // Mango-style month calendar for the booking date step. `selectable(date)` decides which days can
 // be tapped (bookable days within the horizon); past days are always disabled.
+// Compact 2-week calendar for the booking date step. `selectable(date)` returns whether the day has
+// any openings; days that are booked out / unavailable (and past days) render greyed and disabled.
 function MonthCalendar({ selectedDate, onPick, selectable }) {
-  const base = selectedDate || new Date();
-  const [ym, setYm] = useState({ y: base.getFullYear(), m: base.getMonth() });
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const first = new Date(ym.y, ym.m, 1);
-  const startDow = first.getDay();
-  const daysInMonth = new Date(ym.y, ym.m + 1, 0).getDate();
-  const cells = [];
-  for (let i = 0; i < startDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(ym.y, ym.m, d));
+  const sundayOf = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - x.getDay()); return x; };
+  const [weekStart, setWeekStart] = useState(sundayOf(selectedDate || today));
+  const days = Array.from({ length: 14 }, (_, i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate() + i); return d; });
   const DOW = ["S", "M", "T", "W", "T", "F", "S"];
-  const shift = (delta) => setYm((c) => { const nd = new Date(c.y, c.m + delta, 1); return { y: nd.getFullYear(), m: nd.getMonth() }; });
-  const canPrev = (ym.y > today.getFullYear()) || (ym.y === today.getFullYear() && ym.m > today.getMonth());
+  const shift = (delta) => setWeekStart((w) => { const nd = new Date(w); nd.setDate(w.getDate() + delta * 14); return nd; });
+  const canPrev = weekStart > sundayOf(today);
+  const mid = new Date(weekStart); mid.setDate(weekStart.getDate() + 6); // label off mid-window
   const arrow = { background: "none", border: "none", padding: 8, cursor: "pointer", display: "flex", alignItems: "center", borderRadius: 8 };
   return (
     <div style={{ border: "1.5px solid var(--border2)", borderRadius: 16, background: "var(--panel)", overflow: "hidden", boxShadow: "var(--shadow-sm)", marginBottom: 22 }}>
-      {/* month header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 12px", borderBottom: "1px solid var(--line)" }}>
+      {/* header — two weeks at a time, arrows page by a fortnight */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 10px", borderBottom: "1px solid var(--line)" }}>
         <button onClick={() => canPrev && shift(-1)} disabled={!canPrev} style={{ ...arrow, opacity: canPrev ? 1 : 0.3 }}><ChevronLeft size={19} style={{ color: "var(--text)" }} /></button>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500, letterSpacing: "-0.2px" }}>{MONTHS[ym.m]} {ym.y}</div>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 500, letterSpacing: "-0.2px" }}>{MONTHS[mid.getMonth()]} {mid.getFullYear()}</div>
         <button onClick={() => shift(1)} style={arrow}><ChevronRight size={19} style={{ color: "var(--text)" }} /></button>
       </div>
       {/* weekday labels */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: "1px solid var(--line)", background: "var(--panel2)" }}>
-        {DOW.map((d, i) => <div key={i} style={{ textAlign: "center", fontSize: 10.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--faint)", padding: "8px 0" }}>{d}</div>)}
+        {DOW.map((d, i) => <div key={i} style={{ textAlign: "center", fontSize: 10.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--faint)", padding: "7px 0" }}>{d}</div>)}
       </div>
-      {/* day grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "6px 6px 8px" }}>
-        {cells.map((d, i) => {
-          if (!d) return <div key={i} />;
+      {/* two week rows */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "7px 6px 9px" }}>
+        {days.map((d, i) => {
           const on = selectedDate && d.toDateString() === selectedDate.toDateString();
           const isPast = d < today;
           const ok = !isPast && selectable(d);
           return (
             <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "3px 0" }}>
-              <button disabled={!ok} onClick={() => onPick(d)} style={{ width: 38, height: 38, borderRadius: "50%", border: on ? "none" : "1px solid transparent", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : (ok ? "var(--text)" : "var(--faint)"), fontFamily: FONT_BODY, fontSize: 15, fontWeight: on ? 600 : 500, cursor: ok ? "pointer" : "default", opacity: ok ? 1 : 0.3 }}>{d.getDate()}</button>
+              <button disabled={!ok} onClick={() => onPick(d)} style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : (ok ? "var(--text)" : "var(--faint)"), fontFamily: FONT_BODY, fontSize: 15, fontWeight: on ? 600 : 500, cursor: ok ? "pointer" : "default", opacity: ok ? 1 : 0.28, textDecoration: (!ok && !isPast) ? "line-through" : "none" }}>{d.getDate()}</button>
             </div>
           );
         })}
@@ -5677,9 +5674,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </button>
               )}
 
-              {wwPhase === "when" && (() => { const dateSet = new Set(dateOptions.map((d) => d.toDateString())); return (
-                <MonthCalendar selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => dateSet.has(d.toDateString())} />
-              ); })()}
+              {wwPhase === "when" && (
+                <MonthCalendar selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => waSlotsFor(pid, d).length > 0} />
+              )}
 
               {wwPhase === "when" && selectedDate && !dayFull && (<>
                 <div style={{ fontFamily: FONT_BODY, fontSize: 12, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", color: "var(--text)", margin: "2px 2px 2px" }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
