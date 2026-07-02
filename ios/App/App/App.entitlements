@@ -4,7 +4,9 @@
 <dict>
 	<key>aps-environment</key>
 	<string>production</string>
-	<key>com.apple.developer.proximity-reader.payment.acceptance</key>
-	<true/>
+	<!-- Tap to Pay entitlement (com.apple.developer.proximity-reader.payment.acceptance)
+	     removed until Apple approves the Tap to Pay request (Case-ID 20814883) —
+	     with it present but ungranted, automatic signing fails and the build breaks.
+	     Re-add the key once Apple grants it. -->
 </dict>
 </plist>
