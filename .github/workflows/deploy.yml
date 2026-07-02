@@ -34,3 +34,18 @@ jobs:
             exit 1
           fi
           curl -fsS -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}" -o /dev/null -w "Vercel deploy hook fired: HTTP %{http_code}\n"
+      # Confirm gotvero.com is ACTUALLY serving this commit — not just that the hook was accepted.
+      # /api/version reports the build's VERCEL_GIT_COMMIT_SHA (no-store). Poll until it matches
+      # this workflow's commit, or fail loudly so a stuck/failed production build can't look "shipped".
+      - name: Verify gotvero.com is serving this commit
+        run: |
+          SHA="${{ github.sha }}"
+          echo "Waiting for https://gotvero.com/api/version to report $SHA …"
+          for i in $(seq 1 24); do
+            LIVE=$(curl -fsS --max-time 15 "https://gotvero.com/api/version" 2>/dev/null | sed -n 's/.*"sha":"\{0,1\}\([0-9a-f]\{7,40\}\)"\{0,1\}.*/\1/p' || true)
+            if [ "$LIVE" = "$SHA" ]; then echo "✅ gotvero.com is live on $SHA (attempt $i)"; exit 0; fi
+            echo "attempt $i/24: live=${LIVE:-<none>} — not yet, waiting 15s"
+            sleep 15
+          done
+          echo "::error::gotvero.com did not report commit $SHA within ~6 minutes — the production build may have failed to go live. Check Vercel → vero → Deployments."
+          exit 1
