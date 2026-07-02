@@ -3258,9 +3258,12 @@ function MonthCalendar({ selectedDate, onPick, selectable }) {
           const on = selectedDate && d.toDateString() === selectedDate.toDateString();
           const isPast = d < today;
           const ok = !isPast && selectable(d);
+          const isToday = d.toDateString() === today.toDateString();
           return (
-            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "3px 0" }}>
-              <button disabled={!ok} onClick={() => onPick(d)} style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : (ok ? "var(--text)" : "var(--faint)"), fontFamily: FONT_BODY, fontSize: 15, fontWeight: on ? 600 : 500, cursor: ok ? "pointer" : "default", opacity: ok ? 1 : 0.28, textDecoration: (!ok && !isPast) ? "line-through" : "none" }}>{d.getDate()}</button>
+            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "3px 0" }}>
+              {/* bookable days get a warm dot so open dates read at a glance; unavailable days just dim (no strike-through — that read as "broken") */}
+              <button disabled={!ok} onClick={() => onPick(d)} style={{ width: 40, height: 40, borderRadius: "50%", border: (isToday && ok && !on) ? "1.5px solid var(--border2)" : "none", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : (ok ? "var(--text)" : "var(--faint)"), fontFamily: FONT_BODY, fontSize: 15, fontWeight: on ? 600 : 500, cursor: ok ? "pointer" : "default", opacity: ok ? 1 : 0.32 }}>{d.getDate()}</button>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", marginTop: 3, background: (ok && !on) ? "var(--gold)" : "transparent" }} />
             </div>
           );
         })}
@@ -5686,7 +5689,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               {wwPhase === "when" && selectedDate && !dayFull && (<>
                 <div style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, letterSpacing: "-0.3px", color: "var(--text)", margin: "6px 2px 2px" }}>{DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}</div>
                 <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, color: "var(--sub)", margin: "0 2px 14px" }}>{daySlots.length} {daySlots.length === 1 ? "opening" : "openings"}</div>
-                <GroupedTimes slots={daySlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} cell={cell} />
+                <GroupedTimes key={"g-" + (pid || "any") + "-" + selectedDate.toDateString()} slots={daySlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} cell={cell} />
                 <button onClick={toWaitlist} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", padding: "2px 0 22px", color: "var(--sub)", fontSize: 13.5, lineHeight: 1.5, cursor: "pointer", fontFamily: FONT_BODY }}>Not seeing a time that works? <span style={{ color: "var(--text)", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>Join our waitlist</span></button>
               </>)}
               {wwPhase === "when" && dayFull && (
@@ -6247,7 +6250,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
               {!isMultiPerson && bestSet.size > 0 && openSlots.length > bestSet.size && (<div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--sub)", marginBottom: 11 }}><span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />Highlighted times have no wait — you're seen right away</div>)}
               {slotsReady ? (
-                <GroupedTimes slots={openSlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} bestSet={bestSet} cell={(on, best) => ({ background: on ? "var(--text)" : best ? "color-mix(in srgb, var(--text) 13%, transparent)" : "var(--panel)", border: `1.5px solid ${on || best ? "var(--text)" : "var(--border)"}`, borderRadius: 13, padding: "16px 6px", color: on ? "var(--bg)" : "var(--text)", fontFamily: FONT_BODY, fontSize: 15.5, fontWeight: on ? 700 : best ? 600 : 500, cursor: "pointer" })} />
+                <GroupedTimes key={"g6-" + selectedDate.toDateString()} slots={openSlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} bestSet={bestSet} cell={(on, best) => ({ background: on ? "var(--text)" : best ? "color-mix(in srgb, var(--text) 13%, transparent)" : "var(--panel)", border: `1.5px solid ${on || best ? "var(--text)" : "var(--border)"}`, borderRadius: 13, padding: "16px 6px", color: on ? "var(--bg)" : "var(--text)", fontFamily: FONT_BODY, fontSize: 15.5, fontWeight: on ? 700 : best ? 600 : 500, cursor: "pointer" })} />
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 26 }}>{[0, 1, 2, 3, 4, 5].map((i) => (<div key={"sk" + i} className="skeleton" style={{ height: 46, borderRadius: 8 }} />))}</div>
               )}
