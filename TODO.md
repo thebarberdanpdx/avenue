@@ -1,6 +1,6 @@
 # ✅ Vero — What's left to do (Dan's master list)
 
-_Last updated: 2026-07-02. The single, plain-English list of everything still wanted. Deeper detail lives in `AUDIT-TRACKER.md` (security items), `HARDENING-SHOP.md`, `HARDENING-SAAS.md`, and `SESSION-HANDOFF.md` (full history + how-to)._
+_Last updated: 2026-07-03. The single, plain-English list of everything still wanted. Deeper detail lives in `AUDIT-TRACKER.md` (security items), `HARDENING-SHOP.md`, `HARDENING-SAAS.md`, and `SESSION-HANDOFF.md` (full history + how-to)._
 
 **What we're doing, in one breath:** getting Vero safe + solid + polished enough to **(1) open your own shop**, and in parallel **(2) get it on TestFlight for testers.** The "sell it to other shops" path is a separate, much bigger someday-project (kept at the bottom).
 
@@ -16,8 +16,9 @@ Status legend: ☐ not started · ⏳ waiting on someone/something · ✅ done
 - ☐ **Booking link** — confirm the exact web address customers use lands on *your* shop (slug `avenue-phi`). *You + me.*
 - ☐ **Stripe pays you** — confirm your bank is connected + payouts are on in Stripe (charges are already live). *You, ~5 min.*
 - ☐ **One real test booking** — book as a customer → pay → confirmation email → shows on your calendar → refund it. The final proof. *Together, ~30 min.*
-- ☐ **Reminders firing** — decide: Vercel **Pro (~$20/mo)** OR a free timer I set up; then I switch them on. *(Email confirmations already work without this.)*
-- ⏳ **Texts (SMS) + auto-STOP** — turn on automatically when **Vonage approves your toll-free number** (in carrier review). I build the auto-STOP piece then. *Waiting on Vonage — nothing to do.*
+- ✅ **Reminders firing — DONE (2026-07-03).** On **Vercel Pro** now; a `*/5` cron pings the reminder sender every 5 min (the free GitHub timer throttled to ~hourly and kept missing the tight windows). Reminders also re-fire when you **move** an appointment, and a 2-hour catch-up window stops nonsensical late ones (no "2 days before" on a same-day booking). *One thing left to eyeball next session: confirm the `*/5` cron auto-fires — every send so far was a manual trigger.*
+- ✅ **Texts (SMS) — LIVE (2026-07-03).** **Vonage approved your toll-free number** and `SMS_LIVE=true` — confirmation + reminder texts send for real (you got the 15-min check-in text). Texts are GSM-safe (no more "?" glitch) and short to keep costs to pennies.
+  - ☐ **auto-STOP / HELP handler — still to build.** Carriers auto-handle STOP for toll-free at the network level, but we should record opt-outs ourselves (inbound-SMS webhook that flips `smsOptOut`). Reminders already skip anyone marked opted-out; nothing sets that flag from an inbound STOP yet. *Me, small.*
 
 ## 2) 📱 iOS app → TestFlight (for testers) — parallel, NOT a launch blocker
 Customers book on the **web**; the app is for you, staff, and testers.

@@ -4846,46 +4846,52 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             else if (hasCuts) { setCutPhase("type"); setStep(2); }
             else { startAddons(entry); }
           };
-          const metaFor = (svc) => {
-            // New model: the list shows what a service IS (its description), never price or time.
-            // Numbers appear only after a service is chosen — and are personalized for returning
-            // clients — so people pick the right service instead of the cheapest-looking one.
-            return ""; // list shows the service NAME only; the full description appears on the next screen
-          };
           const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.12, letterSpacing: "-0.4px", color: "var(--text)", margin: 0 };
-          const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55 };
+          const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 3.5, fontWeight: 600, textTransform: "uppercase", color: "var(--text2)" };
+          const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, marginTop: 9 };
           const showCats = liveCats.length > 1 && !guidedCat;
+
+          // Category chooser (only when more than one live category). Mirrors the first-time path.
+          if (showCats) {
+            return (
+              <div className="fade-up">
+                <div style={EYE}>Book an appointment</div>
+                <h2 style={{ ...HEAD, marginTop: 11 }}>What are you here for today?</h2>
+                <p style={LEAD}>Tell us the vibe — we'll take it from there.</p>
+                <div className="svc-menu">
+                  {liveCats.map((cat) => {
+                    const l = inCat(cat);
+                    return (
+                      <button key={cat} onClick={() => { setTapSel(cat); setTimeout(() => { if (l.length === 1) pickGuidedService(l[0]); else setGuidedCat(cat); }, 165); }} className={"svc-tile" + (tapSel === cat ? " sel" : "")}>
+                        <span style={{ flex: 1, minWidth: 0 }}><span className="svc-name" style={{ display: "block" }}>{cat}</span></span>
+                        <span className="svc-ar">&#8594;</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }
+
+          // Service list — clean flat rows (matches the first-time flow: no big heading, sans names,
+          // thin dividers, chevron). Returning/back-to-start must look identical, not the old boxed tiles.
           const activeCat = guidedCat || (liveCats.length === 1 ? liveCats[0] : null);
           const list = activeCat ? inCat(activeCat) : services.filter(visible);
           return (
             <div className="fade-up">
               {guidedCat && <button onClick={() => setGuidedCat(null)} style={{ background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 600, padding: 0, marginBottom: 14, cursor: "pointer", letterSpacing: 0.3 }}>‹ {guidedCat}</button>}
-              <div style={{ textAlign: "center", marginBottom: 8 }}>
-                <h2 style={{ ...HEAD, margin: 0 }}>{guidedCat ? "Pick your service" : (showCats ? "What are you here for today?" : "Book an appointment")}</h2>
-                <p style={{ ...LEAD, marginTop: 10 }}>{guidedCat ? ("Here's what we do in " + guidedCat + ".") : "Start here — we'll walk you through the rest."}</p>
-              </div>
-              <div className="svc-menu">
-                {showCats
-                  ? liveCats.map((cat) => {
-                      const l = inCat(cat);
-                      return (
-                        <button key={cat} onClick={() => { setTapSel(cat); setTimeout(() => { if (l.length === 1) pickGuidedService(l[0]); else setGuidedCat(cat); }, 165); }} className={"svc-tile" + (tapSel === cat ? " sel" : "")}>
-                          <span style={{ flex: 1, minWidth: 0 }}><span className="svc-name" style={{ display: "block" }}>{cat}</span></span>
-                          <span className="svc-ar">&#8594;</span>
-                        </button>
-                      );
-                    })
-                  : list.map((svc) => (
-                      <div key={svc.id} style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                        <button onClick={() => { setTapSel(svc.id); setTimeout(() => pickGuidedService(svc), 165); }} className={"svc-tile" + (tapSel === svc.id ? " sel" : "")}>
-                          <span style={{ flex: 1, minWidth: 0 }}>
-                            <span className="svc-name" style={{ display: "block" }}>{svc.name}</span>
-                            {metaFor(svc) ? <span className="svc-meta" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.4 }}>{metaFor(svc)}</span> : null}
-                          </span>
-                          <span className="svc-ar">&#8594;</span>
-                        </button>
-                      </div>
-                    ))}
+              {guidedCat && <h2 style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.2px", margin: "0 0 2px", textAlign: "left" }}>{guidedCat}</h2>}
+              <div style={{ borderTop: "1px solid var(--line)", marginTop: guidedCat ? 14 : 4 }}>
+                {list.map((svc) => (
+                  <div key={svc.id} style={{ borderBottom: "1px solid var(--line)", background: tapSel === svc.id ? "var(--panel2)" : "transparent", transition: "background .15s" }}>
+                    <button onClick={() => { setTapSel(svc.id); setTimeout(() => pickGuidedService(svc), 165); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "none", border: "none", padding: "18px 2px", textAlign: "left", cursor: "pointer" }}>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, letterSpacing: "-0.3px", color: "var(--text)" }}>{svc.name}</span>
+                      </span>
+                      <ChevronRight size={20} style={{ color: "var(--sub)", flexShrink: 0 }} />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           );
@@ -22884,30 +22890,40 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 );
               })()}
 
-              {/* On / At split */}
-              <div style={{ display: "flex", borderBottom: `1px solid ${T.line}` }}>
-                <div style={{ flex: 1, padding: "14px 18px" }}>
-                  <span style={{ fontStyle: "italic", color: T.faint, fontSize: 13, marginRight: 7 }}>On</span>
-                  {editing ? (
-                    <button onClick={() => setDateOpen(true)} style={EDIT_CHIP}>
-                      <Calendar size={14} style={{ color: "#9C7A2E" }} />
-                      <span style={{ fontSize: 16, fontWeight: 500 }}>{dLabel(draftDate)}</span>
-                      <ChevronDown size={13} style={{ color: "#9C7A2E" }} />
-                    </button>
-                  ) : (
-                    <span style={{ fontSize: 16, fontWeight: 500, color: T.text }}>{dLabel(apptDateObj)}</span>
-                  )}
-                </div>
-                <div style={{ width: 1, background: T.line }} />
-                <div style={{ flex: 1, padding: "14px 18px" }}>
-                  <span style={{ fontStyle: "italic", color: T.faint, fontSize: 13, marginRight: 7 }}>At</span>
-                  {editing ? (
-                    <button onClick={() => setPickList("time")} style={EDIT_CHIP}><span style={{ fontSize: 16, fontWeight: 500 }}>{fmtTime(draftStart)}</span><ChevronRight size={14} style={{ color: "#9C7A2E" }} /></button>
-                  ) : (
-                    <span style={{ fontSize: 16, fontWeight: 500, color: T.text }}>{fmtTime(appt.start)}</span>
-                  )}
-                </div>
-              </div>
+              {/* On / At — labeled date + time, aligned side by side (label over pill, pills level) */}
+              {(() => {
+                const dtLbl = { fontSize: 11.5, letterSpacing: 1.5, color: T.sub, fontWeight: 600, marginBottom: 8, textTransform: "uppercase" };
+                const dtChip = { ...EDIT_CHIP, width: "100%", boxSizing: "border-box", justifyContent: "space-between", padding: "9px 12px" };
+                return (
+                  <div style={{ display: "flex", gap: 12, padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={dtLbl}>On</div>
+                      {editing ? (
+                        <button onClick={() => setDateOpen(true)} style={dtChip}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                            <Calendar size={14} style={{ color: "#9C7A2E", flexShrink: 0 }} />
+                            <span style={{ fontSize: 16, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dLabel(draftDate)}</span>
+                          </span>
+                          <ChevronDown size={13} style={{ color: "#9C7A2E", flexShrink: 0 }} />
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 16, fontWeight: 500, color: T.text }}>{dLabel(apptDateObj)}</span>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={dtLbl}>At</div>
+                      {editing ? (
+                        <button onClick={() => setPickList("time")} style={dtChip}>
+                          <span style={{ fontSize: 16, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fmtTime(draftStart)}</span>
+                          <ChevronRight size={14} style={{ color: "#9C7A2E", flexShrink: 0 }} />
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 16, fontWeight: 500, color: T.text }}>{fmtTime(appt.start)}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {editing && timeOrDayChanged && (
                 <div onClick={() => setNotifyChange((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderBottom: `1px solid ${T.line}`, cursor: "pointer" }}>
