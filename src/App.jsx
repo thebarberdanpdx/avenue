@@ -712,6 +712,9 @@ const THEMES = [
 ];
 const THEME_CATS = ["Crisp & Minimal", "Bold & Sleek"];
 const THEME_IDS = THEMES.map((t) => t.id);
+// The app-wide default theme — used for new shops, as the final fallback when no valid theme is
+// set, and on the pre-auth staff-login screen (which must not inherit a saved dark shop theme).
+const DEFAULT_THEME = "square";
 const buildThemeCSS = () => THEMES.map((th) => {
   const v = th.t;
   const grad = th.grad || `linear-gradient(135deg,${v.gold},${v.gold})`;
@@ -1755,7 +1758,7 @@ function App() {
   }, []);
   const userThemePref = signedInUser && business?.userThemes && business.userThemes[signedInUser];
   const theme = (userThemePref && THEME_IDS.includes(userThemePref)) ? userThemePref
-              : (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : "studio";
+              : (business?.theme && THEME_IDS.includes(business.theme)) ? business.theme : DEFAULT_THEME;
   const setTheme = (newTheme) => setBusiness((b) => {
     const nb = { ...(b || {}) };
     if (signedInUser) nb.userThemes = { ...(nb.userThemes || {}), [signedInUser]: newTheme };
@@ -2234,7 +2237,12 @@ function App() {
   // uses the per-user theme. Client components style purely off CSS vars, so swapping the applied
   // theme class is all that's needed.
   const CLIENT_FACING_VIEWS = ["client", "manage", "managetoken", "reviewtoken", "terms", "privacy", "preview"];
-  const appliedTheme = CLIENT_FACING_VIEWS.includes(view) ? "studio" : theme;
+  // Client-facing surfaces force Studio; the pre-auth staff login (view "shop" with no session)
+  // uses the clean app default rather than whatever dark theme the shop saved — a plain sign-in
+  // screen shouldn't render in the owner's dashboard theme. Everything else uses the per-user theme.
+  const appliedTheme = CLIENT_FACING_VIEWS.includes(view) ? "studio"
+                     : (view === "shop" && !session) ? DEFAULT_THEME
+                     : theme;
 
   // Mirror the theme class onto <html> so CSS variables (--gold, --bg, --text, etc.) cascade
   // to portaled content too (booking form, conflict popup, etc. — these render under document.body,
@@ -3953,13 +3961,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     }
   };
   // Toggle an optional add-on on the add-ons screen.
-  const toggleExtra = (group) => {
-    const cur = cart[0] || {}; const a = { ...(cur.addons || {}) };
-    const turningOn = !a[group.id];
-    if (a[group.id]) delete a[group.id]; else a[group.id] = true;
-    putEntry({ ...cur, addons: a });
-    if (turningOn) { const it = group.item || {}; const photos = group.photo ? [group.photo] : []; if ((it.desc && String(it.desc).trim()) || photos.length) { setConfIdx(0); setPickConfirm({ name: it.name || group.label, desc: it.desc || "", photos }); } }
-  };
   const choiceGroupsOf = (svc) => (svc?.addonGroups || []).filter((g) => g.type === "choice");
   const extraGroupsOf = (svc) => (svc?.addonGroups || []).filter((g) => g.type === "addon");
   // All required choice groups must be answered before leaving the cut screen.
@@ -4953,11 +4954,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </div>
               );
             }
-            const it = g.item || {}; const on = !!(e.addons || {})[g.id]; const req = g.required === true; const declined = !!(e.declined || {})[g.id];
+            const it = g.item || {}; const on = !!(e.addons || {})[g.id]; const declined = !!(e.declined || {})[g.id];
             return (
               <div key={g.id} ref={refFn} className={cls} style={{ marginTop: gap, borderRadius: 16 }}>
                 <div style={qHead}>{g.label || (it.name ? `Add ${it.name}?` : "Add-on")}</div>
-                <button onClick={() => { if (req) answerRequired(g, true); else toggleExtra(g); }} style={rowBtn}>
+                {/* Every add-on shows a concrete Yes / No thanks pair — not just required ones — so the
+                    client always has an explicit answer to give (optional ones just don't block Continue). */}
+                <button onClick={() => answerRequired(g, true)} style={rowBtn}>
                   {radio(on)}
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 17.5, fontWeight: 600, letterSpacing: "-0.2px" }}>{g.yesLabel || `Yes${it.name ? ` — ${it.name}` : ""}`}</span>
@@ -4969,12 +4972,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     )}
                   </span>
                 </button>
-                {req && (
-                  <button onClick={() => answerRequired(g, false)} style={rowBtn}>
-                    {radio(declined)}
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 17.5, fontWeight: 600, letterSpacing: "-0.2px" }}>{g.noLabel || "No thanks"}</span>
-                  </button>
-                )}
+                <button onClick={() => answerRequired(g, false)} style={rowBtn}>
+                  {radio(declined)}
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 17.5, fontWeight: 600, letterSpacing: "-0.2px" }}>{g.noLabel || "No thanks"}</span>
+                </button>
               </div>
             );
           };
@@ -10130,7 +10131,7 @@ function OpenShopEditor({ onClose, onCreated }) {
       const { data: created, error } = await supabase.rpc("create_shop", { p_slug: effSlug, p_name: name.trim() });
       if (error || !created) { setErr(error ? error.message : "Couldn't open the shop."); setBusy(false); return; }
       // First full save — boots the shop with a clean config in the Electric identity.
-      const biz = { ...DEFAULT_BUSINESS, name: name.trim(), industry, theme: "slate", address: "", address2: "", cityZip: "", email: "", legalName: "", phones: [{ id: "ph1", label: "Main", number: "" }] };
+      const biz = { ...DEFAULT_BUSINESS, name: name.trim(), industry, theme: DEFAULT_THEME, address: "", address2: "", cityZip: "", email: "", legalName: "", phones: [{ id: "ph1", label: "Main", number: "" }] };
       await supabase.from("shops").upsert({ id: created, name: name.trim(), settings: { ...biz, _categories: ["Services"] } });
       // Seed the industry starter menu.
       const menu = STARTER_MENUS[industry] || STARTER_MENUS.barber;
