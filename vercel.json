@@ -15,6 +15,7 @@
     }
   ],
   "crons": [
+    { "path": "/api/send-reminders", "schedule": "*/5 * * * *" },
     { "path": "/api/calendar-run", "schedule": "0 9 * * *" },
     { "path": "/api/send-birthdays", "schedule": "0 15 * * *" }
   ]
