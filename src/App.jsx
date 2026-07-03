@@ -645,7 +645,7 @@ const SERVICE_TEMPLATES = [
     title: "Basic service",
     blurb: "Just a name, price and time. No questions, no add-ons — clients go straight to picking a time.",
     build: () => ({
-      name: "", price: "", duration: "", color: "slate", usesCutStyles: false,
+      name: "", price: "", duration: "", color: "none", usesCutStyles: false,
       booking: { available: true, description: "" },
       addonGroups: [],
     }),
@@ -700,6 +700,12 @@ const THEMES = [
     disp: "'Geist', sans-serif", body: "'Geist', sans-serif", grain: 0.02,
     canvas: "#FFFFFF",
     t: { bg:"#FFFFFF", panel:"#FFFFFF", panel2:"#F4F5F7", line:"#ECEEF1", border:"#E2E5EA", border2:"#CBCFD7", text:"#0F1115", text2:"#33363D", sub:"#5C6068", faint:"#888D97", gold:"#0F1115", onGold:"#FFFFFF", shadow:"rgba(15,20,35,.07)", overlay:"rgba(15,17,21,0.4)" } },
+  // Steel — Dan's chosen calendar language grown into a full theme (2026-07-03): graphite ink,
+  // white panels, cool steel-blue tint family, one ink accent. Barbershop, not salon.
+  { id: "steel", name: "Steel", tagline: "Graphite ink, steel blue", cat: "Crisp & Minimal", dark: false,
+    disp: "'Geist', sans-serif", body: "'Inter', sans-serif", grain: 0.02,
+    canvas: "linear-gradient(176deg,#FBFCFE,#EEF1F6)",
+    t: { bg:"#F5F7FA", panel:"#FFFFFF", panel2:"#EBF0F6", line:"#E8EBF0", border:"#DFE3EA", border2:"#C6CCD7", text:"#14171F", text2:"#333944", sub:"#5C6575", faint:"#959DAD", gold:"#1A2536", onGold:"#FFFFFF", shadow:"rgba(18,24,38,.07)", overlay:"rgba(16,20,30,0.42)" } },
   { id: "lagoon", name: "Lagoon", tagline: "Navy ink, teal accent", cat: "Crisp & Minimal", dark: false,
     disp: "'Poppins', sans-serif", body: "'Inter', sans-serif", grain: 0.035,
     canvas: "linear-gradient(176deg,#FBFEFE,#EDF7F7)",
@@ -729,7 +735,7 @@ const THEME_CATS = ["Crisp & Minimal", "Bold & Sleek"];
 const THEME_IDS = THEMES.map((t) => t.id);
 // The app-wide default theme — used for new shops, as the final fallback when no valid theme is
 // set, and on the pre-auth staff-login screen (which must not inherit a saved dark shop theme).
-const DEFAULT_THEME = "square";
+const DEFAULT_THEME = "steel";
 const buildThemeCSS = () => THEMES.map((th) => {
   const v = th.t;
   const grad = th.grad || `linear-gradient(135deg,${v.gold},${v.gold})`;
@@ -11309,11 +11315,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
       <SectionLbl>Calendar color</SectionLbl>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {SERVICE_PALETTE.map((c) => { const on = (form.color || "sage") === c.id; return (
+        {(() => { const noneOn = !form.color || form.color === "none"; return (
+          <button onClick={() => setForm({ ...form, color: "none" })} title="No color — use the calendar's steel default" style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--panel2)", border: noneOn ? "2px solid var(--text)" : "2px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{noneOn && <Check size={15} style={{ color: "var(--text)" }} />}</button>
+        ); })()}
+        {SERVICE_PALETTE.map((c) => { const on = form.color === c.id; return (
           <button key={c.id} onClick={() => setForm({ ...form, color: c.id })} title={c.name} style={{ width: 34, height: 34, borderRadius: "50%", background: c.hex, border: on ? "2px solid var(--text)" : "2px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={15} style={{ color: "var(--on-gold)" }} />}</button>
         ); })}
       </div>
-      <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 12, lineHeight: 1.5, fontWeight: 400 }}>Shows on the calendar before a client checks in. Once they're checked in or in service, the block switches to the status color.</p>
+      <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 12, lineHeight: 1.5, fontWeight: 400 }}>Paints this service's appointments on the calendar. Leave "No color" for the clean steel default. Checked-in and in-service blocks always switch to the status color.</p>
     </>
   );
   // Combo lives in Basics legacy view, but in the single-page layout it moves to Advanced.
@@ -12258,7 +12267,10 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <h2 style={{ fontFamily: FONT_DISPLAY, fontWeight: 500, fontSize: 23, letterSpacing: "-0.3px", margin: "0 0 4px" }}>Calendar color</h2>
             <p style={{ fontSize: 13, color: "var(--sub)", margin: "0 0 16px" }}>Shows on the calendar before a client checks in.</p>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", paddingBottom: 8 }}>
-              {SERVICE_PALETTE.map((c) => { const on = (form.color || "sage") === c.id; return (
+              {(() => { const noneOn = !form.color || form.color === "none"; return (
+                <button onClick={() => { setForm({ ...form, color: "none" }); setColorOpen(false); }} title="No color — use the calendar's steel default" style={{ width: 42, height: 42, borderRadius: "50%", background: "var(--panel2)", border: noneOn ? "3px solid var(--text)" : "3px dashed var(--border2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{noneOn && <Check size={17} style={{ color: "var(--text)" }} />}</button>
+              ); })()}
+              {SERVICE_PALETTE.map((c) => { const on = form.color === c.id; return (
                 <button key={c.id} onClick={() => { setForm({ ...form, color: c.id }); setColorOpen(false); }} title={c.name} style={{ width: 42, height: 42, borderRadius: "50%", background: c.hex, border: on ? "3px solid var(--text)" : "3px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={17} style={{ color: "var(--on-gold)" }} />}</button>
               ); })}
             </div>
@@ -20327,23 +20339,22 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
         })}
       </div>
 
-      {/* staff column headers */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
+      {/* staff column headers — plain bold names, Mango-style (no color chips) */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
         <div style={{ width: 56, flexShrink: 0 }} />
         {orderedStaff.map((p) => { const off = isOffDay(p); const editable = p.id !== "anyone"; return (
-          <div key={p.id} onClick={editable ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setHoursMenu({ providerId: p.id, cx: r.left + r.width / 2, top: r.bottom }); } : undefined} style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: off ? 0.55 : 1, minWidth: 0, cursor: editable ? "pointer" : "default" }}>
-            <span style={{ width: 22, height: 22, borderRadius: "50%", background: off ? "var(--border2)" : p.color, color: "#fff", fontSize: 10.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(p.name || "?").charAt(0).toUpperCase()}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: off ? "var(--faint)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}{off ? " · off" : ""}</span>
+          <div key={p.id} onClick={editable ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setHoursMenu({ providerId: p.id, cx: r.left + r.width / 2, top: r.bottom }); } : undefined} style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", opacity: off ? 0.55 : 1, minWidth: 0, cursor: editable ? "pointer" : "default" }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: off ? "var(--faint)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}{off ? " · off" : ""}</span>
           </div>
         ); })}
       </div>
 
       {/* the timeline grid */}
-      <div style={{ display: "flex", position: "relative", gap: 10 }}>
-        {/* time gutter — hour labels only, for a calmer grid */}
+      <div style={{ display: "flex", position: "relative", gap: 6 }}>
+        {/* time gutter — hour labels only, right-aligned against the grid line */}
         <div style={{ width: 56, flexShrink: 0, position: "relative", height: gridHeight }}>
           {quarterLines.filter((t) => t < DAY_END && t % 60 === 0).map((t) => (
-            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, right: 8, fontSize: 13, color: "var(--sub)", fontWeight: 500, transform: "translateY(-1px)" }}>
+            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, right: 10, fontSize: 12.5, color: "var(--faint)", fontWeight: 400, fontVariantNumeric: "tabular-nums", transform: "translateY(-50%)" }}>
               {fmtTime(t).replace(":00", "")}
             </div>
           ))}
@@ -20385,11 +20396,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           })();
           return (
             <div key={p.id}
-              style={{ flex: 1, position: "relative", height: gridHeight, background: "color-mix(in srgb, var(--panel2) 45%, var(--bg))", borderRadius: 14, boxShadow: "inset 0 0 0 1px var(--line)", overflow: "hidden" }}>
+              style={{ flex: 1, position: "relative", height: gridHeight, background: "var(--panel)", overflow: "hidden" }}>
               {/* off-shift shade: dim the hours outside this barber's shift for the selected day (behind cards, ignores taps) */}
               {(() => {
                 const h = hoursForDate(p, selectedDate);
-                const shade = "color-mix(in srgb, var(--text) 4%, transparent)";
+                const shade = "color-mix(in srgb, var(--text) 6%, transparent)";
                 if (!h || !h.on) return <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: gridHeight, background: shade, pointerEvents: "none" }} />;
                 const segs = [];
                 const sStart = Math.max(DAY_START, h.start);
@@ -20422,7 +20433,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               ); })}
               {/* open-gap markers — display only, sit behind the tap layer so tapping a gap still opens a new appointment */}
               {gapsForProvider(p).map((g) => (
-                <div key={`gap-${g.start}`} style={{ position: "absolute", top: (g.start - DAY_START) * PPM + 1, left: 4, right: 4, height: (g.end - g.start) * PPM - 2, borderRadius: 10, background: "color-mix(in srgb, var(--text) 3.5%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 500, letterSpacing: 0.2, color: "var(--faint)", pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
+                <div key={`gap-${g.start}`} style={{ position: "absolute", top: (g.start - DAY_START) * PPM + 1, left: 0, right: 0, height: (g.end - g.start) * PPM - 2, borderRadius: 3, background: "color-mix(in srgb, var(--text) 3.5%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 500, letterSpacing: 0.2, color: "var(--faint)", pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
                   {(g.end - g.start) >= 30 ? `${g.end - g.start} min open` : ""}
                 </div>
               ))}
@@ -20436,77 +20447,73 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                   </div>
                 );
               })()}
-              {/* appointment blocks */}
+              {/* appointment blocks — STEEL: the calendar's own fixed palette (Mango-style: one calm
+                  tint regardless of theme/service color). Flat near-square tiles, flush to the column,
+                  label → NAME → time hierarchy, quiet markers bottom-right. Dan-approved 2026-07-03. */}
               {col.map((a) => {
                 const isDragging = drag && drag.id === a.id && drag.armed;
                 const liveStart = isDragging ? a.start + drag.deltaMin : a.start;
                 const top = (liveStart - DAY_START) * PPM;
-                const height = (a.end - a.start) * PPM - 2;
-                const service = services.find((s) => s.id === a.serviceId);
+                const height = (a.end - a.start) * PPM - 4; // 4px breathing gap between stacked tiles
                 const isBlock = a.status === "block";
-                // cut-style color (set per cut in Cut Styles) wins; falls back to the service's own color
-                const _ctId = a.lineItems && a.lineItems[0] && a.lineItems[0].cutType;
-                const _ct = (_ctId && service && service.cutTypes) ? service.cutTypes.find((c) => c.id === _ctId) : null;
-                const _cutColor = (_ct && _ct.libId) ? ((cutLibrary || []).find((e) => e.id === _ct.libId) || {}).color : null;
-                let accent = hexById(_cutColor || service?.color);
-                if (a.status === "checked-in") accent = STATUS_COLORS["checked-in"];
-                else if (a.status === "in-service") accent = STATUS_COLORS["in-service"];
                 const isDone = a.status === "done";
-                // soft tinted background with a colored accent bar — clean & legible
-                const tint = `color-mix(in srgb, ${accent} 62%, var(--panel))`;
-                // In Studio the "in-service" accent is var(--live) = black, so its 62% tint is a dark
-                // fill — the normal dark/grey text would be unreadable. Flip ALL the block's text to
-                // light on the live (dark) in-service block.
-                const darkBlock = a.status === "in-service" && theme === "studio";
-                const onColor = darkBlock ? "#fff" : "var(--text)";
-                const subOn = darkBlock ? "rgba(255,255,255,0.72)" : "var(--sub)";
-                const text2On = darkBlock ? "rgba(255,255,255,0.88)" : "var(--text2)";
+                const live = a.status === "in-service";
+                const checked = a.status === "checked-in";
                 const blockBg = "repeating-linear-gradient(45deg, var(--panel2), var(--panel2) 7px, var(--line) 7px, var(--line) 14px)";
-                // Appointment blocks are filled with the service-assigned color in every theme
-                // (color-mix tint + accent border + accent left bar). Studio just gets the soft
-                // shadow tier via the --shadow-sm theme override. Done = neutral + faded.
-                const mono = theme === "studio";
-                const blkBg = isBlock ? blockBg : (isDone ? "var(--panel2)" : tint);
-                const blkBorder = `1px solid ${isBlock ? "var(--border)" : `color-mix(in srgb, ${accent} 30%, var(--border))`}`;
-                const blkLeft = `4px solid ${isBlock ? "var(--border2)" : (isDone ? "var(--border2)" : accent)}`;
-                const blkShadow = isDragging ? "var(--shadow-lg)" : "var(--shadow-sm)";
-                // Background for the end-time chip pinned to the block's bottom edge (matches the
-                // tile fill so it cleanly masks any text behind it).
-                const endBg = (isBlock || isDone) ? "var(--panel2)" : tint;
+                // Color cascade: an explicitly-picked cut/service color paints the tile (soft tint);
+                // "No color" (or unset) falls back to the STEEL default. Status overrides win:
+                // checked-in stays PURPLE · in-service = premium COPPER (steel's warm complement) ·
+                // done = neutral + faded · block = stripes.
+                const _svc = services.find((s) => s.id === a.serviceId);
+                const _ctId = a.lineItems && a.lineItems[0] && a.lineItems[0].cutType;
+                const _ct = (_ctId && _svc && _svc.cutTypes) ? _svc.cutTypes.find((c) => c.id === _ctId) : null;
+                const _cutColor = (_ct && _ct.libId) ? ((cutLibrary || []).find((e) => e.id === _ct.libId) || {}).color : null;
+                const _colorId = _cutColor || (_svc && _svc.color);
+                const custom = _colorId && _colorId !== "none" ? hexById(_colorId) : null;
+                const blkBg = isBlock ? blockBg
+                  : isDone ? "var(--panel2)"
+                  : live ? "#96621E"
+                  : checked ? `color-mix(in srgb, ${STATUS_COLORS["checked-in"]} 30%, var(--panel))`
+                  : custom ? `color-mix(in srgb, ${custom} 40%, var(--panel))`
+                  : "#DDE6F0";
+                const steelTile = !isBlock && !isDone && !live && !checked && !custom;
+                const nameOn = live ? "#FFFFFF" : steelTile ? "#1A2536" : "var(--text)";
+                const subOn = live ? "rgba(255,255,255,0.78)" : steelTile ? "#64748B" : "var(--sub)";
                 // Horizontal lane positioning — full width when alone, split into N equal lanes when overlapping.
                 const laneCount = a._laneCount || 1;
                 const lane = a._lane || 0;
                 const lanePos = laneCount > 1
-                  ? { left: `calc(${(lane / laneCount) * 100}% + 2px)`, width: `calc(${100 / laneCount}% - 4px)` }
-                  : { left: 3, right: 3 };
+                  ? { left: `calc(${(lane / laneCount) * 100}% + ${lane ? 2 : 0}px)`, width: `calc(${100 / laneCount}% - 2px)` }
+                  : { left: 0, right: 0 };
                 const isNew = !isBlock && !isDone && (!a.clientId || (() => { const c = clients.find((cl) => cl.id === a.clientId); return c && (c.visits || 0) === 0; })());
+                const rebooked = /rebook/i.test(a.title || "");
+                const range = `${fmtTime(liveStart)} - ${fmtTime(liveStart + (a.end - a.start))}`;
                 return (
                   <div key={a.id} data-appt
                     onClick={() => { const d = dragRef.current; if (d && (d.didDrag || d.scrolled)) return; setOpen(a); }}
                     onMouseDown={(e) => startDrag(e, a)} onTouchStart={(e) => startDrag(e, a)}
                     className={isDragging ? "" : "lift"}
-                    style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: isDone ? (mono ? 0.55 : 0.7) : 1, border: blkBorder, borderLeft: blkLeft, borderRadius: 12, padding: height > 40 ? "7px 10px" : "4px 10px", color: onColor, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", gap: 2, cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: blkShadow, transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
-                    {/* name — always one line, never wraps or collides */}
-                    <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: isNew ? 44 : 14 }}>{apptDisplayName(a, clients)}</span>
-                    {/* Top line: when the tile is tall enough to pin the end time to the bottom edge,
-                        show just the start here; otherwise show the full start–end range inline. */}
-                    {height > 34 && <span style={{ fontSize: 12, color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{height > 40 ? fmtTime(liveStart) : `${fmtTime(liveStart)} – ${fmtTime(liveStart + (a.end - a.start))}`}</span>}
-                    {/* service name */}
-                    {height > 58 && <div style={{ fontSize: 12.5, color: text2On, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.title}</div>}
+                    style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: isDone ? 0.6 : 1, border: "none", borderRadius: 3, padding: height > 44 ? "10px 13px" : "5px 13px", color: nameOn, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
+                    {/* service label — small caps above the name on tall-enough tiles */}
+                    {height > 44 && <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.title}</span>}
+                    {/* client name — the hero, always one line */}
+                    <span style={{ fontSize: 15.5, fontWeight: 700, lineHeight: 1.15, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: height > 44 ? 3 : 0, paddingRight: height <= 50 && isNew ? 34 : 0 }}>{apptDisplayName(a, clients)}</span>
+                    {/* full time range under the name */}
+                    {height > 62 && <span style={{ fontSize: 12.5, color: subOn, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{range}</span>}
                     {/* add-on detail only on tall blocks */}
-                    {height > 84 && a.detail && <div style={{ fontSize: 12, color: subOn, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{a.detail}</div>}
+                    {height > 96 && a.detail && <div style={{ fontSize: 12, color: subOn, lineHeight: 1.3, marginTop: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{a.detail}</div>}
+                    {/* quiet markers, bottom-right: ✎ note · ▱ photos · NEW · ↻ rebooked · ★ regular */}
                     {height > 50 && (
-                    <div style={{ position: "absolute", bottom: 5, right: 6, display: "flex", gap: 5, alignItems: "center", color: subOn }}>
-                      {a.hasNote && <Edit2 size={11} style={{ opacity: 0.7 }} />}
-                      {a.hasPhotos && <ImageIcon size={12} style={{ opacity: 0.7 }} />}
-                      {a.vip && <span style={{ fontSize: 13, color: darkBlock ? "#fff" : accent }}>★</span>}
+                    <div style={{ position: "absolute", bottom: 9, right: 11, display: "flex", gap: 7, alignItems: "center", color: subOn }}>
+                      {a.hasNote && <Edit2 size={11} style={{ opacity: 0.75 }} />}
+                      {a.hasPhotos && <ImageIcon size={12} style={{ opacity: 0.75 }} />}
+                      {isNew && <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8, color: nameOn }}>NEW</span>}
+                      {rebooked && <span style={{ fontSize: 13, lineHeight: 1 }}>↻</span>}
+                      {a.vip && <span style={{ fontSize: 13, color: nameOn }}>★</span>}
                     </div>
                     )}
-                    {/* end time pinned to the block's bottom edge — readable at a glance even when
-                        the appointment ends off the grid lines (e.g. 9:45, 10:20). */}
-                    {height > 40 && <span style={{ position: "absolute", bottom: 0, left: 0, fontSize: 10.5, fontWeight: 600, color: subOn, lineHeight: 1, padding: "2px 7px 3px 11px", background: endBg, borderRadius: "0 8px 0 11px", pointerEvents: "none", maxWidth: "75%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fmtTime(liveStart + (a.end - a.start))}</span>}
-                    {/* NEW tag — top-right; name reserves room for it so they never overlap */}
-                    {isNew && <span style={{ position: "absolute", top: 6, right: 7, fontSize: 9, fontWeight: 700, letterSpacing: 0.8, color: darkBlock ? "#fff" : "var(--gold)", border: `1px solid ${darkBlock ? "rgba(255,255,255,0.6)" : "var(--gold)"}`, borderRadius: 4, padding: "1px 4px", lineHeight: 1.3, background: "var(--wash)" }}>NEW</span>}
+                    {/* short tiles still flag a first-time client */}
+                    {height <= 50 && isNew && <span style={{ position: "absolute", top: 6, right: 11, fontSize: 9, fontWeight: 700, letterSpacing: 0.8, color: nameOn }}>NEW</span>}
                   </div>
                 );
               })}
@@ -20515,7 +20522,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
         })}
       </div>
 
-      <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 16, textAlign: "center" }}>Tap an appointment to check in, notify, or complete · drag it up or down to move it. ★ regular · ✎ note · ▱ photos.</p>
+      <p style={{ color: "var(--faint)", fontSize: 14, marginTop: 16, textAlign: "center" }}>Tap an appointment to check in, notify, or complete · drag it up or down to move it. ★ regular · ↻ rebooked · ✎ note · ▱ photos.</p>
 
       {/* drag-to-move confirmation — pinned so it's always visible on drop */}
       {/* WAITLIST MATCH — a freed slot matches waitlisted clients; confirm to notify */}
