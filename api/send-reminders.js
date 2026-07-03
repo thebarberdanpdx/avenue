@@ -33,13 +33,14 @@ async function handler(req, res) {
   const TZ = process.env.SHOP_TZ || "America/Los_Angeles";
   const now = Date.now();
   const HORIZON_MS = 3 * 24 * 60 * 60 * 1000; // look 3 days ahead — covers the 2-day reminder
-  // A reminder only fires within this window AFTER its scheduled send time. If a reminder's send
-  // time is staler than this, the appointment was booked after that reminder's lead window had
-  // already passed (e.g. a same-day booking) — so firing "2 days before" / "1 day before" now would
-  // be a nonsensical same-day catch-up. Skip those; only reminders whose lead time still applies go
-  // out. The window tolerates normal cron cadence / short delays; the appt-in-past guard above still
-  // stops anything from sending after the appointment itself.
-  const CATCHUP_MS = 6 * 60 * 60 * 1000; // 6 hours
+  // A reminder only fires within this window AFTER its scheduled send time. If the send time is
+  // staler than this, the appointment was booked (or moved) with less lead than the reminder's
+  // offset — e.g. a same-day booking, or an appointment nudged to 30 min out — so firing a
+  // "2 days before" / "1 day before" / "3 hours before" note now would be nonsensical. Skipping
+  // stale sends keeps only reminders whose lead time still applies. 2h is small enough to drop a
+  // "3 hours before" on a short-notice appointment, yet large enough to absorb the reminder cron's
+  // real cadence/delays. The appt-in-past guard above still stops anything after the appointment.
+  const CATCHUP_MS = 2 * 60 * 60 * 1000; // 2 hours
 
   let checked = 0, sent = 0, failed = 0;
 
@@ -108,7 +109,11 @@ async function handler(req, res) {
         if (now < sendAt) continue; // not due yet (appt still future, so it'll catch a later run)
         if (now - sendAt > CATCHUP_MS) continue; // window already lapsed when booked — don't send a stale, out-of-order reminder
 
-        const logId = `${shop.id}__${row.id}__${m.id}`;
+        // Key the idempotency log by the appointment's scheduled time too, so RESCHEDULING an
+        // appointment (bookedFor changes → apptMs changes) yields a fresh key and re-fires the
+        // reminders that apply to the new time. An unchanged appointment keeps the same key, so a
+        // reminder still never double-sends.
+        const logId = `${shop.id}__${row.id}__${m.id}__${apptMs}`;
         const { data: already } = await supa.from("message_log").select("id").eq("id", logId).maybeSingle();
         if (already) continue;
         checked++;
