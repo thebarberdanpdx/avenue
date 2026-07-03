@@ -20514,11 +20514,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     className={isDragging ? "" : "lift"}
                     style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: isDone ? 0.6 : 1, border: "none", borderRadius: 3, padding: height > 48 ? "10px 14px 6px" : "5px 14px", color: nameOn, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
                     {/* service label — small caps above the name on tall-enough tiles */}
-                    {height > 48 && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase", color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.title}</span>}
-                    {/* client name — the hero (Mango's measured 19/700), always one line */}
-                    <span style={{ fontSize: height > 48 ? 19 : 15, fontWeight: 700, lineHeight: 1.12, letterSpacing: "-0.2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: height > 48 ? 3 : 0, paddingRight: height <= 54 && isNew ? 34 : 0 }}>{apptDisplayName(a, clients)}</span>
+                    {height > 48 && <span style={{ fontSize: 10.5, fontWeight: 500, letterSpacing: 0.3, textTransform: "uppercase", color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.title}</span>}
+                    {/* client name — sized to FIT the full name like Mango (not truncate). Compact, not huge. */}
+                    <span style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: height > 48 ? 2 : 0, paddingRight: height <= 54 && isNew ? 34 : 0 }}>{apptDisplayName(a, clients)}</span>
                     {/* full time range under the name */}
-                    {height > 64 && <span style={{ fontSize: 13.5, color: subOn, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{range}</span>}
+                    {height > 64 && <span style={{ fontSize: 12.5, color: subOn, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{range}</span>}
                     {/* add-on detail only on tall blocks */}
                     {height > 110 && a.detail && <div style={{ fontSize: 12, color: subOn, lineHeight: 1.3, marginTop: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{a.detail}</div>}
                     {/* quiet markers, bottom-right: ✎ note · ▱ photos · NEW · ↻ rebooked · ★ regular */}
