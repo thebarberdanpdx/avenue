@@ -13584,11 +13584,12 @@ function WaitlistRulesEditor({ w, onChange }) {
   const delays = [15, 30, 45, 60];
   return (
     <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 22 }}>When an appointment is cancelled, the system finds waitlisted clients whose preferred time and staff member match the open slot, and reaches out with a link to book.</p>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>When an appointment is cancelled, the calendar's ⋯ menu lights up green if the freed time fits anyone waiting. Open the Waitlist there to see who fits and send each offer by hand.</p>
 
-      <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>How it sends</div>
-      <Opt active={w.mode === "ask"} title="Ask me first" sub="Show a confirmation listing who matches, and I send it." onClick={() => set({ mode: "ask" })} />
-      <Opt active={w.mode === "silent"} title="Send automatically (silent)" sub="The system notifies matching clients on its own — no prompt." onClick={() => set({ mode: "silent" })} />
+      <div style={{ background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 14, padding: 16, marginBottom: 6, display: "flex", gap: 12 }}>
+        <Bell size={18} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+        <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}><b style={{ color: "var(--text)" }}>Nothing is ever sent automatically.</b> You choose who gets each opening. Booked clients who asked for an earlier time are shown first, then the waitlist. Each offer goes out as a short text plus an email with a booking link — only when you tap “Send offer.”</div>
+      </div>
 
       <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, margin: "20px 0 8px" }}>Who it reaches</div>
       <Opt active={w.order === "longest"} title="Longest waiting first — one at a time" sub="Offer the slot to whoever has waited longest. If they don't book in time, it moves to the next person in line." onClick={() => set({ order: "longest" })} />
@@ -18703,7 +18704,7 @@ function NativeDiagnostics() {
 }
 
 // ---------- shared dashboard pieces ----------
-function WaitlistView({ waitlist, setWaitlist, onText, showToast, providers = [], services = [] }) {
+function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, providers = [], services = [] }) {
   const whenLabel = { early: "Early — open to 11am", midday: "Midday — 11am to 2pm", afternoon: "Afternoon — 2pm to close" };
   const whenWord = { early: "morning", midday: "midday", afternoon: "afternoon" };
   const [openId, setOpenId] = useState(null);
@@ -18743,7 +18744,8 @@ function WaitlistView({ waitlist, setWaitlist, onText, showToast, providers = []
 
   // Send the client an in-app notification that a slot opened, including a booking link.
   const notifyOpening = (w) => {
-    if (showToast) showToast(`In-app notification sent to ${(w.name || "client").split(" ")[0]} with a link to book.`);
+    if (onNotify) onNotify(w);
+    else if (showToast) showToast(`Open the calendar's Waitlist (⋯ menu) to send ${(w.name || "this client").split(" ")[0]} an offer.`);
     setOpenId(null);
   };
   const removeEntry = (w, i) => { setWaitlist(waitlist.filter((x, j) => (x.id || j) !== (w.id || i))); setOpenId(null); };
@@ -18789,7 +18791,7 @@ function WaitlistView({ waitlist, setWaitlist, onText, showToast, providers = []
               </div>
 
               <button className="lift" onClick={() => notifyOpening(open)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Bell size={17} /> Notify a space opened up</button>
-              <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.45, marginBottom: 16 }}>Sends {(open.name || "the client").split(" ")[0]} an in-app notification with a link to book the open slot.</p>
+              <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.45, marginBottom: 16 }}>Texts + emails {(open.name || "the client").split(" ")[0]} that a spot opened, with a link to book — sent only when you tap.</p>
 
               <button onClick={() => removeEntry(open, waitlist.indexOf(open))} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Trash2 size={16} /> REMOVE FROM WAITLIST</button>
             </div>
@@ -19560,6 +19562,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const DAY_START = ((business?.calendar?.dayStartHr ?? 7)) * 60;
   const DAY_END = ((business?.calendar?.dayEndHr ?? 22)) * 60;
   const [showWaitlistPanel, setShowWaitlistPanel] = useState(false);
+  // Openings the staff can offer to waitlist / "notify me if earlier" clients. Recorded when an
+  // appointment is cancelled or removed. NOTHING is ever sent automatically — the staff chooses who
+  // (if anyone) to offer each opening to from the Waitlist panel. (Dan: no auto-texts, ever.)
+  const [openings, setOpenings] = useState([]);
+  const bookLink = `https://gotvero.com/book?shop=${encodeURIComponent(shopId || "avenue-phi")}`;
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   const [calMenuOpen, setCalMenuOpen] = useState(false); // ⋯ overflow on the calendar header
   const [open, setOpen] = useState(null);
@@ -19760,10 +19767,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   };
   const handleFreedSlot = (freed) => {
     if (!freed || freed.status === "done" || freed.status === "block") return;
-    const matches = [...findWaitlistMatches(freed), ...findEarlierAlerts(freed)];
-    if (!matches.length) return;
-    if (wlRules.mode === "silent") sendWaitlistNotices(matches, freed); // auto-send, no prompt
-    else setWaitlistMatch({ freed, matches }); // ask first
+    // No automatic messages, EVER. Just record the opening — the calendar's ⋯ menu lights GREEN when
+    // an opening fits someone, and the staff sends each offer by hand from the Waitlist panel.
+    if (![...findWaitlistMatches(freed), ...findEarlierAlerts(freed)].length) return;
+    setOpenings((cur) => {
+      if ((cur || []).some((o) => o.apptId === freed.id)) return cur || [];
+      return [{ id: "op" + freed.id, apptId: freed.id, providerId: freed.providerId, bookedFor: freed.bookedFor, start: freed.start, end: freed.end, offered: [] }, ...(cur || [])];
+    });
   };
 
   const deleteAppt = (id) => {
@@ -20159,6 +20169,43 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const selectedDate = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(0, 0, 0, 0); return d; }, [dayOffset]);
   const sameDay = (iso, refDate) => { if (!iso) return false; const a = new Date(iso); return a.getFullYear() === refDate.getFullYear() && a.getMonth() === refDate.getMonth() && a.getDate() === refDate.getDate(); };
 
+  // Openings still genuinely free (not re-booked) + who fits each. Booked "notify me if earlier"
+  // clients sort ABOVE waitlist folks — they're already committed, so moving one up fills this slot
+  // AND frees theirs. Filled slots and already-offered people drop off on their own.
+  const liveOpenings = (openings || []).map((o) => {
+    const filled = (appts || []).some((a) => a.id !== o.apptId && a.providerId === o.providerId && a.status !== "cancelled" && a.status !== "block" && a.bookedFor && sameDay(a.bookedFor, new Date(o.bookedFor)) && a.start === o.start);
+    if (filled) return null;
+    const freed = { id: o.apptId, providerId: o.providerId, bookedFor: o.bookedFor, start: o.start, end: o.end };
+    const people = [...findEarlierAlerts(freed), ...findWaitlistMatches(freed)].filter((p) => !(o.offered || []).includes(p.id));
+    return people.length ? { ...o, people } : null;
+  }).filter(Boolean);
+  const hasOpeningMatches = liveOpenings.length > 0;
+
+  // Manually send ONE opening offer to ONE person: a 1-segment SMS (short link) + a fuller email.
+  // Staff-initiated only — never fires on its own. Respects a client's SMS opt-out.
+  const sendOpeningOffer = (person, opening) => {
+    const digitsOf = (s) => String(s || "").replace(/\D/g, "");
+    const appt = person.earlierApptId ? (appts || []).find((a) => a.id === person.earlierApptId) : null;
+    let cli = appt ? ((clients || []).find((c) => c.id === appt.clientId) || null) : null;
+    let ph = digitsOf(person.phone) || digitsOf(appt && appt.phone) || digitsOf(cli && cli.phone);
+    if (!cli && ph) cli = (clients || []).find((c) => digitsOf(c.phone) === ph) || null;
+    const email = (cli && cli.email) || (appt && appt.email) || "";
+    const canText = !!ph && !(cli && cli.smsOptOut === true);
+    if (!canText && !email) { showToast && showToast(`No phone or email on file for ${person.name || "them"}.`); return; }
+    const first = String(person.name || "there").split(" ")[0];
+    const bizName = business.name || "your barber";
+    const provName = (providers.find((p) => p.id === (opening && opening.providerId)) || {}).name || "";
+    const when = opening ? `${relativeDate(new Date(opening.bookedFor))} at ${fmtTime(opening.start)}` : "";
+    const sms = `${bizName}: an earlier spot just opened - book it before it's taken: ${bookLink}`;
+    const whenPhrase = when ? ` - ${when}${provName ? ` with ${provName}` : ""}` : "";
+    const emailTpl = `Good news, {client}! An earlier spot just opened up at {business}${whenPhrase}.\n\nThis opening is open to everyone and books first-come, so grab it as soon as you can. Tap this {book link} to book it before it's taken.\n\nSee you soon!`;
+    if (canText) fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: "text", to: { phone: ph, email: "", smsOptOut: false }, subject: `${bizName}: a spot opened`, body: sms }) }).catch(() => {});
+    if (email) fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: "email", to: { email, phone: "" }, subject: `${bizName}: a spot just opened up`, template: emailTpl, context: { client: first, business: bizName, bookUrl: bookLink } }) }).catch(() => {});
+    if (opening) setOpenings((cur) => (cur || []).map((o) => o.id === opening.id ? { ...o, offered: [...(o.offered || []), person.id] } : o));
+    const via = [canText ? "text" : null, email ? "email" : null].filter(Boolean).join(" + ");
+    showToast && showToast(`Offer sent to ${first}${via ? ` (${via})` : ""}.`);
+  };
+
   // Column order:
   //  1. The person being viewed (logged-in barber, or "view as X" from Pulse) leads.
   //  2. Anyone OFF the selected day sinks to the far right and renders greyed.
@@ -20223,7 +20270,32 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               </div>
               <button onClick={() => setShowWaitlistPanel(false)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: "50%", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={18} /></button>
             </div>
-            <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={(p) => showToast && showToast(`Texting ${p.name || "client"}…`)} showToast={showToast} />
+            {liveOpenings.length > 0 && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "#16A34A", fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16A34A" }} />OPENING{liveOpenings.length > 1 ? "S" : ""} TO FILL</div>
+                <div style={{ display: "grid", gap: 12 }}>
+                  {liveOpenings.map((o) => (
+                    <div key={o.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)" }}>{fmtTime(o.start)}–{fmtTime(o.end)}{(providers.find((p) => p.id === o.providerId) || {}).name ? ` · ${(providers.find((p) => p.id === o.providerId) || {}).name}` : ""}</div>
+                      <div style={{ fontSize: 12.5, color: "var(--sub)", marginBottom: 10 }}>{relativeDate(new Date(o.bookedFor))}</div>
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {o.people.map((p) => (
+                          <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 14.5, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name || "Client"}</div>
+                              <div style={{ fontSize: 11, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 600, color: p.earlierApptId ? "#96621E" : "var(--faint)" }}>{p.earlierApptId ? "Booked · wants earlier" : "Waitlist"}</div>
+                            </div>
+                            <button className="lift" onClick={() => sendOpeningOffer(p, o)} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "9px 14px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><Bell size={15} /> Send offer</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Booked clients who asked for an earlier time show first. Each offer is a text + email with a booking link — sent only when you tap. Nothing goes out on its own.</p>
+              </div>
+            )}
+            <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={(p) => showToast && showToast(`Texting ${p.name || "client"}…`)} onNotify={(w) => sendOpeningOffer(w, null)} showToast={showToast} providers={providers} services={services} />
           </div>
         </div>
       )}
@@ -20325,7 +20397,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           <button onClick={() => setRegisterOpen(true)} style={{ background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: "0 16px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 400, fontFamily: FONT_BODY, display: "flex", alignItems: "center", gap: 6 }}><DollarSign size={15} style={{ color: "var(--text2)" }} /> Sale</button>
           <div style={{ flex: 1, minWidth: 8 }} />
           {!sameDay(selectedDate.toISOString(), today) && <button onClick={() => setDayOffset(0)} style={{ background: "var(--panel)", color: "var(--gold)", border: "1px solid var(--border)", padding: "0 14px", height: 42, borderRadius: 13, fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY }}>Today</button>}
-          <button onClick={() => setCalMenuOpen(true)} aria-label="More actions" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 42, height: 42, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><MoreHorizontal size={18} />{waitlist.length > 0 && <span style={{ position: "absolute", top: 8, right: 8, width: 7, height: 7, borderRadius: "50%", background: "var(--text)" }} />}</button>
+          <button onClick={() => setCalMenuOpen(true)} aria-label="More actions" style={{ background: "var(--panel)", color: "var(--sub)", border: "1px solid var(--border)", width: 42, height: 42, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><MoreHorizontal size={18} />{(hasOpeningMatches || waitlist.length > 0) && <span style={{ position: "absolute", top: 8, right: 8, width: hasOpeningMatches ? 9 : 7, height: hasOpeningMatches ? 9 : 7, borderRadius: "50%", background: hasOpeningMatches ? "#16A34A" : "var(--text)", boxShadow: hasOpeningMatches ? "0 0 0 2px var(--panel)" : "none" }} />}</button>
         </div>
       </div>
 
