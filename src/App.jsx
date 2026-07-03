@@ -298,7 +298,7 @@ const DEFAULT_BUSINESS = {
     { id: "remind3h", label: "Reminder - 3 hours before", channel: "text", timing: "3 hours before", enabled: true,
       body: "Today's the day, {client}! {provider} will be ready for your {service} at {time}. Can't wait to see you.\n\n{cancel link}" },
     { id: "checkin", label: "Reminder - 15 minutes before", channel: "text", timing: "15 minutes before", enabled: true,
-      body: "Almost time, {client} - see you in about 15 minutes. {provider} is looking forward to your {service} at {business}.\n\nHere already? Let us know:\n{checkin link}" },
+      body: "{business}: See you in 15 min, {client}!\n\n{checkin link}" },
     { id: "canceled", label: "Appointment Canceled", channel: "both", timing: "When canceled", enabled: true,
       body: "Your {service} on {date} at {time} has been canceled, {client}. We'd love to see you again - book anytime at {business}." },
     { id: "rescheduled", label: "Appointment Rescheduled", channel: "both", timing: "When rescheduled", enabled: true,
@@ -332,7 +332,7 @@ const DEFAULT_BUSINESS = {
 // Version-guarded so a shop's own later edits in Settings → Messages are never clobbered: once
 // msgCopyVersion reaches MSG_COPY_VERSION the migration is a no-op. Only the listed ids are touched
 // (label/timing/body); channel and every other message are left exactly as the shop has them.
-const MSG_COPY_VERSION = 4;
+const MSG_COPY_VERSION = 5;
 function migrateMessageCopy(biz) {
   try {
     if (!biz || (biz.msgCopyVersion || 0) >= MSG_COPY_VERSION) return biz;
@@ -352,6 +352,13 @@ function migrateMessageCopy(biz) {
     //     custom wording the shop wrote is preserved — only the dash character changes.
     if ((biz.msgCopyVersion || 0) < 4) {
       messages = messages.map((m) => (m && typeof m.body === "string" && m.body.indexOf("—") !== -1) ? { ...m, body: m.body.replace(/—/g, "-") } : m);
+    }
+    // v5: refresh ONLY the 15-minute check-in body to the shorter, warmer copy (greets the client,
+    //     one SMS segment). The arrival instruction now comes from the {checkin link} tag itself,
+    //     so the old typed "Here already? Let us know:" line is dropped. Only `checkin`'s body is
+    //     touched — channel and every other message stay exactly as the shop has them.
+    if ((biz.msgCopyVersion || 0) < 5) {
+      messages = messages.map((m) => (m && m.id === "checkin" && def.checkin) ? { ...m, body: def.checkin.body } : m);
     }
     return { ...biz, messages, msgCopyVersion: MSG_COPY_VERSION };
   } catch (e) { return biz; }
