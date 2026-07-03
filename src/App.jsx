@@ -2270,6 +2270,10 @@ function App() {
         :root {
           --ease: cubic-bezier(.16,.84,.44,1);
           --spring: cubic-bezier(.34,1.56,.64,1);
+          /* "Heavy but satisfying" — a strong, smooth deceleration (easeOutQuint) with NO overshoot.
+             Interactions settle like they have mass instead of snapping or bouncing. */
+          --ease-heavy: cubic-bezier(.22,1,.36,1);
+          --press: cubic-bezier(.32,.08,.24,1);
           --shadow-sm: 0 1px 3px var(--shadow), 0 1px 2px rgba(0,0,0,0.03);
           --shadow-md: 0 6px 20px -6px var(--shadow), 0 2px 8px -3px var(--shadow);
           --shadow-lg: 0 24px 60px -16px var(--shadow), 0 8px 20px -8px var(--shadow);
@@ -2343,7 +2347,8 @@ function App() {
         .appt-screen { animation: slideInRight .34s cubic-bezier(.32,.72,0,1) both; }
         /* Service menu — bordered tiles (static; no highlight until selected) */
         .svc-menu { display:flex; flex-direction:column; gap:11px; margin-top:26px; }
-        .svc-tile { display:flex; align-items:center; gap:18px; width:100%; text-align:left; cursor:pointer; background:var(--panel); border:1px solid var(--border2); border-radius:14px; padding:18px 18px; -webkit-tap-highlight-color:transparent; transition:background .12s ease, border-color .12s ease; }
+        .svc-tile { display:flex; align-items:center; gap:18px; width:100%; text-align:left; cursor:pointer; background:var(--panel); border:1px solid var(--border2); border-radius:14px; padding:18px 18px; -webkit-tap-highlight-color:transparent; touch-action:manipulation; transition:background .2s var(--ease), border-color .2s var(--ease), transform .42s var(--ease-heavy); }
+        .svc-tile:active { transform: scale(0.985); transition: transform .16s var(--press); }
         .svc-tile.sel { background:var(--text); border-color:var(--text); }
         .svc-num { font-family:'Fraunces',serif; font-size:14px; color:var(--faint); width:24px; flex-shrink:0; letter-spacing:1px; }
         .svc-name { font-family:'Fraunces',serif; font-size:22px; font-weight:500; letter-spacing:-0.2px; color:var(--text); line-height:1.12; transition:color .12s ease; }
@@ -2385,15 +2390,18 @@ function App() {
         @keyframes driftIn { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
         .drift-in { animation: driftIn .55s var(--spring) both; animation-delay: .15s; }
         .scrub-lock, .scrub-lock * { touch-action: none !important; overflow: hidden !important; overscroll-behavior: none !important; -webkit-user-select: none !important; user-select: none !important; }
-        button { font-family: ${FONT_BODY}; cursor: pointer; border: none; transition: transform .18s var(--ease), box-shadow .25s var(--ease), background .2s var(--ease), border-color .2s var(--ease), opacity .2s var(--ease); }
-        button:active { transform: scale(0.96); }
+        /* Tap feel: HEAVY, not bouncy. The press sinks in with a little resistance (~.16s), and on
+           release it settles back with a weighty deceleration (var(--ease-heavy)) — mass, not a spring
+           or a machine snap. touch-action manipulation removes the 300ms tap delay so it feels direct. */
+        button { font-family: ${FONT_BODY}; cursor: pointer; border: none; touch-action: manipulation; transition: transform .42s var(--ease-heavy), box-shadow .3s var(--ease-heavy), background .24s var(--ease), border-color .2s var(--ease), opacity .2s var(--ease); }
+        button:active { transform: scale(0.972); transition: transform .16s var(--press); }
         input, textarea, select { outline: none; font-family: ${FONT_BODY}; transition: border-color .2s var(--ease), box-shadow .2s var(--ease); }
         input:focus, textarea:focus, select:focus { border-color: var(--gold) !important; box-shadow: 0 0 0 3px var(--wash); }
-        .lift { transition: transform .25s var(--spring), box-shadow .25s var(--ease), border-color .2s var(--ease), background .2s var(--ease); box-shadow: var(--float); }
-        .lift-row { transition: background .15s var(--ease), padding-left .15s var(--ease); }
+        .lift { transition: transform .42s var(--ease-heavy), box-shadow .3s var(--ease-heavy), border-color .2s var(--ease), background .2s var(--ease); box-shadow: var(--float); }
+        .lift-row { transition: background .2s var(--ease-heavy), padding-left .2s var(--ease-heavy); }
         .lift-row:active { background: var(--wash); padding-left: 12px; }
         .lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
-        .lift:active { transform: scale(0.96); box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+        .lift:active { transform: scale(0.972); box-shadow: 0 1px 4px rgba(0,0,0,0.15); transition: transform .16s var(--press); }
         .card { box-shadow: var(--shadow-sm); }
         ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 8px; } ::-webkit-scrollbar-track { background: transparent; }
         * { -webkit-tap-highlight-color: transparent; }
