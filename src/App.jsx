@@ -6730,7 +6730,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           clientNote={clientNote} setClientNote={setClientNote} photoList={photos} setPhotos={setPhotos} clientPhotoRef={clientPhotoRef} onPhotoPick={onPhotoPick}
           onManage={() => { captureBookingGallery(); setStep(9); }} onExit={() => { captureBookingGallery(); (matched ? goClientHome : onExit)(); }} />}
 
-        {step === 9 && <ManageAppointment business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} initialPhone={phone} dateOptions={dateOptions} onExit={onExit} showToast={(m) => {}} />}
+        {step === 9 && <ManageByToken token={(appts.find((a) => a.id === bookedId) || {}).manageToken} shopId={shopId} business={business} providers={providers} services={services} onExit={onExit} />}
         </div>
 
         {/* Legal footer — pinned to the bottom of the booking page on every step (#terms / #privacy
@@ -6937,7 +6937,10 @@ function ManageStandalone({ business, appts, setAppts, providers, services, onEx
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, letterSpacing: 3 }}>{business.name}</div>
           <div style={{ width: 50 }} />
         </div>
-        <ManageAppointment business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} initialPhone={null} dateOptions={dateOptions} onExit={onExit} showToast={() => {}} />
+        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "26px 22px", textAlign: "center" }}>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, margin: "0 0 10px" }}>Manage your appointment</h2>
+          <p style={{ color: "var(--sub)", fontSize: 15, lineHeight: 1.55, margin: 0 }}>To reschedule or cancel, tap the <strong style={{ color: "var(--text)" }}>&ldquo;Reschedule or cancel&rdquo;</strong> link in your confirmation text or email &mdash; it opens your appointment securely, with no code to remember. Booked with an account? Sign in and manage it right from your home screen.</p>
+        </div>
       </div>
     </div>
   );
