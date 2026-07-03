@@ -2913,7 +2913,7 @@ function resolveAnyone(providers, appts, dateObj, startMin, durMin, business) {
   const y = dateObj.getFullYear(), mo = dateObj.getMonth(), da = dateObj.getDate();
   const sameDay = (iso) => { const x = new Date(iso); return !isNaN(x) && x.getFullYear() === y && x.getMonth() === mo && x.getDate() === da; };
   const endMin = startMin + (durMin || 0);
-  const liveOnDay = (a) => a && a.status !== "cancelled" && a.status !== "no-show" && a.bookedFor && sameDay(a.bookedFor);
+  const liveOnDay = (a) => a && a.status !== "cancelled" && a.status !== "done" && a.bookedFor && sameDay(a.bookedFor);
   const isFree = (p) => {
     const h = effectiveHours(p, dateObj);
     if (!h || !h.on) return false;
@@ -4123,7 +4123,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     {
       const day0 = new Date(selectedDate); day0.setHours(0, 0, 0, 0);
       const sameDay = (iso) => { const d = new Date(iso); return !isNaN(d) && d.getFullYear() === day0.getFullYear() && d.getMonth() === day0.getMonth() && d.getDate() === day0.getDate(); };
-      const occupies = (a) => a.status !== "cancelled" && a.status !== "no-show";
+      // A slot is "taken" only by a live appointment. Match computeFreeSlots (what SHOWED the times)
+      // and book_public (the server): a DONE (completed) appointment frees its slot, so a shown-
+      // available time can never be falsely rejected as "just taken." (cancelled + done = free.)
+      const occupies = (a) => a.status !== "cancelled" && a.status !== "done";
       const isSameChk = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
       let cursorChk = slot;
       const clash = people.some((person) => {
@@ -4274,6 +4277,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             setCapBlock({ providerName: provName, name: (matched?.name || newName || "").trim(), phone: finalPhone, service: cart.map(describeEntry).join(", "), date: new Date(selectedDate) });
             return;
           }
+          // Genuine race — someone grabbed the slot between showing times and this write. Show the
+          // friendly "pick another opening" banner (same as the pre-check) rather than a generic error.
+          if (emsg.includes("slot_taken")) { setSlot(null); setStep(6); setSlotConflict(true); return; }
           setBookErr(true); return; // nothing was held, nothing lost — they can just tap again
         }
         setAppts((cur) => [...cur, ...newAppts]);
