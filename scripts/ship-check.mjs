@@ -114,6 +114,7 @@ const GUARDS = [
   { needle: "!hasStoredSession()", label: "staff email/phone load-gate (sanitized feed can't overwrite owner)" },
   { needle: "setTabNonce(", label: "bottom-tab tap resets to tab root" },
   { needle: "per-barber-pricing-lock", label: "per-barber price/time overrides on library questions & add-ons (service editor)" },
+  { needle: "apptHoldsSlot", label: "single busy-slot rule — a shown booking time is always bookable (no false 'just taken')" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");

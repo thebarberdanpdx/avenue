@@ -2905,6 +2905,14 @@ function StaffPhotoPicker({ onClose, onPick, onRemove, hasPhoto }) {
 // that omit `business` get the original soonest behavior.
 // Used by the commit path so no "Anyone" booking silently lands on one chair.
 // ============================================================
+// ⛔ SINGLE SOURCE OF TRUTH for "does this appointment still occupy its slot?" — used by the
+// availability engine (computeFreeSlots), the barber picker (resolveAnyone) AND the booking
+// re-check, so they can NEVER disagree and show a client a time that then can't be booked.
+// A cancelled or a completed (done) appointment frees its chair; every other status holds it.
+// The server's book_public guard mirrors this EXACT rule (db/booking-done-slot-2026-07-03.sql).
+// If you change what counts as "taken," change it HERE and in that SQL — nowhere else. [booking-slot-rule-lock]
+function apptHoldsSlot(a) { return !!a && a.status !== "cancelled" && a.status !== "done"; }
+
 function resolveAnyone(providers, appts, dateObj, startMin, durMin, business) {
   const reals = (providers || []).filter((p) => p && p.id !== "anyone" && !p.archived);
   if (!reals.length) return "dan";
@@ -2913,7 +2921,7 @@ function resolveAnyone(providers, appts, dateObj, startMin, durMin, business) {
   const y = dateObj.getFullYear(), mo = dateObj.getMonth(), da = dateObj.getDate();
   const sameDay = (iso) => { const x = new Date(iso); return !isNaN(x) && x.getFullYear() === y && x.getMonth() === mo && x.getDate() === da; };
   const endMin = startMin + (durMin || 0);
-  const liveOnDay = (a) => a && a.status !== "cancelled" && a.status !== "done" && a.bookedFor && sameDay(a.bookedFor);
+  const liveOnDay = (a) => apptHoldsSlot(a) && a.bookedFor && sameDay(a.bookedFor);
   const isFree = (p) => {
     const h = effectiveHours(p, dateObj);
     if (!h || !h.on) return false;
@@ -2997,7 +3005,7 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
   if (provCap > 0 && realCount((a) => a.providerId === prov.id) >= provCap) return [];
   if (shopCap > 0 && realCount(() => true) >= shopCap) return [];
   const busy = (appts || [])
-    .filter((a) => a.status !== "cancelled" && a.status !== "done" && a.providerId === prov.id && a.bookedFor && dayKey(new Date(a.bookedFor)) === dayKey(date))
+    .filter((a) => apptHoldsSlot(a) && a.providerId === prov.id && a.bookedFor && dayKey(new Date(a.bookedFor)) === dayKey(date))
     .map((a) => { const s = a.start; const d = (a.end != null ? a.end - a.start : 30); return [s, s + (d > 0 ? d : 30)]; })
     .sort((a, b) => a[0] - b[0]);
   const isToday = date.toDateString() === new Date().toDateString();
@@ -4123,10 +4131,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     {
       const day0 = new Date(selectedDate); day0.setHours(0, 0, 0, 0);
       const sameDay = (iso) => { const d = new Date(iso); return !isNaN(d) && d.getFullYear() === day0.getFullYear() && d.getMonth() === day0.getMonth() && d.getDate() === day0.getDate(); };
-      // A slot is "taken" only by a live appointment. Match computeFreeSlots (what SHOWED the times)
-      // and book_public (the server): a DONE (completed) appointment frees its slot, so a shown-
-      // available time can never be falsely rejected as "just taken." (cancelled + done = free.)
-      const occupies = (a) => a.status !== "cancelled" && a.status !== "done";
+      // Uses the SAME apptHoldsSlot rule as the availability engine + the server, so a time that was
+      // shown as open can never be falsely rejected here as "just taken."
+      const occupies = apptHoldsSlot;
       const isSameChk = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
       let cursorChk = slot;
       const clash = people.some((person) => {
