@@ -22798,8 +22798,19 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     const doNotify = () => {
                       const wr = (business && business.waitingRoom) || {};
                       const tmpl = wr.readyMessage || "{provider} will meet you at the door.";
-                      showToast(wr.autoReadyMessage === false ? `${appt.name} notified.` : `Sent: "${tmpl.replace(/\{provider\}/g, provider.name)}"`);
+                      const provName = (provider && provider.name) || appt.providerName || "your barber";
+                      const fill = (s) => String(s).replace(/\{provider\}/g, provName).replace(/\{client\}/g, String(appt.name || "").split(" ")[0]).replace(/\{business\}/g, business.name || "");
                       onUpdate && onUpdate(appt.id, { lobbyNotifiedAt: Date.now() }); // persist so the button reads "Notified"
+                      // The owner can turn the auto-text off and just mark the client notified (e.g. they waved them over in person).
+                      if (wr.autoReadyMessage === false) { showToast(`${appt.name} notified.`); return; }
+                      // Actually send the "ready" message to the CLIENT (this used to only show a toast and send nothing).
+                      // Text when SMS is live, else /api/notify bridges to email. Fire-and-forget — never blocks the UI.
+                      const client = (clients || []).find((c) => c.id === appt.clientId) || {};
+                      const phone = (appt.phone || client.phone || "").trim();
+                      const email = (client.email || "").trim();
+                      if (!phone && !email) { showToast(`No phone or email on file for ${String(appt.name || "this client").split(" ")[0]}.`); return; }
+                      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: "text", to: { email, phone, smsOptOut: client.smsOptOut === true }, subject: `${business.name}: We're ready for you`, template: tmpl, context: { client: String(appt.name || "there").split(" ")[0], provider: provName, business: business.name || "your shop" } }) }).catch(() => {});
+                      showToast(`Sent: "${fill(tmpl)}"`);
                     };
                     return notified
                       ? <button className="lift" onClick={doNotify} title="Tap to re-send" style={{ display: "inline-flex", alignItems: "center", gap: 7, background: `color-mix(in srgb, ${STATUS_COLORS["checked-in"]} 13%, var(--panel))`, border: `1px solid color-mix(in srgb, ${STATUS_COLORS["checked-in"]} 40%, transparent)`, color: STATUS_COLORS["checked-in"], padding: "10px 16px", borderRadius: 30, fontSize: 13, letterSpacing: 0.5, fontWeight: 700, cursor: "pointer" }}><Check size={15} strokeWidth={3} /> NOTIFIED</button>
