@@ -17163,10 +17163,13 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
 
         <div style={aoSectionLbl}>Responses</div>
         <div style={{ display: "grid", gap: 10 }}>
-          <input value={form.yesLabel || ""} onChange={(e) => setForm({ ...form, yesLabel: e.target.value })} placeholder={`Yes — ${form.name || "add it"}`} style={aoInp} />
-          <input value={form.noLabel || ""} onChange={(e) => setForm({ ...form, noLabel: e.target.value })} placeholder="No thanks" style={aoInp} />
+          {/* Pre-filled with the suggested wording as REAL, editable text (not a grey placeholder you
+              can't keep) — so every add-on's client options are actually written and you can type over
+              them. The Yes line tracks the name until you customize it. */}
+          <input value={form.yesLabel || `Yes — ${form.name || "add it"}`} onChange={(e) => setForm({ ...form, yesLabel: e.target.value })} style={aoInp} />
+          <input value={form.noLabel || "No thanks"} onChange={(e) => setForm({ ...form, noLabel: e.target.value })} style={aoInp} />
         </div>
-        <p style={{ fontSize: 12.5, color: "var(--faint)", fontStyle: "italic", margin: "8px 2px 0", lineHeight: 1.45 }}>What clients tap while booking. Leave blank to use the standard wording shown above.</p>
+        <p style={{ fontSize: 12.5, color: "var(--faint)", fontStyle: "italic", margin: "8px 2px 0", lineHeight: 1.45 }}>Exactly what clients tap while booking. Edit these to whatever you want.</p>
 
         <div style={aoSectionLbl}>Asked on</div>
         {svcList.length === 0 && <p style={{ fontSize: 14, color: "var(--faint)", padding: "12px 0" }}>No services yet.</p>}
