@@ -4113,6 +4113,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       const today0 = new Date(); today0.setHours(0, 0, 0, 0);
       const existing = myAppts.find((a) => {
         if (a.clientId !== matched.id) return false;
+        if (reschedPrev && a.id === reschedPrev.id) return false; // rescheduling: the appt being moved isn't a "duplicate" of its own new time
         if (a.status !== "confirmed") return false;
         const d = new Date(a.bookedFor); if (isNaN(d)) return false;
         const d0 = new Date(d); d0.setHours(0, 0, 0, 0);
@@ -4299,6 +4300,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         try {
           const ap0 = newAppts[0] || {};
           if (reschedPrev) {
+            // The NEW time is now confirmed on the server — only NOW release the old slot. Because we
+            // never cancel up-front, a client who taps "Pick a new time" and then deserts the search
+            // simply keeps their original appointment, and no slot is ever held while they browse.
+            doCancelAppt(reschedPrev);
             fireStaffPush({ shopId, title: "Appointment rescheduled", appt: ap0, prevAppt: reschedPrev, event: "rescheduled", business });
             setReschedPrev(null);
           } else {
@@ -4549,8 +4554,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           <div onClick={() => setHomeAction(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "var(--bg)", borderRadius: "20px 20px 0 0", padding: "26px 22px 30px" }}>
               <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, color: "var(--text)", margin: "0 0 8px", letterSpacing: "-0.2px" }}>{homeAction.type === "cancel" ? "Cancel this appointment?" : "Pick a new time?"}</h3>
-              <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 0 22px" }}>{homeAction.type === "cancel" ? `Your ${svcLabel(homeAction.appt)} on ${fmtHomeShort(homeAction.appt)} will be released.` : `We'll release your ${fmtHomeShort(homeAction.appt)} time so you can choose a new one.`}</p>
-              <button onClick={() => { const a = homeAction.appt; if (homeAction.type === "cancel") { doCancelAppt(a); setHomeAction(null); } else { setReschedPrev(a); doCancelAppt(a); bookForPerson(a.familyMemberId ? { id: a.familyMemberId, name: personLabel(a) } : { id: null }); } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: "pointer", marginBottom: 11 }}>{homeAction.type === "cancel" ? "Yes, cancel it" : "Release & pick a new time"}</button>
+              <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 0 22px" }}>{homeAction.type === "cancel" ? `Your ${svcLabel(homeAction.appt)} on ${fmtHomeShort(homeAction.appt)} will be released.` : `Your ${fmtHomeShort(homeAction.appt)} spot stays booked until you pick and confirm a new time — nothing is lost if you change your mind.`}</p>
+              <button onClick={() => { const a = homeAction.appt; if (homeAction.type === "cancel") { doCancelAppt(a); setHomeAction(null); } else { setReschedPrev(a); bookForPerson(a.familyMemberId ? { id: a.familyMemberId, name: personLabel(a) } : { id: null }); } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: "pointer", marginBottom: 11 }}>{homeAction.type === "cancel" ? "Yes, cancel it" : "Pick a new time"}</button>
               <button onClick={() => setHomeAction(null)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 500, textTransform: "uppercase", borderRadius: 12, cursor: "pointer" }}>Keep it</button>
             </div>
           </div>
