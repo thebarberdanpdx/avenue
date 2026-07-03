@@ -25,6 +25,21 @@ const IS_NATIVE = typeof window !== "undefined" && (
 );
 const API_BASE = IS_NATIVE ? "https://gotvero.com" : "";
 
+// Native-only haptic tap (Capacitor Haptics). Dynamically imported like our other native plugins so
+// the web bundle stays lean; a silent no-op on the web (Apple blocks web haptics) and never throws.
+// The physical "tick" on a tap is what makes the installed app feel native rather than like a machine.
+let _hapticImpact = null;
+async function haptic(kind) {
+  if (!IS_NATIVE) return;
+  try {
+    if (!_hapticImpact) {
+      const { Haptics, ImpactStyle } = await import("@capacitor/haptics");
+      _hapticImpact = (k) => Haptics.impact({ style: k === "medium" ? ImpactStyle.Medium : ImpactStyle.Light });
+    }
+    _hapticImpact(kind);
+  } catch (e) { /* best-effort — haptics never block a tap */ }
+}
+
 // ---- ensureFreshSession ----------------------------------------------------
 // iOS freezes Supabase's token-refresh timer whenever the app is backgrounded,
 // so a staff login's access token can silently expire. Reopening the app then
@@ -2253,6 +2268,19 @@ function App() {
     stale.forEach((c) => el.classList.remove(c));
     el.classList.add(`theme-${appliedTheme}`);
   }, [appliedTheme]);
+
+  // Physical tap feedback on the native app (no-op on web). One delegated listener fires a light
+  // haptic tick on any real tap of an interactive element — so every button/tile/toggle feels it
+  // without wiring each call site. Uses click (not pointerdown) so scrolling never false-fires.
+  useEffect(() => {
+    if (!IS_NATIVE) return;
+    const onTap = (e) => {
+      const t = e.target && e.target.closest && e.target.closest('button,[role="button"],[role="switch"],[role="tab"],.svc-tile,.lift,a[href]');
+      if (t && !t.disabled && t.getAttribute("aria-disabled") !== "true") haptic("light");
+    };
+    document.addEventListener("click", onTap, true);
+    return () => document.removeEventListener("click", onTap, true);
+  }, []);
 
   return (
     <div id="app-root" className={`theme-${appliedTheme}`} style={{ fontFamily: FONT_BODY, minHeight: "100vh", background: "var(--canvas, var(--bg))", color: "var(--text)", position: "relative" }}>
