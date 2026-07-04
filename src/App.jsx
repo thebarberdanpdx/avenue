@@ -222,7 +222,8 @@ const DEFAULT_BUSINESS = {
   // ---- Online booking rules ----
   booking: {
     enabled: true,
-    leadTimeMin: 120,        // minimum notice before an appointment, in minutes
+    leadTimeMin: 120,        // #1: booking floor — earliest bookable spot from now, in minutes (read by computeFreeSlots)
+    cancelWindowMin: 1440,   // #1: how much notice to cancel/reschedule before it's a late-cancel — its OWN field, not leadTimeMin
     horizonDays: 60,         // how far out clients can book
     sameDayCutoff: "",       // e.g. "14:00" — no same-day bookings after this (blank = off)
     allowMultiple: true,     // multiple services per booking
@@ -7273,9 +7274,12 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
   const [newSlot, setNewSlot] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  // Change/cancel window = the notice the owner set in Settings (booking.leadTimeMin, in
-  // minutes). Convert to hours here. Legacy cancelWindowHrs kept as a fallback; default 24.
-  const windowHrs = (business?.booking?.leadTimeMin != null)
+  // Change/cancel window = the notice the owner set in No-show Protection (booking.cancelWindowMin,
+  // minutes). #1: its OWN field now (was sharing leadTimeMin with the booking floor). Fall back to the
+  // legacy leadTimeMin, then cancelWindowHrs, then 24h, so older shops keep their current behavior.
+  const windowHrs = (business?.booking?.cancelWindowMin != null)
+    ? business.booking.cancelWindowMin / 60
+    : (business?.booking?.leadTimeMin != null)
     ? business.booking.leadTimeMin / 60
     : (business.cancelWindowHrs || 24);
   // Arrival deep-link: the 15-minute reminder's check-in link adds ?a=1 so we open straight
@@ -7528,9 +7532,12 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
   const [newSlot, setNewSlot] = useState(null);
   const [cancelId, setCancelId] = useState(null);    // appt pending cancel confirm
 
-  // Change/cancel window = the notice the owner set in Settings (booking.leadTimeMin, in
-  // minutes). Convert to hours here. Legacy cancelWindowHrs kept as a fallback; default 24.
-  const windowHrs = (business?.booking?.leadTimeMin != null)
+  // Change/cancel window = the notice the owner set in No-show Protection (booking.cancelWindowMin,
+  // minutes). #1: its OWN field now (was sharing leadTimeMin with the booking floor). Fall back to the
+  // legacy leadTimeMin, then cancelWindowHrs, then 24h, so older shops keep their current behavior.
+  const windowHrs = (business?.booking?.cancelWindowMin != null)
+    ? business.booking.cancelWindowMin / 60
+    : (business?.booking?.leadTimeMin != null)
     ? business.booking.leadTimeMin / 60
     : (business.cancelWindowHrs || 24);
   const digits = (s) => (s || "").replace(/\D/g, "");
@@ -16197,7 +16204,7 @@ function Explain({ title, children }) {
 }
 
 // No-show protection: card-on-file, deposit (none/fixed/percent), notice window, and policy text.
-// Writes to business.booking (requireCard, deposit{mode,amount}, leadTimeMin) + business.policy.
+// Writes to business.booking (requireCard, deposit{mode,amount}, cancelWindowMin) + business.policy.
 // The actual charge is simulated until a live payment processor is connected.
 function NoShowEditor({ b, policy, onBooking, onPolicy }) {
   const dep = b.deposit || { mode: "none", amount: 0 };
@@ -16206,7 +16213,7 @@ function NoShowEditor({ b, policy, onBooking, onPolicy }) {
     { v: 0, label: "No minimum" }, { v: 60, label: "1 hour" }, { v: 120, label: "2 hours" },
     { v: 240, label: "4 hours" }, { v: 720, label: "12 hours" }, { v: 1440, label: "24 hours" }, { v: 2880, label: "48 hours" },
   ];
-  const lead = b.leadTimeMin || 0;
+  const lead = b.cancelWindowMin != null ? b.cancelWindowMin : (b.leadTimeMin || 0); // #1: cancel window own field (legacy leadTimeMin only as display fallback)
   return (
     <div style={{ display: "grid", gap: 0 }}>
       {/* Preview-mode notice */}
@@ -16261,7 +16268,7 @@ function NoShowEditor({ b, policy, onBooking, onPolicy }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {noticeOpts.map((o) => {
             const on = lead === o.v;
-            return <button key={o.v} onClick={() => onBooking({ leadTimeMin: o.v })} style={{ padding: "10px 15px", borderRadius: 10, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{o.label}</button>;
+            return <button key={o.v} onClick={() => onBooking({ cancelWindowMin: o.v })} style={{ padding: "10px 15px", borderRadius: 10, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{o.label}</button>;
           })}
         </div>
       </div>
