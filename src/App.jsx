@@ -3561,6 +3561,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [cardOnFile, setCardOnFile] = useState(false); // card-on-file / deposit captured for this booking
   const [cardSheetOpen, setCardSheetOpen] = useState(false); // real Stripe card-entry sheet open
   const [cardInfo, setCardInfo] = useState(null); // { last4, paid, saved } once captured
+  const [bookTipPct, setBookTipPct] = useState(null);   // #7 prepay: chosen tip % (null = none picked)
+  const [bookCustomTip, setBookCustomTip] = useState(null); // #7 prepay: custom tip $ (null = not custom)
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [waitlistDone, setWaitlistDone] = useState(false);
   const [capBlock, setCapBlock] = useState(null); // set when book_public rejects a new client over the daily cap → offer the waitlist
@@ -4204,6 +4206,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       const title = person.items.map(describeEntry).join(", ");
       const serviceName = person.items.map((e) => e.service.name).join(", ");
       const addonLabels = person.items.flatMap(optsFor);
+      const payFull = cart.some((e) => e && e.service && e.service.booking && e.service.booking.requirePayment); // #7: this booking includes a prepay service
       newAppts.push({
         id: baseId + pi,
         providerId: prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, startMin, person.durMin, business) : prov.id,
@@ -4228,7 +4231,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         bigChange: (simpleChange === "fresh" && people.length === 1) ? true : undefined,
         cutConfirmedAt: (pi === 0 && cutConfirm) ? cutConfirm.at : undefined,
         cutDescShown: (pi === 0 && cutConfirm) ? cutConfirm.text : undefined,
-        deposit: (pi === 0 && cardInfo && cardInfo.paid && typeof cardInfo.amount === "number") ? cardInfo.amount : (pi === 0 && cardInfo && cardInfo.paid) ? (() => { const dep = (business.booking || {}).deposit || {}; return dep.mode === "fixed" ? Number(dep.amount || 0) : dep.mode === "percent" ? Math.round(cartAdjTotal * (Number(dep.amount || 0) / 100)) : 0; })() : 0,
+        deposit: (pi === 0 && !payFull && cardInfo && cardInfo.paid && typeof cardInfo.amount === "number") ? cardInfo.amount : (pi === 0 && !payFull && cardInfo && cardInfo.paid) ? (() => { const dep = (business.booking || {}).deposit || {}; return dep.mode === "fixed" ? Number(dep.amount || 0) : dep.mode === "percent" ? Math.round(cartAdjTotal * (Number(dep.amount || 0) / 100)) : 0; })() : 0,
+        prepaid: (pi === 0 && payFull && cardInfo && cardInfo.paid) ? true : undefined, // #7: paid in full at booking
+        prepaidTotal: (pi === 0 && payFull && cardInfo && cardInfo.paid && typeof cardInfo.amount === "number") ? cardInfo.amount : undefined,
+        prepaidTip: (pi === 0 && payFull && cardInfo && cardInfo.paid) ? (cardInfo.tip || 0) : undefined,
+        prepaidIntentId: (pi === 0 && payFull && cardInfo && cardInfo.paid) ? (cardInfo.paymentIntentId || null) : undefined,
         phone: person.key === "self" ? finalPhone : ((((matched?.family || []).find((m) => m.id === person.key) || {}).phone || "").replace(/\D/g, "").length >= 10 ? ((matched?.family || []).find((m) => m.id === person.key) || {}).phone : finalPhone),
         groupId: isMultiPerson ? baseId : null,
         manageToken: makeManageToken(),
@@ -6640,6 +6647,87 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {(() => {
               const bk = business.booking || {};
               const dep = bk.deposit || { mode: "none", amount: 0 };
+              // #7: PREPAY — a service flagged booking.requirePayment must be paid IN FULL at booking
+              // (everyone, regulars included). When that's the case we show a dedicated "PAY TO BOOK"
+              // card with an OPTIONAL tip prompt (only here, because prepay is on), and paying commits
+              // the booking. No-shows are charged separately by staff from the dashboard.
+              const payFull = cart.length ? cart.some((e) => e && e.service && e.service.booking && e.service.booking.requirePayment) : false;
+              if (payFull) {
+                const tipCfg = business?.tipping || { enabled: true, presets: [18, 20, 25], allowCustom: true, allowNoTip: true, smartDefault: 20 };
+                const tipOn = tipCfg.enabled !== false;
+                const payBase = Math.max(0, selfie ? cartAdjTotal - 5 : cartAdjTotal); // honor the $5 selfie discount
+                const usingCustom = bookCustomTip != null;
+                const effPct = usingCustom ? null : (bookTipPct != null ? bookTipPct : (tipOn ? (tipCfg.smartDefault ?? 0) : 0));
+                const tipAmt = !tipOn ? 0 : (usingCustom ? Math.max(0, Math.round(Number(bookCustomTip) || 0)) : Math.round(payBase * (effPct || 0) / 100));
+                const payTotal = payBase + tipAmt;
+                const livePay = business.payments?.live === true;
+                const paid = !!(cardInfo && cardInfo.paid);
+                const last4 = (cardInfo && cardInfo.last4) || "••••";
+                const identityOk = agreed && smsConsent && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10 && (!cart.some((e) => e && e.service && e.service.booking && e.service.booking.requireAddress) || !!newAddress.trim());
+                const tipBtn = (on) => ({ flex: "1 1 58px", background: on ? "var(--text)" : "var(--panel2)", color: on ? "var(--bg)" : "var(--text)", border: `1px solid ${on ? "var(--text)" : "var(--border)"}`, borderRadius: 11, padding: "10px 6px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", lineHeight: 1.25, textAlign: "center" });
+                return (
+                  <div style={{ background: "var(--panel)", border: `1px solid ${paid ? "color-mix(in srgb, var(--text) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16, boxShadow: "var(--shadow-sm)" }}>
+                    <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--text)", fontWeight: 600, marginBottom: 6 }}>{paid ? "PAID · YOU'RE ALL SET" : "PAY TO BOOK"}</div>
+                    <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: paid ? 0 : 16 }}>
+                      {paid
+                        ? <>You paid <b style={{ color: "var(--text)" }}>${payTotal}</b>{tipAmt > 0 ? <> (incl. ${tipAmt} tip)</> : null} · card ending {last4}. Your spot's locked in.</>
+                        : <>This service is paid when you book — <b style={{ color: "var(--text)" }}>${payBase}</b>{tipOn ? <> before an optional tip</> : null}.</>}
+                    </p>
+                    {!paid && tipOn && (
+                      <>
+                        <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>ADD A TIP <span style={{ fontWeight: 500, letterSpacing: 0 }}>(optional)</span></div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: usingCustom ? 10 : 14 }}>
+                          {(tipCfg.presets || []).map((p) => {
+                            const on = !usingCustom && (bookTipPct != null ? bookTipPct === p : (tipCfg.smartDefault ?? -1) === p);
+                            return (
+                              <button key={p} onClick={() => { setBookCustomTip(null); setBookTipPct(p); }} style={tipBtn(on)}>{p}%<br /><span style={{ fontSize: 11.5, fontWeight: 500, opacity: 0.8 }}>${Math.round(payBase * p / 100)}</span></button>
+                            );
+                          })}
+                          {tipCfg.allowCustom !== false && (
+                            <button onClick={() => { setBookTipPct(null); setBookCustomTip(bookCustomTip != null ? bookCustomTip : 0); }} style={tipBtn(usingCustom)}>Custom</button>
+                          )}
+                          {tipCfg.allowNoTip !== false && (
+                            <button onClick={() => { setBookCustomTip(null); setBookTipPct(0); }} style={tipBtn(!usingCustom && bookTipPct === 0)}>No&nbsp;tip</button>
+                          )}
+                        </div>
+                        {usingCustom && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                            <span style={{ fontSize: 16, color: "var(--sub)" }}>$</span>
+                            <input inputMode="decimal" autoFocus value={bookCustomTip === 0 ? "" : bookCustomTip} onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ""); setBookCustomTip(v === "" ? 0 : Number(v)); }} placeholder="0" style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 11, padding: "11px 13px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box" }} />
+                          </div>
+                        )}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "13px 0 15px", borderTop: "1px solid var(--border)" }}>
+                          <span style={{ fontSize: 14.5, color: "var(--text)", fontWeight: 600 }}>Total today</span>
+                          <span style={{ fontSize: 19, color: "var(--text)", fontWeight: 700 }}>${payTotal}</span>
+                        </div>
+                      </>
+                    )}
+                    {paid ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", marginTop: 14 }}>
+                        <Check size={18} style={{ color: "var(--text)" }} />
+                        <span style={{ fontSize: 14.5, color: "var(--text)" }}>Paid ${payTotal} · card ending {last4}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <button disabled={!identityOk} onClick={() => { if (identityOk) setCardSheetOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: identityOk ? "var(--gold)" : "var(--panel2)", border: identityOk ? "none" : "1px solid var(--border)", borderRadius: 12, padding: 15, color: identityOk ? "var(--on-gold)" : "var(--faint)", fontSize: 15, fontWeight: 700, cursor: identityOk ? "pointer" : "default", opacity: identityOk ? 1 : 0.6 }}><CreditCard size={17} /> Pay ${payTotal} to book</button>
+                        {!identityOk && <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, marginTop: 8, textAlign: "center" }}>Add your name, phone &amp; email and check the box above first.</p>}
+                      </>
+                    )}
+                    {!livePay && <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Secure card entry · test mode — no real charge yet.</p>}
+                    {cardSheetOpen && <StripeCardSheet
+                      live={livePay}
+                      mode="payment"
+                      amount={payTotal}
+                      totalDue={payTotal}
+                      clientName={`${newFirst} ${newLast}`.trim()}
+                      clientEmail={newEmail}
+                      clientPhone={phone}
+                      onClose={() => setCardSheetOpen(false)}
+                      onDone={(res) => { const r = res || {}; setCardInfo({ ...r, paid: true, amount: payTotal, tip: tipAmt, paymentIntentId: r.intentId || r.paymentIntentId || null }); setCardOnFile(true); setCardSheetOpen(false); setPendingFinish(true); }}
+                    />}
+                  </div>
+                );
+              }
               // #10: a card is needed if there's a deposit, OR any service being booked requires one.
               // Per-service booking.requireCard wins (an explicit false exempts it, e.g. a free consult);
               // a service that doesn't specify falls back to the shop-wide requireCard setting.
@@ -6701,8 +6789,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               // Per-service booking.requireCard wins (an explicit false exempts it, e.g. a free consult);
               // a service that doesn't specify falls back to the shop-wide requireCard setting.
               const needsCard = (dep.mode && dep.mode !== "none") || (cart.length ? cart.some((e) => { const r = e && e.service && e.service.booking ? e.service.booking.requireCard : undefined; return r === undefined ? !!bk.requireCard : !!r; }) : !!bk.requireCard);
+              // #7: a prepay service must be PAID before the booking can be locked (not just a card added).
+              const payFull = cart.length ? cart.some((e) => e && e.service && e.service.booking && e.service.booking.requirePayment) : false;
+              const paid = !!(cardInfo && cardInfo.paid);
               const baseOk = agreed && smsConsent && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10 && (!cart.some((e) => e && e.service && e.service.booking && e.service.booking.requireAddress) || !!newAddress.trim());
-              const canLock = baseOk && (!needsCard || cardOnFile);
+              const canLock = payFull ? (baseOk && paid) : (baseOk && (!needsCard || cardOnFile));
               return (
             <>
             <button className="lift" onMouseDown={(e) => e.preventDefault()} disabled={!canLock || booking} onClick={() => {
@@ -6715,7 +6806,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 return;
               }
               commitBooking(phone, newEmail);
-            }} style={{ width: "100%", background: canLock ? "var(--text)" : "transparent", color: canLock ? "var(--bg)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (!smsConsent ? "AGREE TO TEXT REMINDERS ABOVE" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : `BOOK FOR ${relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate).split(",")[0].toUpperCase() + " " + MONTHS[selectedDate.getMonth()].toUpperCase() + " " + selectedDate.getDate() : relativeDate(selectedDate).toUpperCase()}`))}</button>
+            }} style={{ width: "100%", background: canLock ? "var(--text)" : "transparent", color: canLock ? "var(--bg)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (!smsConsent ? "AGREE TO TEXT REMINDERS ABOVE" : (payFull && !paid ? "PAY ABOVE TO BOOK" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : `BOOK FOR ${relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate).split(",")[0].toUpperCase() + " " + MONTHS[selectedDate.getMonth()].toUpperCase() + " " + selectedDate.getDate() : relativeDate(selectedDate).toUpperCase()}`)))}</button>
             {bookErr && <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "color-mix(in srgb, #c0392b 14%, var(--panel))", color: "var(--text)", fontSize: 13.5, lineHeight: 1.45, textAlign: "center" }}>Couldn't confirm your booking — check your connection and tap again. Your time wasn't held, so nothing's lost.</div>}
             </>
               );
