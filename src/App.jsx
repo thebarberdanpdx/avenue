@@ -320,8 +320,8 @@ const DEFAULT_BUSINESS = {
       body: "Updated! Your {service} with {provider} is now {date} at {time}. See you then, {client}." },
     { id: "waitlist", label: "Waitlist - Slot Opened", channel: "both", timing: "When a slot opens", enabled: true,
       body: "Good news {client} - an earlier {service} spot opened on {date} at {time}. It's first come, so tap here to grab it before it's taken: {book link}" },
-    { id: "deposit", label: "Deposit Received", channel: "both", timing: "When a deposit is taken", enabled: true,
-      body: "Thanks {client}! We've received your deposit for your {service} with {provider} on {date} at {time}. It goes toward your total - see you at {business}." },
+    { id: "deposit", label: "Payment Received", channel: "email", timing: "When paid at booking", enabled: true,
+      body: "Thanks {client}! We've received your {amount} payment for your {service} on {date} at {time}. See you at {business}!" },
     { id: "birthday", label: "Birthday message", channel: "email", timing: "On their birthday", enabled: false,
       body: "Happy birthday, {client}! Everyone at {business} hopes your day is a great one. Whenever you're ready for a fresh look, we'd love to see you in the chair." },
   ],
@@ -345,7 +345,7 @@ const DEFAULT_BUSINESS = {
 // Version-guarded so a shop's own later edits in Settings → Messages are never clobbered: once
 // msgCopyVersion reaches MSG_COPY_VERSION the migration is a no-op. Only the listed ids are touched
 // (label/timing/body); channel and every other message are left exactly as the shop has them.
-const MSG_COPY_VERSION = 7;
+const MSG_COPY_VERSION = 8;
 function migrateMessageCopy(biz) {
   try {
     if (!biz || (biz.msgCopyVersion || 0) >= MSG_COPY_VERSION) return biz;
@@ -386,6 +386,14 @@ function migrateMessageCopy(biz) {
     if ((biz.msgCopyVersion || 0) < 7) {
       const staleWaitlist = "Good news {client} - a spot opened for your {service} with {provider} on {date} at {time}. Reply YES to grab it before someone else does!";
       messages = messages.map((m) => (m && m.id === "waitlist" && m.body === staleWaitlist && def.waitlist) ? { ...m, body: def.waitlist.body, channel: def.waitlist.channel } : m);
+    }
+    // v8: the "Deposit Received" message never actually fired (audit #14) and was worded as a
+    //     partial deposit — wrong for a pay-in-full prepay (audit #7). Now it's a general payment
+    //     receipt that fires whenever money is taken at booking. Refresh label/timing/body/channel
+    //     ONLY if the shop still has the old default, so any custom wording is preserved.
+    if ((biz.msgCopyVersion || 0) < 8) {
+      const staleDeposit = "Thanks {client}! We've received your deposit for your {service} with {provider} on {date} at {time}. It goes toward your total - see you at {business}.";
+      messages = messages.map((m) => (m && m.id === "deposit" && m.body === staleDeposit && def.deposit) ? { ...m, label: def.deposit.label, timing: def.deposit.timing, body: def.deposit.body, channel: def.deposit.channel } : m);
     }
     return { ...biz, messages, msgCopyVersion: MSG_COPY_VERSION };
   } catch (e) { return biz; }
@@ -3171,7 +3179,7 @@ function makeManageToken() {
 // Fire-and-forget — never throws, never blocks the UI. `contact` = { email, phone, smsOptOut }.
 // Used by every booking path (online, staff dashboard, staff via booking flow) so confirmations
 // behave identically everywhere, with the exact stored service name and the private manage link.
-function fireApptNotify({ msgId, appt, business, providers, contact, subject }) {
+function fireApptNotify({ msgId, appt, business, providers, contact, subject, extra }) {
   try {
     if (!appt || !business) return;
     const m = (business.messages || []).find((x) => x.id === msgId);
@@ -3195,6 +3203,7 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject }) 
       cancelUrl: (typeof window !== "undefined" && appt.manageToken) ? `${window.location.origin}/manage?t=${appt.manageToken}` : "",
       arriveUrl: (typeof window !== "undefined" && appt.manageToken) ? `${window.location.origin}/manage?t=${appt.manageToken}&a=1` : "",
     };
+    if (extra && typeof extra === "object") Object.assign(ctx, extra); // e.g. {amount} for a payment receipt
     fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: m.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: subject || `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
   } catch (e) {}
 }
@@ -4308,7 +4317,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     };
 
     // Staff/preview bookings persist through the dashboard's own save path — show success immediately.
-    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); captureClientPhotos(); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); fireStaffPush({ shopId, title: "New booking", appt: newAppts[0], event: "newBooking", business }); fireStaffNotify({ shopId, appt: newAppts[0], business }); setBookedId(baseId); setBookedClientId(clientId); galleryCapturedRef.current = false; setStep(8); return; }
+    if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); captureClientPhotos(); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); { const _paid = newAppts[0] && (newAppts[0].prepaidTotal || newAppts[0].deposit || 0); if (_paid > 0) fireApptNotify({ msgId: "deposit", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Payment received`, extra: { amount: `$${_paid}` } }); } fireStaffPush({ shopId, title: "New booking", appt: newAppts[0], event: "newBooking", business }); fireStaffNotify({ shopId, appt: newAppts[0], business }); setBookedId(baseId); setBookedClientId(clientId); galleryCapturedRef.current = false; setStep(8); return; }
     // Public booking: the slot is never held while saving, and the client is only told they're booked
     // once the server actually has it — so a failed save can never become a ghost booking.
     setBooking(true); setBookErr(false);
@@ -4335,6 +4344,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         // Fire the booking confirmation (event-driven). Fire-and-forget — the booking already
         // succeeded on the server, so a send failure must never affect it.
         fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` });
+        // #14: a payment RECEIPT when money was actually taken at booking — a deposit, or a #7 pay-in-full.
+        // Only fires if something was charged, so a returning client whose card just holds the spot gets none.
+        const _paidAtBooking = newAppts[0] && (newAppts[0].prepaidTotal || newAppts[0].deposit || 0);
+        if (_paidAtBooking > 0) fireApptNotify({ msgId: "deposit", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Payment received`, extra: { amount: `$${_paidAtBooking}` } });
         // Alert staff devices (native app push). Fire-and-forget; never affects the booking.
         try {
           const ap0 = newAppts[0] || {};
