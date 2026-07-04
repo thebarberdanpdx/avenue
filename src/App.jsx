@@ -868,9 +868,21 @@ function getStripe() {
 // real 4xx like a card decline — money didn't move), and keep it only when the
 // network never answered (a 5xx or no response) — exactly the case where a
 // blind retry could otherwise double up.
-const _idemKeys = new Map();
+const _idemKeys = new Map(); // sig -> { key, ts }
+// #14: a retained key must not live forever. Reuse it only briefly, so a genuine retry of an uncertain
+// charge stays idempotent (a few seconds later) but two legitimately-separate identical charges of the
+// same client in one long-lived session (e.g. an all-day front-desk iPad) never share a key and swallow
+// the second. A definitive server answer still rotates the key immediately (see stripeApi below).
+const IDEM_TTL_MS = 600000; // 10 minutes — far longer than any real retry, far shorter than a session
 const newIdemKey = () => { try { return crypto.randomUUID(); } catch (e) { return Date.now().toString(36) + Math.random().toString(36).slice(2); } };
-const idemKeyFor = (sig) => { if (!_idemKeys.has(sig)) _idemKeys.set(sig, newIdemKey()); return _idemKeys.get(sig); };
+const idemKeyFor = (sig) => {
+  const now = Date.now();
+  const cur = _idemKeys.get(sig);
+  if (cur && (now - cur.ts) < IDEM_TTL_MS) return cur.key;
+  const key = newIdemKey();
+  _idemKeys.set(sig, { key, ts: now });
+  return key;
+};
 const idemSig = (p) => {
   const cents = Math.round((Number(p.amount) || 0) * 100);
   if (p.action === "charge") return `charge:${p.customerId}:${p.paymentMethodId}:${cents}`;
@@ -9241,7 +9253,16 @@ function AppointmentsView({ appts, providers, services, onBack }) {
   if (minHour === 24) { minHour = 9; maxHour = 19; }
   const hourLabels = []; for (let h = minHour; h < maxHour; h++) hourLabels.push(h);
   const grid = Array.from({ length: 7 }, () => Array(hourLabels.length).fill(0));
-  live.filter((a) => a.bookedFor).forEach((a) => { const d = new Date(a.bookedFor); const hi = hourLabels.indexOf(d.getHours()); if (hi >= 0) grid[d.getDay()][hi] += 1; });
+  // #10: bucket by the SHOP wall clock — time-of-day from `start` (minutes-from-midnight) and weekday
+  // from shop-local midnight — not getHours()/getDay() on the raw instant, which drift by the tz offset
+  // for an appointment booked on an off-Pacific device and disagree with the calendar tile.
+  live.filter((a) => a.bookedFor).forEach((a) => {
+    const hasStart = typeof a.start === "number";
+    const hr = hasStart ? Math.floor(a.start / 60) : new Date(a.bookedFor).getHours();
+    const dow = hasStart ? new Date(new Date(a.bookedFor).getTime() - a.start * 60000).getUTCDay() : new Date(a.bookedFor).getDay();
+    const hi = hourLabels.indexOf(hr);
+    if (hi >= 0) grid[dow][hi] += 1;
+  });
   const dowOrder = [1, 2, 3, 4, 5, 6, 0];
   const dowLabels = ["M", "T", "W", "T", "F", "S", "S"];
   const orderedGrid = dowOrder.map((d) => grid[d]);
