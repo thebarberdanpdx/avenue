@@ -5696,9 +5696,18 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const toWaitlist = () => {
             const provFinal = prov || waReal[0];
             const entry = { service: draft, addons: draftAddons, cutType, beardType, provider: provFinal, forMemberId: activeMember?.id || null, forName: activeMember ? activeMember.name : (matched?.name || newName || "Me") };
-            setCart([...cart, entry]);
+            const nextCart = [...cart, entry];
+            setCart(nextCart);
             setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
-            setSlot(null); setStep(6);
+            setSlot(null);
+            // Open the waitlist form directly — works whether or not the day is full — prefilled with the
+            // day + service they were looking at. Inside, they can add more days and a time for each.
+            const dlbl = relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate) : `${relativeDate(selectedDate)}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
+            setWlName(matched ? matched.name : (newName || ""));
+            setWlDays([dlbl]); setWlDayTimes({ [dlbl]: "any" });
+            setWlService(nextCart.map(describeEntry).join(", "));
+            setShowWaitlist(true);
+            setStep(6);
           };
           const ready = selectedDate && slot != null;
           const tabStyle = (on) => ({ background: "none", border: "none", padding: "0 1px 12px", marginBottom: -1, fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: on ? "var(--text)" : "var(--sub)", borderBottom: on ? "2px solid var(--text)" : "2px solid transparent", cursor: "pointer" });
@@ -6032,14 +6041,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <>
               <CheckCircle2 size={30} style={{ color: "#7A9E9F", marginBottom: 12 }} />
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>You're on the list</h2>
-              <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>We'll text {capBlock.name ? capBlock.name.split(" ")[0] : "you"} the moment a spot opens up with {capBlock.providerName}. No need to check back.</p>
+              <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>You're on the list, {capBlock.name ? capBlock.name.split(" ")[0] : "there"}. If a spot opens up with {capBlock.providerName}, we'll reach out.</p>
               <button onClick={() => { setCapBlock(null); onExit(); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>Done</button>
             </>
           ) : (
             <>
               <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Fully booked for new clients</h2>
-              <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>{capBlock.providerName} is taking no more new clients on <strong style={{ color: "var(--text)" }}>{relativeDate(capBlock.date)}, {MONTHS[capBlock.date.getMonth()]} {capBlock.date.getDate()}</strong>. Join the waitlist and we'll text you the moment a spot opens.</p>
+              <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>{capBlock.providerName} is taking no more new clients on <strong style={{ color: "var(--text)" }}>{relativeDate(capBlock.date)}, {MONTHS[capBlock.date.getMonth()]} {capBlock.date.getDate()}</strong>. Join the waitlist and we'll reach out if a spot opens up.</p>
               <button className="lift" onClick={() => {
                 const e = capBlock;
                 const dayLabel = `${relativeDate(e.date)}, ${MONTHS[e.date.getMonth()]} ${e.date.getDate()}`;
@@ -6368,12 +6377,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             </>)}
 
             {/* date is fully booked → waitlist path */}
-            {dateIsFull && !waitlistDone && (
+            {(dateIsFull || showWaitlist) && !waitlistDone && (
               <div className="fade-up" style={{ marginBottom: 8 }}>
+                {dateIsFull && !showWaitlist && (
                 <div style={{ background: "rgba(176,141,87,0.08)", border: "1px solid rgba(176,141,87,0.25)", borderRadius: 6, padding: "16px 18px", marginBottom: 20, display: "flex", gap: 12, alignItems: "flex-start" }}>
                   <AlertCircle size={18} style={{ color: "var(--text)", flexShrink: 0, marginTop: 1 }} />
-                  <div style={{ fontSize: 14, lineHeight: 1.5 }}><strong>{relativeDate(selectedDate)}</strong> is fully booked. Join the waitlist and we'll text you the moment something opens.</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.5 }}><strong>{relativeDate(selectedDate)}</strong> is fully booked. Join the waitlist and we'll reach out if a spot opens that fits.</div>
                 </div>
+                )}
 
                 {!showWaitlist ? (
                   <button className="lift" onClick={() => { setShowWaitlist(true); setWlName(matched ? matched.name : ""); setWlDays([relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate) : `${relativeDate(selectedDate)}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`]); setWlService(cart.map(describeEntry).join(", ")); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>Join the waitlist →</button>
@@ -6450,13 +6461,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
                     {(() => {
                       const photoMode = business?.waitlist?.photoMode || (business?.waitlist?.photoNudge === false ? "off" : "required");
-                      const photoRequired = photoMode === "required";
+                      // Only ask for a selfie if we DON'T already have a photo of them. A returning client
+                      // with a profile picture already shows you their hair — no need to make them re-shoot it.
+                      const hasProfilePhoto = !!(matched && matched.photo);
+                      const photoRequired = photoMode === "required" && !hasProfilePhoto;
                       const phoneOk = phone.replace(/\D/g, "").length >= 10;
                       const daysOk = wlDays.length > 0 && wlDays.every((l) => wlDayTimes[l] && (wlDayTimes[l] !== "custom" || (wlDayCustom[l] || "").trim()));
                       const ready = !!(wlName && phoneOk && daysOk && (!photoRequired || wlPhotos > 0));
                       return (
                         <>
-                          {photoMode !== "off" && (<>
+                          {photoMode !== "off" && !hasProfilePhoto && (<>
                             <label style={{ fontSize: 13, color: "var(--faint)", display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>A quick selfie
                               <span style={{ fontSize: 9.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--bg)", background: photoRequired ? "var(--text)" : "var(--border2)", borderRadius: 4, padding: "2px 6px" }}>{photoRequired ? "REQUIRED" : "RECOMMENDED"}</span>
                             </label>
@@ -6485,7 +6499,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               </div>
             )}
 
-            {waitlistDone && <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8, padding: 24, textAlign: "center" }}><CheckCircle2 size={32} style={{ color: "#7A9E9F", marginBottom: 12 }} /><div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>You're on the list</div><p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5 }}>We'll text {wlName ? wlName.split(" ")[0] : "you"} the moment a matching spot opens up. No need to check back.</p></div>}
+            {waitlistDone && <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8, padding: 24, textAlign: "center" }}><CheckCircle2 size={32} style={{ color: "#7A9E9F", marginBottom: 12 }} /><div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 6 }}>You're on the list</div><p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.5 }}>You're all set, {wlName ? wlName.split(" ")[0] : "there"}. If a spot opens that fits your days, we'll reach out.</p></div>}
 
             {!dateIsFull && !waitlistDone && (
               <div style={{ borderTop: "1px solid var(--line)", paddingTop: 22, textAlign: "center", marginTop: 8 }}>
@@ -18741,8 +18755,8 @@ function NativeDiagnostics() {
 
 // ---------- shared dashboard pieces ----------
 function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, providers = [], services = [] }) {
-  const whenLabel = { early: "Early — open to 11am", midday: "Midday — 11am to 2pm", afternoon: "Afternoon — 2pm to close" };
-  const whenWord = { early: "morning", midday: "midday", afternoon: "afternoon" };
+  const whenLabel = { early: "Morning", morning: "Morning", midday: "Midday", afternoon: "Afternoon", evening: "Evening", any: "Any time" };
+  const whenWord = { early: "morning", morning: "morning", midday: "midday", afternoon: "afternoon", evening: "evening" };
   const [openId, setOpenId] = useState(null);
   const open = waitlist.find((w, i) => (w.id || i) === openId);
 
@@ -18819,10 +18833,10 @@ function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, prov
               </div>
 
               <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><Clock size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Preferred time:</span> <span style={{ fontWeight: 600 }}>{whenLabel[open.when] || open.when || "Any time"}</span></div>
+                {(() => { const allDays = (open.days && open.days.length > 0) ? open.days : (open.day ? [open.day] : []); if (!allDays.length) return null; const dt = open.dayTimes || {}; const winLbl = (w) => { const s = String(w || "any"); if (s.startsWith("custom:")) return s.slice(7) || "Custom"; return whenLabel[s] || "Any time"; }; return <div style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 15 }}><Clock size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} /><span style={{ color: "var(--sub)", flexShrink: 0 }}>Wants:</span> <span style={{ display: "grid", gap: 3 }}>{allDays.map((d) => <span key={d} style={{ fontWeight: 600 }}>{d} <span style={{ color: "var(--sub)", fontWeight: 400 }}>&middot; {winLbl(dt[d])}</span></span>)}</span></div>; })()}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><Sparkles size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Service:</span> <span style={{ fontWeight: 600 }}>{open.service}</span></div>
                 {open.provider && <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><User size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Prefers:</span> <span style={{ fontWeight: 600 }}>{open.provider}</span></div>}
-                {(() => { const allDays = (open.days && open.days.length > 0) ? open.days : (open.day ? [open.day] : []); return allDays.length > 0 && <div style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 15 }}><Calendar size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} /><span style={{ color: "var(--sub)" }}>{allDays.length > 1 ? "Days:" : "Day:"}</span> <span style={{ fontWeight: 600 }}>{allDays.join(" · ")}</span></div>; })()}
+                {/* days + times are shown together in the "Wants" block above */}
                 {open.at && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 2 }}>Added {open.at}</div>}
               </div>
 
@@ -19719,7 +19733,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const updateAppt = (id, patch) => { setAppts((cur) => cur.map((a) => a.id === id ? { ...a, ...patch } : a)); setOpen((o) => o && o.id === id ? { ...o, ...patch } : o); };
   // When a slot frees up, find waitlisted clients whose requested window + barber
   // match it, then act per the shop's Waitlist settings (Settings → Waitlist).
-  const WINDOW = { early: [DAY_START, 11 * 60], midday: [11 * 60, 14 * 60], afternoon: [14 * 60, DAY_END] };
+  // Time-of-day windows. Covers BOTH the client booking form's words (morning/afternoon/evening) and
+  // the legacy staff words (early/midday) so a client's stated preference is actually honored.
+  const WINDOW = { early: [DAY_START, 12 * 60], morning: [DAY_START, 12 * 60], midday: [11 * 60, 14 * 60], afternoon: [12 * 60, 17 * 60], evening: [17 * 60, DAY_END] };
   const wlRules = (business && business.waitlist) || { mode: "ask", order: "longest", delayMin: 30 };
   const [waitlistMatch, setWaitlistMatch] = useState(null); // { freed, matches } awaiting confirm
   // Eye-level popup that fires when the provider tries to book/move an appointment on top of another.
@@ -19732,9 +19748,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     if (!freed) return [];
     const prov = providers.find((p) => p.id === freed.providerId);
     return (waitlist || []).filter((w) => {
-      const provOk = !w.provider || w.provider === "Any" || (prov && w.provider === prov.name);
-      let timeOk = true;
-      if (w.when && WINDOW[w.when]) { const [a, b] = WINDOW[w.when]; timeOk = freed.start < b && freed.end > a; }
+      const provOk = !w.provider || w.provider === "Any" || w.provider === "Anyone" || w.anyProvider === true || (prov && w.provider === prov.name);
+      // Honor the client's time-of-day choice across ALL their chosen days (a "custom" note or "any" = flexible).
+      const wins = (w.dayTimes && Object.keys(w.dayTimes).length) ? Object.values(w.dayTimes) : (w.when ? [w.when] : []);
+      const timeOk = !wins.length || wins.some((win) => { const W = WINDOW[String(win).replace(/^custom.*/, "")]; return !W || (freed.start < W[1] && freed.end > W[0]); });
       return provOk && timeOk;
     }).sort((a, b) => {
       const ap = (a.photos || 0) > 0 ? 1 : 0;
