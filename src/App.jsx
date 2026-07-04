@@ -322,8 +322,6 @@ const DEFAULT_BUSINESS = {
       body: "Good news {client} - a spot opened for your {service} with {provider} on {date} at {time}. Reply YES to grab it before someone else does!" },
     { id: "deposit", label: "Deposit Received", channel: "both", timing: "When a deposit is taken", enabled: true,
       body: "Thanks {client}! We've received your deposit for your {service} with {provider} on {date} at {time}. It goes toward your total - see you at {business}." },
-    { id: "noshow", label: "Missed / Late Cancellation", channel: "both", timing: "On a no-show or late cancel", enabled: false,
-      body: "Hi {client}, we missed you for your {service} on {date}. Per our policy, a fee may apply. Questions? Just reply and we'll help. - {business}" },
     { id: "birthday", label: "Birthday message", channel: "email", timing: "On their birthday", enabled: false,
       body: "Happy birthday, {client}! Everyone at {business} hopes your day is a great one. Whenever you're ready for a fresh look, we'd love to see you in the chair." },
   ],
@@ -347,7 +345,7 @@ const DEFAULT_BUSINESS = {
 // Version-guarded so a shop's own later edits in Settings → Messages are never clobbered: once
 // msgCopyVersion reaches MSG_COPY_VERSION the migration is a no-op. Only the listed ids are touched
 // (label/timing/body); channel and every other message are left exactly as the shop has them.
-const MSG_COPY_VERSION = 5;
+const MSG_COPY_VERSION = 6;
 function migrateMessageCopy(biz) {
   try {
     if (!biz || (biz.msgCopyVersion || 0) >= MSG_COPY_VERSION) return biz;
@@ -374,6 +372,12 @@ function migrateMessageCopy(biz) {
     //     touched — channel and every other message stay exactly as the shop has them.
     if ((biz.msgCopyVersion || 0) < 5) {
       messages = messages.map((m) => (m && m.id === "checkin" && def.checkin) ? { ...m, body: def.checkin.body } : m);
+    }
+    // v6: drop the "Missed / Late Cancellation" (no-show) template. It was never wired to send —
+    // a dead toggle. The owner charges no-show fees silently from the dashboard and does not want
+    // any no-show notice or auto-receipt going to clients, so the setting is removed entirely.
+    if ((biz.msgCopyVersion || 0) < 6) {
+      messages = messages.filter((m) => m && m.id !== "noshow");
     }
     return { ...biz, messages, msgCopyVersion: MSG_COPY_VERSION };
   } catch (e) { return biz; }
