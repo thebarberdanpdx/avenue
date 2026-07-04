@@ -225,7 +225,6 @@ const DEFAULT_BUSINESS = {
     leadTimeMin: 120,        // #1: booking floor — earliest bookable spot from now, in minutes (read by computeFreeSlots)
     cancelWindowMin: 1440,   // #1: how much notice to cancel/reschedule before it's a late-cancel — its OWN field, not leadTimeMin
     horizonDays: 60,         // how far out clients can book
-    sameDayCutoff: "",       // e.g. "14:00" — no same-day bookings after this (blank = off)
     allowMultiple: true,     // multiple services per booking
     clientType: "all",       // all | returning | new
     requireCard: true,
@@ -233,7 +232,6 @@ const DEFAULT_BUSINESS = {
     bufferBefore: 0,         // minutes pad before each appt
     bufferAfter: 5,          // minutes pad after each appt
     dailyCap: 0,             // 0 = unlimited online bookings per day
-    fillGapsFirst: true,     // Boulevard-style: offer gap-filling slots first
     // ---- How clients get offered times (booking-times engine) ----
     // "grid"  → clean clock every gridMin minutes
     // "smart" → by service length, anchored to fit the day tightly (Smart Timing)
@@ -241,13 +239,8 @@ const DEFAULT_BUSINESS = {
     // "all"   → every possible opening (max choice)
     timeMode: "smart",
     gridMin: 30,             // increment for "grid" mode
-    rebookNudgeWeeks: 4,     // suggest rebooking after N weeks (0 = off)
-    guidedConsult: false,    // simple tile flow (true = legacy guided consultation, retired)
     // Gap avoidance — strict back-to-back booking to eliminate dead time
     avoidGaps: true,         // when true, only offer times flush with existing appts (or day start)
-    maxGapMin: 0,            // don't offer a slot if it would leave a gap LARGER than this on either side (0 = no max)
-    minGapMin: 0,            // don't offer a slot that would leave a gap SMALLER than this (0 = no min)
-    emptyDayMode: "all",     // "all" = offer all increments on empty days; "anchored" = only earliest of each shift
     // ---- "Anyone" routing — which real barber gets a booking made for "Anyone" ----
     // "soonest" (default) | "share" | "roundRobin" | "topChairs". The last two
     // walk anyoneOrder (array of provider ids) — rotation order / priority order.
@@ -18487,7 +18480,6 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: <ReportsHub appts={appts} clients={clients} providers={providers} services={services} business={form} setBusiness={setBusiness} me={me} onOpenCard={setOpenCard} />,
     },
   ];
-  const CATEGORY_ORDER = ["Business Setup", "Services & Menu", "Calendar & Appointments", "Payments & Checkout", "Online Booking", "Automated Messages", "Reporting"];
 
   // ---- Category grid: concrete, plain-named buckets. Every setting lives in exactly one,
   // so nothing falls through to search-only. Tap a tile → that category's list. ----
