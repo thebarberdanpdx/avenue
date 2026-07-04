@@ -4457,6 +4457,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setBookingFor(null); setActiveMember(null); setCart([]); setShowWhoFor(false); setShowUsual(false);
     setSimpleStep(null); setSimpleCat(null); setSimplePref(null); setStep(0);
     setUsePhone(true); setShowCodeEntry(false); setCodeEntry(""); setClientEmail(""); setLoginNoMatch(null);
+    // Clear the previous person's identity fields too, so signing out on a shared device leaves a truly
+    // clean slate. Otherwise the next person's login/confirm screens stay pre-filled with the last
+    // client's phone, name and email — and a booking (plus its reminder texts) could go out under them.
+    setPhone(""); setNewFirst(""); setNewLast(""); setNewEmail(""); setSmsConsent(false);
   };
   const doCancelAppt = (appt) => {
     try { supabase.rpc("cancel_my_appointment", { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(appt.id) }).catch(() => {}); } catch (e) {}
