@@ -4770,6 +4770,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <button onClick={() => { setTapSel(svc.id); setTimeout(() => selectService(svc), 165); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "none", border: "none", padding: "18px 2px", textAlign: "left", cursor: "pointer" }}>
                         <span style={{ flex: 1, minWidth: 0 }}>
                           <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, letterSpacing: "-0.3px", color: "var(--text)" }}>{svc.name}</span>
+                          {desc && <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{desc}</span>}
                         </span>
                         <ChevronRight size={20} style={{ color: "var(--sub)", flexShrink: 0 }} />
                       </button>
@@ -5015,6 +5016,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <button onClick={() => { setTapSel(svc.id); setTimeout(() => pickGuidedService(svc), 165); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "none", border: "none", padding: "18px 2px", textAlign: "left", cursor: "pointer" }}>
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, letterSpacing: "-0.3px", color: "var(--text)" }}>{svc.name}</span>
+                        {svc.booking && svc.booking.description && <span style={{ display: "block", fontFamily: FONT_BODY, fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{svc.booking.description}</span>}
                       </span>
                       <ChevronRight size={20} style={{ color: "var(--sub)", flexShrink: 0 }} />
                     </button>
