@@ -19889,7 +19889,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
   const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts((cur) => cur.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } setTimeout(() => handleFreedSlot(freed), 350); } };
   // open checkout instead of silently completing
-  const startCheckout = (appt, opts) => { setOpen(null); setCheckout(opts && opts.reopen ? { ...appt, __reopen: true } : appt); };
+  // #16: an appointment that already carries a payment (checked out once, or a status reverted after
+  // payment) must open in balance-only (reopen) mode — never the full-price charge flow — so it can
+  // never be charged a second time. paidForAppt credits what was already collected.
+  const startCheckout = (appt, opts) => { setOpen(null); const alreadyPaid = !!(appt && appt.paid && Number(appt.paid.total) > 0); setCheckout(((opts && opts.reopen) || alreadyPaid) ? { ...appt, __reopen: true } : appt); };
   const [refundAppt, setRefundAppt] = useState(null); // appt whose payment is being refunded from the appointment sheet
   // Everything ever charged against an appointment (ledger first, appt summary as fallback).
   const paidForAppt = (appt) => {
@@ -21272,13 +21275,24 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   // Subtotal is the line total minus any applied discount, so every downstream amount (tip,
   // total, balance, the charge) follows automatically. Tip is calculated on the discounted total.
   const grossSubtotal = +lines.reduce((s, l) => s + (Number(l.price) || 0), 0).toFixed(2);
+  // Money already collected for THIS ticket at booking — credited so checkout never charges it twice.
+  //  • PREPAID (#7/#11): the full amount incl. tip was charged at booking. Credit the PRE-TIP service
+  //    portion (prepaidTotal − prepaidTip) and take NO second tip (they already tipped).
+  //  • DEPOSIT (#6/#12): a partial payment toward the total. Credit it, but STILL tip — on the balance,
+  //    matching the booking promise "the rest is due at your visit."
+  const prepaidService = (!reopen && appt.prepaid) ? Math.max(0, +(((Number(appt.prepaidTotal) || 0) - (Number(appt.prepaidTip) || 0))).toFixed(2)) : 0;
+  const depositCredit = (!reopen && !appt.prepaid && Number(appt.deposit) > 0) ? +Number(appt.deposit).toFixed(2) : 0;
+  const bookingCredit = +(prepaidService + depositCredit).toFixed(2); // pre-tip credit for money paid at booking
+  const noNewTip = reopen || prepaidService > 0; // prepaid already collected a tip; deposit still tips on the balance
   const discountAmt = reopen ? 0 : resolveDiscount(checkoutDiscount, grossSubtotal);
   const subtotal = +Math.max(0, grossSubtotal - discountAmt).toFixed(2);
-  const tipAmt = reopen ? 0 : (customTip != null ? +Number(customTip).toFixed(2) : +(subtotal * tipPct / 100).toFixed(2));
+  const netDue = +Math.max(0, subtotal - bookingCredit).toFixed(2); // what's genuinely still owed for services/products
+  const tipAmt = noNewTip ? 0 : (customTip != null ? +Number(customTip).toFixed(2) : +(netDue * tipPct / 100).toFixed(2));
   // Reopened tickets only ever charge the balance — what's on the ticket minus what was already paid.
-  const balance = reopen ? Math.max(0, +(subtotal - alreadyPaid).toFixed(2)) : 0;
-  const chargeBase = reopen ? balance : +(subtotal + tipAmt).toFixed(2);
-  const total = +(subtotal + tipAmt).toFixed(2);
+  const balance = reopen ? Math.max(0, +(subtotal - alreadyPaid).toFixed(2)) : netDue;
+  const chargeBase = reopen ? balance : +(netDue + tipAmt).toFixed(2);
+  const total = +(subtotal + tipAmt).toFixed(2); // grand total of the ticket (incl. what was paid at booking)
+  const fullyPaidAtBooking = !reopen && bookingCredit > 0 && netDue === 0; // nothing left to charge — settle & close
   // Card-on-file surcharge — only when the shop turned it on in Checkout & money.
   const scCfg = (business?.checkout && business.checkout.cofSurcharge) || {};
   const scOn = !!scCfg.on;
@@ -21341,6 +21355,16 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       else { setPayErr(res && res.error ? res.error : `Stripe returned "${(res && res.status) || "an error"}" — the card may need to be present.`); }
     } catch (e) { setPayErr(e.message || "Charge failed."); }
     finally { setPayBusy(false); }
+  };
+  // #11: a ticket already paid IN FULL at booking has nothing to charge. Settle it: record the
+  // booking-time payment into the ledger (it wasn't recorded at booking) so revenue reports see it,
+  // then finalize — WITHOUT charging the card a second time.
+  const settlePrepaid = () => {
+    if (payBusy) return; setPayBusy(true);
+    const paidTot = +((Number(appt.prepaidTotal) || bookingCredit) || 0).toFixed(2);
+    const paidTip = +(Number(appt.prepaidTip) || 0).toFixed(2);
+    recordSale({ id: "pay_" + Date.now().toString(36), ts: Date.now(), apptId: appt.id, type: "sale", status: "paid", method: "prepaid", amount: paidTot, tip: paidTip, surcharge: 0, paymentIntentId: appt.prepaidIntentId || null, brand: null, last4: null, note: "Paid in full at booking · " + lines.map((l) => l.name).join(" · ") + (provider ? ` — with ${provider.name}` : ""), items: lines.map((l) => ({ name: l.name, price: +(Number(l.price) || 0).toFixed(2), productId: l.productId || null, qty: 1 })), staffId: (provider && provider.id) || appt.providerId || null, refunded: 0 });
+    onDone(appt.id, { total: paidTot, totalLabel: money(paidTot), tip: paidTip, discount: 0 });
   };
   useEffect(() => {
     if (stage === "approved") { const t = setTimeout(() => setStage(!reopen && rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
@@ -21405,7 +21429,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const startMethod = (m) => {
     setPayErr("");
     setPendingMethod(m);
-    if (tipCfg.enabled && !reopen) { setStage("tipPick"); }
+    if (tipCfg.enabled && !noNewTip) { setStage("tipPick"); }
     else { if (m === "cof") setStage("charging"); executeCharge(m); }
   };
   const runTapToPay = async () => {
@@ -21452,7 +21476,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 44, marginBottom: 8 }}>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text)", padding: 4, cursor: "pointer", width: 44, textAlign: "left" }}><X size={19} /></button>
         <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>Checkout</span>
-        <button onClick={() => { if ((reopen ? balance : subtotal) > 0) { setPayErr(""); setStage("method"); } }} disabled={(reopen ? balance : subtotal) <= 0} style={{ background: "none", border: "none", color: (reopen ? balance : subtotal) > 0 ? "var(--gold)" : "var(--faint)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: (reopen ? balance : subtotal) > 0 ? "pointer" : "default", padding: 4, width: 44, textAlign: "right" }}>Pay</button>
+        {fullyPaidAtBooking
+          ? <button onClick={settlePrepaid} disabled={payBusy} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer", padding: 4, width: 60, textAlign: "right", opacity: payBusy ? 0.5 : 1 }}>Done</button>
+          : <button onClick={() => { if ((reopen ? balance : netDue) > 0) { setPayErr(""); setStage("method"); } }} disabled={(reopen ? balance : netDue) <= 0} style={{ background: "none", border: "none", color: (reopen ? balance : netDue) > 0 ? "var(--gold)" : "var(--faint)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: (reopen ? balance : netDue) > 0 ? "pointer" : "default", padding: 4, width: 44, textAlign: "right" }}>Pay</button>}
       </div>
 
       {/* client header — avatar · name · client since */}
@@ -21463,6 +21489,13 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>{liveClient && liveClient.since ? `Client since ${liveClient.since}` : (provider ? `With ${provider.name}` : "")}</div>
         </div>
       </div>
+
+      {fullyPaidAtBooking && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "color-mix(in srgb, var(--gold) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginTop: 14 }}>
+          <Check size={17} style={{ color: "var(--gold)" }} />
+          <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.45 }}>Paid in full at booking{(Number(appt.prepaidTip) || 0) > 0 ? ` — ${money(+((Number(appt.prepaidTotal) || 0)).toFixed(2))} incl. ${money(+((Number(appt.prepaidTip) || 0)).toFixed(2))} tip` : ` — ${money(+((Number(appt.prepaidTotal) || bookingCredit) || 0).toFixed(2))}`}. Nothing to charge — tap <b>Done</b>. Add items above to charge extra.</div>
+        </div>
+      )}
 
       {lines.map((l) => {
         const chipVals = l.id === "main" ? [appt.cutLabel, ...(Array.isArray(appt.addonLabels) ? appt.addonLabels : [])].filter(Boolean) : [];
@@ -21550,9 +21583,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         </div>
       ); })()}
       <div style={{ flex: 1 }} />
-      {reopen && (
+      {(reopen || bookingCredit > 0) && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", padding: "14px 2px 0", fontSize: 14.5, color: "var(--sub)" }}>
-          <span>Paid earlier</span><span>−{money(alreadyPaid)}</span>
+          <span>{reopen ? "Paid earlier" : (appt.prepaid ? "Paid at booking" : "Deposit paid")}</span><span>−{money(reopen ? alreadyPaid : bookingCredit)}</span>
         </div>
       )}
       {!reopen && checkoutDiscount && (
@@ -21564,8 +21597,8 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       {showDiscPick && <DiscountPicker discounts={business?.discounts || []} current={checkoutDiscount} onPick={setCheckoutDiscount} onClose={() => setShowDiscPick(false)} />}
       {/* Foot: Mango shows a running Subtotal here; the pay action lives in the top-right "Pay". */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", marginTop: 14, padding: "16px 2px 8px" }}>
-        <span style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{reopen ? "Balance due" : "Subtotal"}</span>
-        <span style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500 }}>{money(reopen ? balance : subtotal)}</span>
+        <span style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{(reopen || bookingCredit > 0) ? "Balance due" : "Subtotal"}</span>
+        <span style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500 }}>{money(reopen ? balance : netDue)}</span>
       </div>
     </>);
 
@@ -21575,8 +21608,8 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       <Header title="Payment" onBack={() => setStage("summary")} />
       <div style={{ textAlign: "center", margin: "10px 0 30px" }}>
         <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Charging</div>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1 }}>{money(reopen ? balance : subtotal)}</div>
-        {tipCfg.enabled && !reopen && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 9 }}>{appt.name || "Walk-in"} · tip comes next</div>}
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1 }}>{money(reopen ? balance : netDue)}</div>
+        {tipCfg.enabled && !noNewTip && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 9 }}>{appt.name || "Walk-in"} · tip comes next</div>}
         {reopen && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 9 }}>Balance on a reopened ticket — no tip step</div>}
       </div>
       {!liveMode && <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5 }}>Payments are in test mode — card options are off. Flip Payments to Live in Checkout &amp; money.</div>}
