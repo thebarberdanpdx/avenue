@@ -5167,7 +5167,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const item = group.item || {};
           const price = Number(item.price) || 0;
           const addsMoney = item.addsPrice !== false && price > 0;
-          const priceLabel = addsMoney ? `+ $${price}` : (group.required ? "Required" : "Included");
+          // #22: "Show prices while booking" must govern EVERY price in the flow, not just cut-style
+          // cards. When off (the default), hide the running total and the add-on's dollar amount —
+          // but keep non-price info like "Required"/"Included" and the time.
+          const showPrices = !!(business && business.bookingStep && business.bookingStep.showPrices === true);
+          const priceLabel = addsMoney ? (showPrices ? `+ $${price}` : "") : (group.required ? "Required" : "Included");
           const heading = group.label || (item.name ? `Want ${item.name}?` : "One more thing?");
           const desc = item.desc || "";
           return (
@@ -5175,7 +5179,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 480, borderRadius: "22px 22px 0 0", padding: "24px 26px calc(30px + env(safe-area-inset-bottom))", boxShadow: "0 -12px 40px rgba(0,0,0,0.18)", maxHeight: "88dvh", overflowY: "auto" }}>
                 <div style={{ width: 38, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 16px" }} />
                 {/* Service is confirmed by now — reveal its price (plus a running total as add-ons are chosen). */}
-                <div style={{ textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginBottom: 16 }}>{entry.service.name} · <span style={{ color: "var(--text)", fontWeight: 600 }}>${lineTotal(entry).price}</span></div>
+                <div style={{ textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginBottom: 16 }}>{entry.service.name}{showPrices ? <> · <span style={{ color: "var(--text)", fontWeight: 600 }}>${lineTotal(entry).price}</span></> : null}</div>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1.2, textAlign: "center", color: "var(--text)" }}>{heading}</div>
                 {isChoice ? (
                   <div style={{ marginTop: 22 }}>
@@ -5187,14 +5191,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                             <span style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${on ? "var(--text)" : "var(--faint)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--text)" }} />}</span>
                             <span style={{ fontSize: 15.5 }}>{o.label}</span>
                           </span>
-                          <span style={{ color: "var(--sub)", fontSize: 14, textAlign: "right" }}>{o.price > 0 ? `+ $${o.price}` : ""}{o.min > 0 ? <span style={{ display: "block", fontSize: 13, color: "var(--faint)" }}>+ {o.min} min</span> : null}</span>
+                          <span style={{ color: "var(--sub)", fontSize: 14, textAlign: "right" }}>{showPrices && o.price > 0 ? `+ $${o.price}` : ""}{o.min > 0 ? <span style={{ display: "block", fontSize: 13, color: "var(--faint)" }}>+ {o.min} min</span> : null}</span>
                         </button>
                       );
                     })}
                   </div>
                 ) : (
                   <>
-                    <div style={{ textAlign: "center", fontSize: 13.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text2)", fontWeight: 600, marginTop: 12 }}>{priceLabel}</div>
+                    {priceLabel ? <div style={{ textAlign: "center", fontSize: 13.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text2)", fontWeight: 600, marginTop: 12 }}>{priceLabel}</div> : null}
                     {desc ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 15, lineHeight: 1.55, color: "var(--sub)", fontWeight: 400, textAlign: "center", maxWidth: 300, margin: "16px auto 0" }}>{desc}</div> : null}
                     <div style={{ display: "flex", gap: 10, marginTop: 26 }}>
                       <button onClick={() => answerAddon(group, false)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 12, padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>{group.noLabel || "No thanks"}</button>
