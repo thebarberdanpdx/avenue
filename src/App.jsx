@@ -10654,7 +10654,7 @@ function ConfirmModal({ open, onClose, children, maxWidth = 400 }) {
   if (!mounted) return null;
   return createPortal(
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 900, background: "var(--overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box", opacity: shown ? 1 : 0, transition: "opacity 0.28s ease", WebkitBackdropFilter: shown ? "blur(2px)" : "none", backdropFilter: shown ? "blur(2px)" : "none" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth, maxHeight: "85vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 24, boxShadow: "0 1px 2px rgba(0,0,0,0.06), 0 28px 64px -14px rgba(0,0,0,0.34)", transform: shown ? "translateY(0) scale(1)" : "translateY(20px) scale(0.94)", opacity: shown ? 1 : 0, transition: "transform 0.46s cubic-bezier(0.34,1.56,0.64,1), opacity 0.28s ease", willChange: "transform, opacity" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth, maxHeight: "85vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 24, boxShadow: "0 1px 2px rgba(0,0,0,0.06), 0 28px 64px -14px rgba(0,0,0,0.34)", transform: shown ? "translateY(0) scale(1)" : "translateY(20px) scale(0.94)", opacity: shown ? 1 : 0, transition: "transform 0.46s cubic-bezier(0.34,1.56,0.64,1), opacity 0.28s ease", willChange: "transform, opacity", pointerEvents: open ? "auto" : "none" }}>
         {open ? children : lastRef.current}
       </div>
     </div>,
@@ -19937,7 +19937,31 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       }
     } catch (e) {}
   };
-  const updateAppt = (id, patch) => { setAppts((cur) => cur.map((a) => a.id === id ? { ...a, ...patch } : a)); setOpen((o) => o && o.id === id ? { ...o, ...patch } : o); };
+  const applyApptPatch = (id, patch) => { setAppts((cur) => cur.map((a) => a.id === id ? { ...a, ...patch } : a)); setOpen((o) => o && o.id === id ? { ...o, ...patch } : o); };
+  // #15: an edit that changes an appointment's time / day / duration / provider must run the SAME
+  // overlap check every other write path (create, drag-move) already does — otherwise the Edit sheet
+  // silently double-books a chair. On a conflict, pop the conflict modal and RETURN FALSE (the caller
+  // must not fire its "rescheduled" text / toast until the write actually happens). A non-time patch
+  // (note, price, discount, flags) writes straight through as before.
+  const updateAppt = (id, patch) => {
+    if (patch && (patch.start != null || patch.end != null || patch.bookedFor != null || patch.providerId != null)) {
+      const cur0 = (appts || []).find((a) => a.id === id);
+      if (cur0) {
+        const prov = patch.providerId != null ? patch.providerId : cur0.providerId;
+        const ns = patch.start != null ? patch.start : cur0.start;
+        const ne = patch.end != null ? patch.end : cur0.end;
+        const bf = patch.bookedFor != null ? patch.bookedFor : cur0.bookedFor;
+        const day = new Date(bf); // check against the TARGET day (an edit can move to a different date)
+        const conflicts = (appts || []).filter((a) => a && a.id !== id && a.status !== "cancelled" && a.status !== "done" && a.providerId === prov && sameDay(a.bookedFor, day) && Math.min(a.start, a.end) < Math.max(ns, ne) && Math.max(a.start, a.end) > Math.min(ns, ne));
+        if (conflicts.length > 0) {
+          setConflictModal({ mode: "edit", editData: { id, patch, prov }, conflicts, nextSlot: null, dur: Math.max(0, ne - ns) });
+          return false;
+        }
+      }
+    }
+    applyApptPatch(id, patch);
+    return true;
+  };
   // When a slot frees up, find waitlisted clients whose requested window + barber
   // match it, then act per the shop's Waitlist settings (Settings → Waitlist).
   // Time-of-day windows. Covers BOTH the client booking form's words (morning/afternoon/evening) and
@@ -19948,6 +19972,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   // Eye-level popup that fires when the provider tries to book/move an appointment on top of another.
   // Shape: { mode: "create"|"move", bookData?, moveData?, conflicts:[...], nextSlot:number|null, dur:number }
   const [conflictModal, setConflictModal] = useState(null);
+  const commitGuardRef = useRef(new Set()); // #7: dedupe double-tapped booking commits
   const [capWarn, setCapWarn] = useState(null); // { bookData, who, limit, scope } — booking would exceed a daily cap
   // parse the "at" timestamp so we can order by who's waited longest
   const waitedSince = (w) => { const t = Date.parse(w.at); return isNaN(t) ? 0 : t; };
@@ -20360,6 +20385,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   // The actual save — runs after conflict has been resolved (no conflict, or provider chose to keep both).
   // Accepts an optional `overrideStart` so the conflict modal can slide the booking to the next free slot in one tap.
   const commitAppt = ({ providerId, start, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note, addons, optAddMin = 0, optAddPrice = 0, optLabels = [] }, overrideStart = null) => {
+    // #7: in-flight guard — a double-tapped "Book anyway" / "Move" (the override modal stays live for
+    // its 300ms close animation) must not create two appointments. Same booking signature within a
+    // short window is dropped. Pairs with the ConfirmModal pointer-events fix.
+    const _sig = `${providerId}|${start}|${(client && client.id) || walkInPhone || walkInFirst || ""}|${(service && service.id) || ""}`;
+    if (commitGuardRef.current.has(_sig)) return;
+    commitGuardRef.current.add(_sig);
+    setTimeout(() => commitGuardRef.current.delete(_sig), 1500);
     const useStart = overrideStart != null ? overrideStart : start;
     const id = "a" + Date.now() + Math.floor(Math.random() * 1000); // collision-proof string id
     const dur = getDuration(client, service, providerId) + (Number(optAddMin) || 0);
@@ -20963,7 +20995,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const more = conflictModal.conflicts.length - 1;
           const nextSlotTxt = conflictModal.nextSlot != null ? fmtTime(conflictModal.nextSlot) : null;
           // Which barber are we double-booking? Pull from the booking (create) or the moving appt (move).
-          const provId = conflictModal.mode === "create" ? conflictModal.bookData.providerId : conflictModal.moveData.appt.providerId;
+          const provId = conflictModal.mode === "create" ? conflictModal.bookData.providerId : conflictModal.mode === "edit" ? conflictModal.editData.prov : conflictModal.moveData.appt.providerId;
           const provObj = providers.find((p) => p.id === provId);
           const barberName = provObj ? (provObj.name || "").split(" ")[0] : "This staff member";
           const onMove = () => {
@@ -20977,6 +21009,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const onKeepBoth = () => {
             if (conflictModal.mode === "create") {
               commitAppt(conflictModal.bookData);
+            } else if (conflictModal.mode === "edit") {
+              // Conscious double-book via the Edit sheet: apply the edit and close the sheet (a silent
+              // override never texts the client, matching the drag-move conflict path).
+              applyApptPatch(conflictModal.editData.id, conflictModal.editData.patch);
+              setConflictModal(null); setOpen(null); showToast("Appointment updated.");
             } else {
               commitMove(conflictModal.moveData);
             }
@@ -23066,7 +23103,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const DUR_OPTS = []; for (let m = 5; m <= 240; m += 5) DUR_OPTS.push(m);
   const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setDraftDate(appt.bookedFor ? new Date(appt.bookedFor) : new Date()); setNotifyChange(false); setPickList(null); setDateOpen(false); setMode("edit"); setMenuOpen(false); };
   const cancelEdit = () => { setPickList(null); setDateOpen(false); setNotifyChange(false); setMode("detail"); };
-  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged; onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); if (willNotify) { const _cl = (clients || []).find((c) => c.id === appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: { ...appt, start: draftStart, end: draftStart + draftDur, providerId: draftProvider, bookedFor: bf.toISOString() }, business, providers, contact: { email: _cl.email || "", phone: appt.phone || _cl.phone || "" } }); } if (timeOrDayChanged) { fireStaffPush({ shopId, title: "Appointment moved", appt: { ...appt, start: draftStart, bookedFor: bf.toISOString() }, event: "rescheduled", business }); } showToast(willNotify ? "Updated — client notified." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
+  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged; const _wrote = onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); if (_wrote === false) return; if (willNotify) { const _cl = (clients || []).find((c) => c.id === appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: { ...appt, start: draftStart, end: draftStart + draftDur, providerId: draftProvider, bookedFor: bf.toISOString() }, business, providers, contact: { email: _cl.email || "", phone: appt.phone || _cl.phone || "" } }); } if (timeOrDayChanged) { fireStaffPush({ shopId, title: "Appointment moved", appt: { ...appt, start: draftStart, bookedFor: bf.toISOString() }, event: "rescheduled", business }); } showToast(willNotify ? "Updated — client notified." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
   // TODO(SMS live): when willNotify, dispatch the reschedule/moved template to the client's phone.
 
   // ---- price (admin-editable; per-appointment override stored on appt.price) ----
