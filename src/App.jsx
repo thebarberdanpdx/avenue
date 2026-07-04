@@ -10336,7 +10336,7 @@ function MasterCalendar({ shops, onEnter }) {
 // CONCIERGE — OPEN A NEW SHOP
 // Industry-specific starter menus + the setup screen (master mode only).
 // ============================================================
-const _seedBooking = (extra) => ({ available: true, description: "", customPrice: false, promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false, ...(extra || {}) });
+const _seedBooking = (extra) => ({ available: true, description: "", promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false, ...(extra || {}) });
 const _mkSvc = (i, name, duration, price, color, extra) => ({ id: `svc-${i}`, name, category: "Services", price, duration, color, photo: "", staff: {}, addonGroups: [], booking: _seedBooking(extra) });
 const STARTER_MENUS = {
   barber: [
@@ -11230,7 +11230,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const staffList = (providers || []).filter((p) => p.id !== "anyone");
   // build a default staff map: everyone ON, no overrides (null = use service default)
   const defaultStaffMap = () => { const m = {}; staffList.forEach((p) => { m[p.id] = { on: true, duration: null, price: null }; }); return m; };
-  const defaultBooking = () => ({ available: true, description: "", customPrice: false, promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false });
+  const defaultBooking = () => ({ available: true, description: "", promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false });
   const blank = { id: "", name: "", price: "", duration: "", color: "sage", photo: "", photos: [], category: cats[0], addonGroups: [], staff: {}, booking: defaultBooking(), usesCutStyles: false };
   const [form, setForm] = useState(blank);
   const dragId = useRef(null);
@@ -12117,7 +12117,6 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           <Row stack title="Who can book it" desc="Limit complex work to clients you've seen before — new clients are asked to call.">
             <Segmented inline options={[{ value: "all", label: "Everyone" }, { value: "returning", label: "Returning only" }]} value={b.whoCanBook || "all"} onChange={(v) => setBooking({ whoCanBook: v })} />
           </Row>
-          {bookingRow("Custom price label", "customPrice", "Show a label like “from $42” instead of the exact price.")}
           {bookingRow("Prompt to call", "promptToCall", "Ask clients to call instead of booking this online.")}
           {bookingRow("Require home address", "requireAddress", "For in-home or mobile services.")}
           {bookingRow("Require a card", "requireCard", "Hold a card on file to book — your no-show protection.")}
@@ -17021,7 +17020,7 @@ function HelpCenter({ business, onBack }) {
 
 // Default online-booking settings, shared so SettingsView can fall back safely when a saved
 // shop has no `booking` block yet (MenuEditor has its own local defaultBooking()).
-const DEFAULT_BOOKING = { available: true, description: "", customPrice: false, promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false };
+const DEFAULT_BOOKING = { available: true, description: "", promptToCall: false, requireAddress: false, requireCard: true, requirePayment: false };
 // Test-book tool — fills the shop with a realistic busy week of fake clients,
 // appointments, and waitlist entries so the owner can see/feel/test a full book.
 // SAFETY: every record is tagged (_test:true) and given a "test_" id prefix, and
