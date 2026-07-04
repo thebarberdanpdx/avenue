@@ -3301,10 +3301,11 @@ function ServicePhotoStrip({ photos }) {
 // and the arrows nudge the strip; each day shows its weekday, date, and a warm dot when it has
 // openings. `selectable(date)` decides which days can be tapped; past days and booked-out days
 // render dimmed + disabled. Same props as before so both booking call sites are unchanged.
-function DateStrip({ selectedDate, onPick, selectable }) {
+function DateStrip({ selectedDate, onPick, selectable, horizonDays }) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const HORIZON = 90; // days out you can scroll to
-  const days = useMemo(() => Array.from({ length: HORIZON }, (_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i); return d; }), []);
+  // #13: cap how far out clients can scroll/book to the owner's "how far ahead" window (default 90).
+  const HORIZON = Math.max(1, Math.min(730, Number(horizonDays) || 90));
+  const days = useMemo(() => Array.from({ length: HORIZON }, (_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i); return d; }), [HORIZON]);
   const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const ITEM_W = 60;
   const scrollRef = useRef(null);
@@ -3464,6 +3465,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [dupWarn, setDupWarn] = useState(null); // { existing, phone, email } — client already has an appt within 10 days
   const [wantEarlier, setWantEarlier] = useState(false); // client opts in to be told if an earlier slot opens
   const [clientTypeBlock, setClientTypeBlock] = useState(null); // "returning_only" | "new_only" | null — set when shop's online booking is restricted to one type and this client is the other
+  const [callOnly, setCallOnly] = useState(null); // #12: a service marked "prompt to call" — show a call-to-book message instead of booking it online
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberNote, setNewMemberNote] = useState("");
   const [newMemberPhone, setNewMemberPhone] = useState(""); // phone for the person you're booking for — their reminders/check-in go here
@@ -3481,6 +3483,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [newFirst, setNewFirst] = useState("");  // first-timer first name collected at the end
   const [newLast, setNewLast] = useState("");    // first-timer last name collected at the end
   const [newEmail, setNewEmail] = useState(""); // first-timer email collected at the end (optional)
+  const [newAddress, setNewAddress] = useState(""); // #11: home address, collected only for services that require it (mobile/in-home)
   const [phoneConflict, setPhoneConflict] = useState(false); // true when a first-timer's phone already exists on file → verify by code
   // Derived full name — keeps older call sites that read `newName` working without rewrites.
   const newName = `${newFirst.trim()} ${newLast.trim()}`.trim();
@@ -4230,6 +4233,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         groupId: isMultiPerson ? baseId : null,
         manageToken: makeManageToken(),
         wantsEarlier: wantEarlier,
+        address: (pi === 0 && newAddress.trim()) ? newAddress.trim() : undefined, // #11: home address for mobile/in-home services
         discount: (pi === 0 && selfie) ? { id: "selfie", name: "Profile photo", type: "amount", value: 5 } : undefined, // $5 off for adding a profile selfie
       });
       if (!isSame) cursor += person.durMin;
@@ -4460,7 +4464,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     // Clear the previous person's identity fields too, so signing out on a shared device leaves a truly
     // clean slate. Otherwise the next person's login/confirm screens stay pre-filled with the last
     // client's phone, name and email — and a booking (plus its reminder texts) could go out under them.
-    setPhone(""); setNewFirst(""); setNewLast(""); setNewEmail(""); setSmsConsent(false);
+    setPhone(""); setNewFirst(""); setNewLast(""); setNewEmail(""); setNewAddress(""); setSmsConsent(false);
   };
   const doCancelAppt = (appt) => {
     try { supabase.rpc("cancel_my_appointment", { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(appt.id) }).catch(() => {}); } catch (e) {}
@@ -4622,7 +4626,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </span>
                 <span className="wel-ar">&#8594;</span>
               </button>
-              <button onClick={() => { setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} className="wel-card wel-sec">
+              <button onClick={() => { if ((business?.booking?.clientType) === "returning") { setClientTypeBlock("returning_only"); return; } setBookingFor(null); setMatched(null); setMyAppts([]); setCart([]); setSimplePref(null); setSimpleChange(null); setSimpleCat(null); setSimpleStep("what"); }} className="wel-card wel-sec">
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="wel-h" style={{ display: "block" }}>It's my first time</span>
                   <span className="wel-s" style={{ display: "block" }}>Welcome — let's take a look</span>
@@ -4655,11 +4659,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* SIMPLE · WHAT — one clean question: what are you here for? */}
         {simpleStep === "what" && !cutFlow && (() => {
           const cats = (categories && categories.length) ? categories : ["Services"];
-          const visible = (s) => !s.archived && !s.hidden;
+          const visible = (s) => !s.archived && !s.hidden && (s.booking?.available !== false); // #8: honor the per-service "Available in online booking" toggle
           const inCat = (cat) => services.filter((s) => visible(s) && (s.category || cats[0]) === cat);
           const bs = (business && business.bookingStep) || {};
           const selectService = (svc) => {
             if (!svc) return;
+            if (svc.booking && svc.booking.promptToCall) { setCallOnly(svc); return; } // #12: this service is call-to-book
             setDraft(svc);
             setSimpleChange(null);
             setCutConfirm(null);
@@ -4912,12 +4917,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
         {/* STEP 1 — service picker (returning / family / add-another). Editorial tiles, no guided tour. */}
         {step === 1 && !cutFlow && (() => {
-          const visible = (s) => !s.archived && !s.hidden;
+          const visible = (s) => !s.archived && !s.hidden && (s.booking?.available !== false); // #8: honor the per-service "Available in online booking" toggle
           const cats = (categories && categories.length) ? categories : ["Services"];
           const inCat = (cat) => services.filter((s) => visible(s) && (s.category || cats[0]) === cat);
           const liveCats = cats.filter((c) => inCat(c).length > 0);
           const pickGuidedService = (svc) => {
             if (!svc) return;
+            if (svc.booking && svc.booking.promptToCall) { setCallOnly(svc); return; } // #12: this service is call-to-book
             if (svc.firstTime && svc.intake) { setIntakeFor(svc); return; }
             setDraft(svc); setDraftAddons({}); setCutType(null); setBeardType(null);
             setSimpleChange(null); setCutConfirm(null); setDescConfirmed(false); setConfirmSheet(null); setAddonFlow(null);
@@ -5809,7 +5815,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               )}
 
               {wwPhase === "when" && (
-                <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => waSlotsFor(pid, d).length > 0} />
+                <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => waSlotsFor(pid, d).length > 0} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
               )}
 
               {wwPhase === "when" && selectedDate && !dayFull && (<>
@@ -5966,7 +5972,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <button onClick={() => { setUsePhone(true); setLoginNoMatch(null); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>Text me a code instead</button>
             </p>
             <p style={{ textAlign: "center", marginTop: 2 }}>
-              <button onClick={() => { setStep(0); setSimpleStep("what"); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>First time here? Book as a new client</button>
+              <button onClick={() => { if ((business?.booking?.clientType) === "returning") { setClientTypeBlock("returning_only"); return; } setStep(0); setSimpleStep("what"); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>First time here? Book as a new client</button>
             </p>
           </div>
         )}
@@ -6035,9 +6041,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* Client-type gate — fires when the shop's "Who can book" setting blocks this client type. */}
         <Sheet open={!!clientTypeBlock} onClose={() => setClientTypeBlock(null)} align="top">
           <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
-          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>{clientTypeBlock === "returning_only" ? "Returning clients only" : "New clients only"}</h2>
-          <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>{clientTypeBlock === "returning_only" ? "Online booking at this shop is currently open to returning clients only. Please give us a call to book your first visit." : "Online booking at this shop is currently for new clients only. Please give us a call to book your next visit."}{business?.phones?.[0]?.number ? ` Phone: ${business.phones[0].number}.` : ""}</p>
-          <button onClick={() => setClientTypeBlock(null)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>OK</button>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>{clientTypeBlock === "returning_only" ? "Booking is for existing clients" : "New clients only right now"}</h2>
+          <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>{clientTypeBlock === "returning_only" ? "We're only booking clients we've seen before at the moment — please check back soon!" : "Online booking is open to new clients only right now — please check back soon!"}</p>
+          {clientTypeBlock === "returning_only" && (
+            <button onClick={() => { setClientTypeBlock(null); setBookingFor("self"); setActiveMember(null); setAddingMember(false); setStep(5); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>Already been in? Sign in</button>
+          )}
+          <button onClick={() => setClientTypeBlock(null)} style={{ width: "100%", background: "transparent", color: "var(--text)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 500, borderRadius: 12, border: "1px solid var(--border)" }}>Close</button>
+        </Sheet>
+        {/* #12: a service marked "prompt to call" isn't booked online — the client is asked to reach out (call OR text, since Dan prefers texts). */}
+        <Sheet open={!!callOnly} onClose={() => setCallOnly(null)} align="top">
+          <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Let's set this up together</h2>
+          <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>{callOnly ? `Booking ${callOnly.name} starts with a quick chat so we can go over the details. ` : ""}{business?.phones?.[0]?.number ? `Call or text us at ${business.phones[0].number} and we'll get you scheduled.` : "Reach out and we'll get you scheduled."}</p>
+          <button onClick={() => setCallOnly(null)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>Got it</button>
         </Sheet>
         {/* New-client daily cap — this barber is full for new clients that day; offer the existing waitlist. */}
         <Sheet open={!!capBlock} onClose={() => setCapBlock(null)} align="top">
@@ -6366,7 +6382,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             })()}
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 12 }}>Or pick another day</div>
             {(() => { const calProv = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]); return (
-              <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0} />
+              <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
             ); })()}
             {selectedDate && !dateIsFull && (<>
               <div style={{ height: 26 }} />
@@ -6541,6 +6557,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <input placeholder="Last name" autoComplete="family-name" style={{ ...inputStyle, flex: 1 }} value={newLast} onChange={(e) => setNewLast(e.target.value)} />
               </div>
               <input placeholder="Email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" style={{ ...inputStyle }} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+              {cart.some((e) => e && e.service && e.service.booking && e.service.booking.requireAddress) && (
+                <input placeholder="Home address (so we know where to come)" autoComplete="street-address" style={{ ...inputStyle }} value={newAddress} onChange={(e) => setNewAddress(e.target.value)} />
+              )}
               <input placeholder="Phone number" type="tel" inputMode="tel" autoComplete="tel" style={{ ...inputStyle, ...(phoneConflict ? { borderColor: "#C0392B", borderWidth: 1.5 } : {}) }} value={phone} onChange={(e) => { setPhone(e.target.value); if (phoneConflict) setPhoneConflict(false); }} onBlur={async () => {
                 const digits = phone.replace(/\D/g, "");
                 if (digits.length < 10 || matched) { setPhoneConflict(false); return; }
@@ -6621,7 +6640,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {(() => {
               const bk = business.booking || {};
               const dep = bk.deposit || { mode: "none", amount: 0 };
-              const needsCard = !!bk.requireCard || (dep.mode && dep.mode !== "none");
+              // #10: a card is needed if there's a deposit, OR any service being booked requires one.
+              // Per-service booking.requireCard wins (an explicit false exempts it, e.g. a free consult);
+              // a service that doesn't specify falls back to the shop-wide requireCard setting.
+              const needsCard = (dep.mode && dep.mode !== "none") || (cart.length ? cart.some((e) => { const r = e && e.service && e.service.booking ? e.service.booking.requireCard : undefined; return r === undefined ? !!bk.requireCard : !!r; }) : !!bk.requireCard);
               if (!needsCard) return null;
               const depositAmt = Math.max(0, Math.min(cartAdjTotal, dep.mode === "fixed" ? Number(dep.amount || 0) : dep.mode === "percent" ? Math.round(cartAdjTotal * (Number(dep.amount || 0) / 100)) : 0));
               const livePay = business.payments?.live === true;
@@ -6648,7 +6670,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   ) : (() => {
                     // Card / Apple Pay may ONLY open once name, phone, email & consent are set — otherwise
                     // a one-tap wallet payment could commit a booking with no client details.
-                    const identityOk = agreed && smsConsent && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10;
+                    const identityOk = agreed && smsConsent && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10 && (!cart.some((e) => e && e.service && e.service.booking && e.service.booking.requireAddress) || !!newAddress.trim());
                     return (
                       <>
                         <button disabled={!identityOk} onClick={() => { if (identityOk) setCardSheetOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: identityOk ? "pointer" : "default", opacity: identityOk ? 1 : 0.5 }}><CreditCard size={17} style={{ color: "var(--text)" }} /> {depositAmt > 0 ? `Pay $${depositAmt} deposit` : "Add a card"}</button>
@@ -6675,8 +6697,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             {(() => {
               const bk = business.booking || {};
               const dep = bk.deposit || { mode: "none", amount: 0 };
-              const needsCard = !!bk.requireCard || (dep.mode && dep.mode !== "none");
-              const baseOk = agreed && smsConsent && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10;
+              // #10: a card is needed if there's a deposit, OR any service being booked requires one.
+              // Per-service booking.requireCard wins (an explicit false exempts it, e.g. a free consult);
+              // a service that doesn't specify falls back to the shop-wide requireCard setting.
+              const needsCard = (dep.mode && dep.mode !== "none") || (cart.length ? cart.some((e) => { const r = e && e.service && e.service.booking ? e.service.booking.requireCard : undefined; return r === undefined ? !!bk.requireCard : !!r; }) : !!bk.requireCard);
+              const baseOk = agreed && smsConsent && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10 && (!cart.some((e) => e && e.service && e.service.booking && e.service.booking.requireAddress) || !!newAddress.trim());
               const canLock = baseOk && (!needsCard || cardOnFile);
               return (
             <>
