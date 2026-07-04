@@ -32,6 +32,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const STAFF_ONLY = new Set(["charge", "refund", "connection_token", "terminal_intent", "terminal_location"]);
+// Money-OUT actions must ALSO belong to the caller's shop, not just any valid
+// session. `charge` pulls a saved card; `refund` sends money out. On top of the
+// staff-session gate above, the signed-in email must match a provider of the
+// shop named in the request — so a valid session for one shop can never move
+// money in another once Vero is multi-tenant. (Terminal actions stay behind the
+// session gate only; they mint account-scoped intents, not shop-specific ones.)
+const SHOP_SCOPED = new Set(["charge", "refund"]);
 
 // Tap to Pay on iPhone requires the reader to be tied to a Terminal Location.
 // Resolve one: prefer a pinned env id, else the account's first existing Location.
@@ -64,6 +71,25 @@ async function getStaffUser(req) {
     return data.user;
   } catch (e) {
     return null;
+  }
+}
+
+// Is this signed-in staff user a member of `shop`? True only if their login
+// email matches a provider record of that shop — the SAME identity rule the app
+// uses to know "who am I" at the register (App.jsx: norm(p.email) === login email).
+// Fails closed on any missing input or DB error: a money-out call is never let
+// through on doubt (a blocked charge is retryable; a cross-shop charge isn't).
+async function isShopMember(user, shop) {
+  if (!user || !shop || typeof shop !== "string" || !SERVICE_KEY) return false;
+  const email = String(user.email || "").trim().toLowerCase();
+  if (!email) return false;
+  try {
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+    const { data: rows, error } = await supabase.from("providers").select("data").eq("shop_id", shop);
+    if (error) return false;
+    return (rows || []).some((r) => r && r.data && String(r.data.email || "").trim().toLowerCase() === email);
+  } catch (e) {
+    return false;
   }
 }
 
@@ -167,10 +193,21 @@ async function handler(req, res) {
     }
 
     // Money-moving actions require a signed-in staff member.
+    let staffUser = null;
     if (STAFF_ONLY.has(action)) {
-      const user = await getStaffUser(req);
-      if (!user) {
+      staffUser = await getStaffUser(req);
+      if (!staffUser) {
         return res.status(401).json({ error: "Not authorized — please sign in again." });
+      }
+    }
+
+    // …and money-OUT actions (charge / refund) must also belong to the shop named
+    // in the request. charge/refund ⊂ STAFF_ONLY, so staffUser is already set here.
+    // Blocks a valid session for one shop from moving money in another (multi-tenant).
+    if (SHOP_SCOPED.has(action)) {
+      const ok = await isShopMember(staffUser, body.shop);
+      if (!ok) {
+        return res.status(403).json({ error: "Not authorized for this shop." });
       }
     }
 
