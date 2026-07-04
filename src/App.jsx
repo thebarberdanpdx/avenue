@@ -7692,6 +7692,10 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
 
   // --- Price-per-appt ---
   const apptPrice = (a) => {
+    // #29: prefer the price LOCKED onto the appointment at booking so deleting or re-pricing a service
+    // never restates historical revenue (a deleted service used to report $0; a re-priced one restated
+    // every past visit). Live-service pricing is only a fallback for old/imported appts with no price.
+    if (typeof a.price === "number") return a.price;
     if (a.lineItems && a.lineItems.length) {
       return a.lineItems.reduce((sum, li) => {
         const s = services.find((x) => x.id === li.serviceId);
@@ -8850,6 +8854,10 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
 
   // Price-per-appt — same as Pulse
   const apptPrice = (a) => {
+    // #29: prefer the price LOCKED onto the appointment at booking so deleting or re-pricing a service
+    // never restates historical revenue (a deleted service used to report $0; a re-priced one restated
+    // every past visit). Live-service pricing is only a fallback for old/imported appts with no price.
+    if (typeof a.price === "number") return a.price;
     if (a.lineItems && a.lineItems.length) {
       return a.lineItems.reduce((sum, li) => {
         const s = services.find((x) => x.id === li.serviceId);
@@ -9331,6 +9339,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
   const provName = (c) => providers.find((p) => p.id === c.provider)?.name;
 
   const apptPrice = (a) => {
+    if (typeof a.price === "number") return a.price; // #29: locked price wins so service delete/re-price can't restate history
     if (a.lineItems && a.lineItems.length) {
       return a.lineItems.reduce((sum, li) => { const s = services.find((x) => x.id === li.serviceId); return sum + (s ? getPrice(s, a.providerId) : 0); }, 0);
     }
@@ -9563,6 +9572,10 @@ function ServiceMixView({ appts, services, providers, onBack }) {
   const som = (d) => { const x = sod(d); x.setDate(1); return x; };
 
   const apptPrice = (a) => {
+    // #29: prefer the price LOCKED onto the appointment at booking so deleting or re-pricing a service
+    // never restates historical revenue (a deleted service used to report $0; a re-priced one restated
+    // every past visit). Live-service pricing is only a fallback for old/imported appts with no price.
+    if (typeof a.price === "number") return a.price;
     if (a.lineItems && a.lineItems.length) {
       return a.lineItems.reduce((sum, li) => {
         const s = services.find((x) => x.id === li.serviceId);
@@ -9809,6 +9822,10 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
   const som = (d) => { const x = sod(d); x.setDate(1); return x; };
 
   const apptPrice = (a) => {
+    // #29: prefer the price LOCKED onto the appointment at booking so deleting or re-pricing a service
+    // never restates historical revenue (a deleted service used to report $0; a re-priced one restated
+    // every past visit). Live-service pricing is only a fallback for old/imported appts with no price.
+    if (typeof a.price === "number") return a.price;
     if (a.lineItems && a.lineItems.length) {
       return a.lineItems.reduce((sum, li) => {
         const s = services.find((x) => x.id === li.serviceId);
@@ -24643,6 +24660,14 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   // ---- Delete client ---- (syncList persists the removal; past appointments are left intact)
   const [deletePrompt, setDeletePrompt] = useState(false);
   const removeClient = () => {
+    // #30: a client's payment records (real Stripe sales + no-show fees, each with a paymentIntentId)
+    // live ONLY on the client object. Deleting the client used to erase them — wiping the money ledger,
+    // revenue/tax reports, and the ability to refund settled charges (no-show fees have no appt, so they
+    // were unrecoverable). Relocate the ledger into business.sales FIRST so it survives the delete.
+    const ledger = (live.payments || []);
+    if (ledger.length && setBusiness) {
+      setBusiness((b) => ({ ...b, sales: [...((b && b.sales) || []), ...ledger.map((p) => ({ ...p, clientName: live.name, _fromDeletedClient: live.id }))] }));
+    }
     setClients(clients.filter((c) => c.id !== live.id));
     setDeletePrompt(false); setMenuOpen(false);
     showToast(`${firstName} deleted.`);
@@ -25019,7 +25044,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
       </Sheet>
       <Sheet open={deletePrompt} onClose={() => setDeletePrompt(false)} align="center" maxWidth={420}>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 6 }}>Delete {firstName}?</h2>
-        <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>This removes {live.name} and their notes, photos and preferences from your client list. Past appointments stay on the calendar. This can't be undone.</p>
+        <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 18 }}>This removes {live.name} and their notes, photos and preferences from your client list. Past appointments and their payment history stay in your records for reporting and refunds. This can't be undone.</p>
         <button onClick={removeClient} style={{ width: "100%", background: "#c0392b", color: "#fff", padding: 15, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none", cursor: "pointer", marginBottom: 10 }}>DELETE CLIENT</button>
         <button onClick={() => setDeletePrompt(false)} style={{ width: "100%", background: "transparent", color: "var(--sub)", border: "1px solid var(--border)", padding: 14, fontSize: 14, fontWeight: 500, borderRadius: 12, cursor: "pointer" }}>Cancel</button>
       </Sheet>
