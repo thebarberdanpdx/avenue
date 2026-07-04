@@ -3891,10 +3891,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       if (groupSlots.sameTime.length) return groupSlots.sameTime;
       return groupSlots.sequential.map((s) => s.start);
     }
-    const prov = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]);
-    const raw = computeFreeSlots({ prov, date: selectedDate, durMin: effMin || 30, providers, appts, business, services });
-    let avail = raw.map((s) => s.start).filter((t) => !slotBlockedByRules(prov.id, selectedDate, t));
     const bk = business?.booking || {};
+    // #20: "Anyone available" (or no barber picked yet) means a time is open if ANY bookable barber is
+    // free — union across staff, so one barber's day off or blocked hours never falsely marks the whole
+    // day "fully booked". Pool matches resolveAnyone (all non-archived real barbers). A specific barber
+    // is just a pool of one, so their behavior is unchanged.
+    const anyone = !(provider && provider.id !== "anyone");
+    const pool = anyone ? (providers || []).filter((p) => p && p.id !== "anyone" && !p.archived) : [provider];
+    const usePool = pool.length ? pool : [providers.find((p) => p.id === "dan") || providers[1]].filter(Boolean);
+    const seen = new Set();
+    const raw = [];
+    usePool.forEach((p) => {
+      if (!p) return;
+      computeFreeSlots({ prov: p, date: selectedDate, durMin: effMin || 30, providers, appts, business, services })
+        .forEach((s) => { if (!seen.has(s.start) && !slotBlockedByRules(p.id, selectedDate, s.start)) { seen.add(s.start); raw.push(s); } });
+    });
+    raw.sort((a, b) => a.start - b.start);
+    let avail = raw.map((s) => s.start);
     if (bk.fakeIt != null ? bk.fakeIt : bk.curated) {
       const keepBest = raw.filter((s) => s.best).map((s) => s.start);
       avail = curateStarts(avail, fakeItKeep(avail.length, bk), selectedDate, keepBest);
@@ -3907,9 +3920,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // Computed separately so freeSlotsFor (group-booking math) keeps returning plain numbers.
   const bestSet = useMemo(() => {
     if (!selectedDate || isMultiPerson) return new Set();
-    const prov = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]);
-    if (!prov) return new Set();
-    return new Set(computeFreeSlots({ prov, date: selectedDate, durMin: effMin || 30, providers, appts, business, services }).filter((s) => s.best).map((s) => s.start));
+    // Union "best" times across the same pool as openSlots so highlights match what's shown (#20).
+    const anyone = !(provider && provider.id !== "anyone");
+    const pool = anyone ? (providers || []).filter((p) => p && p.id !== "anyone" && !p.archived) : [provider];
+    const usePool = pool.length ? pool : [providers.find((p) => p.id === "dan") || providers[1]].filter(Boolean);
+    const out = new Set();
+    usePool.forEach((p) => { if (!p) return; computeFreeSlots({ prov: p, date: selectedDate, durMin: effMin || 30, providers, appts, business, services }).filter((s) => s.best).forEach((s) => out.add(s.start)); });
+    return out;
   }, [selectedDate, provider, providers, appts, isMultiPerson, cartMin, cart, business]);
   useEffect(() => {
     if (!selectedDate) { setSlotsReady(false); return; }
