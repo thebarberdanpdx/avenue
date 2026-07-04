@@ -5195,6 +5195,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div onClick={() => { if (!req && !isChoice) answerAddon(group, false); }} style={{ position: "fixed", top: 0, left: 0, right: 0, height: "100dvh", background: "rgba(10,10,10,0.5)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
               <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", width: "100%", maxWidth: 480, borderRadius: "22px 22px 0 0", padding: "24px 26px calc(30px + env(safe-area-inset-bottom))", boxShadow: "0 -12px 40px rgba(0,0,0,0.18)", maxHeight: "88dvh", overflowY: "auto" }}>
                 <div style={{ width: 38, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 16px" }} />
+                {/* #25: show the add-on's photo WHILE the client decides (before "Yes"), not only after —
+                    gated on the owner's "show add-on photos" setting. */}
+                {business.showAddonPhotos && group.photo && <img src={imgUrl(group.photo, 360)} alt="" style={{ display: "block", width: 128, height: 128, borderRadius: 16, objectFit: "cover", margin: "0 auto 16px" }} />}
                 {/* Service is confirmed by now — reveal its price (plus a running total as add-ons are chosen). */}
                 <div style={{ textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginBottom: 16 }}>{entry.service.name}{showPrices ? <> · <span style={{ color: "var(--text)", fontWeight: 600 }}>${lineTotal(entry).price}</span></> : null}</div>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, lineHeight: 1.2, textAlign: "center", color: "var(--text)" }}>{heading}</div>
@@ -6069,6 +6072,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             }} style={{ width: "100%", background: loginBusy || phone.replace(/\D/g, "").length < 10 ? "transparent" : "var(--text)", color: loginBusy || phone.replace(/\D/g, "").length < 10 ? "var(--faint)" : "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: loginBusy || phone.replace(/\D/g, "").length < 10 ? "1px solid var(--border)" : "none", cursor: "pointer" }}>{loginBusy ? "Sending…" : "Text me a code →"}</button>
             <p style={{ textAlign: "center", marginTop: 14 }}>
               <button onClick={() => { setUsePhone(false); setLoginNoMatch(null); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>Didn't get it? Use my email instead</button>
+            </p>
+            {/* #27: a genuinely new client must be able to escape the returning-client login (the email
+                screen already offers this; the phone screen was missing it). */}
+            <p style={{ textAlign: "center", marginTop: 2 }}>
+              <button onClick={() => { if ((business?.booking?.clientType) === "returning") { setClientTypeBlock("returning_only"); return; } setStep(0); setSimpleStep("what"); }} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, padding: 4, cursor: "pointer", fontFamily: "inherit" }}>First time here? Book as a new client</button>
             </p>
           </div>
         )}
