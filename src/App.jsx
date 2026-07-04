@@ -314,7 +314,7 @@ const DEFAULT_BUSINESS = {
       body: "Today's the day, {client}! {provider} will be ready for your {service} at {time}. Can't wait to see you.\n\n{cancel link}" },
     { id: "checkin", label: "Reminder - 15 minutes before", channel: "text", timing: "15 minutes before", enabled: true,
       body: "{business}: See you in 15 min, {client}!\n\n{checkin link}" },
-    { id: "canceled", label: "Appointment Canceled", channel: "both", timing: "When canceled", enabled: true,
+    { id: "canceled", label: "Appointment Canceled", channel: "email", timing: "When canceled", enabled: true,
       body: "Your {service} on {date} at {time} has been canceled, {client}. We'd love to see you again - book anytime at {business}." },
     { id: "rescheduled", label: "Appointment Rescheduled", channel: "both", timing: "When rescheduled", enabled: true,
       body: "Updated! Your {service} with {provider} is now {date} at {time}. See you then, {client}." },
@@ -4237,6 +4237,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         prepaidTip: (pi === 0 && payFull && cardInfo && cardInfo.paid) ? (cardInfo.tip || 0) : undefined,
         prepaidIntentId: (pi === 0 && payFull && cardInfo && cardInfo.paid) ? (cardInfo.paymentIntentId || null) : undefined,
         phone: person.key === "self" ? finalPhone : ((((matched?.family || []).find((m) => m.id === person.key) || {}).phone || "").replace(/\D/g, "").length >= 10 ? ((matched?.family || []).find((m) => m.id === person.key) || {}).phone : finalPhone),
+        email: (finalEmail || "").trim(), // #15: carry the booker's email on the appt so a manage-link cancel/reschedule can actually email them (email is required to book, so it's always here)
         groupId: isMultiPerson ? baseId : null,
         manageToken: makeManageToken(),
         wantsEarlier: wantEarlier,
@@ -7271,7 +7272,11 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
         cancelUrl: typeof window !== "undefined" ? `${window.location.origin}/manage?t=${token}` : "",
         arriveUrl: typeof window !== "undefined" ? `${window.location.origin}/manage?t=${token}&a=1` : "",
       };
-      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: m.channel || "email", to: { email: (a.email || "").trim(), phone: (a.phone || "").trim(), smsOptOut: false }, subject: `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
+      // #15: cancellations go by EMAIL ONLY — never SMS (shop policy). Reschedules keep the
+      // template's channel (email + text). Email now actually lands because the appt carries the
+      // booker's email (see booking); text still works off a.phone as before.
+      const channel = msgId === "canceled" ? "email" : (m.channel || "email");
+      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel, to: { email: (a.email || "").trim(), phone: (a.phone || "").trim(), smsOptOut: false }, subject: `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
     } catch (e) {}
   };
 
@@ -20290,7 +20295,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       setClients((cur) => cur.map((c) => c.id === bookClient.id ? { ...c, lastActivity: new Date().toISOString() } : c));
     }
 
-    const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: (optLabels && optLabels.length) ? `${service.name} · ${optLabels.join(", ")}` : service.name, serviceName: service.name, addonLabels: optLabels || [], lineItems: [{ serviceId: service.id, cutType: null, beardType: null, addons: addons || {} }], manageToken: makeManageToken(), detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), hasPhotos: false, photos: 0 };
+    const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: (optLabels && optLabels.length) ? `${service.name} · ${optLabels.join(", ")}` : service.name, serviceName: service.name, addonLabels: optLabels || [], lineItems: [{ serviceId: service.id, cutType: null, beardType: null, addons: addons || {} }], manageToken: makeManageToken(), detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), email: bookClient ? (bookClient.email || "") : (walkInEmail || ""), hasPhotos: false, photos: 0 };
     setAppts((cur) => [...cur, newAppt]);
     // Staff-created booking → fire the confirmation too (same engine as online bookings).
     fireApptNotify({ msgId: "booked", appt: newAppt, business, providers, contact: { email: (bookClient ? bookClient.email : walkInEmail) || "", phone: (bookClient ? bookClient.phone : walkInPhone) || "" }, subject: `${business.name}: Appointment confirmed` });
