@@ -6628,9 +6628,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const last4 = (cardInfo && cardInfo.last4) || "••••";
               return (
                 <div style={{ background: "var(--panel)", border: `1px solid ${cardOnFile ? "color-mix(in srgb, var(--text) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16, boxShadow: "var(--shadow-sm)" }}>
-                  <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--text)", fontWeight: 600, marginBottom: 6 }}>{depositAmt > 0 ? "DEPOSIT TO RESERVE" : "CARD TO RESERVE"}</div>
+                  <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--text)", fontWeight: 600, marginBottom: 6 }}>{cardOnFile ? "CARD ON FILE" : depositAmt > 0 ? "DEPOSIT TO RESERVE" : "CARD TO RESERVE"}</div>
                   <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>
-                    {depositAmt > 0
+                    {/* A returning client with a card on file is NOT charged a deposit up front (Dan's call):
+                        their card holds the spot and they're only charged if they miss. New clients still
+                        pay the deposit below. */}
+                    {cardOnFile
+                      ? <>Your card's already on file to hold your spot. You won't be charged now &mdash; only if you no-show or cancel late, per the policy above.</>
+                      : depositAmt > 0
                       ? <>A <b style={{ color: "var(--text)" }}>${depositAmt}</b> deposit holds your spot and goes toward your total. The rest (${Math.max(0, cartAdjTotal - depositAmt)}) is due at your visit.</>
                       : <>We keep a card on file to hold your spot. You won't be charged unless you no-show or cancel late, per the policy above.</>}
                   </p>
