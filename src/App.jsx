@@ -18279,7 +18279,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "waitlist", title: "Waitlist", icon: Clock, category: "Calendar & Appointments",
-      status: (form.waitlist?.mode === "silent" ? "Auto" : "Ask first") + (form.waitlist?.order === "longest" ? " · longest first" : " · first come"),
+      status: form.waitlist?.autoNotify === true ? "Auto — everyone notified" : "Manual — you pick who",
       keywords: "waitlist auto notify automatic slot opened cancellation longest waiting queue order delay minutes silent ask first link book",
       editor: <WaitlistRulesEditor w={form.waitlist || { mode: "ask", order: "longest", delayMin: 30 }} onChange={(wl) => setForm({ ...form, waitlist: wl })} />,
     },
