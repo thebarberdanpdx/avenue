@@ -15,6 +15,7 @@
 // so this endpoint does NO date math — it only persists what it's handed.
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { getStaffUser, isShopMember } from "../lib/shop-auth.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -28,26 +29,14 @@ const isSynced = (a) => !!a && (a.source === "sync" || a._synced);
 const normShop = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9-]/g, "");
 const icalToken = (shop) => crypto.createHmac("sha256", SERVICE_KEY || "").update("ical:" + normShop(shop)).digest("hex").slice(0, 24);
 
-// Owner-only guard. This endpoint writes appointments with the service-role key
-// (it can rewrite or wipe the synced calendar), and it is ONLY ever called from
-// the signed-in dashboard — never from the public booking page. So we require a
-// valid Supabase session token; anonymous callers are rejected. (The daily
+// Auth guard. This endpoint writes appointments with the service-role key (it can
+// rewrite or wipe the synced calendar), and it is ONLY ever called from the
+// signed-in dashboard — never from the public booking page. So we require a valid
+// Supabase session token AND that the caller belongs to the shop they named (see
+// the isShopMember check below) — a valid session for one shop must not be able to
+// rewrite another shop's calendar or mint its private iCal token. (The daily
 // background sync uses /api/calendar-run, NOT this endpoint, so it's unaffected.)
-// Same mechanism the Stripe endpoint uses for money-moving actions.
-async function getUser(req) {
-  const header = req.headers.authorization || req.headers.Authorization || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-  if (!token || !SERVICE_KEY) return null;
-  try {
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data || !data.user) return null;
-    return data.user;
-  } catch (e) {
-    return null;
-  }
-}
-
+// Same shared mechanism the Stripe money-out endpoint uses.
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -57,13 +46,18 @@ export default async function handler(req, res) {
   if (!SERVICE_KEY) return res.status(500).json({ error: "server not configured" });
 
   // Require a signed-in user before touching the calendar.
-  const user = await getUser(req);
+  const user = await getStaffUser(req);
   if (!user) return res.status(401).json({ error: "Not authorized — please sign in again." });
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const shop = (body.shop || "").toString();
     if (!shop) return res.status(400).json({ error: "missing shop" });
+    // …and the caller must belong to THAT shop — not just any valid session — before
+    // we rewrite its calendar or hand back its private iCal token. Blocks a valid
+    // session for one shop from touching another's data (multi-tenant).
+    const member = await isShopMember(user, shop);
+    if (!member) return res.status(403).json({ error: "Not authorized for this shop." });
     // Issue the owner's private iCal feed key (owner-only via the guard above; no DB work needed).
     if (body.mode === "icaltoken") return res.status(200).json({ ok: true, token: icalToken(shop) });
     const mode = ["clear", "config"].includes(body.mode) ? body.mode : "sync";

@@ -20,6 +20,7 @@
 // ---------------------------------------------------------------------------
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { getStaffUser, isShopMember } from "../lib/shop-auth.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -60,38 +61,6 @@ function validAmount(amount) {
   return Number.isFinite(n) && n > 0 && n <= MAX_AMOUNT;
 }
 
-async function getStaffUser(req) {
-  const header = req.headers.authorization || req.headers.Authorization || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-  if (!token || !SERVICE_KEY) return null;
-  try {
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data || !data.user) return null;
-    return data.user;
-  } catch (e) {
-    return null;
-  }
-}
-
-// Is this signed-in staff user a member of `shop`? True only if their login
-// email matches a provider record of that shop — the SAME identity rule the app
-// uses to know "who am I" at the register (App.jsx: norm(p.email) === login email).
-// Fails closed on any missing input or DB error: a money-out call is never let
-// through on doubt (a blocked charge is retryable; a cross-shop charge isn't).
-async function isShopMember(user, shop) {
-  if (!user || !shop || typeof shop !== "string" || !SERVICE_KEY) return false;
-  const email = String(user.email || "").trim().toLowerCase();
-  if (!email) return false;
-  try {
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data: rows, error } = await supabase.from("providers").select("data").eq("shop_id", shop);
-    if (error) return false;
-    return (rows || []).some((r) => r && r.data && String(r.data.email || "").trim().toLowerCase() === email);
-  } catch (e) {
-    return false;
-  }
-}
 
 // --- Webhook: keep our records in sync with Stripe ---------------------------
 // Stripe calls us when something happens out-of-band — a refund issued from the
