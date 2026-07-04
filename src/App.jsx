@@ -19900,6 +19900,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     if (recs.length) return recs.reduce((s, r) => s + (r.amount || 0) - (r.refunded || 0), 0);
     return (appt.paid && appt.paid.total) || 0;
   };
+  // #13: the credit for a REOPENED ticket must exclude tips — crediting a prior tip against the
+  // newly-added items silently nets it out and undercharges them. This is items-only paid.
+  const paidTowardItems = (appt) => {
+    const recs = clients.flatMap((c) => (c.payments || [])).concat((business && business.sales) || []).filter((r) => r.apptId === appt.id);
+    if (recs.length) return recs.reduce((s, r) => s + (r.amount || 0) - (r.tip || 0) - (r.refunded || 0), 0);
+    return Math.max(0, ((appt.paid && appt.paid.total) || 0) - ((appt.paid && appt.paid.tip) || 0));
+  };
   const finishCheckout = (id, summary) => {
     setAppts((cur) => {
       const done = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceStartedAt ? Date.now() : a.serviceEndedAt, pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a);
@@ -21131,7 +21138,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           setBusiness={setBusiness}
           allServices={services}
           reopen={!!checkout.__reopen}
-          alreadyPaid={checkout.__reopen ? +paidForAppt(checkout).toFixed(2) : 0}
+          alreadyPaid={checkout.__reopen ? +paidTowardItems(checkout).toFixed(2) : 0}
           clients={clients}
           appts={appts}
           setClients={setClients}
@@ -24658,6 +24665,8 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   // money helpers (mirror CalendarView.paidForAppt — payment records are the source of truth)
   const recsFor = (a) => (live.payments || []).filter((r) => r.apptId === a.id);
   const paidForAppt = (a) => { const recs = recsFor(a); if (recs.length) return recs.reduce((s, r) => s + (r.amount || 0) - (r.refunded || 0), 0); return (a.paid && a.paid.total) || 0; };
+  // #13: reopen credit excludes tips (items-only) so a prior tip can't net against newly-added items.
+  const paidTowardItems = (a) => { const recs = recsFor(a); if (recs.length) return recs.reduce((s, r) => s + (r.amount || 0) - (r.tip || 0) - (r.refunded || 0), 0); return Math.max(0, ((a.paid && a.paid.total) || 0) - ((a.paid && a.paid.tip) || 0)); };
   const lifetime = myAppts.reduce((s, a) => s + paidForAppt(a), 0) + (Number(live.importedSpent) || 0);
   const money0 = (n) => "$" + (Math.round(n) === n ? Math.round(n) : n.toFixed(2));
 
@@ -25134,7 +25143,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           setBusiness={setBusiness}
           allServices={services}
           reopen={!!checkout.__reopen}
-          alreadyPaid={checkout.__reopen ? +paidForAppt(checkout).toFixed(2) : 0}
+          alreadyPaid={checkout.__reopen ? +paidTowardItems(checkout).toFixed(2) : 0}
           clients={clients}
           appts={appts}
           setClients={setClients}
