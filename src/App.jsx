@@ -3649,6 +3649,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [personalizeOpen, setPersonalizeOpen] = useState(true); // combined note+photo card — open by default so the photo ask is obvious
   const [bookedId, setBookedId] = useState(null); // id of the appointment just created
   const [bookedClientId, setBookedClientId] = useState(null); // client the booking is for (for post-booking photo/note attach)
+  const [bookedToken, setBookedToken] = useState(null); // the just-booked appointment's private code — used to save its post-booking note/photos to the server (public bookings)
   const galleryCapturedRef = useRef(false); // guard so post-booking reference photos capture to the gallery only once
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
   const [waProvId, setWaProvId] = useState(null); // Who & When merged screen: selected barber tab ("anyone" = First free)
@@ -4066,6 +4067,20 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     const pd = photos;
     setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, note, hasNote: !!note, photos: pd.length, hasPhotos: pd.length > 0, photoData: pd } : a));
   }, [step, bookedId, clientNote, photos]);
+  // Persist a PUBLIC client's post-booking note + reference photos to the appointment on the SERVER
+  // (staff bookings already persist through the dashboard). Debounced so we write once after they
+  // finish, scoped to the appointment's own private code so it can only ever touch their booking.
+  // Server-side only — no SMS, no email, no cost.
+  useEffect(() => {
+    if (isStaff || step !== 8 || !bookedToken) return;
+    const note = clientNote.trim();
+    const pd = Array.isArray(photos) ? photos : [];
+    if (!note && !pd.length) return;
+    const t = setTimeout(() => {
+      supabase.rpc("attach_booking_details_by_token", { p_token: bookedToken, p_note: note, p_photos: pd }).catch(() => {});
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [isStaff, step, bookedToken, clientNote, photos]);
   // Capture the attached reference photos onto the client's gallery once, when they leave the screen.
   const captureBookingGallery = () => {
     if (galleryCapturedRef.current || !photos.length || !bookedClientId) return;
@@ -4317,7 +4332,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             fireStaffNotify({ shopId, appt: ap0, business });
           }
         } catch (e) {}
-        setBookedId(baseId); setBookedClientId(clientId); galleryCapturedRef.current = false; setStep(8);
+        setBookedId(baseId); setBookedClientId(clientId); setBookedToken(newAppts[0] && newAppts[0].manageToken); galleryCapturedRef.current = false; setStep(8);
         // ---- Authoritative card-on-file persistence (single source of truth) ----
         // Runs after book_public so the client row exists, and re-applies the card LAST so
         // book_public's delete-then-insert can't clobber it. Works for new + returning clients.
@@ -4395,7 +4410,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setShowCodeEntry(false); setAddingMember(false); setBookingFor(null); setActiveMember(null);
     setCart([]); setDraft(null); setDraftAddons({}); setCutType(null); setBeardType(null); setCutPhase("type");
     setGroupPeople([]); setGroupMode(null); setWizardIdx(0); setBookedId(null); setCameFromUsual(false);
-    setPhotos([]); setClientNote(""); setSelfie(null); setBookedClientId(null); galleryCapturedRef.current = false;
+    setPhotos([]); setClientNote(""); setSelfie(null); setBookedClientId(null); setBookedToken(null); galleryCapturedRef.current = false;
     setConsult(null); setShowAllVisits(false); setHomeAction(null); setReschedPrev(null); setShowHome(true);
     refreshMyAppts();
   };
