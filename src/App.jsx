@@ -216,7 +216,7 @@ const DEFAULT_BUSINESS = {
   // Shop open hours per weekday (0=Sun … 6=Sat), times in minutes from midnight
   hours: { 0: { on: true, start: 600, end: 900 }, 1: { on: true, start: 540, end: 1020 }, 2: { on: false, start: 540, end: 1020 }, 3: { on: false, start: 540, end: 1020 }, 4: { on: true, start: 540, end: 1020 }, 5: { on: true, start: 540, end: 1020 }, 6: { on: true, start: 540, end: 1020 } },
   // Waitlist auto-notify behavior when a slot frees up
-  waitlist: { mode: "ask", order: "longest", delayMin: 30, photoMode: "required", photoNudge: true, askAnyProvider: true }, // photoMode: required|recommended|off · askAnyProvider: ask if open to any provider
+  waitlist: { mode: "ask", order: "longest", delayMin: 30, photoMode: "required", photoNudge: true, askAnyProvider: true, autoNotify: false }, // photoMode: required|recommended|off · askAnyProvider: ask if open to any provider · autoNotify: false = staff picks who to offer (manual); true = message all matching clients the moment a slot opens
   // Softened, neutral default policy — every business edits this freely
   policy: "We kindly ask for at least 24 hours' notice to cancel or reschedule so we can offer the time to someone else. A card is required to reserve your appointment; you won't be charged unless you miss it without notice. Thank you for understanding.",
   // ---- Online booking rules ----
@@ -318,8 +318,8 @@ const DEFAULT_BUSINESS = {
       body: "Your {service} on {date} at {time} has been canceled, {client}. We'd love to see you again - book anytime at {business}." },
     { id: "rescheduled", label: "Appointment Rescheduled", channel: "both", timing: "When rescheduled", enabled: true,
       body: "Updated! Your {service} with {provider} is now {date} at {time}. See you then, {client}." },
-    { id: "waitlist", label: "Waitlist - Slot Opened", channel: "text", timing: "When a slot opens", enabled: true,
-      body: "Good news {client} - a spot opened for your {service} with {provider} on {date} at {time}. Reply YES to grab it before someone else does!" },
+    { id: "waitlist", label: "Waitlist - Slot Opened", channel: "both", timing: "When a slot opens", enabled: true,
+      body: "Good news {client} - an earlier {service} spot opened on {date} at {time}. It's first come, so tap here to grab it before it's taken: {book link}" },
     { id: "deposit", label: "Deposit Received", channel: "both", timing: "When a deposit is taken", enabled: true,
       body: "Thanks {client}! We've received your deposit for your {service} with {provider} on {date} at {time}. It goes toward your total - see you at {business}." },
     { id: "birthday", label: "Birthday message", channel: "email", timing: "On their birthday", enabled: false,
@@ -345,7 +345,7 @@ const DEFAULT_BUSINESS = {
 // Version-guarded so a shop's own later edits in Settings → Messages are never clobbered: once
 // msgCopyVersion reaches MSG_COPY_VERSION the migration is a no-op. Only the listed ids are touched
 // (label/timing/body); channel and every other message are left exactly as the shop has them.
-const MSG_COPY_VERSION = 6;
+const MSG_COPY_VERSION = 7;
 function migrateMessageCopy(biz) {
   try {
     if (!biz || (biz.msgCopyVersion || 0) >= MSG_COPY_VERSION) return biz;
@@ -378,6 +378,14 @@ function migrateMessageCopy(biz) {
     // any no-show notice or auto-receipt going to clients, so the setting is removed entirely.
     if ((biz.msgCopyVersion || 0) < 6) {
       messages = messages.filter((m) => m && m.id !== "noshow");
+    }
+    // v7: the "Slot Opened" offer used to say "Reply YES to grab it" — but there's no reply-YES
+    //     handler; openings book first-come via a link. Refresh that one body to the current
+    //     first-come copy (with a {book link}) ONLY if the shop hasn't customized it, so the
+    //     editable template matches what actually gets sent. Any custom wording is preserved.
+    if ((biz.msgCopyVersion || 0) < 7) {
+      const staleWaitlist = "Good news {client} - a spot opened for your {service} with {provider} on {date} at {time}. Reply YES to grab it before someone else does!";
+      messages = messages.map((m) => (m && m.id === "waitlist" && m.body === staleWaitlist && def.waitlist) ? { ...m, body: def.waitlist.body, channel: def.waitlist.channel } : m);
     }
     return { ...biz, messages, msgCopyVersion: MSG_COPY_VERSION };
   } catch (e) { return biz; }
@@ -13768,13 +13776,20 @@ function WaitlistRulesEditor({ w, onChange }) {
   const delays = [15, 30, 45, 60];
   return (
     <div>
-      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>When an appointment is cancelled, the calendar's ⋯ menu lights up green if the freed time fits anyone waiting. Open the Waitlist there to see who fits and send each offer by hand.</p>
+      <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>When an appointment is cancelled, the calendar's ⋯ menu lights up green if the freed time fits anyone waiting.</p>
+
+      <div style={{ marginBottom: 10 }}>
+        <ToggleSetting label="Notify the waitlist automatically" desc="When a spot opens, text + email a booking link to every matching client at once — first to book gets it. Leave OFF to pick who to offer by hand from the calendar." on={w.autoNotify === true} onToggle={(v) => set({ autoNotify: v })} />
+      </div>
 
       <div style={{ background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 14, padding: 16, marginBottom: 6, display: "flex", gap: 12 }}>
         <Bell size={18} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
-        <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}><b style={{ color: "var(--text)" }}>Nothing is ever sent automatically.</b> You choose who gets each opening. Booked clients who asked for an earlier time are shown first, then the waitlist. Each offer goes out as a short text plus an email with a booking link — only when you tap “Send offer.”</div>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>{w.autoNotify === true
+          ? <><b style={{ color: "var(--text)" }}>Offers go out automatically.</b> The moment a slot opens, every matching client is texted and emailed the booking link — whoever books first gets it. Booked clients who asked to move up are included. The exact wording is your editable “Waitlist &ndash; Slot Opened” message.</>
+          : <><b style={{ color: "var(--text)" }}>Nothing is ever sent automatically.</b> You choose who gets each opening. Booked clients who asked for an earlier time are shown first, then the waitlist. Each offer goes out as a text plus an email with a booking link — only when you tap “Send offer.”</>}</div>
       </div>
 
+      {w.autoNotify !== true && (<>
       <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, margin: "20px 0 8px" }}>Who it reaches</div>
       <Opt active={w.order === "longest"} title="Longest waiting first — one at a time" sub="Offer the slot to whoever has waited longest. If they don't book in time, it moves to the next person in line." onClick={() => set({ order: "longest" })} />
       <Opt active={w.order === "all"} title="First come, first serve — notify all at once" sub="Notify every matching client at the same time. Whoever books first gets the slot." onClick={() => set({ order: "all" })} />
@@ -13790,6 +13805,7 @@ function WaitlistRulesEditor({ w, onChange }) {
           <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Each client gets {w.delayMin || 30} minutes to claim the slot before it's offered to the next person in line.</p>
         </div>
       )}
+      </>)}
       <div style={{ borderTop: "1px solid var(--line)", marginTop: 22, paddingTop: 8 }}>
         <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", margin: "8px 0 4px" }}>ON THE CLIENT'S WAITLIST FORM</div>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 3 }}>Reference photo</div>
@@ -19954,13 +19970,22 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   };
   const handleFreedSlot = (freed) => {
     if (!freed || freed.status === "done" || freed.status === "block") return;
-    // No automatic messages, EVER. Just record the opening — the calendar's ⋯ menu lights GREEN when
-    // an opening fits someone, and the staff sends each offer by hand from the Waitlist panel.
-    if (![...findWaitlistMatches(freed), ...findEarlierAlerts(freed)].length) return;
-    setOpenings((cur) => {
-      if ((cur || []).some((o) => o.apptId === freed.id)) return cur || [];
-      return [{ id: "op" + freed.id, apptId: freed.id, providerId: freed.providerId, bookedFor: freed.bookedFor, start: freed.start, end: freed.end, offered: [] }, ...(cur || [])];
-    });
+    // Earlier-alert clients (already booked, want to move up) sort ABOVE the waitlist.
+    const matches = [...findEarlierAlerts(freed), ...findWaitlistMatches(freed)];
+    if (!matches.length) return;
+    const alreadyOpen = (openings || []).some((o) => o.apptId === freed.id);
+    const opening = { id: "op" + freed.id, apptId: freed.id, providerId: freed.providerId, bookedFor: freed.bookedFor, start: freed.start, end: freed.end, offered: [] };
+    if (!alreadyOpen) {
+      setOpenings((cur) => (cur || []).some((o) => o.apptId === freed.id) ? (cur || []) : [opening, ...(cur || [])]);
+    }
+    // #18: default is MANUAL — just record the opening so the calendar's ⋯ menu lights GREEN and the
+    // owner picks who to offer by hand. If the shop turned AUTO-NOTIFY on, message every matching client
+    // right away instead (first-come). This fires exactly once, here, when the slot frees — never in an
+    // effect/loop — so no client is ever double-messaged.
+    if (!alreadyOpen && business?.waitlist?.autoNotify === true) {
+      matches.forEach((person) => sendOpeningOffer(person, opening, { silent: true }));
+      showToast && showToast(`Waitlist notified — ${matches.length} ${matches.length === 1 ? "client" : "clients"} messaged.`);
+    }
   };
 
   const deleteAppt = (id) => {
@@ -20368,29 +20393,39 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   }).filter(Boolean);
   const hasOpeningMatches = liveOpenings.length > 0;
 
-  // Manually send ONE opening offer to ONE person: a 1-segment SMS (short link) + a fuller email.
-  // Staff-initiated only — never fires on its own. Respects a client's SMS opt-out.
-  const sendOpeningOffer = (person, opening) => {
+  // Send ONE opening offer to ONE person — text + email, worded from the owner's editable
+  // "Waitlist - Slot Opened" message. Used both by the manual "Send offer" button and by
+  // auto-notify (opts.silent). Respects a client's SMS opt-out.
+  const sendOpeningOffer = (person, opening, opts) => {
+    const silent = !!(opts && opts.silent); // auto-notify sends many at once — suppress the per-send toast
     const digitsOf = (s) => String(s || "").replace(/\D/g, "");
     const appt = person.earlierApptId ? (appts || []).find((a) => a.id === person.earlierApptId) : null;
     let cli = appt ? ((clients || []).find((c) => c.id === appt.clientId) || null) : null;
     let ph = digitsOf(person.phone) || digitsOf(appt && appt.phone) || digitsOf(cli && cli.phone);
     if (!cli && ph) cli = (clients || []).find((c) => digitsOf(c.phone) === ph) || null;
     const email = (cli && cli.email) || (appt && appt.email) || "";
-    const canText = !!ph && !(cli && cli.smsOptOut === true);
-    if (!canText && !email) { showToast && showToast(`No phone or email on file for ${person.name || "them"}.`); return; }
+    const optedOut = !!(cli && cli.smsOptOut === true);
+    const canText = !!ph && !optedOut;
+    if (!canText && !email) { if (!silent) showToast && showToast(`No phone or email on file for ${person.name || "them"}.`); return false; }
     const first = String(person.name || "there").split(" ")[0];
     const bizName = business.name || "your barber";
     const provName = (providers.find((p) => p.id === (opening && opening.providerId)) || {}).name || "";
-    const when = opening ? `${relativeDate(new Date(opening.bookedFor))} at ${fmtTime(opening.start)}` : "";
-    const sms = `${bizName}: an earlier spot just opened - book it before it's taken: ${bookLink}`;
-    const whenPhrase = when ? ` - ${when}${provName ? ` with ${provName}` : ""}` : "";
-    const emailTpl = `Good news, {client}! An earlier spot just opened up at {business}${whenPhrase}.\n\nThis opening is open to everyone and books first-come, so grab it as soon as you can. Tap this {book link} to book it before it's taken.\n\nSee you soon!`;
-    if (canText) fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: "text", to: { phone: ph, email: "", smsOptOut: false }, subject: `${bizName}: a spot opened`, body: sms }) }).catch(() => {});
-    if (email) fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: "email", to: { email, phone: "" }, subject: `${bizName}: a spot just opened up`, template: emailTpl, context: { client: first, business: bizName, bookUrl: bookLink } }) }).catch(() => {});
+    // #18: the wording is the owner's editable "Waitlist - Slot Opened" message (Settings → Messages),
+    // NOT hardcoded — so editing it actually changes what clients receive. A single /api/notify call
+    // renders that one body for BOTH the text and the email (renderPlainText + renderEmailHtml), so the
+    // two channels can never drift apart, and {book link} carries the booking URL.
+    const tplMsg = (business.messages || []).find((m) => m.id === "waitlist");
+    const body = (tplMsg && tplMsg.body) || "Good news {client} - an earlier spot opened at {business}. Tap here to grab it before it's taken: {book link}";
+    const ctx = {
+      client: first, business: bizName, provider: provName,
+      service: (appt && (appt.serviceName || appt.title)) || person.service || "your appointment",
+      date: opening ? relativeDate(new Date(opening.bookedFor)) : "", time: opening ? fmtTime(opening.start) : "",
+      bookUrl: bookLink,
+    };
+    fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: "both", to: { email, phone: ph, smsOptOut: optedOut }, subject: `${bizName}: a spot just opened up`, template: body, context: ctx }) }).catch(() => {});
     if (opening) setOpenings((cur) => (cur || []).map((o) => o.id === opening.id ? { ...o, offered: [...(o.offered || []), person.id] } : o));
-    const via = [canText ? "text" : null, email ? "email" : null].filter(Boolean).join(" + ");
-    showToast && showToast(`Offer sent to ${first}${via ? ` (${via})` : ""}.`);
+    if (!silent) { const via = [canText ? "text" : null, email ? "email" : null].filter(Boolean).join(" + "); showToast && showToast(`Offer sent to ${first}${via ? ` (${via})` : ""}.`); }
+    return true;
   };
 
   // Column order:
