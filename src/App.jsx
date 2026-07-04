@@ -3697,11 +3697,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const lineTotal = (entry) => {
     const dc = activeMember || matched; // duration/notes come from the person being booked for
     const provId = entry.provider && entry.provider.id !== "anyone" ? entry.provider.id : "dan"; // barber decides the per-service length; "anyone" books as Dan (matches the commit)
-    let p = (dc && dc.customPrices && dc.customPrices[entry.service.id] != null) ? dc.customPrices[entry.service.id] : entry.service.price, m = getDuration(dc, entry.service, provId);
-    // cut type overrides the base price/time when present
+    const hasCustomPrice = !!(dc && dc.customPrices && dc.customPrices[entry.service.id] != null && dc.customPrices[entry.service.id] !== "");
+    const hasCustomDur = !!(dc && dc.customDurations && dc.customDurations[entry.service.id] != null);
+    let p = hasCustomPrice ? Number(dc.customPrices[entry.service.id]) : entry.service.price, m = getDuration(dc, entry.service, provId);
+    // #19: a cut style sets the base price/time — BUT this client's own custom price/duration (their
+    // known "usual" rate) always wins, so picking a style never silently drops it. A client with no
+    // custom price still gets the style's price. (A different service they have no override for → default.)
     if (entry.service.cutTypes && entry.cutType) {
-      p = cutStylePrice(entry.service, provId, entry.cutType);
-      m = cutStyleDuration(dc, entry.service, provId, entry.cutType);
+      if (!hasCustomPrice) p = cutStylePrice(entry.service, provId, entry.cutType);
+      if (!hasCustomDur) m = cutStyleDuration(dc, entry.service, provId, entry.cutType);
     } else if (entry.service.cutTypes && entry.service.cutTypes.length && entry.service.booking && entry.service.booking.holdLongest) {
       // No cut type locked yet — reserve the LONGEST cut's length so the chair never runs over.
       m = Math.max(m, ...entry.service.cutTypes.map((ct) => cutStyleDuration(dc, entry.service, provId, ct.id)));
