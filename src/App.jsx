@@ -260,14 +260,15 @@ const DEFAULT_BUSINESS = {
     ranges: ["5–10", "10–15"],       // delay options offered to choose from
     message: "Hi {client}, it's {provider} at {shop} — I'm just wrapping up and running about {range} min behind. Thanks so much for your patience, see you soon!",
   },
-  // ---- "It's been a while" buffer: add time for clients overdue past a threshold ----
+  // ---- "It's been a while" buffer: add FREE chair time for clients overdue past a threshold ----
+  // Wired in the booking paths (audit #27): a returning client whose last visit is older than
+  // `thresholdWeeks` gets `addMinutes` of extra time reserved on their next appointment. Never a
+  // charge — pure courtesy so an overgrown visit doesn't run the chair over.
   overdueBuffer: {
     enabled: true,
-    thresholdWeeks: 8,   // if last visit was longer ago than this, add buffer
-    addMinutes: 10,      // how much time to add
-    charge: false,       // false = free bonus (perceived value); true = charge for it
-    chargeAmount: 5,     // $ added when charge = true
-    message: "Welcome back! Since it's been a little while, we've added some extra time to your appointment so we can take care of everything properly.",
+    thresholdWeeks: 10,  // 10 weeks = 70 days; older than this since last visit → add the buffer
+    addMinutes: 5,       // minutes of extra chair time to reserve (free)
+    message: "Welcome back! Since it's been a little while, we've added a few extra minutes to your appointment so we can take care of everything properly — no extra charge.",
   },
   // ---- Tipping shown at checkout ----
   tipping: {
@@ -1297,10 +1298,23 @@ function useNow(intervalMs = 1000) {
 // Duration cascade: per-client override → per-staff default → service default.
 const getStaffEntry = (service, providerId) => (service && service.staff && providerId && service.staff[providerId]) || null;
 const getDuration = (client, service, providerId) => {
-  if (client && client.customDurations && client.customDurations[service.id]) return client.customDurations[service.id];
+  if (client && client.customDurations && client.customDurations[service.id] != null) return client.customDurations[service.id]; // != null so a deliberately-saved 0 min isn't skipped (audit #61)
   const se = getStaffEntry(service, providerId);
   if (se && se.duration != null) return se.duration;
   return service.duration;
+};
+// Overdue "welcome back" buffer (audit #27). A returning client whose last visit is older than the
+// configured threshold gets a few extra minutes of chair time reserved on their next appointment —
+// a free courtesy so an overgrown visit never runs the chair over. Returns minutes to ADD to the
+// duration (never a charge). 0 when the feature is off, there's no client, or they're not yet overdue.
+const overdueBufferMin = (client, business) => {
+  const ob = business && business.overdueBuffer;
+  if (!ob || ob.enabled === false) return 0;
+  const lv = client && client.lastVisit;
+  if (!lv) return 0;
+  const weeksAgo = (Date.now() - new Date(lv).getTime()) / (7 * 86400000);
+  if (!(weeksAgo >= (ob.thresholdWeeks || 10))) return 0;   // NaN-safe: an unparseable date adds nothing
+  return Math.max(0, Number(ob.addMinutes) || 0);
 };
 // Price cascade: per-staff price → service default. (No per-client price.)
 const getPrice = (service, providerId) => {
@@ -3691,6 +3705,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [bookedToken, setBookedToken] = useState(null); // the just-booked appointment's private code — used to save its post-booking note/photos to the server (public bookings)
   const galleryCapturedRef = useRef(false); // guard so post-booking reference photos capture to the gallery only once
   const [slotConflict, setSlotConflict] = useState(false); // set if the slot got taken between picking and confirming
+  const [ncCapFull, setNcCapFull] = useState(false); // set if a new client's chosen barber hit their new-client day cap (audit #29)
   const [waProvId, setWaProvId] = useState(null); // Who & When merged screen: selected barber tab ("anyone" = First free)
   const [wwPhase, setWwPhase] = useState("provider"); // merged who&when: "provider" (pick barber) → "when" (date/time)
   const [booking, setBooking] = useState(false);   // true while the confirmed booking is being saved to the server
@@ -3736,8 +3751,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   };
   const cartPrice = cart.reduce((s, e) => s + lineTotal(e).price, 0);
   const cartMin = cart.reduce((s, e) => s + lineTotal(e).min, 0);
+  // Overdue "welcome back" buffer (audit #27): a returning client past the threshold gets a few free
+  // extra minutes reserved on this visit. Baked into BOTH effMin (slot display) and people[0].durMin
+  // (the committed appointment) so what's shown and what's actually booked always agree.
+  const overdueExtra = overdueBufferMin(matched, business);
   // Effective duration for slot-finding: a "going a lot shorter" first-timer gets +10 min of chair time reserved (no charge).
-  const effMin = cartMin + (simpleChange === "fresh" ? 10 : 0);
+  const effMin = cartMin + (simpleChange === "fresh" ? 10 : 0) + overdueExtra;
   const describeEntry = (entry) => {
     // First-time intake answers (if present) read as the meaningful description
     if (entry.intakeAnswers && entry.service.intake) {
@@ -3876,8 +3895,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     });
     // First-timer going a lot shorter → reserve +10 min on the (single) appointment so the chair isn't rushed.
     if (simpleChange === "fresh") { const vals = Object.values(groups); if (vals.length === 1) vals[0].durMin += 10; }
+    // Overdue "welcome back" buffer (audit #27): reserve a few free extra minutes on the primary
+    // appointment. Applied to vals[0] so it matches the effMin bump used for single-person slot-finding.
+    if (overdueExtra > 0) { const vals = Object.values(groups); if (vals.length) vals[0].durMin += overdueExtra; }
     return Object.values(groups);
-  }, [cart, providers, simpleChange]);
+  }, [cart, providers, simpleChange, overdueExtra]);
   const isMultiPerson = people.length > 1;
 
   const allSlots = useMemo(() => { if (!cartMin) return []; const out = []; for (let t = 9 * 60; t + cartMin <= 17 * 60; t += cartMin) out.push(t); return out; }, [cartMin]);
@@ -3897,8 +3919,32 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       return slotMin >= r.start && slotMin < r.end;
     }));
   };
+  // ---- New-client-per-day cap (audit #29) ----------------------------------------------------
+  // Each barber can cap how many BRAND-NEW clients book them per day online. A returning (matched)
+  // client is never capped. Enforced by making a capped day read as "full" for a new booker — which
+  // routes them to the existing waitlist flow — plus a commit-time backstop for "Anyone" bookings.
+  const isNewBooker = !matched;
+  const ncSameDay = (iso, dateObj) => { const d = new Date(iso); return !isNaN(d) && d.getFullYear() === dateObj.getFullYear() && d.getMonth() === dateObj.getMonth() && d.getDate() === dateObj.getDate(); };
+  const newClientCapReached = (providerId, dateObj) => {
+    const p = providers.find((x) => x.id === providerId);
+    const nc = p && p.newClients; if (!nc || !nc.enabled) return false;   // master switch off → unlimited
+    const cap = nc.capMode === "week"
+      ? (nc.capWeek || {})[["sun", "mon", "tue", "wed", "thu", "fri", "sat"][dateObj.getDay()]]
+      : nc.capSame;
+    if (cap == null) return false;                          // "No limit"
+    const booked = (appts || []).filter((a) => a && a.newClient && a.status !== "cancelled" && a.status !== "block" && a.providerId === providerId && a.bookedFor && ncSameDay(a.bookedFor, dateObj)).length;
+    return booked >= cap;                                   // cap 0 = take none → always reached
+  };
+  // "Day full for new clients?" — understands "Anyone" (full only when every barber is capped out that day).
+  const newClientDayFull = (prov, dateObj) => {
+    if (!isNewBooker || !dateObj) return false;
+    if (prov && prov.id && prov.id !== "anyone") return newClientCapReached(prov.id, dateObj);
+    const real = providers.filter((p) => p.id !== "anyone");
+    return real.length > 0 && real.every((p) => newClientCapReached(p.id, dateObj));
+  };
   const openSlots = useMemo(() => {
     if (!selectedDate) return [];
+    if (newClientDayFull(provider, selectedDate)) return [];   // new-client cap hit → treat as full (→ waitlist)
     if (isMultiPerson && groupSlots) {
       // prefer same-time starts; fall back to the start of each back-to-back option
       if (groupSlots.sameTime.length) return groupSlots.sameTime;
@@ -3926,7 +3972,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       avail = curateStarts(avail, fakeItKeep(avail.length, bk), selectedDate, keepBest);
     }
     return avail;
-  }, [selectedDate, provider, providers, cartMin, appts, isMultiPerson, groupSlots, cart, business]);
+  }, [selectedDate, provider, providers, cartMin, appts, isMultiPerson, groupSlots, cart, business, matched]);
   const slotIsSameTime = isMultiPerson && groupSlots && slot != null && groupSlots.sameTime.includes(slot);
   const dateIsFull = selectedDate && openSlots.length === 0;
   // Best = gap-closing / no-wait times, surfaced for highlight on the client picker only.
@@ -4251,6 +4297,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       // so a barber-added record gets an email, a corrected name persists, etc.
       setClients((cur) => cur.map((c) => c.id === matched.id ? { ...c, firstName: newFirst.trim(), lastName: newLast.trim(), name: newName, email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), lastActivity: new Date().toISOString() } : c));
     }
+    // New-client-per-day cap (audit #29): a genuinely first-time booker (a brand-new profile was just
+    // created — matched/looked-up returning clients never count) can't push a barber past their daily
+    // new-client limit. openSlots already blanks a fully-capped day (→ waitlist); this backstops the
+    // "Anyone" case, where slots showed but the chosen barber resolves to one that's already capped out.
+    const bookingIsNew = !!newClientRow;
+    if (bookingIsNew && people[0] && people[0].prov) {
+      const pid0 = people[0].prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, people[0].durMin, business) : people[0].prov.id;
+      if (pid0 && newClientCapReached(pid0, selectedDate)) { setSlot(null); setStep(6); setNcCapFull(true); return; }
+    }
     const newAppts = [];
     const isSame = isMultiPerson && groupSlots && groupSlots.sameTime.includes(slot);
     let cursor = slot;
@@ -4296,6 +4351,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         groupId: isMultiPerson ? baseId : null,
         manageToken: makeManageToken(),
         wantsEarlier: wantEarlier,
+        newClient: (pi === 0 && bookingIsNew) ? true : undefined, // audit #29: counts toward the barber's new-client-per-day cap
         address: (pi === 0 && newAddress.trim()) ? newAddress.trim() : undefined, // #11: home address for mobile/in-home services
         discount: (pi === 0 && selfie) ? { id: "selfie", name: "Profile photo", type: "amount", value: 5 } : undefined, // $5 off for adding a profile selfie
       });
@@ -6426,16 +6482,20 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <div style={{ fontSize: 14, lineHeight: 1.5 }}>That time was just taken — pick another opening below.</div>
               </div>
             )}
-            {matched && matched.lastVisit && business.overdueBuffer && business.overdueBuffer.enabled !== false && (() => {
+            {ncCapFull && (
+              <div style={{ background: "rgba(176,141,87,0.10)", border: "1px solid rgba(176,141,87,0.30)", borderRadius: 12, padding: "13px 16px", marginBottom: 18, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <AlertCircle size={17} style={{ color: "var(--text)", flexShrink: 0, marginTop: 1 }} />
+                <div style={{ fontSize: 14, lineHeight: 1.5 }}>That day is fully booked for new clients — please pick another day, or choose a specific barber.</div>
+              </div>
+            )}
+            {overdueExtra > 0 && business.overdueBuffer && (() => {
               const ob = business.overdueBuffer;
-              const weeksAgo = (Date.now() - new Date(matched.lastVisit)) / (7 * 86400000);
-              if (weeksAgo < (ob.thresholdWeeks || 8)) return null;
               return (
                 <div style={{ background: "rgba(122,158,159,0.10)", border: "1px solid rgba(122,158,159,0.30)", borderRadius: 12, padding: "14px 16px", marginBottom: 20, display: "flex", gap: 12, alignItems: "flex-start" }}>
                   <Clock size={18} style={{ color: "#5E8C8C", flexShrink: 0, marginTop: 2 }} />
                   <div style={{ fontSize: 14.5, lineHeight: 1.5 }}>
                     {ob.message || "Since it's been a while, we've added a little extra time."}
-                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 6 }}>+{ob.addMinutes || 10} min added{ob.charge ? ` · +$${ob.chargeAmount || 5}` : " · no extra charge"}</div>
+                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 6 }}>+{overdueExtra} min added · no extra charge</div>
                   </div>
                 </div>
               );
@@ -6446,12 +6506,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             </div>
             {/* soonest available shortcut */}
             {(() => {
-              const firstOpen = dateOptions.find((d) => freeSlotsFor(provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]), d, effMin || 30, 15).length > 0);
+              const firstOpen = dateOptions.find((d) => freeSlotsFor(provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]), d, effMin || 30, 15).length > 0 && !newClientDayFull(provider, d));
               if (!firstOpen) return null;
               const isFirstToday = firstOpen.toDateString() === new Date().toDateString();
               const already = selectedDate && firstOpen.toDateString() === selectedDate.toDateString();
               return (
-                <button onClick={() => { setSelectedDate(firstOpen); setSlot(null); setSlotConflict(false); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: `1px solid ${already ? "var(--text)" : "var(--border)"}`, borderRadius: 10, padding: "15px 17px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
+                <button onClick={() => { setSelectedDate(firstOpen); setSlot(null); setSlotConflict(false); setNcCapFull(false); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: `1px solid ${already ? "var(--text)" : "var(--border)"}`, borderRadius: 10, padding: "15px 17px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
                   <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 2, color: "var(--text)", fontWeight: 600, textTransform: "uppercase" }}>Soonest opening</span>
                     <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: "var(--text)" }}>{DAYS[firstOpen.getDay()]}, {MONTHS[firstOpen.getMonth()]} {firstOpen.getDate()}</span>
@@ -6463,7 +6523,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             })()}
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 12 }}>Or pick another day</div>
             {(() => { const calProv = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]); return (
-              <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
+              <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); setNcCapFull(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
             ); })()}
             {selectedDate && !dateIsFull && (<>
               <div style={{ height: 26 }} />
@@ -13088,60 +13148,32 @@ function Segmented({ options, value, onChange, inline }) {
 }
 
 // ============================================================
-// NEW CLIENTS — per-provider daily cap on first-time bookers, plus optional
-// reserved windows. Data shape lives on prov.newClients (see normNewClients).
-// This editor is UI + persistence only; the public booking flow does not yet
-// enforce the cap — that's a deliberate second pass (computeFreeSlots + the
-// book_public RPC do the actual gating, where new-client detection is safe).
+// NEW CLIENTS — per-provider daily cap on first-time bookers. Data shape lives on
+// prov.newClients (see normNewClients). ENFORCED in the public booking flow (audit #29):
+// ClientFlow blanks a barber's day for new bookers once their new-client cap is hit (→ waitlist)
+// and stamps appt.newClient so the running count is exact. (The old unenforced "reserved windows"
+// sub-feature was removed — it saved data but never gated availability.)
 // ============================================================
 const NC_WEEK = [["mon", "Monday"], ["tue", "Tuesday"], ["wed", "Wednesday"], ["thu", "Thursday"], ["fri", "Friday"], ["sat", "Saturday"], ["sun", "Sunday"]];
-// Add-a-time day chips start on Sunday, matching the mock.
-const NC_CHIP_DAYS = [["sun", "Sun"], ["mon", "Mon"], ["tue", "Tue"], ["wed", "Wed"], ["thu", "Thu"], ["fri", "Fri"], ["sat", "Sat"]];
-const NC_WHO = [
-  { v: "new", label: "New clients only" },
-  { v: "returning", label: "Returning clients only" },
-  { v: "anyone", label: "Anyone" },
-];
-const hhmm2min = (s) => { const [h, m] = String(s || "0:0").split(":").map((n) => parseInt(n, 10) || 0); return h * 60 + m; };
-const min2hhmm = (m) => `${Math.floor(m / 60).toString().padStart(2, "0")}:${(m % 60).toString().padStart(2, "0")}`;
 function normNewClients(x) {
   x = x || {};
   return {
+    // Master switch (audit #29). OFF by default → the cap NEVER blocks a booking unless the owner
+    // deliberately turns it on. This also protects any shop that set a number in the old (unenforced)
+    // UI: that stray value stays dormant until they opt in here. Off = unlimited new clients per day.
+    enabled: !!x.enabled,
     capMode: x.capMode === "week" ? "week" : "same",
     capSame: x.capSame === undefined ? null : x.capSame,           // null = No limit, 0 = none
     capWeek: { mon: null, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null, ...(x.capWeek || {}) },
-    saveOpenTimes: !!x.saveOpenTimes,
-    savedTimes: Array.isArray(x.savedTimes) ? x.savedTimes : [],
   };
 }
-const ncDaysLabel = (days) => {
-  const set = new Set(days || []);
-  if (set.size === 7) return "Every day";
-  const wk = ["mon", "tue", "wed", "thu", "fri"];
-  if (set.size === 5 && wk.every((d) => set.has(d))) return "Weekdays";
-  if (set.size === 2 && set.has("sat") && set.has("sun")) return "Weekends";
-  // Keep chip order; single day reads as a plural ("Saturdays").
-  const picked = NC_WEEK.filter(([k]) => set.has(k));
-  if (picked.length === 1) return picked[0][1] + "s";
-  return picked.map(([, full]) => full.slice(0, 3)).join(", ");
-};
-const ncWhoLabel = (who) => (NC_WHO.find((w) => w.v === who) || NC_WHO[0]).label;
-const ncTimeRange = (t) => `${fmtTime(hhmm2min(t.from))}–${fmtTime(hhmm2min(t.to))}`;
 
 function NewClientsEditor({ providers = [], setProviders, onBackRef }) {
   const staff = (providers || []).filter((p) => p.id !== "anyone");
   const [pid, setPid] = useState(staff[0]?.id || null);
-  const [editing, setEditing] = useState(null); // null | { idx: number|null, draft }
   const prov = staff.find((p) => p.id === pid) || staff[0] || null;
   const nc = normNewClients(prov?.newClients);
   const patch = (obj) => { if (!prov || !setProviders) return; setProviders(providers.map((p) => p.id === prov.id ? { ...p, newClients: { ...normNewClients(p.newClients), ...obj } } : p)); };
-
-  // The settings back arrow first closes the add-a-time sub-screen if it's open.
-  useEffect(() => {
-    if (!onBackRef) return;
-    onBackRef.current = editing ? () => { setEditing(null); return true; } : null;
-    return () => { if (onBackRef) onBackRef.current = null; };
-  }, [editing, onBackRef]);
 
   if (!prov) return <div style={{ fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5 }}>Add a staff member first — each person sets their own new-client limits.</div>;
 
@@ -13150,63 +13182,6 @@ function NewClientsEditor({ providers = [], setProviders, onBackRef }) {
   const SOFT = { fontSize: 11.5, fontWeight: 600, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--sub)", margin: "26px 4px 10px" };
   const HINT = { fontSize: 12.5, color: "var(--faint)", margin: "10px 4px 0", lineHeight: 1.45 };
   const first = (prov.name || "").split(" ")[0] || "this person";
-
-  // ---------- Add / edit a saved time ----------
-  if (editing) {
-    const d = editing.draft;
-    const setD = (obj) => setEditing((e) => ({ ...e, draft: { ...e.draft, ...obj } }));
-    const toggleDay = (k) => setD({ days: d.days.includes(k) ? d.days.filter((x) => x !== k) : [...d.days, k] });
-    const canSave = d.days.length > 0 && hhmm2min(d.to) > hhmm2min(d.from);
-    const commit = () => {
-      const list = nc.savedTimes.slice();
-      const clean = { id: d.id, days: d.days, from: d.from, to: d.to, who: d.who };
-      if (editing.idx == null) list.push(clean); else list[editing.idx] = clean;
-      patch({ savedTimes: list });
-      setEditing(null);
-    };
-    const remove = () => { patch({ savedTimes: nc.savedTimes.filter((_, i) => i !== editing.idx) }); setEditing(null); };
-    return (
-      <div>
-        <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, letterSpacing: "-0.2px", marginBottom: 2 }}>{editing.idx == null ? "Add a time" : "Edit time"}</h3>
-        <div style={SOFT}>Which days</div>
-        <div style={{ ...CARD, padding: "14px 16px" }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {NC_CHIP_DAYS.map(([k, lbl]) => {
-              const on = d.days.includes(k);
-              return (
-                <button key={k} onClick={() => toggleDay(k)} style={{ minWidth: 46, height: 42, padding: "0 12px", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--text2)", fontSize: 14, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" }}>{lbl}</button>
-              );
-            })}
-          </div>
-        </div>
-        <div style={SOFT}>From / to</div>
-        <div style={{ ...CARD, padding: "14px 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ flex: 1 }}><TimeScrollPicker value={hhmm2min(d.from)} onChange={(m) => setD({ from: min2hhmm(m) })} label="From" full /></div>
-            <span style={{ color: "var(--faint)", fontSize: 13 }}>to</span>
-            <div style={{ flex: 1 }}><TimeScrollPicker value={hhmm2min(d.to)} onChange={(m) => setD({ to: min2hhmm(m) })} label="To" full /></div>
-          </div>
-        </div>
-        <div style={SOFT}>Who can book it</div>
-        <div style={CARD}>
-          {NC_WHO.map((w, i) => {
-            const on = d.who === w.v;
-            return (
-              <button key={w.v} onClick={() => setD({ who: w.v })} style={{ ...ROW, width: "100%", textAlign: "left", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", cursor: "pointer", fontFamily: FONT_BODY }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, color: "var(--text)" }}>{w.label}</div>
-                  {w.sub && <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>{w.sub}</div>}
-                </div>
-                <span style={{ width: 21, height: 21, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={12} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
-              </button>
-            );
-          })}
-        </div>
-        <button disabled={!canSave} onClick={commit} style={{ width: "100%", marginTop: 18, background: canSave ? "var(--gold)" : "var(--panel2)", color: canSave ? "var(--on-gold)" : "var(--faint)", border: "none", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 13, cursor: canSave ? "pointer" : "default", fontFamily: FONT_BODY }}>Save</button>
-        {editing.idx != null && <button onClick={remove} style={{ width: "100%", marginTop: 4, background: "none", border: "none", color: "var(--sub)", fontSize: 14, padding: "12px 0 2px", cursor: "pointer", fontFamily: FONT_BODY }}>Remove this time</button>}
-      </div>
-    );
-  }
 
   // ---------- Main screen ----------
   const capStep = (value, onChange) => (
@@ -13230,56 +13205,40 @@ function NewClientsEditor({ providers = [], setProviders, onBackRef }) {
         </div>
       )}
 
-      <div style={SOFT}>How many per day</div>
-      <Segmented options={[{ value: "same", label: "Same every day" }, { value: "week", label: "Per weekday" }]} value={nc.capMode} onChange={(m) => patch({ capMode: m })} />
-
-      {nc.capMode === "same" ? (
-        <>
-          <div style={{ ...CARD, marginTop: 12 }}>
-            <div style={ROW}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>New clients per day</div>{capStep(nc.capSame, (v) => patch({ capSame: v }))}</div>
-          </div>
-          <p style={HINT}>Tap the number to set "No limit." Set it to 0 to take none.</p>
-        </>
-      ) : (
-        <>
-          <div style={{ ...CARD, marginTop: 12 }}>
-            {NC_WEEK.map(([k, full], i) => (
-              <div key={k} style={{ ...ROW, borderTop: i ? "1px solid var(--line)" : "none" }}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>{full}</div>{capStep(nc.capWeek[k], (v) => patch({ capWeek: { ...nc.capWeek, [k]: v } }))}</div>
-            ))}
-          </div>
-          <p style={HINT}>Tap a number to set "No limit." 0 means no new clients that day.</p>
-        </>
-      )}
-
-      <div style={SOFT}>Save open times</div>
-      <div style={CARD}>
+      <div style={{ ...CARD, marginTop: 4 }}>
         <div style={ROW}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, color: "var(--text)" }}>Save some open times</div>
-            <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.35 }}>Hold a few slots for walk-ins or new bookings</div>
+            <div style={{ fontSize: 15, color: "var(--text)" }}>Limit new clients per day</div>
+            <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3, lineHeight: 1.35 }}>{nc.enabled ? `Cap how many first-timers can book ${first} online each day.` : `Off — ${first} can take any number of new clients each day.`}</div>
           </div>
-          <Toggle on={nc.saveOpenTimes} onClick={() => patch({ saveOpenTimes: !nc.saveOpenTimes })} />
+          <Toggle on={nc.enabled} onClick={() => patch({ enabled: !nc.enabled })} />
         </div>
       </div>
 
-      {nc.saveOpenTimes && (
-        <div style={{ marginTop: 12 }}>
-          {nc.savedTimes.length > 0 && (
-            <div style={CARD}>
-              {nc.savedTimes.map((t, i) => (
-                <button key={t.id || i} onClick={() => setEditing({ idx: i, draft: { ...t } })} style={{ ...ROW, width: "100%", textAlign: "left", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", cursor: "pointer", fontFamily: FONT_BODY }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, color: "var(--text)" }}>{ncDaysLabel(t.days)} · {ncTimeRange(t)}</div>
-                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{ncWhoLabel(t.who)}</div>
-                  </div>
-                  <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
-                </button>
+      {nc.enabled && (<>
+        <div style={SOFT}>How many per day</div>
+        <Segmented options={[{ value: "same", label: "Same every day" }, { value: "week", label: "Per weekday" }]} value={nc.capMode} onChange={(m) => patch({ capMode: m })} />
+
+        {nc.capMode === "same" ? (
+          <>
+            <div style={{ ...CARD, marginTop: 12 }}>
+              <div style={ROW}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>New clients per day</div>{capStep(nc.capSame, (v) => patch({ capSame: v }))}</div>
+            </div>
+            <p style={HINT}>Tap the number to set "No limit" (unlimited). Set it to 0 to take none.</p>
+          </>
+        ) : (
+          <>
+            <div style={{ ...CARD, marginTop: 12 }}>
+              {NC_WEEK.map(([k, full], i) => (
+                <div key={k} style={{ ...ROW, borderTop: i ? "1px solid var(--line)" : "none" }}><div style={{ flex: 1, fontSize: 15, color: "var(--text)" }}>{full}</div>{capStep(nc.capWeek[k], (v) => patch({ capWeek: { ...nc.capWeek, [k]: v } }))}</div>
               ))}
             </div>
-          )}
-          <button onClick={() => setEditing({ idx: null, draft: { id: `nct_${prov.id}_${Date.now()}`, days: ["sat"], from: "14:00", to: "16:00", who: "new" } })} style={{ display: "block", width: "100%", textAlign: "center", marginTop: nc.savedTimes.length ? 10 : 0, background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 13, padding: 14, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: FONT_BODY, boxShadow: "var(--shadow-sm)" }}>+ Add a time</button>
-        </div>
-      )}
+            <p style={HINT}>Tap a number to set "No limit" (unlimited). 0 means no new clients that day.</p>
+          </>
+        )}
+
+        <p style={HINT}>New means anyone with no prior booking. Once {first} hits the limit for a day, that day shows as fully booked to new clients online — they're offered the waitlist instead. Staff can still book anyone in by hand.</p>
+      </>)}
     </div>
   );
 }
@@ -14152,7 +14111,8 @@ function RunningLateEditor({ r, onChange }) {
   );
 }
 
-// "It's been a while" buffer — add time for overdue clients; charge or gift it.
+// "It's been a while" buffer — add free chair time for overdue clients (audit #27: charge option
+// removed — it was never wired into pricing, and the extra time is always a courtesy).
 function OverdueBufferEditor({ b, onChange }) {
   const set = (patch) => onChange({ ...b, ...patch });
   return (
@@ -14166,28 +14126,13 @@ function OverdueBufferEditor({ b, onChange }) {
         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
           <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Counts as "a while" after</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>How long since their last visit before time gets added.</div>
-          <Stepper value={b.thresholdWeeks || 8} onChange={(v) => set({ thresholdWeeks: v })} min={1} max={52} step={1} suffix="weeks" />
+          <Stepper value={b.thresholdWeeks || 10} onChange={(v) => set({ thresholdWeeks: v })} min={1} max={52} step={1} suffix="weeks" />
         </div>
 
         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
           <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Extra time to add</div>
-          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>How many minutes to pad the appointment.</div>
-          <Stepper value={b.addMinutes || 10} onChange={(v) => set({ addMinutes: v })} min={5} max={60} step={5} suffix="min" />
-        </div>
-
-        <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
-          <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 10 }}>How to handle it</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => set({ charge: false })} style={{ flex: 1, padding: "12px 8px", borderRadius: 10, border: `1px solid ${!b.charge ? "var(--gold)" : "var(--border2)"}`, background: !b.charge ? "rgba(176,141,87,0.12)" : "transparent", color: !b.charge ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: !b.charge ? 600 : 400 }}>Free bonus</button>
-            <button onClick={() => set({ charge: true })} style={{ flex: 1, padding: "12px 8px", borderRadius: 10, border: `1px solid ${b.charge ? "var(--gold)" : "var(--border2)"}`, background: b.charge ? "rgba(176,141,87,0.12)" : "transparent", color: b.charge ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: b.charge ? 600 : 400 }}>Charge for it</button>
-          </div>
-          {b.charge && (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 8 }}>Amount to add</div>
-              <Stepper value={b.chargeAmount || 5} onChange={(v) => set({ chargeAmount: v })} min={0} max={100} step={5} suffix="$" />
-            </div>
-          )}
-          <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>{b.charge ? "The client sees the added time and small fee, framed as a more thorough visit." : "The client is told the extra time is on the house — they feel looked-after, and your schedule stays protected."}</p>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>How many minutes to pad the appointment — always free, never charged.</div>
+          <Stepper value={b.addMinutes || 5} onChange={(v) => set({ addMinutes: v })} min={5} max={60} step={5} suffix="min" />
         </div>
 
         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: 18 }}>
@@ -18311,7 +18256,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     {
       id: "overduebuffer", title: "It's Been a While", smart: true, icon: Clock, category: "Calendar & Appointments",
       explain: <>When a regular hasn't been in for a long stretch, there's usually more to do — more hair to cut, more cleanup. This quietly adds a little extra time to their appointment when they've been away past a point you set, so you're not scrambling to finish on time. It happens automatically; the client just sees their normal booking.</>,
-      status: form.overdueBuffer?.enabled === false ? "Off" : `+${form.overdueBuffer?.addMinutes || 10} min after ${form.overdueBuffer?.thresholdWeeks || 8} wks`,
+      status: form.overdueBuffer?.enabled === false ? "Off" : `+${form.overdueBuffer?.addMinutes || 5} min after ${form.overdueBuffer?.thresholdWeeks || 10} wks`,
       keywords: "overdue buffer been a while extra time add minutes long time since last visit haircut more to cut charge free bonus perceived value lapsed returning",
       editor: <OverdueBufferEditor b={form.overdueBuffer || {}} onChange={(ob) => setForm({ ...form, overdueBuffer: { ...(form.overdueBuffer || {}), ...ob } })} />,
     },
@@ -18388,14 +18333,14 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       status: (() => {
         const s = (providers || []).filter((p) => p.id !== "anyone");
         const set = s.filter((p) => {
-          const n = p.newClients; if (!n) return false;
+          const n = p.newClients; if (!n || !n.enabled) return false;   // off = not limiting
           const same = n.capMode !== "week" && n.capSame != null;
           const wk = n.capMode === "week" && Object.values(n.capWeek || {}).some((v) => v != null);
-          return same || wk || (n.saveOpenTimes && (n.savedTimes || []).length);
+          return same || wk;
         }).length;
-        return set ? `${set} of ${s.length} staff set` : "No limits set";
+        return set ? `${set} of ${s.length} staff limited` : "No limits — unlimited new clients";
       })(),
-      keywords: "new clients per day limit cap first time first-time reserve hold open slots times waitlist gate accept how many",
+      keywords: "new clients per day limit cap first time first-time waitlist gate accept how many",
       editor: <NewClientsEditor providers={providers} setProviders={setProviders} onBackRef={editorBack} />,
     },
     {
@@ -20438,7 +20383,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     setTimeout(() => commitGuardRef.current.delete(_sig), 1500);
     const useStart = overrideStart != null ? overrideStart : start;
     const id = "a" + Date.now() + Math.floor(Math.random() * 1000); // collision-proof string id
-    const dur = getDuration(client, service, providerId) + (Number(optAddMin) || 0);
+    // + overdue "welcome back" buffer (audit #27): a returning client past the threshold auto-gets a
+    // few free extra minutes. No price change — the buffer only ever touches duration.
+    const dur = getDuration(client, service, providerId) + (Number(optAddMin) || 0) + overdueBufferMin(client, business);
     const price = priceWithTimeRules(service, providerId, selectedDate, useStart) + (Number(optAddPrice) || 0);
     // Stamp the appointment with the day currently shown on the calendar, or it can't be placed on any date.
     const bookedFor = new Date(selectedDate); bookedFor.setHours(Math.floor(useStart / 60), useStart % 60, 0, 0);
@@ -20457,7 +20404,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       setClients((cur) => cur.map((c) => c.id === bookClient.id ? { ...c, lastActivity: new Date().toISOString() } : c));
     }
 
-    const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: (optLabels && optLabels.length) ? `${service.name} · ${optLabels.join(", ")}` : service.name, serviceName: service.name, addonLabels: optLabels || [], lineItems: [{ serviceId: service.id, cutType: null, beardType: null, addons: addons || {} }], manageToken: makeManageToken(), detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), email: bookClient ? (bookClient.email || "") : (walkInEmail || ""), hasPhotos: false, photos: 0 };
+    const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: (optLabels && optLabels.length) ? `${service.name} · ${optLabels.join(", ")}` : service.name, serviceName: service.name, addonLabels: optLabels || [], lineItems: [{ serviceId: service.id, cutType: null, beardType: null, addons: addons || {} }], manageToken: makeManageToken(), detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), email: bookClient ? (bookClient.email || "") : (walkInEmail || ""), hasPhotos: false, photos: 0, newClient: (!client && !!walkInName) ? true : undefined /* audit #29: a new walk-in counts toward the barber's new-client-per-day cap */ };
     setAppts((cur) => [...cur, newAppt]);
     // Staff-created booking → fire the confirmation too (same engine as online bookings).
     fireApptNotify({ msgId: "booked", appt: newAppt, business, providers, contact: { email: (bookClient ? bookClient.email : walkInEmail) || "", phone: (bookClient ? bookClient.phone : walkInPhone) || "" }, subject: `${business.name}: Appointment confirmed` });
@@ -20481,7 +20428,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
   // commit a fully-formed appointment from the booking form — checks for conflict first
   const bookAppt = (data) => {
-    let dur = getDuration(data.client, data.service, data.providerId) + (Number(data.optAddMin) || 0);
+    // Include the overdue "welcome back" buffer (audit #27) here too, so the conflict/cap pre-check
+    // reserves exactly what commitAppt will book (otherwise the +min could overlap the next appt).
+    let dur = getDuration(data.client, data.service, data.providerId) + (Number(data.optAddMin) || 0) + overdueBufferMin(data.client, business);
     if (!dur || isNaN(dur) || dur <= 0) dur = 30;     // bad/missing duration must never skip the check
     const end = data.start + dur;
     const conflicts = findConflicts(data.providerId, data.start, end);
