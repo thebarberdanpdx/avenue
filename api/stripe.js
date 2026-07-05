@@ -32,7 +32,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 // they're also called from the public booking page, where there is no login.
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const STAFF_ONLY = new Set(["charge", "refund", "connection_token", "terminal_intent", "terminal_location"]);
+const STAFF_ONLY = new Set(["charge", "refund", "connection_token", "terminal_intent", "terminal_location", "payouts"]);
 // Money-OUT actions must ALSO belong to the caller's shop, not just any valid
 // session. `charge` pulls a saved card; `refund` sends money out. On top of the
 // staff-session gate above, the signed-in email must match a provider of the
@@ -305,6 +305,45 @@ async function handler(req, res) {
         description: description || "Vero — Tap to Pay",
       });
       return res.status(200).json({ clientSecret: pi.client_secret, id: pi.id });
+    }
+
+    // --- Payouts, balance & payout schedule (read-only) ----------------------
+    // Powers the Settings → Payouts screen: current Stripe balance, the account's
+    // automatic-payout schedule, and recent payouts. Staff-only (see STAFF_ONLY).
+    // All amounts are returned in CENTS; the app formats them.
+    if (action === "payouts") {
+      const limit = Math.min(24, Math.max(1, Number(body.limit) || 10));
+      const [balance, payoutList, account] = await Promise.all([
+        stripe.balance.retrieve(),
+        stripe.payouts.list({ limit }),
+        stripe.accounts.retrieve().catch(() => null), // no id → the key's own account
+      ]);
+      const sumBy = (arr) => (arr || []).reduce((s, b) => s + (b.amount || 0), 0);
+      const sched = account && account.settings && account.settings.payouts ? account.settings.payouts.schedule : null;
+      const curr = (balance.available && balance.available[0] && balance.available[0].currency)
+        || (balance.pending && balance.pending[0] && balance.pending[0].currency) || "usd";
+      return res.status(200).json({
+        currency: curr,
+        available: sumBy(balance.available), // cents, settled & ready to pay out
+        pending: sumBy(balance.pending),     // cents, still clearing
+        payoutsEnabled: account ? !!(account.payouts_enabled) : null,
+        schedule: sched ? {
+          interval: sched.interval,          // "daily" | "weekly" | "monthly" | "manual"
+          delayDays: sched.delay_days,
+          weeklyAnchor: sched.weekly_anchor || null,
+          monthlyAnchor: sched.monthly_anchor || null,
+        } : null,
+        payouts: (payoutList.data || []).map((p) => ({
+          id: p.id,
+          amount: p.amount,                  // cents
+          currency: p.currency,
+          status: p.status,                  // paid | pending | in_transit | canceled | failed
+          arrivalDate: p.arrival_date,       // unix seconds — when it lands in the bank
+          created: p.created,                // unix seconds
+          method: p.method,                  // standard | instant
+          description: p.description || p.statement_descriptor || "",
+        })),
+      });
     }
 
     return res.status(400).json({ error: "Unknown action." });

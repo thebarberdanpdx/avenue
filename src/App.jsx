@@ -15999,6 +15999,105 @@ function PaymentsEditor({ p, onChange }) {
   );
 }
 
+// Payouts — real Stripe balance, payout schedule, and recent payouts.
+// Reads /api/stripe {action:"payouts"} (staff-only). All money comes back in cents.
+function PayoutsView({ showToast }) {
+  const [state, setState] = useState({ loading: true, error: "", data: null });
+  const load = async () => {
+    setState((s) => ({ ...s, loading: true, error: "" }));
+    try {
+      const d = await stripeApi({ action: "payouts", limit: 12 });
+      setState({ loading: false, error: "", data: d });
+    } catch (e) {
+      setState({ loading: false, error: (e && e.message) || "Couldn't load payouts.", data: null });
+    }
+  };
+  useEffect(() => { load(); }, []); // eslint-disable-line
+
+  const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+  const money = (cents, curr) => {
+    const v = (Number(cents) || 0) / 100;
+    try { return v.toLocaleString(undefined, { style: "currency", currency: (curr || "usd").toUpperCase() }); }
+    catch (e) { return "$" + v.toFixed(2); }
+  };
+  const dayLabel = (unixSec) => { if (!unixSec) return ""; const d = new Date(unixSec * 1000); return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
+  const scheduleLine = (sc) => {
+    if (!sc) return "Your payout schedule is managed in Stripe.";
+    const delay = sc.delayDays != null ? ` Money lands about ${sc.delayDays} business day${sc.delayDays === 1 ? "" : "s"} after each sale.` : "";
+    if (sc.interval === "manual") return "Manual — payouts only go out when you trigger them in Stripe.";
+    if (sc.interval === "daily") return `Automatic — paid out every business day (not weekends or bank holidays).${delay}`;
+    if (sc.interval === "weekly") return `Automatic — paid out weekly${sc.weeklyAnchor ? ` on ${cap(sc.weeklyAnchor)}` : ""}.${delay}`;
+    if (sc.interval === "monthly") return `Automatic — paid out monthly${sc.monthlyAnchor ? ` on day ${sc.monthlyAnchor}` : ""}.${delay}`;
+    return `Automatic (${sc.interval}).${delay}`;
+  };
+  const statusColor = (st) => st === "paid" ? "var(--gold)" : (st === "failed" || st === "canceled") ? "#C2563F" : "var(--sub)";
+  const statusLabel = (st) => ({ paid: "Paid", pending: "Pending", in_transit: "On the way", canceled: "Canceled", failed: "Failed" })[st] || cap(st || "");
+
+  const d = state.data;
+  const card = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "20px 20px" };
+
+  return (
+    <div style={{ padding: "4px 2px 24px" }}>
+      {state.loading && (
+        <div style={{ ...card, textAlign: "center", color: "var(--sub)", fontSize: 14 }}>Loading your payouts…</div>
+      )}
+
+      {!state.loading && state.error && (
+        <div style={{ ...card, borderColor: "color-mix(in srgb, #C2563F 45%, var(--border))" }}>
+          <div style={{ fontSize: 14.5, color: "var(--text)", fontWeight: 600, marginBottom: 6 }}>Couldn't load payouts</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>{state.error}</div>
+          <button onClick={load} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12, padding: "11px 16px", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}><RefreshCw size={15} /> Try again</button>
+        </div>
+      )}
+
+      {!state.loading && !state.error && d && (
+        <>
+          {/* Balance + schedule */}
+          <div style={{ ...card, marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>Current balance</div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, lineHeight: 1, color: "var(--text)" }}>{money(d.available, d.currency)}</div>
+                {Number(d.pending) > 0 && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 8 }}>{money(d.pending, d.currency)} still clearing</div>}
+              </div>
+              <button onClick={load} aria-label="Refresh" style={{ background: "none", border: "1px solid var(--border)", borderRadius: 10, color: "var(--sub)", padding: "8px 10px", cursor: "pointer", flexShrink: 0 }}><RefreshCw size={15} /></button>
+            </div>
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)", display: "flex", alignItems: "flex-start", gap: 9 }}>
+              <Clock size={15} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
+              <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{scheduleLine(d.schedule)}</div>
+            </div>
+            {d.payoutsEnabled === false && (
+              <div style={{ marginTop: 12, fontSize: 12.5, color: "#C2563F", lineHeight: 1.5 }}>Payouts are paused on your Stripe account — finish verification in Stripe to start getting paid.</div>
+            )}
+          </div>
+
+          {/* Recent payouts */}
+          <div style={{ fontSize: 12.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 0 9px 4px" }}>Recent payouts</div>
+          {(d.payouts || []).length === 0 ? (
+            <div style={{ ...card, color: "var(--sub)", fontSize: 13.5, lineHeight: 1.5 }}>No payouts yet. Once you take payments, your automatic payouts will show up here.</div>
+          ) : (
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+              {d.payouts.map((p, i) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "15px 18px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{money(p.amount, p.currency)}</div>
+                    <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>
+                      {p.status === "paid" ? `Paid ${dayLabel(p.arrivalDate)}` : `${statusLabel(p.status)} · expected ${dayLabel(p.arrivalDate)}`}
+                      {p.method === "instant" ? " · instant" : ""}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.5, color: statusColor(p.status), border: `1px solid color-mix(in srgb, ${statusColor(p.status)} 40%, transparent)`, borderRadius: 30, padding: "5px 11px", whiteSpace: "nowrap" }}>{statusLabel(p.status)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.5, marginTop: 14, padding: "0 4px" }}>Balances and payouts come straight from Stripe. To change your bank account or payout schedule, use “Manage account” in Stripe.</div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function RebookCheckoutEditor({ r, onChange }) {
   const set = (patch) => onChange({ ...r, ...patch });
   const discountOn = r.discountEnabled !== false;
@@ -18406,6 +18505,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       status: (form.payments?.live === true) ? "Live — real cards are charged" : "Test mode — nothing is charged",
       keywords: "payments live test mode stripe charge real money deposit checkout no-show fee turn on off card processing go live simulate master switch",
       editor: <PaymentsEditor p={form.payments || { live: false }} onChange={(pp) => setForm({ ...form, payments: { ...(form.payments || {}), ...pp } })} />,
+    },
+    {
+      id: "payouts", title: "Payouts", icon: DollarSign, category: "Payments & Checkout",
+      explain: <>See your Stripe balance, when your money hits the bank, and every recent payout — pulled live from Stripe.</>,
+      status: "Balance, schedule & recent payouts",
+      keywords: "payouts payout balance paid get paid deposit bank transfer stripe schedule when do i get paid money out arrival",
+      editor: <PayoutsView showToast={showToast} />,
     },
     {
       id: "servicesmenu", fullBleed: true, title: "Services & Menu", icon: ImageIcon, category: "Services & Menu",
