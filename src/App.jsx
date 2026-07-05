@@ -897,6 +897,11 @@ async function authedHeaders() {
   return headers;
 }
 
+// The shop this browser/app is currently acting for (the subdomain/path-derived
+// SHOP_ID). Set once App resolves it; read by stripeApi so money-out calls name
+// their shop and the server can verify the signed-in staff member belongs to it.
+let _stripeShop = null;
+
 // Call our serverless Stripe function. Throws with a readable message on failure.
 // Money-moving actions (charge / refund) are staff-only on the server, so we
 // attach the signed-in staff member's token when there is a session. Public
@@ -911,7 +916,8 @@ async function stripeApi(payload) {
     if (token) headers.Authorization = `Bearer ${token}`;
   } catch (e) {}
   const sig = idemSig(payload);
-  const body = sig ? { ...payload, idempotencyKey: idemKeyFor(sig) } : payload;
+  const withShop = _stripeShop ? { ...payload, shop: _stripeShop } : payload;
+  const body = sig ? { ...withShop, idempotencyKey: idemKeyFor(sig) } : withShop;
   let r;
   try {
     r = await fetch(API_BASE + "/api/stripe", { method: "POST", headers, body: JSON.stringify(body) });
@@ -1863,6 +1869,7 @@ function App() {
     return FALLBACK;
   };
   const SHOP_ID = resolveShopId();
+  _stripeShop = SHOP_ID; // let stripeApi name this shop on money-out calls (server verifies membership)
 
   const [pendingApptId, setPendingApptId] = useState(null); // notification tap → open this appointment on the calendar
   // ---- PUSH NOTIFICATIONS (native app only): register this device for booking
