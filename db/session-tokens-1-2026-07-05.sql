@@ -21,7 +21,7 @@ create table if not exists public.client_sessions (
   shop_id     text not null,
   client_id   text not null,
   created_at  timestamptz not null default now(),
-  expires_at  timestamptz not null default now() + interval '2 hours'
+  expires_at  timestamptz not null default now() + interval '90 days'  -- matches the app's "stay logged in" persistence so a token never expires mid-session
 );
 create index if not exists client_sessions_lookup on public.client_sessions (shop_id, client_id);
 alter table public.client_sessions enable row level security;
