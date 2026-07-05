@@ -9,7 +9,8 @@ import {
   Settings, Image as ImageIcon, Lock, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
   BarChart3, TrendingUp, Palette, Globe, HelpCircle, BookOpen, Search, LifeBuoy, Scissors, Package,
-  Smartphone, Link2, AlertTriangle, Pause, Play, RotateCw, UserPlus, Star, List
+  Smartphone, Link2, AlertTriangle, Pause, Play, RotateCw, UserPlus, Star, List,
+  Zap, ArrowUpRight, Download
 } from "lucide-react";
 
 // ============================================================
@@ -15999,10 +16000,15 @@ function PaymentsEditor({ p, onChange }) {
   );
 }
 
-// Payouts — real Stripe balance, payout schedule, and recent payouts.
-// Reads /api/stripe {action:"payouts"} (staff-only). All money comes back in cents.
+// Payouts — real Stripe balance, schedule, recent payouts, per-payout breakdown,
+// a full transactions ledger with CSV export, and an opt-in "Pay me now" instant
+// payout. Reads /api/stripe (staff-only). All money comes back in CENTS.
 function PayoutsView({ showToast }) {
   const [state, setState] = useState({ loading: true, error: "", data: null });
+  const [detail, setDetail] = useState(null);   // { payout, loading, error, data }
+  const [ledger, setLedger] = useState(null);    // { open, loading, items, cursor, hasMore, error }
+  const [instant, setInstant] = useState(null);  // { amount(cents), busy, error }
+
   const load = async () => {
     setState((s) => ({ ...s, loading: true, error: "" }));
     try {
@@ -16021,6 +16027,7 @@ function PayoutsView({ showToast }) {
     catch (e) { return "$" + v.toFixed(2); }
   };
   const dayLabel = (unixSec) => { if (!unixSec) return ""; const d = new Date(unixSec * 1000); return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
+  const fullDate = (unixSec) => { if (!unixSec) return ""; const d = new Date(unixSec * 1000); return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${d.getFullYear()}`; };
   const scheduleLine = (sc) => {
     if (!sc) return "Your payout schedule is managed in Stripe.";
     const delay = sc.delayDays != null ? ` Money lands about ${sc.delayDays} business day${sc.delayDays === 1 ? "" : "s"} after each sale.` : "";
@@ -16032,9 +16039,73 @@ function PayoutsView({ showToast }) {
   };
   const statusColor = (st) => st === "paid" ? "var(--gold)" : (st === "failed" || st === "canceled") ? "#C2563F" : "var(--sub)";
   const statusLabel = (st) => ({ paid: "Paid", pending: "Pending", in_transit: "On the way", canceled: "Canceled", failed: "Failed" })[st] || cap(st || "");
+  const txnLabel = (t) => (t || "").replace(/_/g, " ");
+
+  // Drill into one payout → the tickets/fees that composed it.
+  const openDetail = async (payout) => {
+    setDetail({ payout, loading: true, error: "", data: null });
+    try {
+      const dd = await stripeApi({ action: "payout_detail", payoutId: payout.id });
+      setDetail({ payout, loading: false, error: "", data: dd });
+    } catch (e) {
+      setDetail({ payout, loading: false, error: (e && e.message) || "Couldn't load this payout.", data: null });
+    }
+  };
+
+  // Transactions ledger (paginated).
+  const openLedger = async () => {
+    setLedger({ open: true, loading: true, items: [], cursor: null, hasMore: false, error: "" });
+    try {
+      const r = await stripeApi({ action: "transactions", limit: 50 });
+      setLedger({ open: true, loading: false, items: r.items || [], cursor: r.nextCursor, hasMore: !!r.hasMore, error: "" });
+    } catch (e) {
+      setLedger({ open: true, loading: false, items: [], cursor: null, hasMore: false, error: (e && e.message) || "Couldn't load transactions." });
+    }
+  };
+  const loadMoreLedger = async () => {
+    if (!ledger || !ledger.cursor) return;
+    setLedger((l) => ({ ...l, loading: true }));
+    try {
+      const r = await stripeApi({ action: "transactions", limit: 50, startingAfter: ledger.cursor });
+      setLedger((l) => ({ ...l, loading: false, items: [...l.items, ...(r.items || [])], cursor: r.nextCursor, hasMore: !!r.hasMore }));
+    } catch (e) {
+      setLedger((l) => ({ ...l, loading: false, error: (e && e.message) || "Couldn't load more." }));
+    }
+  };
+  const exportCSV = () => {
+    const items = (ledger && ledger.items) || [];
+    if (!items.length) { showToast && showToast("Nothing to export yet."); return; }
+    const esc = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
+    const head = ["Date", "Type", "Description", "Gross", "Fee", "Net", "Currency"];
+    const lines = items.map((t) => [fullDate(t.created), txnLabel(t.type), t.description, (t.amount / 100).toFixed(2), (t.fee / 100).toFixed(2), (t.net / 100).toFixed(2), (t.currency || "usd").toUpperCase()].map(esc).join(","));
+    const csv = [head.map(esc).join(","), ...lines].join("\n");
+    try {
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "vero-transactions.csv";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { showToast && showToast("Export isn't available here — open Vero on the web to download."); }
+  };
+
+  // "Pay me now" — instant payout of the full instant-eligible balance.
+  const doInstant = async () => {
+    setInstant((s) => ({ ...s, busy: true, error: "" }));
+    try {
+      await stripeApi({ action: "instant_payout" }); // no amount → full instant-available
+      setInstant(null);
+      showToast && showToast("Instant payout sent — it should hit your debit card shortly.");
+      load();
+    } catch (e) {
+      setInstant((s) => ({ ...s, busy: false, error: (e && e.message) || "Couldn't start the instant payout." }));
+    }
+  };
 
   const d = state.data;
   const card = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "20px 20px" };
+  const linkBtn = { background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, cursor: "pointer", padding: "6px 2px" };
+  const canInstant = d && Number(d.instantAvailable) > 0;
 
   return (
     <div style={{ padding: "4px 2px 24px" }}>
@@ -16069,16 +16140,25 @@ function PayoutsView({ showToast }) {
             {d.payoutsEnabled === false && (
               <div style={{ marginTop: 12, fontSize: 12.5, color: "#C2563F", lineHeight: 1.5 }}>Payouts are paused on your Stripe account — finish verification in Stripe to start getting paid.</div>
             )}
+            {/* Pay me now — SECONDARY, only when there are instant-eligible funds. Never the default action. */}
+            {canInstant && (
+              <button onClick={() => setInstant({ amount: d.instantAvailable, busy: false, error: "" })} style={{ marginTop: 16, display: "inline-flex", alignItems: "center", gap: 8, background: "none", border: "1px solid var(--border)", borderRadius: 12, color: "var(--text)", padding: "11px 15px", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>
+                <Zap size={15} style={{ color: "var(--gold)" }} /> Pay me now · {money(d.instantAvailable, d.currency)}
+              </button>
+            )}
           </div>
 
           {/* Recent payouts */}
-          <div style={{ fontSize: 12.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 0 9px 4px" }}>Recent payouts</div>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "0 0 9px 4px" }}>
+            <div style={{ fontSize: 12.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Recent payouts</div>
+            <button onClick={openLedger} style={linkBtn}>View all transactions ›</button>
+          </div>
           {(d.payouts || []).length === 0 ? (
             <div style={{ ...card, color: "var(--sub)", fontSize: 13.5, lineHeight: 1.5 }}>No payouts yet. Once you take payments, your automatic payouts will show up here.</div>
           ) : (
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
               {d.payouts.map((p, i) => (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "15px 18px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
+                <button key={p.id} onClick={() => openDetail(p)} style={{ width: "100%", textAlign: "left", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "15px 18px", borderTop: i > 0 ? "1px solid var(--line)" : "none", borderLeft: "none", borderRight: "none", borderBottom: "none", color: "var(--text)" }}>
                   <div>
                     <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{money(p.amount, p.currency)}</div>
                     <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>
@@ -16086,14 +16166,97 @@ function PayoutsView({ showToast }) {
                       {p.method === "instant" ? " · instant" : ""}
                     </div>
                   </div>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.5, color: statusColor(p.status), border: `1px solid color-mix(in srgb, ${statusColor(p.status)} 40%, transparent)`, borderRadius: 30, padding: "5px 11px", whiteSpace: "nowrap" }}>{statusLabel(p.status)}</span>
-                </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.5, color: statusColor(p.status), border: `1px solid color-mix(in srgb, ${statusColor(p.status)} 40%, transparent)`, borderRadius: 30, padding: "5px 11px", whiteSpace: "nowrap" }}>{statusLabel(p.status)}</span>
+                    <ChevronRight size={17} style={{ color: "var(--faint)" }} />
+                  </div>
+                </button>
               ))}
             </div>
           )}
-          <div style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.5, marginTop: 14, padding: "0 4px" }}>Balances and payouts come straight from Stripe. To change your bank account or payout schedule, use “Manage account” in Stripe.</div>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+            <a href="https://dashboard.stripe.com/payouts" target="_blank" rel="noopener noreferrer" style={{ ...linkBtn, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>Manage account in Stripe <ArrowUpRight size={15} /></a>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.5, marginTop: 8, padding: "0 4px" }}>Balances, payouts and transactions come straight from Stripe. To change your bank account or payout schedule, use “Manage account in Stripe”.</div>
         </>
       )}
+
+      {/* PAYOUT DETAIL — the tickets & fees inside one payout */}
+      <Sheet open={!!detail} onClose={() => setDetail(null)} align="bottom" maxWidth={480}>
+        {detail && (
+          <div style={{ padding: "4px 2px 6px" }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 2 }}>{money(detail.payout.amount, detail.payout.currency)}</div>
+            <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 16 }}>{detail.payout.status === "paid" ? `Paid ${fullDate(detail.payout.arrivalDate)}` : `${statusLabel(detail.payout.status)} · expected ${fullDate(detail.payout.arrivalDate)}`}</div>
+            {detail.loading && <div style={{ color: "var(--sub)", fontSize: 14, padding: "8px 0" }}>Loading breakdown…</div>}
+            {detail.error && <div style={{ color: "#C2563F", fontSize: 13.5, lineHeight: 1.5 }}>{detail.error}</div>}
+            {detail.data && (
+              <>
+                <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                  {[["Gross", detail.data.gross], ["Stripe fees", -Math.abs(detail.data.fees)], ["Net", detail.data.net]].map(([lbl, val]) => (
+                    <div key={lbl} style={{ flex: 1, textAlign: "center", border: "1px solid var(--border)", background: "var(--panel2)", borderRadius: 12, padding: "11px 4px" }}>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{money(val, detail.payout.currency)}</div>
+                      <div style={{ fontSize: 10.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 3 }}>{lbl}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "4px 0 6px" }}>{detail.data.count} item{detail.data.count === 1 ? "" : "s"}</div>
+                <div style={{ maxHeight: "46vh", overflowY: "auto" }}>
+                  {detail.data.items.map((t, i) => (
+                    <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "11px 2px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 14, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.description || cap(txnLabel(t.type))}</div>
+                        <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 1 }}>{dayLabel(t.created)}{t.fee ? ` · fee ${money(t.fee, t.currency)}` : ""}</div>
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: t.net < 0 ? "#C2563F" : "var(--text)", flexShrink: 0 }}>{money(t.net, t.currency)}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </Sheet>
+
+      {/* TRANSACTIONS LEDGER + CSV */}
+      <Sheet open={!!(ledger && ledger.open)} onClose={() => setLedger(null)} align="bottom" maxWidth={520}>
+        {ledger && (
+          <div style={{ padding: "4px 2px 6px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500 }}>Transactions</div>
+              <button onClick={exportCSV} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, color: "var(--text)", padding: "9px 13px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}><Download size={15} /> Export CSV</button>
+            </div>
+            {ledger.error && <div style={{ color: "#C2563F", fontSize: 13.5, marginBottom: 10 }}>{ledger.error}</div>}
+            <div style={{ maxHeight: "58vh", overflowY: "auto" }}>
+              {ledger.items.map((t, i) => (
+                <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 2px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.description || cap(txnLabel(t.type))}</div>
+                    <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 1 }}>{dayLabel(t.created)} · {txnLabel(t.type)}{t.fee ? ` · fee ${money(t.fee, t.currency)}` : ""}</div>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: t.net < 0 ? "#C2563F" : "var(--text)", flexShrink: 0 }}>{money(t.net, t.currency)}</div>
+                </div>
+              ))}
+              {!ledger.loading && ledger.items.length === 0 && !ledger.error && <div style={{ color: "var(--sub)", fontSize: 13.5, padding: "10px 0" }}>No transactions yet.</div>}
+            </div>
+            {ledger.loading && <div style={{ color: "var(--sub)", fontSize: 13.5, textAlign: "center", padding: "12px 0" }}>Loading…</div>}
+            {ledger.hasMore && !ledger.loading && <button onClick={loadMoreLedger} style={{ width: "100%", background: "none", border: "1px solid var(--border)", borderRadius: 12, color: "var(--text)", padding: "12px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", marginTop: 8 }}>Load more</button>}
+          </div>
+        )}
+      </Sheet>
+
+      {/* PAY ME NOW — confirm (opt-in, fee disclosed) */}
+      <Sheet open={!!instant} onClose={() => (instant && instant.busy ? null : setInstant(null))} align="center" maxWidth={400}>
+        {instant && (
+          <div style={{ padding: "4px 2px 6px" }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 4 }}>Pay me now</div>
+            <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.55, marginBottom: 16 }}>Send <strong style={{ color: "var(--text)" }}>{money(instant.amount, d && d.currency)}</strong> to your debit card now instead of waiting for the scheduled payout. Stripe charges a small instant-payout fee (about 1%); your regular scheduled payouts are always free.</p>
+            {instant.error && <div style={{ color: "#C2563F", fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>{instant.error}</div>}
+            <button disabled={instant.busy} onClick={doInstant} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: 15, fontSize: 14, fontWeight: 700, letterSpacing: 0.5, cursor: instant.busy ? "default" : "pointer", opacity: instant.busy ? 0.6 : 1 }}>{instant.busy ? "Sending…" : `Pay out ${money(instant.amount, d && d.currency)} now`}</button>
+            <button disabled={instant.busy} onClick={() => setInstant(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 4, cursor: "pointer" }}>Cancel</button>
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 }
