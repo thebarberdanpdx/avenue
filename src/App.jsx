@@ -3722,12 +3722,32 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [wlAnyProvider, setWlAnyProvider] = useState(false); // false = only their provider (the respectful default)
   const [wlService, setWlService] = useState("");
 
+  // --- New-client pricing / grandfathering ------------------------------------------------
+  // Current clients keep today's prices until business.pricing.grandfatherUntil (a YYYY-MM-DD
+  // the owner sets). After that date — and for any new/unrecognized booker — each service's
+  // newClientPrice applies. Keyed off the matched ACCOUNT so a client's family inherits status.
+  const grandfatheredNow = (() => {
+    if (!matched) return false;                          // not recognized → new prices
+    if (matched.legacyPricing === false) return false;   // a client created new (post-launch)
+    const until = ((business && business.pricing) || {}).grandfatherUntil;
+    if (!until) return true;                             // no end date set → protected
+    return Date.now() <= new Date(until + "T23:59:59").getTime(); // protected through that day
+  })();
+  // Base storefront price for a service for the person being booked for (dc = family member or account).
+  const menuBasePrice = (svc, dc) => {
+    const cp = dc && dc.customPrices ? dc.customPrices[svc.id] : null;
+    if (cp != null && cp !== "") return Number(cp);      // an explicit per-client price always wins
+    const nc = svc.newClientPrice;
+    if (!grandfatheredNow && nc != null && nc !== "") return Number(nc); // new booker → higher price
+    return Number(svc.price) || 0;
+  };
+
   const lineTotal = (entry) => {
     const dc = activeMember || matched; // duration/notes come from the person being booked for
     const provId = entry.provider && entry.provider.id !== "anyone" ? entry.provider.id : "dan"; // barber decides the per-service length; "anyone" books as Dan (matches the commit)
     const hasCustomPrice = !!(dc && dc.customPrices && dc.customPrices[entry.service.id] != null && dc.customPrices[entry.service.id] !== "");
     const hasCustomDur = !!(dc && dc.customDurations && dc.customDurations[entry.service.id] != null);
-    let p = hasCustomPrice ? Number(dc.customPrices[entry.service.id]) : entry.service.price, m = getDuration(dc, entry.service, provId);
+    let p = menuBasePrice(entry.service, dc), m = getDuration(dc, entry.service, provId);
     // #19: a cut style sets the base price/time — BUT this client's own custom price/duration (their
     // known "usual" rate) always wins, so picking a style never silently drops it. A client with no
     // custom price still gets the style's price. (A different service they have no override for → default.)
@@ -4288,7 +4308,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         clientId = existing.id; // reuse the existing profile
       } else {
         clientId = "c" + baseId + Math.floor(Math.random() * 1000);
-        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), smsConsent: smsConsent, smsConsentAt: smsConsent ? new Date().toISOString() : undefined, provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30), business) : provider.id, visits: 0, lastActivity: new Date().toISOString(), customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile) ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } : undefined };
+        const newClient = { id: clientId, name: newName, firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), smsConsent: smsConsent, smsConsentAt: smsConsent ? new Date().toISOString() : undefined, provider: provider.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, slot, (people[0]?.durMin || 30), business) : provider.id, visits: 0, lastActivity: new Date().toISOString(), legacyPricing: false, customDurations: {}, notes: "", messages: [], gallery: [], timeline: [], family: [], savedCard: (cardInfo && cardInfo.pmId && !cardInfo.onFile) ? { pmId: cardInfo.pmId, stripeCustomerId: cardInfo.stripeCustomerId, last4: cardInfo.last4, brand: cardInfo.brand, savedAt: new Date().toISOString() } : undefined };
         setClients((cur) => [newClient, ...cur]);
         newClientRow = { id: String(clientId), shop_id: shopId, data: newClient };
       }
@@ -4851,8 +4871,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <div style={{ borderTop: "1px solid var(--line)", marginTop: simpleCat ? 14 : 4 }}>
                 {list.map((svc) => {
                   const dc = activeMember || matched;
-                  const cp = dc && dc.customPrices ? dc.customPrices[svc.id] : null;
-                  const price = (cp != null && cp !== "") ? Number(cp) : (Number(svc.price) || 0);
+                  const price = menuBasePrice(svc, dc);
                   const desc = (svc.booking && svc.booking.description) || "";
                   const open = svcInfo === svc.id;
                   return (
@@ -11423,7 +11442,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
       if (e.answerPrice && Object.keys(e.answerPrice).length) cleanStaff[pid].answerPrice = e.answerPrice; else delete cleanStaff[pid].answerPrice;
     });
     const photos = Array.isArray(form.photos) ? form.photos.filter(Boolean) : [];
-    const clean = { ...form, price: Math.min(100000, priceNum), duration: Math.max(5, Math.min(600, Number(form.duration) || 30)), staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false };
+    const ncp = (form.newClientPrice === "" || form.newClientPrice == null) ? null : Math.max(0, Math.min(100000, Number(form.newClientPrice) || 0));
+    const clean = { ...form, price: Math.min(100000, priceNum), newClientPrice: ncp, duration: Math.max(5, Math.min(600, Number(form.duration) || 30)), staff: cleanStaff, photos, photo: photos[0] || form.photo || "", booking: { ...defaultBooking(), ...(form.booking || {}) }, usesCutStyles: form.usesCutStyles !== false };
     if (editing === "new") setServices([...services, clean]);
     else setServices(services.map((s) => (s.id === editing ? clean : s)));
     // MangoMint pattern: saving a section lands on the service's section menu. A brand-new
@@ -11659,6 +11679,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           </div>
         </div>
       </div>
+
+      <SectionLbl>New-client price <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--faint)" }}>· optional</span></SectionLbl>
+      <div style={moneyWrap}>
+        <span style={moneyPrefix}>$</span>
+        <input type="number" inputMode="decimal" value={form.newClientPrice ?? ""} onChange={(e) => setForm({ ...form, newClientPrice: e.target.value })} placeholder={String(form.price || "—")} style={{ ...moneyInput, width: "100%" }} />
+      </div>
+      <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.45 }}>What new clients pay. Leave blank to charge everyone the same. Your current clients keep the price above until the grandfather date (set on the Services list).</p>
 
       <SectionLbl>Category</SectionLbl>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -12884,6 +12911,25 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           <button onClick={() => setEditMode((v) => !v)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 14.5, fontWeight: editMode ? 600 : 500, padding: "4px 2px", cursor: "pointer" }}>{editMode ? "Done" : "Reorder"}</button>
         </div>
         <CategorySheet open={catSheet} onClose={() => setCatSheet(false)} categories={categories} setCategories={setCategories} services={services} setServices={setServices} showToast={showToast} />
+
+        {(() => {
+          const gfUntil = ((business && business.pricing) || {}).grandfatherUntil || "";
+          const anyNew = (services || []).some((s) => s.newClientPrice != null && s.newClientPrice !== "");
+          if (!anyNew && !gfUntil) return null; // stays out of the way until you set a new-client price
+          const dateInput = { fontFamily: FONT_BODY, fontSize: 14.5, color: "var(--text)", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px" };
+          return (
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "15px 16px", marginBottom: 20 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>New-client pricing</div>
+              <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 13 }}>Current clients keep today's prices; new clients pay each service's New-client price. Pick the date your current clients are protected through — after it, everyone moves to the new prices.</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 500 }}>Grandfather current clients through</span>
+                <input type="date" value={gfUntil} onChange={(e) => setBusiness((b) => ({ ...b, pricing: { ...((b && b.pricing) || {}), grandfatherUntil: e.target.value } }))} style={dateInput} />
+                {gfUntil && <button onClick={() => setBusiness((b) => ({ ...b, pricing: { ...((b && b.pricing) || {}), grandfatherUntil: "" } }))} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "4px 2px" }}>Clear</button>}
+              </div>
+              {!gfUntil && <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 9 }}>No end date set — current clients stay on old prices indefinitely.</div>}
+            </div>
+          );
+        })()}
 
         {cats.map((cat) => {
           const inCat = services.filter((s) => !s.archived && (s.category || cats[0]) === cat && matchesSearch(s));
