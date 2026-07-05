@@ -899,8 +899,9 @@ async function authedHeaders() {
 }
 
 // The shop this browser/app is currently acting for (the subdomain/path-derived
-// SHOP_ID). Set once App resolves it; read by stripeApi so money-out calls name
-// their shop and the server can verify the signed-in staff member belongs to it.
+// SHOP_ID). Set once App resolves it; read by stripeApi (money-out calls name
+// their shop so the server can verify staff membership) and by the /api/notify
+// callers (so the server can bind a send to a recipient on file for this shop).
 let _stripeShop = null;
 
 // Call our serverless Stripe function. Throws with a readable message on failure.
@@ -3231,7 +3232,7 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject, ex
       arriveUrl: (typeof window !== "undefined" && appt.manageToken) ? `${window.location.origin}/manage?t=${appt.manageToken}&a=1` : "",
     };
     if (extra && typeof extra === "object") Object.assign(ctx, extra); // e.g. {amount} for a payment receipt
-    fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: m.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: subject || `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
+    fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel: m.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: subject || `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
   } catch (e) {}
 }
 
@@ -3314,7 +3315,7 @@ function fireReviewRequest({ appt, business, providers, client, contact, visitNo
     };
     fetch(API_BASE + "/api/notify", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel: cfg.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: `${business.name}: How was your visit?`, template: cfg.body || DEFAULT_REVIEW_BODY, context: ctx }),
+      body: JSON.stringify({ shop: _stripeShop, channel: cfg.channel || "email", to: { email, phone, smsOptOut: !!(contact && contact.smsOptOut) }, subject: `${business.name}: How was your visit?`, template: cfg.body || DEFAULT_REVIEW_BODY, context: ctx }),
     }).catch(() => {});
   } catch (e) {}
 }
@@ -7412,7 +7413,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
       // template's channel (email + text). Email now actually lands because the appt carries the
       // booker's email (see booking); text still works off a.phone as before.
       const channel = msgId === "canceled" ? "email" : (m.channel || "email");
-      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel, to: { email: (a.email || "").trim(), phone: (a.phone || "").trim(), smsOptOut: false }, subject: `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
+      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel, to: { email: (a.email || "").trim(), phone: (a.phone || "").trim(), smsOptOut: false }, subject: `${business.name}: ${m.label}`, template: m.body, context: ctx }) }).catch(() => {});
     } catch (e) {}
   };
 
@@ -20499,7 +20500,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       date: opening ? relativeDate(new Date(opening.bookedFor)) : "", time: opening ? fmtTime(opening.start) : "",
       bookUrl: bookLink,
     };
-    fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: "both", to: { email, phone: ph, smsOptOut: optedOut }, subject: `${bizName}: a spot just opened up`, template: body, context: ctx }) }).catch(() => {});
+    fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel: "both", to: { email, phone: ph, smsOptOut: optedOut }, subject: `${bizName}: a spot just opened up`, template: body, context: ctx }) }).catch(() => {});
     if (opening) setOpenings((cur) => (cur || []).map((o) => o.id === opening.id ? { ...o, offered: [...(o.offered || []), person.id] } : o));
     if (!silent) { const via = [canText ? "text" : null, email ? "email" : null].filter(Boolean).join(" + "); showToast && showToast(`Offer sent to ${first}${via ? ` (${via})` : ""}.`); }
     return true;
@@ -23313,7 +23314,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       const phone = (appt.phone || client.phone || "").trim();
                       const email = (client.email || "").trim();
                       if (!phone && !email) { showToast(`No phone or email on file for ${String(appt.name || "this client").split(" ")[0]}.`); return; }
-                      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: "text", to: { email, phone, smsOptOut: client.smsOptOut === true }, subject: `${business.name}: We're ready for you`, template: tmpl, context: { client: String(appt.name || "there").split(" ")[0], provider: provName, business: business.name || "your shop" } }) }).catch(() => {});
+                      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel: "text", to: { email, phone, smsOptOut: client.smsOptOut === true }, subject: `${business.name}: We're ready for you`, template: tmpl, context: { client: String(appt.name || "there").split(" ")[0], provider: provName, business: business.name || "your shop" } }) }).catch(() => {});
                       showToast(`Sent: "${fill(tmpl)}"`);
                     };
                     return notified

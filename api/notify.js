@@ -104,6 +104,41 @@ async function handler(req, res) {
 
   const email = String(to.email || "").trim();
   const phone = String(to.phone || "").replace(/\D/g, "");
+
+  // ── Anti-relay: this endpoint has no login (the public booking page calls it),
+  // so it was an open pipe to send email/SMS "as the shop" to ANY address with ANY
+  // content — phishing the shop's own clients (DKIM-valid) or draining the SMS
+  // budget to random numbers. Bind it: an unauthenticated send may only reach a
+  // contact ALREADY ON FILE for the named shop (a client or staff member). Real
+  // confirmations still pass — the person who just booked is on file. We fail OPEN
+  // only if the lookup itself errors, so a DB hiccup never silently drops a real
+  // booking confirmation; a clean "not on file" result is blocked.
+  const shop = String(b.shop || "").trim();
+  if (!shop) return res.status(400).json({ error: "missing shop" });
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const emLc = email.toLowerCase();
+    const onFile = (rows) => (rows || []).some((r) => {
+      const d = (r && r.data) || {};
+      return (emLc && String(d.email || "").trim().toLowerCase() === emLc) ||
+             (phone && String(d.phone || "").replace(/\D/g, "") === phone);
+    });
+    let recognized = false, lookupOk = true;
+    try {
+      const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+      const { data: crows, error: cErr } = await supa.from("clients").select("data").eq("shop_id", shop);
+      if (cErr) throw cErr;
+      recognized = onFile(crows);
+      if (!recognized) {
+        const { data: prows, error: pErr } = await supa.from("providers").select("data").eq("shop_id", shop);
+        if (pErr) throw pErr;
+        recognized = onFile(prows);
+      }
+    } catch (e) { lookupOk = false; } // DB error → don't drop a real confirmation
+    if (lookupOk && !recognized) {
+      return res.status(403).json({ error: "recipient is not on file for this shop" });
+    }
+  }
+
   const ch = resolveChannels({ channel: b.channel || "email", smsLive: SMS_LIVE, email, phone, smsOptOut: to.smsOptOut === true });
 
   const results = {};
