@@ -58,9 +58,12 @@ export default async function handler(req, res) {
 
       // Send it through the existing notify pipe. Template is pre-rendered (no tags).
       const origin = `https://${req.headers.host}`;
+      // `shop` is required by /api/notify's anti-relay check (the recipient must be
+      // on file for this shop). We only reach here when `hit` matched a real client,
+      // so the recipient is on file and the send passes.
       const body = byPhone
-        ? { channel: "text", to: { phone: digits }, subject: "Your sign-in code", template: `Your sign-in code is ${code}. It expires in 10 minutes.`, context: {} }
-        : { channel: "email", to: { email: em }, subject: "Your sign-in code", template: `Your sign-in code is ${code}. It expires in 10 minutes. If you didn't request this, you can ignore this email.`, context: {} };
+        ? { shop, channel: "text", to: { phone: digits }, subject: "Your sign-in code", template: `Your sign-in code is ${code}. It expires in 10 minutes.`, context: {} }
+        : { shop, channel: "email", to: { email: em }, subject: "Your sign-in code", template: `Your sign-in code is ${code}. It expires in 10 minutes. If you didn't request this, you can ignore this email.`, context: {} };
       await fetch(origin + "/api/notify", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       }).catch(() => {});
