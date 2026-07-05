@@ -19861,15 +19861,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     const sel = strip.querySelector('[data-sel="1"]') || strip.querySelector('[data-today="1"]');
     if (!sel) return;
     const pos = sel.offsetLeft - strip.offsetLeft;  // selected cell's position within the strip
-    let left;
-    if (dayOffset === 0) {
-      // Today selected → "normal" view: align the current week (Sunday at the left edge).
-      const cellW = sel.offsetWidth + 6;            // cell width + flex gap
-      left = pos - selectedDate.getDay() * cellW - 2;
-    } else {
-      // A future/other day picked → center that day in the strip.
-      left = pos - strip.clientWidth / 2 + sel.offsetWidth / 2;
-    }
+    // Center the selected/today cell in the strip. The 7-day week is wider than the
+    // visible strip, so aligning Sunday to the left edge shoved the last weekday (e.g.
+    // Saturday) off the right edge — center it instead so today is always fully in view.
+    const left = pos - strip.clientWidth / 2 + sel.offsetWidth / 2;
     try { strip.scrollTo({ left: Math.max(0, left), behavior: behavior || "auto" }); }
     catch (e) { strip.scrollLeft = Math.max(0, left); }
   };
