@@ -23110,6 +23110,23 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     showToast(`Price set to $${v}.`);
   };
   const resetPrice = () => { onUpdate(appt.id, { price: null }); setPriceOpen(false); showToast("Price reset to the service default."); };
+  // ---- Timer start correction (forgot to tap "Start service" until after the service began) ----
+  // The whole in-service timer — live countdown, elapsed clock, AND the real duration measured for
+  // this client at checkout — all derive from the single serviceStartedAt timestamp. So if the tap
+  // landed late, nudging that ONE value back to when work actually began makes all three accurate at
+  // once. Two ways: (A) one-tap snap to the scheduled start ("it began on time, I just forgot"),
+  // (B) pick the exact minute it really started.
+  const [startTimeOpen, setStartTimeOpen] = useState(false);   // exact-time picker open
+  const [startDraft, setStartDraft] = useState(appt.start);
+  const apptDayBase = () => { const b = new Date(appt.bookedFor || Date.now()); b.setHours(0, 0, 0, 0); return b.getTime(); };
+  // serviceStartedAt as minutes-from-midnight (for the picker); falls back to the scheduled start.
+  const startedAtMin = appt.serviceStartedAt != null
+    ? (new Date(appt.serviceStartedAt).getHours() * 60 + new Date(appt.serviceStartedAt).getMinutes())
+    : appt.start;
+  const writeStartMin = (v, note) => { onUpdate(appt.id, { serviceStartedAt: apptDayBase() + v * 60000 }); if (note) showToast(note); };
+  const openStartEdit = () => { setStartDraft(startedAtMin); setStartTimeOpen(true); };
+  const saveStartEdit = () => { writeStartMin(startDraft, `Timer set to ${fmtTime(startDraft)} start.`); setStartTimeOpen(false); };
+  const snapToScheduled = () => writeStartMin(appt.start, `Timer moved to the ${fmtTime(appt.start)} start.`);
   // Who can edit price: owners and admins (you + Heather). Only an explicit regular "Staff" member is blocked.
   const canEditPrice = me ? (me.pulseRole === "owner" || me.userType !== "Staff") : true;
   // ---- card on file (admin) ----
@@ -23330,6 +23347,26 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   lateNotified={nextClient && nextClient.lateNotified}
                   onLetThemKnow={() => setLateOpen(true)}
                 />
+              )}
+
+              {/* TIMER START CORRECTION — reconcile a late "Start service" tap with when work really began.
+                  (A) snap chip appears when the tap was 5+ min after the scheduled start; (B) "Edit" always
+                  lets you set the exact minute. Both just rewrite serviceStartedAt, so the countdown and the
+                  learned service time become accurate in real time. */}
+              {appt.status === "in-service" && appt.serviceStartedAt != null && (
+                <div style={{ padding: "0 18px 14px" }}>
+                  {startedLate && (
+                    <button className="lift" onClick={snapToScheduled} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", background: `color-mix(in srgb, ${T.accent} 11%, ${T.panel})`, border: `1px solid color-mix(in srgb, ${T.accent} 42%, transparent)`, color: T.text, padding: "12px 14px", borderRadius: 12, fontSize: 13.5, fontWeight: 600, lineHeight: 1.4, marginBottom: 9, cursor: "pointer" }}>
+                      <RefreshCw size={16} style={{ color: T.accent, flexShrink: 0 }} />
+                      <span>Timer started {startedLateBy} min after the booked time — but it began on time? <span style={{ color: T.accent, whiteSpace: "nowrap" }}>Use {fmtTime(appt.start)} →</span></span>
+                    </button>
+                  )}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: T.sub }}>
+                    <Clock size={14} style={{ flexShrink: 0, opacity: 0.85 }} />
+                    <span>Timer started at <strong style={{ color: T.text }}>{fmtClockTs(appt.serviceStartedAt)}</strong></span>
+                    <button onClick={openStartEdit} style={{ marginLeft: "auto", background: "none", border: "none", color: T.accent, fontWeight: 700, fontSize: 13, cursor: "pointer", padding: "4px 2px" }}>Edit</button>
+                  </div>
+                </div>
               )}
 
               {/* CHAIR-SIDE BRIEFING — full client story on check-in/in-service */}
@@ -23749,6 +23786,22 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
             <button onClick={resetPrice} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", padding: 14, fontSize: 13.5, fontWeight: 600, letterSpacing: 1, borderRadius: 14 }}><RefreshCw size={15} /> RESET TO ${defaultPrice}</button>
           )}
           <button onClick={() => setPriceOpen(false)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 4 }}>Cancel</button>
+        </div>
+      </Sheet>
+
+      {/* Exact start-time picker — set when the service ACTUALLY started (caps at now; can't start in the future). */}
+      <Sheet open={startTimeOpen} onClose={() => setStartTimeOpen(false)} align="bottom" maxWidth={420}>
+        <div style={{ padding: "6px 4px 8px" }}>
+          <div style={{ textAlign: "center", marginBottom: 16 }}>
+            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>STARTED AT</div>
+            <div style={{ fontFamily: FONT_BODY, fontSize: 20, fontWeight: 600 }}>{service?.name || appt.title}</div>
+            <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 4 }}>When did the service actually begin?</div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <TimeScrollPicker value={startDraft} onChange={setStartDraft} step={5} maxMin={nowMinTick} label="Start time" full />
+          </div>
+          <button onClick={saveStartEdit} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", marginBottom: 4 }}><Check size={17} /> SET START TIME</button>
+          <button onClick={() => setStartTimeOpen(false)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 4 }}>Cancel</button>
         </div>
       </Sheet>
 
