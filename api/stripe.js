@@ -32,14 +32,14 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 // they're also called from the public booking page, where there is no login.
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://iufgznminbujcabqeesk.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const STAFF_ONLY = new Set(["charge", "refund", "connection_token", "terminal_intent", "terminal_location"]);
+const STAFF_ONLY = new Set(["charge", "refund", "connection_token", "terminal_intent", "terminal_location", "payouts", "payout_detail", "transactions", "instant_payout"]);
 // Money-OUT actions must ALSO belong to the caller's shop, not just any valid
 // session. `charge` pulls a saved card; `refund` sends money out. On top of the
 // staff-session gate above, the signed-in email must match a provider of the
 // shop named in the request — so a valid session for one shop can never move
 // money in another once Vero is multi-tenant. (Terminal actions stay behind the
 // session gate only; they mint account-scoped intents, not shop-specific ones.)
-const SHOP_SCOPED = new Set(["charge", "refund"]);
+const SHOP_SCOPED = new Set(["charge", "refund", "instant_payout"]);
 
 // Tap to Pay on iPhone requires the reader to be tied to a Terminal Location.
 // Resolve one: prefer a pinned env id, else the account's first existing Location.
@@ -305,6 +305,108 @@ async function handler(req, res) {
         description: description || "Vero — Tap to Pay",
       });
       return res.status(200).json({ clientSecret: pi.client_secret, id: pi.id });
+    }
+
+    // --- Payouts, balance & payout schedule (read-only) ----------------------
+    // Powers the Settings → Payouts screen: current Stripe balance, the account's
+    // automatic-payout schedule, and recent payouts. Staff-only (see STAFF_ONLY).
+    // All amounts are returned in CENTS; the app formats them.
+    if (action === "payouts") {
+      const limit = Math.min(24, Math.max(1, Number(body.limit) || 10));
+      const [balance, payoutList, account] = await Promise.all([
+        stripe.balance.retrieve(),
+        stripe.payouts.list({ limit }),
+        stripe.accounts.retrieve().catch(() => null), // no id → the key's own account
+      ]);
+      const sumBy = (arr) => (arr || []).reduce((s, b) => s + (b.amount || 0), 0);
+      const sched = account && account.settings && account.settings.payouts ? account.settings.payouts.schedule : null;
+      const curr = (balance.available && balance.available[0] && balance.available[0].currency)
+        || (balance.pending && balance.pending[0] && balance.pending[0].currency) || "usd";
+      return res.status(200).json({
+        currency: curr,
+        available: sumBy(balance.available),               // cents, settled & ready to pay out
+        pending: sumBy(balance.pending),                   // cents, still clearing
+        instantAvailable: sumBy(balance.instant_available), // cents eligible for an instant payout (0 if none)
+        payoutsEnabled: account ? !!(account.payouts_enabled) : null,
+        schedule: sched ? {
+          interval: sched.interval,          // "daily" | "weekly" | "monthly" | "manual"
+          delayDays: sched.delay_days,
+          weeklyAnchor: sched.weekly_anchor || null,
+          monthlyAnchor: sched.monthly_anchor || null,
+        } : null,
+        payouts: (payoutList.data || []).map((p) => ({
+          id: p.id,
+          amount: p.amount,                  // cents
+          currency: p.currency,
+          status: p.status,                  // paid | pending | in_transit | canceled | failed
+          arrivalDate: p.arrival_date,       // unix seconds — when it lands in the bank
+          created: p.created,                // unix seconds
+          method: p.method,                  // standard | instant
+          description: p.description || p.statement_descriptor || "",
+        })),
+      });
+    }
+
+    // --- One payout's breakdown: the charges/refunds/fees that composed it ----
+    // balanceTransactions filtered by payout id → every ticket that rolled into
+    // that deposit, plus Stripe's fee and your net. Staff-only, read-only.
+    if (action === "payout_detail") {
+      const { payoutId } = body;
+      if (!payoutId) return res.status(400).json({ error: "Missing payoutId." });
+      const txns = await stripe.balanceTransactions.list({ payout: payoutId, limit: 100 });
+      const rows = (txns.data || []).filter((t) => t.type !== "payout" && t.type !== "payout_cancel");
+      const items = rows.map((t) => ({
+        id: t.id, type: t.type, amount: t.amount, fee: t.fee, net: t.net,
+        currency: t.currency, created: t.created, description: t.description || "",
+      }));
+      return res.status(200).json({
+        items,
+        gross: items.reduce((s, i) => s + (i.amount || 0), 0),
+        fees: items.reduce((s, i) => s + (i.fee || 0), 0),
+        net: items.reduce((s, i) => s + (i.net || 0), 0),
+        count: items.length,
+      });
+    }
+
+    // --- Transactions ledger: every charge / refund / fee on the account -------
+    // Powers "View all transactions" + CSV export. Cursor-paginated. Read-only.
+    if (action === "transactions") {
+      const limit = Math.min(100, Math.max(1, Number(body.limit) || 50));
+      const params = { limit };
+      if (body.startingAfter) params.starting_after = body.startingAfter;
+      const txns = await stripe.balanceTransactions.list(params);
+      return res.status(200).json({
+        items: (txns.data || []).map((t) => ({
+          id: t.id, type: t.type, amount: t.amount, fee: t.fee, net: t.net,
+          currency: t.currency, created: t.created, available: t.available_on,
+          description: t.description || "",
+        })),
+        hasMore: !!txns.has_more,
+        nextCursor: txns.data && txns.data.length ? txns.data[txns.data.length - 1].id : null,
+      });
+    }
+
+    // --- "Pay me now": an instant payout to the linked debit card --------------
+    // Money-OUT → staff-only AND shop-scoped (see STAFF_ONLY / SHOP_SCOPED). Never
+    // the default; the app surfaces it as a secondary action with the fee shown.
+    // Omitting amount pays out the full instant-eligible balance. Stripe charges a
+    // fee and requires an eligible debit card; if not eligible it errors clearly.
+    if (action === "instant_payout") {
+      let cents;
+      if (body.amount != null && body.amount !== "") {
+        if (!validAmount(body.amount)) return res.status(400).json({ error: "Invalid amount." });
+        cents = Math.round(Number(body.amount) * 100);
+      } else {
+        const bal = await stripe.balance.retrieve();
+        cents = (bal.instant_available || []).reduce((s, b) => s + (b.amount || 0), 0);
+      }
+      if (!cents || cents <= 0) {
+        return res.status(400).json({ error: "No funds are available for an instant payout right now." });
+      }
+      const currency = (body.currency || "usd").toLowerCase();
+      const opts = body.idempotencyKey ? { idempotencyKey: body.idempotencyKey } : {};
+      const payout = await stripe.payouts.create({ amount: cents, currency, method: "instant" }, opts);
+      return res.status(200).json({ id: payout.id, amount: payout.amount, status: payout.status, arrivalDate: payout.arrival_date });
     }
 
     return res.status(400).json({ error: "Unknown action." });
