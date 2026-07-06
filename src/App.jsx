@@ -21254,15 +21254,18 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                   return !appts.some((o) => o.id !== a.id && o.clientId === a.clientId && o.status !== "cancelled" && o.status !== "no-show" && o.status !== "block" && o.bookedFor && new Date(o.bookedFor) < new Date(a.bookedFor));
                 })());
                 const rebooked = /rebook/i.test(a.title || "");
-                const range = `${fmtTime(liveStart)} - ${fmtTime(liveStart + (a.end - a.start))}`;
+                const range = `${fmtTime(liveStart)} – ${fmtTime(liveStart + (a.end - a.start))}`;
+                // Eyebrow shows the service alone; the cut style + add-ons get their own clean line below,
+                // so the tile never crams a truncated "HAIRCUT (SKIN FADE, FACIAL…)" into one row.
+                const svcTop = a.serviceName || (a.title || "").replace(/\s*[(·].*$/, "");
                 return (
                   <div key={a.id} data-appt
                     onClick={() => { const d = dragRef.current; if (d && (d.didDrag || d.scrolled)) return; setOpen(a); }}
                     onMouseDown={(e) => startDrag(e, a)} onTouchStart={(e) => startDrag(e, a)}
                     className={isDragging ? "" : "lift"}
                     style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: isDone ? 0.6 : 1, border: "none", borderRadius: 3, padding: height > 48 ? "10px 14px 6px" : "5px 14px", color: nameOn, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
-                    {/* service label — small caps above the name on tall-enough tiles */}
-                    {height > 48 && <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: 0.4, textTransform: "uppercase", color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.title}</span>}
+                    {/* service — small-caps eyebrow above the name on tall-enough tiles (service only, clean) */}
+                    {height > 48 && <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{svcTop}</span>}
                     {/* client name — compact & airy, sized to FIT the full name like Mango (Dan-approved). */}
                     <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: height > 48 ? 3 : 0, paddingRight: height <= 54 && isNew ? 30 : 0 }}>{apptDisplayName(a, clients)}</span>
                     {/* full time range under the name */}
@@ -21271,9 +21274,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                         addonLabels; older/staff appts keep a free-text detail string, shown verbatim */}
                     {height > 110 && (() => {
                       const txt = (Array.isArray(a.addonLabels) && a.addonLabels.length)
-                        ? [...new Set(a.addonLabels.map(cleanServiceLabel).filter(Boolean))].join(", ")
+                        ? [...new Set(a.addonLabels.map(cleanServiceLabel).filter(Boolean))].join(" · ")
                         : (a.detail || "");
-                      return txt ? <div style={{ fontSize: 12, color: subOn, lineHeight: 1.3, marginTop: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{txt}</div> : null;
+                      return txt ? <div style={{ fontSize: 11.5, fontWeight: 500, letterSpacing: 0.1, color: subOn, lineHeight: 1.35, marginTop: 5, paddingRight: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{txt}</div> : null;
                     })()}
                     {/* quiet markers, bottom-right: ✎ note · ▱ photos · NEW · ↻ rebooked · ★ regular */}
                     {height > 54 && (
