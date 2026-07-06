@@ -198,6 +198,28 @@ async function handler(req, res) {
       return res.status(200).json({ clientSecret: intent.client_secret, customerId: customer });
     }
 
+    // --- Is the card on file still good? (read-only) -------------------------
+    // The booking flow calls this before letting a RETURNING client reuse their
+    // saved card: confirms the PaymentMethod still exists and isn't expired as of
+    // the appointment date. Returns booleans only — never card details — so probing
+    // an (unguessable) pmId leaks nothing. NOT staff-only: public booking calls it.
+    if (action === "card_status") {
+      const { paymentMethodId, byDate } = body;
+      if (!paymentMethodId) return res.status(400).json({ error: "Missing paymentMethodId." });
+      let pm;
+      try { pm = await stripe.paymentMethods.retrieve(paymentMethodId); }
+      catch (e) { return res.status(200).json({ exists: false, valid: false, expired: false }); } // deleted/unknown card
+      const card = pm && pm.card;
+      if (!card) return res.status(200).json({ exists: !!pm, valid: false, expired: false });
+      // Target month = the appointment date if given, else today. A card is valid
+      // THROUGH the end of its exp_month/exp_year.
+      const d = byDate ? new Date(byDate) : new Date();
+      const dd = isNaN(d.getTime()) ? new Date() : d;
+      const ty = dd.getFullYear(), tm = dd.getMonth() + 1;
+      const expired = (card.exp_year < ty) || (card.exp_year === ty && card.exp_month < tm);
+      return res.status(200).json({ exists: true, valid: !expired, expired });
+    }
+
     // --- Charge a saved card -------------------------------------------------
     // Used for a no-show fee. `amount` is in dollars; Stripe works in cents.
     if (action === "charge") {
