@@ -13267,7 +13267,7 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
               {on && (
                 <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
                   {CH.map(([v, lbl]) => { const sel = (m.channel || "email") === v; return (
-                    <button key={v} onClick={() => setMsg(m.id, { channel: v })} style={{ flex: 1, padding: "8px 6px", borderRadius: 10, fontSize: 13, fontWeight: sel ? 600 : 400, background: sel ? "var(--wash)" : "var(--panel2)", border: `1px solid ${sel ? "var(--gold)" : "var(--border2)"}`, color: sel ? "var(--text)" : "var(--sub)", cursor: "pointer" }}>{lbl}{(v === "text" || v === "both") ? " *" : ""}</button>
+                    <button key={v} onClick={() => setMsg(m.id, { channel: v })} style={{ flex: 1, padding: "8px 6px", borderRadius: 10, fontSize: 13, fontWeight: sel ? 600 : 400, background: sel ? "var(--wash)" : "var(--panel2)", border: `1px solid ${sel ? "var(--gold)" : "var(--border2)"}`, color: sel ? "var(--text)" : "var(--sub)", cursor: "pointer" }}>{lbl}</button>
                   ); })}
                 </div>
               )}
@@ -13275,7 +13275,6 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
           ); })}
         </div>
         <button onClick={onOpenMessages} style={{ marginTop: 14, background: "none", border: "none", color: "var(--gold)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "4px 2px", display: "inline-flex", alignItems: "center", gap: 5 }}>Edit wording & timing <ChevronRight size={15} /></button>
-        <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>* Texts begin once your A2P carrier registration clears; until then a “Text” or “Both” message is delivered by email.</p>
       </>) : (<>
         <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>How your team is alerted to activity. <b>App</b> pop-ups go to the assigned barber's phone (needs the Vero iOS app, notifications allowed). <b>Text</b> &amp; <b>Email</b> reach the contact info saved in each staff profile.</p>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 14px" }}>
@@ -16431,7 +16430,7 @@ function ReviewsManager({ value = {}, onChange, reviews = [], setReviews, showTo
   const shown = list.filter((r) => tab === "all" ? true : (tab === "pending" ? (r.status || "pending") === "pending" : r.status === "published"));
 
   return (<div>
-    <ToggleSetting label="Ask clients for a review after they pay" desc="Vero emails the invite after checkout — and texts too, once your number's approved." on={cfg.enabled === true} onToggle={(v) => set({ enabled: v })} />
+    <ToggleSetting label="Ask clients for a review after they pay" desc="Vero sends the review invite automatically after checkout." on={cfg.enabled === true} onToggle={(v) => set({ enabled: v })} />
     {cfg.enabled && (<div style={{ marginTop: 18, display: "grid", gap: 20 }}>
       <div>
         <div style={{ fontSize: 14.5, fontWeight: 500, marginBottom: 3 }}>Only ask after the client's…</div>
@@ -16441,7 +16440,6 @@ function ReviewsManager({ value = {}, onChange, reviews = [], setReviews, showTo
       <div>
         <div style={{ fontSize: 14.5, fontWeight: 500, marginBottom: 8 }}>Send by</div>
         <Segmented options={[{ value: "email", label: "Email" }, { value: "text", label: "Text" }, { value: "both", label: "Both" }]} value={cfg.channel || "both"} onChange={(v) => set({ channel: v })} />
-        <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 6 }}>Texts start automatically once your number is approved — email is used until then.</div>
       </div>
       <ToggleSetting label="Only ask each client once" desc="Never re-ask someone who's already been invited." on={cfg.oncePerClient !== false} onToggle={(v) => set({ oncePerClient: v })} />
       <div>
