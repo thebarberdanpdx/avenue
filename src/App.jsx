@@ -23798,14 +23798,13 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
                   <DetailRow T={T} label="Phone" value={client?.phone ? <PhoneLink number={client.phone} /> : "—"} accent />
                   <DetailRow T={T} label="Email" value={client?.email ? <EmailLink email={client.email} /> : "—"} />
-                  <DetailRow T={T} label="Card" value={savedCard ? `${savedCard.brand ? savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1) : "Card"} ···· ${savedCard.last4 || "••••"}${savedCard.exp ? ` · Exp ${savedCard.exp}` : ""}` : "No card on file"} />
-                  <DetailRow T={T} label="Credit" value={
+                  <DetailRow T={T} label="Card" value={
                     canEditPrice ? (
                       <button onClick={() => setCardOpen(true)} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: savedCard ? T.text : "var(--gold)", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500 }}>
-                        {savedCard ? `${savedCard.brand ? savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1) : "Card"} ···· ${savedCard.last4}${savedCard.exp ? `  Exp: ${savedCard.exp}` : ""}` : "Add card on file"}
+                        {savedCard ? `${savedCard.brand ? savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1) : "Card"} ···· ${savedCard.last4}${savedCard.exp ? ` · Exp ${savedCard.exp}` : ""}` : "Add card on file"}
                         <Edit2 size={13} style={{ color: T.faint }} />
                       </button>
-                    ) : (savedCard ? `${savedCard.brand || "Card"} ···· ${savedCard.last4}` : "No card on file")
+                    ) : (savedCard ? `${savedCard.brand ? savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1) : "Card"} ···· ${savedCard.last4}${savedCard.exp ? ` · Exp ${savedCard.exp}` : ""}` : "No card on file")
                   } />
                 </div>
                 {client && client.notes && (
@@ -24212,7 +24211,7 @@ function ApptDatePicker({ value, onPick, T }) {
 function DetailRow({ T, label, value, accent, icon }) {
   return (
     <div style={{ display: "flex", alignItems: "baseline", gap: 14, fontSize: 16 }}>
-      <span style={{ fontStyle: "italic", color: T.faint, minWidth: 64, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: T.faint, minWidth: 64, flexShrink: 0, fontWeight: 400 }}>{label}</span>
       <span style={{ color: accent ? "var(--gold)" : T.text, display: "flex", alignItems: "center", gap: 7, fontWeight: 500 }}>{icon}{value}</span>
     </div>
   );
