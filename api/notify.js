@@ -79,6 +79,10 @@ async function handler(req, res) {
     if (note) lines.push(`Booking note: "${note}"`);
     if (clientNote) lines.push(`Note on file: "${clientNote}"`);
     const textBody = lines.filter(Boolean).join("\n");
+    // SMS is one glanceable line — who, what, when — with the name shown ONCE and no appended notes,
+    // so the whole alert lands inside a single 160-char GSM segment. (Email keeps the fuller body above.)
+    const smsRaw = `New booking: ${clientName} - ${svc}. ${when}`.replace(/\s+/g, " ").trim();
+    const smsText = smsRaw.length <= 160 ? smsRaw : smsRaw.slice(0, 160).replace(/\s+\S*$/, "");
 
     const sent = [];
     for (const p of recip) {
@@ -90,7 +94,7 @@ async function handler(req, res) {
       // SMS is GSM-7; non-GSM characters get delivered as "?". sendSms() sanitizes centrally
       // (see gsmSafe in lib/messaging.js), so every SMS — including the middot service separator —
       // reads clean without each call site handling it.
-      try { if (SMS_LIVE && pPhone) { await sendSms({ to: pPhone, text: `${subject}\n${textBody}` }); r.sms = "sent"; } }
+      try { if (SMS_LIVE && pPhone) { await sendSms({ to: pPhone, text: smsText }); r.sms = "sent"; } }
       catch (e) { r.sms = "error: " + e.message; }
       sent.push(r);
     }
