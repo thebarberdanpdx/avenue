@@ -1361,17 +1361,24 @@ const addonPriceFor = (service, providerId, group) => {
   if (se && se.addonPrice && group && se.addonPrice[group.id] != null) return Number(se.addonPrice[group.id]) || 0;
   return Number(group && group.item && group.item.price) || 0;
 };
-// Turn an add-on label into the plain SERVICE the client actually chose — never the yes/no prompt.
-// Owners often name an add-on as a question ("Want a facial?", "Add a hot towel?"), but the appointment
-// card, calendar and every booking notification should read the thing itself ("Facial", "Hot towel"),
-// so staff know what to prep. Only strings that read as a question (end in "?") are rewritten; a real
-// service name ("The Gentleman's Facial", "Skin fade or specialty style") passes straight through.
+// Shorten a service / cut-style / add-on label to the couple of words that say what it is, so the
+// appointment card, calendar and every notification stay glanceable. Rules, in order: a yes/no prompt
+// ("Want a facial?") becomes the thing itself ("Facial"); a leading article is dropped ("The Gentleman's
+// Facial" → "Gentleman's Facial"); then we keep the first two words ("Skin fade or specialty style" →
+// "Skin fade", "Hot Towel & Straight Razor" → "Hot Towel"), never ending on a dangling connector.
+// Structured menu labels only — free-text notes are never passed through here (2 words would gut them).
 const cleanServiceLabel = (raw) => {
   let s = String(raw == null ? "" : raw).trim();
-  if (!s || !s.endsWith("?")) return s;                       // real service name (or empty) — leave as-is
-  s = s.replace(/\?+\s*$/, "").trim();                        // drop the trailing question mark(s)
-  const stripped = s.replace(/^(?:want|add|care for|would you like|interested in|how about|fancy)(?:\s+(?:a|an|the|some))?\s+/i, "").trim() || s;
-  return stripped.charAt(0).toUpperCase() + stripped.slice(1); // "Want a facial?" -> "Facial"
+  if (!s) return "";
+  if (s.endsWith("?")) {                                        // a prompt → the service being offered
+    s = s.replace(/\?+\s*$/, "").trim();
+    s = s.replace(/^(?:want|add|care for|would you like|interested in|how about|fancy)(?:\s+(?:a|an|the|some))?\s+/i, "").trim() || s;
+  }
+  s = s.replace(/^(?:the|a|an)\s+/i, "").trim();                // drop a leading article
+  const words = s.split(/\s+/).filter(Boolean).slice(0, 2);    // first two words…
+  while (words.length && /^(?:&|and|or|\+|\/|with|plus|-|–|—)$/i.test(words[words.length - 1])) words.pop(); // …never a dangling connector
+  s = (words.join(" ") || s).replace(/[\s,&/+–—-]+$/, "").trim();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 };
 // Per-ANSWER overrides — a chosen question answer (e.g. "Skin fade") can take a barber more time / cost
 // more. per-barber override (staff.answerDur/answerPrice[groupId][optId]) → the answer's own min/price.
@@ -3794,7 +3801,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       const ik = entry.service.intake; const a = entry.intakeAnswers; const parts = [];
       if (ik.service && a.service) parts.push(ik.service.options.find((o) => o.id === a.service)?.label);
       if (ik.style && a.style) parts.push(ik.style.options.find((o) => o.id === a.style)?.label);
-      const clean = parts.filter(Boolean);
+      const clean = parts.map(cleanServiceLabel).filter(Boolean);
       return clean.length ? `First visit — ${clean.join(", ")}` : entry.service.name;
     }
     const picks = [];
@@ -3803,28 +3810,29 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     entry.service.addonGroups.forEach((g) => {
       const sel = entry.addons[g.id];
       if (g.type === "choice" && sel) picks.push(g.options.find((o) => o.id === sel)?.label);
-      if (g.type === "addon" && sel) picks.push(cleanServiceLabel(g.item.name));
+      if (g.type === "addon" && sel) picks.push(g.item.name);
     });
-    return picks.length ? `${entry.service.name} (${picks.join(", ")})` : entry.service.name;
+    const short = picks.map(cleanServiceLabel).filter(Boolean);
+    return short.length ? `${entry.service.name} (${short.join(", ")})` : entry.service.name;
   };
-  // Exact full option / add-on labels for an entry (no service name, no abbreviation) — persisted on
-  // the appointment so confirmations and reminders print the real menu wording, never a derived guess.
+  // Short option / add-on labels for an entry (no service name) — persisted on the appointment so the
+  // card, calendar, confirmations and reminders all read the same couple of words (see cleanServiceLabel).
   const optsFor = (entry) => {
     const picks = [];
     if (entry.intakeAnswers && entry.service.intake) {
       const ik = entry.service.intake, a = entry.intakeAnswers;
       if (ik.service && a.service) picks.push(ik.service.options.find((o) => o.id === a.service)?.label);
       if (ik.style && a.style) picks.push(ik.style.options.find((o) => o.id === a.style)?.label);
-      return picks.filter(Boolean);
+      return picks.map(cleanServiceLabel).filter(Boolean);
     }
     if (entry.service.cutTypes && entry.cutType) { const ct = entry.service.cutTypes.find((c) => c.id === entry.cutType); if (ct) picks.push(ct.label); }
     if (entry.service.beardTypes && entry.beardType) { const bt = entry.service.beardTypes.find((b) => b.id === entry.beardType); if (bt) picks.push(bt.label); }
     (entry.service.addonGroups || []).forEach((g) => {
       const sel = entry.addons && entry.addons[g.id];
       if (g.type === "choice" && sel) picks.push(g.options.find((o) => o.id === sel)?.label);
-      if (g.type === "addon" && sel) picks.push(cleanServiceLabel(g.item.name));
+      if (g.type === "addon" && sel) picks.push(g.item.name);
     });
-    return picks.filter(Boolean);
+    return picks.map(cleanServiceLabel).filter(Boolean);
   };
   const provider = cart[0]?.provider || providers[0];
 
@@ -19714,11 +19722,11 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
     }
     if (!selVal) return { p: 0, m: 0, label: null };
     const it = (svcGrp && svcGrp.item) || grp.item || {};
-    return { p: it.addsPrice !== false ? (svcGrp ? addonPriceFor(service, provId, svcGrp) : (Number(it.price) || 0)) : 0, m: it.addsTime !== false ? (svcGrp ? addonDuration(service, provId, svcGrp) : (Number(it.min) || 0)) : 0, label: cleanServiceLabel(it.name || grp.label) };
+    return { p: it.addsPrice !== false ? (svcGrp ? addonPriceFor(service, provId, svcGrp) : (Number(it.price) || 0)) : 0, m: it.addsTime !== false ? (svcGrp ? addonDuration(service, provId, svcGrp) : (Number(it.min) || 0)) : 0, label: it.name || grp.label };
   };
   const optExtra = (() => {
     let p = 0, m = 0; const labels = [];
-    allOptionGroups.forEach((g) => { const sel = opts[g.id]; if (!sel) return; const a = groupAmount(g, sel); p += a.p; m += a.m; if (a.label) labels.push(a.label); });
+    allOptionGroups.forEach((g) => { const sel = opts[g.id]; if (!sel) return; const a = groupAmount(g, sel); p += a.p; m += a.m; const lbl = a.label && cleanServiceLabel(a.label); if (lbl) labels.push(lbl); });
     return { p, m, labels };
   })();
   const fmtHM = (m) => fmtTime(m);
@@ -21259,10 +21267,12 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: height > 48 ? 3 : 0, paddingRight: height <= 54 && isNew ? 30 : 0 }}>{apptDisplayName(a, clients)}</span>
                     {/* full time range under the name */}
                     {height > 64 && <span style={{ fontSize: 11, color: subOn, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{range}</span>}
-                    {/* cut style + add-ons on tall blocks — detail (older/staff appts) or addonLabels (online) */}
+                    {/* cut style + add-ons on tall blocks — online bookings carry them (shortened) on
+                        addonLabels; older/staff appts keep a free-text detail string, shown verbatim */}
                     {height > 110 && (() => {
-                      const src = a.detail ? a.detail.split(",") : (Array.isArray(a.addonLabels) ? a.addonLabels : []);
-                      const txt = [...new Set(src.map((d) => cleanServiceLabel(d)).filter(Boolean))].join(", ");
+                      const txt = (Array.isArray(a.addonLabels) && a.addonLabels.length)
+                        ? [...new Set(a.addonLabels.map(cleanServiceLabel).filter(Boolean))].join(", ")
+                        : (a.detail || "");
                       return txt ? <div style={{ fontSize: 12, color: subOn, lineHeight: 1.3, marginTop: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{txt}</div> : null;
                     })()}
                     {/* quiet markers, bottom-right: ✎ note · ▱ photos · NEW · ↻ rebooked · ★ regular */}
@@ -21894,7 +21904,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       )}
 
       {lines.map((l) => {
-        const chipVals = l.id === "main" ? [appt.cutLabel, ...(Array.isArray(appt.addonLabels) ? appt.addonLabels : [])].filter(Boolean) : [];
+        const chipVals = l.id === "main" ? [...new Set([appt.cutLabel, ...(Array.isArray(appt.addonLabels) ? appt.addonLabels : [])].map(cleanServiceLabel).filter(Boolean))] : [];
         return (
         <div key={l.id} style={{ borderTop: "1px solid var(--line)", marginTop: 16, padding: "16px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div style={{ minWidth: 0 }}>
@@ -23921,11 +23931,12 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     </div>
                   ) : null;
                 })()}
-                {/* legacy / staff-entered detail (older appts store the cut or a note here) — kept so nothing is lost */}
+                {/* legacy / staff-entered detail (older appts store the cut or a free-text note here) — shown
+                    verbatim, never shortened, so a staff note is preserved word-for-word */}
                 {appt.detail && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 13 }}>
                     {appt.detail.split(",").map((d, i) => (
-                      <span key={i} style={{ background: T.chip, color: T.text, padding: "7px 12px", borderRadius: 8, fontSize: 13.5 }}>{cleanServiceLabel(d.trim())}</span>
+                      <span key={i} style={{ background: T.chip, color: T.text, padding: "7px 12px", borderRadius: 8, fontSize: 13.5 }}>{d.trim()}</span>
                     ))}
                   </div>
                 )}
