@@ -21600,7 +21600,10 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const depositCredit = (!reopen && !appt.prepaid && Number(appt.deposit) > 0) ? +Number(appt.deposit).toFixed(2) : 0;
   const bookingCredit = +(prepaidService + depositCredit).toFixed(2); // pre-tip credit for money paid at booking
   const noNewTip = reopen || prepaidService > 0; // prepaid already collected a tip; deposit still tips on the balance
-  const discountAmt = reopen ? 0 : resolveDiscount(checkoutDiscount, grossSubtotal);
+  // #4: on reopen, re-apply the discount that was locked at first checkout (appt.paid.discount) instead
+  // of zeroing it — else the subtotal rebuilds at full price and shows a phantom balance = the discount,
+  // re-charging the client money they don't owe. (Fixed $ amount, so it doesn't grow with added items.)
+  const discountAmt = reopen ? (Number(appt.paid && appt.paid.discount) || 0) : resolveDiscount(checkoutDiscount, grossSubtotal);
   const subtotal = +Math.max(0, grossSubtotal - discountAmt).toFixed(2);
   const netDue = +Math.max(0, subtotal - bookingCredit).toFixed(2); // what's genuinely still owed for services/products
   const tipAmt = noNewTip ? 0 : (customTip != null ? +Number(customTip).toFixed(2) : +(netDue * tipPct / 100).toFixed(2));
@@ -21685,7 +21688,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   useEffect(() => {
     if (stage === "approved") { const t = setTimeout(() => setStage(!reopen && rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
     if (stage === "rebook" && rhythmWeek != null && rebookWeeks == null && !customDate) { setRebookWeeks(rhythmWeek); }
-    if (stage === "done") { const grandTotal = reopen ? +(alreadyPaid + (paidRec ? paidRec.amount : 0)).toFixed(2) : total; const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt; const t = setTimeout(() => onDone(appt.id, { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, discount: reopen ? 0 : discountAmt, discountName: (!reopen && checkoutDiscount) ? checkoutDiscount.name : null, rebookWeeks, rebookDate: customDate, rebookStart: chosenStart, rebookLabel: hasSelection ? selectionLabel : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null }), 1200); return () => clearTimeout(t); }
+    if (stage === "done") { const grandTotal = reopen ? +(alreadyPaid + (paidRec ? paidRec.amount : 0)).toFixed(2) : total; const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt; const t = setTimeout(() => onDone(appt.id, { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, discount: discountAmt, discountName: reopen ? ((appt.paid && appt.paid.discountName) || null) : (checkoutDiscount ? checkoutDiscount.name : null), rebookWeeks, rebookDate: customDate, rebookStart: chosenStart, rebookLabel: hasSelection ? selectionLabel : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null }), 1200); return () => clearTimeout(t); }
   }, [stage]);
 
   const rebookDate = (weeks) => { const d = new Date(); d.setDate(d.getDate() + weeks * 7); return d; };
@@ -23234,17 +23237,31 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const client = clients.find((c) => c.id === appt.clientId);
   const service = services.find((s) => s.id === appt.serviceId);
   const dur = appt.end - appt.start;
+  // #8: a family-member appointment wraps up to the MEMBER (nested in the parent's family[]), not the
+  // parent. `wuTarget` is the person this wrap-up is for; `patchTarget` writes to them — member or
+  // parent alike — so a son's note/photo/duration/price never lands on his dad's profile.
+  const _wuMem = (appt.familyMemberId && client) ? (client.family || []).find((m) => m.id === appt.familyMemberId) : null;
+  const wuMemberId = _wuMem ? _wuMem.id : null; // only a member if it actually exists in family
+  const wuTarget = _wuMem || client;
+  const patchTarget = (updater) => {
+    if (!client) return;
+    setClients((cs) => cs.map((c) => {
+      if (c.id !== client.id) return c;
+      if (!wuMemberId) return updater(c);
+      return { ...c, family: (c.family || []).map((m) => m.id === wuMemberId ? updater(m) : m) };
+    }));
+  };
 
   // ---- Wrap-up: photos / note / service-time. Changes stage as "pending" and commit on the
   // Save button so you get a clear "Saved ✓" confirmation. A quiet note fallback still auto-saves
   // if the sheet closes before tapping, so nothing is ever lost.
-  const [wuNote, setWuNote] = useState(client?.notes || "");
+  const [wuNote, setWuNote] = useState(wuTarget?.notes || "");
   const [wuDirty, setWuDirty] = useState(false);     // something changed since last save
   const [wuSaved, setWuSaved] = useState(false);     // show "Saved ✓" briefly after a save
   const [pendingDur, setPendingDur] = useState(null); // staged duration, applied on Save
   const [pendingPrice, setPendingPrice] = useState(null); // staged per-client price, applied on Save
   const [wuPriceText, setWuPriceText] = useState(null); // null = show stored; string = mid-edit
-  useEffect(() => { setWuNote(client?.notes || ""); setWuDirty(false); setWuSaved(false); setPendingDur(null); setPendingPrice(null); setWuPriceText(null); }, [client?.id]);
+  useEffect(() => { setWuNote(wuTarget?.notes || ""); setWuDirty(false); setWuSaved(false); setPendingDur(null); setPendingPrice(null); setWuPriceText(null); }, [wuTarget?.id]);
   const wuFileRef = useRef(null);
   // Keep the LATEST note in a ref so the unmount fallback persists the current value, not a
   // stale mount-time closure. The old `[]`-deps cleanup captured the pre-edit note and wrote it
@@ -23255,7 +23272,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   useEffect(() => () => {
     if (!client) return;
     const v = (wuNoteRef.current || "").trim();
-    setClients((cs) => cs.map((c) => (c.id === client.id && (c.notes || "") !== v) ? { ...c, notes: v } : c));
+    patchTarget((p) => ((p.notes || "") !== v) ? { ...p, notes: v } : p);
   }, []);
   const addWuPhoto = (file) => {
     if (!file || !client) return;
@@ -23270,7 +23287,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
         canvas.width = w; canvas.height = h;
         canvas.getContext("2d").drawImage(img, 0, 0, w, h);
         const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
-        setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: [...(c.gallery || []), { id: "g" + Date.now(), photo: dataUrl, note: "", date: new Date().toISOString() }] } : c));
+        patchTarget((p) => ({ ...p, gallery: [...(p.gallery || []), { id: "g" + Date.now(), photo: dataUrl, note: "", date: new Date().toISOString() }] }));
         setWuSaved(true); setTimeout(() => setWuSaved(false), 2000);
         if (showToast) showToast("Photo saved to their profile.");
       };
@@ -23280,13 +23297,13 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   };
   const removeWuPhoto = (gid) => {
     if (!client) return;
-    setClients(clients.map((c) => c.id === client.id ? { ...c, gallery: (c.gallery || []).filter((g) => g.id !== gid) } : c));
+    patchTarget((p) => ({ ...p, gallery: (p.gallery || []).filter((g) => g.id !== gid) }));
   };
-  const storedDur = (client && service && client.customDurations && client.customDurations[service.id] != null) ? client.customDurations[service.id] : (service?.duration || dur);
+  const storedDur = (wuTarget && service && wuTarget.customDurations && wuTarget.customDurations[service.id] != null) ? wuTarget.customDurations[service.id] : (service?.duration || dur);
   const wuDur = pendingDur != null ? pendingDur : storedDur; // show staged value if any
   const setWuDur = (val) => { setPendingDur(val); setWuDirty(true); setWuSaved(false); };
   // Per-client price, mirroring the duration override. Stored falls back to the effective service price.
-  const storedPrice = (client && service && client.customPrices && client.customPrices[service.id] != null) ? client.customPrices[service.id] : (service ? getPrice(service, appt.providerId) : 0);
+  const storedPrice = (wuTarget && service && wuTarget.customPrices && wuTarget.customPrices[service.id] != null) ? wuTarget.customPrices[service.id] : (service ? getPrice(service, appt.providerId) : 0);
   const wuPriceVal = wuPriceText != null ? wuPriceText : (storedPrice != null ? String(storedPrice) : "");
   const setWuPrice = (raw) => {
     const clean = String(raw).replace(/[^0-9.]/g, "");
@@ -23299,14 +23316,13 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const saveWrapUp = () => {
     if (!client) return;
     const v = (wuNote || "").trim();
-    setClients(clients.map((c) => {
-      if (c.id !== client.id) return c;
-      const next = { ...c };
-      if ((c.notes || "") !== v) next.notes = v;
-      if (pendingDur != null && service) next.customDurations = { ...(c.customDurations || {}), [service.id]: pendingDur };
-      if (pendingPrice != null && service) next.customPrices = { ...(c.customPrices || {}), [service.id]: pendingPrice };
+    patchTarget((p) => {
+      const next = { ...p };
+      if ((p.notes || "") !== v) next.notes = v;
+      if (pendingDur != null && service) next.customDurations = { ...(p.customDurations || {}), [service.id]: pendingDur };
+      if (pendingPrice != null && service) next.customPrices = { ...(p.customPrices || {}), [service.id]: pendingPrice };
       return next;
-    }));
+    });
     setPendingDur(null); setPendingPrice(null); setWuPriceText(null); setWuDirty(false); setWuSaved(true);
     setTimeout(() => setWuSaved(false), 2500);
     if (showToast) showToast("Wrap-up saved to their profile.");
