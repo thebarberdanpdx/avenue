@@ -18716,7 +18716,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       { label: "Your booking page", ids: ["booking", "bookingwords", "website", "reviews"] },
       { label: "What clients can do", ids: ["showprices", "rebook_usual", "family", "refphotos"] },
     ] },
-    { id: "pay",   section: "Booking & money", label: "Payments & checkout", icon: CreditCard, desc: "Payments, tips, deposits & rebooking", settings: ["payments", "checkout", "tipping", "rebookco", "discounts", "policy"], groups: [
+    { id: "pay",   section: "Booking & money", label: "Payments & checkout", icon: CreditCard, desc: "Payments, tips, deposits & rebooking", settings: ["payouts", "payments", "checkout", "tipping", "rebookco", "discounts", "policy"], groups: [
+      { label: "Getting paid", ids: ["payouts"] },
       { label: "Payments & tips", collapse: true, desc: "Payments, checkout, tipping, discounts & rebooking", ids: ["payments", "checkout", "tipping", "rebookco", "discounts"] },
       { label: "Deposits & no-shows", ids: ["policy"] },
     ] },
