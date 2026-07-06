@@ -80,7 +80,7 @@ export default withErrorReporting(handler, "push");
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   if (!originAllowed(req)) return res.status(403).json({ error: "forbidden" });
-  const { shopId, title, body, data, clientId } = req.body || {};
+  const { shopId, title, body, data, clientId, providerId } = req.body || {};
   if (!shopId || !title) return res.status(400).json({ error: "missing shopId or title" });
 
   // Bound abuse: anyone reaching this URL could push arbitrary alerts to a shop's staff
@@ -95,10 +95,22 @@ async function handler(req, res) {
   }
 
   const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-  const { data: rows, error } = await supa.from("device_tokens").select("token").eq("shop_id", shopId);
+  // Target ONE barber's own device(s) when the caller names a provider, so only they are buzzed.
+  // Fall back to shop-wide when: no providerId given (e.g. an "Anyone" waitlist), the provider_id
+  // column isn't present yet (pre-migration — never drop a push), or that barber has no registered
+  // device (better to alert the shop than lose the alert). `targeted` is echoed for observability.
+  let rows = null, error = null, targeted = false;
+  if (providerId) {
+    const q = await supa.from("device_tokens").select("token, provider_id").eq("shop_id", shopId).eq("provider_id", providerId);
+    if (!q.error && q.data && q.data.length) { rows = q.data; targeted = true; }
+  }
+  if (!targeted) {
+    const q2 = await supa.from("device_tokens").select("token").eq("shop_id", shopId);
+    rows = q2.data; error = q2.error;
+  }
   if (error) return res.status(500).json({ error: "token lookup: " + error.message });
   const tokens = [...new Set((rows || []).map((r) => r.token).filter(Boolean))];
-  if (!tokens.length) return res.status(200).json({ sent: 0, note: "no devices registered" });
+  if (!tokens.length) return res.status(200).json({ sent: 0, targeted, note: "no devices registered" });
 
   let providerToken;
   try { providerToken = makeProviderToken(); }
@@ -137,5 +149,5 @@ async function handler(req, res) {
     results.push({ status: r.status || 0, reason: r.reason || "" });
   }
 
-  return res.status(200).json({ sent, total: tokens.length, results });
+  return res.status(200).json({ sent, total: tokens.length, targeted, results });
 }

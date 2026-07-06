@@ -321,9 +321,24 @@ const DEFAULT_BUSINESS = {
     { id: "birthday", label: "Birthday message", channel: "email", timing: "On their birthday", enabled: false,
       body: "Happy birthday, {client}! Everyone at {business} hopes your day is a great one. Whenever you're ready for a fresh look, we'd love to see you in the chair." },
   ],
-  // ---- Staff push alerts: which appointment events push the team's iOS app. Read by
-  //      fireStaffPush (the real gate). Default all on = preserves prior always-push behavior. ----
-  staffAlerts: { newBooking: true, rescheduled: true, checkedIn: true, emailStaffOnBooking: true, bookingAlertScope: "assigned" },
+  // ---- Staff alerts: which appointment events notify the team, and by which channel. Each event
+  //      has its own app (iOS push) / sms / email switches, read by resolveStaffChannels →
+  //      fireStaffPush (app, targeted at the ASSIGNED barber's device) and fireStaffContact
+  //      (sms/email). Defaults match the shop's setup: new bookings app + text, everything else
+  //      app-only for now — text/email stay available to switch on per event. bookingAlertScope
+  //      picks who email/text reaches. Legacy per-event booleans are kept so a config saved before
+  //      the channel matrix existed still resolves (see resolveStaffChannels). ----
+  staffAlerts: {
+    channels: {
+      newBooking:  { app: true, sms: true,  email: false },
+      rescheduled: { app: true, sms: false, email: false },
+      cancelled:   { app: true, sms: false, email: false },
+      waitlist:    { app: true, sms: false, email: false },
+      checkedIn:   { app: true, sms: false, email: false },
+    },
+    bookingAlertScope: "assigned",
+    newBooking: true, rescheduled: true, checkedIn: true, emailStaffOnBooking: false,
+  },
   // ---- Customer reviews: after-visit review requests + internal moderation + storefront social proof.
   //      enabled = master off until the owner sets it up. afterVisit = only ask once a client has
   //      come this many times (returning clients leave more, more honest reviews). autoApprove=false
@@ -1936,6 +1951,10 @@ function App() {
           try {
             await ensureFreshSession(); // make sure the JWT is fresh so auth.uid() resolves
             const { error } = await supabase.rpc("save_device_token", { p_token: token.value, p_shop: SHOP_ID, p_platform: "ios" });
+            // Tag this device with the barber signed in on it, so an appointment push can target ONLY
+            // that barber (api/push filters by provider_id). Additive RPC — silently no-ops until the
+            // set_device_provider migration is applied, and never blocks the token save above.
+            try { const _prov = window.localStorage.getItem("vero_signed_in_as"); if (_prov) await supabase.rpc("set_device_provider", { p_token: token.value, p_shop: SHOP_ID, p_provider: _prov }); } catch (e) {}
             console.log(error ? "[vero push] token save FAILED: " + (error.message || "") : "[vero push] token saved — booking alerts on");
             try { window.localStorage.setItem("vero_push_status", error ? ("Phone alerts: save error — " + (error.message || "unknown")) : "Phone alerts: ON \u2705"); } catch (e) {}
           } catch (e) { console.log("[vero push] save threw: " + (e && e.message ? e.message : String(e))); try { window.localStorage.setItem("vero_push_status", "Phone alerts: save error — " + (e && e.message ? e.message : String(e))); } catch (_) {} }
@@ -3269,16 +3288,40 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject, ex
   } catch (e) {}
 }
 
-// Buzz the shop's phones (native app push) about a staff-side appointment event.
-// Same server endpoint the online-booking path uses, so closed-app notifications
-// behave identically no matter where the change came from. Fire-and-forget — a
-// push failure must never affect the appointment itself.
-function fireStaffPush({ shopId, title, appt, prevAppt, event, business }) {
+// Per-event staff-alert channel defaults {app,sms,email}. app = iOS push, sms/email = the
+// barber's saved contact info. These are the "for now" setup; the owner can flip any of them in
+// the notifications center. checkedIn stays app-only (its prior behavior).
+const STAFF_ALERT_DEFAULTS = {
+  newBooking:  { app: true, sms: true,  email: false },
+  rescheduled: { app: true, sms: false, email: false },
+  cancelled:   { app: true, sms: false, email: false },
+  waitlist:    { app: true, sms: false, email: false },
+  checkedIn:   { app: true, sms: false, email: false },
+};
+// Resolve which channels an event alerts staff on. Prefers the explicit per-event matrix
+// (business.staffAlerts.channels); falls back to the legacy flags so a shop saved before the
+// matrix existed still resolves: app honors old per-event push booleans; sms/email use defaults.
+function resolveStaffChannels(business, event) {
+  const sa = (business && business.staffAlerts) || {};
+  const def = STAFF_ALERT_DEFAULTS[event] || { app: true, sms: false, email: false };
+  const c = sa.channels && sa.channels[event];
+  if (c) return { app: c.app !== false, sms: !!c.sms, email: !!c.email };
+  const app = sa[event] !== undefined ? sa[event] !== false : def.app;
+  // No matrix saved yet (config predates it): app honors any legacy per-event push flag; sms/email
+  // follow the current per-event defaults so the "for now" setup applies without a settings save.
+  return { app, sms: def.sms, email: def.email };
+}
+
+// Buzz the ASSIGNED barber's phone (native app push) about an appointment event. Targets that
+// barber's own device(s) via providerId (server falls back to shop-wide when no barber is
+// resolvable, e.g. an "Anyone" waitlist). Same endpoint the online-booking path uses, so closed-
+// app notifications behave identically no matter where the change came from. Gated by the event's
+// app channel. Fire-and-forget. Pass `bodyOverride` to replace the auto-built body (for waitlist).
+function fireStaffPush({ shopId, title, appt, prevAppt, event, business, providerId, bodyOverride }) {
   try {
     if (!shopId || !appt) return;
-    // The notifications center gates which events push the team. Missing flag → push (prior behavior).
-    const sa = business && business.staffAlerts;
-    if (event && sa && sa[event] === false) return;
+    // The notifications center gates which events push the team, and by channel (app here).
+    if (event && !resolveStaffChannels(business, event).app) return;
     const fmtWhen = (a) => (a && a.bookedFor) ? new Date(a.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
     const whenStr = fmtWhen(appt);
     const nNote = (appt.note || "").trim();
@@ -3293,31 +3336,53 @@ function fireStaffPush({ shopId, title, appt, prevAppt, event, business }) {
     fetch(API_BASE + "/api/push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shopId, title, body, data: { t: "appt", id: appt.id }, clientId: appt.clientId || null }),
+      body: JSON.stringify({ shopId, title, body: (bodyOverride != null ? bodyOverride : body), data: { t: "appt", id: appt.id }, clientId: appt.clientId || null, providerId: (providerId !== undefined ? providerId : appt.providerId) || null }),
     }).catch(() => {});
   } catch (e) {}
 }
 
-// Email (and, once SMS is live, text) the barber a new booking — at the email/phone saved in
-// their staff profile. Recipients are resolved SERVER-SIDE (api/notify) so a public booker
-// never sees staff contact info; this only sends shopId + providerId + scope + plain context.
-// Scope is owner-set in Notifications → Your team: "assigned" (default) | "ownerPlus" | "all".
-function fireStaffNotify({ shopId, appt, business }) {
+// Email / text the RIGHT staff about an appointment event, at the contact info saved in their
+// staff profile. Recipients + final wording are resolved SERVER-SIDE (api/notify) so a public
+// booker never sees staff contact info; this only sends shopId + providerId + scope + event +
+// plain context. Which channels fire per event comes from the notifications center
+// (resolveStaffChannels); SMS additionally waits for SMS_LIVE (carrier A2P) on the server. Scope
+// is owner-set in Notifications → Your team: "assigned" (default) | "ownerPlus" | "all". `entry`
+// carries non-appointment context (a waitlist request).
+function fireStaffContact({ shopId, event, appt, prevAppt, entry, business, providers }) {
   try {
-    if (!shopId || !appt) return;
+    if (!shopId) return;
+    const ch = resolveStaffChannels(business, event);
+    if (!ch.sms && !ch.email) return; // nothing enabled for this event by text/email → skip
     const sa = (business && business.staffAlerts) || {};
-    if (sa.emailStaffOnBooking === false) return; // master off
     const scope = sa.bookingAlertScope || "assigned";
-    const when = appt.bookedFor ? new Date(appt.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+    const fmtWhen = (a) => (a && a.bookedFor) ? new Date(a.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+    // Resolve the assigned barber for recipient scoping. A waitlist entry stores a provider NAME.
+    let providerId = appt ? (appt.providerId || null) : null;
+    if (!providerId && entry && entry.provider && Array.isArray(providers)) {
+      const p = providers.find((x) => x && x.name === entry.provider);
+      providerId = p ? p.id : null;
+    }
+    const ctx = {
+      client: (appt && appt.name) || (entry && entry.name) || "A client",
+      service: (appt && (appt.title || appt.serviceName)) || (entry && entry.service) || "an appointment",
+      when: appt ? fmtWhen(appt) : "",
+      prevWhen: prevAppt ? fmtWhen(prevAppt) : "",
+      days: entry ? (Array.isArray(entry.days) ? entry.days.join(", ") : (entry.day || "")) : "",
+      note: ((appt && (appt.note || appt.detail)) || "").trim(),
+    };
     fetch(API_BASE + "/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        staff: { shopId, providerId: appt.providerId || null, scope, clientId: appt.clientId || null },
-        context: { client: appt.name || "A client", service: appt.title || appt.serviceName || "an appointment", when, note: (appt.note || appt.detail || "").trim() },
+        staff: { shopId, providerId, scope, clientId: (appt && appt.clientId) || null, event: event || "newBooking", channels: { sms: ch.sms, email: ch.email } },
+        context: ctx,
       }),
     }).catch(() => {});
   } catch (e) {}
+}
+// Back-compatible new-booking helper — the booking call sites still call this.
+function fireStaffNotify({ shopId, appt, business, providers }) {
+  fireStaffContact({ shopId, event: "newBooking", appt, business, providers });
 }
 
 // Default after-visit review-request wording (owner can override in Settings → Customer Reviews).
@@ -4489,18 +4554,20 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             // The NEW time is now confirmed on the server — only NOW release the old slot. Because we
             // never cancel up-front, a client who taps "Pick a new time" and then deserts the search
             // simply keeps their original appointment, and no slot is ever held while they browse.
-            doCancelAppt(reschedPrev);
+            doCancelAppt(reschedPrev, { silent: true });
             fireStaffPush({ shopId, title: "Appointment rescheduled", appt: ap0, prevAppt: reschedPrev, event: "rescheduled", business });
+            fireStaffContact({ shopId, event: "rescheduled", appt: ap0, prevAppt: reschedPrev, business, providers });
             setReschedPrev(null);
           } else {
             const whenStr = ap0.bookedFor ? new Date(ap0.bookedFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
             const nNote = (ap0.note || "").trim();
-            fetch(API_BASE + "/api/push", {
+            // Honor the app toggle + target ONLY the assigned barber (providerId added to the body below).
+            if (resolveStaffChannels(business, "newBooking").app) fetch(API_BASE + "/api/push", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : ""), data: { t: "appt", id: ap0.id }, clientId: ap0.clientId || null }),
+              body: JSON.stringify({ shopId, title: nNote ? "\uD83D\uDCDD New booking — note attached" : "New booking", body: [ap0.name, ap0.title, whenStr].filter(Boolean).join(" · ") + (nNote ? `\n\u201C${nNote}\u201D` : ""), data: { t: "appt", id: ap0.id }, clientId: ap0.clientId || null, providerId: ap0.providerId || null }),
             }).catch(() => {});
-            fireStaffNotify({ shopId, appt: ap0, business });
+            fireStaffNotify({ shopId, appt: ap0, business, providers });
           }
         } catch (e) {}
         setBookedId(baseId); setBookedClientId(clientId); setBookedToken(newAppts[0] && newAppts[0].manageToken); galleryCapturedRef.current = false; setStep(8);
@@ -4659,9 +4726,16 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     // client's phone, name and email — and a booking (plus its reminder texts) could go out under them.
     setPhone(""); setNewFirst(""); setNewLast(""); setNewEmail(""); setNewAddress(""); setSmsConsent(false);
   };
-  const doCancelAppt = (appt) => {
+  const doCancelAppt = (appt, opts) => {
     try { supabase.rpc("cancel_my_appointment", { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(appt.id), p_session: matched.sessionToken }).catch(() => {}); } catch (e) {}
     setMyAppts((cur) => cur.map((a) => a.id === appt.id ? { ...a, status: "cancelled" } : a));
+    // Genuine client cancel → alert the assigned barber (app now; text/email if the owner enables it).
+    // Skipped when this is the internal "release the old slot" step of a reschedule (opts.silent),
+    // which fires its own "moved" alert instead.
+    if (!(opts && opts.silent)) {
+      fireStaffPush({ shopId, title: "Appointment cancelled", appt, event: "cancelled", business });
+      fireStaffContact({ shopId, event: "cancelled", appt, business, providers });
+    }
   };
   const lblStyle = { fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 10px" };
   const avStyle = { width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 14, color: "var(--text)", flexShrink: 0 };
@@ -6278,6 +6352,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 const dayLabel = `${relativeDate(e.date)}, ${MONTHS[e.date.getMonth()]} ${e.date.getDate()}`;
                 const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: e.name, phone: e.phone, forWho: "self", provider: e.providerName, anyProvider: false, days: [dayLabel], day: dayLabel, dayTimes: { [dayLabel]: "any" }, when: "any", service: e.service, photos: 0, at: new Date().toLocaleString() };
                 setWaitlist((cur) => [...cur, wlEntry]);
+                { const _wlProv = (providers || []).find((p) => p && p.name === wlEntry.provider); fireStaffPush({ shopId, title: "New waitlist request", appt: { id: wlEntry.id, name: wlEntry.name, providerId: _wlProv ? _wlProv.id : null }, event: "waitlist", business, providerId: _wlProv ? _wlProv.id : null, bodyOverride: [wlEntry.name, wlEntry.service].filter(Boolean).join(" · ") }); fireStaffContact({ shopId, event: "waitlist", entry: wlEntry, business, providers }); }
                 if (!isStaff) { try { supabase.rpc("join_waitlist", { p_shop: shopId, p_entry: wlEntry }); } catch (err) {} }
                 setCapBlock({ ...e, done: true });
               }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>Join the waitlist</button>
@@ -6715,6 +6790,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                             const dayTimes = {}; wlDays.forEach((l) => { dayTimes[l] = wlDayTimes[l] === "custom" ? `custom:${(wlDayCustom[l] || "").trim()}` : (wlDayTimes[l] || "any"); });
                             const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: wlName, phone, forWho: wlFor, provider: provider.name, anyProvider: provider.name === "Anyone" ? true : wlAnyProvider, days: wlDays, day: wlDays[0] || "", dayTimes, when: dayTimes[wlDays[0]] || "any", service: wlService || cart.map(describeEntry).join(", "), photos: wlPhotos, at: new Date().toLocaleString() };
                             setWaitlist((cur) => [...cur, wlEntry]);
+                            { const _wlProv = (providers || []).find((p) => p && p.name === wlEntry.provider); fireStaffPush({ shopId, title: "New waitlist request", appt: { id: wlEntry.id, name: wlEntry.name, providerId: _wlProv ? _wlProv.id : null }, event: "waitlist", business, providerId: _wlProv ? _wlProv.id : null, bodyOverride: [wlEntry.name, wlEntry.service].filter(Boolean).join(" · ") }); fireStaffContact({ shopId, event: "waitlist", entry: wlEntry, business, providers }); }
                             if (!isStaff) { try { supabase.rpc('join_waitlist', { p_shop: shopId, p_entry: wlEntry }); } catch (e) {} }
                             setWaitlistDone(true); setShowWaitlist(false);
                           }} style={{ width: "100%", background: ready ? "var(--text)" : "var(--border2)", color: ready ? "var(--bg)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
@@ -7502,7 +7578,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
 
   const submitCancel = async () => {
     if (busy) return; setBusy(true);
-    try { await supabase.rpc("manage_cancel_by_token", { p_token: token }); fireNotify("canceled", appt); setPhase("cancelled"); }
+    try { await supabase.rpc("manage_cancel_by_token", { p_token: token }); fireNotify("canceled", appt); fireStaffPush({ shopId, title: "Appointment cancelled", appt, event: "cancelled", business }); fireStaffContact({ shopId, event: "cancelled", appt, business, providers }); setPhase("cancelled"); }
     catch (e) { setPhase("error"); } finally { setBusy(false); }
   };
   const submitReschedule = async () => {
@@ -7511,7 +7587,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
     try {
       await supabase.rpc("manage_reschedule_by_token", { p_token: token, p_start: newSlot, p_date: when.toISOString() });
       const updated = { ...appt, start: newSlot, end: newSlot + dur, bookedFor: when.toISOString() };
-      setAppt(updated); fireNotify("rescheduled", updated); fireStaffPush({ shopId, title: "Appointment rescheduled", appt: updated, prevAppt: appt, event: "rescheduled", business }); setPhase("rescheduled");
+      setAppt(updated); fireNotify("rescheduled", updated); fireStaffPush({ shopId, title: "Appointment rescheduled", appt: updated, prevAppt: appt, event: "rescheduled", business }); fireStaffContact({ shopId, event: "rescheduled", appt: updated, prevAppt: appt, business, providers }); setPhase("rescheduled");
     } catch (e) { setPhase("error"); } finally { setBusy(false); }
   };
   // Client self-check-in: flip the appointment to "in lobby" (RPC) AND push the barber. The push
@@ -13151,10 +13227,13 @@ function Stepper({ value, onChange, min = 0, max = 999, step = 1, suffix, zeroLa
   );
 }
 
-// The staff-push events the app actually fires (gated for real by fireStaffPush via business.staffAlerts).
+// The staff-alert events + copy shown in the notifications center. Channels per event live in
+// business.staffAlerts.channels (resolved by resolveStaffChannels → fireStaffPush / fireStaffContact).
 const TEAM_ALERTS = [
   { k: "newBooking", label: "New booking", desc: "A client books — online or in person" },
   { k: "rescheduled", label: "Rescheduled or moved", desc: "An appointment's time changes" },
+  { k: "cancelled", label: "Cancellation", desc: "An appointment is cancelled" },
+  { k: "waitlist", label: "Waitlist request", desc: "A client joins the waitlist" },
   { k: "checkedIn", label: "Client checked in", desc: "Someone's marked as arrived" },
 ];
 // Notifications center — the single "who gets what, by what method" surface.
@@ -13164,8 +13243,11 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
   const [aud, setAud] = useState("clients");
   const messages = form.messages || [];
   const setMsg = (id, patch) => setForm({ ...form, messages: messages.map((m) => m.id === id ? { ...m, ...patch } : m) });
-  const sa = { newBooking: true, rescheduled: true, checkedIn: true, emailStaffOnBooking: true, bookingAlertScope: "assigned", ...(form.staffAlerts || {}) };
+  const sa = { bookingAlertScope: "assigned", ...(form.staffAlerts || {}) };
   const setSA = (k, v) => setForm({ ...form, staffAlerts: { ...sa, [k]: v } });
+  // Per-event staff channels {app,sms,email}, defaulting from STAFF_ALERT_DEFAULTS until edited.
+  const chFor = (k) => { const c = sa.channels && sa.channels[k]; return c ? { app: c.app !== false, sms: !!c.sms, email: !!c.email } : { ...STAFF_ALERT_DEFAULTS[k] }; };
+  const setCh = (k, chan, val) => setForm({ ...form, staffAlerts: { ...sa, channels: { ...(sa.channels || {}), [k]: { ...chFor(k), [chan]: val } } } });
   const CH = [["email", "Email"], ["text", "Text"], ["both", "Both"]];
   return (
     <div>
@@ -13195,35 +13277,27 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
         <button onClick={onOpenMessages} style={{ marginTop: 14, background: "none", border: "none", color: "var(--gold)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "4px 2px", display: "inline-flex", alignItems: "center", gap: 5 }}>Edit wording & timing <ChevronRight size={15} /></button>
         <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>* Texts begin once your A2P carrier registration clears; until then a “Text” or “Both” message is delivered by email.</p>
       </>) : (<>
-        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>How your team is alerted to activity. App pop-ups need the Vero iOS app (and each person allowing notifications on their device); email &amp; text alerts go to the contact info saved in each staff profile.</p>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
-          {TEAM_ALERTS.map((ev, i) => { const on = sa[ev.k] !== false; return (
-            <div key={ev.k} style={{ padding: "15px 0", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>How your team is alerted to activity. <b>App</b> pop-ups go to the assigned barber's phone (needs the Vero iOS app, notifications allowed). <b>Text</b> &amp; <b>Email</b> reach the contact info saved in each staff profile.</p>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 14px" }}>
+          {TEAM_ALERTS.map((ev, i) => { const ch = chFor(ev.k); const CHANS = ev.k === "checkedIn" ? [["app", "App"]] : [["app", "App"], ["sms", "Text"], ["email", "Email"]]; return (
+            <div key={ev.k} style={{ padding: "14px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>{ev.label}</span>
-                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{ev.desc} · Push</span>
+                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{ev.desc}</span>
               </span>
-              <Toggle on={on} onClick={() => setSA(ev.k, !on)} />
+              <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                {CHANS.map(([c, lbl]) => { const on = !!ch[c]; return (
+                  <button key={c} onClick={() => setCh(ev.k, c, !on)} style={{ flex: 1, padding: "8px 6px", borderRadius: 10, fontSize: 13, fontWeight: on ? 600 : 400, background: on ? "var(--wash)" : "var(--panel2)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: on ? "var(--text)" : "var(--sub)", cursor: "pointer" }}>{lbl}{c === "sms" ? " *" : ""}</button>
+                ); })}
+              </div>
             </div>
           ); })}
         </div>
-
-        <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", margin: "22px 2px 10px" }}>Email / text the barber</p>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
-          <div style={{ padding: "15px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <span style={{ minWidth: 0 }}>
-              <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>Alert the barber on new bookings</span>
-              <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Sent to the email in their staff profile · text joins once your carrier clears</span>
-            </span>
-            <Toggle on={sa.emailStaffOnBooking !== false} onClick={() => setSA("emailStaffOnBooking", !(sa.emailStaffOnBooking !== false))} />
-          </div>
-          {sa.emailStaffOnBooking !== false && (
-            <div style={{ padding: "4px 0 14px", borderTop: "1px solid var(--line)" }}>
-              <div style={{ fontSize: 13, color: "var(--sub)", margin: "12px 0 9px" }}>Who gets the alert</div>
-              <Segmented options={[{ value: "assigned", label: "Assigned barber" }, { value: "ownerPlus", label: "You + barber" }, { value: "all", label: "All staff" }]} value={sa.bookingAlertScope || "assigned"} onChange={(v) => setSA("bookingAlertScope", v)} />
-            </div>
-          )}
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 13, color: "var(--sub)", margin: "0 2px 9px" }}>Who gets text &amp; email alerts</div>
+          <Segmented options={[{ value: "assigned", label: "Assigned barber" }, { value: "ownerPlus", label: "You + barber" }, { value: "all", label: "All staff" }]} value={sa.bookingAlertScope || "assigned"} onChange={(v) => setSA("bookingAlertScope", v)} />
         </div>
+        <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>* Text alerts begin once your A2P carrier registration clears; email &amp; app pop-ups work now.</p>
       </>)}
     </div>
   );
@@ -19275,6 +19349,7 @@ function NativeDiagnostics() {
         try {
           await ensureFreshSession();
           const { error } = await supabase.rpc("save_device_token", { p_token: token.value, p_shop: SHOP_ID, p_platform: "ios" });
+          try { const _prov = window.localStorage.getItem("vero_signed_in_as"); if (_prov) await supabase.rpc("set_device_provider", { p_token: token.value, p_shop: SHOP_ID, p_provider: _prov }); } catch (e) {}
           setStatus(error ? ("Phone alerts: save error — " + (error.message || "unknown")) : "Phone alerts: ON \u2705 (token saved)");
         } catch (e) { setStatus("Phone alerts: save threw — " + (e && e.message ? e.message : String(e))); }
         await run(); setPushBusy(false);
@@ -20236,7 +20311,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   useLayoutEffect(() => { scrollStripToWeek("auto"); didStripMount.current = true; }, []);
   useEffect(() => { if (didStripMount.current) scrollStripToWeek("smooth"); }, [dayOffset]); // eslint-disable-line
 
-  const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts((cur) => cur.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } setTimeout(() => handleFreedSlot(freed), 350); } };
+  const setStatus = (id, status, msg, notify = false) => { const freed = appts.find((a) => a.id === id); setAppts((cur) => cur.map((a) => (a.id === id ? { ...a, status, ...(status === "in-service" && !a.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : a))); if (msg) showToast(msg); setOpen((o) => o && o.id === id ? { ...o, status, ...(status === "in-service" && !o.serviceStartedAt ? { serviceStartedAt: Date.now() } : {}) } : o); if (status === "cancelled" && freed) { if (notify) { const _cl = (clients || []).find((c) => c.id === freed.clientId) || {}; fireApptNotify({ msgId: "canceled", appt: freed, business, providers, contact: { email: _cl.email || "", phone: freed.phone || _cl.phone || "" } }); } if (freed.status !== "block") { fireStaffPush({ shopId, title: "Appointment cancelled", appt: freed, event: "cancelled", business }); fireStaffContact({ shopId, event: "cancelled", appt: freed, business, providers }); } setTimeout(() => handleFreedSlot(freed), 350); } };
   // open checkout instead of silently completing
   // #16: an appointment that already carries a payment (checked out once, or a status reverted after
   // payment) must open in balance-only (reopen) mode — never the full-price charge flow — so it can
@@ -20268,7 +20343,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const startMin = (summary.rebookStart != null) ? summary.rebookStart : earliestOpenSlot(src.providerId, nd, dur);
           const newAppt = { ...src, id: "rb" + Date.now() + Math.floor(Math.random() * 1000), status: "confirmed", paid: null, prepaid: false, rebookDiscount: (business?.rebook?.discountEnabled !== false ? (business?.rebook?.discount || 0) : 0), rebookDiscountType: business?.rebook?.discountType || "amount", bookedFor: nd.toISOString(), start: startMin, end: startMin + dur, photos: 0, hasPhotos: false, hasNote: false };
           fireStaffPush({ shopId, title: "New booking", appt: newAppt, event: "newBooking", business });
-          fireStaffNotify({ shopId, appt: newAppt, business });
+          fireStaffNotify({ shopId, appt: newAppt, business, providers });
           done.push(newAppt);
         }
       }
@@ -20584,7 +20659,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     // until a later retry. This was the drag-to-reschedule-needs-a-few-tries bug.
     setAppts((cur) => cur.map((a) => a.id === p.appt.id ? { ...a, start: p.newStart, end: p.newEnd, bookedFor: bf.toISOString() } : a));
     if (notifyMove) { const _cl = (clients || []).find((c) => c.id === p.appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: moved, business, providers, contact: { email: _cl.email || "", phone: p.appt.phone || _cl.phone || "" } }); }
-    fireStaffPush({ shopId, title: "Appointment moved", appt: moved, event: "rescheduled", business });
+    fireStaffPush({ shopId, title: "Appointment moved", appt: moved, prevAppt: p.appt, event: "rescheduled", business });
+    fireStaffContact({ shopId, event: "rescheduled", appt: moved, prevAppt: p.appt, business, providers });
     showToast(notifyMove ? `${p.appt.name} moved — client notified.` : `${p.appt.name} moved to ${fmtTime(p.newStart)}.`);
     setPending(null);
     setConflictModal(null);
@@ -20769,7 +20845,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     // Staff-created booking → fire the confirmation too (same engine as online bookings).
     fireApptNotify({ msgId: "booked", appt: newAppt, business, providers, contact: { email: (bookClient ? bookClient.email : walkInEmail) || "", phone: (bookClient ? bookClient.phone : walkInPhone) || "" }, subject: `${business.name}: Appointment confirmed` });
     fireStaffPush({ shopId, title: "New booking", appt: newAppt, event: "newBooking", business });
-    fireStaffNotify({ shopId, appt: newAppt, business });
+    fireStaffNotify({ shopId, appt: newAppt, business, providers });
     setNewApptSlot(null);
     setConflictModal(null);
     showToast(`${newAppt.name} booked at ${fmtTime(useStart)}.`);
@@ -23486,7 +23562,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const DUR_OPTS = []; for (let m = 5; m <= 240; m += 5) DUR_OPTS.push(m);
   const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setDraftDate(appt.bookedFor ? new Date(appt.bookedFor) : new Date()); setNotifyChange(false); setPickList(null); setDateOpen(false); setMode("edit"); setMenuOpen(false); };
   const cancelEdit = () => { setPickList(null); setDateOpen(false); setNotifyChange(false); setMode("detail"); };
-  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged; const _wrote = onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); if (_wrote === false) return; if (willNotify) { const _cl = (clients || []).find((c) => c.id === appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: { ...appt, start: draftStart, end: draftStart + draftDur, providerId: draftProvider, bookedFor: bf.toISOString() }, business, providers, contact: { email: _cl.email || "", phone: appt.phone || _cl.phone || "" } }); } if (timeOrDayChanged) { fireStaffPush({ shopId, title: "Appointment moved", appt: { ...appt, start: draftStart, bookedFor: bf.toISOString() }, event: "rescheduled", business }); } showToast(willNotify ? "Updated — client notified." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
+  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged; const _wrote = onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); if (_wrote === false) return; if (willNotify) { const _cl = (clients || []).find((c) => c.id === appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: { ...appt, start: draftStart, end: draftStart + draftDur, providerId: draftProvider, bookedFor: bf.toISOString() }, business, providers, contact: { email: _cl.email || "", phone: appt.phone || _cl.phone || "" } }); } if (timeOrDayChanged) { const _moved = { ...appt, start: draftStart, providerId: draftProvider, bookedFor: bf.toISOString() }; fireStaffPush({ shopId, title: "Appointment moved", appt: _moved, prevAppt: appt, event: "rescheduled", business }); fireStaffContact({ shopId, event: "rescheduled", appt: _moved, prevAppt: appt, business, providers }); } showToast(willNotify ? "Updated — client notified." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
   // TODO(SMS live): when willNotify, dispatch the reschedule/moved template to the client's phone.
 
   // ---- price (admin-editable; per-appointment override stored on appt.price) ----
@@ -25219,7 +25295,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const rebook = (a) => { if (onRebook) onRebook({ clientId: client.id, serviceId: a.serviceId, providerId: a.providerId || live.provider }); setDetail(null); };
 
   const checkInAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "in-service", serviceStartedAt: x.serviceStartedAt || Date.now() } : x)); setDetail(null); showToast(`${firstName} checked in.`); };
-  const cancelAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "cancelled" } : x)); setDetail(null); showToast("Appointment cancelled."); };
+  const cancelAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "cancelled" } : x)); fireStaffPush({ shopId, title: "Appointment cancelled", appt: a, event: "cancelled", business }); fireStaffContact({ shopId, event: "cancelled", appt: a, business, providers }); setDetail(null); showToast("Appointment cancelled."); };
   const finishCheckoutLite = (id, summary) => { setAppts((cur) => cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceStartedAt ? Date.now() : a.serviceEndedAt } : a)); setCheckout(null); showToast("Payment recorded."); };
   const sameDayLocal = (iso, ref) => { if (!iso || !ref) return false; const a = new Date(iso); return a.getFullYear() === ref.getFullYear() && a.getMonth() === ref.getMonth() && a.getDate() === ref.getDate(); };
   // Double-booking guard for inline reschedule — mirrors the online-booking guard

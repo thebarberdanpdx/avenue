@@ -59,6 +59,10 @@ async function handler(req, res) {
       return res.status(500).json({ error: "staff alerts not configured" });
     }
     const { shopId, providerId, scope } = b.staff;
+    // event: which alert (newBooking|rescheduled|cancelled|waitlist). channels: which of email/sms
+    // the owner enabled for it (default both, for older callers that predate the channel matrix).
+    const event = (!b.staff.event || b.staff.event === "newBooking") ? "booking" : String(b.staff.event);
+    const chans = b.staff.channels || { email: true, sms: true };
     const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
     const { data: rows, error } = await supa.from("providers").select("data").eq("shop_id", shopId);
     if (error) return res.status(500).json({ error: "staff lookup: " + error.message });
@@ -77,24 +81,42 @@ async function handler(req, res) {
     const clientName = String(c.client || "A client").slice(0, 80);
     const svc = String(c.service || "an appointment").slice(0, 120);
     const when = String(c.when || "").slice(0, 60);
+    const prevWhen = String(c.prevWhen || "").slice(0, 60);
+    const days = String(c.days || "").slice(0, 80);
     const note = String(c.note || "").slice(0, 300);
     // The client's permanent profile note — resolved here on the server (never sent by a public
-    // booker) so the barber gets both the booking note AND the note on file.
+    // booker) so the barber gets both the booking note AND the note on file. Bookings only.
     let clientNote = "";
-    if (b.staff.clientId && b.staff.clientId !== "guest") {
+    if (event === "booking" && b.staff.clientId && b.staff.clientId !== "guest") {
       try {
         const { data: crow } = await supa.from("clients").select("data").eq("shop_id", shopId).eq("id", b.staff.clientId).maybeSingle();
         clientNote = crow && crow.data ? String(crow.data.notes || "").trim().slice(0, 500) : "";
       } catch (e) {}
     }
-    const subject = `New booking — ${clientName}`;
-    const lines = [`${clientName} booked ${svc}.`, when];
-    if (note) lines.push(`Booking note: "${note}"`);
-    if (clientNote) lines.push(`Note on file: "${clientNote}"`);
+    // Wording per event. Email carries the fuller body; SMS is one glanceable line that fits a single
+    // 160-char GSM segment (name shown ONCE, no appended notes). sendSms() sanitizes to GSM-7 centrally.
+    let subject, lines, smsRaw;
+    if (event === "rescheduled") {
+      subject = `Appointment moved — ${clientName}`;
+      lines = [`${clientName}'s ${svc} was moved.`, prevWhen ? `Was: ${prevWhen}` : "", when ? `Now: ${when}` : ""];
+      smsRaw = `Reschedule: ${clientName} - ${svc}${when ? `, now ${when}` : ""}`;
+    } else if (event === "cancelled") {
+      subject = `Appointment cancelled — ${clientName}`;
+      lines = [`${clientName} cancelled ${svc}${when ? ` (${when})` : ""}.`];
+      smsRaw = `Cancelled: ${clientName} - ${svc}${when ? ` (${when})` : ""}`;
+    } else if (event === "waitlist") {
+      subject = `New waitlist request — ${clientName}`;
+      lines = [`${clientName} joined the waitlist for ${svc}.`, days ? `Preferred: ${days}` : ""];
+      smsRaw = `Waitlist: ${clientName} - ${svc}`;
+    } else {
+      subject = `New booking — ${clientName}`;
+      lines = [`${clientName} booked ${svc}.`, when];
+      if (note) lines.push(`Booking note: "${note}"`);
+      if (clientNote) lines.push(`Note on file: "${clientNote}"`);
+      smsRaw = `New booking: ${clientName} - ${svc}. ${when}`;
+    }
     const textBody = lines.filter(Boolean).join("\n");
-    // SMS is one glanceable line — who, what, when — with the name shown ONCE and no appended notes,
-    // so the whole alert lands inside a single 160-char GSM segment. (Email keeps the fuller body above.)
-    const smsRaw = `New booking: ${clientName} - ${svc}. ${when}`.replace(/\s+/g, " ").trim();
+    smsRaw = smsRaw.replace(/\s+/g, " ").trim();
     const smsText = smsRaw.length <= 160 ? smsRaw : smsRaw.slice(0, 160).replace(/\s+\S*$/, "");
 
     const sent = [];
@@ -102,16 +124,16 @@ async function handler(req, res) {
       const pEmail = String(p.email || "").trim();
       const pPhone = String(p.phone || "").replace(/\D/g, "");
       const r = { id: p.id };
-      try { if (pEmail) { await sendEmail({ to: pEmail, subject, text: textBody }); r.email = "sent"; } else r.email = "no-email"; }
+      try { if (chans.email && pEmail) { await sendEmail({ to: pEmail, subject, text: textBody }); r.email = "sent"; } else r.email = chans.email ? "no-email" : "off"; }
       catch (e) { r.email = "error: " + e.message; }
       // SMS is GSM-7; non-GSM characters get delivered as "?". sendSms() sanitizes centrally
       // (see gsmSafe in lib/messaging.js), so every SMS — including the middot service separator —
       // reads clean without each call site handling it.
-      try { if (SMS_LIVE && pPhone) { await sendSms({ to: pPhone, text: smsText }); r.sms = "sent"; } }
+      try { if (chans.sms && SMS_LIVE && pPhone) { await sendSms({ to: pPhone, text: smsText }); r.sms = "sent"; } else if (!chans.sms) r.sms = "off"; else if (!SMS_LIVE) r.sms = "sms-not-live"; }
       catch (e) { r.sms = "error: " + e.message; }
       sent.push(r);
     }
-    return res.status(200).json({ ok: true, staff: true, smsLive: SMS_LIVE, scope: scope || "assigned", sent });
+    return res.status(200).json({ ok: true, staff: true, event, smsLive: SMS_LIVE, scope: scope || "assigned", sent });
   }
 
   const ctx = b.context || {};
