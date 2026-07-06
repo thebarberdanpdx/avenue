@@ -7436,7 +7436,19 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
 
   const prov = appt ? providers.find((p) => p.id === appt.providerId) : null;
   const dur = appt ? ((appt.end != null && appt.start != null && appt.end > appt.start) ? (appt.end - appt.start) : ((services.find((s) => s.id === appt.serviceId) || {}).duration || 45)) : 45;
-  const reSlots = (prov && newDate) ? computeFreeSlots({ prov, date: newDate, durMin: dur, providers, appts: avail, business, services }) : [];
+  const reSlotsRaw = (prov && newDate) ? computeFreeSlots({ prov, date: newDate, durMin: dur, providers, appts: avail, business, services }) : [];
+  // #17: honor 'Blocked' time-rule windows on reschedule too. computeFreeSlots doesn't apply them —
+  // the booking flow filters them on top — so without this a client could self-reschedule into a
+  // blocked window. Drop any slot whose full span overlaps a block for this service/barber/day.
+  const reSlots = (() => {
+    if (!prov || !newDate || !appt) return reSlotsRaw;
+    const svc = services.find((s) => s.id === appt.serviceId);
+    const blocks = ((svc && svc.timeRules) || []).filter((r) => r && r.block
+      && (!r.scope || r.scope === "all" || r.scope === prov.id)
+      && (!r.days || !r.days.length || r.days.includes(newDate.getDay())));
+    if (!blocks.length) return reSlotsRaw;
+    return reSlotsRaw.filter((s) => { const st = s.start, en = s.start + dur; return !blocks.some((r) => st < r.end && en > r.start); });
+  })();
 
   const fmtWhenObj = (iso) => { const d = new Date(iso); const day = relativeDate(d); const lbl = day.includes(",") ? day : `${day}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; return { date: lbl, time: fmtTime(d.getHours() * 60 + d.getMinutes()) }; };
   const hoursUntil = (iso) => (new Date(iso) - new Date()) / 36e5;

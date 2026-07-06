@@ -115,6 +115,7 @@ async function handler(req, res) {
   // booking confirmation; a clean "not on file" result is blocked.
   const shop = String(b.shop || "").trim();
   if (!shop) return res.status(400).json({ error: "missing shop" });
+  let recipientOptedOut = false; // set true if the on-file client for this recipient opted out of SMS (#21)
   if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const emLc = email.toLowerCase();
     const onFile = (rows) => (rows || []).some((r) => {
@@ -127,7 +128,15 @@ async function handler(req, res) {
       const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
       const { data: crows, error: cErr } = await supa.from("clients").select("data").eq("shop_id", shop);
       if (cErr) throw cErr;
-      recognized = onFile(crows);
+      // #21: find the matching CLIENT and capture their real SMS opt-out here, on the server, so a
+      // caller can never text someone who opted out by passing smsOptOut:false (the manage-link
+      // reschedule did exactly that). Server-authoritative — protects every notify caller.
+      const cmatch = (crows || []).find((r) => {
+        const d = (r && r.data) || {};
+        return (emLc && String(d.email || "").trim().toLowerCase() === emLc) ||
+               (phone && String(d.phone || "").replace(/\D/g, "") === phone);
+      });
+      if (cmatch) { recognized = true; if (((cmatch.data || {}).smsOptOut) === true) recipientOptedOut = true; }
       if (!recognized) {
         const { data: prows, error: pErr } = await supa.from("providers").select("data").eq("shop_id", shop);
         if (pErr) throw pErr;
@@ -139,7 +148,8 @@ async function handler(req, res) {
     }
   }
 
-  const ch = resolveChannels({ channel: b.channel || "email", smsLive: SMS_LIVE, email, phone, smsOptOut: to.smsOptOut === true });
+  // SMS is suppressed if EITHER the caller flags opt-out OR the server found this recipient opted out.
+  const ch = resolveChannels({ channel: b.channel || "email", smsLive: SMS_LIVE, email, phone, smsOptOut: (to.smsOptOut === true) || recipientOptedOut });
 
   const results = {};
   try { if (ch.email) { await sendEmail({ to: email, subject: b.subject || "Your appointment", text, html }); results.email = "sent"; } }
