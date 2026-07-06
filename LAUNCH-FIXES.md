@@ -66,8 +66,9 @@ charged online without the booking recording it.
 - **Online deposit/prepay verification** — when you want to turn the deposit setting ON:
   build a server step that verifies the Stripe PaymentIntent (succeeded, amount, not reused)
   before a booking is trusted as paid; the client flow must also carry a deposit intent id.
-- **Backups (C4)** — enable Supabase Pro / point-in-time recovery before real bookings;
-  `supabase db dump --schema-only` into version control (schema currently un-versioned).
+- **Backups (C4)** — ✅ Supabase Pro is on → automatic daily backups (7-day retention) are
+  running. Data is now recoverable. REMAINING (optional, non-blocking): dump the schema
+  (RLS policies + RPC bodies) into version control so the DB is rebuildable / reviewable.
 - **Session tokens** — client session lives 90 days (not the intended 2h), stored plaintext.
 - **Timezone** — `book_public` hardcodes `America/Los_Angeles`; off-tz bookers get wrong
   reminder timing. Fine for a single Pacific shop; must fix before multi-tenant.
