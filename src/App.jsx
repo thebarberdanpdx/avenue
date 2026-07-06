@@ -5,7 +5,7 @@ import { tapToPayCharge, cardReaderCharge } from './tapToPay'
 import * as Sentry from '@sentry/react'
 import {
   Calendar, Phone, Check, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MessageSquare, Bell, User, Camera,
-  Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, X, Clock, PenSquare,
+  Send, Edit2, CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Plus, Minus, X, Clock, PenSquare,
   Settings, Image as ImageIcon, Lock, Trash2, Upload, GripVertical, DollarSign,
   MoreHorizontal, Mail, CreditCard, RefreshCw, Copy, Repeat, Users, Sun, Moon, MapPin as MapPinIcon,
   BarChart3, TrendingUp, Palette, Globe, HelpCircle, BookOpen, Search, LifeBuoy, Scissors, Package,
@@ -24105,8 +24105,27 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
             <div style={{ fontFamily: FONT_BODY, fontSize: 20, fontWeight: 600 }}>{service?.name || appt.title}</div>
             <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 4 }}>When did the service actually begin?</div>
           </div>
-          <div style={{ marginBottom: 12 }}>
-            <TimeScrollPicker value={startDraft} onChange={setStartDraft} step={5} maxMin={nowMinTick} label="Start time" full />
+          {/* Minute stepper — tick up/down a minute at a time, centered on when the timer started.
+              Stays within an hour either side (can't run past "now"), so there's no day-long list to scroll. */}
+          <div style={{ marginBottom: 14 }}>
+            {(() => {
+              const lo = Math.max(0, startedAtMin - 60);
+              const hi = Math.min(startedAtMin + 60, nowMinTick);
+              const atLo = startDraft <= lo, atHi = startDraft >= hi;
+              const stepBtn = (off) => ({ display: "flex", alignItems: "center", justifyContent: "center", width: 58, height: 58, borderRadius: 999, border: "1px solid var(--border)", background: "var(--panel2)", color: off ? "var(--faint)" : "var(--text)", cursor: off ? "default" : "pointer", flexShrink: 0 });
+              const delta = startDraft - startedAtMin;
+              const sub = delta === 0 ? "when the timer started" : (delta < 0 ? `${-delta} min earlier` : `${delta} min later`);
+              return (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18 }}>
+                  <button onClick={() => !atLo && setStartDraft((v) => Math.max(lo, v - 1))} disabled={atLo} style={stepBtn(atLo)} aria-label="One minute earlier"><Minus size={24} /></button>
+                  <div style={{ minWidth: 138, textAlign: "center" }}>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 600, lineHeight: 1 }}>{fmtTime(startDraft)}</div>
+                    <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 7 }}>{sub}</div>
+                  </div>
+                  <button onClick={() => !atHi && setStartDraft((v) => Math.min(hi, v + 1))} disabled={atHi} style={stepBtn(atHi)} aria-label="One minute later"><Plus size={24} /></button>
+                </div>
+              );
+            })()}
           </div>
           <button onClick={saveStartEdit} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, border: "none", marginBottom: 4 }}><Check size={17} /> SET START TIME</button>
           <button onClick={() => setStartTimeOpen(false)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 4px", marginTop: 4 }}>Cancel</button>
