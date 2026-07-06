@@ -13287,7 +13287,7 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
               </span>
               <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
                 {CHANS.map(([c, lbl]) => { const on = !!ch[c]; return (
-                  <button key={c} onClick={() => setCh(ev.k, c, !on)} style={{ flex: 1, padding: "8px 6px", borderRadius: 10, fontSize: 13, fontWeight: on ? 600 : 400, background: on ? "var(--wash)" : "var(--panel2)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: on ? "var(--text)" : "var(--sub)", cursor: "pointer" }}>{lbl}{c === "sms" ? " *" : ""}</button>
+                  <button key={c} onClick={() => setCh(ev.k, c, !on)} style={{ flex: 1, padding: "8px 6px", borderRadius: 10, fontSize: 13, fontWeight: on ? 600 : 400, background: on ? "var(--wash)" : "var(--panel2)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, color: on ? "var(--text)" : "var(--sub)", cursor: "pointer" }}>{lbl}</button>
                 ); })}
               </div>
             </div>
@@ -13297,7 +13297,6 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
           <div style={{ fontSize: 13, color: "var(--sub)", margin: "0 2px 9px" }}>Who gets text &amp; email alerts</div>
           <Segmented options={[{ value: "assigned", label: "Assigned barber" }, { value: "ownerPlus", label: "You + barber" }, { value: "all", label: "All staff" }]} value={sa.bookingAlertScope || "assigned"} onChange={(v) => setSA("bookingAlertScope", v)} />
         </div>
-        <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>* Text alerts begin once your A2P carrier registration clears; email &amp; app pop-ups work now.</p>
       </>)}
     </div>
   );
