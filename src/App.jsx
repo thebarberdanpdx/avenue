@@ -3060,7 +3060,14 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
   const isToday = date.toDateString() === new Date().toDateString();
   const bk = business?.booking || {};
   const leadMin = bk.leadTimeMin || 0;
-  const earliest = isToday ? (new Date().getHours() * 60 + new Date().getMinutes() + leadMin) : 0;
+  // Minimum-notice floor applied to EVERY day, not just today (was: future days used 0, so a 24h
+  // lead time still let tomorrow's early slots through). On a future date the floor is (now+leadMin)
+  // minus the whole days between, clamped ≥0.
+  const _nowLead = new Date();
+  const _today0Lead = new Date(_nowLead); _today0Lead.setHours(0, 0, 0, 0);
+  const _date0Lead = new Date(date); _date0Lead.setHours(0, 0, 0, 0);
+  const _daysUntil = Math.round((_date0Lead - _today0Lead) / 86400000);
+  const earliest = Math.max(0, _nowLead.getHours() * 60 + _nowLead.getMinutes() + leadMin - _daysUntil * 1440);
   const bufBefore = Math.max(0, Number(prov.bufferBefore ?? bk.bufferBefore) || 0);
   const bufAfter = Math.max(0, Number(prov.bufferAfter ?? bk.bufferAfter) || 0);
   const overrunMin = Math.max(0, Number(prov.overrunMin) || 0);
