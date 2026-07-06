@@ -114,12 +114,17 @@ async function handler(req, res) {
         // reminders that apply to the new time. An unchanged appointment keeps the same key, so a
         // reminder still never double-sends.
         const logId = `${shop.id}__${row.id}__${m.id}__${apptMs}`;
-        const { data: already } = await supa.from("message_log").select("id").eq("id", logId).maybeSingle();
-        if (already) continue;
-        checked++;
 
         const ch = resolveChannels({ channel: m.channel, smsLive: SMS_LIVE, email, phone, smsOptOut });
-        if (!ch.email && !ch.sms) continue; // no reachable channel
+        if (!ch.email && !ch.sms) continue; // no reachable channel — nothing to claim or send
+
+        // #30: ATOMIC dedupe. Claim the send by INSERTING the log row FIRST (message_log.id is the
+        // primary key, so a concurrent cron run inserting the same id conflicts and errors). Only the
+        // run that wins the insert goes on to send; an overlapping run sees the conflict and skips —
+        // closing the old check-then-insert race that could double-send the same reminder.
+        const claim = await supa.from("message_log").insert({ id: logId, shop_id: shop.id, appt_id: row.id, message_id: m.id, via: "pending", sent_at: new Date().toISOString() });
+        if (claim.error) continue; // already claimed (or sent) by another run
+        checked++;
 
         const textBody = renderPlainText(m.body, ctx);
         const htmlBody = renderEmailHtml(m.body, ctx);
@@ -128,8 +133,11 @@ async function handler(req, res) {
         try { if (ch.sms) { await sendSms({ to: phone, text: textBody }); via.push("sms"); } } catch (e) { failed++; }
 
         if (via.length) {
-          await supa.from("message_log").insert({ id: logId, shop_id: shop.id, appt_id: row.id, message_id: m.id, via: via.join("+"), sent_at: new Date().toISOString() });
+          await supa.from("message_log").update({ via: via.join("+"), sent_at: new Date().toISOString() }).eq("id", logId);
           sent++;
+        } else {
+          // Nothing actually sent (all channels errored) — release the claim so a later run can retry.
+          await supa.from("message_log").delete().eq("id", logId);
         }
       }
     }
