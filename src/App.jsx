@@ -3058,7 +3058,7 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
   const provCap = Math.max(0, Number(prov.maxPerDay) || 0);
   const shopCap = Math.max(0, Number(business?.booking?.dailyCap) || 0);
   if (provCap > 0 && realCount((a) => a.providerId === prov.id) >= provCap) return [];
-  if (shopCap > 0 && realCount(() => true) >= shopCap) return [];
+  if (shopCap > 0 && realCount((a) => a.bookedOnline) >= shopCap) return []; // #24: the shop cap limits ONLINE bookings only — manual/phone appts must not count toward it
   const busy = (appts || [])
     .filter((a) => apptHoldsSlot(a) && a.providerId === prov.id && a.bookedFor && dayKey(new Date(a.bookedFor)) === dayKey(date))
     .map((a) => { const s = a.start; const d = (a.end != null ? a.end - a.start : 30); return [s, s + (d > 0 ? d : 30)]; })
@@ -3931,11 +3931,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const slotBlockedByRules = (provId, dayDate, slotMin) => {
     const dow = dayDate.getDay();
     const svcs = (cart || []).map((c) => c.service).filter(Boolean);
+    const slotEnd = slotMin + (effMin || 0); // #16: the appt's full reserved span, so a service that OVERRUNS a block is caught, not just one that starts inside it
     return svcs.some((svc) => (svc.timeRules || []).some((r) => {
       if (!r.block) return false;
       if (r.scope && r.scope !== "all" && r.scope !== provId) return false;
       if (r.days && r.days.length && !r.days.includes(dow)) return false;
-      return slotMin >= r.start && slotMin < r.end;
+      return slotMin < r.end && slotEnd > r.start; // overlap, not just start-inside
     }));
   };
   // ---- New-client-per-day cap (audit #29) ----------------------------------------------------
@@ -4338,6 +4339,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       const payFull = cart.some((e) => e && e.service && e.service.booking && e.service.booking.requirePayment); // #7: this booking includes a prepay service
       newAppts.push({
         id: baseId + pi,
+        bookedOnline: true, // #24: mark public/online bookings so the shop's online daily cap counts only these (never manual/phone appts)
         providerId: prov.id === "anyone" ? resolveAnyone(providers, appts, selectedDate, startMin, person.durMin, business) : prov.id,
         clientId: clientId || "guest",
         familyMemberId: person.key === "self" ? null : person.key,
@@ -8997,6 +8999,16 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
     return s ? getPrice(s, a.providerId) : 0;
   };
 
+  // #10: money refunded for an appt, summed across every payment record tied to it (checkout sales
+  // live in business.sales; client-attached sales in client.payments). Subtracted from the appt's
+  // service revenue so a refunded visit no longer counts at full price.
+  const refundedFor = (a) => {
+    let r = 0;
+    (business?.sales || []).forEach((p) => { if (p && p.apptId === a.id) r += Number(p.refunded) || 0; });
+    (clients || []).forEach((c) => (c.payments || []).forEach((p) => { if (p && p.apptId === a.id) r += Number(p.refunded) || 0; }));
+    return r;
+  };
+
   const inRange = (a, start, end) => {
     if (!a.bookedFor) return false;
     const t = new Date(a.bookedFor).getTime();
@@ -9008,7 +9020,7 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
   const sumRevenue = (start, end) =>
     appts
       .filter((a) => !isBlock(a) && isRevenue(a) && inRange(a, start, end))
-      .reduce((sum, a) => sum + apptPrice(a), 0);
+      .reduce((sum, a) => sum + Math.max(0, apptPrice(a) - refundedFor(a)), 0);
 
   // --- Period boundaries (current + prior) ---
   let periodStart, periodEnd, priorStart, priorEnd, priorLabel;
@@ -9750,9 +9762,11 @@ function ServiceMixView({ appts, services, providers, onBack }) {
     const items = (a.lineItems && a.lineItems.length) ? a.lineItems.map((li) => ({ sid: li.serviceId, mins: (li.duration != null ? li.duration : 0) })) : [{ sid: a.serviceId, mins: (a.end - a.start) }];
     items.forEach((it) => {
       if (!it.sid) return;
-      const svc = services.find((s) => s.id === it.sid);
-      if (!svc) return;
-      const r = getPrice(svc, a.providerId) || 0;
+      // #22: a DELETED service must not drop the visit's revenue — bucket it under a placeholder row
+      // instead of skipping. And prefer the price LOCKED on the appt (single-line case) over live
+      // getPrice, so re-pricing or deleting a service never restates past service-mix revenue.
+      const svc = services.find((s) => s.id === it.sid) || { id: it.sid, name: "Deleted service", duration: 0 };
+      const r = (items.length === 1 && typeof a.price === "number") ? a.price : (getPrice(svc, a.providerId) || 0);
       const m = it.mins || svc.duration || 0;
       agg[it.sid] = agg[it.sid] || { svc, visits: 0, revenue: 0, minutes: 0 };
       agg[it.sid].visits += 1;
@@ -20212,7 +20226,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   };
   const finishCheckout = (id, summary) => {
     setAppts((cur) => {
-      const done = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceStartedAt ? Date.now() : a.serviceEndedAt, pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a);
+      const done = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a);
       // if they rebooked, drop a real future appointment on the calendar — confirmed, NOT prepaid
       if (summary && (summary.rebookWeeks != null || summary.rebookDate)) {
         const src = cur.find((a) => a.id === id);
@@ -20736,7 +20750,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     const provCap = Math.max(0, Number(prov?.maxPerDay) || 0);
     const shopCap = Math.max(0, Number(business?.booking?.dailyCap) || 0);
     if (provCap > 0 && dayCount((a) => a.providerId === providerId) >= provCap) return { who: prov?.name || "This staff member", limit: provCap, scope: "provider" };
-    if (shopCap > 0 && dayCount(() => true) >= shopCap) return { who: "the shop", limit: shopCap, scope: "shop" };
+    if (shopCap > 0 && dayCount((a) => a.bookedOnline) >= shopCap) return { who: "the shop", limit: shopCap, scope: "shop" }; // #24: online-booking cap counts online appts only
     return null;
   };
 
@@ -24023,7 +24037,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               <>
                 <div onClick={() => setMenuOpen(false)} style={{ position: "absolute", inset: 0, zIndex: 8 }} />
                 <div className="fade-in" style={{ position: "absolute", top: 56, right: 14, width: 250, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,0.28)", zIndex: 9, overflow: "hidden", padding: "6px 0" }}>
-                  <MenuItem T={T} danger icon={<Trash2 size={17} />} label="Cancel / Delete" onClick={() => onDelete(appt.id)} />
+                  <MenuItem T={T} danger icon={<Trash2 size={17} />} label="Cancel / Delete" onClick={() => { const paidOrDone = (appt.paid && Number(appt.paid.total) > 0) || appt.status === "done"; if (paidOrDone && typeof window !== "undefined" && !window.confirm("This appointment is checked out / paid. Deleting it permanently removes its record and it drops from your reports. Delete anyway?")) return; onDelete(appt.id); }} />
                   {appt.paid ? (
                     <>
                       <MenuItem T={T} icon={<DollarSign size={17} />} label="Reopen ticket" onClick={() => { setMenuOpen(false); onCheckout(appt, { reopen: true }); }} />
