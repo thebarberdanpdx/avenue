@@ -24212,7 +24212,13 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
   const FD = "'Fraunces', serif";
   const staff = providers.filter((p) => p.id !== "anyone");
   const money = (n) => "$" + Math.round(n).toLocaleString();
-  const priceOf = (a) => { const s = services.find((x) => x.id === a.serviceId); return s ? s.price : 45; };
+  // #9: use the LOCKED price the appt was sold at (per-staff/per-client aware, survives a service
+  // delete/re-price), not the live menu base. #10: net out any refunds recorded against this appt.
+  const refundedFor = (a) => (business?.sales || []).filter((p) => p && p.apptId === a.id).reduce((s, p) => s + (Number(p.refunded) || 0), 0);
+  const priceOf = (a) => {
+    const base = (typeof a.price === "number") ? a.price : (() => { const s = services.find((x) => x.id === a.serviceId); return s && typeof s.price === "number" ? s.price : 0; })();
+    return Math.max(0, base - refundedFor(a));
+  };
   const svcName = (id) => { const s = services.find((x) => x.id === id); return s ? s.name : "Service"; };
   const provName = (id) => { const p = providers.find((x) => x.id === id); return p ? p.name : "—"; };
 
@@ -24273,7 +24279,9 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
   const matchStaff = (a) => staffId === "all" || a.providerId === staffId;
   const matchSvc = (a) => serviceId === "all" || a.serviceId === serviceId || (Array.isArray(a.lineItems) && a.lineItems.some((li) => li.serviceId === serviceId));
   const scoped = (appts || []).filter((a) => a.status !== "block" && a.bookedFor && inRange(a) && matchStaff(a) && matchSvc(a));
-  const sales = scoped.filter((a) => a.status !== "cancelled" && a.status !== "no-show");
+  // #9: only DONE appts are realized revenue. Confirmed/upcoming and in-service haven't been paid,
+  // so they must not inflate sales / tax-set-aside reports.
+  const sales = scoped.filter((a) => a.status === "done");
 
   // ---- report catalog ----
   const REPORTS = [
