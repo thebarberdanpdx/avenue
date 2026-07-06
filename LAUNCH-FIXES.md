@@ -43,12 +43,18 @@ clients still insert fully.
 
 ---
 
-## ⏳ Fix #3 — Batched: app_state lockdown + save_client_card + append_family_member
-- `app_state` table is currently `ALL` to `public` (anon + authenticated) — world
-  read/write. Not referenced anywhere in `src/App.jsx`; lock it.
-- `save_client_card` — same anon-overwrite class as C1 (anon can set any client's card).
-- `append_family_member` — anon can append arbitrary family members to any client.
-_(pending: exact `append_family_member` body before writing the batch)_
+## ✅ Fix #3 — app_state lockdown + save_client_card + append_family_member (ran in Supabase)
+Single batched migration:
+- **app_state** was `ALL` to `public` (world read/write) and unused by `src/App.jsx` →
+  enabled RLS, dropped the `allow all` policy, revoked anon/authenticated grants
+  (service-role server access is unaffected — it bypasses RLS).
+- **save_client_card** let anon overwrite *any* client's saved card by id → now only
+  sets a card when none is on file yet; replacing an existing card is a logged-in/staff
+  action. (Low-severity griefing hole; closed.)
+- **append_family_member** let anon append arbitrary family members (with self-set
+  `customPrices`/`customDurations`) to any client → now strips owner-only keys
+  (`customPrices`, `customDurations`, `cadenceDays`, `blocked`, `blockReason`) from the
+  incoming member and caps the family array at 25 to stop bloat/spam.
 
 ## 🧠 Needs code work (not pure SQL) — tracked, not yet done
 - **notify.js / push.js** unauthenticated → anyone can spam/phish a shop's staff by email/
