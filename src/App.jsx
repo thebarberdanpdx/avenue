@@ -3725,11 +3725,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [wlService, setWlService] = useState("");
 
   const lineTotal = (entry) => {
-    const dc = activeMember || matched; // duration/notes come from the person being booked for
+    // Price/duration overrides come from the person THIS line is for — the family member the
+    // entry was added for (entry.forMemberId), else the main client. (Was `activeMember || matched`,
+    // which priced every line in a multi-person cart against the last-active person.)
+    const dc = entry.forMemberId ? (matched?.family || []).find((m) => m.id === entry.forMemberId) : matched;
     const provId = entry.provider && entry.provider.id !== "anyone" ? entry.provider.id : "dan"; // barber decides the per-service length; "anyone" books as Dan (matches the commit)
     const hasCustomPrice = !!(dc && dc.customPrices && dc.customPrices[entry.service.id] != null && dc.customPrices[entry.service.id] !== "");
     const hasCustomDur = !!(dc && dc.customDurations && dc.customDurations[entry.service.id] != null);
-    let p = hasCustomPrice ? Number(dc.customPrices[entry.service.id]) : entry.service.price, m = getDuration(dc, entry.service, provId);
+    let p = hasCustomPrice ? Number(dc.customPrices[entry.service.id]) : getPrice(entry.service, provId), m = getDuration(dc, entry.service, provId);
     // #19: a cut style sets the base price/time — BUT this client's own custom price/duration (their
     // known "usual" rate) always wins, so picking a style never silently drops it. A client with no
     // custom price still gets the style's price. (A different service they have no override for → default.)
@@ -4326,7 +4329,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         familyMemberId: person.key === "self" ? null : person.key,
         bookedByName: person.key === "self" ? null : (matched?.name || newName.trim()),
         serviceId: person.items[0].service.id,
-        price: person.items.reduce((s, e) => s + lineTotal(e).price, 0),
+        // Lock the TIME-OF-DAY adjusted price (peak/off-peak) onto the appt, so the amount charged at
+        // checkout matches what the client saw and agreed to (cartAdjTotal). lineTotal is the base; the
+        // per-line delta mirrors cartTimeDelta, evaluated at THIS person's start. No-op when no time rules.
+        price: person.items.reduce((s, e) => { const _pid = (e.provider && e.provider.id !== "anyone") ? e.provider.id : "dan"; const _td = (startMin != null && selectedDate) ? (priceWithTimeRules(e.service, _pid, selectedDate, startMin) - getPrice(e.service, _pid)) : 0; return s + lineTotal(e).price + _td; }, 0),
         lineItems: person.items.map((e) => ({ serviceId: e.service.id, cutType: e.cutType || null, beardType: e.beardType || null, addons: e.addons || {} })),
         start: startMin,
         end: startMin + person.durMin,
@@ -23233,10 +23239,15 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const [wuPriceText, setWuPriceText] = useState(null); // null = show stored; string = mid-edit
   useEffect(() => { setWuNote(client?.notes || ""); setWuDirty(false); setWuSaved(false); setPendingDur(null); setPendingPrice(null); setWuPriceText(null); }, [client?.id]);
   const wuFileRef = useRef(null);
+  // Keep the LATEST note in a ref so the unmount fallback persists the current value, not a
+  // stale mount-time closure. The old `[]`-deps cleanup captured the pre-edit note and wrote it
+  // back on close — reverting every saved note. Reading the ref means: after Save (note ===
+  // stored) the cleanup is a no-op; a typed-but-unsaved note still auto-persists. Never reverts.
+  const wuNoteRef = useRef(wuNote); wuNoteRef.current = wuNote;
   // Fallback only: if the sheet closes with an unsaved note, persist it so it isn't lost.
   useEffect(() => () => {
     if (!client) return;
-    const v = (wuNote || "").trim();
+    const v = (wuNoteRef.current || "").trim();
     setClients((cs) => cs.map((c) => (c.id === client.id && (c.notes || "") !== v) ? { ...c, notes: v } : c));
   }, []);
   const addWuPhoto = (file) => {
