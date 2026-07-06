@@ -11171,7 +11171,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={navBack} />}
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
-        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} />}
+        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} onMessage={() => { setMsgTarget({ clientId: activeClient.id }); goTab("messages"); }} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} />}
         {tab === "messages" && <MessagesView key={`messages-${tabNonce}`} clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
@@ -25035,14 +25035,20 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
   );
 }
 
-function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, setAppts, business, setBusiness, me, shopId, onBack, showToast, onRebook }) {
+function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, setAppts, business, setBusiness, me, shopId, onBack, showToast, onRebook, waitlist = [], setWaitlist, onMessage }) {
   const live = clients.find((c) => c.id === client.id) || client;
   const provider = providers.find((p) => p.id === live.provider) || providers[1] || providers[0] || {};
   const firstName = (live.name || "").split(" ")[0] || "this client";
   const saveBirthday = (iso) => setClients(clients.map((c) => c.id === live.id ? { ...c, birthday: iso || undefined } : c));
   const fmtBday = (v) => { if (!v) return null; const d = new Date(v); if (isNaN(d.getTime())) return String(v); return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
-  const [pfTab, setPfTab] = useState("timeline"); // timeline | family | pricing
+  const [pfTab, setPfTab] = useState("activity"); // activity | photos | family | pricing
   const [openMember, setOpenMember] = useState(null);
+  // ---- add-to-waitlist (staff-side) form state ----
+  const [wlSheet, setWlSheet] = useState(false);
+  const [wlProv, setWlProv] = useState("Anyone");
+  const [wlDays, setWlDays] = useState([]);
+  const [wlDayTimes, setWlDayTimes] = useState({});
+  const [wlService, setWlService] = useState("");
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [mName, setMName] = useState("");
   const [mNote, setMNote] = useState("");
@@ -25176,7 +25182,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const rebook = (a) => { if (onRebook) onRebook({ clientId: client.id, serviceId: a.serviceId, providerId: a.providerId || live.provider }); setDetail(null); };
 
   const checkInAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "in-service", serviceStartedAt: x.serviceStartedAt || Date.now() } : x)); setDetail(null); showToast(`${firstName} checked in.`); };
-  const cancelAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "cancelled" } : x)); setDetail(null); showToast("Appointment cancelled."); };
+  const cancelAppt = (a) => { const at = new Date().toISOString(); setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "cancelled", cancelledAt: at, history: [...(x.history || []), { type: "cancel", at, by: "staff" }] } : x)); setDetail(null); showToast("Appointment cancelled."); };
   const finishCheckoutLite = (id, summary) => { setAppts((cur) => cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceStartedAt ? Date.now() : a.serviceEndedAt } : a)); setCheckout(null); showToast("Payment recorded."); };
   const sameDayLocal = (iso, ref) => { if (!iso || !ref) return false; const a = new Date(iso); return a.getFullYear() === ref.getFullYear() && a.getMonth() === ref.getMonth() && a.getDate() === ref.getDate(); };
   // Double-booking guard for inline reschedule — mirrors the online-booking guard
@@ -25201,7 +25207,8 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
     if (reschedClashes(resched.id, resched.date, resched.start)) { showToast(`That overlaps another booking for ${provName(a)} — pick a free time.`); return; }
     const dur = Math.max(5, (a.end - a.start) || 30);
     const bf = new Date(resched.date); bf.setHours(Math.floor(resched.start / 60), resched.start % 60, 0, 0);
-    setAppts((cur) => cur.map((x) => x.id === resched.id ? { ...x, bookedFor: bf.toISOString(), start: resched.start, end: resched.start + dur } : x));
+    const fromIso = a.bookedFor; const at = new Date().toISOString();
+    setAppts((cur) => cur.map((x) => x.id === resched.id ? { ...x, bookedFor: bf.toISOString(), start: resched.start, end: resched.start + dur, history: [...(x.history || []), { type: "reschedule", at, from: fromIso, to: bf.toISOString(), by: "staff" }] } : x));
     setResched(null); setDetail(null); showToast("Appointment moved.");
   };
 
@@ -25233,61 +25240,153 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
     </div>
   );
 
+  // ---- activity feed: EVERY appointment, incl. cancelled / no-show / rescheduled ----
+  const digitsOnly = (s) => (s || "").replace(/\D/g, "");
+  const apptStatus = (a) => {
+    if (a.status === "cancelled") return "cancelled";
+    if (a.status === "no-show" || a.status === "noshow") return "noshow";
+    if (a.status === "done") return "done";
+    const t = a.bookedFor ? new Date(a.bookedFor).getTime() : 0;
+    if (t && t >= now) return "upcoming";
+    return "done"; // past & not explicitly cancelled/no-show → completed
+  };
+  const activityFeed = (() => {
+    const items = [];
+    myAppts.forEach((a) => {
+      if (nextAppt && a.id === nextAppt.id) return; // the soonest upcoming shows in the overview card
+      items.push({ key: "a" + a.id, kind: "appt", st: apptStatus(a), date: a.bookedFor, a });
+      (a.history || []).forEach((h, i) => { if (h.type === "reschedule") items.push({ key: "r" + a.id + i, kind: "resched", date: h.at || a.bookedFor, a, h }); });
+    });
+    (live.timeline || []).forEach((t, i) => items.push({ key: "n" + (t.id || i), kind: "note", date: t.date, t }));
+    return items.sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
+  })();
+  const statTag = { fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", padding: "2px 7px", borderRadius: 6, flexShrink: 0 };
+  const actBtn = { flex: 1, height: 50, borderRadius: 14, border: "none", cursor: "pointer", fontFamily: FONT_BODY, fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--panel2)", color: "var(--text2)" };
+
+  // ---- gallery grouped by the day each photo was added (newest first) ----
+  const galleryByDate = (() => {
+    const groups = []; const idx = {};
+    gallery.forEach((g) => { const k = g.date ? niceDate(g.date) : "Undated"; if (idx[k] == null) { idx[k] = groups.length; groups.push([k, []]); } groups[idx[k]][1].push(g); });
+    return groups;
+  })();
+
+  // ---- waitlist: staff-side add + on-waitlist status (mirrors WaitlistView entry shape) ----
+  const myWaitEntry = (waitlist || []).find((w) => digitsOnly(w.phone) && digitsOnly(w.phone) === digitsOnly(live.phone)) || null;
+  const realProvs = (providers || []).filter((p) => p.id !== "anyone" && p.isProvider !== false && !p.archived);
+  const wlProvOptions = ["Anyone", ...realProvs.map((p) => p.name)];
+  const wlDayOpts = Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i); return d; });
+  const wlDayLabel = (d) => { const r = relativeDate(d); return r.includes(",") ? r : `${r}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
+  const toggleWlDay = (l) => setWlDays((prev) => {
+    if (prev.includes(l)) { setWlDayTimes((t) => { const n = { ...t }; delete n[l]; return n; }); return prev.filter((x) => x !== l); }
+    if (prev.length >= 3) return prev;
+    setWlDayTimes((t) => ({ ...t, [l]: "any" }));
+    return [...prev, l];
+  });
+  const wlAddReady = wlDays.length > 0 && !!wlService && !!live.phone;
+  const openWaitlist = () => {
+    const lastA = historyAppts[0];
+    const lastName = (lastA && (services.find((s) => s.id === lastA.serviceId) || {}).name) || (services[0] || {}).name || "";
+    setWlService((cur) => cur || lastName);
+    setWlProv((provider && provider.name) || "Anyone");
+    setWlDays([]); setWlDayTimes({}); setWlSheet(true);
+  };
+  const addToWaitlist = () => {
+    if (!wlAddReady) return;
+    const dayTimes = {}; wlDays.forEach((l) => { dayTimes[l] = wlDayTimes[l] || "any"; });
+    const entry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: live.name, phone: live.phone || "", forWho: "self", provider: wlProv, anyProvider: wlProv === "Anyone", days: wlDays, day: wlDays[0] || "", dayTimes, when: dayTimes[wlDays[0]] || "any", service: wlService, photos: 0, at: new Date().toLocaleString(), addedByStaff: true, clientId: live.id };
+    if (setWaitlist) setWaitlist([...(waitlist || []), entry]);
+    setWlSheet(false); showToast(`${firstName} added to the waitlist.`);
+  };
+  const removeFromWaitlist = () => { if (!myWaitEntry || !setWaitlist) return; setWaitlist((waitlist || []).filter((w) => (w.id || "") !== (myWaitEntry.id || "x"))); showToast(`${firstName} removed from the waitlist.`); };
+
   return (
     <div className="fade-up">
-      {/* top bar: back · shop · kebab */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <div />
+      {/* kebab only — back + shop title are the dashboard chrome */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 4 }}>
         <button onClick={() => setMenuOpen(true)} style={{ background: "none", border: "none", color: "var(--faint)", cursor: "pointer", padding: 4 }}><MoreHorizontal size={20} /></button>
       </div>
 
-      {/* header: avatar · name · contact line · action pills */}
-      <div style={{ textAlign: "center", marginBottom: 18 }}>
-        <button onClick={() => setPicker(true)} style={{ position: "relative", width: 84, height: 84, borderRadius: "50%", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-          <Avatar size={84} photo={clientPhoto(live)} initial={(live.name || "?").charAt(0)} color="var(--text)" fontSize={34} />
-          <span style={{ position: "absolute", bottom: 0, right: 0, width: 24, height: 24, borderRadius: "50%", background: "var(--text)", color: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--bg)" }}><Camera size={12} /></span>
+      {/* identity — avatar beside name */}
+      <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
+        <button onClick={() => setPicker(true)} style={{ position: "relative", width: 64, height: 64, borderRadius: "50%", background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+          <Avatar size={64} photo={clientPhoto(live)} initial={(live.name || "?").charAt(0)} color="var(--text)" fontSize={26} />
+          <span style={{ position: "absolute", bottom: -2, right: -2, width: 22, height: 22, borderRadius: "50%", background: "var(--text)", color: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", border: "3px solid var(--bg)" }}><Camera size={11} /></span>
         </button>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 31, fontWeight: 500, letterSpacing: "-0.5px", marginTop: 14 }}>{live.name}</h2>
-        {(() => { const sl = clientSinceLabel(live, appts); return sl ? <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 6 }}>Client since {sl}</div> : null; })()}
-        <div style={{ color: "var(--sub)", fontSize: 13, marginTop: 9 }}>
-          {live.phone && <PhoneLink number={live.phone} />}
-          {live.phone && live.email && "  ·  "}
-          {live.email && <EmailLink email={live.email} />}
-          {!live.phone && !live.email && <span style={{ color: "var(--faint)", fontStyle: "italic" }}>No contact info on file</span>}
-        </div>
-        <div style={{ marginTop: 7 }}>
-          {editBday ? (
-            <input type="date" autoFocus value={live.birthday ? String(live.birthday).slice(0, 10) : ""} onChange={(e) => saveBirthday(e.target.value ? new Date(e.target.value + "T12:00:00").toISOString() : "")} onBlur={() => setEditBday(false)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "6px 10px", color: "var(--text)", fontSize: 13, fontFamily: FONT_BODY }} />
-          ) : (
-            <button onClick={() => setEditBday(true)} style={{ background: "none", border: "none", color: live.birthday ? "var(--sub)" : "var(--faint)", fontSize: 12.5, cursor: "pointer", fontFamily: FONT_BODY }}>{live.birthday ? `Birthday · ${fmtBday(live.birthday)}` : "+ Add birthday"}</button>
-          )}
-        </div>
-      </div>
-
-      {/* four-stat strip */}
-      <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden", marginBottom: 6 }}>
-        {[[visitCount, "Visits"], [sinceLabel, "Since"], [cadenceShort, "Cadence"], [money0(lifetime), "Lifetime"]].map(([n, l], i) => (
-          <div key={l} style={{ flex: 1, textAlign: "center", padding: "12px 4px", borderLeft: i === 0 ? "none" : "1px solid var(--line)" }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>{n}</div>
-            <div style={{ fontSize: 9.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 3 }}>{l}</div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, letterSpacing: "-0.4px", lineHeight: 1.05, margin: 0 }}>{live.name}</h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+            {isBlocked ? (
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#c0392b", background: "color-mix(in srgb,#c0392b 12%, transparent)", padding: "3px 9px", borderRadius: 999 }}>Blocked</span>
+            ) : (() => { const sl = clientSinceLabel(live, appts); return (<>
+              {visitCount <= 1 && <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--gold)", background: "var(--wash)", padding: "3px 9px", borderRadius: 999 }}>New</span>}
+              {sl && <span style={{ fontSize: 12.5, color: "var(--sub)" }}>Client since {sl}</span>}
+            </>); })()}
           </div>
-        ))}
+        </div>
       </div>
 
-      {/* tab bar */}
-      <div style={{ display: "flex", gap: 20, borderBottom: "1px solid var(--line)", overflowX: "auto", padding: "18px 4px 0", marginBottom: 4 }}>
-        {[["timeline", "Timeline"], ["family", "Family"], ["pricing", "Pricing"]].map(([id, label]) => { const on = pfTab === id; return (
-          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontFamily: "'Jost', sans-serif", fontWeight: 500, fontSize: 13, paddingBottom: 12, marginBottom: -1, whiteSpace: "nowrap", cursor: "pointer" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
+      {/* actions — Book (accent) · Message · Call */}
+      <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
+        <button onClick={() => onRebook && onRebook({ clientId: client.id, providerId: live.provider })} style={{ ...actBtn, background: "var(--gold)", color: "var(--on-gold)" }}><Calendar size={17} /> Book</button>
+        <button onClick={() => { if (onMessage && live.phone) onMessage(); }} disabled={!live.phone} style={{ ...actBtn, opacity: live.phone ? 1 : 0.45, cursor: live.phone ? "pointer" : "default" }}><MessageSquare size={17} /> Message</button>
+        <a href={live.phone ? `tel:${live.phone}` : undefined} style={{ ...actBtn, textDecoration: "none", opacity: live.phone ? 1 : 0.45, pointerEvents: live.phone ? "auto" : "none" }}><Phone size={17} /> Call</a>
+      </div>
+
+      {/* overview — the one elevated surface: scheduling status + metrics */}
+      <div style={{ marginTop: 16, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 18, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+        {myWaitEntry ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "15px 16px" }}>
+            <span style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(183,121,31,.14)", color: "#B7791F" }}><Clock size={18} /></span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>On the waitlist</div>
+              <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{(myWaitEntry.anyProvider || myWaitEntry.provider === "Anyone") ? "Any barber" : myWaitEntry.provider}{myWaitEntry.days && myWaitEntry.days.length ? ` · ${myWaitEntry.days.length} day${myWaitEntry.days.length > 1 ? "s" : ""}` : ""}</div>
+            </div>
+            <button onClick={openWaitlist} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: FONT_BODY, fontSize: 12.5, fontWeight: 600, color: "var(--sub)", padding: "6px 4px" }}>Edit</button>
+            <button onClick={removeFromWaitlist} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: FONT_BODY, fontSize: 12.5, fontWeight: 600, color: "#B7791F", padding: "6px 4px" }}>Remove</button>
+          </div>
+        ) : nextAppt ? (
+          <button onClick={() => setDetail({ appt: nextAppt, mode: "up" })} style={{ display: "flex", alignItems: "center", gap: 12, padding: "15px 16px", width: "100%", background: "none", border: "none", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
+            <span style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--wash)", color: "var(--gold)" }}><Calendar size={18} /></span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{niceDateFull(nextAppt.bookedFor)} · {fmtTime(nextAppt.start)}</div>
+              <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{nextAppt.title} · {provName(nextAppt)}</div>
+            </div>
+            <ChevronRight size={18} style={{ color: "var(--border2)", flexShrink: 0 }} />
+          </button>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "15px 16px" }}>
+            <span style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--wash)", color: "var(--gold)" }}><Calendar size={18} /></span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>No upcoming visit</div>
+              <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{historyAppts.length ? `Last seen ${niceDate(historyAppts[0].bookedFor)}` : "Not booked yet"}</div>
+            </div>
+            <button onClick={openWaitlist} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: FONT_BODY, fontSize: 13, fontWeight: 600, color: "var(--gold)", padding: "8px 4px", whiteSpace: "nowrap" }}>Add to waitlist</button>
+          </div>
+        )}
+        <div style={{ display: "flex", borderTop: "1px solid var(--line)" }}>
+          {[[visitCount, "Visits"], [money0(lifetime), "Spent"], [cadenceShort, "Every"]].map(([v, l], i) => (
+            <div key={l} style={{ flex: 1, textAlign: "center", padding: "14px 6px", borderLeft: i === 0 ? "none" : "1px solid var(--line)" }}>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, lineHeight: 1 }}>{v}</div>
+              <div style={{ fontSize: 10, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 7 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* tabs */}
+      <div style={{ display: "flex", gap: 24, borderBottom: "1px solid var(--line)", overflowX: "auto", padding: "22px 2px 0", marginBottom: 4 }}>
+        {[["activity", "Activity"], ["photos", "Photos"], ["family", "Family"], ["pricing", "Pricing"]].map(([id, label]) => { const on = pfTab === id; return (
+          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--gold)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontFamily: "'Jost', sans-serif", fontWeight: on ? 600 : 500, fontSize: 13.5, paddingBottom: 12, marginBottom: -1, whiteSpace: "nowrap", cursor: "pointer" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}{id === "photos" && gallery.length > 0 ? ` (${gallery.length})` : ""}</button>
         ); })}
       </div>
 
       {picker && <StaffPhotoPicker hasPhoto={!!live.photo} onClose={() => setPicker(false)} onPick={setClientPhoto} onRemove={removeClientPhoto} />}
       {galPicker && <PhotoPicker onClose={() => setGalPicker(false)} onPick={addGalleryPhoto} />}
 
-      {/* ============ TIMELINE — pinned preferences + upcoming + one chronological feed ============ */}
-      {pfTab === "timeline" && <div style={{ paddingBottom: 24 }}>
-        {/* pinned preferences note */}
-        <div style={tabLabel}>Preferences</div>
+      {/* ============ ACTIVITY — pinned notes + full status-aware timeline ============ */}
+      {pfTab === "activity" && <div style={{ paddingBottom: 24 }}>
+        {/* pinned preferences / notes */}
+        <div style={tabLabel}>Notes</div>
         {editingNote ? (
           <div>
             <textarea autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Preferences, allergies, formulas, conversation topics." rows={4} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", boxSizing: "border-box" }} />
@@ -25297,62 +25396,88 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
             </div>
           </div>
         ) : (
-          <div onClick={() => setEditingNote(true)} style={{ display: "flex", gap: 10, border: `1px ${live.notes ? "solid" : "dashed"} var(--border2)`, borderRadius: 14, padding: 14, cursor: "pointer", color: live.notes ? "var(--text2)" : "var(--sub)", fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+          <div onClick={() => setEditingNote(true)} style={{ display: "flex", gap: 10, background: "var(--panel)", border: `1px ${live.notes ? "solid" : "dashed"} var(--border2)`, borderRadius: 14, padding: 14, cursor: "pointer", color: live.notes ? "var(--text2)" : "var(--sub)", fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap", boxShadow: live.notes ? "var(--shadow-sm)" : "none" }}>
             <span style={{ color: "var(--gold)", flexShrink: 0, lineHeight: 1.5 }}>★</span>
             <span>{live.notes || "Tap to note preferences, allergies, formulas — anything worth remembering."}</span>
           </div>
         )}
 
-        {/* upcoming */}
-        {upcomingAppts.length > 0 && (<>
-          <div style={tabLabel}>Upcoming</div>
-          <div style={cardStyle}>{upcomingAppts.map((a) => <VisitRow key={a.id} a={a} mode="up" />)}</div>
-        </>)}
-
-        {/* the feed: visits + photos + notes, newest first */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "22px 4px 10px" }}>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Timeline</div>
-          <button onClick={() => setGalPicker(true)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}><Plus size={14} /> Add photo</button>
-        </div>
-        {(() => {
-          const feed = [
-            ...historyAppts.map((a) => ({ kind: "visit", date: a.bookedFor, a })),
-            ...gallery.map((g) => ({ kind: "photo", date: g.date, g })),
-            ...(live.timeline || []).map((t) => ({ kind: "note", date: t.date, t })),
-          ].sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
-          if (!feed.length) return <p style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", padding: "4px 4px" }}>Nothing yet — visits, photos and notes will show up here.</p>;
-          return <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {feed.map((it, i) => {
-              if (it.kind === "visit") { const a = it.a; const el = elapsedMin(a); return (
-                <button key={`v-${a.id}`} onClick={() => setDetail({ appt: a, mode: "past" })} style={{ display: "block", width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 15px", background: "var(--bg)", cursor: "pointer", color: "var(--text)", boxShadow: "var(--shadow-sm)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                    <b style={{ fontWeight: 500, fontSize: 14.5 }}>{a.title}</b>
-                    <span style={{ fontSize: 12, color: "var(--sub)", whiteSpace: "nowrap" }}>{niceDate(a.bookedFor)} · {money0(paidForAppt(a))} · {provName(a)}</span>
-                  </div>
-                  {el != null && <span style={{ display: "inline-block", fontSize: 11, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "2px 9px", marginTop: 8, fontWeight: 500 }}>{el} min in the chair</span>}
-                  {a.note && <div style={{ fontSize: 12.5, color: "var(--text2)", background: "var(--panel2)", borderRadius: 9, padding: "8px 10px", marginTop: 8, lineHeight: 1.4 }}>“{a.note}” <span style={{ color: "var(--faint)" }}>· {firstName} at booking</span></div>}
-                  {a.wrapNote && <div style={{ fontSize: 12.5, color: "var(--text2)", background: "var(--panel2)", borderRadius: 9, padding: "8px 10px", marginTop: 8, lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{a.wrapNote}</div>}
-                </button>
-              ); }
-              if (it.kind === "photo") { const g = it.g; return (
-                <button key={`p-${g.id}`} onClick={() => setLightbox(g.id)} style={{ display: "flex", gap: 12, width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 13, padding: 10, background: "var(--bg)", cursor: "pointer", color: "var(--text)", alignItems: "center" }}>
-                  <img src={imgUrl(g.photo, 200)} alt="" style={{ width: 52, height: 52, borderRadius: 9, objectFit: "cover", flexShrink: 0, border: "1px solid var(--border)" }} />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontSize: 13.5, color: "var(--text2)" }}>{g.note || "Photo"}</span>
-                    <span style={{ display: "block", fontSize: 11.5, color: "var(--faint)", marginTop: 3 }}>{g.source === "client" ? "From client" : "Photo"}{g.date ? ` · ${niceDate(g.date)}` : ""}</span>
-                  </span>
-                  {chev}
-                </button>
-              ); }
-              const t = it.t; return (
-                <div key={`n-${t.id || i}`} style={{ border: "1px solid var(--border)", borderRadius: 13, padding: "12px 15px", background: "var(--bg)" }}>
-                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{t.text}</div>
-                  {t.date && <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 6 }}>{niceDate(t.date)}</div>}
+        {/* the activity timeline — every appointment, colour-marked by status */}
+        <div style={tabLabel}>Activity</div>
+        {activityFeed.length === 0 ? (
+          <p style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", padding: "2px 2px" }}>No visits yet — appointments, cancellations and notes will show up here.</p>
+        ) : (
+          <div style={{ position: "relative", paddingLeft: 24 }}>
+            <div style={{ position: "absolute", left: 5, top: 14, bottom: 14, width: 2, background: "var(--border)" }} />
+            {activityFeed.map((it) => {
+              if (it.kind === "note") return (
+                <div key={it.key} style={{ position: "relative", padding: "13px 2px 15px" }}>
+                  <span style={{ position: "absolute", left: -24, top: 16, width: 12, height: 12, borderRadius: "50%", background: "var(--panel)", border: "2.5px solid var(--border2)", boxSizing: "border-box" }} />
+                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{it.t.text}</div>
+                  {it.t.date && <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 5 }}>{niceDate(it.t.date)}</div>}
                 </div>
               );
+              if (it.kind === "resched") return (
+                <div key={it.key} style={{ position: "relative", padding: "13px 2px 15px" }}>
+                  <span style={{ position: "absolute", left: -24, top: 16, width: 12, height: 12, borderRadius: "50%", background: "#B7791F", border: "2.5px solid var(--bg)", boxShadow: "0 0 0 3px rgba(183,121,31,.16)", boxSizing: "border-box" }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}><b style={{ fontWeight: 600, fontSize: 14.5 }}>{it.a.title}</b><span style={{ ...statTag, color: "#B7791F", background: "rgba(183,121,31,.14)" }}>Rescheduled</span></span>
+                    <span style={{ fontSize: 12, color: "var(--sub)", whiteSpace: "nowrap" }}>{niceDate(it.h.at)}</span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 5 }}>{it.h.from ? `Moved from ${niceDate(it.h.from)} → ${niceDate(it.h.to)}` : "Moved to a new time"}{it.a.providerId ? ` · ${provName(it.a)}` : ""}</div>
+                </div>
+              );
+              const a = it.a; const st = it.st; const el = elapsedMin(a);
+              const dotBg = st === "noshow" ? "#C0392B" : (st === "upcoming" || st === "cancelled") ? "var(--panel)" : "var(--gold)";
+              const hollow = st === "upcoming" || st === "cancelled";
+              return (
+                <button key={it.key} onClick={() => setDetail({ appt: a, mode: st === "upcoming" ? "up" : "past" })} style={{ position: "relative", display: "block", width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", color: "var(--text)", fontFamily: FONT_BODY, padding: "13px 2px 15px" }}>
+                  <span style={{ position: "absolute", left: -24, top: 16, width: 12, height: 12, borderRadius: "50%", background: dotBg, border: `2.5px solid ${hollow ? "var(--border2)" : "var(--bg)"}`, boxShadow: (st === "noshow" || st === "done") ? `0 0 0 3px ${st === "noshow" ? "rgba(192,57,43,.14)" : "var(--wash)"}` : "none", boxSizing: "border-box" }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <b style={{ fontWeight: 600, fontSize: 14.5, textDecoration: st === "cancelled" ? "line-through" : "none", color: st === "cancelled" ? "var(--sub)" : "var(--text)" }}>{a.title}</b>
+                      {st === "noshow" && <span style={{ ...statTag, color: "#C0392B", background: "rgba(192,57,43,.14)" }}>No-show</span>}
+                      {st === "cancelled" && <span style={{ ...statTag, color: "var(--sub)", background: "var(--panel2)" }}>Cancelled</span>}
+                      {st === "upcoming" && <span style={{ ...statTag, color: "var(--gold)", background: "var(--wash)" }}>Upcoming</span>}
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--sub)", whiteSpace: "nowrap" }}>{niceDate(a.bookedFor)}</span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 5 }}>
+                    {st === "done" && `${money0(paidForAppt(a))} · ${provName(a)}${el != null ? ` · ${el} min in the chair` : ""}`}
+                    {st === "noshow" && `${paidForAppt(a) > 0 ? `${money0(paidForAppt(a))} fee · ` : ""}${provName(a)}`}
+                    {st === "cancelled" && `${provName(a)}${a.cancelledAt ? ` · cancelled ${niceDate(a.cancelledAt)}` : ""}`}
+                    {st === "upcoming" && `${fmtTime(a.start)} · ${provName(a)}`}
+                  </div>
+                  {st === "done" && a.note && <div style={{ fontSize: 12.5, color: "var(--text2)", marginTop: 8, paddingLeft: 11, borderLeft: "2px solid var(--border2)", lineHeight: 1.5 }}>“{a.note}” <span style={{ color: "var(--faint)" }}>— {firstName} at booking</span></div>}
+                  {st === "done" && a.wrapNote && <div style={{ fontSize: 12.5, color: "var(--text2)", marginTop: 8, paddingLeft: 11, borderLeft: "2px solid var(--border2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{a.wrapNote}</div>}
+                </button>
+              );
             })}
-          </div>;
-        })()}
+          </div>
+        )}
+      </div>}
+
+      {/* ============ PHOTOS — gallery grouped by the day each was added ============ */}
+      {pfTab === "photos" && <div style={{ paddingBottom: 24 }}>
+        <div style={{ ...tabLabel, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>Photos{gallery.length ? ` · ${gallery.length}` : ""}</span>
+          <button onClick={() => setGalPicker(true)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 5, cursor: "pointer", letterSpacing: 0, textTransform: "none", fontFamily: FONT_BODY }}><Plus size={14} /> Add photo</button>
+        </div>
+        {gallery.length === 0 ? (
+          <p style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", padding: "2px 2px" }}>No photos yet. Tap “Add photo” to start a gallery — each one files under the day you add it.</p>
+        ) : galleryByDate.map(([label, gs]) => (
+          <div key={label} style={{ marginBottom: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11, margin: "18px 0 11px", fontSize: 10.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{label}<span style={{ flex: 1, height: 1, background: "var(--line)" }} /></div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+              {gs.map((g) => (
+                <button key={g.id} onClick={() => setLightbox(g.id)} style={{ position: "relative", aspectRatio: "1", borderRadius: 13, overflow: "hidden", border: "1px solid var(--border)", padding: 0, cursor: "pointer", background: "var(--panel2)" }}>
+                  <img src={imgUrl(g.photo, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  {g.source === "client" && <span style={{ position: "absolute", left: 6, bottom: 6, fontSize: 8.5, letterSpacing: 0.4, fontWeight: 700, color: "#fff", background: "rgba(0,0,0,.5)", padding: "2px 6px", borderRadius: 5 }}>Client</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>}
 
       {/* ============ PRICING ============ */}
@@ -25439,6 +25564,52 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           )}
         </div>
       )}
+
+      {/* ============ ADD TO WAITLIST ============ */}
+      <Sheet open={wlSheet} onClose={() => setWlSheet(false)} align="center" maxWidth={440}>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, marginBottom: 4 }}>Add to the waitlist</h2>
+        <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>{live.phone ? `${firstName}'s number is on file — we'll text if a matching slot opens.` : `Add a phone number to ${firstName}'s profile first so we can reach them.`}</p>
+
+        <div style={{ fontSize: 10, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>Barber</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+          {wlProvOptions.map((p) => { const on = wlProv === p; return (
+            <button key={p} onClick={() => setWlProv(p)} style={{ padding: "9px 14px", borderRadius: 10, border: "none", background: on ? "var(--wash)" : "var(--panel2)", color: on ? "var(--gold)" : "var(--sub)", fontFamily: FONT_BODY, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{p === "Anyone" ? "Any barber" : p}</button>
+          ); })}
+        </div>
+
+        <div style={{ fontSize: 10, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>Which days? <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--sub)", fontWeight: 400 }}>(up to 3)</span></div>
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 14 }}>
+          {wlDayOpts.slice(0, 12).map((d, i) => { const l = wlDayLabel(d); const on = wlDays.includes(l); const atMax = !on && wlDays.length >= 3; return (
+            <button key={i} disabled={atMax} onClick={() => toggleWlDay(l)} style={{ flexShrink: 0, minWidth: 52, padding: "9px 0", borderRadius: 10, border: "none", background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center", opacity: atMax ? 0.4 : 1, cursor: atMax ? "default" : "pointer" }}>
+              <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.7 }}>{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][d.getDay()]}</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17 }}>{d.getDate()}</div>
+            </button>
+          ); })}
+        </div>
+
+        {wlDays.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            {wlDays.map((l) => { const sel = wlDayTimes[l] || "any"; return (
+              <div key={l} style={{ background: "var(--panel2)", borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 8 }}>{l}</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {[["morning", "Morning"], ["afternoon", "Afternoon"], ["evening", "Evening"], ["any", "Any"]].map(([id, label]) => { const on = sel === id; return (
+                    <button key={id} onClick={() => setWlDayTimes((t) => ({ ...t, [l]: id }))} style={{ padding: "6px 11px", borderRadius: 9, border: "none", background: on ? "var(--wash)" : "var(--panel)", color: on ? "var(--gold)" : "var(--text2)", fontSize: 12.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{label}</button>
+                  ); })}
+                </div>
+              </div>
+            ); })}
+          </div>
+        )}
+
+        <div style={{ fontSize: 10, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>Service</div>
+        <select value={wlService} onChange={(e) => setWlService(e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14.5, fontFamily: FONT_BODY, marginBottom: 20, boxSizing: "border-box" }}>
+          <option value="">Choose a service…</option>
+          {services.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+        </select>
+
+        <button onClick={addToWaitlist} disabled={!wlAddReady} style={{ width: "100%", background: wlAddReady ? "var(--gold)" : "var(--panel2)", color: wlAddReady ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 14.5, fontWeight: 600, borderRadius: 12, border: "none", cursor: wlAddReady ? "pointer" : "default" }}>Add to waitlist</button>
+      </Sheet>
 
       {/* ============ LIGHTBOX ============ */}
       {lightbox && (() => { const g = gallery.find((x) => x.id === lightbox); if (!g) return null; return (
