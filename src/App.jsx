@@ -21276,7 +21276,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                       const txt = (Array.isArray(a.addonLabels) && a.addonLabels.length)
                         ? [...new Set(a.addonLabels.map(cleanServiceLabel).filter(Boolean))].join(" · ")
                         : (a.detail || "");
-                      return txt ? <div style={{ fontSize: 11.5, fontWeight: 500, letterSpacing: 0.1, color: subOn, lineHeight: 1.35, marginTop: 5, paddingRight: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{txt}</div> : null;
+                      return txt ? <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: 0.1, color: nameOn, lineHeight: 1.35, marginTop: 5, paddingRight: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{txt}</div> : null;
                     })()}
                     {/* quiet markers, bottom-right: ✎ note · ▱ photos · NEW · ↻ rebooked · ★ regular */}
                     {height > 54 && (
