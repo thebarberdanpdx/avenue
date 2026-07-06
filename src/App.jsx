@@ -1361,6 +1361,18 @@ const addonPriceFor = (service, providerId, group) => {
   if (se && se.addonPrice && group && se.addonPrice[group.id] != null) return Number(se.addonPrice[group.id]) || 0;
   return Number(group && group.item && group.item.price) || 0;
 };
+// Turn an add-on label into the plain SERVICE the client actually chose — never the yes/no prompt.
+// Owners often name an add-on as a question ("Want a facial?", "Add a hot towel?"), but the appointment
+// card, calendar and every booking notification should read the thing itself ("Facial", "Hot towel"),
+// so staff know what to prep. Only strings that read as a question (end in "?") are rewritten; a real
+// service name ("The Gentleman's Facial", "Skin fade or specialty style") passes straight through.
+const cleanServiceLabel = (raw) => {
+  let s = String(raw == null ? "" : raw).trim();
+  if (!s || !s.endsWith("?")) return s;                       // real service name (or empty) — leave as-is
+  s = s.replace(/\?+\s*$/, "").trim();                        // drop the trailing question mark(s)
+  const stripped = s.replace(/^(?:want|add|care for|would you like|interested in|how about|fancy)(?:\s+(?:a|an|the|some))?\s+/i, "").trim() || s;
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1); // "Want a facial?" -> "Facial"
+};
 // Per-ANSWER overrides — a chosen question answer (e.g. "Skin fade") can take a barber more time / cost
 // more. per-barber override (staff.answerDur/answerPrice[groupId][optId]) → the answer's own min/price.
 // These only adjust the answer's EXTRA minutes; the base service length still comes from getDuration
@@ -3791,7 +3803,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     entry.service.addonGroups.forEach((g) => {
       const sel = entry.addons[g.id];
       if (g.type === "choice" && sel) picks.push(g.options.find((o) => o.id === sel)?.label);
-      if (g.type === "addon" && sel) picks.push(g.item.name);
+      if (g.type === "addon" && sel) picks.push(cleanServiceLabel(g.item.name));
     });
     return picks.length ? `${entry.service.name} (${picks.join(", ")})` : entry.service.name;
   };
@@ -3810,7 +3822,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     (entry.service.addonGroups || []).forEach((g) => {
       const sel = entry.addons && entry.addons[g.id];
       if (g.type === "choice" && sel) picks.push(g.options.find((o) => o.id === sel)?.label);
-      if (g.type === "addon" && sel) picks.push(g.item.name);
+      if (g.type === "addon" && sel) picks.push(cleanServiceLabel(g.item.name));
     });
     return picks.filter(Boolean);
   };
@@ -19702,7 +19714,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
     }
     if (!selVal) return { p: 0, m: 0, label: null };
     const it = (svcGrp && svcGrp.item) || grp.item || {};
-    return { p: it.addsPrice !== false ? (svcGrp ? addonPriceFor(service, provId, svcGrp) : (Number(it.price) || 0)) : 0, m: it.addsTime !== false ? (svcGrp ? addonDuration(service, provId, svcGrp) : (Number(it.min) || 0)) : 0, label: it.name || grp.label };
+    return { p: it.addsPrice !== false ? (svcGrp ? addonPriceFor(service, provId, svcGrp) : (Number(it.price) || 0)) : 0, m: it.addsTime !== false ? (svcGrp ? addonDuration(service, provId, svcGrp) : (Number(it.min) || 0)) : 0, label: cleanServiceLabel(it.name || grp.label) };
   };
   const optExtra = (() => {
     let p = 0, m = 0; const labels = [];
@@ -21247,8 +21259,12 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: height > 48 ? 3 : 0, paddingRight: height <= 54 && isNew ? 30 : 0 }}>{apptDisplayName(a, clients)}</span>
                     {/* full time range under the name */}
                     {height > 64 && <span style={{ fontSize: 11, color: subOn, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{range}</span>}
-                    {/* add-on detail only on tall blocks */}
-                    {height > 110 && a.detail && <div style={{ fontSize: 12, color: subOn, lineHeight: 1.3, marginTop: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{a.detail}</div>}
+                    {/* cut style + add-ons on tall blocks — detail (older/staff appts) or addonLabels (online) */}
+                    {height > 110 && (() => {
+                      const src = a.detail ? a.detail.split(",") : (Array.isArray(a.addonLabels) ? a.addonLabels : []);
+                      const txt = [...new Set(src.map((d) => cleanServiceLabel(d)).filter(Boolean))].join(", ");
+                      return txt ? <div style={{ fontSize: 12, color: subOn, lineHeight: 1.3, marginTop: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{txt}</div> : null;
+                    })()}
                     {/* quiet markers, bottom-right: ✎ note · ▱ photos · NEW · ↻ rebooked · ★ regular */}
                     {height > 54 && (
                     <div style={{ position: "absolute", bottom: 9, right: 11, display: "flex", gap: 7, alignItems: "center", color: subOn }}>
@@ -23893,10 +23909,23 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   </div>
                 )}
                 {discOpen && <DiscountPicker discounts={business?.discounts || []} current={appt.discount || null} onPick={(d) => { onUpdate(appt.id, { discount: d }); showToast(d ? `${d.name} applied — comes off at checkout.` : "Discount removed."); }} onClose={() => setDiscOpen(false)} />}
+                {/* cut style + chosen add-ons, so the barber sees what to prep at a glance. Online bookings
+                    carry these on addonLabels (the question label is cleaned to the service itself). */}
+                {Array.isArray(appt.addonLabels) && appt.addonLabels.length > 0 && (() => {
+                  const chips = [...new Set(appt.addonLabels.map((d) => cleanServiceLabel(d)).filter(Boolean))];
+                  return chips.length ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 13 }}>
+                      {chips.map((d, i) => (
+                        <span key={i} style={{ background: T.chip, color: T.text, padding: "7px 12px", borderRadius: 8, fontSize: 13.5 }}>{d}</span>
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
+                {/* legacy / staff-entered detail (older appts store the cut or a note here) — kept so nothing is lost */}
                 {appt.detail && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 13 }}>
                     {appt.detail.split(",").map((d, i) => (
-                      <span key={i} style={{ background: T.chip, color: T.text, padding: "7px 12px", borderRadius: 8, fontSize: 13.5 }}>{d.trim()}</span>
+                      <span key={i} style={{ background: T.chip, color: T.text, padding: "7px 12px", borderRadius: 8, fontSize: 13.5 }}>{cleanServiceLabel(d.trim())}</span>
                     ))}
                   </div>
                 )}
