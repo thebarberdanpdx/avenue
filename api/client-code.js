@@ -65,7 +65,13 @@ export default async function handler(req, res) {
         ? { shop, channel: "text", to: { phone: digits }, subject: "Your sign-in code", template: `Your sign-in code is ${code}. It expires in 10 minutes.`, context: {} }
         : { shop, channel: "email", to: { email: em }, subject: "Your sign-in code", template: `Your sign-in code is ${code}. It expires in 10 minutes. If you didn't request this, you can ignore this email.`, context: {} };
       await fetch(origin + "/api/notify", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // Trusted server-to-server call → skip notify's public Origin/rate-limit gate.
+          "x-internal-key": process.env.INTERNAL_API_KEY || "",
+        },
+        body: JSON.stringify(body),
       }).catch(() => {});
     }
 

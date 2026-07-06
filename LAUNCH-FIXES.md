@@ -56,9 +56,38 @@ Single batched migration:
   (`customPrices`, `customDurations`, `cadenceDays`, `blocked`, `blockReason`) from the
   incoming member and caps the family array at 25 to stop bloat/spam.
 
+## 🔧 Fix #4 — Rate-limit notify.js / push.js (code pushed; 2 manual steps to activate)
+**Issue:** `notify.js` and `push.js` were gated only by an Origin header check, which a
+scripted attacker can forge — so both were effectively open: send email/SMS to a shop's
+staff (toll-fraud + phishing) or push arbitrary alerts to their iPhones.
+
+**Code (done, on branch):**
+- New `lib/ratelimit.js` — DB-backed limiter (per endpoint+shop+IP), fails open.
+- `api/notify.js` — public callers now pass Origin **and** a 30-per-10-min rate limit;
+  trusted internal caller (`client-code.js`) is exempt via an `x-internal-key` secret.
+- `api/push.js` — same 30-per-10-min limit; also stopped echoing device-token prefixes
+  back to the caller.
+- `api/client-code.js` — sends `x-internal-key` so login-code emails stay exempt.
+
+**2 steps to activate (only you can do these):**
+1. Create the table — run in Supabase SQL editor:
+   ```sql
+   create table if not exists public.rate_limits (
+     bucket text not null,
+     created_at timestamptz not null default now()
+   );
+   create index if not exists rate_limits_bucket_time on public.rate_limits (bucket, created_at);
+   alter table public.rate_limits enable row level security; -- no policies: service-role only
+   ```
+2. In Vercel → project → Settings → Environment Variables, add **`INTERNAL_API_KEY`** =
+   any long random string. (Optional but recommended — without it, login-code sends fall
+   under the same public limit, which is fine at low volume.)
+3. Deploy: `npx vercel --prod --force`.
+
+_Note: this bounds flooding; it is not full auth (a public booking endpoint can't fully
+authenticate an anonymous booker). Deeper content/blast-radius hardening tracked separately._
+
 ## 🧠 Needs code work (not pure SQL) — tracked, not yet done
-- **notify.js / push.js** unauthenticated → anyone can spam/phish a shop's staff by email/
-  SMS/push. Fix = real auth + rate limiting (code change, push to branch).
 - **Server-authoritative pricing (C3)** — `book_public` trusts client-sent `price`/deposit/
   paid flags. Impact: online prepay/deposit bypass, no-show-fee defeat, poisoned reports.
   In-person checkout limits the "free haircut." Needs price re-derived server-side.
