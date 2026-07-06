@@ -731,6 +731,12 @@ const THEMES = [
     disp: "'Space Grotesk', sans-serif", body: "'Inter', sans-serif", grain: 0.04,
     canvas: "linear-gradient(176deg,#FCFAF7,#F4EFE8)",
     t: { bg:"#FAF8F5", panel:"#FFFFFF", panel2:"#F3EEE7", line:"#ECE6DD", border:"#E4DDD2", border2:"#CFC5B6", text:"#1A1714", text2:"#423C34", sub:"#6A6258", faint:"#968C7C", gold:"#1E1B17", onGold:"#FAF8F5", shadow:"rgba(40,30,15,.08)", overlay:"rgba(26,23,20,0.42)" } },
+  // Atelier — the "premium grooming brand" direction (2026-07-06): warm paper, warm ink,
+  // one deep-pine accent, editorial Fraunces serif. Quiet, roomy, easy to read.
+  { id: "atelier", name: "Atelier", tagline: "Warm paper, ink & pine", cat: "Crisp & Minimal", dark: false,
+    disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.035,
+    canvas: "linear-gradient(176deg,#FCFBF8,#F5F3EC)",
+    t: { bg:"#FAF9F6", panel:"#FFFFFF", panel2:"#F4F2EC", line:"#EFEDE6", border:"#E6E3DB", border2:"#D3CEC2", text:"#1B1A16", text2:"#3B372F", sub:"#8A857A", faint:"#B3AEA3", gold:"#34483C", onGold:"#F6F4EE", live:"#34483C", shadow:"rgba(40,34,22,.08)", overlay:"rgba(24,22,18,0.42)" } },
   // ===== BOLD & SLEEK — deep, dramatic dark themes =====
   { id: "noir", name: "Noir", tagline: "Midnight, lit in platinum", cat: "Bold & Sleek", dark: true,
     disp: "'Fraunces', serif", body: "'Jost', sans-serif", grain: 0.08,
