@@ -13274,7 +13274,14 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
             </div>
           ); })}
         </div>
-        <button onClick={onOpenMessages} style={{ marginTop: 14, background: "none", border: "none", color: "var(--gold)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "4px 2px", display: "inline-flex", alignItems: "center", gap: 5 }}>Edit wording & timing <ChevronRight size={15} /></button>
+        <button onClick={onOpenMessages} style={{ marginTop: 12, width: "100%", display: "flex", alignItems: "center", gap: 13, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "15px 16px", cursor: "pointer", textAlign: "left", fontFamily: FONT_BODY }}>
+          <span style={{ width: 38, height: 38, borderRadius: 11, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><MessageSquare size={18} style={{ color: "var(--gold)" }} /></span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 15.5, fontWeight: 600, color: "var(--text)" }}>Edit wording &amp; timing</span>
+            <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>Change the exact words in each message and when it sends</span>
+          </span>
+          <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
+        </button>
       </>) : (<>
         <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>How your team is alerted to activity. <b>App</b> pop-ups go to the assigned barber's phone (needs the Vero iOS app, notifications allowed). <b>Text</b> &amp; <b>Email</b> reach the contact info saved in each staff profile.</p>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 14px" }}>
