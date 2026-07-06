@@ -3248,7 +3248,7 @@ function fireApptNotify({ msgId, appt, business, providers, contact, subject, ex
     const ctx = {
       client: String(appt.name || "there").split(" ")[0], business: business.name || "your shop",
       service: appt.serviceName || appt.title || "your appointment",
-      addons: Array.isArray(appt.addonLabels) ? appt.addonLabels : [],
+      addons: Array.isArray(appt.addonLabels) ? appt.addonLabels.map(cleanServiceLabel).filter(Boolean) : [],
       date: dateStr, time: `${h12}:${String(mn).padStart(2, "0")} ${ap}`, provider: prov.name || appt.providerName || "your staff member",
       address: [business.address, business.address2].filter(Boolean).join(", "),
       phone: (business.phones && business.phones[0] && business.phones[0].number) || "",
@@ -7475,7 +7475,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
       const sm = a.start || 0, hr = Math.floor(sm / 60), mn = sm % 60, ap = hr >= 12 ? "PM" : "AM", h12 = (hr % 12) || 12;
       const ctx = {
         client: String(a.name || "there").split(" ")[0], business: business.name || "your shop",
-        service: a.serviceName || a.title || "your appointment", addons: Array.isArray(a.addonLabels) ? a.addonLabels : [],
+        service: a.serviceName || a.title || "your appointment", addons: Array.isArray(a.addonLabels) ? a.addonLabels.map(cleanServiceLabel).filter(Boolean) : [],
         date: dateStr, time: `${h12}:${String(mn).padStart(2, "0")} ${ap}`, provider: pv.name || a.providerName || "your staff member",
         address: [business.address, business.address2].filter(Boolean).join(", "),
         phone: (business.phones && business.phones[0] && business.phones[0].number) || "",
@@ -7546,7 +7546,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
   const when = fmtWhenObj(appt.bookedFor);
   const dObj = new Date(appt.bookedFor);
   const _h = dObj.getHours(), _m = dObj.getMinutes(), heroAP = _h >= 12 ? "PM" : "AM", heroHM = `${(_h % 12) || 12}:${String(_m).padStart(2, "0")}`;
-  const addonsStr = Array.isArray(appt.addonLabels) ? appt.addonLabels.join(" · ") : "";
+  const addonsStr = Array.isArray(appt.addonLabels) ? appt.addonLabels.map(cleanServiceLabel).filter(Boolean).join(" · ") : "";
   const changeable = hoursUntil(appt.bookedFor) >= windowHrs;
   const refCode = token ? token.slice(0, 6).toUpperCase().replace(/(.{3})(.{3})/, "$1·$2") : "";
 
