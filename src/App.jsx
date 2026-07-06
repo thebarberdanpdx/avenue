@@ -3622,6 +3622,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [agreed, setAgreed] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false); // cancellation policy text collapsed by default on confirm
   const [cardOnFile, setCardOnFile] = useState(false); // card-on-file / deposit captured for this booking
+  const [cardOnFileInvalid, setCardOnFileInvalid] = useState(false); // returning client's saved card failed Stripe validity (expired/gone) → force a new card
   const [cardSheetOpen, setCardSheetOpen] = useState(false); // real Stripe card-entry sheet open
   const [cardInfo, setCardInfo] = useState(null); // { last4, paid, saved } once captured
   const [bookTipPct, setBookTipPct] = useState(null);   // #7 prepay: chosen tip % (null = none picked)
@@ -4506,6 +4507,32 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       setCardOnFile(true);
     }
   }, [matched]);
+
+  // Card-on-file validity gate: a returning client's saved card must still be good at Stripe
+  // (exists + not expired as of the appointment date) before it can satisfy "card required".
+  // An expired/removed card is dropped so the client is asked to add a new one — a booking can
+  // never ride on a dead card. ONLY the returning on-file card (onFile === true) is checked; a
+  // card the client just entered is never re-validated. Best-effort: a failed check (network/API)
+  // never blocks the booking, it just leaves the existing card in place.
+  const cardCheckedRef = useRef("");
+  useEffect(() => {
+    if (!cardInfo || cardInfo.onFile !== true || !cardInfo.pmId) return;
+    if (business.payments?.live !== true) return; // only real (live) cards exist at Stripe; test-mode cards are simulated
+    const bk = business.booking || {}, dep = bk.deposit || {};
+    const needsCard = (dep.mode && dep.mode !== "none") || (cart.length ? cart.some((e) => { const r = e && e.service && e.service.booking ? e.service.booking.requireCard : undefined; return r === undefined ? !!bk.requireCard : !!r; }) : !!bk.requireCard);
+    if (!needsCard) return; // no card required for this booking → nothing to validate
+    const key = cardInfo.pmId + "|" + (selectedDate ? selectedDate.toDateString() : "");
+    if (cardCheckedRef.current === key) return; // one check per (card, date)
+    cardCheckedRef.current = key;
+    let alive = true;
+    (async () => {
+      try {
+        const r = await stripeApi({ action: "card_status", paymentMethodId: cardInfo.pmId, byDate: selectedDate ? selectedDate.toISOString() : undefined });
+        if (alive && r && r.valid === false) { setCardOnFileInvalid(true); setCardOnFile(false); setCardInfo(null); }
+      } catch (e) { /* network/API hiccup — don't block a booking on a failed validity check */ }
+    })();
+    return () => { alive = false; };
+  }, [cardInfo, selectedDate, cart, business]);
 
   // After the card is saved, finish the booking exactly once. Driven by state (not a cross-component
   // call) so it always runs with fresh cardOnFile and can't double-fire.
@@ -6901,6 +6928,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       ? <>A <b style={{ color: "var(--text)" }}>${depositAmt}</b> deposit holds your spot and goes toward your total. The rest (${Math.max(0, cartAdjTotal - depositAmt)}) is due at your visit.</>
                       : <>We keep a card on file to hold your spot. You won't be charged unless you no-show or cancel late, per the policy above.</>}
                   </p>
+                  {cardOnFileInvalid && !cardOnFile && (
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: "color-mix(in srgb, #C2563F 10%, var(--panel))", border: "1px solid color-mix(in srgb, #C2563F 35%, var(--border))", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+                      <span style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.45 }}>The card we had on file has expired or is no longer valid — please add a card below to hold your spot.</span>
+                    </div>
+                  )}
                   {cardOnFile ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px" }}>
                       <Check size={18} style={{ color: "var(--text)" }} />
