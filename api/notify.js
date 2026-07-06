@@ -14,6 +14,7 @@
 
 import { renderMessage, renderEmailHtml, renderPlainText, sendEmail, sendSms, resolveChannels } from "../lib/messaging.js";
 import { createClient } from "@supabase/supabase-js";
+import { allowRequest, clientIp } from "../lib/ratelimit.js";
 
 // Light anti-abuse guard. Booking runs on gotvero.com (web AND the native app,
 // which loads from server.url = https://gotvero.com), so the only legitimate
@@ -32,10 +33,22 @@ import { withErrorReporting } from "../lib/observe.js";
 export default withErrorReporting(handler, "notify");
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
-  if (!originAllowed(req)) return res.status(403).json({ error: "forbidden" });
   const b = req.body || {};
   const to = b.to || {};
   const SMS_LIVE = process.env.SMS_LIVE === "true";
+
+  // Trusted internal callers (api/client-code.js) present a shared secret and skip
+  // the public gates. Everyone else (the public booking page, and any scripted caller)
+  // must pass the Origin filter AND a per-shop/per-IP rate limit so this pipe can't be
+  // flooded to spam/phish staff or burn the SMS budget. Fails open on limiter error.
+  const internalKey = (req.headers["x-internal-key"] || "").toString();
+  const isInternal = !!process.env.INTERNAL_API_KEY && internalKey === process.env.INTERNAL_API_KEY;
+  if (!isInternal) {
+    if (!originAllowed(req)) return res.status(403).json({ error: "forbidden" });
+    const shopForLimit = String(b.shop || (b.staff && b.staff.shopId) || "none");
+    const ok = await allowRequest(`notify:${shopForLimit}:${clientIp(req)}`, 30, 10 * 60 * 1000);
+    if (!ok) return res.status(429).json({ error: "Too many requests. Please try again shortly." });
+  }
 
   // ---- Staff booking alert: notify the barber an appointment is for, at the email/phone
   //      saved in their staff profile. Recipients are resolved SERVER-SIDE with the service

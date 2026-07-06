@@ -15,6 +15,7 @@
 import crypto from "crypto";
 import http2 from "http2";
 import { createClient } from "@supabase/supabase-js";
+import { allowRequest, clientIp } from "../lib/ratelimit.js";
 
 const BUNDLE_ID = process.env.APNS_BUNDLE_ID || "com.gotvero.app";
 
@@ -82,6 +83,12 @@ async function handler(req, res) {
   const { shopId, title, body, data, clientId } = req.body || {};
   if (!shopId || !title) return res.status(400).json({ error: "missing shopId or title" });
 
+  // Bound abuse: anyone reaching this URL could push arbitrary alerts to a shop's staff
+  // iPhones. Cap per shop+IP so it can't be used as a push-spam/phishing cannon. Fails
+  // open on limiter error so a real "new booking" push is never dropped.
+  const rlOk = await allowRequest(`push:${shopId}:${clientIp(req)}`, 30, 10 * 60 * 1000);
+  if (!rlOk) return res.status(429).json({ error: "Too many requests. Please try again shortly." });
+
   if (!process.env.APNS_KEY || !process.env.APNS_KEY_ID || !process.env.APNS_TEAM_ID ||
       !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return res.status(500).json({ error: "push not configured" });
@@ -126,7 +133,8 @@ async function handler(req, res) {
       r = await sendOne("api.sandbox.push.apple.com", t, providerToken, payload);
     }
     if (r.ok) sent++;
-    results.push({ token: t.slice(0, 10) + "…", status: r.status || 0, reason: r.reason || "" });
+    // Don't echo any part of the device token back to the (public) caller.
+    results.push({ status: r.status || 0, reason: r.reason || "" });
   }
 
   return res.status(200).json({ sent, total: tokens.length, results });
