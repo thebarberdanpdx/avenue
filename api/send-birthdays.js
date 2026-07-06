@@ -29,11 +29,16 @@ async function handler(req, res) {
   // Some serverless runtimes ship without the IANA timezone database and throw
   // "RangeError: Invalid time zone specified" on a named zone. Try the shop tz; if it
   // throws, fall back to UTC date parts (date-granular, so birthday matching is unaffected).
-  let todayMD, year;
+  // mdFmt is reused below to read MM/DD off any free-text birthday we couldn't normalise to ISO.
+  // It MUST be defined here — a missing mdFmt threw ReferenceError on the first non-ISO birthday
+  // and crashed the whole run, silently killing birthday emails shop-wide.
+  let todayMD, year, mdFmt;
   try {
-    todayMD = new Intl.DateTimeFormat("en-US", { timeZone: TZ, month: "2-digit", day: "2-digit" }).format(today);
+    mdFmt = new Intl.DateTimeFormat("en-US", { timeZone: TZ, month: "2-digit", day: "2-digit" });
+    todayMD = mdFmt.format(today);
     year = new Intl.DateTimeFormat("en-US", { timeZone: TZ, year: "numeric" }).format(today);
   } catch (e) {
+    mdFmt = new Intl.DateTimeFormat("en-US", { month: "2-digit", day: "2-digit" });
     todayMD = String(today.getUTCMonth() + 1).padStart(2, "0") + "/" + String(today.getUTCDate()).padStart(2, "0");
     year = String(today.getUTCFullYear());
   }
