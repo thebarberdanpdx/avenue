@@ -6982,7 +6982,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
                   <button onClick={() => setSmsConsent(v => !v)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, color: "var(--text)", cursor: "pointer", flex: 1, textAlign: "left" }}>
                     <span style={{ width: 44, height: 26, borderRadius: 13, background: smsConsent ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: smsConsent ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-                    <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>Text me my appointment reminders</span>
+                    <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>Consent to SMS <span style={{ color: "var(--sub)" }}>(Required)</span></span>
                   </button>
                   <button onClick={() => setSmsOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, fontWeight: 600, padding: "6px 2px", flexShrink: 0, cursor: "pointer" }}>{smsOpen ? "Hide" : "Read it ›"}</button>
                 </div>
