@@ -23539,11 +23539,22 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   // back on close — reverting every saved note. Reading the ref means: after Save (note ===
   // stored) the cleanup is a no-op; a typed-but-unsaved note still auto-persists. Never reverts.
   const wuNoteRef = useRef(wuNote); wuNoteRef.current = wuNote;
+  // Persist the running note AND stamp a dated "Visit note" entry on the timeline (one per
+  // appointment — re-edits update that entry in place instead of stacking duplicates).
+  const persistWuNote = (raw) => {
+    const v = (raw || "").trim();
+    patchTarget((p) => {
+      if ((p.notes || "") === v) return p;
+      const tid = "tlvn_" + appt.id;
+      const rest = (p.timeline || []).filter((x) => x.id !== tid);
+      const entry = { id: tid, text: `Visit note — “${v}”`, date: new Date().toISOString() };
+      return { ...p, notes: v, timeline: v ? [entry, ...rest] : rest };
+    });
+  };
   // Fallback only: if the sheet closes with an unsaved note, persist it so it isn't lost.
   useEffect(() => () => {
     if (!client) return;
-    const v = (wuNoteRef.current || "").trim();
-    patchTarget((p) => ((p.notes || "") !== v) ? { ...p, notes: v } : p);
+    persistWuNote(wuNoteRef.current);
   }, []);
   const addWuPhoto = (file) => {
     if (!file || !client) return;
@@ -23587,8 +23598,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const commitWuNote = () => {
     if (!client) return;
     const v = (wuNote || "").trim();
-    let changed = false;
-    patchTarget((pt) => { if ((pt.notes || "") === v) return pt; changed = true; return { ...pt, notes: v }; });
+    const changed = ((wuTarget && wuTarget.notes) || "") !== v;
+    persistWuNote(v);
     if (changed) { setWuSaved(true); setTimeout(() => setWuSaved(false), 2500); }
   };
   // Commit all pending Wrap Up changes (note + duration) on the Save button.
