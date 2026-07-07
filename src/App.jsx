@@ -3677,11 +3677,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const max = 1200; let w = img.width, h = img.height;
+        const max = 900; let w = img.width, h = img.height;
         if (w > h && w > max) { h = Math.round(h * max / w); w = max; } else if (h > max) { w = Math.round(w * max / h); h = max; }
         const c = document.createElement("canvas"); c.width = w; c.height = h;
         c.getContext("2d").drawImage(img, 0, 0, w, h);
-        const url = c.toDataURL("image/jpeg", 0.6);
+        const url = c.toDataURL("image/jpeg", 0.5); // keep the base64 payload small so the token save can't choke
         setPhotos((cur) => cur.length >= 3 ? cur : [...cur, url]);
       };
       img.src = reader.result;
@@ -3700,11 +3700,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const max = 600; let w = img.width, h = img.height;
+        const max = 500; let w = img.width, h = img.height;
         if (w > h && w > max) { h = Math.round(h * max / w); w = max; } else if (h > max) { w = Math.round(w * max / h); h = max; }
         const c = document.createElement("canvas"); c.width = w; c.height = h;
         c.getContext("2d").drawImage(img, 0, 0, w, h);
-        applySelfie(c.toDataURL("image/jpeg", 0.7));
+        applySelfie(c.toDataURL("image/jpeg", 0.6)); // small profile-photo payload for the token save
       };
       img.src = reader.result;
     };
@@ -4225,28 +4225,32 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     </div>); };
 
   // Reference photos / note are now added on the post-booking "You're in" screen (like Mangomint).
-  // While on that screen, keep the booked appointment in sync with whatever the client attaches.
+  // ── ONE reliable server write for every confirmation-screen extra ──────────────────────────────
+  // A PUBLIC (anon) client's React state never syncs to the server — only explicit RPCs write. So this
+  // single token-authenticated call (same model as the proven $5-discount write) is THE persistence
+  // path. It writes, on the server: the note + reference photos → the appointment; the selfie → the
+  // client's profile photo; and each reference photo → the client's gallery (by date). Photos are
+  // downscaled so the payload stays small (a bloated body was silently failing before).
+  const saveConfirmationExtras = (over = {}) => {
+    if (isStaff || !bookedToken) return;
+    const note = ((over.note !== undefined ? over.note : clientNote) || "").trim();
+    const pd = Array.isArray(over.photos) ? over.photos : (Array.isArray(photos) ? photos : []);
+    const sf = (over.selfie !== undefined ? over.selfie : selfie) || null;
+    try { supabase.rpc("attach_booking_extras_by_token", { p_token: bookedToken, p_note: note, p_photos: pd, p_selfie: sf }).catch(() => {}); } catch (e) {}
+  };
+  // Keep the booked appointment in local state in sync while on the confirmation screen, and re-save the
+  // extras to the server (debounced) after any change to the note / photos / selfie.
   useEffect(() => {
     if (step !== 8 || bookedId == null) return;
-    const note = clientNote.trim();
-    const pd = photos;
-    setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, note, hasNote: !!note, photos: pd.length, hasPhotos: pd.length > 0, photoData: pd } : a));
-  }, [step, bookedId, clientNote, photos]);
-  // Persist a PUBLIC client's post-booking note + reference photos to the appointment on the SERVER
-  // (staff bookings already persist through the dashboard). Debounced so we write once after they
-  // finish, scoped to the appointment's own private code so it can only ever touch their booking.
-  // Server-side only — no SMS, no email, no cost.
-  useEffect(() => {
-    if (isStaff || step !== 8 || !bookedToken) return;
-    const note = clientNote.trim();
+    const note = (clientNote || "").trim();
     const pd = Array.isArray(photos) ? photos : [];
-    if (!note && !pd.length) return;
-    const t = setTimeout(() => {
-      supabase.rpc("attach_booking_details_by_token", { p_token: bookedToken, p_note: note, p_photos: pd }).catch(() => {});
-    }, 1200);
+    setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, note, hasNote: !!note, photos: pd.length, hasPhotos: pd.length > 0, photoData: pd } : a));
+    if (isStaff || !bookedToken) return;
+    const t = setTimeout(() => saveConfirmationExtras(), 900);
     return () => clearTimeout(t);
-  }, [isStaff, step, bookedToken, clientNote, photos]);
-  // Capture the attached reference photos onto the client's gallery once, when they leave the screen.
+  }, [step, bookedId, bookedToken, isStaff, clientNote, photos, selfie]);
+  // Mirror the reference photos onto the just-booked client's LOCAL gallery immediately (the server copy
+  // is written by the extras RPC) so their own signed-in-on-device view is in sync right away.
   const captureBookingGallery = () => {
     if (galleryCapturedRef.current || !photos.length || !bookedClientId) return;
     galleryCapturedRef.current = true;
@@ -4254,46 +4258,27 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     const entries = photos.map((p, i) => ({ id: "g" + baseTs + "_" + i, photo: p, note: "", date: new Date().toISOString(), source: "client" }));
     setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, gallery: [...entries, ...(c.gallery || [])] } : c));
   };
+  // Immediate flush on "Update Appt" / exit — guarantees the extras land even if the client leaves before
+  // the 900ms debounce fires. Also surfaces the in-app "note/photos added" alert to the assigned staff.
+  const flushBookingDetails = () => { saveConfirmationExtras(); };
 
-  // Write the post-booking note + reference photos to the appointment IMMEDIATELY (no debounce). The
-  // background debounce (see the step-8 effect) can be cancelled if the client leaves within ~1.2s, so
-  // "Update Appt"/exit calls this to guarantee the details land on the server — which also surfaces the
-  // in-app "note/photos added" alert to the assigned staff (the appts watcher picks up the change).
-  const flushBookingDetails = () => {
-    if (isStaff || bookedId == null || !bookedToken) return;
-    const note = (clientNote || "").trim();
-    const pd = Array.isArray(photos) ? photos : [];
-    setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, note, hasNote: !!note, photos: pd.length, hasPhotos: pd.length > 0, photoData: pd } : a));
-    if (!note && !pd.length) return;
-    try { supabase.rpc("attach_booking_details_by_token", { p_token: bookedToken, p_note: note, p_photos: pd }).catch(() => {}); } catch (e) {}
-  };
-
-  // Selfie taken on the CONFIRMATION screen: set it as the client's PROFILE photo (server-merged via
-  // save_booking_client) and take $5 off THIS visit. The discount is written onto the appointment by
-  // its own private code (set_selfie_discount_by_token) so staff see it at checkout — same possession-
-  // of-the-token model as the manage link. Runs post-booking only (bookedClientId/bookedToken are set).
+  // Selfie taken on the CONFIRMATION screen → the client's PROFILE photo + gallery (persisted by the
+  // extras RPC, passing the fresh dataURL since state isn't updated yet) and $5 off THIS visit.
   const SELFIE_DISCOUNT = { id: "selfie", name: "Profile photo", type: "amount", value: 5 };
   const applySelfie = (dataUrl) => {
     setSelfie(dataUrl);
     if (!bookedClientId) return;
     setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, photo: dataUrl } : c));
-    const existing = (clients || []).find((c) => c.id === bookedClientId);
-    const patch = existing ? { ...existing, photo: dataUrl } : { id: bookedClientId, photo: dataUrl };
-    try { supabase.rpc("save_booking_client", { p_shop: shopId, p_client: patch }).catch(() => {}); } catch (e) {}
     setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a));
     setMyAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a));
     if (matched && matched.id === bookedClientId) setMatched((m) => m ? { ...m, photo: dataUrl, _localAppts: Array.isArray(m._localAppts) ? m._localAppts.map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a) : m._localAppts } : m);
+    saveConfirmationExtras({ selfie: dataUrl });
     if (bookedToken) { try { supabase.rpc("set_selfie_discount_by_token", { p_token: bookedToken, p_on: true }).catch(() => {}); } catch (e) {} }
   };
   const clearSelfie = () => {
     setSelfie(null);
     if (!bookedClientId) return;
-    // Full undo: the offer only shows for clients with NO photo, so reverting the profile photo to
-    // none is correct — and it flips selfieEligible back to true so the offer reappears (re-addable).
-    const existing = (clients || []).find((c) => c.id === bookedClientId);
     setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, photo: undefined } : c));
-    const patch = existing ? { ...existing, photo: null } : { id: bookedClientId, photo: null };
-    try { supabase.rpc("save_booking_client", { p_shop: shopId, p_client: patch }).catch(() => {}); } catch (e) {}
     setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: undefined } : a));
     setMyAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: undefined } : a));
     if (matched && matched.id === bookedClientId) setMatched((m) => m ? { ...m, photo: undefined, _localAppts: Array.isArray(m._localAppts) ? m._localAppts.map((a) => a.id === bookedId ? { ...a, discount: undefined } : a) : m._localAppts } : m);
@@ -25510,6 +25495,36 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           <div style={tabLabel}>Upcoming</div>
           <div style={cardStyle}>{upcomingAppts.map((a) => <VisitRow key={a.id} a={a} mode="up" />)}</div>
         </>)}
+
+        {/* Gallery — every uploaded photo (client selfies/refs + staff adds), grouped by date */}
+        {gallery.length > 0 && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "22px 4px 10px" }}>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Gallery</div>
+              <button onClick={() => setGalPicker(true)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}><Plus size={14} /> Add photo</button>
+            </div>
+            {(() => {
+              const groups = {};
+              [...gallery].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)).forEach((g) => {
+                const key = g.date ? new Date(g.date).toDateString() : "undated";
+                (groups[key] = groups[key] || []).push(g);
+              });
+              return Object.values(groups).map((gs, gi) => (
+                <div key={gi} style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, color: "var(--sub)", margin: "0 4px 7px", fontWeight: 500 }}>{gs[0].date ? niceDate(gs[0].date) : "Undated"}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                    {gs.map((g) => (
+                      <button key={g.id} onClick={() => setLightbox(g.id)} style={{ position: "relative", aspectRatio: "1", borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", cursor: "pointer", padding: 0 }}>
+                        <img src={imgUrl(g.photo, 240)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                        {g.source === "client" && <span style={{ position: "absolute", bottom: 4, left: 4, fontSize: 9, fontWeight: 700, letterSpacing: 0.4, color: "#fff", background: "rgba(0,0,0,0.55)", borderRadius: 5, padding: "2px 5px" }}>CLIENT</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ));
+            })()}
+          </>
+        )}
 
         {/* the feed: visits + photos + notes, newest first */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "22px 4px 10px" }}>
