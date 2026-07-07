@@ -11187,6 +11187,31 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       const pruned = noteAppts.size ? cur.filter((n) => !(n.kind === "note" && noteAppts.has(n.apptId))) : cur;
       return [...fresh, ...pruned].slice(0, 50);
     });
+    // ── Change log → client timeline ─────────────────────────────────────────────
+    // Every appointment change this dashboard observes (booked, moved, cancelled, note/photos added —
+    // whether made by staff here or by the client via booking/manage links) is also recorded on the
+    // client's timeline, so the profile card keeps a permanent history. Deterministic ids make the
+    // writes idempotent (a re-observed change never duplicates).
+    if (fresh.length) {
+      const fmtW = (iso, startMin) => { const d = iso ? new Date(iso) : null; if (!d || isNaN(d)) return ""; const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()]; return `${dow}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}${typeof startMin === "number" ? " " + fmtTime(startMin) : ""}`; };
+      const logs = [];
+      for (const f of fresh) {
+        const appt = (appts || []).find((x) => String(x.id) === f.apptId);
+        if (!appt || !appt.clientId || appt.clientId === "guest") continue;
+        const svc = f.service ? ` — ${f.service}` : "";
+        if (f.kind === "new") logs.push({ clientId: appt.clientId, id: "tl_new_" + f.apptId, text: `${appt.bookedOnline ? "Booked online" : "Booked by staff"}${svc} · ${fmtW(f.when, f.start)}`, date: new Date().toISOString() });
+        else if (f.kind === "moved") logs.push({ clientId: appt.clientId, id: `tl_mv_${f.apptId}_${f.prevStart}_${f.start}_${new Date(f.when || 0).getTime()}`, text: `Rescheduled${svc}: ${fmtW(f.prevWhen, f.prevStart)} → ${fmtW(f.when, f.start)}${appt.bookedOnline ? "" : " (staff)"}`, date: new Date().toISOString() });
+        else if (f.kind === "canceled") logs.push({ clientId: appt.clientId, id: "tl_cx_" + f.apptId, text: `Cancelled${svc} · was ${fmtW(f.when, f.start)}`, date: new Date().toISOString() });
+        else if (f.kind === "note") logs.push({ clientId: appt.clientId, id: `tl_np_${f.apptId}_${f.addedNote ? 1 : 0}_${f.photoCount || 0}`, text: `Client added ${f.addedNote && f.photoCount > 0 ? "a note & " + f.photoCount + " photo" + (f.photoCount > 1 ? "s" : "") : f.addedNote ? "a note" : (f.photoCount || "") + " photo" + (f.photoCount > 1 ? "s" : "")} to ${fmtW(f.when, f.start)}${f.note ? `\n“${f.note}”` : ""}`, date: new Date().toISOString() });
+      }
+      if (logs.length) setClients((cur) => (cur || []).map((c) => {
+        const mine = logs.filter((l) => l.clientId === c.id);
+        if (!mine.length) return c;
+        const have = new Set((c.timeline || []).map((t) => t.id));
+        const add = mine.filter((l) => !have.has(l.id)).map(({ clientId, ...t }) => t);
+        return add.length ? { ...c, timeline: [...add, ...(c.timeline || [])] } : c;
+      }));
+    }
   }, [appts]);
   // Owners see the whole shop; a barber sees their own chair (mirrors the per-role
   // notification settings). Your own entries appear here too — that's intended.
@@ -23533,7 +23558,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
         canvas.width = w; canvas.height = h;
         canvas.getContext("2d").drawImage(img, 0, 0, w, h);
         const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
-        patchTarget((p) => ({ ...p, gallery: [...(p.gallery || []), { id: "g" + Date.now(), photo: dataUrl, note: "", date: new Date().toISOString() }] }));
+        patchTarget((p) => ({ ...p, gallery: [...(p.gallery || []), { id: "g" + Date.now(), photo: dataUrl, note: "", date: new Date().toISOString(), source: "staff", apptId: appt.id }] }));
         setWuSaved(true); setTimeout(() => setWuSaved(false), 2000);
         if (showToast) showToast("Photo saved to their profile.");
       };
@@ -24015,19 +24040,6 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 </div>
               )}
 
-              {/* appointment note — what the client typed at booking (or staff added). Read block in detail, textarea in edit. */}
-              {editing ? (
-                <div style={{ padding: "14px 18px", borderBottom: `1px solid ${T.line}` }}>
-                  <div style={{ fontSize: 11.5, letterSpacing: 1.5, color: T.sub, fontWeight: 600, marginBottom: 8 }}>APPOINTMENT NOTE</div>
-                  <textarea value={draftNote} onChange={(e) => setDraftNote(e.target.value)} placeholder="Anything to remember for this visit…" rows={2} style={{ width: "100%", boxSizing: "border-box", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 10, padding: "11px 13px", color: T.text, fontSize: 15, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", outline: "none" }} />
-                </div>
-              ) : (appt.note || "").trim() ? (
-                <div style={{ padding: "14px 18px", borderBottom: `1px solid ${T.line}` }}>
-                  <div style={{ fontSize: 11.5, letterSpacing: 1.5, color: T.sub, fontWeight: 600, marginBottom: 7 }}>{"\uD83D\uDCDD"} APPOINTMENT NOTE</div>
-                  <div style={{ background: T.chip, borderLeft: "2px solid var(--gold)", borderRadius: "0 9px 9px 0", padding: "10px 13px", fontSize: 14.5, color: T.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{appt.note.trim()}</div>
-                </div>
-              ) : null}
-
               {/* client */}
               <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
@@ -24125,6 +24137,21 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 </div>
               </div>
 
+
+              {/* appointment note — what the client typed at booking (or staff added). Sits directly
+                  under the service info, above the photos, on a highlighted band so it can't be missed. */}
+              {editing ? (
+                <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
+                  <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: T.sub, fontWeight: 700, marginBottom: 9 }}>APPOINTMENT NOTE</div>
+                  <textarea value={draftNote} onChange={(e) => setDraftNote(e.target.value)} placeholder="Anything to remember for this visit" rows={2} style={{ width: "100%", boxSizing: "border-box", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 10, padding: "12px 14px", color: T.text, fontSize: 15.5, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", outline: "none" }} />
+                </div>
+              ) : (appt.note || "").trim() ? (
+                <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}`, background: "color-mix(in srgb, var(--gold) 9%, transparent)" }}>
+                  <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, marginBottom: 8 }}>{"\uD83D\uDCDD"} APPOINTMENT NOTE</div>
+                  <div style={{ fontSize: 16, color: T.text, fontWeight: 500, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{"\u201C"}{appt.note.trim()}{"\u201D"}</div>
+                </div>
+              ) : null}
+
               {/* client-uploaded photos */}
               {(() => {
                 const pd = Array.isArray(appt.photoData) ? appt.photoData : [];
@@ -24199,21 +24226,25 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     {/* Photos — 3 tiles, camera or gallery */}
                     <div style={{ padding: 18, borderTop: service ? `1px solid ${T.line}` : "none" }}>
                       <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Photos</div>
+                      {/* Only photos taken in THIS visit's wrap-up — the client's booking photos live in
+                          "Client Photos" above and the profile gallery, never pre-filling these tiles. */}
+                      {(() => { const wuPhotos = (client.gallery || []).filter((g) => g.apptId === appt.id); return (
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        {(client.gallery || []).map((g) => (
+                        {wuPhotos.map((g) => (
                           <div key={g.id} style={{ width: 64, height: 64, borderRadius: 12, overflow: "hidden", position: "relative", flexShrink: 0, background: T.chip }}>
                             <img src={imgUrl(g.photo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                             <button onClick={() => removeWuPhoto(g.id)} style={{ position: "absolute", top: 4, right: 4, width: 21, height: 21, borderRadius: "50%", background: "rgba(0,0,0,.55)", color: "#fff", fontSize: 13, border: "none", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>×</button>
                           </div>
                         ))}
-                        {Array.from({ length: Math.max(1, 3 - (client.gallery || []).length) }).map((_, i) => (
+                        {Array.from({ length: Math.max(1, 3 - wuPhotos.length) }).map((_, i) => (
                           <button key={"wuadd" + i} className="lift" onClick={() => wuFileRef.current && wuFileRef.current.click()} style={{ width: 64, height: 64, borderRadius: 12, border: `1.5px dashed ${T.faint}`, background: "none", boxShadow: "none", color: T.accent, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
                             <Plus size={20} /> Add
                           </button>
                         ))}
                         <input ref={wuFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { addWuPhoto(e.target.files && e.target.files[0]); e.target.value = ""; }} />
                       </div>
-                      <div style={{ fontSize: 12.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Tap a tile to take a photo or choose one from your gallery.</div>
+                      ); })()}
+                      <div style={{ fontSize: 12.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Photos you take after the cut — saved to {(client.name || "their").split(" ")[0]}'s gallery.</div>
                     </div>
                     {/* Note — last, bigger box */}
                     <div style={{ padding: 18, borderTop: `1px solid ${T.line}` }}>
@@ -25211,19 +25242,19 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
   const effPrice = curPrice != null ? curPrice : basePrice;
   const commitT = () => { const v = t.trim() === "" ? null : Math.max(0, parseInt(t, 10) || 0); onSave({ dur: v }); };
   const commitP = () => { const v = p.trim() === "" ? null : Math.max(0, Math.round((parseFloat(p) || 0) * 100) / 100); onSave({ price: v }); };
-  const fl = { fontSize: 9.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 5 };
+  const fl = { fontSize: 11.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, marginBottom: 6 };
   const ipt = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--bg)" };
   const inp = { width: "100%", border: "none", outline: "none", background: "transparent", padding: "11px 12px", fontFamily: FONT_BODY, fontSize: 15, color: "var(--text)" };
   return (
     <div style={{ padding: "16px 18px", borderTop: "1px solid var(--line)" }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
         <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500 }}>{service.name}</span>
-        <span style={{ fontSize: 11.5, color: "var(--faint)", flexShrink: 0 }}>Default {fmtDur(baseDur)} · ${basePrice}</span>
+        <span style={{ fontSize: 13, color: "var(--sub)", flexShrink: 0 }}>Default {fmtDur(baseDur)} · ${basePrice}</span>
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 13 }}>
         <div style={{ flex: 1 }}>
           <div style={fl}>Time for {firstName}</div>
-          <div style={ipt}><input value={t} onChange={(e) => setT(e.target.value.replace(/[^0-9]/g, ""))} onBlur={commitT} placeholder={String(baseDur)} inputMode="numeric" style={inp} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 12.5 }}>min</span></div>
+          <div style={ipt}><input value={t} onChange={(e) => setT(e.target.value.replace(/[^0-9]/g, ""))} onBlur={commitT} placeholder={String(baseDur)} inputMode="numeric" style={inp} /><span style={{ padding: "0 12px 0 0", color: "var(--sub)", fontSize: 13.5 }}>min</span></div>
         </div>
         <div style={{ flex: 1 }}>
           <div style={fl}>Price for {firstName}</div>
@@ -25232,14 +25263,14 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
       </div>
       {hasOverride ? (
         <div style={{ marginTop: 11 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--text)", fontWeight: 500 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text)", fontWeight: 500 }}>
             <span style={{ background: "var(--text)", color: "var(--bg)", borderRadius: 20, padding: "3px 9px", fontSize: 10, letterSpacing: 0.5 }}>CUSTOM</span>
             Books at {fmtDur(effDur)} · ${effPrice}
           </span>
-          <div><button onClick={onClear} style={{ background: "none", border: "none", padding: 0, fontSize: 11.5, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, marginTop: 10, cursor: "pointer" }}>Revert to default</button></div>
+          <div><button onClick={onClear} style={{ background: "none", border: "none", padding: 0, fontSize: 13, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, marginTop: 10, cursor: "pointer" }}>Revert to default</button></div>
         </div>
       ) : (
-        <div style={{ marginTop: 11, fontSize: 11.5, color: "var(--faint)" }}>Using the default — type above to customize</div>
+        <div style={{ marginTop: 11, fontSize: 13, color: "var(--sub)" }}>Using the default — type above to customize</div>
       )}
     </div>
   );
@@ -25251,7 +25282,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const firstName = (live.name || "").split(" ")[0] || "this client";
   const saveBirthday = (iso) => setClients(clients.map((c) => c.id === live.id ? { ...c, birthday: iso || undefined } : c));
   const fmtBday = (v) => { if (!v) return null; const d = new Date(v); if (isNaN(d.getTime())) return String(v); return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
-  const [pfTab, setPfTab] = useState("timeline"); // timeline | family | pricing
+  const [pfTab, setPfTab] = useState("timeline"); // timeline | gallery | pricing | family
   const [openMember, setOpenMember] = useState(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [mName, setMName] = useState("");
@@ -25415,7 +25446,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
     setResched(null); setDetail(null); showToast("Appointment moved.");
   };
 
-  const tabLabel = { fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "22px 4px 10px" };
+  const tabLabel = { fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 2.2, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, margin: "22px 4px 10px" };
   const cardStyle = { border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", background: "var(--bg)", boxShadow: "var(--shadow-sm)" };
   const chev = <ChevronRight size={16} style={{ color: "var(--border2)", flexShrink: 0 }} />;
 
@@ -25423,16 +25454,23 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
   const VisitRow = ({ a, mode, showPrice }) => {
     const el = elapsedMin(a);
     return (
-      <button onClick={() => setDetail({ appt: a, mode })} style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 18px", borderTop: "1px solid var(--line)", width: "100%", background: "none", border: "none", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
-        {mode === "up"
-          ? <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />
-          : <span style={{ fontFamily: "'Fraunces', serif", fontSize: 14, width: 50, flexShrink: 0, color: "var(--text2)" }}>{niceDate(a.bookedFor)}</span>}
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <b style={{ fontWeight: 500, fontSize: 14.5, display: "block" }}>{mode === "up" ? `${niceDateFull(a.bookedFor)} · ${fmtTime(a.start)}` : a.title}</b>
-          <span style={{ fontSize: 12, color: "var(--sub)" }}>{mode === "up" ? `${a.title} · ${provName(a)}` : `${showPrice ? money0(paidForAppt(a)) + " · " : ""}${provName(a)}`}</span>
+      <button onClick={() => setDetail({ appt: a, mode })} style={{ display: "block", padding: "14px 18px", borderTop: "1px solid var(--line)", width: "100%", background: "none", border: "none", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 13 }}>
+          {mode === "up"
+            ? <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />
+            : <span style={{ fontFamily: "'Fraunces', serif", fontSize: 14, width: 50, flexShrink: 0, color: "var(--text2)" }}>{niceDate(a.bookedFor)}</span>}
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <b style={{ fontWeight: 500, fontSize: 14.5, display: "block" }}>{mode === "up" ? `${niceDateFull(a.bookedFor)} · ${fmtTime(a.start)}` : a.title}</b>
+            <span style={{ fontSize: 12, color: "var(--sub)" }}>{mode === "up" ? `${a.title} · ${provName(a)}` : `${showPrice ? money0(paidForAppt(a)) + " · " : ""}${provName(a)}`}</span>
+          </span>
+          {el != null && mode !== "up" && <span style={{ fontSize: 11, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 9px", whiteSpace: "nowrap", fontWeight: 500 }}>{el} min</span>}
+          {chev}
         </span>
-        {el != null && mode !== "up" && <span style={{ fontSize: 11, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 9px", whiteSpace: "nowrap", fontWeight: 500 }}>{el} min</span>}
-        {chev}
+        {/* the client's booking note — front and center on upcoming appointments */}
+        {mode === "up" && (a.note || "").trim() && (
+          <span style={{ display: "block", fontSize: 14, color: "var(--text)", background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))", borderRadius: 10, padding: "10px 12px", marginTop: 10, lineHeight: 1.45 }}>📝 “{a.note.trim()}”</span>
+        )}
+        {mode === "up" && a.hasPhotos && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 10px", marginTop: 8, fontWeight: 500 }}><ImageIcon size={12} /> {a.photos || ""} photo{(a.photos || 0) > 1 ? "s" : ""} attached</span>}
       </button>
     );
   };
@@ -25486,8 +25524,8 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {/* tab bar */}
       <div style={{ display: "flex", gap: 20, borderBottom: "1px solid var(--line)", overflowX: "auto", padding: "18px 4px 0", marginBottom: 4 }}>
-        {[["timeline", "Timeline"], ["family", "Family"], ["pricing", "Pricing"]].map(([id, label]) => { const on = pfTab === id; return (
-          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontFamily: "'Jost', sans-serif", fontWeight: 500, fontSize: 13, paddingBottom: 12, marginBottom: -1, whiteSpace: "nowrap", cursor: "pointer" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
+        {[["timeline", "Timeline"], ["gallery", "Gallery"], ["pricing", "Pricing/Duration"], ["family", "Family"]].map(([id, label]) => { const on = pfTab === id; return (
+          <button key={id} onClick={() => { setPfTab(id); setOpenMember(null); }} style={{ flexShrink: 0, background: "none", border: "none", borderBottom: `2px solid ${on ? "var(--text)" : "transparent"}`, color: on ? "var(--text)" : "var(--faint)", fontFamily: "'Jost', sans-serif", fontWeight: on ? 600 : 500, fontSize: 15, paddingBottom: 12, marginBottom: -1, whiteSpace: "nowrap", cursor: "pointer" }}>{label}{id === "family" && family.length > 0 ? ` (${family.length})` : ""}</button>
         ); })}
       </div>
 
@@ -25519,50 +25557,16 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           <div style={cardStyle}>{upcomingAppts.map((a) => <VisitRow key={a.id} a={a} mode="up" />)}</div>
         </>)}
 
-        {/* Gallery — every uploaded photo (client selfies/refs + staff adds), grouped by date.
-            ALWAYS visible (empty state included) so the owner can find it before the first photo. */}
-        {(
-          <>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "22px 4px 10px" }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Gallery</div>
-              <button onClick={() => setGalPicker(true)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}><Plus size={14} /> Add photo</button>
-            </div>
-            {gallery.length === 0 && <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", margin: "0 4px 6px" }}>No photos yet — booking photos and selfies land here automatically, newest first.</p>}
-            {(() => {
-              const groups = {};
-              [...gallery].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)).forEach((g) => {
-                const key = g.date ? new Date(g.date).toDateString() : "undated";
-                (groups[key] = groups[key] || []).push(g);
-              });
-              return Object.values(groups).map((gs, gi) => (
-                <div key={gi} style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, color: "var(--sub)", margin: "0 4px 7px", fontWeight: 500 }}>{gs[0].date ? niceDate(gs[0].date) : "Undated"}</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                    {gs.map((g) => (
-                      <button key={g.id} onClick={() => setLightbox(g.id)} style={{ position: "relative", aspectRatio: "1", borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", cursor: "pointer", padding: 0 }}>
-                        <img src={imgUrl(g.photo, 240)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                        {g.source === "client" && <span style={{ position: "absolute", bottom: 4, left: 4, fontSize: 9, fontWeight: 700, letterSpacing: 0.4, color: "#fff", background: "rgba(0,0,0,0.55)", borderRadius: 5, padding: "2px 5px" }}>CLIENT</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ));
-            })()}
-          </>
-        )}
-
-        {/* the feed: visits + photos + notes, newest first */}
+        {/* the feed: appointments + every change made to them (staff or client), newest first */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "22px 4px 10px" }}>
           <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Timeline</div>
-          <button onClick={() => setGalPicker(true)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}><Plus size={14} /> Add photo</button>
         </div>
         {(() => {
           const feed = [
             ...historyAppts.map((a) => ({ kind: "visit", date: a.bookedFor, a })),
-            ...gallery.map((g) => ({ kind: "photo", date: g.date, g })),
             ...(live.timeline || []).map((t) => ({ kind: "note", date: t.date, t })),
           ].sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
-          if (!feed.length) return <p style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", padding: "4px 4px" }}>Nothing yet — visits, photos and notes will show up here.</p>;
+          if (!feed.length) return <p style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", padding: "4px 4px" }}>Nothing yet — visits and every appointment change will show up here.</p>;
           return <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {feed.map((it, i) => {
               if (it.kind === "visit") { const a = it.a; const el = elapsedMin(a); return (
@@ -25572,28 +25576,50 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
                     <span style={{ fontSize: 12, color: "var(--sub)", whiteSpace: "nowrap" }}>{niceDate(a.bookedFor)} · {money0(paidForAppt(a))} · {provName(a)}</span>
                   </div>
                   {el != null && <span style={{ display: "inline-block", fontSize: 11, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "2px 9px", marginTop: 8, fontWeight: 500 }}>{el} min in the chair</span>}
-                  {a.note && <div style={{ fontSize: 12.5, color: "var(--text2)", background: "var(--panel2)", borderRadius: 9, padding: "8px 10px", marginTop: 8, lineHeight: 1.4 }}>“{a.note}” <span style={{ color: "var(--faint)" }}>· {firstName} at booking</span></div>}
+                  {a.note && <div style={{ fontSize: 13.5, color: "var(--text)", background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))", borderRadius: 9, padding: "9px 11px", marginTop: 8, lineHeight: 1.45 }}>📝 “{a.note}” <span style={{ color: "var(--sub)" }}>· {firstName} at booking</span></div>}
                   {a.wrapNote && <div style={{ fontSize: 12.5, color: "var(--text2)", background: "var(--panel2)", borderRadius: 9, padding: "8px 10px", marginTop: 8, lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{a.wrapNote}</div>}
                 </button>
               ); }
-              if (it.kind === "photo") { const g = it.g; return (
-                <button key={`p-${g.id}`} onClick={() => setLightbox(g.id)} style={{ display: "flex", gap: 12, width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 13, padding: 10, background: "var(--bg)", cursor: "pointer", color: "var(--text)", alignItems: "center" }}>
-                  <img src={imgUrl(g.photo, 200)} alt="" style={{ width: 52, height: 52, borderRadius: 9, objectFit: "cover", flexShrink: 0, border: "1px solid var(--border)" }} />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontSize: 13.5, color: "var(--text2)" }}>{g.note || "Photo"}</span>
-                    <span style={{ display: "block", fontSize: 11.5, color: "var(--faint)", marginTop: 3 }}>{g.source === "client" ? "From client" : "Photo"}{g.date ? ` · ${niceDate(g.date)}` : ""}</span>
-                  </span>
-                  {chev}
-                </button>
-              ); }
               const t = it.t; return (
-                <div key={`n-${t.id || i}`} style={{ border: "1px solid var(--border)", borderRadius: 13, padding: "12px 15px", background: "var(--bg)" }}>
-                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{t.text}</div>
-                  {t.date && <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 6 }}>{niceDate(t.date)}</div>}
+                <div key={`n-${t.id || i}`} style={{ display: "flex", gap: 10, border: "1px solid var(--border)", borderRadius: 13, padding: "12px 15px", background: "var(--bg)" }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--gold)", flexShrink: 0, marginTop: 6 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{t.text}</div>
+                    {t.date && <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 5 }}>{niceDate(t.date)}{t.at ? ` · ${t.at}` : ""}</div>}
+                  </div>
                 </div>
               );
             })}
           </div>;
+        })()}
+      </div>}
+
+      {/* ============ GALLERY — every uploaded photo (client selfies/refs + staff adds), by date ============ */}
+      {pfTab === "gallery" && <div style={{ paddingBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "18px 4px 12px" }}>
+          <div style={tabLabel}>Gallery</div>
+          <button onClick={() => setGalPicker(true)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 14, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}><Plus size={15} /> Add photo</button>
+        </div>
+        {gallery.length === 0 && <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", margin: "0 4px" }}>No photos yet — booking photos and selfies land here automatically, newest first.</p>}
+        {(() => {
+          const groups = {};
+          [...gallery].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)).forEach((g) => {
+            const key = g.date ? new Date(g.date).toDateString() : "undated";
+            (groups[key] = groups[key] || []).push(g);
+          });
+          return Object.values(groups).map((gs, gi) => (
+            <div key={gi} style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 4px 8px", fontWeight: 600 }}>{gs[0].date ? niceDate(gs[0].date) : "Undated"}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7 }}>
+                {gs.map((g) => (
+                  <button key={g.id} onClick={() => setLightbox(g.id)} style={{ position: "relative", aspectRatio: "1", borderRadius: 11, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", cursor: "pointer", padding: 0 }}>
+                    <img src={imgUrl(g.photo, 240)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    {g.source === "client" && <span style={{ position: "absolute", bottom: 4, left: 4, fontSize: 9, fontWeight: 700, letterSpacing: 0.4, color: "#fff", background: "rgba(0,0,0,0.55)", borderRadius: 5, padding: "2px 5px" }}>CLIENT</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ));
         })()}
       </div>}
 
@@ -25615,7 +25641,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
               />
             </div>
           ))}
-          <div style={{ fontSize: 11.5, color: "var(--sub)", lineHeight: 1.5, padding: "14px 18px 16px" }}>These apply only to {firstName}. When {firstName} books this service online, they see this time and price automatically.</div>
+          <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, padding: "14px 18px 16px" }}>These apply only to {firstName}. When {firstName} books this service online, they see this time and price automatically.</div>
         </div>
       </div>}
 
