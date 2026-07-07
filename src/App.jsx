@@ -3647,6 +3647,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [slotsReady, setSlotsReady] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false); // cancellation policy text collapsed by default on confirm
+  const [smsOpen, setSmsOpen] = useState(false); // SMS consent full disclosure collapsed by default (essentials stay visible)
   const [cardOnFile, setCardOnFile] = useState(false); // card-on-file / deposit captured for this booking
   const [cardOnFileInvalid, setCardOnFileInvalid] = useState(false); // returning client's saved card failed Stripe validity (expired/gone) → force a new card
   const [cardSheetOpen, setCardSheetOpen] = useState(false); // real Stripe card-entry sheet open
@@ -6972,22 +6973,28 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               );
             })()}
 
-            {/* One SMS consent unit: the Vonage-required checkbox (never pre-checked) + the
-                  by-providing-your-number fine-print, wrapped as a single block instead of two
-                  separate paragraphs. Copy is carrier-vetted — do NOT reword; the locked SMS
-                  reminder phrase must stay present (ship-check enforces exactly 4x in App.jsx). */}
-              <div style={{ border: `1px solid ${smsConsent ? "var(--border)" : "var(--border2)"}`, background: smsConsent ? "var(--panel)" : "color-mix(in srgb, var(--gold) 6%, var(--panel))", borderRadius: 12, padding: "13px 14px", marginBottom: 14, transition: "background .15s" }}>
-                <button type="button" onClick={() => setSmsConsent(v => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                  <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${smsConsent ? "var(--gold)" : "var(--text)"}`, background: smsConsent ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1, transition: "background .15s, border-color .15s" }}>
-                    {smsConsent && <Check size={14} style={{ color: "var(--on-gold)" }} />}
-                  </span>
-                  <span style={{ color: smsConsent ? "var(--sub)" : "var(--text2)", fontSize: 12.5, lineHeight: 1.5 }}>
-                    <b style={{ color: "var(--text)" }}>Required</b> — check to get your appointment reminders by text. I agree to receive appointment reminders via SMS from Sanctuary Barber Co. Message and data rates may apply. Message frequency varies. Text HELP for help or STOP to opt out. See our <a href="https://sanctuarybarberco.com/privacy-policy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a>.
-                  </span>
-                </button>
-                <p style={{ color: "var(--faint)", fontSize: 11, margin: "10px 0 0", lineHeight: 1.5 }}>
-                  By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text2)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text2)", textDecoration: "underline" }}>terms</a>.
+            {/* SMS consent — styled to match the cancellation-policy row (toggle + "Read it ›").
+                  COMPLIANCE (10DLC / carrier-vetted): the mandatory disclosure — msg & data rates,
+                  STOP, HELP, privacy link — stays VISIBLE at opt-in; only the fuller vetted copy sits
+                  behind "Read it". Do NOT reword any consent copy; the locked phrase "reminders from
+                  Sanctuary Barber Co" must stay present (ship-check enforces exactly 4x in App.jsx). */}
+              <div style={{ background: smsConsent ? "var(--panel)" : "color-mix(in srgb, var(--gold) 6%, var(--panel))", border: `1px solid ${smsConsent ? "var(--border)" : "var(--border2)"}`, borderRadius: 16, padding: "6px 18px", marginBottom: 18, boxShadow: "var(--shadow-sm)", transition: "background .15s" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
+                  <button onClick={() => setSmsConsent(v => !v)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, color: "var(--text)", cursor: "pointer", flex: 1, textAlign: "left" }}>
+                    <span style={{ width: 44, height: 26, borderRadius: 13, background: smsConsent ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: smsConsent ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+                    <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>Text me my appointment reminders</span>
+                  </button>
+                  <button onClick={() => setSmsOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, fontWeight: 600, padding: "6px 2px", flexShrink: 0, cursor: "pointer" }}>{smsOpen ? "Hide" : "Read it ›"}</button>
+                </div>
+                {/* Mandatory essentials — always visible at opt-in (never hidden behind "Read it"). */}
+                <p style={{ color: "var(--sub)", fontSize: 12, margin: "0 0 12px", lineHeight: 1.5 }}>
+                  Appointment reminders only. Message and data rates may apply. Message frequency varies. Text HELP for help or STOP to opt out.
                 </p>
+                {smsOpen && (
+                  <p style={{ color: "var(--faint)", fontSize: 12, margin: "0 0 14px", lineHeight: 1.55 }}>
+                    I agree to receive appointment reminders via SMS from Sanctuary Barber Co. By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Message frequency varies. Reply STOP to opt out or HELP for help. See our <a href="https://sanctuarybarberco.com/privacy-policy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "var(--text2)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text2)", textDecoration: "underline" }}>terms</a>.
+                  </p>
+                )}
               </div>
 
             {/* Cancellation policy — collapsed to an agree row with an expandable "Read it" */}
