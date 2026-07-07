@@ -10901,26 +10901,25 @@ function Toast({ msg, onDone }) {
   return createPortal(
     <div style={{ position: "fixed", left: 0, right: 0, bottom: "calc(96px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 9999, padding: "0 16px" }}>
       <div style={{
-        pointerEvents: "auto", display: "flex", alignItems: "center", gap: 12, maxWidth: 420,
-        padding: "13px 20px 13px 13px", borderRadius: 18,
-        background: "linear-gradient(180deg, #262626 0%, #0a0a0a 100%)", color: "#fff",
-        border: "1px solid rgba(255,255,255,0.10)",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.30), 0 20px 48px -12px rgba(0,0,0,0.60)",
-        fontFamily: FONT_BODY, fontSize: 14.5, fontWeight: 500, lineHeight: 1.3, letterSpacing: 0.1,
+        pointerEvents: "auto", display: "flex", alignItems: "center", gap: 12, maxWidth: 440,
+        padding: "14px 22px 14px 14px", borderRadius: 16,
+        background: "var(--panel)", color: "var(--text)",
+        border: warn ? "1px solid color-mix(in srgb, #C0392B 40%, var(--border))" : "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))",
+        boxShadow: "0 2px 6px rgba(40,34,22,0.10), 0 22px 54px -14px rgba(40,34,22,0.38)",
+        fontFamily: FONT_BODY, fontSize: 15.5, fontWeight: 500, lineHeight: 1.35, letterSpacing: 0.1,
         transform: vis ? "translateY(0) scale(1)" : "translateY(28px) scale(0.93)",
         opacity: vis ? 1 : 0,
         transition: "transform 0.46s cubic-bezier(0.34,1.56,0.64,1), opacity 0.32s ease",
         willChange: "transform, opacity",
       }}>
         <span style={{
-          flexShrink: 0, width: 28, height: 28, borderRadius: "50%",
-          background: warn ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.16)",
-          boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
+          flexShrink: 0, width: 30, height: 30, borderRadius: "50%",
+          background: warn ? "#C0392B" : "var(--gold)",
           display: "flex", alignItems: "center", justifyContent: "center",
           transform: vis ? "scale(1)" : "scale(0.2)", opacity: vis ? 1 : 0,
           transition: "transform 0.5s cubic-bezier(0.34,1.7,0.5,1) 0.1s, opacity 0.3s ease 0.1s",
         }}>
-          {warn ? <AlertCircle size={15} strokeWidth={2.5} color="#fff" /> : <Check size={15} strokeWidth={3} color="#fff" />}
+          {warn ? <AlertCircle size={16} strokeWidth={2.5} color="#fff" /> : <Check size={16} strokeWidth={3} color="var(--on-gold)" />}
         </span>
         <span style={{ paddingRight: 2 }}>{msg}</span>
       </div>
@@ -23980,8 +23979,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                         .then(async (r) => {
                           const j = await r.json().catch(() => ({}));
                           const rs = (j && j.results) || {};
-                          if (rs.sms === "sent") showToast(`Texted: "${fill(tmpl)}"`);
-                          else if (rs.email === "sent") showToast(`Emailed (no text — ${client.smsOptOut ? "client opted out of SMS" : "texting unavailable"}): "${fill(tmpl)}"`);
+                          if (rs.sms === "sent") { onUpdate && onUpdate(appt.id, { lobbyNotifiedText: fill(tmpl), lobbyNotifiedVia: "text" }); showToast("Text sent"); }
+                          else if (rs.email === "sent") { onUpdate && onUpdate(appt.id, { lobbyNotifiedText: fill(tmpl), lobbyNotifiedVia: "email" }); showToast(`Emailed (no text — ${client.smsOptOut ? "client opted out of SMS" : "texting unavailable"})`); }
                           else showToast(`Couldn't send — ${j.error || rs.sms || rs.email || (client.smsOptOut === true ? "client opted out of SMS" : "no channel available")}`);
                         })
                         .catch(() => showToast("Couldn't send — check your connection and tap again."));
@@ -23992,6 +23991,17 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   })()}
                   {appt.status === "in-service" && <button className="lift" onClick={() => onCheckout(appt)} style={{ background: "var(--gold)", border: "none", color: "var(--on-gold)", padding: "11px 18px", borderRadius: 30, fontSize: 14, letterSpacing: 0.5, fontWeight: 700, boxShadow: "var(--shadow)" }}>CHECKOUT</button>}
                 </div>
+                {/* Persistent send receipt — the toast is fleeting; this stays on the sheet so the
+                    exact message (and that it truly went out) can't be missed. */}
+                {appt.status === "checked-in" && appt.lobbyNotifiedText && (
+                  <div style={{ display: "flex", gap: 11, marginTop: 14, padding: "13px 15px", borderRadius: 13, background: "color-mix(in srgb, var(--gold) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))" }}>
+                    <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1 }}><Check size={14} strokeWidth={3} /></span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, letterSpacing: 1.2, textTransform: "uppercase", fontWeight: 700, color: "var(--gold)", marginBottom: 3 }}>{appt.lobbyNotifiedVia === "email" ? "Emailed" : "Texted"} {appt.lobbyNotifiedAt ? "· " + new Date(appt.lobbyNotifiedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}</div>
+                      <div style={{ fontSize: 15.5, color: T.text, fontWeight: 500, lineHeight: 1.45 }}>{"“"}{appt.lobbyNotifiedText}{"”"}</div>
+                    </div>
+                  </div>
+                )}
                 {appt.status === "checked-in" && (
                   <button onClick={() => onSetStatus(appt.id, "in-service", `${appt.name} is in the chair.`)} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", border: "none", background: "var(--text)", color: "var(--bg)", fontWeight: 700, fontSize: 16, padding: "15px", borderRadius: 14, marginTop: 16, cursor: "pointer", animation: "lobbyStart 2.4s ease-in-out infinite" }}>Start service</button>
                 )}
