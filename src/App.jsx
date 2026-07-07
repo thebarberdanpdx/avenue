@@ -7282,46 +7282,46 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
         </div>
       </div>
 
-      {/* before you come in — selfie + inspiration/notes */}
+      {/* before you come in — a compact selfie card, then a roomier inspiration/notes card so the
+          "add photos & a note" step stands out and isn't easy to skip past */}
       {(showSelfie || noteOn || photoOn) && (
         <>
           <span style={eyebrow}>Before you come in</span>
-          <div style={{ ...card, overflow: "hidden", marginBottom: 26 }}>
-            {showSelfie && (
-              <div style={{ display: "flex", alignItems: "center", gap: 13, padding: 16 }}>
-                <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
-                {selfie
-                  ? <img src={selfie} alt="" style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: `1px solid ${goldLine}` }} />
-                  : <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: goldSoft, border: `1px solid ${goldLine}`, color: "var(--gold)" }}><Camera size={19} /></div>}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ ...rowTitle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{selfie ? "Selfie added" : "Add a selfie"}<span style={chip}>{selfie ? "$5 OFF" : "SAVE $5"}</span></div>
-                  <div style={{ ...rowSub, fontSize: 12, marginTop: 3 }}>{selfie ? "Now your profile photo." : "So we see how you look today."}</div>
-                </div>
-                {selfie
-                  ? <button onClick={onClearSelfie} style={{ flexShrink: 0, background: "none", border: "1px solid var(--border)", color: "var(--sub)", borderRadius: 10, padding: "9px 12px", fontFamily: F, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Remove</button>
-                  : <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "9px 14px", fontFamily: F, fontSize: 12.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Selfie</button>}
+          {showSelfie && (
+            <div style={{ ...card, display: "flex", alignItems: "center", gap: 13, padding: 16, marginBottom: 14 }}>
+              <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
+              {selfie
+                ? <img src={selfie} alt="" style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: `1px solid ${goldLine}` }} />
+                : <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: goldSoft, border: `1px solid ${goldLine}`, color: "var(--gold)" }}><Camera size={19} /></div>}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ ...rowTitle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{selfie ? "Selfie added" : "Add a selfie"}<span style={chip}>{selfie ? "$5 OFF" : "SAVE $5"}</span></div>
+                <div style={{ ...rowSub, fontSize: 12, marginTop: 3 }}>{selfie ? "Now your profile photo." : "So we see how you look today."}</div>
               </div>
-            )}
-            {(noteOn || photoOn) && (
-              <div style={{ padding: 16, borderTop: showSelfie ? "1px solid var(--line)" : "none" }}>
-                <div style={{ ...rowTitle, marginBottom: 12 }}>Inspiration &amp; notes</div>
-                {photoOn && (
-                  <>
-                    <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
-                    <div style={{ display: "flex", gap: 8, marginBottom: noteOn ? 10 : 0 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
-                      <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 11, overflow: "hidden", border: `1.5px ${src ? "solid" : "dashed"} ${src ? goldLine : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--panel2)", cursor: src ? "default" : "pointer" }}>
-                        {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={18} style={{ color: "var(--faint)" }} />}
-                      </div>
-                    ); })}</div>
-                  </>
-                )}
-                {noteOn && (
-                  <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="Anything your barber should know — e.g. tighter on the sides, keep length on top." rows={2} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 11, padding: "11px 13px", color: "var(--text)", fontSize: 14, resize: "none", minHeight: 54, lineHeight: 1.45, fontFamily: F }} />
-                )}
-                <div style={{ fontFamily: F, fontSize: 11.5, color: "var(--faint)", marginTop: 9, textAlign: "left" }}>Up to 3 photos · saved to your profile for next time.</div>
-              </div>
-            )}
-          </div>
+              {selfie
+                ? <button onClick={onClearSelfie} style={{ flexShrink: 0, background: "none", border: "1px solid var(--border)", color: "var(--sub)", borderRadius: 10, padding: "9px 12px", fontFamily: F, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Remove</button>
+                : <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "9px 14px", fontFamily: F, fontSize: 12.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Selfie</button>}
+            </div>
+          )}
+          {(noteOn || photoOn) && (
+            <div style={{ ...card, padding: "20px 18px 18px", marginBottom: 28 }}>
+              <div style={{ fontFamily: F, fontSize: 16.5, fontWeight: 600, lineHeight: 1.2, color: "var(--text)", marginBottom: 4 }}>Inspiration &amp; notes</div>
+              <div style={{ ...rowSub, marginBottom: 18 }}>Show your barber exactly what you're after — a few reference photos and a quick note go a long way.</div>
+              {photoOn && (
+                <>
+                  <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
+                  <div style={{ display: "flex", gap: 11, marginBottom: noteOn ? 14 : 0 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
+                    <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 13, overflow: "hidden", border: `1.5px ${src ? "solid" : "dashed"} ${src ? goldLine : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--panel2)", cursor: src ? "default" : "pointer" }}>
+                      {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 23, height: 23, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={20} style={{ color: "var(--faint)" }} />}
+                    </div>
+                  ); })}</div>
+                </>
+              )}
+              {noteOn && (
+                <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="Anything your barber should know — e.g. tighter on the sides, keep length on top." rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "13px 14px", color: "var(--text)", fontSize: 14.5, resize: "none", minHeight: 76, lineHeight: 1.5, fontFamily: F }} />
+              )}
+              <div style={{ fontFamily: F, fontSize: 11.5, color: "var(--faint)", marginTop: 11, textAlign: "left" }}>Up to 3 photos · saved to your profile for next time.</div>
+            </div>
+          )}
         </>
       )}
 
@@ -8988,7 +8988,7 @@ function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, pr
               const unread = n.ts > seenCut;
               const subBits = [n.name, n.service && n.service !== n.name ? n.service : null, fmtWhen(n.when, n.start), provName(n.providerId)].filter(Boolean);
               return (
-                <button key={n.id} onClick={onOpenCalendar} style={{ width: "100%", display: "flex", gap: 13, padding: "15px 16px 15px 18px", background: "none", border: "none", borderBottom: i < g.items.length - 1 ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left", cursor: "pointer", position: "relative" }}>
+                <button key={n.id} onClick={() => onOpenCalendar(n)} style={{ width: "100%", display: "flex", gap: 13, padding: "15px 16px 15px 18px", background: "none", border: "none", borderBottom: i < g.items.length - 1 ? "1px solid var(--line)" : "none", color: "var(--text)", textAlign: "left", cursor: "pointer", position: "relative" }}>
                   {unread && <span style={{ position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)", width: 6, height: 6, borderRadius: "50%", background: "var(--live, var(--gold))" }} />}
                   <span style={{ width: 36, height: 36, borderRadius: "50%", background: live ? "color-mix(in srgb, var(--live, var(--gold)) 14%, transparent)" : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", color: live ? "var(--live, var(--gold))" : "var(--sub)", flexShrink: 0 }}><Icon size={16} /></span>
                   <span style={{ flex: 1, minWidth: 0 }}>
@@ -11276,7 +11276,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
       </div>
       <div style={{ width: "100%", margin: "0 auto", padding: "24px 10px 120px" }}>
         {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => goTab(t)} onOpenRevenue={() => navTo({ pulseDetail: "revenue" })} onOpenPayments={() => navTo({ pulseDetail: "payments" })} onOpenAppointments={() => navTo({ pulseDetail: "appointments" })} onOpenClients={() => navTo({ pulseDetail: "clients" })} onOpenServices={() => navTo({ pulseDetail: "services" })} onOpenBarbers={() => navTo({ pulseDetail: "barbers" })} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c, pulseDetail: null })} onOpenAppt={(id) => { setPulseOpenApptId(id); navTo({ tab: "calendar", pulseDetail: null, activeClient: null }); }} showToast={showToast} notifCount={unseenCount} onOpenNotifications={() => navTo({ pulseDetail: "notifications" })} />}
-        {tab === "pulse" && pulseDetail === "notifications" && <NotificationsView notifs={myNotifs} notifSeenAt={notifSeenAt} markSeen={markNotifsSeen} onClear={() => setNotifs([])} clients={clients} providers={providers} isOwner={isOwner} me={me} onBack={navBack} onOpenCalendar={() => goTab("calendar")} onOpenNudge={() => goTab("clients")} />}
+        {tab === "pulse" && pulseDetail === "notifications" && <NotificationsView notifs={myNotifs} notifSeenAt={notifSeenAt} markSeen={markNotifsSeen} onClear={() => setNotifs([])} clients={clients} providers={providers} isOwner={isOwner} me={me} onBack={navBack} onOpenCalendar={(n) => { if (n && n.apptId != null) setPulseOpenApptId(n.apptId); goTab("calendar"); }} onOpenNudge={() => goTab("clients")} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} business={business} onBack={navBack} />}
         {tab === "pulse" && pulseDetail === "payments" && <PaymentsView appts={appts} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={navBack} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={navBack} />}
@@ -20324,7 +20324,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   // Retries as appts load (the booking may not be in state yet at tap time); clears once it's found and opened.
   useEffect(() => {
     if (!deepLinkApptId) return;
-    const ap = (appts || []).find((a) => a.id === deepLinkApptId);
+    const ap = (appts || []).find((a) => a.id === deepLinkApptId || String(a.id) === String(deepLinkApptId));
     if (!ap) return; // not loaded yet — wait for the next appts update
     if (ap.bookedFor) {
       const d = new Date(ap.bookedFor); d.setHours(0, 0, 0, 0);
