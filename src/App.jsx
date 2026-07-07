@@ -3607,7 +3607,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [usePhone, setUsePhone] = useState(true);          // returning clients verify by TEXT first; email is the fallback ("Use my email instead")
   const [emailMasked, setEmailMasked] = useState("");      // masked address shown on the code screen
   const [loginBusy, setLoginBusy] = useState(false);
-  const [loginNoMatch, setLoginNoMatch] = useState(null);  // null | "nomatch" | "error"
+  const [loginNoMatch, setLoginNoMatch] = useState(null);  // null | "nomatch" | "error" | "throttled"
   const [blockedNotice, setBlockedNotice] = useState(false); // shown when a blocked client tries to book
   const [dupWarn, setDupWarn] = useState(null); // { existing, phone, email } — client already has an appt within 10 days
   const [wantEarlier, setWantEarlier] = useState(false); // client opts in to be told if an earlier slot opens
@@ -3665,6 +3665,21 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: c.id, p_session: c.sessionToken })
             .then(({ data }) => { if (alive) setMyAppts(Array.isArray(data) ? data : []); })
             .catch(() => {});
+          // Verify the cached client still EXISTS on the server. If the owner has since deleted them,
+          // don't leave a dead profile logged in — clear the session and drop back to the front door.
+          // Fail-open: log out only on a definitive "not on file" result, never on a network/RPC error,
+          // so a transient hiccup can't sign out a real returning client.
+          const lookup = c.phone
+            ? supabase.rpc("lookup_client_by_phone", { p_shop: shopId, p_phone: c.phone })
+            : (c.email ? supabase.rpc("lookup_client_by_email", { p_shop: shopId, p_email: String(c.email).trim().toLowerCase() }) : null);
+          if (lookup) lookup.then(({ data, error }) => {
+            if (!alive || error) return;
+            const stillThere = data && data.id && String(data.id) === String(c.id);
+            if (!stillThere) {
+              try { localStorage.removeItem(_clientKey); } catch (e) {}
+              setMatched(null); setShowHome(false); setMyAppts([]);
+            }
+          }).catch(() => {});
         }
       }
     } catch (e) {}
@@ -6224,15 +6239,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 Too many code requests just now. Please wait a few minutes and try again.
               </div>
             )}
+            {loginNoMatch === "nomatch" && (
+              <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", marginBottom: 16, fontSize: 14, lineHeight: 1.5, color: "var(--text)" }}>
+                We don't see this email in our records. If you're new here, book as a new client — it only takes a minute.
+                <button onClick={() => { if ((business?.booking?.clientType) === "returning") { setClientTypeBlock("returning_only"); return; } setLoginNoMatch(null); setStep(0); setSimpleStep("what"); }} style={{ display: "block", width: "100%", marginTop: 10, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: 13, fontSize: 13.5, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer", fontFamily: "'Jost', sans-serif" }}>Book as a new client</button>
+              </div>
+            )}
             <button className="lift" disabled={loginBusy || !/^\S+@\S+\.\S+$/.test(clientEmail.trim())} onClick={async () => {
               const em = clientEmail.trim().toLowerCase();
               setLoginBusy(true); setLoginNoMatch(null);
               try {
+                // Confirm the email is one of ours first; if not, steer them to book as a new client
+                // (same choice as the phone screen — this does reveal whether an email is on file).
+                const look = await supabase.rpc("lookup_client_by_email", { p_shop: shopId, p_email: em });
+                if (!look.error && (!look.data || !look.data.id)) { setLoginNoMatch("nomatch"); setLoginBusy(false); return; }
                 const res = await fetch(API_BASE + "/api/client-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, email: em }) });
                 const out = await res.json().catch(() => ({}));
                 if (res.ok && out && out.ok) {
-                  // Uniform: always advance to the code screen. If the email isn't on file
-                  // no code is sent — but we never reveal that here (anti-enumeration).
                   setEmailMasked(out.masked || em);
                   setPendingMatch(null); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true);
                 } else if (res.status === 429) {
@@ -6266,14 +6289,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 Too many code requests just now. Please wait a few minutes and try again.
               </div>
             )}
+            {loginNoMatch === "nomatch" && (
+              <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", marginBottom: 16, fontSize: 14, lineHeight: 1.5, color: "var(--text)" }}>
+                We don't see this number in our records. If you're new here, book as a new client — it only takes a minute.
+                <button onClick={() => { if ((business?.booking?.clientType) === "returning") { setClientTypeBlock("returning_only"); return; } setLoginNoMatch(null); setStep(0); setSimpleStep("what"); }} style={{ display: "block", width: "100%", marginTop: 10, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: 13, fontSize: 13.5, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer", fontFamily: "'Jost', sans-serif" }}>Book as a new client</button>
+              </div>
+            )}
             <button className="lift" disabled={loginBusy || phone.replace(/\D/g, "").length < 10} onClick={async () => {
               setLoginBusy(true); setLoginNoMatch(null);
               try {
+                // Confirm the number is actually one of ours FIRST. If it isn't, guide them to book as
+                // a NEW client instead of a dead-end code screen. (Owner's choice — unlike the old
+                // silent path, this does confirm to a caller whether a number is on file.)
+                const look = await supabase.rpc("lookup_client_by_phone", { p_shop: shopId, p_phone: phone });
+                if (!look.error && (!look.data || !look.data.id)) { setLoginNoMatch("nomatch"); setLoginBusy(false); return; }
                 const res = await fetch(API_BASE + "/api/client-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: shopId, phone }) });
                 const out = await res.json().catch(() => ({}));
                 if (res.ok && out && out.ok) {
-                  // Uniform: always advance to the code screen (anti-enumeration — we never
-                  // reveal here whether the number is on file).
                   setPendingMatch(null); setCodeEntry(""); setCodeError(false); setShowCodeEntry(true);
                 } else if (res.status === 429) { setLoginNoMatch("throttled"); }
                 else { setLoginNoMatch("error"); }
