@@ -8961,6 +8961,7 @@ function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, pr
   const kindMeta = (n) => {
     if (n.kind === "new") return { Icon: Scissors, title: "New booking", live: true };
     if (n.kind === "moved") return { Icon: RefreshCw, title: "Rescheduled", live: false };
+    if (n.kind === "note") return { Icon: n.addedNote ? Edit2 : ImageIcon, title: n.addedNote ? (n.photoCount > 0 ? "Note & photos added" : "Note added") : "Photos added", live: true };
     return { Icon: X, title: "Canceled", live: false };
   };
 
@@ -9009,8 +9010,11 @@ function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, pr
                     <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>
                       {n.kind === "moved" && n.prevWhen ? `${n.name} moved ${fmtWhen(n.prevWhen, n.prevStart)} → ${fmtWhen(n.when, n.start)}` : subBits.join(" · ")}
                     </span>
-                    {n.kind === "new" && n.note ? (
+                    {(n.kind === "new" || n.kind === "note") && n.note ? (
                       <span style={{ display: "block", marginTop: 8, background: "var(--panel2)", borderLeft: "2px solid var(--gold)", borderRadius: "0 9px 9px 0", padding: "8px 11px", fontSize: 13.5, color: "var(--text)", lineHeight: 1.45 }}>{"\uD83D\uDCDD \u201C" + n.note + "\u201D"}</span>
+                    ) : null}
+                    {n.kind === "note" && !n.note && n.photoCount ? (
+                      <span style={{ display: "block", marginTop: 8, fontSize: 13, color: "var(--sub)" }}>{"\uD83D\uDCF7 " + n.photoCount + " reference photo" + (n.photoCount > 1 ? "s" : "")}</span>
                     ) : null}
                   </span>
                   <span style={{ fontSize: 12, color: "var(--faint)", flexShrink: 0, paddingTop: 2 }}>{fmtAgo(n.ts)}</span>
@@ -11147,7 +11151,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     if (!dataLoaded) return;
     const t = setTimeout(() => {
       const snap = {};
-      for (const a of (appts || [])) { if (a && a.id != null) snap[String(a.id)] = { start: a.start, bookedFor: a.bookedFor, status: a.status }; }
+      for (const a of (appts || [])) { if (a && a.id != null) snap[String(a.id)] = { start: a.start, bookedFor: a.bookedFor, status: a.status, hasNote: !!a.hasNote, photos: a.photos || 0 }; }
       apptSnapRef.current = snap;
       notifReadyRef.current = true;
     }, 1500);
@@ -11161,7 +11165,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     for (const a of (appts || [])) {
       if (!a || a.id == null) continue;
       const key = String(a.id);
-      nextSnap[key] = { start: a.start, bookedFor: a.bookedFor, status: a.status };
+      nextSnap[key] = { start: a.start, bookedFor: a.bookedFor, status: a.status, hasNote: !!a.hasNote, photos: a.photos || 0 };
       if (a.status === "block") continue;
       if (a.source === "sync" || a._synced) continue; // mirrored appts stay silent — the Sync panel reports them, not the bell
       const prev = snap[key];
@@ -11174,10 +11178,21 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         fresh.push({ ...base, id: "nn_" + key + "_" + Date.now(), kind: "new", note: (a.note || "").trim() });
       } else if (prev.start !== a.start || prev.bookedFor !== a.bookedFor) {
         fresh.push({ ...base, id: "nm_" + key + "_" + Date.now(), kind: "moved", prevWhen: prev.bookedFor, prevStart: prev.start });
+      } else if (a.bookedOnline && ((!prev.hasNote && !!a.hasNote) || ((a.photos || 0) > (prev.photos || 0)))) {
+        // Client added a note / reference photos AFTER booking (online bookings only, so a staff edit
+        // to a manual appt never self-notifies). IN-APP ONLY — this lands in the feed and never fires
+        // a push, email, or SMS (those are only the booking/reschedule/cancel alerts).
+        fresh.push({ ...base, id: "np_" + key + "_" + Date.now(), kind: "note", note: (a.note || "").trim(), addedNote: (!prev.hasNote && !!a.hasNote), photoCount: a.photos || 0 });
       }
     }
     apptSnapRef.current = nextSnap;
-    if (fresh.length) setNotifs((cur) => [...fresh, ...cur].slice(0, 50));
+    if (fresh.length) setNotifs((cur) => {
+      // Collapse repeat note/photo updates for the same appointment into one latest entry (a client
+      // adding a photo, then a note, then another photo shouldn't stack up multiple alerts).
+      const noteAppts = new Set(fresh.filter((f) => f.kind === "note").map((f) => f.apptId));
+      const pruned = noteAppts.size ? cur.filter((n) => !(n.kind === "note" && noteAppts.has(n.apptId))) : cur;
+      return [...fresh, ...pruned].slice(0, 50);
+    });
   }, [appts]);
   // Owners see the whole shop; a barber sees their own chair (mirrors the per-role
   // notification settings). Your own entries appear here too — that's intended.
