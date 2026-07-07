@@ -1080,7 +1080,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
             </div>
           ) : (
             <>
-              <div style={{ fontSize: 11, letterSpacing: 2, color: A, fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>{isPay ? "Deposit to reserve" : "Card to reserve"}</div>
+              <div style={{ fontSize: 12.5, letterSpacing: 2, color: A, fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>{isPay ? "Deposit to reserve" : "Card to reserve"}</div>
               {isPay ? (
                 <>
                   <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, lineHeight: 1, letterSpacing: -1 }}>${amount}</div>
@@ -1091,7 +1091,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
               )}
 
               {walletChecking && !wallet && (
-                <div style={{ marginTop: 18, height: 48, borderRadius: 10, background: "var(--panel2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "var(--faint)", fontSize: 12.5 }}>
+                <div style={{ marginTop: 18, height: 48, borderRadius: 10, background: "var(--panel2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "var(--faint)", fontSize: 13.5 }}>
                   Checking for Apple&nbsp;Pay…
                 </div>
               )}
@@ -1099,7 +1099,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
               {wallet && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
                   <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-                  <span style={{ fontSize: 12, color: "var(--faint)" }}>{isPay ? "or pay with card" : "or enter your card"}</span>
+                  <span style={{ fontSize: 13, color: "var(--faint)" }}>{isPay ? "or pay with card" : "or enter your card"}</span>
                   <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
                 </div>
               )}
@@ -1107,11 +1107,11 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
               <div style={{ marginTop: 18 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>Enter your card</div>
                 <div ref={cardBox} style={{ ...field, display: "block", paddingTop: 15 }} />
-                {err && <div style={{ color: "#B5564B", fontSize: 12.5, marginTop: 8, paddingLeft: 2 }}>{err}</div>}
+                {err && <div style={{ color: "#B5564B", fontSize: 13.5, marginTop: 8, paddingLeft: 2 }}>{err}</div>}
               </div>
 
               <button disabled={busy || !ready} onClick={submit} style={{ width: "100%", marginTop: 18, background: (busy || !ready) ? "var(--border2)" : A, color: "var(--bg)", border: "none", borderRadius: 13, padding: 16, fontSize: 15.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: (busy || !ready) ? "default" : "pointer", boxShadow: (busy || !ready) ? "none" : "0 10px 22px -10px rgba(0,0,0,.4)" }}>{busy ? "Processing…" : (!ready ? "Loading…" : (isPay ? `Pay $${amount}` : "Save card"))}</button>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14, fontSize: 11.5, color: "var(--faint)" }}><Lock size={13} /> Encrypted &amp; secure · Powered by Stripe</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14, fontSize: 13, color: "var(--faint)" }}><Lock size={13} /> Encrypted &amp; secure · Powered by Stripe</div>
               <button onClick={close} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, marginTop: 12, cursor: "pointer", fontFamily: FONT_BODY, textDecoration: "underline", textUnderlineOffset: 3 }}>Cancel</button>
             </>
           )}
@@ -1141,7 +1141,7 @@ function PhoneLink({ number, style }) {
       <Sheet open={open} onClose={() => setOpen(false)} align="bottom" maxWidth={420}>
         <div style={{ padding: "6px 4px 8px" }}>
           <div style={{ textAlign: "center", marginBottom: 18 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CONTACT</div>
+            <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CONTACT</div>
             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{disp}</div>
           </div>
           <a href={`tel:${digits}`} onClick={() => setOpen(false)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 14, fontWeight: 600, letterSpacing: 1.5, borderRadius: 14, textDecoration: "none", marginBottom: 10 }}>
@@ -1198,7 +1198,7 @@ function TimeScrollPicker({ value, onChange, step = 15, minMin = 0, maxMin = 24 
       <Sheet open={open} onClose={() => setOpen(false)} align="center" maxWidth={300}>
         <div style={{ padding: "4px 0 6px" }}>
           <div style={{ textAlign: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>{(label || "Select time").toUpperCase()}</div>
+            <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>{(label || "Select time").toUpperCase()}</div>
           </div>
           <div ref={listRef} style={{ maxHeight: "52vh", overflowY: "auto", WebkitOverflowScrolling: "touch", display: "grid", gap: 5 }}>
             {options.map((t) => {
@@ -1240,7 +1240,7 @@ function DurPick({ value, defaultMin, onChange, step = 5, maxMin = 240 }) {
       <Sheet open={open} onClose={() => setOpen(false)} align="center" maxWidth={300}>
         <div style={{ padding: "4px 0 6px" }}>
           <div style={{ textAlign: "center", marginBottom: 14 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>LENGTH</div>
+            <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>LENGTH</div>
           </div>
           <div ref={listRef} style={{ maxHeight: "52vh", overflowY: "auto", WebkitOverflowScrolling: "touch", display: "grid", gap: 5 }}>
             <button onClick={() => { onChange(null); setOpen(false); }} style={{ width: "100%", textAlign: "center", padding: "13px 0", borderRadius: 11, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--sub)", fontSize: 14.5, fontWeight: 500, fontFamily: FONT_BODY, cursor: "pointer" }}>Shop default · {defaultMin || step} min</button>
@@ -1533,7 +1533,7 @@ const inputStyle = { width: "100%", background: "var(--panel)", border: "1px sol
 // a field sits inside a panel2 card. G_SEC = left-aligned bold section header. G_HINT = muted help text.
 const G_BOX = { position: "relative", border: "1.5px solid var(--border)", borderRadius: 14, padding: "17px 15px 12px", marginBottom: 13, background: "var(--panel)" };
 const G_BOX_ON = (bg) => ({ ...G_BOX, background: bg });
-const G_LBL = { position: "absolute", top: -8, left: 12, background: "var(--panel)", padding: "0 6px", fontSize: 11.5, color: "var(--sub)", fontWeight: 500, fontFamily: FONT_BODY };
+const G_LBL = { position: "absolute", top: -8, left: 12, background: "var(--panel)", padding: "0 6px", fontSize: 13, color: "var(--sub)", fontWeight: 500, fontFamily: FONT_BODY };
 const G_LBL_ON = (bg) => ({ ...G_LBL, background: bg });
 const G_INPUT = { width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: 0, color: "var(--text)", fontSize: 16.5, fontWeight: 500, fontFamily: FONT_BODY };
 const G_SEC = { fontSize: 18, fontWeight: 700, letterSpacing: "-0.3px", margin: "22px 0 12px", fontFamily: FONT_DISPLAY };
@@ -1587,7 +1587,7 @@ function StaffLogin({ authReady, onBack }) {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "var(--bg, #f6f3ec)" }}>
       <div className="fade-up" style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-          <span style={{ fontSize: 12, letterSpacing: 3, color: "var(--faint)", textTransform: "uppercase" }}>Staff sign-in</span>
+          <span style={{ fontSize: 13, letterSpacing: 3, color: "var(--faint)", textTransform: "uppercase" }}>Staff sign-in</span>
         </div>
         {!sent ? (
           <>
@@ -1639,7 +1639,7 @@ class ErrorBoundary extends React.Component {
         <div style={{ padding: 24, maxWidth: 680, margin: "0 auto" }}>
           <div style={{ fontFamily: "var(--font-disp, Georgia, serif)", fontSize: 24, fontWeight: 600, marginBottom: 10, color: "var(--text, #232221)" }}>Something went wrong{this.props.label ? ` on ${this.props.label}` : ""}.</div>
           <p style={{ fontSize: 15, color: "var(--sub, #6F685D)", lineHeight: 1.5, marginBottom: 16 }}>The rest of the app still works — head back and try again. If this keeps happening, send a screenshot of the text below:</p>
-          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", background: "var(--panel2, #F4EFE4)", border: "1px solid var(--border, #E0D8C7)", borderRadius: 12, padding: 14, fontSize: 12.5, color: "var(--text, #232221)" }}>{String((e && (e.stack || e.message)) || e)}</pre>
+          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", background: "var(--panel2, #F4EFE4)", border: "1px solid var(--border, #E0D8C7)", borderRadius: 12, padding: 14, fontSize: 13.5, color: "var(--text, #232221)" }}>{String((e && (e.stack || e.message)) || e)}</pre>
           <button onClick={() => { try { window.location.reload(); } catch (x) {} }} style={{ marginTop: 16, background: "var(--gold, #0A0A0A)", color: "var(--on-gold, #fff)", border: "none", borderRadius: 12, padding: "12px 18px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Reload</button>
         </div>
       );
@@ -2589,7 +2589,7 @@ function PrivacyPage({ onExit }) {
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY }}>
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "32px 22px 80px" }}>
         <button onClick={onExit} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 24 }}><ArrowLeft size={16} /> Back</button>
-        <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>SANCTUARY BARBER CO</div>
+        <div style={{ fontSize: 13.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>SANCTUARY BARBER CO</div>
         <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.1, marginBottom: 8 }}>Privacy Policy</h1>
         <p style={{ fontSize: 14, color: "var(--sub)", marginBottom: 8 }}>Last updated: {updated}</p>
 
@@ -2642,7 +2642,7 @@ function TermsPage({ onExit }) {
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: FONT_BODY }}>
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "32px 22px 80px" }}>
         <button onClick={onExit} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 6, fontSize: 15, marginBottom: 24 }}><ArrowLeft size={16} /> Back</button>
-        <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>SANCTUARY BARBER CO</div>
+        <div style={{ fontSize: 13.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 10 }}>SANCTUARY BARBER CO</div>
         <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, lineHeight: 1.1, marginBottom: 8 }}>Terms &amp; Conditions</h1>
         <p style={{ fontSize: 14, color: "var(--sub)", marginBottom: 8 }}>Last updated: {updated}</p>
 
@@ -2704,7 +2704,7 @@ function Storefront({ business, services = [], providers = [], categories = [], 
       {preview && (
         <div style={{ position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 18px", background: "color-mix(in srgb, var(--bg) 88%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", borderBottom: "1px solid var(--line)" }}>
           <button onClick={() => (onExitPreview ? onExitPreview() : window.history.back())} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "none", border: "none", color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}><ArrowLeft size={17} /> Back to settings</button>
-          <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 600 }}>PREVIEW</span>
+          <span style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600 }}>PREVIEW</span>
         </div>
       )}
       {/* HERO */}
@@ -2758,7 +2758,7 @@ function Storefront({ business, services = [], providers = [], categories = [], 
               <div key={p.id} style={{ textAlign: "center", width: 96 }}>
                 <Avatar size={72} initial={p.name?.charAt(0)} color={p.color} photo={p.photo} />
                 <div style={{ fontSize: 14.5, fontWeight: 500, marginTop: 8 }}>{p.name}</div>
-                {p.role && <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{p.role}</div>}
+                {p.role && <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{p.role}</div>}
               </div>
             ))}
           </div>
@@ -2789,7 +2789,7 @@ function Storefront({ business, services = [], providers = [], categories = [], 
         <div style={{ marginTop: 22, display: "flex", gap: 18, justifyContent: "center" }}>
           <button onClick={() => onPick("manage")} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 3 }}>Manage my appointment</button>
         </div>
-        <div style={{ marginTop: 34, fontSize: 11.5, color: "var(--faint)", letterSpacing: 1 }}>Powered by Vero</div>
+        <div style={{ marginTop: 34, fontSize: 13, color: "var(--faint)", letterSpacing: 1 }}>Powered by Vero</div>
       </div>
     </div>
   );
@@ -2799,7 +2799,7 @@ function SfHeading({ label }) {
   return (
     <div style={{ textAlign: "center", marginBottom: 18 }}>
       <div style={{ width: 24, height: 1.5, background: "var(--gold)", margin: "0 auto 10px" }} />
-      <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--gold)", fontWeight: 600 }}>{label.toUpperCase()}</div>
+      <div style={{ fontSize: 12.5, letterSpacing: 3, color: "var(--gold)", fontWeight: 600 }}>{label.toUpperCase()}</div>
     </div>
   );
 }
@@ -3427,7 +3427,7 @@ function DateStrip({ selectedDate, onPick, selectable, horizonDays }) {
           const isToday = d.toDateString() === today.toDateString();
           return (
             <button key={i} ref={on ? selRef : null} disabled={!ok} onClick={() => onPick(d)} style={{ flexShrink: 0, width: ITEM_W, scrollSnapAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "none", border: "none", padding: "4px 0", cursor: ok ? "pointer" : "default" }}>
-              <span style={{ fontFamily: FONT_BODY, fontSize: 11, fontWeight: 600, letterSpacing: 0.4, color: ok ? "var(--sub)" : "var(--faint)", opacity: ok ? 1 : 0.5 }}>{DOW[d.getDay()]}</span>
+              <span style={{ fontFamily: FONT_BODY, fontSize: 12.5, fontWeight: 600, letterSpacing: 0.4, color: ok ? "var(--sub)" : "var(--faint)", opacity: ok ? 1 : 0.5 }}>{DOW[d.getDay()]}</span>
               {/* bookable days get a warm dot; unavailable days just dim (no strike-through — that read as "broken") */}
               <span style={{ width: 42, height: 42, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: (isToday && ok && !on) ? "1.5px solid var(--border2)" : "1.5px solid transparent", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : (ok ? "var(--text)" : "var(--faint)"), fontFamily: FONT_BODY, fontSize: 16, fontWeight: on ? 600 : 500, opacity: ok ? 1 : 0.35 }}>{d.getDate()}</span>
               <span style={{ width: 5, height: 5, borderRadius: "50%", background: (ok && !on) ? "var(--gold)" : "transparent" }} />
@@ -4741,7 +4741,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     try { supabase.rpc("cancel_my_appointment", { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(appt.id), p_session: matched.sessionToken }).catch(() => {}); } catch (e) {}
     setMyAppts((cur) => cur.map((a) => a.id === appt.id ? { ...a, status: "cancelled" } : a));
   };
-  const lblStyle = { fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 10px" };
+  const lblStyle = { fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 10px" };
   const avStyle = { width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 14, color: "var(--text)", flexShrink: 0 };
 
   if (showHome && matched) {
@@ -4769,7 +4769,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: "var(--bg)" }}>
         <div style={{ width: "100%", maxWidth: 480, padding: "30px 22px 60px" }}>
           <div className="fade-up">
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{business.name}</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{business.name}</div>
             <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1.05, margin: "12px 0 0", color: "var(--text)" }}>Welcome back,<br />{firstName}.</h1>
 
             <div style={lblStyle}>Your next visit</div>
@@ -4797,7 +4797,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <span style={avStyle}>{(p.name || "?").trim().charAt(0).toUpperCase()}</span>
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{p.isMember ? p.name : firstName}</span>
-                        <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}>{p.isMember ? (p.note || "Family") : "You"}</span>
+                        <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)" }}>{p.isMember ? (p.note || "Family") : "You"}</span>
                       </span>
                       <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: "var(--border)" }}>&#8594;</span>
                     </button>
@@ -4806,7 +4806,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <span style={{ ...avStyle, color: "var(--sub)", fontSize: 16 }}>+</span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>Add someone</span>
-                      <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}>Kids, partner, siblings</span>
+                      <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)" }}>Kids, partner, siblings</span>
                     </span>
                     <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: "var(--border)" }}>&#8594;</span>
                   </button>
@@ -4824,22 +4824,22 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <button key={(a.serviceId || "") + (a.familyMemberId || "") + i} onClick={() => bookAgain(a)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderTop: i ? "1px solid var(--line)" : "none", borderLeft: "none", borderRight: "none", borderBottom: "none", background: "transparent", textAlign: "left", cursor: "pointer" }}>
                         <span style={{ flex: 1, minWidth: 0 }}>
                           <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{svcLabel(a)}{a.familyMemberId ? ` · ${personLabel(a)}` : ""}</span>
-                          <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 3 }}>Last {fmtHomeShort(a)} · booked {count} time{count === 1 ? "" : "s"}</span>
+                          <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>Last {fmtHomeShort(a)} · booked {count} time{count === 1 ? "" : "s"}</span>
                         </span>
                         {price != null && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--text)", flexShrink: 0 }}>${price}</span>}
-                        <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 600, letterSpacing: 0.3, color: "var(--text)", flexShrink: 0, borderBottom: "1px solid var(--text)", paddingBottom: 1 }}>Book again</span>
+                        <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, fontWeight: 600, letterSpacing: 0.3, color: "var(--text)", flexShrink: 0, borderBottom: "1px solid var(--text)", paddingBottom: 1 }}>Book again</span>
                       </button>
                     );
                   })}
                   {pastServices.length > 3 && (
-                    <button onClick={() => setShowAllVisits((v) => !v)} style={{ width: "100%", background: "transparent", borderTop: "1px solid var(--line)", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: 13, fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", letterSpacing: 0.3, cursor: "pointer" }}>{showAllVisits ? "Show less" : `See all ${pastServices.length} services \u2192`}</button>
+                    <button onClick={() => setShowAllVisits((v) => !v)} style={{ width: "100%", background: "transparent", borderTop: "1px solid var(--line)", borderLeft: "none", borderRight: "none", borderBottom: "none", padding: 13, fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", letterSpacing: 0.3, cursor: "pointer" }}>{showAllVisits ? "Show less" : `See all ${pastServices.length} services \u2192`}</button>
                   )}
                 </div>
               </>
             )}
 
             <div style={{ textAlign: "center", marginTop: 28 }}>
-              <button onClick={signOutClient} style={{ background: "none", border: "none", fontFamily: "'Jost', sans-serif", fontSize: 12, color: "var(--faint)", cursor: "pointer" }}>Not {firstName}? Sign out</button>
+              <button onClick={signOutClient} style={{ background: "none", border: "none", fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--faint)", cursor: "pointer" }}>Not {firstName}? Sign out</button>
             </div>
           </div>
         </div>
@@ -4926,13 +4926,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const picks = (feat.length ? feat : pubReviews).slice(0, 3);
               return (
                 <div style={{ marginTop: 30 }}>
-                  <div style={{ textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 2.5, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 14 }}>What clients say</div>
+                  <div style={{ textAlign: "center", fontFamily: "'Jost', sans-serif", fontSize: 13.5, letterSpacing: 2.5, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 14 }}>What clients say</div>
                   <div style={{ display: "grid", gap: 10 }}>
                     {picks.map((r, i) => (
                       <div key={i} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px" }}>
                         <div style={{ display: "flex", gap: 2, marginBottom: 7 }}>{[1, 2, 3, 4, 5].map((n) => <Star key={n} size={13} style={{ color: "var(--gold)", fill: n <= (r.rating || 0) ? "var(--gold)" : "transparent" }} />)}</div>
                         {r.comment ? <div style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--text2)" }}>“{r.comment}”</div> : null}
-                        <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 8 }}>— {r.displayName || "A client"}</div>
+                        <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 8 }}>— {r.displayName || "A client"}</div>
                       </div>
                     ))}
                   </div>
@@ -5010,7 +5010,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const list = activeCat ? inCat(activeCat) : services.filter(visible);
           return (
             <div className="fade-up">
-              {simpleCat && <button onClick={() => setSimpleCat(null)} style={{ background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 600, padding: 0, marginBottom: 14, cursor: "pointer", letterSpacing: 0.3 }}>‹ {simpleCat}</button>}
+              {simpleCat && <button onClick={() => setSimpleCat(null)} style={{ background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 14, cursor: "pointer", letterSpacing: 0.3 }}>‹ {simpleCat}</button>}
               {simpleCat && <h2 style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.2px", margin: "0 0 2px", textAlign: "left" }}>{simpleCat}</h2>}
               <div style={{ borderTop: "1px solid var(--line)", marginTop: simpleCat ? 14 : 4 }}>
                 {list.map((svc) => {
@@ -5085,7 +5085,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const addYes = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: true }, finishAns: "yes" } : e));
           const addNo = () => setCart((c) => c.map((e, i) => i === 0 ? { ...e, addons: { ...(e.addons || {}), [fin.id]: undefined }, finishAns: "no" } : e));
 
-          const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
+          const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
           const firstSentence = (s) => { if (!s) return s; const t = String(s).trim().replace(/\s+/g, " "); if (t.length <= 52) return t; const cut = t.slice(0, 52); const sp = cut.lastIndexOf(" "); return (sp > 24 ? cut.slice(0, sp) : cut).replace(/[\s—,.;:!?-]+$/, "") + "…"; };
           const renderCard = (ct, selected, hidden) => {
             const img = ct.images && ct.images[0];
@@ -5095,10 +5095,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{ct.label || niceName[ct.id]}</span>
-                    {ct.popular && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text)", fontWeight: 600 }}>Most common</span>}
+                    {ct.popular && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text)", fontWeight: 600 }}>Most common</span>}
                   </span>
                   {showPrices && <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, color: "var(--text)", marginTop: 6 }}>${ct.price}</span>}
-                  {draft?.booking?.showTypeTimes && (() => { const m = ct.duration != null ? ct.duration : (Number(draft.duration) || 0) + (Number(ct.min) || 0); return m ? <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", marginTop: 4 }}>{m} min</span> : null; })()}
+                  {draft?.booking?.showTypeTimes && (() => { const m = ct.duration != null ? ct.duration : (Number(draft.duration) || 0) + (Number(ct.min) || 0); return m ? <span style={{ display: "block", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)", marginTop: 4 }}>{m} min</span> : null; })()}
                 </span>
                 <ChevronRight size={18} style={{ color: "var(--text)", flexShrink: 0 }} />
               </button>
@@ -5112,7 +5112,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, marginTop: 9 }}>{T.lead}</p>
               {draft.comboOf && draft.comboOf.length > 0 && (() => {
                 const incl = draft.comboOf.map((id) => { const s = services.find((x) => x.id === id); return s && s.name; }).filter(Boolean);
-                return incl.length ? <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--text)", fontWeight: 500, margin: "10px 0 0" }}>Includes {incl.join(" + ")}</p> : null;
+                return incl.length ? <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--text)", fontWeight: 500, margin: "10px 0 0" }}>Includes {incl.join(" + ")}</p> : null;
               })()}
 
               {!picked ? (
@@ -5130,9 +5130,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 21, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, lineHeight: 1.25, color: "var(--text)" }}>{cName}</div>
                   {(cPrice != null && cPrice !== "") ? <div style={{ marginTop: 9, display: "flex", justifyContent: "center", alignItems: "baseline", gap: 9 }}>
                     <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: "var(--text)" }}>${cPrice}</span>
-                    {cDur ? <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}>· {cDur} min</span> : null}
+                    {cDur ? <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)" }}>· {cDur} min</span> : null}
                   </div> : null}
-                  <button onClick={changeCut} style={{ marginTop: 16, background: "none", border: "none", color: "var(--text)", fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 600, letterSpacing: 0.3, padding: 0, cursor: "pointer" }}>‹ Choose a different style</button>
+                  <button onClick={changeCut} style={{ marginTop: 16, background: "none", border: "none", color: "var(--text)", fontFamily: "'Jost', sans-serif", fontSize: 13.5, fontWeight: 600, letterSpacing: 0.3, padding: 0, cursor: "pointer" }}>‹ Choose a different style</button>
                 </div>
                 );
               })()}
@@ -5150,7 +5150,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, lineHeight: 1.45, color: "var(--text2)", textAlign: "center", fontWeight: 500, marginTop: 14, padding: "0 4px" }}>{(draft?.booking?.confirmSubtext != null && draft.booking.confirmSubtext.trim()) ? draft.booking.confirmSubtext : <>So we set aside the <b style={{ color: "var(--text)", fontWeight: 600 }}>right amount of time</b>.</>}</div>
                       <div style={{ maxHeight: confirmReveal ? 640 : 0, opacity: confirmReveal ? 1 : 0, overflow: "hidden", transition: "max-height .55s cubic-bezier(.22,1,.36,1), opacity .45s ease .15s" }}>
                         <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
-                        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, textAlign: "center" }}>You picked</div>
+                        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, textAlign: "center" }}>You picked</div>
                         <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 20, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, textAlign: "center", lineHeight: 1.1, color: "var(--text)", marginTop: 7 }}>{nm}</div>
                           {d ? <><div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} /><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, lineHeight: 1.55, color: "var(--text)", textAlign: "center", fontWeight: 400, padding: "0 2px" }}>{d}</div></> : null}
                         <div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} />
@@ -5172,7 +5172,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* SIMPLE · WHO — anyone, or a specific person? Defaults make this a one-tap step. */}
         {simpleStep === "who" && (
           <div className="fade-up">
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Your staff member</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Your staff member</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Anyone in particular?</h2>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 0" }}>No wrong answer — if you're not sure, we'll match you with whoever's free soonest.</p>
             <div style={{ marginTop: 24, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
@@ -5195,7 +5195,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 setSimpleStep(null); setStep(6);
               }} style={{ border: "1px solid var(--border)", borderRadius: 13, minHeight: 104, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 0, background: "var(--panel)", padding: "10px 6px", color: "var(--text)", cursor: "pointer" }}>
                 <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, lineHeight: 1.15, textAlign: "center", color: "var(--text)" }}>First<br />available</span>
-                <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 6 }}>Soonest open</span>
+                <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 6 }}>Soonest open</span>
               </button>
             </div>
           </div>
@@ -5260,7 +5260,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const list = activeCat ? inCat(activeCat) : services.filter(visible);
           return (
             <div className="fade-up">
-              {guidedCat && <button onClick={() => setGuidedCat(null)} style={{ background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 600, padding: 0, marginBottom: 14, cursor: "pointer", letterSpacing: 0.3 }}>‹ {guidedCat}</button>}
+              {guidedCat && <button onClick={() => setGuidedCat(null)} style={{ background: "none", border: "none", color: "var(--sub)", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 14, cursor: "pointer", letterSpacing: 0.3 }}>‹ {guidedCat}</button>}
               {guidedCat && <h2 style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.2px", margin: "0 0 2px", textAlign: "left" }}>{guidedCat}</h2>}
               <div style={{ borderTop: "1px solid var(--line)", marginTop: guidedCat ? 14 : 4 }}>
                 {list.map((svc) => (
@@ -5392,7 +5392,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   )}
                 </div>
               )}
-              <div style={{ fontFamily: FONT_BODY, fontSize: 12, letterSpacing: 2.5, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, textAlign: "center", margin: "0 0 12px", flexShrink: 0 }}>Please Confirm</div>
+              <div style={{ fontFamily: FONT_BODY, fontSize: 13, letterSpacing: 2.5, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, textAlign: "center", margin: "0 0 12px", flexShrink: 0 }}>Please Confirm</div>
               {pickConfirm.name && <div style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.12, color: "var(--text)", textAlign: "center", margin: "0 0 16px", flexShrink: 0 }}>{pickConfirm.name}</div>}
               {pickConfirm.desc && String(pickConfirm.desc).trim() && (
                 <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: "0 1 auto", minHeight: 0, margin: "0 0 26px" }}>
@@ -5482,7 +5482,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const niceName = { standard: "Haircut", skinfade: "Skin Fade", scissor: "Scissor Only" };
               return (
                 <>
-                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Choose your style</div>
+                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Choose your style</div>
                   <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Pick your cut</h2>
                   <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, marginTop: 9 }}>Tap whichever's closest — your staff member dials it in in the chair.</p>
                   <div style={{ marginTop: 26, marginBottom: 26, borderBottom: "1px solid var(--line)" }}>
@@ -5494,7 +5494,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                           <span style={{ flex: 1, minWidth: 0 }}>
                             <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                               <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.3, lineHeight: 1.25 }}>{ct.label || niceName[ct.id]}</span>
-                              {ct.popular && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text)", fontWeight: 600 }}>Most common</span>}
+                              {ct.popular && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text)", fontWeight: 600 }}>Most common</span>}
                             </span>
                             {showPrices && <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, color: "var(--text)", marginTop: 6 }}>${ct.price}</span>}
                           </span>
@@ -5631,7 +5631,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                                   {match.images && match.images[0] && <img src={imgUrl(match.images[0], 240)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
                                 </div>
                                 <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                                  <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--text)", fontWeight: 600, marginBottom: 4 }}>YOUR MATCH</div>
+                                  <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--text)", fontWeight: 600, marginBottom: 4 }}>YOUR MATCH</div>
                                   <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>{photoResult.matchLabel}</div>
                                 </div>
                               </div>
@@ -5646,7 +5646,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       })()}
                       {!photoLoading && !photoResult && (
                         <>
-                          <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>OR PICK FROM THE LIST</div>
+                          <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>OR PICK FROM THE LIST</div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 9, marginBottom: 14 }}>
                             {draft.cutTypes.map((ct) => (
                               <button key={ct.id} className="lift" onClick={() => { setCutType(ct.id); setCutHelperOpen(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", color: "var(--text)", textAlign: "left" }}>
@@ -5723,7 +5723,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                                   {match.images && match.images[0] && <img src={imgUrl(match.images[0], 240)} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
                                 </div>
                                 <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                                  <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--text)", fontWeight: 600, marginBottom: 4 }}>BEST MATCH</div>
+                                  <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--text)", fontWeight: 600, marginBottom: 4 }}>BEST MATCH</div>
                                   <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, lineHeight: 1.1 }}>{notSureResult.matchLabel}</div>
                                 </div>
                               </div>
@@ -5738,7 +5738,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       })()}
                       {!notSureResult && notSureError && (
                         <>
-                          <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10, marginTop: 4 }}>OR PICK FROM THE LIST</div>
+                          <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10, marginTop: 4 }}>OR PICK FROM THE LIST</div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
                             {draft.cutTypes.map((ct) => (
                               <button key={ct.id} className="lift" onClick={() => { setCutType(ct.id); setCutHelperOpen(null); setNotSureText(""); setNotSureResult(null); setCutPhase(draft.beardTypes && draft.beardTypes.length ? "beard" : "addons"); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 0, overflow: "hidden", display: "flex", alignItems: "stretch", color: "var(--text)", textAlign: "left", height: 80 }}>
@@ -5750,7 +5750,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ct.label}</div>
                                     <div style={{ fontSize: 14, color: "var(--text)", fontWeight: 500, flexShrink: 0 }}>${ct.price}</div>
                                   </div>
-                                  {ct.desc && <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ct.desc}</div>}
+                                  {ct.desc && <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ct.desc}</div>}
                                 </div>
                               </button>
                             ))}
@@ -5778,7 +5778,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, lineHeight: 1.45, color: "var(--text2)", textAlign: "center", fontWeight: 500, marginTop: 14, padding: "0 4px" }}>{(draft?.booking?.confirmSubtext != null && draft.booking.confirmSubtext.trim()) ? draft.booking.confirmSubtext : <>So we set aside the <b style={{ color: "var(--text)", fontWeight: 600 }}>right amount of time</b>.</>}</div>
                     <div style={{ maxHeight: confirmReveal ? 640 : 0, opacity: confirmReveal ? 1 : 0, overflow: "hidden", transition: "max-height .55s cubic-bezier(.22,1,.36,1), opacity .45s ease .15s" }}>
                       <div style={{ height: 1, background: "var(--line)", margin: "20px 0" }} />
-                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, textAlign: "center" }}>You picked</div>
+                      <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, textAlign: "center" }}>You picked</div>
                       <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 20, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, textAlign: "center", lineHeight: 1.1, color: "var(--text)", marginTop: 7 }}>{nm}</div>
                       {d ? <><div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} /><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 16, lineHeight: 1.55, color: "var(--text)", textAlign: "center", fontWeight: 400, padding: "0 2px" }}>{d}</div></> : null}
                       <div style={{ height: 1, background: "var(--line)", margin: "19px 0" }} />
@@ -5929,8 +5929,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.1 }}>{p.name}</div>
                             {bookedProvBefore(p.id, draft.id)
-                              ? <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 5, background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", color: "var(--text)", fontSize: 10.5, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase", padding: "3px 9px", borderRadius: 20 }}><Check size={11} strokeWidth={3} /> Booked before</div>
-                              : (p.role && <div style={{ fontSize: 12, color: "var(--faint)", letterSpacing: 1.5, marginTop: 3, textTransform: "uppercase" }}>{p.role}</div>)}
+                              ? <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 5, background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", color: "var(--text)", fontSize: 12, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase", padding: "3px 9px", borderRadius: 20 }}><Check size={11} strokeWidth={3} /> Booked before</div>
+                              : (p.role && <div style={{ fontSize: 13, color: "var(--faint)", letterSpacing: 1.5, marginTop: 3, textTransform: "uppercase" }}>{p.role}</div>)}
                           </div>
                           <ChevronRight size={22} style={{ color: "var(--text)", flexShrink: 0 }} />
                         </div>
@@ -6050,7 +6050,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                                 <Check size={16} style={{ color: "var(--text)", flexShrink: 0, marginTop: 2 }} />
                                 <span style={{ flex: 1, minWidth: 0 }}>
                                   <span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>{p.name}</span>
-                                  {p.desc ? <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{p.desc}</span> : null}
+                                  {p.desc ? <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{p.desc}</span> : null}
                                 </span>
                                 {p.price ? <span style={{ fontSize: 13.5, fontWeight: 600, flexShrink: 0 }}>+${p.price}</span> : null}
                               </div>
@@ -6194,7 +6194,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           const nextLabel = nextAvail ? (() => { const d = nextAvail.date; const day = relativeDate(d); const lbl = day.includes(",") ? day : `${day}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; return `${lbl} · ${fmtTime(nextAvail.slot)}`; })() : null;
           return (
             <div className="fade-up">
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.2, letterSpacing: "-0.2px", color: "var(--text)" }}>Good to see you, {who.name.split(" ")[0]}.</h2>
               <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 26px", fontWeight: 400, lineHeight: 1.55 }}>{rhythmLine}</p>
 
@@ -6202,11 +6202,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 {lastPhoto && (
                   <div style={{ width: "100%", height: 150, overflow: "hidden", position: "relative" }}>
                     <img src={imgUrl(lastPhoto, 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                    <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", color: "#fff", fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 1.5, fontWeight: 600, padding: "5px 11px", borderRadius: 20 }}>YOUR LAST CUT</div>
+                    <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", color: "#fff", fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.5, fontWeight: 600, padding: "5px 11px", borderRadius: 20 }}>YOUR LAST CUT</div>
                   </div>
                 )}
                 <div style={{ padding: "22px 20px", textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 2, color: "var(--text)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your usual</div>
+                  <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--text)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Your usual</div>
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 18, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.2, lineHeight: 1.2, color: "var(--text)" }}>{usualSvc.name}</div>
                   {usualProv && usualProv.id !== "anyone" ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, color: "var(--sub)", marginTop: 8 }}>with {usualProv.name}</div> : null}
                 </div>
@@ -6215,7 +6215,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               {nextAvail ? (
                 <button onClick={() => { setCart([usualEntry]); setSelectedDate(nextAvail.date); setSlot(nextAvail.slot); setCameFromUsual(true); setShowUsual(false); setStep(7); }} style={{ width: "100%", textAlign: "left", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: "16px 18px", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
                   <span style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9.5, fontWeight: 600, opacity: 0.85, letterSpacing: 1.5, textTransform: "uppercase" }}>Book next available{usualProv && usualProv.id !== "anyone" ? ` with ${usualProv.name}` : ""}</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, fontWeight: 600, opacity: 0.85, letterSpacing: 1.5, textTransform: "uppercase" }}>Book next available{usualProv && usualProv.id !== "anyone" ? ` with ${usualProv.name}` : ""}</span>
                     <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, lineHeight: 1.2 }}>{nextLabel}</span>
                   </span>
                   <ChevronRight size={20} style={{ flexShrink: 0 }} />
@@ -6234,7 +6234,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* STEP 5 — phone */}
         {step === 5 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && !usePhone && (
           <div className="fade-up">
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>What's your email?</h2>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 24px", fontWeight: 400, lineHeight: 1.55 }}>The one we have on file from your last visit — we'll email you a quick sign-in code.</p>
             <div style={{ position: "relative", marginBottom: 18 }}><Mail size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus inputMode="email" autoComplete="email" autoCapitalize="none" value={clientEmail} onChange={(e) => { setClientEmail(e.target.value); setLoginNoMatch(null); }} placeholder="you@email.com" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
@@ -6272,12 +6272,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
         {step === 5 && !simpleStep && !showWhoFor && !showUsual && !showSchedChoice && !showWizardIntro && !showCodeEntry && usePhone && (
           <div className="fade-up">
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Welcome back</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Your number</h2>
             <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 13, margin: "9px 0 24px", fontWeight: 400, lineHeight: 1.55 }}>We'll text you a quick code to confirm it's you.</p>
             <div style={{ position: "relative", marginBottom: 18 }}><Phone size={18} style={{ position: "absolute", left: 16, top: 16, color: "var(--faint)" }} /><input autoFocus inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="503-555-0142" style={{ ...inputStyle, paddingLeft: 46 }} /></div>
             {/* SMS opt-in disclosure — required by carriers (A2P 10DLC) so Twilio's reviewer can verify on the public booking page. */}
-            <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
+            <p style={{ color: "var(--faint)", fontSize: 13.5, marginBottom: 14, lineHeight: 1.5 }}>
               By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text)", textDecoration: "underline" }}>terms</a>.
             </p>
             {loginNoMatch === "error" && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 14 }}>Couldn't send the text — give it another try in a moment, or use your email below.</p>}
@@ -6355,7 +6355,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         </Sheet>
         {step === 5 && showCodeEntry && (
           <div className="fade-up">
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Verify</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Verify</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 10px", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Enter your code</h2>
             <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 8, fontWeight: 400, lineHeight: 1.5 }}>{usePhone ? <>We texted a 6-digit code to <strong>{phone}</strong>. It's good for 10 minutes.</> : <>We emailed a 6-digit code to <strong>{emailMasked}</strong>. It's good for 10 minutes.</>}</p>
             <div style={{ marginBottom: 16 }} />
@@ -6390,7 +6390,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           };
           return (
             <div className="fade-up">
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 14 }}>Hi {matched.name.split(" ")[0]}</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 14 }}>Hi {matched.name.split(" ")[0]}</div>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>Who are we taking care of?</h2>
               <p style={{ fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 24px" }}>Pick one or more — tap everyone you're booking today.</p>
               {[selfPerson, ...(matched.family || []).map((m) => ({ id: m.id, name: m.name, note: m.note, isMember: true }))].map((person) => {
@@ -6418,7 +6418,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* ADD A FAMILY MEMBER */}
         {showWhoFor && matched && addingMember && (
           <div className="fade-up">
-            <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--text)", fontWeight: 600, marginBottom: 14 }}>NEW PERSON</div>
+            <div style={{ fontSize: 12.5, letterSpacing: 3, color: "var(--text)", fontWeight: 600, marginBottom: 14 }}>NEW PERSON</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>Who are we adding?</h2>
             <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 22, fontWeight: 400, lineHeight: 1.5 }}>They'll be saved under your account for next time.</p>
             <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>First name</label>
@@ -6427,11 +6427,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <input value={newMemberNote} onChange={(e) => setNewMemberNote(e.target.value)} placeholder="e.g. son, age 8" style={{ ...inputStyle, marginBottom: 16 }} />
             <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Their phone <span style={{ color: "var(--sub)" }}>(optional)</span></label>
             <input value={newMemberPhone} onChange={(e) => setNewMemberPhone(e.target.value)} placeholder="Their mobile number" type="tel" inputMode="tel" autoComplete="off" style={{ ...inputStyle, marginBottom: 8 }} />
-            <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: newMemberPhone.replace(/\D/g, "").length >= 10 ? 14 : 22, lineHeight: 1.5 }}>If this is the person coming in, add their number — their reminders and check-in link go here, not to you. Leave blank to send everything to your own phone.</p>
+            <p style={{ color: "var(--faint)", fontSize: 13.5, marginBottom: newMemberPhone.replace(/\D/g, "").length >= 10 ? 14 : 22, lineHeight: 1.5 }}>If this is the person coming in, add their number — their reminders and check-in link go here, not to you. Leave blank to send everything to your own phone.</p>
             {newMemberPhone.replace(/\D/g, "").length >= 10 && (
               <button type="button" onClick={() => setNewMemberConsent(v => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", textAlign: "left", background: newMemberConsent ? "transparent" : "color-mix(in srgb, var(--gold) 6%, var(--panel))", border: `1px solid ${newMemberConsent ? "transparent" : "var(--border2)"}`, borderRadius: 12, padding: newMemberConsent ? 0 : "12px 12px", marginBottom: 22, cursor: "pointer" }}>
                 <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${newMemberConsent ? "var(--gold)" : "var(--text)"}`, background: newMemberConsent ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1 }}>{newMemberConsent && <Check size={14} style={{ color: "var(--on-gold)" }} />}</span>
-                <span style={{ color: newMemberConsent ? "var(--faint)" : "var(--text2)", fontSize: 12.5, lineHeight: 1.5 }}><b style={{ color: "var(--text)" }}>Required</b> — they agreed to get appointment reminders by text at this number from Sanctuary Barber Co. Msg &amp; data rates may apply. Reply STOP to opt out.</span>
+                <span style={{ color: newMemberConsent ? "var(--faint)" : "var(--text2)", fontSize: 13.5, lineHeight: 1.5 }}><b style={{ color: "var(--text)" }}>Required</b> — they agreed to get appointment reminders by text at this number from Sanctuary Barber Co. Msg &amp; data rates may apply. Reply STOP to opt out.</span>
               </button>
             )}
             {(() => {
@@ -6455,7 +6455,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         {/* TOGETHER vs SEPARATE — only for multiple people */}
         {showSchedChoice && (
           <div className="fade-up">
-            <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--text)", fontWeight: 600, marginBottom: 14 }}>{groupPeople.map((p) => (p.id ? p.name : "You")).map((n) => n.split(" ")[0]).join(" & ").toUpperCase()}</div>
+            <div style={{ fontSize: 12.5, letterSpacing: 3, color: "var(--text)", fontWeight: 600, marginBottom: 14 }}>{groupPeople.map((p) => (p.id ? p.name : "You")).map((n) => n.split(" ")[0]).join(" & ").toUpperCase()}</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>How do you want to book?</h2>
             <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>We can get everyone in on the same visit, or just find the soonest opening for each.</p>
             <button className="lift" onClick={() => { setGroupMode("together"); setShowSchedChoice(false); setShowWizardIntro(true); setWizardIdx(0); }} style={{ width: "100%", background: "var(--panel)", color: "var(--text)", padding: "20px 18px", fontSize: 16, borderRadius: 14, border: "1px solid var(--border)", marginBottom: 13, textAlign: "left", display: "flex", flexDirection: "column", gap: 4 }}>
@@ -6514,7 +6514,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           };
           return (
             <div className="fade-up">
-              <div style={{ fontSize: 11, letterSpacing: 3, color: "var(--text)", fontWeight: 600, marginBottom: 14 }}>{isFirst ? "LET'S START WITH" : "NEXT UP"} · {first.toUpperCase()}</div>
+              <div style={{ fontSize: 12.5, letterSpacing: 3, color: "var(--text)", fontWeight: 600, marginBottom: 14 }}>{isFirst ? "LET'S START WITH" : "NEXT UP"} · {first.toUpperCase()}</div>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, marginBottom: 10, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{isFirst ? `Let's start with ${first}` : `Now let's get ${first} taken care of`}</h2>
               <p style={{ color: "var(--text)", fontSize: 16, marginBottom: 24, fontWeight: 400, lineHeight: 1.5 }}>Person {wizardIdx + 1} of {groupPeople.length}.</p>
               {usualSvc && (
@@ -6591,7 +6591,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                               <Check size={16} style={{ color: "var(--text)", flexShrink: 0, marginTop: 2 }} />
                               <span style={{ flex: 1, minWidth: 0 }}>
                                 <span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>{p.name}</span>
-                                {p.desc ? <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{p.desc}</span> : null}
+                                {p.desc ? <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>{p.desc}</span> : null}
                               </span>
                               {p.price ? <span style={{ fontSize: 13.5, fontWeight: 600, flexShrink: 0 }}>+${p.price}</span> : null}
                             </div>
@@ -6636,7 +6636,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               );
             })()}
             <div style={{ marginBottom: 24 }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Pick a time</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" }}>Pick a time</div>
               <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, margin: "11px 0 0", lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)" }}>When works for you?</h2>
             </div>
             {/* soonest available shortcut */}
@@ -6648,22 +6648,22 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               return (
                 <button onClick={() => { setSelectedDate(firstOpen); setSlot(null); setSlotConflict(false); setNcCapFull(false); }} style={{ width: "100%", textAlign: "left", background: "transparent", border: `1px solid ${already ? "var(--text)" : "var(--border)"}`, borderRadius: 10, padding: "15px 17px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
                   <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 9, letterSpacing: 2, color: "var(--text)", fontWeight: 600, textTransform: "uppercase" }}>Soonest opening</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 2, color: "var(--text)", fontWeight: 600, textTransform: "uppercase" }}>Soonest opening</span>
                     <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, color: "var(--text)" }}>{DAYS[firstOpen.getDay()]}, {MONTHS[firstOpen.getMonth()]} {firstOpen.getDate()}</span>
-                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)" }}>{isFirstToday ? "Today" : daysFromNow(firstOpen)}</span>
+                    <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--sub)" }}>{isFirstToday ? "Today" : daysFromNow(firstOpen)}</span>
                   </span>
                   <ChevronRight size={18} style={{ color: "var(--text)", flexShrink: 0 }} />
                 </button>
               );
             })()}
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 12 }}>Or pick another day</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 12 }}>Or pick another day</div>
             {(() => { const calProv = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]); return (
               <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); setNcCapFull(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0 && !newClientDayFull(calProv, d)} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
             ); })()}
             {selectedDate && !dateIsFull && (<>
               <div style={{ height: 26 }} />
               {isMultiPerson && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 13px" }}>Booking for {people.map((p) => p.name.split(" ")[0]).join(" & ")}. {groupSlots && groupSlots.sameTime.length ? "Times shown fit everyone at once." : "No same-time openings — times shown run back-to-back."}</div>)}
-              {!isMultiPerson && bestSet.size > 0 && openSlots.length > bestSet.size && (<div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--sub)", marginBottom: 11 }}><span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />Highlighted times have no wait — you're seen right away</div>)}
+              {!isMultiPerson && bestSet.size > 0 && openSlots.length > bestSet.size && (<div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: "var(--sub)", marginBottom: 11 }}><span style={{ width: 11, height: 11, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />Highlighted times have no wait — you're seen right away</div>)}
               {slotsReady ? (
                 <GroupedTimes key={"g6-" + selectedDate.toDateString()} slots={openSlots} selected={slot} onPick={(t) => { setSlot(t); setSlotConflict(false); }} bestSet={bestSet} cell={(on, best) => ({ background: on ? "var(--text)" : best ? "color-mix(in srgb, var(--text) 13%, transparent)" : "var(--panel)", border: `1.5px solid ${on || best ? "var(--text)" : "var(--border)"}`, borderRadius: 13, padding: "16px 6px", color: on ? "var(--bg)" : "var(--text)", fontFamily: FONT_BODY, fontSize: 15.5, fontWeight: on ? 700 : best ? 600 : 500, cursor: "pointer" })} />
               ) : (
@@ -6697,11 +6697,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         <button key={v} onClick={() => setWlFor(v)} style={{ flex: 1, padding: "12px 6px", borderRadius: 10, border: `1.5px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "color-mix(in srgb, var(--text) 12%, var(--panel))" : "transparent", color: on ? "var(--text)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400 }}>{label}</button>
                       ); })}
                     </div>
-                    {wlFor === "group" && <p style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5, margin: "-4px 0 16px" }}>Great — note who's coming and what each person wants in the photo step or service notes (e.g. you + your son). We'll look for room for everyone together.</p>}
+                    {wlFor === "group" && <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "-4px 0 16px" }}>Great — note who's coming and what each person wants in the photo step or service notes (e.g. you + your son). We'll look for room for everyone together.</p>}
 
                     <label style={{ fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 6 }}>Phone</label>
                     <input inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 16 }} />
-                    <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
+                    <p style={{ color: "var(--faint)", fontSize: 13.5, marginBottom: 14, lineHeight: 1.5 }}>
                       By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text)", textDecoration: "underline" }}>terms</a>.
                     </p>
 
@@ -6709,7 +6709,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 16 }}>
                       {dateOptions.slice(0, 14).map((d, i) => { const lbl = relativeDate(d).includes(",") ? relativeDate(d) : `${relativeDate(d)}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; const on = wlDays.includes(lbl); const atMax = !on && wlDays.length >= 3; return (
                         <button key={i} disabled={atMax} onClick={() => setWlDays((prev) => { if (prev.includes(lbl)) { setWlDayTimes((t) => { const n = { ...t }; delete n[lbl]; return n; }); return prev.filter((x) => x !== lbl); } if (prev.length >= 3) return prev; setWlDayTimes((t) => ({ ...t, [lbl]: "any" })); return [...prev, lbl]; })} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", textAlign: "center", opacity: atMax ? 0.4 : 1 }}>
-                          <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
+                          <div style={{ fontSize: 13, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
                           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{d.getDate()}</div>
                         </button>
                       ); })}
@@ -6768,7 +6768,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         <>
                           {photoMode !== "off" && !hasProfilePhoto && (<>
                             <label style={{ fontSize: 13, color: "var(--faint)", display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>A quick selfie
-                              <span style={{ fontSize: 9.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--bg)", background: photoRequired ? "var(--text)" : "var(--border2)", borderRadius: 4, padding: "2px 6px" }}>{photoRequired ? "REQUIRED" : "RECOMMENDED"}</span>
+                              <span style={{ fontSize: 11.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--bg)", background: photoRequired ? "var(--text)" : "var(--border2)", borderRadius: 4, padding: "2px 6px" }}>{photoRequired ? "REQUIRED" : "RECOMMENDED"}</span>
                             </label>
                             <div style={{ background: "color-mix(in srgb, var(--text) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--text) 28%, var(--border))", borderRadius: 12, padding: "13px 15px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
                               <Camera size={17} style={{ color: "var(--text)", flexShrink: 0, marginTop: 2 }} />
@@ -6786,7 +6786,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                             if (!isStaff) { try { supabase.rpc('join_waitlist', { p_shop: shopId, p_entry: wlEntry }); } catch (e) {} }
                             setWaitlistDone(true); setShowWaitlist(false);
                           }} style={{ width: "100%", background: ready ? "var(--text)" : "var(--border2)", color: ready ? "var(--bg)" : "var(--faint)", padding: 15, fontSize: 14, letterSpacing: 1, fontWeight: 600, borderRadius: 6 }}>Add me to the waitlist</button>
-                          {photoRequired && wlPhotos === 0 && wlName && phoneOk && daysOk && <div style={{ fontSize: 12.5, color: "var(--faint)", textAlign: "center", marginTop: 8 }}>Add a selfie to join.</div>}
+                          {photoRequired && wlPhotos === 0 && wlName && phoneOk && daysOk && <div style={{ fontSize: 13.5, color: "var(--faint)", textAlign: "center", marginTop: 8 }}>Add a selfie to join.</div>}
                         </>
                       );
                     })()}
@@ -6826,7 +6826,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               );
             })()}
 
-            <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 11px" }}>Your details</div>
+            <div style={{ fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 11px" }}>Your details</div>
             <div style={{ display: "grid", gap: 11, marginBottom: 20 }}>
               <div style={{ display: "flex", gap: 11 }}>
                 <input placeholder="First name" autoComplete="given-name" style={{ ...inputStyle, flex: 1 }} value={newFirst} onChange={(e) => setNewFirst(e.target.value)} />
@@ -6847,7 +6847,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <AlertCircle size={17} style={{ color: "#C0392B", marginTop: 1, flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 9 }}>This number's already on file. Verify it's you with a quick text code to use your account — that keeps your history and avoids a duplicate.</div>
-                    <button onClick={() => { setPhoneConflict(false); setShowWhoFor(false); setShowUsual(false); setShowSchedChoice(false); setShowWizardIntro(false); setShowCodeEntry(false); setUsePhone(true); setLoginNoMatch(null); setStep(5); }} style={{ display: "inline-block", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 9, padding: "9px 16px", fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 0.8, fontWeight: 600, cursor: "pointer" }}>Verify &amp; sign in →</button>
+                    <button onClick={() => { setPhoneConflict(false); setShowWhoFor(false); setShowUsual(false); setShowSchedChoice(false); setShowWizardIntro(false); setShowCodeEntry(false); setUsePhone(true); setLoginNoMatch(null); setStep(5); }} style={{ display: "inline-block", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 9, padding: "9px 16px", fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 0.8, fontWeight: 600, cursor: "pointer" }}>Verify &amp; sign in →</button>
                   </div>
                 </div>
               )}
@@ -6881,7 +6881,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 const tipBtn = (on) => ({ flex: "1 1 58px", background: on ? "var(--text)" : "var(--panel2)", color: on ? "var(--bg)" : "var(--text)", border: `1px solid ${on ? "var(--text)" : "var(--border)"}`, borderRadius: 11, padding: "10px 6px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", lineHeight: 1.25, textAlign: "center" });
                 return (
                   <div style={{ background: "var(--panel)", border: `1px solid ${paid ? "color-mix(in srgb, var(--text) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16, boxShadow: "var(--shadow-sm)" }}>
-                    <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--text)", fontWeight: 600, marginBottom: 6 }}>{paid ? "PAID · YOU'RE ALL SET" : "PAY TO BOOK"}</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--text)", fontWeight: 600, marginBottom: 6 }}>{paid ? "PAID · YOU'RE ALL SET" : "PAY TO BOOK"}</div>
                     <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: paid ? 0 : 16 }}>
                       {paid
                         ? <>You paid <b style={{ color: "var(--text)" }}>${payTotal}</b>{tipAmt > 0 ? <> (incl. ${tipAmt} tip)</> : null} · card ending {last4}. Your spot's locked in.</>
@@ -6889,12 +6889,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     </p>
                     {!paid && tipOn && (
                       <>
-                        <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>ADD A TIP <span style={{ fontWeight: 500, letterSpacing: 0 }}>(optional)</span></div>
+                        <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>ADD A TIP <span style={{ fontWeight: 500, letterSpacing: 0 }}>(optional)</span></div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: usingCustom ? 10 : 14 }}>
                           {(tipCfg.presets || []).map((p) => {
                             const on = !usingCustom && (bookTipPct != null ? bookTipPct === p : (tipCfg.smartDefault ?? -1) === p);
                             return (
-                              <button key={p} onClick={() => { setBookCustomTip(null); setBookTipPct(p); }} style={tipBtn(on)}>{p}%<br /><span style={{ fontSize: 11.5, fontWeight: 500, opacity: 0.8 }}>${Math.round(payBase * p / 100)}</span></button>
+                              <button key={p} onClick={() => { setBookCustomTip(null); setBookTipPct(p); }} style={tipBtn(on)}>{p}%<br /><span style={{ fontSize: 13, fontWeight: 500, opacity: 0.8 }}>${Math.round(payBase * p / 100)}</span></button>
                             );
                           })}
                           {tipCfg.allowCustom !== false && (
@@ -6924,10 +6924,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     ) : (
                       <>
                         <button disabled={!identityOk} onClick={() => { if (identityOk) setCardSheetOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: identityOk ? "var(--gold)" : "var(--panel2)", border: identityOk ? "none" : "1px solid var(--border)", borderRadius: 12, padding: 15, color: identityOk ? "var(--on-gold)" : "var(--faint)", fontSize: 15, fontWeight: 700, cursor: identityOk ? "pointer" : "default", opacity: identityOk ? 1 : 0.6 }}><CreditCard size={17} /> Pay ${payTotal} to book</button>
-                        {!identityOk && <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, marginTop: 8, textAlign: "center" }}>Add your name, phone &amp; email and check the boxes below first.</p>}
+                        {!identityOk && <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.45, marginTop: 8, textAlign: "center" }}>Add your name, phone &amp; email and check the boxes below first.</p>}
                       </>
                     )}
-                    {!livePay && <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Secure card entry · test mode — no real charge yet.</p>}
+                    {!livePay && <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Secure card entry · test mode — no real charge yet.</p>}
                     {cardSheetOpen && <StripeCardSheet
                       live={livePay}
                       mode="payment"
@@ -6952,7 +6952,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               const last4 = (cardInfo && cardInfo.last4) || "••••";
               return (
                 <div style={{ background: "var(--panel)", border: `1px solid ${cardOnFile ? "color-mix(in srgb, var(--text) 40%, var(--border))" : "var(--border)"}`, borderRadius: 16, padding: "18px 18px", marginBottom: 16, boxShadow: "var(--shadow-sm)" }}>
-                  <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--text)", fontWeight: 600, marginBottom: 6 }}>{cardOnFile ? "CARD ON FILE" : depositAmt > 0 ? "DEPOSIT TO RESERVE" : "CARD TO RESERVE"}</div>
+                  <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--text)", fontWeight: 600, marginBottom: 6 }}>{cardOnFile ? "CARD ON FILE" : depositAmt > 0 ? "DEPOSIT TO RESERVE" : "CARD TO RESERVE"}</div>
                   <p style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>
                     {/* A returning client with a card on file is NOT charged a deposit up front (Dan's call):
                         their card holds the spot and they're only charged if they miss. New clients still
@@ -6982,11 +6982,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     return (
                       <>
                         <button disabled={!identityOk} onClick={() => { if (identityOk) setCardSheetOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: identityOk ? "pointer" : "default", opacity: identityOk ? 1 : 0.5 }}><CreditCard size={17} style={{ color: "var(--text)" }} /> {depositAmt > 0 ? `Pay $${depositAmt} deposit` : "Add a card"}</button>
-                        {!identityOk && <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, marginTop: 8, textAlign: "center" }}>Add your name, phone &amp; email first.</p>}
+                        {!identityOk && <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.45, marginTop: 8, textAlign: "center" }}>Add your name, phone &amp; email first.</p>}
                       </>
                     );
                   })()}
-                  {!livePay && <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Secure card entry · test mode — no real charge yet.</p>}
+                  {!livePay && <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Secure card entry · test mode — no real charge yet.</p>}
                   {cardSheetOpen && <StripeCardSheet
                     live={livePay}
                     mode={depositAmt > 0 ? "payment" : "setup"}
@@ -7016,11 +7016,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <button onClick={() => setSmsOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, fontWeight: 600, padding: "6px 2px", flexShrink: 0, cursor: "pointer" }}>{smsOpen ? "Hide" : "Read it ›"}</button>
                 </div>
                 {/* Mandatory essentials — always visible at opt-in (never hidden behind "Read it"). */}
-                <p style={{ color: "var(--sub)", fontSize: 12, margin: "0 0 12px", lineHeight: 1.5 }}>
+                <p style={{ color: "var(--sub)", fontSize: 13, margin: "0 0 12px", lineHeight: 1.5 }}>
                   Appointment reminders only. Message and data rates may apply. Message frequency varies. Text HELP for help or STOP to opt out.
                 </p>
                 {smsOpen && (
-                  <p style={{ color: "var(--faint)", fontSize: 12, margin: "0 0 14px", lineHeight: 1.55 }}>
+                  <p style={{ color: "var(--faint)", fontSize: 13, margin: "0 0 14px", lineHeight: 1.55 }}>
                     I agree to receive appointment reminders via SMS from Sanctuary Barber Co. By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Message frequency varies. Reply STOP to opt out or HELP for help. See our <a href="https://sanctuarybarberco.com/privacy-policy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "var(--text2)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text2)", textDecoration: "underline" }}>terms</a>.
                   </p>
                 )}
@@ -7079,7 +7079,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
                 {contactConfirm?.phone && matched && (
                   <div style={{ marginBottom: 22 }}>
-                    <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>PHONE</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>PHONE</div>
                     <div style={{ display: "grid", gap: 8 }}>
                       {[
                         { id: "file", topLabel: "ON FILE", topColor: "var(--faint)", value: matched.phone },
@@ -7089,7 +7089,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         return (
                           <button key={opt.id} onClick={() => setKeepPhone(opt.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--text) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer", width: "100%" }}>
                             <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ fontSize: 11, letterSpacing: 1.5, color: opt.topColor, fontWeight: 600, marginBottom: 4 }}>{opt.topLabel}</div>
+                              <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: opt.topColor, fontWeight: 600, marginBottom: 4 }}>{opt.topLabel}</div>
                               <div style={{ fontSize: 16 }}>{opt.value}</div>
                             </div>
                             {on && <Check size={18} style={{ color: "var(--text)", flexShrink: 0, marginLeft: 8 }} />}
@@ -7102,7 +7102,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
                 {contactConfirm?.email && matched && (
                   <div style={{ marginBottom: 22 }}>
-                    <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>EMAIL</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>EMAIL</div>
                     <div style={{ display: "grid", gap: 8 }}>
                       {[
                         { id: "file", topLabel: "ON FILE", topColor: "var(--faint)", value: matched.email },
@@ -7112,7 +7112,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                         return (
                           <button key={opt.id} onClick={() => setKeepEmail(opt.id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: on ? "color-mix(in srgb, var(--text) 10%, var(--panel))" : "var(--panel)", border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, borderRadius: 12, padding: "13px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer", width: "100%" }}>
                             <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ fontSize: 11, letterSpacing: 1.5, color: opt.topColor, fontWeight: 600, marginBottom: 4 }}>{opt.topLabel}</div>
+                              <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: opt.topColor, fontWeight: 600, marginBottom: 4 }}>{opt.topLabel}</div>
                               <div style={{ fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.value}</div>
                             </div>
                             {on && <Check size={18} style={{ color: "var(--text)", flexShrink: 0, marginLeft: 8 }} />}
@@ -7185,7 +7185,7 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
   return (
     <div className="fade-up">
       <button onClick={back} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", color: "var(--sub)", fontSize: 15, marginBottom: 18 }}><ArrowLeft size={18} /> Back</button>
-      <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--text)", fontWeight: 600, marginBottom: 10 }}>FIRST VISIT · STEP {i + 1} OF {steps.length}</div>
+      <div style={{ fontSize: 13.5, letterSpacing: 1.5, color: "var(--text)", fontWeight: 600, marginBottom: 10 }}>FIRST VISIT · STEP {i + 1} OF {steps.length}</div>
       <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, marginBottom: 8, lineHeight: 1.1 }}>{cur.label}</h2>
       <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 24, fontWeight: 300, lineHeight: 1.55 }}>Pick the look closest to what you want — it helps us reserve exactly the right time for you.</p>
 
@@ -7257,10 +7257,10 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
   const goldSoft = "color-mix(in srgb, var(--gold) 7%, var(--panel))";
   const goldLine = "color-mix(in srgb, var(--gold) 26%, var(--border))";
   const card = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)" };
-  const eyebrow = { display: "block", fontFamily: F, fontSize: 10.5, letterSpacing: 1.8, textTransform: "uppercase", fontWeight: 700, color: "var(--sub)", textAlign: "left", margin: "0 2px 11px" };
+  const eyebrow = { display: "block", fontFamily: F, fontSize: 12, letterSpacing: 1.8, textTransform: "uppercase", fontWeight: 700, color: "var(--sub)", textAlign: "left", margin: "0 2px 11px" };
   const rowTitle = { fontFamily: F, fontSize: 14.5, fontWeight: 600, lineHeight: 1.2, color: "var(--text)", textAlign: "left" };
-  const rowSub = { fontFamily: F, fontSize: 12.5, color: "var(--sub)", lineHeight: 1.4, textAlign: "left" };
-  const chip = { fontFamily: F, fontSize: 10, fontWeight: 700, letterSpacing: 0.4, color: "var(--gold)", background: goldSoft, border: `1px solid ${goldLine}`, borderRadius: 999, padding: "2px 7px" };
+  const rowSub = { fontFamily: F, fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4, textAlign: "left" };
+  const chip = { fontFamily: F, fontSize: 12, fontWeight: 700, letterSpacing: 0.4, color: "var(--gold)", background: goldSoft, border: `1px solid ${goldLine}`, borderRadius: 999, padding: "2px 7px" };
   return (
     <div className="fade-up" style={{ paddingTop: 4, fontFamily: F, textAlign: "left" }}>
       {/* hero */}
@@ -7276,10 +7276,10 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
       <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 16px", marginBottom: 26 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: "var(--text)", lineHeight: 1.25 }}>{relPlus} · {fmtTime(slot)}</div>
-          <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--sub)", marginTop: 3 }}>{cart.map(describeEntry).join(", ")} · with {provider.name}</div>
+          <div style={{ fontFamily: F, fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{cart.map(describeEntry).join(", ")} · with {provider.name}</div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          {selfie && <div style={{ fontFamily: F, fontSize: 12, color: "var(--faint)", textDecoration: "line-through" }}>${cartPrice}</div>}
+          {selfie && <div style={{ fontFamily: F, fontSize: 13, color: "var(--faint)", textDecoration: "line-through" }}>${cartPrice}</div>}
           <div style={{ fontFamily: F, fontSize: 19, fontWeight: 600, color: "var(--text)", lineHeight: 1 }}>${total}</div>
         </div>
       </div>
@@ -7297,11 +7297,11 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
                 : <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: goldSoft, border: `1px solid ${goldLine}`, color: "var(--gold)" }}><Camera size={19} /></div>}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ ...rowTitle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{selfie ? "Selfie added" : "Add a selfie"}<span style={chip}>{selfie ? "$5 OFF" : "SAVE $5"}</span></div>
-                <div style={{ ...rowSub, fontSize: 12, marginTop: 3 }}>{selfie ? "Now your profile photo." : "So we see how you look today."}</div>
+                <div style={{ ...rowSub, fontSize: 13, marginTop: 3 }}>{selfie ? "Now your profile photo." : "So we see how you look today."}</div>
               </div>
               {selfie
-                ? <button onClick={onClearSelfie} style={{ flexShrink: 0, background: "none", border: "1px solid var(--border)", color: "var(--sub)", borderRadius: 10, padding: "9px 12px", fontFamily: F, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Remove</button>
-                : <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "9px 14px", fontFamily: F, fontSize: 12.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Selfie</button>}
+                ? <button onClick={onClearSelfie} style={{ flexShrink: 0, background: "none", border: "1px solid var(--border)", color: "var(--sub)", borderRadius: 10, padding: "9px 12px", fontFamily: F, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>Remove</button>
+                : <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "9px 14px", fontFamily: F, fontSize: 13.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Selfie</button>}
             </div>
           )}
           {(noteOn || photoOn) && (
@@ -7321,7 +7321,7 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
               {noteOn && (
                 <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="Anything your barber should know — e.g. tighter on the sides, keep length on top." rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "13px 14px", color: "var(--text)", fontSize: 14.5, resize: "none", minHeight: 76, lineHeight: 1.5, fontFamily: F }} />
               )}
-              <div style={{ fontFamily: F, fontSize: 11.5, color: "var(--faint)", marginTop: 11, textAlign: "left" }}>Up to 3 photos · saved to your profile for next time.</div>
+              <div style={{ fontFamily: F, fontSize: 13, color: "var(--faint)", marginTop: 11, textAlign: "left" }}>Up to 3 photos · saved to your profile for next time.</div>
             </div>
           )}
         </>
@@ -7332,27 +7332,27 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
       <div style={{ marginBottom: 26 }}>
         {[["24 hours before", "Reminder by text & email."], ["3 hours before", "A quick heads-up text."], ["15 minutes before", "Check-in text — time to head over."]].map(([w, d], i) => (
           <div key={i} style={{ display: "flex", gap: 12, alignItems: "baseline", padding: "5px 0" }}>
-            <div style={{ flexShrink: 0, width: 104, fontFamily: F, fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{w}</div>
-            <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--sub)", lineHeight: 1.4 }}>{d}</div>
+            <div style={{ flexShrink: 0, width: 104, fontFamily: F, fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{w}</div>
+            <div style={{ fontFamily: F, fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4 }}>{d}</div>
           </div>
         ))}
         <div style={{ display: "flex", gap: 10, marginTop: 14, padding: "12px 14px", background: goldSoft, border: `1px solid ${goldLine}`, borderRadius: 12 }}>
           <MapPinIcon size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
-          <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--text2)", lineHeight: 1.45 }}>We're inside the <b style={{ color: "var(--text)" }}>Image Studio</b> building and the door stays locked. No need to knock or call &mdash; just <b style={{ color: "var(--text)" }}>check in when you arrive</b> and we're notified right away.</div>
+          <div style={{ fontFamily: F, fontSize: 13.5, color: "var(--text2)", lineHeight: 1.45 }}>We're inside the <b style={{ color: "var(--text)" }}>Image Studio</b> building and the door stays locked. No need to knock or call &mdash; just <b style={{ color: "var(--text)" }}>check in when you arrive</b> and we're notified right away.</div>
         </div>
       </div>
 
       {saveState && saveState.state === "error" && (
         <div style={{ display: "flex", gap: 9, background: "color-mix(in srgb, #C0392B 9%, var(--panel))", border: "1px solid color-mix(in srgb, #C0392B 30%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-          <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--text)", lineHeight: 1.45 }}><b>Couldn't save your photos &amp; note</b> — check your connection and tap Update Appt again.{saveState.msg ? <span style={{ color: "var(--sub)" }}> ({saveState.msg})</span> : null}</div>
+          <div style={{ fontFamily: F, fontSize: 13.5, color: "var(--text)", lineHeight: 1.45 }}><b>Couldn't save your photos &amp; note</b> — check your connection and tap Update Appt again.{saveState.msg ? <span style={{ color: "var(--sub)" }}> ({saveState.msg})</span> : null}</div>
         </div>
       )}
-      <button disabled={saveState && saveState.state === "saving"} onClick={onExit} style={{ width: "100%", background: (saveState && saveState.state === "saving") ? "var(--border2)" : "var(--text)", color: "var(--bg)", padding: 16, fontFamily: F, fontSize: 12.5, letterSpacing: 1.2, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: (saveState && saveState.state === "saving") ? "default" : "pointer" }}>{(saveState && saveState.state === "saving") ? "Saving…" : (hasChanges ? (saveState && saveState.state === "error" ? "Try again" : "Update Appt") : "Done")}</button>
-      {saveState && saveState.state === "saved" && hasChanges && <div style={{ textAlign: "center", fontFamily: F, fontSize: 12, color: "var(--gold)", fontWeight: 600, marginTop: 8 }}>✓ Saved to your appointment</div>}
+      <button disabled={saveState && saveState.state === "saving"} onClick={onExit} style={{ width: "100%", background: (saveState && saveState.state === "saving") ? "var(--border2)" : "var(--text)", color: "var(--bg)", padding: 16, fontFamily: F, fontSize: 13.5, letterSpacing: 1.2, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: (saveState && saveState.state === "saving") ? "default" : "pointer" }}>{(saveState && saveState.state === "saving") ? "Saving…" : (hasChanges ? (saveState && saveState.state === "error" ? "Try again" : "Update Appt") : "Done")}</button>
+      {saveState && saveState.state === "saved" && hasChanges && <div style={{ textAlign: "center", fontFamily: F, fontSize: 13, color: "var(--gold)", fontWeight: 600, marginTop: 8 }}>✓ Saved to your appointment</div>}
       <button onClick={onManage} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", color: "var(--sub)", padding: "14px 0 4px", fontFamily: F, fontSize: 13, fontWeight: 500, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>Reschedule or cancel</button>
 
-      <div style={{ textAlign: "center", color: "var(--faint)", fontFamily: F, fontSize: 11.5, marginTop: 22, lineHeight: 1.6, paddingBottom: 8 }}>
-        <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--sub)", marginBottom: 2 }}>{business.legalName || business.name}</div>
+      <div style={{ textAlign: "center", color: "var(--faint)", fontFamily: F, fontSize: 13, marginTop: 22, lineHeight: 1.6, paddingBottom: 8 }}>
+        <div style={{ fontFamily: F, fontSize: 13.5, color: "var(--sub)", marginBottom: 2 }}>{business.legalName || business.name}</div>
         Signed in on this device — come back anytime, no code needed.
       </div>
     </div>
@@ -7489,7 +7489,7 @@ function ReviewByToken({ token, shopId, business, onExit }) {
     <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name (shown with your review)" style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", fontSize: 15, color: "var(--text)", fontFamily: "'Jost', sans-serif", marginBottom: 16 }} />
     {err ? <p style={{ color: "#C0392B", fontSize: 13, marginBottom: 12 }}>{err}</p> : null}
     <button type="button" onClick={submit} disabled={!rating || busy} style={{ ...btnPrimary, width: "100%", boxSizing: "border-box", opacity: (!rating || busy) ? 0.5 : 1, cursor: (!rating || busy) ? "default" : "pointer" }}>{busy ? "Sending…" : "Share your feedback"}</button>
-    <p style={{ color: "var(--faint)", fontSize: 11.5, marginTop: 14, lineHeight: 1.4 }}>Your review goes to {biz} and may be featured after they review it.</p>
+    <p style={{ color: "var(--faint)", fontSize: 13, marginTop: 14, lineHeight: 1.4 }}>Your review goes to {biz} and may be featured after they review it.</p>
   </div></div>);
 }
 
@@ -7614,7 +7614,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
   const Shell = ({ children }) => (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center" }}>
       <div style={{ width: "100%", maxWidth: 412, padding: "26px 20px 44px" }}>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 12, letterSpacing: 4, textTransform: "uppercase", textAlign: "center", color: "var(--faint)", marginBottom: 18 }}>{business.name}</div>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 13, letterSpacing: 4, textTransform: "uppercase", textAlign: "center", color: "var(--faint)", marginBottom: 18 }}>{business.name}</div>
         {children}
       </div>
     </div>
@@ -7686,11 +7686,11 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
       <div style={ticketBox}>
         <Band />
         <div style={{ padding: "22px 22px 24px" }}>
-          <div style={{ fontSize: 10.5, letterSpacing: 2.5, color: A, fontWeight: 600, textTransform: "uppercase", marginBottom: 14 }}>Pick a new time</div>
+          <div style={{ fontSize: 12, letterSpacing: 2.5, color: A, fontWeight: 600, textTransform: "uppercase", marginBottom: 14 }}>Pick a new time</div>
           <div style={{ display: "flex", gap: 9, overflowX: "auto", paddingBottom: 6, marginBottom: 18 }}>
             {dateOptions.map((d, i) => { const on = newDate && d.toDateString() === newDate.toDateString(); return (
               <button key={i} onClick={() => { setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, width: 54, padding: "10px 0", borderRadius: 13, border: `1px solid ${on ? A : "var(--border)"}`, background: on ? A : "var(--panel)", color: on ? ON : "var(--text)", textAlign: "center", cursor: "pointer", boxShadow: on ? "0 8px 18px -10px var(--shadow)" : "none" }}>
-                <div style={{ fontSize: 10.5, letterSpacing: 1, opacity: 0.72 }}>{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][d.getDay()]}</div>
+                <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.72 }}>{["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][d.getDay()]}</div>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, marginTop: 1 }}>{d.getDate()}</div>
               </button>
             ); })}
@@ -7701,7 +7701,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
                 {reSlots.map(({ start: t, best }) => { const on = newSlot === t; return (
                   <button key={t} onClick={() => setNewSlot(t)} style={{ position: "relative", padding: "10px 15px", borderRadius: 11, border: `1px solid ${on ? A : (best ? "color-mix(in srgb, var(--gold) 45%, var(--border))" : "var(--border)")}`, background: on ? A : "var(--panel)", color: on ? ON : "var(--text)", fontSize: 14.5, cursor: "pointer" }}>
                     {fmtTime(t)}
-                    {best && !on && <span style={{ position: "absolute", top: -7, right: -5, background: A, color: ON, fontSize: 7.5, letterSpacing: 0.5, padding: "2px 4px", borderRadius: 5, fontWeight: 700 }}>BEST</span>}
+                    {best && !on && <span style={{ position: "absolute", top: -7, right: -5, background: A, color: ON, fontSize: 10, letterSpacing: 0.5, padding: "2px 4px", borderRadius: 5, fontWeight: 700 }}>BEST</span>}
                   </button>
                 ); })}
               </div>)}
@@ -7712,7 +7712,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
           <button onClick={() => { setPhase("view"); setNewDate(null); setNewSlot(null); }} style={ghostBtn}>Back to my appointment</button>
         </div>
       </div>
-      <div style={{ textAlign: "center", fontSize: 12, color: "var(--sub)", marginTop: 16 }}>Showing your real availability.</div>
+      <div style={{ textAlign: "center", fontSize: 13, color: "var(--sub)", marginTop: 16 }}>Showing your real availability.</div>
     </Shell>
   );
 
@@ -7721,7 +7721,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
       <div style={ticketBox}>
         <Band />
         <div style={{ padding: "24px 24px 20px" }}>
-          <div style={{ fontSize: 10.5, letterSpacing: 2.5, color: A, fontWeight: 600, textTransform: "uppercase", marginBottom: 18, display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ fontSize: 12, letterSpacing: 2.5, color: A, fontWeight: 600, textTransform: "uppercase", marginBottom: 18, display: "flex", alignItems: "center", gap: 8 }}>
             <span>Your chair is reserved</span>
             <span style={{ flex: 1, height: 1, background: "linear-gradient(90deg, var(--wash), transparent)" }} />
           </div>
@@ -7733,7 +7733,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, lineHeight: 1.12 }}>{appt.serviceName || appt.title}</div>
           {addonsStr && <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 14.5, color: A, marginTop: 5 }}>{addonsStr}</div>}
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 16, fontSize: 14.5 }}>
-            <span style={{ width: 26, height: 26, borderRadius: "50%", background: A, color: ON, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif" }}>{(prov ? prov.name : "?").trim().charAt(0).toUpperCase()}</span>
+            <span style={{ width: 26, height: 26, borderRadius: "50%", background: A, color: ON, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif" }}>{(prov ? prov.name : "?").trim().charAt(0).toUpperCase()}</span>
             <span>with <b>{prov ? prov.name : "your staff member"}</b></span>
           </div>
         </div>
@@ -7743,7 +7743,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={A} strokeWidth="2" style={{ flexShrink: 0, marginTop: 2 }}><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>
             <div>
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{business.name}</div>
-              <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 1 }}>{[business.address, business.address2].filter(Boolean).join(", ")}</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 1 }}>{[business.address, business.address2].filter(Boolean).join(", ")}</div>
             </div>
           </div>
           {changeable ? (
@@ -7757,12 +7757,12 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
             </div>
           )}
           {refCode && <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px dotted var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 10, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase" }}>Confirmation</span>
-            <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 12.5, letterSpacing: 1, color: "var(--sub)" }}>{refCode}</span>
+            <span style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase" }}>Confirmation</span>
+            <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 13.5, letterSpacing: 1, color: "var(--sub)" }}>{refCode}</span>
           </div>}
         </div>
       </div>
-      {changeable && <div style={{ textAlign: "center", fontSize: 12, color: "var(--sub)", marginTop: 16 }}>Free to change up to {windowHrs} hours before.</div>}
+      {changeable && <div style={{ textAlign: "center", fontSize: 13, color: "var(--sub)", marginTop: 16 }}>Free to change up to {windowHrs} hours before.</div>}
     </Shell>
   );
 }
@@ -7812,7 +7812,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 6 }}>Manage your appointment</h2>
         <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 22, fontWeight: 300, lineHeight: 1.5 }}>Enter the phone number you booked with. We'll text you a code — confirm it to see your appointments.</p>
         <input inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" style={{ ...inputStyle, marginBottom: 14 }} />
-        <p style={{ color: "var(--faint)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>
+        <p style={{ color: "var(--faint)", fontSize: 13.5, marginBottom: 14, lineHeight: 1.5 }}>
           By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--gold)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--gold)", textDecoration: "underline" }}>terms</a>.
         </p>
         <button className="lift" disabled={digits(phone).length < 10} onClick={() => setConfirmed(true)} style={{ width: "100%", background: digits(phone).length < 10 ? "var(--border)" : "var(--gold)", color: digits(phone).length < 10 ? "var(--faint)" : "var(--on-gold)", padding: 15, fontSize: 14, letterSpacing: 2, fontWeight: 500, borderRadius: 10 }}>That's me →</button>
@@ -7847,7 +7847,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
                   <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 14 }}>
                     {dateOptions.slice(0, 10).map((d, i) => { const on = newDate && d.toDateString() === newDate.toDateString(); return (
                       <button key={i} onClick={() => { setNewDate(d); setNewSlot(null); }} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--text)", textAlign: "center" }}>
-                        <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
+                        <div style={{ fontSize: 13, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
                         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{d.getDate()}</div>
                       </button>
                     ); })}
@@ -8255,7 +8255,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       <div style={{ marginBottom: 26, paddingTop: 8 }}>
         <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, color: "var(--text)" }}>{headerName}</h2>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 14 }}>
-          <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500 }}>{todayLabel}</div>
+          <div style={{ fontSize: 12.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500 }}>{todayLabel}</div>
           {/* Owner-only "viewing as" picker. Barbers see only their avatar + name (no toggle). */}
           {isOwner && realProviders.length > 1 ? (
             <div style={{ flexShrink: 0 }}>
@@ -8287,7 +8287,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500 }}>Wrap up</span>
             <span style={{ display: "block", fontSize: 13, color: "var(--text2)", marginTop: 3 }}>{wrapUpList.length} {wrapUpList.length === 1 ? "cut" : "cuts"} to log</span>
           </span>
-          <span style={{ minWidth: 24, height: 24, borderRadius: 12, padding: "0 8px", background: "var(--gold)", color: "var(--on-gold)", fontSize: 12.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{wrapUpList.length}</span>
+          <span style={{ minWidth: 24, height: 24, borderRadius: 12, padding: "0 8px", background: "var(--gold)", color: "var(--on-gold)", fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{wrapUpList.length}</span>
           <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 300, color: "var(--gold)", flexShrink: 0 }}>→</span>
         </button>
       )}
@@ -8301,7 +8301,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500 }}>{overdueCount} {overdueCount === 1 ? "regular" : "regulars"} overdue</span>
               <span style={{ display: "block", fontSize: 13, color: "var(--text2)", marginTop: 3 }}>About {fmtMoney(overdueDollars)} in cuts waiting · tap to {rebookOpen ? "hide" : "see who"}</span>
             </span>
-            <span style={{ minWidth: 24, height: 24, borderRadius: 12, padding: "0 8px", background: "var(--gold)", color: "var(--on-gold)", fontSize: 12.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{overdueCount}</span>
+            <span style={{ minWidth: 24, height: 24, borderRadius: 12, padding: "0 8px", background: "var(--gold)", color: "var(--on-gold)", fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{overdueCount}</span>
             <ChevronDown size={16} style={{ color: "var(--gold)", flexShrink: 0, transform: rebookOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
           </button>
           {rebookOpen && (
@@ -8312,7 +8312,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                     <Avatar size={34} initial={c.name?.charAt(0)} color={c.color} photo={c.photo} />
                     <span style={{ minWidth: 0 }}>
                       <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-                      <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 1 }}>{daysSince} days · usually {c.cadenceDays}{value > 0 ? ` · ${fmtMoney(value)}` : ""}</span>
+                      <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 1 }}>{daysSince} days · usually {c.cadenceDays}{value > 0 ? ` · ${fmtMoney(value)}` : ""}</span>
                     </span>
                   </button>
                   <button onClick={() => setClients((cur) => cur.map((x) => x.id === c.id ? { ...x, nudgeDismissedAt: new Date().toISOString() } : x))} aria-label={`Dismiss ${c.name}`} style={{ background: "none", border: "none", color: "var(--faint)", fontSize: 20, lineHeight: 1, padding: "0 4px", flexShrink: 0, cursor: "pointer" }}>×</button>
@@ -8329,7 +8329,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       {/* TODAY — hero card: money + goal ring */}
       <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, padding: "20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 11 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 10.5, letterSpacing: "2.5px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginBottom: 8 }}>{isShopView ? "Today · shop" : "Today"}</div>
+          <div style={{ fontSize: 12, letterSpacing: "2.5px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginBottom: 8 }}>{isShopView ? "Today · shop" : "Today"}</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 46, fontWeight: 400, color: "var(--text)", lineHeight: 0.95, letterSpacing: -1 }}>
             {fmtMoney(todayMoney)}
           </div>
@@ -8365,8 +8365,8 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               <circle cx="48" cy="48" r="34" fill="none" stroke="var(--text)" strokeWidth="8" strokeLinecap="round" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} transform="rotate(-90 48 48)" style={{ transition: "stroke-dashoffset .4s ease" }} />
               <text x="48" y="53" textAnchor="middle" fill="var(--text)" fontSize="23" fontFamily="'Fraunces', serif" fontWeight="500">{dailyPct}%</text>
             </svg>
-            <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 1 }}>{fmtMoney(todayMoney)} / {fmtMoney(dailyGoal)}</div>
-            <div style={{ fontSize: 11, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> Edit goal</div>
+            <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 1 }}>{fmtMoney(todayMoney)} / {fmtMoney(dailyGoal)}</div>
+            <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> Edit goal</div>
           </button>
         ) : (
           <button onClick={() => openGoalEditor("daily")} style={{ textAlign: "center", flexShrink: 0, background: "none", border: "none", padding: 0, cursor: "pointer" }}>
@@ -8374,7 +8374,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               <circle cx="48" cy="48" r="34" fill="none" stroke="var(--panel2)" strokeWidth="8" strokeDasharray="4 7" />
               <text x="48" y="56" textAnchor="middle" fill="var(--faint)" fontSize="34" fontFamily="'Fraunces', serif" fontWeight="400">+</text>
             </svg>
-            <div style={{ fontSize: 11, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> Set a daily goal</div>
+            <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Edit2 size={9} /> Set a daily goal</div>
           </button>
         ))}
       </div>
@@ -8389,15 +8389,15 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 30 }}>
         <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "16px 10px", textAlign: "center" }}>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 400, color: "var(--text)", lineHeight: 1 }}>{cutsToday}</div>
-          <div style={{ fontSize: 10.5, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--faint)", marginTop: 8, fontWeight: 500 }}>Cuts</div>
+          <div style={{ fontSize: 12, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--faint)", marginTop: 8, fontWeight: 500 }}>Cuts</div>
         </div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "16px 10px", textAlign: "center" }}>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 400, color: "var(--text)", lineHeight: 1 }}>{occupancyToday}%</div>
-          <div style={{ fontSize: 10.5, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--faint)", marginTop: 8, fontWeight: 500 }}>Chair full</div>
+          <div style={{ fontSize: 12, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--faint)", marginTop: 8, fontWeight: 500 }}>Chair full</div>
         </div>
         <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "16px 10px", textAlign: "center" }}>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 400, color: "var(--text)", lineHeight: 1 }}>{fmtMoney(avgTicket)}</div>
-          <div style={{ fontSize: 10.5, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--faint)", marginTop: 8, fontWeight: 500 }}>Avg ticket</div>
+          <div style={{ fontSize: 12, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--faint)", marginTop: 8, fontWeight: 500 }}>Avg ticket</div>
         </div>
       </div>
 
@@ -8410,24 +8410,24 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               <button onClick={() => (showToast && showToast("All caught up — nothing to log."))} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Wrap up</span>
-                  <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>All caught up</span>
+                  <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>All caught up</span>
                 </span>
                 <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
               </button>
           )}
           <button onClick={() => setGrowthOpen(true)} style={{ width: "100%", background: "none", border: "none", borderTop: wrapUpList.length === 0 ? "1px solid var(--line)" : "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-            <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>How you're growing</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>People keep coming back</span></span>
+            <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>How you're growing</span><span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>People keep coming back</span></span>
             <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
           </button>
           {(isOwner && onOpenRevenue) && (
             <button onClick={onOpenRevenue} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Reports</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>The full numbers</span></span>
+              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Reports</span><span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>The full numbers</span></span>
               <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </button>
           )}
           {(isOwner && onOpenBarbers && realProviders.length > 1) && (
             <button onClick={onOpenBarbers} style={{ width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
-              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Team</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Compare each staff member</span></span>
+              <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Team</span><span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>Compare each staff member</span></span>
               <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </button>
           )}
@@ -8448,16 +8448,16 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         if (!insights.length) return null;
         return (
           <div style={{ marginBottom: 30 }}>
-            <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 9px" }}>Insights</div>
+            <div style={{ fontSize: 12, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 9px" }}>Insights</div>
             <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
               {insights.map((it, i) => {
                 return (
                   <button key={i} onClick={it.onClick} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>{it.label}</span>
-                      {it.desc && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>}
+                      {it.desc && <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.desc}</span>}
                     </span>
-                    {it.badge > 0 && <span style={{ minWidth: 22, height: 22, borderRadius: 11, padding: "0 7px", background: "var(--text)", color: "var(--bg)", fontSize: 12, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, alignSelf: "center" }}>{it.badge > 9 ? "9+" : it.badge}</span>}
+                    {it.badge > 0 && <span style={{ minWidth: 22, height: 22, borderRadius: 11, padding: "0 7px", background: "var(--text)", color: "var(--bg)", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, alignSelf: "center" }}>{it.badge > 9 ? "9+" : it.badge}</span>}
                     <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
                   </button>
                 );
@@ -8475,7 +8475,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
               <div style={{ fontSize: 15.5, fontWeight: 600 }}>{cutting.name || "In service"}</div>
               {cutSvc && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>{cutSvc}</div>}
             </div>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexShrink: 0, background: cutWrap ? "color-mix(in srgb, #C08A3E 13%, var(--panel2))" : "var(--tint2)", border: "1px solid " + (cutWrap ? "color-mix(in srgb, #C08A3E 30%, var(--border))" : "color-mix(in srgb, var(--gold) 26%, var(--border))"), color: cutWrap ? "#C08A3E" : "var(--gold)", fontSize: 12, fontWeight: 600, padding: "4px 11px 4px 9px", borderRadius: 30 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexShrink: 0, background: cutWrap ? "color-mix(in srgb, #C08A3E 13%, var(--panel2))" : "var(--tint2)", border: "1px solid " + (cutWrap ? "color-mix(in srgb, #C08A3E 30%, var(--border))" : "color-mix(in srgb, var(--gold) 26%, var(--border))"), color: cutWrap ? "#C08A3E" : "var(--gold)", fontSize: 13, fontWeight: 600, padding: "4px 11px 4px 9px", borderRadius: 30 }}>
               <span style={{ position: "relative", width: 9, height: 9 }}>
                 <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: "currentColor", opacity: 0.35, animation: "pulse 1.6s var(--ease) infinite" }} />
                 <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "currentColor" }} />
@@ -8502,7 +8502,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           </div>
           <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.45, marginTop: 10 }}>{gapDayName} has a <strong style={{ fontWeight: 600 }}>{awkwardGap.gapMin}-minute gap</strong> at {fmtTime(awkwardGap.atMin)} — too short to book. Moving <strong style={{ fontWeight: 600 }}>{awkwardGap.N.name || "the next client"}</strong> up to {fmtTime(awkwardGap.moveToMin)} would open a bookable slot later in {isShopView ? `${awkwardGap.prov.name}'s` : "your"} day.</div>
           <div onClick={() => setGapNotify((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 13px", marginTop: 13, cursor: "pointer" }}>
-            <div><div style={{ fontSize: 13, fontWeight: 500 }}>Notify {(awkwardGap.N.name || "client").split(" ")[0]} of the new time</div><div style={{ fontSize: 11.5, color: gapNotify ? "var(--gold)" : "var(--sub)", marginTop: 1 }}>{gapNotify ? "On — we'll text the change" : "Off — moves silently"}</div></div>
+            <div><div style={{ fontSize: 13, fontWeight: 500 }}>Notify {(awkwardGap.N.name || "client").split(" ")[0]} of the new time</div><div style={{ fontSize: 13, color: gapNotify ? "var(--gold)" : "var(--sub)", marginTop: 1 }}>{gapNotify ? "On — we'll text the change" : "Off — moves silently"}</div></div>
             <span role="switch" aria-checked={gapNotify} style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: gapNotify ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: gapNotify ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
           </div>
           <div style={{ display: "flex", gap: 9, marginTop: 11 }}>
@@ -8535,7 +8535,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
           so the provider can text the next client without digging through the calendar. */}
       {inChair && nextAppt && minutesLeft != null && minutesLeft <= ((business?.runningLate?.thresholdMin) || 5) && (business?.runningLate?.enabled !== false) && !nextAppt.lateNotified && (
         <div style={{ marginBottom: 16, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--border))", borderRadius: 14, padding: "14px 16px" }}>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--gold)", marginBottom: 6, fontWeight: 600 }}>RUNNING LATE?</div>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--gold)", marginBottom: 6, fontWeight: 600 }}>RUNNING LATE?</div>
           <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.45, marginBottom: 10 }}>
             {minutesLeft} min left with {inChair.name}. {(nextAppt.name || "").split(" ")[0]} is up next at {fmtTime(nextAppt.start)}. Want to give them a heads-up?
           </div>
@@ -8628,13 +8628,13 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
 
       {/* THIS WEEK */}
       <div style={{ marginBottom: 30 }}>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>THIS WEEK</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", marginBottom: 6, fontWeight: 600 }}>THIS WEEK</div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, color: "var(--text)", lineHeight: 1, letterSpacing: -0.6 }}>
             {fmtMoney(thisWeekMoney)}
           </div>
           {!isShopView && (
-            <button onClick={() => openGoalEditor("weekly")} className="lift" style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 40%, var(--border))", color: "var(--gold)", borderRadius: 20, padding: "6px 13px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+            <button onClick={() => openGoalEditor("weekly")} className="lift" style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 40%, var(--border))", color: "var(--gold)", borderRadius: 20, padding: "6px 13px", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>
               <Edit2 size={12} /> {rawWeeklyGoal > 0 ? "Edit weekly goal" : "Set weekly goal"}
             </button>
           )}
@@ -8654,8 +8654,8 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         {!isShopView && weeklyGoal > 0 && (
           <div style={{ marginTop: 6 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-              <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>WEEKLY GOAL</div>
-              <div style={{ fontSize: 12.5, color: weeklyPct >= 100 ? "var(--gold)" : "var(--sub)", fontWeight: weeklyPct >= 100 ? 600 : 400 }}>
+              <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>WEEKLY GOAL</div>
+              <div style={{ fontSize: 13.5, color: weeklyPct >= 100 ? "var(--gold)" : "var(--sub)", fontWeight: weeklyPct >= 100 ? 600 : 400 }}>
                 {weeklyPct >= 100 ? `🎯 ${fmtMoney(thisWeekMoney)} of ${fmtMoney(weeklyGoal)}` : `${fmtMoney(thisWeekMoney)} of ${fmtMoney(weeklyGoal)} · ${weeklyPct}%`}
               </div>
             </div>
@@ -8675,7 +8675,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         <div onClick={() => setGoalEditor(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 2000, overflowY: "auto" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, background: "var(--panel)", borderRadius: 20, border: "1px solid var(--border2)", padding: "24px 22px 26px", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>{goalEditor === "daily" ? "DAILY GOAL" : "WEEKLY GOAL"}</div>
+              <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>{goalEditor === "daily" ? "DAILY GOAL" : "WEEKLY GOAL"}</div>
               <button onClick={() => setGoalEditor(null)} style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--panel2)", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={16} /></button>
             </div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 600, marginBottom: 6, lineHeight: 1.05 }}>Set {viewedProvider.name === me?.name ? "your" : `${viewedProvider.name}'s`} {goalEditor} target</h2>
@@ -8717,40 +8717,40 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 520, background: "var(--bg)", borderRadius: "24px 24px 0 0", boxShadow: "0 -10px 40px rgba(40,34,22,0.22)", padding: "10px 16px 22px", maxHeight: "82%", display: "flex", flexDirection: "column" }}>
               <div style={{ width: 38, height: 4, borderRadius: 4, background: "var(--border2)", margin: "4px auto 12px" }} />
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500 }}>{awkwardGap.date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</div>
-              <div style={{ fontSize: 12, color: "var(--sub)", marginBottom: 12 }}>The {awkwardGap.gapMin}-min gap, in context{isShopView ? ` · ${prov.name}` : ""}</div>
+              <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 12 }}>The {awkwardGap.gapMin}-min gap, in context{isShopView ? ` · ${prov.name}` : ""}</div>
               <div style={{ overflowY: "auto" }}>
                 {dayAppts.map((a, i) => (
                   <div key={a.id}>
                     {i === idx && (
                       <div style={{ display: "flex", gap: 9 }}>
-                        <div style={{ width: 52, flexShrink: 0, fontSize: 11, color: "var(--faint)", paddingTop: 9, textAlign: "right" }}>{fmtTime(awkwardGap.atMin)}</div>
-                        <div style={{ flex: 1, borderRadius: 10, padding: "9px 11px", marginBottom: 6, background: "repeating-linear-gradient(45deg, color-mix(in srgb, #C08A3E 10%, transparent), color-mix(in srgb, #C08A3E 10%, transparent) 6px, transparent 6px, transparent 12px)", border: "1px dashed color-mix(in srgb, #C08A3E 48%, var(--border))", color: "#C08A3E", fontSize: 11.5, fontWeight: 600, textAlign: "center" }}>{awkwardGap.gapMin}-min gap · too short to book</div>
+                        <div style={{ width: 52, flexShrink: 0, fontSize: 12.5, color: "var(--faint)", paddingTop: 9, textAlign: "right" }}>{fmtTime(awkwardGap.atMin)}</div>
+                        <div style={{ flex: 1, borderRadius: 10, padding: "9px 11px", marginBottom: 6, background: "repeating-linear-gradient(45deg, color-mix(in srgb, #C08A3E 10%, transparent), color-mix(in srgb, #C08A3E 10%, transparent) 6px, transparent 6px, transparent 12px)", border: "1px dashed color-mix(in srgb, #C08A3E 48%, var(--border))", color: "#C08A3E", fontSize: 13, fontWeight: 600, textAlign: "center" }}>{awkwardGap.gapMin}-min gap · too short to book</div>
                       </div>
                     )}
                     <div style={{ display: "flex", gap: 9 }}>
-                      <div style={{ width: 52, flexShrink: 0, fontSize: 11, color: "var(--faint)", paddingTop: 9, textAlign: "right" }}>{fmtTime(a.start)}</div>
+                      <div style={{ width: 52, flexShrink: 0, fontSize: 12.5, color: "var(--faint)", paddingTop: 9, textAlign: "right" }}>{fmtTime(a.start)}</div>
                       <div style={{ flex: 1, borderRadius: 10, padding: "9px 11px", marginBottom: 6, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))" }}>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{a.name || "Booked"}</div>
-                        <div style={{ fontSize: 11.5, color: "var(--sub)" }}>{(a.title ? a.title + " · " : "") + fmtTime(a.start) + "–" + fmtTime(a.end)}</div>
+                        <div style={{ fontSize: 13, color: "var(--sub)" }}>{(a.title ? a.title + " · " : "") + fmtTime(a.start) + "–" + fmtTime(a.end)}</div>
                       </div>
                     </div>
                     {i === idx && (
                       <div style={{ display: "flex", gap: 9 }}>
-                        <div style={{ width: 52, flexShrink: 0, fontSize: 11, color: "var(--faint)", paddingTop: 9, textAlign: "right" }}>{fmtTime(awkwardGap.N.end)}</div>
-                        <div style={{ flex: 1, borderRadius: 10, padding: "11px", marginBottom: 6, background: "var(--panel2)", border: "1px dashed var(--border2)", color: "var(--faint)", fontSize: 11.5, textAlign: "center" }}>Open · {fmtTime(awkwardGap.N.end)}–{fmtTime(openEnd)} → grows if {firstName} moves up</div>
+                        <div style={{ width: 52, flexShrink: 0, fontSize: 12.5, color: "var(--faint)", paddingTop: 9, textAlign: "right" }}>{fmtTime(awkwardGap.N.end)}</div>
+                        <div style={{ flex: 1, borderRadius: 10, padding: "11px", marginBottom: 6, background: "var(--panel2)", border: "1px dashed var(--border2)", color: "var(--faint)", fontSize: 13, textAlign: "center" }}>Open · {fmtTime(awkwardGap.N.end)}–{fmtTime(openEnd)} → grows if {firstName} moves up</div>
                       </div>
                     )}
                   </div>
                 ))}
               </div>
               <div onClick={() => setGapNotify((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 13px", marginTop: 14, cursor: "pointer" }}>
-                <div><div style={{ fontSize: 13, fontWeight: 500 }}>Notify {firstName} of the new time</div><div style={{ fontSize: 11.5, color: gapNotify ? "var(--gold)" : "var(--sub)", marginTop: 1 }}>{gapNotify ? "On — we'll text the change" : "Off — moves silently"}</div></div>
+                <div><div style={{ fontSize: 13, fontWeight: 500 }}>Notify {firstName} of the new time</div><div style={{ fontSize: 13, color: gapNotify ? "var(--gold)" : "var(--sub)", marginTop: 1 }}>{gapNotify ? "On — we'll text the change" : "Off — moves silently"}</div></div>
                 <span role="switch" aria-checked={gapNotify} style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: gapNotify ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: gapNotify ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
               </div>
               <div style={{ marginTop: 11, display: "flex", flexDirection: "column", gap: 9 }}>
-                <button onClick={() => moveAppointmentUp(awkwardGap, gapNotify)} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: "13px 0", fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, lineHeight: 1.25, cursor: "pointer" }}>Move {firstName} up to {fmtTime(awkwardGap.moveToMin)}<span style={{ display: "block", fontSize: 11.5, fontWeight: 400, opacity: 0.92, marginTop: 2 }}>{awkwardGap.gapMin} min earlier · {gapNotify ? `${firstName} gets a text with the new time` : "no message sent"}</span></button>
+                <button onClick={() => moveAppointmentUp(awkwardGap, gapNotify)} style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: "13px 0", fontSize: 14, fontWeight: 600, fontFamily: FONT_BODY, lineHeight: 1.25, cursor: "pointer" }}>Move {firstName} up to {fmtTime(awkwardGap.moveToMin)}<span style={{ display: "block", fontSize: 13, fontWeight: 400, opacity: 0.92, marginTop: 2 }}>{awkwardGap.gapMin} min earlier · {gapNotify ? `${firstName} gets a text with the new time` : "no message sent"}</span></button>
                 <button onClick={() => { const ph = awkwardGap.N.phone; const msg = `Hi ${firstName}, any chance you could come in around ${fmtTime(awkwardGap.moveToMin)} on ${gapDayName} instead? Would help me tighten the day. Thanks!`; if (ph) { window.location.href = `sms:${ph}?&body=${encodeURIComponent(msg)}`; } else if (showToast) { showToast("No phone on file for this client."); } }} style={{ background: "var(--panel)", color: "var(--gold)", border: "1.5px solid color-mix(in srgb, var(--gold) 40%, var(--border))", borderRadius: 12, padding: "12px 0", fontSize: 13.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer" }}>Text {firstName} first instead</button>
-                <button onClick={() => { setGapPeek(false); onNavigate && onNavigate("calendar", awkwardGap.date.toISOString()); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 600, padding: 4, fontFamily: FONT_BODY, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, cursor: "pointer" }}><Calendar size={14} /> Open full calendar to do it myself</button>
+                <button onClick={() => { setGapPeek(false); onNavigate && onNavigate("calendar", awkwardGap.date.toISOString()); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, padding: 4, fontFamily: FONT_BODY, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, cursor: "pointer" }}><Calendar size={14} /> Open full calendar to do it myself</button>
                 <button onClick={() => setGapPeek(false)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, fontWeight: 500, padding: 6, fontFamily: FONT_BODY, cursor: "pointer" }}>Not now</button>
               </div>
             </div>
@@ -8766,7 +8766,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
         <div onClick={() => setPickerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 2000, overflowY: "auto" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", borderRadius: 20, border: "1px solid var(--border2)", padding: "20px 16px", boxShadow: "0 24px 60px rgba(0,0,0,0.55)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px", marginBottom: 14 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>WHOSE NUMBERS?</div>
+              <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>WHOSE NUMBERS?</div>
               <button onClick={() => setPickerOpen(false)} style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--panel2)", border: "none", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={16} /></button>
             </div>
             <div style={{ display: "grid", gap: 4 }}>
@@ -8783,7 +8783,7 @@ function PulseView({ business, appts, setAppts, clients, setClients, services, p
                 {pulseView === "me" && <Check size={17} style={{ color: "var(--gold)" }} />}
               </button>
               {realProviders.filter((p) => p.id !== me?.id).length > 0 && (
-                <div style={{ fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "10px 8px 3px" }}>Your staff</div>
+                <div style={{ fontSize: 12.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "10px 8px 3px" }}>Your staff</div>
               )}
               {realProviders.filter((p) => p.id !== me?.id).map((p) => (
                 <button key={p.id} onClick={() => { setPulseView(p.id); setPickerOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 12px", background: pulseView === p.id ? "var(--panel2)" : "transparent", color: "var(--text)", border: `1px solid ${pulseView === p.id ? "var(--border2)" : "transparent"}`, borderRadius: 12, fontSize: 15, textAlign: "left", cursor: "pointer" }}>
@@ -8849,13 +8849,13 @@ function GrowthView({ appts, scopeFilter, services, clients, onBack }) {
 
   const heroStyle = { background: "linear-gradient(160deg, var(--tint), var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 24%, var(--border))", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: 18, marginTop: 14 };
   const groupStyle = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" };
-  const headLbl = { fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "20px 6px 9px" };
+  const headLbl = { fontSize: 12.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "20px 6px 9px" };
   const statRow = (r, i) => (
     <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "15px 16px", borderTop: i ? "1px solid var(--line)" : "none" }}>
       <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 500 }}>{r.name}</div>
       <div style={{ textAlign: "right" }}>
         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 21, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1 }}>{r.value}</div>
-        {r.sub ? <div style={{ fontSize: 11.5, color: "var(--sub)", fontWeight: 600, marginTop: 4 }}>{r.sub}</div> : null}
+        {r.sub ? <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 600, marginTop: 4 }}>{r.sub}</div> : null}
       </div>
     </div>
   );
@@ -8989,7 +8989,7 @@ function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, pr
 
       {groups.map((g) => (
         <div key={g.label} style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 11.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 10px" }}>{g.label}</div>
+          <div style={{ fontSize: 13, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 4px 10px" }}>{g.label}</div>
           <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
             {g.items.map((n, i) => {
               const { Icon, title, live } = kindMeta(n);
@@ -9011,7 +9011,7 @@ function NotificationsView({ notifs, notifSeenAt, markSeen, onClear, clients, pr
                       <span style={{ display: "block", marginTop: 8, fontSize: 13, color: "var(--sub)" }}>{"\uD83D\uDCF7 " + n.photoCount + " reference photo" + (n.photoCount > 1 ? "s" : "")}</span>
                     ) : null}
                   </span>
-                  <span style={{ fontSize: 12, color: "var(--faint)", flexShrink: 0, paddingTop: 2 }}>{fmtAgo(n.ts)}</span>
+                  <span style={{ fontSize: 13, color: "var(--faint)", flexShrink: 0, paddingTop: 2 }}>{fmtAgo(n.ts)}</span>
                 </button>
               );
             })}
@@ -9034,7 +9034,7 @@ const RPT_STATNUM = { fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight:
 function RptMast({ eyebrow, title }) {
   return (
     <div style={{ marginBottom: 22 }}>
-      {eyebrow && <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>{eyebrow}</div>}
+      {eyebrow && <div style={{ fontSize: 12.5, letterSpacing: "3px", color: "var(--faint)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase" }}>{eyebrow}</div>}
       <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: "-0.4px", lineHeight: 1 }}>{title}</h2>
     </div>
   );
@@ -9053,7 +9053,7 @@ function RptPeriod({ value, onChange, options = [["week", "Week"], ["month", "Mo
 function RptLabel({ children, action, style }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14, ...style }}>
-      <div style={{ fontSize: 11, letterSpacing: "2.5px", color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>{children}</div>
+      <div style={{ fontSize: 12.5, letterSpacing: "2.5px", color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>{children}</div>
       {action}
     </div>
   );
@@ -9074,9 +9074,9 @@ function RptSection({ label, action, first, children, style }) {
 function RptStat({ label, value, sub, accent, style }) {
   return (
     <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", minWidth: 0, ...style }}>
-      <div style={{ fontSize: 10.5, letterSpacing: "1.5px", color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 9 }}>{label}</div>
+      <div style={{ fontSize: 12, letterSpacing: "1.5px", color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 9 }}>{label}</div>
       <div style={{ ...RPT_STATNUM, color: accent ? "var(--gold)" : "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 6, lineHeight: 1.4 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 6, lineHeight: 1.4 }}>{sub}</div>}
     </div>
   );
 }
@@ -9318,16 +9318,16 @@ function RevenueView({ appts, clients, services, providers, business, onBack }) 
       <RptPeriod value={period} onChange={setPeriod} style={{ marginBottom: period === "custom" ? 14 : 28 }} />
       {period === "custom" && (<>
         <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-          <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, fontSize: 11, letterSpacing: 1, color: "var(--faint)", fontWeight: 600 }}>FROM
+          <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, fontSize: 12.5, letterSpacing: 1, color: "var(--faint)", fontWeight: 600 }}>FROM
             <input type="date" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "11px 12px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
           </label>
-          <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, fontSize: 11, letterSpacing: 1, color: "var(--faint)", fontWeight: 600 }}>TO
+          <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, fontSize: 12.5, letterSpacing: 1, color: "var(--faint)", fontWeight: 600 }}>TO
             <input type="date" value={customTo} min={customFrom} onChange={(e) => setCustomTo(e.target.value)} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "11px 12px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY }} />
           </label>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 28 }}>
           {[["7", "Last 7 days"], ["30", "Last 30"], ["qtd", "This quarter"], ["ytd", "Year to date"]].map(([k, lbl]) => (
-            <button key={k} onClick={() => applyQuickRange(k)} style={{ padding: "8px 14px", borderRadius: 20, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--sub)", fontSize: 12.5, fontWeight: 500, cursor: "pointer" }}>{lbl}</button>
+            <button key={k} onClick={() => applyQuickRange(k)} style={{ padding: "8px 14px", borderRadius: 20, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--sub)", fontSize: 13.5, fontWeight: 500, cursor: "pointer" }}>{lbl}</button>
           ))}
         </div>
       </>)}
@@ -9542,7 +9542,7 @@ function AppointmentsView({ appts, providers, services, onBack }) {
       ) : (
       <>
       <RptAccentCard>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700, marginBottom: 10 }}>CHAIR OCCUPANCY</div>
+        <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 700, marginBottom: 10 }}>CHAIR OCCUPANCY</div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 14 }}>
           <div style={{ ...RPT_HERO, color: "var(--gold)" }}>{occupancy}%</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45 }}>of your open chair time is booked</div>
@@ -9550,7 +9550,7 @@ function AppointmentsView({ appts, providers, services, onBack }) {
         <div style={{ height: 8, borderRadius: 4, background: "var(--tint2)", overflow: "hidden", marginBottom: 10 }}>
           <div style={{ width: Math.min(100, occupancy) + "%", height: "100%", background: "var(--gold)" }} />
         </div>
-        <div style={{ fontSize: 12.5, color: "var(--sub)" }}><b style={{ color: "var(--text)" }}>{bookedHrs}h</b> booked &middot; <b style={{ color: "var(--text)" }}>{openHrs}h</b> still open of {availHrs}h</div>
+        <div style={{ fontSize: 13.5, color: "var(--sub)" }}><b style={{ color: "var(--text)" }}>{bookedHrs}h</b> booked &middot; <b style={{ color: "var(--text)" }}>{openHrs}h</b> still open of {availHrs}h</div>
       </RptAccentCard>
 
       <RptSection label="SCHEDULE HEALTH" style={{ marginBottom: 28 }}>
@@ -9568,10 +9568,10 @@ function AppointmentsView({ appts, providers, services, onBack }) {
         {busiestDay && busiestHour && (<div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: -4, marginBottom: 16 }}>Your busiest stretch is <b style={{ color: "var(--text)" }}>{dayFull[busiestDay.dow]}s around {fmtHour(busiestHour.hour)}</b>.</div>)}
         <div style={{ overflowX: "auto", paddingBottom: 4 }}>
           <svg width={gridW} height={gridH} style={{ display: "block" }}>
-            {hourLabels.map((h, i) => (i % 2 === 0 ? (<text key={"h" + h} x={leftLabel + i * (cellW + gap) + cellW / 2} y={12} textAnchor="middle" style={{ fontSize: 9, fill: "var(--faint)" }}>{fmtHour(h).replace(" ", "")}</text>) : null))}
+            {hourLabels.map((h, i) => (i % 2 === 0 ? (<text key={"h" + h} x={leftLabel + i * (cellW + gap) + cellW / 2} y={12} textAnchor="middle" style={{ fontSize: 10.5, fill: "var(--faint)" }}>{fmtHour(h).replace(" ", "")}</text>) : null))}
             {orderedGrid.map((row, r) => (
               <g key={"r" + r}>
-                <text x={0} y={topLabel + r * (cellH + gap) + cellH / 2 + 3} style={{ fontSize: 10, fill: "var(--faint)" }}>{dowLabels[r]}</text>
+                <text x={0} y={topLabel + r * (cellH + gap) + cellH / 2 + 3} style={{ fontSize: 12, fill: "var(--faint)" }}>{dowLabels[r]}</text>
                 {row.map((v, c) => { const t = v / maxCell; const bg = v === 0 ? "var(--panel2)" : "color-mix(in srgb, var(--gold) " + Math.round(20 + t * 70) + "%, var(--panel))"; return (<rect key={"c" + c} x={leftLabel + c * (cellW + gap)} y={topLabel + r * (cellH + gap)} width={cellW} height={cellH} rx={4} fill={bg} />); })}
               </g>
             ))}
@@ -9685,7 +9685,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
 
   const periodLabel = period === "week" ? "This week" : period === "month" ? "This month" : "This year";
   const open = (c) => onOpenClient && onOpenClient(c);
-  const Eyebrow = ({ children }) => <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>{children}</div>;
+  const Eyebrow = ({ children }) => <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 16, fontWeight: 600 }}>{children}</div>;
   const Rule = () => <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />;
   const isEmpty = totalActive === 0 && lapsed.length === 0 && comingDue.length === 0 && top.length === 0;
 
@@ -9705,8 +9705,8 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
       {lapsed.length > 0 && (
         <RptAccentCard style={{ padding: "18px 16px 12px" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--gold)", fontWeight: 700 }}>WIN BACK</div>
-            <div style={{ fontSize: 12.5, color: "var(--sub)" }}>~{fmtMoney(atRisk)} at risk <span style={{ color: "var(--faint)" }}>(est.)</span></div>
+            <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 700 }}>WIN BACK</div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)" }}>~{fmtMoney(atRisk)} at risk <span style={{ color: "var(--faint)" }}>(est.)</span></div>
           </div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.5, color: "var(--text)", marginBottom: 14 }}>{lapsed.length} overdue to rebook</div>
           <div style={{ display: "grid", gap: 2 }}>
@@ -9714,9 +9714,9 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
               <button key={c.id} onClick={() => open(c)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "none", border: "none", borderTop: "1px solid color-mix(in srgb, var(--gold) 16%, var(--border))", padding: "12px 2px", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
                 <span style={{ minWidth: 0, flex: 1 }}>
                   <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-                  <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 1 }}>Last seen {since}d ago{!filterProv && provName(c) ? ` · ${provName(c)}` : ""}</span>
+                  <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 1 }}>Last seen {since}d ago{!filterProv && provName(c) ? ` · ${provName(c)}` : ""}</span>
                 </span>
-                <span style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 600, color: "var(--gold)" }}>{over}d over</span>
+                <span style={{ flexShrink: 0, fontSize: 13.5, fontWeight: 600, color: "var(--gold)" }}>{over}d over</span>
               </button>
             ))}
           </div>
@@ -9734,7 +9734,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
               <div style={{ ...RPT_HERO, color: rebookPct >= 60 ? "var(--gold)" : "var(--text)" }}>{rebookPct}%</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>of recent clients already have their next visit booked</div>
             </div>
-            <div style={{ fontSize: 12.5, color: "var(--faint)" }}>{rebooked} of {recent.length} seen in the last 90 days.</div>
+            <div style={{ fontSize: 13.5, color: "var(--faint)" }}>{rebooked} of {recent.length} seen in the last 90 days.</div>
           </div>
         </>
       )}
@@ -9752,11 +9752,11 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
             <div style={{ display: "grid", gap: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--gold)" }} /><span style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>New</span></div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{newThisPeriod}</span><span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((newThisPeriod / totalActive) * 100)}%</span></div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{newThisPeriod}</span><span style={{ fontSize: 13.5, color: "var(--faint)" }}>{Math.round((newThisPeriod / totalActive) * 100)}%</span></div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--tint2)" }} /><span style={{ fontSize: 13.5, color: "var(--sub)", fontStyle: "italic" }}>Returning</span></div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{returningThisPeriod}</span><span style={{ fontSize: 12.5, color: "var(--faint)" }}>{Math.round((returningThisPeriod / totalActive) * 100)}%</span></div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{returningThisPeriod}</span><span style={{ fontSize: 13.5, color: "var(--faint)" }}>{Math.round((returningThisPeriod / totalActive) * 100)}%</span></div>
               </div>
             </div>
           </div>
@@ -9791,7 +9791,7 @@ function ClientsReportView({ appts, clients, services, providers, pulseView, me,
               <div style={{ ...RPT_HERO, color: retentionPct >= 60 ? "var(--gold)" : "var(--text)" }}>{retentionPct}%</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>of first-timers came back within 60 days</div>
             </div>
-            <div style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5 }}>Based on {cohortSize} {cohortSize === 1 ? "client whose" : "clients whose"} first visit was 60–180 days ago.</div>
+            <div style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5 }}>Based on {cohortSize} {cohortSize === 1 ? "client whose" : "clients whose"} first visit was 60–180 days ago.</div>
           </div>
         </>
       )}
@@ -10043,7 +10043,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
                     <div style={{ width: `${pct}%`, height: "100%", background: "var(--gold)" }} />
                   </div>
                   {/* Secondary line — shows the other two metrics for context */}
-                  <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 5 }}>
+                  <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 5 }}>
                     {sortBy !== "revenue" && <>{fmtMoney(row.revenue)} · </>}
                     {sortBy !== "visits" && <>{row.visits}×{row.perHour > 0 && sortBy !== "perhour" && " · "}</>}
                     {sortBy !== "perhour" && row.perHour > 0 && <>{fmtMoneyDec(row.perHour)}/hr</>}
@@ -10058,7 +10058,7 @@ function ServiceMixView({ appts, services, providers, onBack }) {
       {/* IDLE — services with zero activity this period (only shown if there are any) */}
       {idleRows.length > 0 && sortedActive.length > 0 && (
         <RptSection label="IDLE THIS PERIOD">
-            <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: -4, marginBottom: 14, lineHeight: 1.5 }}>Services on your menu that haven't been booked.</div>
+            <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: -4, marginBottom: 14, lineHeight: 1.5 }}>Services on your menu that haven't been booked.</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
               {idleRows.map((row) => (
                 <span key={row.svc.id} style={{ fontSize: 13, color: "var(--sub)", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 16, padding: "5px 11px" }}>{row.svc.name}</span>
@@ -10280,7 +10280,7 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, lineHeight: 1 }}>{fmtMoney(r.revenue)}</div>
-                    <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{r.visits} {r.visits === 1 ? "visit" : "visits"}</div>
+                    <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>{r.visits} {r.visits === 1 ? "visit" : "visits"}</div>
                   </div>
                 </div>
 
@@ -10294,15 +10294,15 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
                 {/* Stats grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 18px" }}>
                   <div>
-                    <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>AVG TICKET</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>AVG TICKET</div>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>{r.visits > 0 ? fmtMoney(r.avgTicket) : "—"}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>TIPS</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>TIPS</div>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>{r.tips > 0 ? fmtMoney(r.tips) : "—"}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>REBOOKING</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>REBOOKING</div>
                     {r.rebookPct !== null ? (
                       <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, color: r.rebookPct >= 50 ? "var(--gold)" : "var(--text)" }}>{r.rebookPct}%</div>
                     ) : (
@@ -10310,24 +10310,24 @@ function PerBarberView({ appts, clients, services, providers, onBack }) {
                     )}
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>OCCUPANCY</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>OCCUPANCY</div>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>{r.occupancyPct}%</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>NO-SHOW RATE</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>NO-SHOW RATE</div>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, color: r.noShow > 0 ? "var(--gold)" : "var(--text)" }}>{r.noShowRate}%</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>TOP SERVICE</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>TOP SERVICE</div>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.topService ? r.topService.svc.name : "—"}</div>
-                    {r.topService && <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 1 }}>{r.topService.count}×</div>}
+                    {r.topService && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 1 }}>{r.topService.count}×</div>}
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>60-DAY RETENTION</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 4, fontWeight: 600 }}>60-DAY RETENTION</div>
                     {r.retentionPct !== null ? (
                       <>
                         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, color: r.retentionPct >= 60 ? "var(--gold)" : "var(--text)" }}>{r.retentionPct}%</div>
-                        <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 1 }}>of {r.cohortSize}</div>
+                        <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 1 }}>of {r.cohortSize}</div>
                       </>
                     ) : (
                       <div style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic" }}>not enough data yet</div>
@@ -10384,11 +10384,11 @@ function LocationSwitcher({ current, fallbackName, authEmail }) {
       {open && (
         <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "var(--overlay)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "64px 18px", zIndex: 120 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.45)" }}>
-            <div style={{ padding: "16px 18px 12px", fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Switch location</div>
+            <div style={{ padding: "16px 18px 12px", fontSize: 13, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Switch location</div>
             <button onClick={() => { try { const u = new URL(window.location.href); u.searchParams.set("master", "1"); u.searchParams.delete("shop"); window.location.href = u.toString(); } catch (e) {} }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>All Locations</div>
-                <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>Overview of every shop</div>
+                <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>Overview of every shop</div>
               </div>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
@@ -10398,7 +10398,7 @@ function LocationSwitcher({ current, fallbackName, authEmail }) {
                 <button key={s.shop_id} onClick={() => { if (on) { setOpen(false); } else { go(s.shop_id); } }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", background: on ? "var(--wash)" : "none", border: "none", borderTop: "1px solid var(--line)", cursor: "pointer", textAlign: "left" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.shop_name || s.shop_id}</div>
-                    <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>{s.account_name}{s.role === "owner" ? " · Owner" : ""}</div>
+                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{s.account_name}{s.role === "owner" ? " · Owner" : ""}</div>
                   </div>
                   {on && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
                 </button>
@@ -10470,9 +10470,9 @@ function MasterTeam({ shops }) {
           <button key={i} onClick={() => { if (isOwner) { setNote(""); setManage(m); } }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "15px 16px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, cursor: isOwner ? "pointer" : "default", textAlign: "left" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text)", fontFamily: FONT_BODY, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
-              <div style={{ fontSize: 12.5, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{accessLabel(m)}</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{accessLabel(m)}</div>
             </div>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, color: m.pending ? "var(--sub)" : "var(--on-gold)", background: m.pending ? "color-mix(in srgb, var(--sub) 18%, transparent)" : (m.role === "owner" ? "var(--gold)" : "var(--wash)"), flexShrink: 0 }}>{m.pending ? "Invited" : (m.role === "owner" ? "Owner" : "Manager")}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, color: m.pending ? "var(--sub)" : "var(--on-gold)", background: m.pending ? "color-mix(in srgb, var(--sub) 18%, transparent)" : (m.role === "owner" ? "var(--gold)" : "var(--wash)"), flexShrink: 0 }}>{m.pending ? "Invited" : (m.role === "owner" ? "Owner" : "Manager")}</span>
           </button>
         ))}
         {!loading && members.length === 0 && <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 20, color: "var(--sub)", fontSize: 14, fontFamily: FONT_BODY }}>No team members yet.</div>}
@@ -10491,7 +10491,7 @@ function MasterTeam({ shops }) {
               </div>
               {iRole === "manager" ? (
                 <div style={{ marginBottom: 4 }}>
-                  <div style={{ fontSize: 12.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 8 }}>Which shops can they manage?</div>
+                  <div style={{ fontSize: 13.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 8 }}>Which shops can they manage?</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {(shops || []).map((s) => (
                       <button key={s.shop_id} onClick={() => toggleIShop(s.shop_id)} style={chip(iShops.includes(s.shop_id))}>{s.shop_name || s.shop_id}</button>
@@ -10499,10 +10499,10 @@ function MasterTeam({ shops }) {
                   </div>
                 </div>
               ) : (
-                <div style={{ fontSize: 12.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 4 }}>Owners can manage every shop and the whole account.</div>
+                <div style={{ fontSize: 13.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 4 }}>Owners can manage every shop and the whole account.</div>
               )}
               <button disabled={busy} onClick={sendInvite} style={{ width: "100%", marginTop: 16, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "13px 0", fontSize: 14.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Send invite</button>
-              <div style={{ fontSize: 12, color: "var(--faint)", fontFamily: FONT_BODY, textAlign: "center", marginTop: 10, lineHeight: 1.4 }}>They join automatically the next time they sign into Vero with this email.</div>
+              <div style={{ fontSize: 13, color: "var(--faint)", fontFamily: FONT_BODY, textAlign: "center", marginTop: 10, lineHeight: 1.4 }}>They join automatically the next time they sign into Vero with this email.</div>
             </div>
           </div>
         </div>
@@ -10520,7 +10520,7 @@ function MasterTeam({ shops }) {
                 </div>
               ) : (
                 <div>
-                  <div style={{ fontSize: 12.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 8 }}>Role</div>
+                  <div style={{ fontSize: 13.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 8 }}>Role</div>
                   <div style={{ display: "flex", gap: 6, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, padding: 4, marginBottom: 18 }}>
                     {[["manager", "Manager"], ["owner", "Owner"]].map((o) => (
                       <button key={o[0]} disabled={busy} onClick={() => doRole(manage, o[0])} style={seg(manage.role === o[0])}>{o[1]}</button>
@@ -10528,7 +10528,7 @@ function MasterTeam({ shops }) {
                   </div>
                   {manage.role === "manager" && (
                     <div style={{ marginBottom: 18 }}>
-                      <div style={{ fontSize: 12.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 8 }}>Shop access</div>
+                      <div style={{ fontSize: 13.5, color: "var(--sub)", fontFamily: FONT_BODY, marginBottom: 8 }}>Shop access</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {(shops || []).map((s) => (
                           <button key={s.shop_id} disabled={busy} onClick={() => { const cur = manage.shop_ids || []; const next = cur.includes(s.shop_id) ? cur.filter((x) => x !== s.shop_id) : [...cur, s.shop_id]; doShops(manage, next); }} style={chip((manage.shop_ids || []).includes(s.shop_id))}>{s.shop_name || s.shop_id}</button>
@@ -10588,7 +10588,7 @@ function MasterCalendar({ shops, onEnter }) {
         <button onClick={() => shift(-1)} style={arrowBtn}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg></button>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 500, color: "var(--text)" }}>{fmtDay}</div>
-          {!isToday && <button onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setDay(d); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, fontFamily: FONT_BODY, cursor: "pointer", marginTop: 2 }}>Back to today</button>}
+          {!isToday && <button onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setDay(d); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontFamily: FONT_BODY, cursor: "pointer", marginTop: 2 }}>Back to today</button>}
         </div>
         <button onClick={() => shift(1)} style={arrowBtn}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg></button>
       </div>
@@ -10602,16 +10602,16 @@ function MasterCalendar({ shops, onEnter }) {
               <div key={s.shop_id} style={{ flex: "0 0 auto", width: 230, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
                 <button onClick={() => onEnter && onEnter(s.shop_id)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "13px 14px", background: "var(--wash)", border: "none", borderBottom: "1px solid var(--line)", cursor: "pointer", textAlign: "left" }}>
                   <span style={{ fontFamily: "'Fraunces', serif", fontSize: 14.5, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.shop_name || s.shop_id}</span>
-                  <span style={{ fontSize: 12, color: "var(--sub)", fontFamily: FONT_BODY, flexShrink: 0 }}>{list.length}</span>
+                  <span style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY, flexShrink: 0 }}>{list.length}</span>
                 </button>
                 <div style={{ padding: 10, display: "grid", gap: 8, minHeight: 90 }}>
                   {list.length === 0 ? (
                     <div style={{ color: "var(--faint)", fontSize: 13, fontFamily: FONT_BODY, padding: "16px 4px", textAlign: "center" }}>No bookings</div>
                   ) : list.map((x, i) => (
                     <div key={i} style={{ background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 10, padding: "9px 11px" }}>
-                      <div style={{ fontSize: 12, color: "var(--gold)", fontWeight: 600, fontFamily: FONT_BODY }}>{x.t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>
+                      <div style={{ fontSize: 13, color: "var(--gold)", fontWeight: 600, fontFamily: FONT_BODY }}>{x.t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>
                       <div style={{ fontSize: 14, color: "var(--text)", fontFamily: FONT_BODY, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.a.name || "Booked"}</div>
-                      {x.a.serviceName && <div style={{ fontSize: 12, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.a.serviceName}</div>}
+                      {x.a.serviceName && <div style={{ fontSize: 13, color: "var(--sub)", fontFamily: FONT_BODY, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.a.serviceName}</div>}
                     </div>
                   ))}
                 </div>
@@ -10741,7 +10741,7 @@ function OpenShopEditor({ onClose, onCreated }) {
       <div style={{ padding: "38px 28px", textAlign: "center" }}>
         <div style={{ width: 44, height: 44, borderRadius: 13, margin: "0 auto 22px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 600, color: EC.onAccent, background: EC.accent, fontFamily: GEIST }}>{initial}</div>
         <div style={{ fontFamily: GEIST, fontSize: 30, fontWeight: 600, letterSpacing: 0.5, lineHeight: 1.12, color: EC.text, wordBreak: "break-word" }}>{displayName.toUpperCase()}</div>
-        <div style={{ margin: "20px 0 0", fontSize: 11, letterSpacing: 2.5, textTransform: "uppercase", color: live ? "#D9F2A0" : EC.faint, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontFamily: INTERF }}>
+        <div style={{ margin: "20px 0 0", fontSize: 12.5, letterSpacing: 2.5, textTransform: "uppercase", color: live ? "#D9F2A0" : EC.faint, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontFamily: INTERF }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: live ? EC.lime : "#52565F", boxShadow: live ? "0 0 12px rgba(198,242,78,1)" : "none" }} />
           {live ? "Now booking" : "Not open yet"}
         </div>
@@ -10753,7 +10753,7 @@ function OpenShopEditor({ onClose, onCreated }) {
   return (
     <div style={{ minHeight: "100dvh", background: `radial-gradient(70% 44% at 50% 0%,rgba(255,255,255,0.045),transparent 60%),${EC.stage}`, color: EC.text, fontFamily: INTERF }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 18px", borderBottom: `1px solid #221A33` }}>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: EC.faint, fontWeight: 600 }}>OPEN A NEW SHOP</div>
+        <div style={{ fontSize: 12.5, letterSpacing: 2, color: EC.faint, fontWeight: 600 }}>OPEN A NEW SHOP</div>
         <button onClick={onClose} style={{ background: "none", border: "none", color: EC.sub, fontSize: 14, cursor: "pointer", fontFamily: INTERF }}>{phase === "done" ? "Done" : "Cancel"}</button>
       </div>
 
@@ -10763,7 +10763,7 @@ function OpenShopEditor({ onClose, onCreated }) {
             <Plate live={false} />
 
             <div style={{ marginTop: 24 }}>
-              <div style={{ fontSize: 10.5, letterSpacing: 1.8, textTransform: "uppercase", color: EC.faint, marginBottom: 9 }}>What kind of shop</div>
+              <div style={{ fontSize: 12, letterSpacing: 1.8, textTransform: "uppercase", color: EC.faint, marginBottom: 9 }}>What kind of shop</div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {INDUSTRIES.map(([id, label]) => {
                   const on = industry === id;
@@ -10775,16 +10775,16 @@ function OpenShopEditor({ onClose, onCreated }) {
             </div>
 
             <div style={{ marginTop: 22 }}>
-              <div style={{ fontSize: 10.5, letterSpacing: 1.8, textTransform: "uppercase", color: EC.faint, marginBottom: 7 }}>Shop name</div>
+              <div style={{ fontSize: 12, letterSpacing: 1.8, textTransform: "uppercase", color: EC.faint, marginBottom: 7 }}>Shop name</div>
               <input value={name} autoFocus placeholder="The Fade Room" onChange={(e) => setName(e.target.value)} style={{ width: "100%", boxSizing: "border-box", background: EC.field, border: `1px solid ${EC.border}`, borderRadius: 11, padding: "12px 14px", color: EC.text, fontSize: 15.5, fontFamily: GEIST }} />
             </div>
 
             <div style={{ marginTop: 18 }}>
-              <div style={{ fontSize: 10.5, letterSpacing: 1.8, textTransform: "uppercase", color: EC.faint, marginBottom: 7 }}>Web address</div>
+              <div style={{ fontSize: 12, letterSpacing: 1.8, textTransform: "uppercase", color: EC.faint, marginBottom: 7 }}>Web address</div>
               <div style={{ display: "flex", alignItems: "center", background: EC.field, border: `1px solid ${EC.border}`, borderRadius: 11, padding: "12px 14px" }}>
                 <span style={{ color: EC.faint, fontSize: 14.5 }}>gotvero.com/</span>
                 <input value={effSlug} placeholder="faderoom" onChange={(e) => { setSlugTouched(true); setSlug(slugify(e.target.value)); }} style={{ flex: 1, minWidth: 0, background: "none", border: "none", outline: "none", color: EC.text, fontSize: 14.5, fontWeight: 500, fontFamily: INTERF }} />
-                <span style={{ fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", color: reserved || avail === false ? "#FF8FA0" : (avail === true ? EC.lime : EC.faint) }}>
+                <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", color: reserved || avail === false ? "#FF8FA0" : (avail === true ? EC.lime : EC.faint) }}>
                   {!effSlug || effSlug.length < 2 ? "" : reserved ? "reserved" : checking ? "checking\u2026" : avail === true ? "\u2713 free" : avail === false ? "taken" : ""}
                 </span>
               </div>
@@ -10793,7 +10793,7 @@ function OpenShopEditor({ onClose, onCreated }) {
             {err ? <div style={{ marginTop: 14, color: "#FF8FA0", fontSize: 13 }}>{err}</div> : null}
 
             <button onClick={open} disabled={!canOpen} style={{ width: "100%", marginTop: 26, background: EC.lime, borderRadius: 13, padding: 15, textAlign: "center", color: "#10140A", fontSize: 15.5, fontWeight: 600, fontFamily: GEIST, border: "none", cursor: canOpen ? "pointer" : "default", opacity: canOpen ? 1 : 0.4, boxShadow: canOpen ? "0 0 26px rgba(198,242,78,0.32)" : "none" }}>{busy ? "Opening\u2026" : "Open the doors"}</button>
-            <div style={{ textAlign: "center", marginTop: 11, fontSize: 12.5, color: EC.faint }}>Lights the sign · seeds the {INDUSTRIES.find((x) => x[0] === industry)[1].toLowerCase()} menu · goes live</div>
+            <div style={{ textAlign: "center", marginTop: 11, fontSize: 13.5, color: EC.faint }}>Lights the sign · seeds the {INDUSTRIES.find((x) => x[0] === industry)[1].toLowerCase()} menu · goes live</div>
           </>
         ) : (
           <>
@@ -10833,7 +10833,7 @@ function MasterDashboard({ authEmail, onSignOutAccount }) {
   return (
     <div style={{ position: "relative", minHeight: "100dvh", background: "var(--bg)", color: "var(--text)" }}>
       <div style={{ borderBottom: "1px solid var(--line)", padding: "calc(env(safe-area-inset-top, 0px) + 16px) 20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "color-mix(in srgb, var(--bg) 80%, transparent)", backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", zIndex: 10, position: "sticky", top: 0 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600 }}>ALL LOCATIONS</div>
+        <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--faint)", fontWeight: 600 }}>ALL LOCATIONS</div>
         <button onClick={() => onSignOutAccount && onSignOutAccount()} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, fontFamily: FONT_BODY, cursor: "pointer" }}>Sign out</button>
       </div>
       <div style={{ maxWidth: 560, margin: "0 auto", padding: "26px 16px 120px" }}>
@@ -11331,9 +11331,9 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
           <button key={id} onClick={() => goTab(id)} style={{ background: "none", flex: 1, padding: "6px 2px", color: tab === id ? "var(--gold)" : "var(--faint)", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
             <div style={{ position: "relative", padding: "5px 16px", borderRadius: 13, background: tab === id ? "var(--wash)" : "transparent", boxShadow: tab === id ? "0 5px 16px -6px var(--wash)" : "none", transition: "background .2s var(--ease), box-shadow .2s var(--ease)" }}>
               <Icon size={21} />
-              {id === "waitlist" && waitlist.length > 0 && <span style={{ position: "absolute", top: -5, right: -9, background: "var(--gold)", color: "var(--on-gold)", fontSize: 12, fontWeight: 600, borderRadius: 8, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{waitlist.length}</span>}
+              {id === "waitlist" && waitlist.length > 0 && <span style={{ position: "absolute", top: -5, right: -9, background: "var(--gold)", color: "var(--on-gold)", fontSize: 13, fontWeight: 600, borderRadius: 8, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{waitlist.length}</span>}
             </div>
-            <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 0.8, textTransform: "uppercase", fontWeight: 500 }}>{label}</span>
+            <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 0.8, textTransform: "uppercase", fontWeight: 500 }}>{label}</span>
           </button>
         ))}
       </div>
@@ -11365,7 +11365,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
                       <Avatar size={36} initial={p.name?.charAt(0)} color={p.color} photo={p.photo} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14.5, fontWeight: 500 }}>{p.name}</div>
-                        <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{p.role}{p.pulseRole === "owner" ? " · Owner" : ""}{p.pin ? " · PIN" : ""}</div>
+                        <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{p.role}{p.pulseRole === "owner" ? " · Owner" : ""}{p.pin ? " · PIN" : ""}</div>
                       </div>
                     </button>
                   ))}
@@ -11660,7 +11660,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   const SectionHeader = ({ title }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
       <button onClick={() => { if (editing !== "new") { const s = services.find((x) => x.id === editing); if (s) { const copy = JSON.parse(JSON.stringify(s)); copy.staff = ensureStaff(copy); copy.booking = { ...defaultBooking(), ...(copy.booking || {}) }; setForm(copy); } } setSection(null); }} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", gap: 4, fontSize: 16 }}><ChevronLeft size={20} /></button>
-      <div><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{form.name || "SERVICE"}</div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{title}</h2></div>
+      <div><div style={{ fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{form.name || "SERVICE"}</div><h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{title}</h2></div>
     </div>
   );
   const SaveBar = () => (
@@ -11676,7 +11676,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
 
   // ---- shared premium style idiom (matches ProductsEditor) ----
   const inpStyle = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
-  const sectionLblStyle = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" };
+  const sectionLblStyle = { fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" };
   const SectionLbl = ({ children, style }) => <div style={{ ...sectionLblStyle, ...style }}>{children}</div>;
   const moneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)", boxSizing: "border-box", minWidth: 0 };
   const moneyInput = { flex: 1, minWidth: 0, boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
@@ -11731,8 +11731,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         <button onClick={() => setEditStyleId(entry.id)} className="lift" style={{ flex: 1, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 13, padding: "13px 4px 13px 15px", background: "transparent", color: "var(--text)", textAlign: "left", minWidth: 0 }}>
           <span style={{ width: 44, height: 44, borderRadius: 11, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--line)" }}>{img ? <img src={imgUrl(img, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={17} style={{ color: "var(--faint)" }} />}</span>
           <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.label}{ct && ct.popular ? <span style={{ marginLeft: 7, fontSize: 9.5, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700, color: "var(--bg)", background: "var(--text)", borderRadius: 20, padding: "2px 7px", verticalAlign: "middle" }}>Common</span> : null}</span>
-            <span style={{ display: "block", fontSize: 12.5, color: ct ? "var(--sub)" : "var(--faint)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{styleSummary(entry)}</span>
+            <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.label}{ct && ct.popular ? <span style={{ marginLeft: 7, fontSize: 11.5, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700, color: "var(--bg)", background: "var(--text)", borderRadius: 20, padding: "2px 7px", verticalAlign: "middle" }}>Common</span> : null}</span>
+            <span style={{ display: "block", fontSize: 13.5, color: ct ? "var(--sub)" : "var(--faint)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{styleSummary(entry)}</span>
           </span>
         </button>
         {reorderable && count > 1 ? (
@@ -11792,13 +11792,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <div style={moneyCol}><div style={moneyWrap}><span style={moneyPrefix}>$</span><input type="number" inputMode="decimal" value={ct.price === undefined || ct.price === null ? "" : ct.price} onChange={(e) => setStyle(entry, { price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder={String(form.price || "")} style={{ ...moneyInput, minWidth: 0 }} /></div></div>
               <div style={moneyCol}><div style={moneyWrap}><input type="number" inputMode="numeric" value={ct.duration === undefined || ct.duration === null || ct.duration === "" ? "" : ct.duration} onChange={(e) => setStyle(entry, { duration: e.target.value === "" ? "" : Number(e.target.value) })} placeholder={String(form.duration || 45)} style={{ ...moneyInput, minWidth: 0, paddingLeft: 16 }} /><span style={unitSuffix}>min</span></div></div>
             </div>
-            <p style={{ fontSize: 12, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Blank uses the service default (${form.price || "—"} · {form.duration || 45} min).</p>
+            <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Blank uses the service default (${form.price || "—"} · {form.duration || 45} min).</p>
           </div>
         )}
         {on && ct && offeringStaff.length > 0 && (
           <div style={{ ...cardStyle, marginBottom: 16 }}>
             <SectionLbl style={{ margin: "0 2px 4px" }}>Prices by staff member</SectionLbl>
-            <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 2px 14px", lineHeight: 1.45 }}>Each staff member's own price/time for this cut. Blank uses the price above. Same data as My team → {offeringStaff[0] ? offeringStaff[0].name.split(" ")[0] : "their"} → Services.</p>
+            <p style={{ fontSize: 13, color: "var(--faint)", margin: "0 2px 14px", lineHeight: 1.45 }}>Each staff member's own price/time for this cut. Blank uses the price above. Same data as My team → {offeringStaff[0] ? offeringStaff[0].name.split(" ")[0] : "their"} → Services.</p>
             <div style={{ display: "grid", gap: 14 }}>
               {offeringStaff.map((p) => {
                 const se = form.staff[p.id] || {};
@@ -11832,7 +11832,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             ))}
             {imgs.length < 3 && (
               <button onClick={() => setPicker({ target: "style", entry })} style={{ width: 76, height: 76, borderRadius: 12, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 3, padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                <Plus size={18} /><span style={{ fontSize: 10.5, fontWeight: 600 }}>Add photo</span>
+                <Plus size={18} /><span style={{ fontSize: 12, fontWeight: 600 }}>Add photo</span>
               </button>
             )}
           </div>
@@ -11843,11 +11843,11 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <button key={c.id} onClick={() => setLibField(entry, { color: c.id })} title={c.name} style={{ width: 32, height: 32, borderRadius: "50%", background: c.hex, border: sel ? "2px solid var(--text)" : "2px solid transparent", boxShadow: sel ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{sel && <Check size={14} style={{ color: "var(--on-gold)" }} />}</button>
             ); })}
           </div>
-          <p style={{ fontSize: 12, color: "var(--faint)", marginTop: 10, lineHeight: 1.45 }}>Name, description, photos &amp; color are shared — editing here updates this style on every service that offers it.</p>
+          <p style={{ fontSize: 13, color: "var(--faint)", marginTop: 10, lineHeight: 1.45 }}>Name, description, photos &amp; color are shared — editing here updates this style on every service that offers it.</p>
         </div>
         {on && ct && (
           <div style={{ ...cardStyle, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-            <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>Mark as most common</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Shows a "Most common" badge to clients.</span></span>
+            <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 14.5, fontWeight: 500 }}>Mark as most common</span><span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.4 }}>Shows a "Most common" badge to clients.</span></span>
             <span onClick={() => setStylePopular(entry)} style={{ cursor: "pointer" }}>{pillSwitch(!!ct.popular)}</span>
           </div>
         )}
@@ -11958,7 +11958,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   <span style={{ width: 38, height: 38, borderRadius: "50%", background: (p.color || "var(--gold)") + "22", color: p.color || "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontSize: 16, flexShrink: 0 }}>{p.name?.charAt(0)}</span>
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 16, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
-                    <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 1 }}>{on ? (overridden ? "Custom price · time" : "Service default") : "Not offering"}</span>
+                    <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 1 }}>{on ? (overridden ? "Custom price · time" : "Service default") : "Not offering"}</span>
                   </span>
                 </div>
                 <span onClick={() => setStaff(p.id, { on: !on })} style={{ cursor: "pointer" }}>{pillSwitch(on)}</span>
@@ -11983,7 +11983,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 <div style={{ marginTop: 10, textAlign: "right", minHeight: 18 }}>
                   {overridden
                     ? <button onClick={() => setStaff(p.id, { duration: null, price: null })} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13, fontWeight: 500, padding: 0, cursor: "pointer" }}>Reset to default</button>
-                    : <span style={{ fontSize: 12.5, color: "var(--faint)" }}>Blank uses the service default</span>}
+                    : <span style={{ fontSize: 13.5, color: "var(--faint)" }}>Blank uses the service default</span>}
                 </div>
               )}
               {on && hasStyles && (() => {
@@ -12020,7 +12020,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                             </div>
                           );
                         })}
-                        <p style={{ fontSize: 12, color: "var(--faint)", margin: "2px 2px 0", lineHeight: 1.45 }}>Blank uses the style's default. Mirrors My team → {p.name.split(" ")[0]} → Services.</p>
+                        <p style={{ fontSize: 13, color: "var(--faint)", margin: "2px 2px 0", lineHeight: 1.45 }}>Blank uses the style's default. Mirrors My team → {p.name.split(" ")[0]} → Services.</p>
                       </div>
                     )}
                   </div>
@@ -12097,7 +12097,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
     const matches = (g) => kind === "all" ? true : (kind === "addon" ? g.type === "addon" : g.type !== "addon");
     // Mangomint-clean shared bits: sentence-case gray label, italic helper, airy card + toggle row.
     const qLbl = { fontSize: 13, color: "var(--sub)", fontWeight: 500, margin: "0 0 8px" };
-    const qHelp = { fontSize: 12.5, color: "var(--faint)", fontStyle: "italic", margin: "8px 2px 0", lineHeight: 1.45 };
+    const qHelp = { fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", margin: "8px 2px 0", lineHeight: 1.45 };
     const cardCln = { ...cardStyle, padding: 20, marginBottom: 14, borderRadius: 16 };
     const togRow = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "18px 0", borderTop: "1px solid var(--line)" };
     return (
@@ -12144,7 +12144,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <button onClick={jump} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", padding: "14px 16px", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{label}</span>
-                  <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{sub} · tap to edit</span>
+                  <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>{sub} · tap to edit</span>
                 </span>
                 <ChevronRight size={17} style={{ color: "var(--faint)", flexShrink: 0 }} />
               </button>
@@ -12158,7 +12158,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                     <div style={{ padding: "0 16px 14px" }}>
                       {isQ ? (g.options || []).map((o) => (
                         <div key={o.id} style={{ marginBottom: 12 }}>
-                          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--sub)", margin: "4px 0 8px" }}>{o.label || "Answer"}</div>
+                          <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--sub)", margin: "4px 0 8px" }}>{o.label || "Answer"}</div>
                           {staffList.map((p) => {
                             const se = form.staff[p.id] || {};
                             const pv = (se.answerPrice && se.answerPrice[gid] && se.answerPrice[gid][o.id] != null) ? se.answerPrice[gid][o.id] : "";
@@ -12184,7 +12184,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                           </div>
                         );
                       })}
-                      <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.4, margin: "2px 0 0" }}>Blank uses the standard price &amp; time. These overrides are just for this service.</p>
+                      <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.4, margin: "2px 0 0" }}>Blank uses the standard price &amp; time. These overrides are just for this service.</p>
                     </div>
                   )}
                 </div>
@@ -12224,7 +12224,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           return (
             <div key={i} style={cardCln}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-                <span style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Question</span>
+                <span style={{ fontSize: 12.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Question</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   {reorder}
                   <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", border: "none", color: "#c0392b", flexShrink: 0, display: "flex", padding: 4, cursor: "pointer" }}><Trash2 size={16} /></button>
@@ -12238,8 +12238,8 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                 <div key={o.id || oi} style={{ border: "1px solid var(--border)", borderRadius: 16, padding: "12px 14px 16px", marginBottom: 14, background: "var(--panel2)", boxShadow: "var(--shadow-sm)" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                     <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                      <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--text)", color: "var(--bg)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{oi + 1}</span>
-                      <span style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--sub)", fontWeight: 700 }}>Answer</span>
+                      <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--text)", color: "var(--bg)", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{oi + 1}</span>
+                      <span style={{ fontSize: 12, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--sub)", fontWeight: 700 }}>Answer</span>
                     </span>
                     <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
                       {opts.length > 1 && (
@@ -12258,7 +12258,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                     {moneyField("Extra time", null, "min", o.min, (n) => setOpt(oi, { min: n }), "0")}
                   </div>
                   <div style={{ marginTop: 14 }}>
-                    <div style={{ fontSize: 12.5, color: "var(--sub)", fontWeight: 500, margin: "0 0 8px" }}>Example photos <span style={{ color: "var(--faint)", fontWeight: 400 }}>· up to 3, optional — shown on the confirm popup</span></div>
+                    <div style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 500, margin: "0 0 8px" }}>Example photos <span style={{ color: "var(--faint)", fontWeight: 400 }}>· up to 3, optional — shown on the confirm popup</span></div>
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                       {(o.photos || []).filter(Boolean).map((pid) => (
                         <div key={pid} style={{ position: "relative", width: 66, height: 66, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel)", flexShrink: 0 }}>
@@ -12268,14 +12268,14 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                       ))}
                       {(o.photos || []).filter(Boolean).length < 3 && (
                         <button onClick={() => setPicker({ target: { kind: "answer", gi: i, oi } })} style={{ width: 66, height: 66, borderRadius: 12, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 3, padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                          <Plus size={17} /><span style={{ fontSize: 10, fontWeight: 600 }}>Add</span>
+                          <Plus size={17} /><span style={{ fontSize: 12, fontWeight: 600 }}>Add</span>
                         </button>
                       )}
                     </div>
                   </div>
                   {staffList.length > 0 && (
                     <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
-                      <div style={{ fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: "var(--sub)", fontWeight: 700, marginBottom: 10 }}>Per barber (optional)</div>
+                      <div style={{ fontSize: 12, letterSpacing: 1, textTransform: "uppercase", color: "var(--sub)", fontWeight: 700, marginBottom: 10 }}>Per barber (optional)</div>
                       {staffList.map((p) => {
                         const se = form.staff[p.id] || {};
                         const pv = (se.answerPrice && se.answerPrice[g.id] && se.answerPrice[g.id][o.id] != null) ? se.answerPrice[g.id][o.id] : "";
@@ -12294,15 +12294,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                           </div>
                         );
                       })}
-                      <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.4, margin: "2px 0 0" }}>Blank uses the default above. This is {(staffList[0] && staffList[0].name.split(" ")[0]) || "each barber"}'s own price &amp; time for this answer.</p>
+                      <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.4, margin: "2px 0 0" }}>Blank uses the default above. This is {(staffList[0] && staffList[0].name.split(" ")[0]) || "each barber"}'s own price &amp; time for this answer.</p>
                     </div>
                   )}
                 </div>
               ))}
               <button onClick={() => setGroup(i, { options: [...opts, { id: "o" + Date.now(), label: "", desc: "", price: 0, min: 0 }] })} style={{ ...addTileStyle, width: "100%", padding: "12px 10px", margin: "2px 0 14px" }}><Plus size={15} /> Add an answer</button>
-              <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, margin: "0 0 16px" }}>Clients don't see these amounts on the question screen — they only change the running total on the add-on page.</p>
+              <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.45, margin: "0 0 16px" }}>Clients don't see these amounts on the question screen — they only change the running total on the add-on page.</p>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "14px 0 16px", borderTop: "1px solid var(--line)" }}>
-                <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15, fontWeight: 500 }}>Must answer</span><span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>They can't continue until they pick one.</span></span>
+                <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: 15, fontWeight: 500 }}>Must answer</span><span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>They can't continue until they pick one.</span></span>
                 <span onClick={() => setGroup(i, { required: !req })} style={{ cursor: "pointer" }}>{pillSwitch(req)}</span>
               </div>
               <button onClick={() => setShareQ({ i, sel: {} })} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", border: "1.5px solid var(--border)", color: "var(--text)", padding: "12px 14px", fontSize: 14, fontWeight: 600, borderRadius: 12, cursor: "pointer", fontFamily: FONT_BODY, borderTop: "1px solid var(--line)" }}><Copy size={16} /> Use this question on other services</button>
@@ -12315,7 +12315,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         return (
           <div key={i} style={{ ...cardCln, border: g.required ? "1.5px solid var(--text)" : "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-              <span style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Add-on</span>
+              <span style={{ fontSize: 12.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Add-on</span>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 {reorder}
                 <button onClick={() => setForm({ ...form, addonGroups: form.addonGroups.filter((_, idx) => idx !== i) })} style={{ background: "none", border: "none", color: "#c0392b", flexShrink: 0, display: "flex", padding: 4, cursor: "pointer" }}><Trash2 size={16} /></button>
@@ -12376,13 +12376,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <div style={{ display: "flex", border: "1px solid var(--border2)", borderRadius: 10, overflow: "hidden", flexShrink: 0 }}>
                 {[{ v: false, l: "Optional" }, { v: true, l: "Required" }].map((o) => {
                   const on = !!g.required === o.v;
-                  return <button key={o.l} onClick={() => setGroup(i, { required: o.v })} style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: 0.5, padding: "9px 14px", border: "none", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--sub)", cursor: "pointer" }}>{o.l}</button>;
+                  return <button key={o.l} onClick={() => setGroup(i, { required: o.v })} style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.5, padding: "9px 14px", border: "none", background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--sub)", cursor: "pointer" }}>{o.l}</button>;
                 })}
               </div>
             </div>
             {staffList.length > 0 && (addsPrice || addsTime) && (
               <div style={{ marginTop: 4, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-                <div style={{ fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: "var(--sub)", fontWeight: 700, marginBottom: 10 }}>Per barber (optional)</div>
+                <div style={{ fontSize: 12, letterSpacing: 1, textTransform: "uppercase", color: "var(--sub)", fontWeight: 700, marginBottom: 10 }}>Per barber (optional)</div>
                 {staffList.map((p) => {
                   const se = form.staff[p.id] || {};
                   const pv = (se.addonPrice && se.addonPrice[g.id] != null) ? se.addonPrice[g.id] : "";
@@ -12401,7 +12401,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                     </div>
                   );
                 })}
-                <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.4, margin: "2px 0 0" }}>Blank uses the default above.</p>
+                <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.4, margin: "2px 0 0" }}>Blank uses the default above.</p>
               </div>
             )}
           </div>
@@ -12473,13 +12473,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <label style={G_LBL_ON("var(--bg)")}>Sub-line</label>
               <textarea value={b.confirmSubtext != null ? b.confirmSubtext : "So we set aside the right amount of time."} onChange={(e) => setBooking({ confirmSubtext: e.target.value })} rows={2} placeholder="So we set aside the right amount of time." style={{ ...G_INPUT, resize: "vertical", lineHeight: 1.5 }} />
             </div>
-            <div style={{ fontSize: 12, color: "var(--faint)", margin: "7px 2px 0", lineHeight: 1.45 }}>Shown big at the top of the sheet. The service name, price, and description appear below it.</div>
+            <div style={{ fontSize: 13, color: "var(--faint)", margin: "7px 2px 0", lineHeight: 1.45 }}>Shown big at the top of the sheet. The service name, price, and description appear below it.</div>
           </div>
         </>
       )}
 
       <div style={{ marginTop: 18, background: "var(--wash)", border: "1px solid var(--wash)", borderRadius: 14, padding: "14px 16px" }}>
-        <div style={{ fontSize: 10.5, letterSpacing: 1.4, color: "var(--gold)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>How this reads to clients</div>
+        <div style={{ fontSize: 12, letterSpacing: 1.4, color: "var(--gold)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>How this reads to clients</div>
         <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.55 }}>{bookingPreview()}</div>
       </div>
       <SaveBar />
@@ -12506,13 +12506,13 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         {tr.map((r) => (
           <div key={r.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>APPLIES TO</span>
+              <span style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600 }}>APPLIES TO</span>
               <button onClick={() => removeRule(r.id)} style={{ background: "none", color: "var(--sub)", display: "flex" }}><Trash2 size={16} /></button>
             </div>
             <div style={{ marginBottom: 16 }}>
               <Segmented options={[{ value: "all", label: "All staff" }, ...staffList.map((p) => ({ value: p.id, label: p.name.split(" ")[0] }))]} value={r.scope} onChange={(v) => setRule(r.id, { scope: v })} />
             </div>
-            <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>DAYS <span style={{ color: "var(--faint)", letterSpacing: 0, fontWeight: 400, textTransform: "none" }}>(none = every day)</span></div>
+            <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>DAYS <span style={{ color: "var(--faint)", letterSpacing: 0, fontWeight: 400, textTransform: "none" }}>(none = every day)</span></div>
             <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
               {DOW.map((d, i) => { const on = r.days.includes(i); return (
                 <button key={i} onClick={() => toggleDay(r.id, i)} style={{ flex: 1, height: 38, borderRadius: 9, fontSize: 13.5, fontWeight: on ? 700 : 400, background: on ? "var(--gold)" : "var(--panel2)", color: on ? "var(--on-gold)" : "var(--sub)", border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}` }}>{d}</button>
@@ -12521,12 +12521,12 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
               {[["From", "start"], ["To", "end"]].map(([lbl, key]) => (
                 <div key={key} style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>{lbl}</div>
+                  <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>{lbl}</div>
                   <TimeScrollPicker value={r[key]} onChange={(v) => setRule(r.id, { [key]: v })} label={lbl === "From" ? "Window start" : "Window end"} compact />
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>IN THIS WINDOW</div>
+            <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>IN THIS WINDOW</div>
             <Segmented options={[{ value: "open", label: "Available" }, { value: "block", label: "Blocked" }]} value={r.block ? "block" : "open"} onChange={(v) => setRule(r.id, { block: v === "block" })} />
             {!r.block && (
               <div style={{ marginTop: 14 }}>
@@ -12617,7 +12617,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   ))}
                   {imgs.length < 3 && (
                     <button onClick={() => setLibPicker(true)} className="lift" style={{ aspectRatio: "1/1", borderRadius: 12, border: "1.5px dashed var(--border2)", overflow: "hidden", background: "var(--panel2)", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 6, padding: 0 }}>
-                      <ImageIcon size={22} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 12, fontWeight: 600 }}>Add a photo</span>
+                      <ImageIcon size={22} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 13, fontWeight: 600 }}>Add a photo</span>
                     </button>
                   )}
                 </div>
@@ -12633,7 +12633,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
                   <button key={c.id} onClick={() => setLibForm((f) => ({ ...f, color: c.id }))} title={c.name} style={{ width: 34, height: 34, borderRadius: "50%", background: c.hex, border: on ? "2px solid var(--text)" : "2px solid transparent", boxShadow: on ? "0 0 0 2px var(--bg) inset" : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={15} style={{ color: "var(--on-gold)" }} />}</button>
                 ); })}
               </div>
-              <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Paints this cut on the calendar everywhere it's used. Leave the first (dashed) chip selected to fall back to the service's own color.</p>
+              <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Paints this cut on the calendar everywhere it's used. Leave the first (dashed) chip selected to fall back to the service's own color.</p>
             </div>
             <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 14, lineHeight: 1.5 }}>{libUsedCount(libForm) > 0 ? `Used in ${libUsedCount(libForm)} service${libUsedCount(libForm) > 1 ? "s" : ""}. Saving updates all of them.` : "Not used by any service yet."}</p>
             <button onClick={saveLibStyle} className="lift" style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 17, fontWeight: 600, borderRadius: 14, marginTop: 16, border: "none" }}>Save style</button>
@@ -12679,18 +12679,18 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
   // ---- shared idiom for the new sectioned form ----
   const band = (label, sub) => (
     <div style={{ background: "var(--panel2)", padding: "9px 16px", margin: "0 -1px", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
-      <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.1px" }}>{label}</span>
-      {sub && <span style={{ fontSize: 12.5, color: "var(--sub)", fontWeight: 400 }}> · {sub}</span>}
+      <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.1px" }}>{label}</span>
+      {sub && <span style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 400 }}> · {sub}</span>}
     </div>
   );
   // A whole-row back link (chevron + label both tappable, with a comfortable hit area).
   const backBar = (label, onBack) => (
     <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "none", padding: "6px 6px 6px 0", marginBottom: 6, cursor: "pointer", color: "var(--gold)", WebkitTapHighlightColor: "transparent" }}>
       <ChevronLeft size={20} />
-      <span style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{label}</span>
+      <span style={{ fontSize: 13, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 500 }}>{label}</span>
     </button>
   );
-  const microLbl = { fontFamily: FONT_BODY, fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 5, display: "block" };
+  const microLbl = { fontFamily: FONT_BODY, fontSize: 12, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 5, display: "block" };
   const fieldBox = { border: "1px solid var(--border2)", borderRadius: 12, background: "var(--panel)", padding: "9px 13px 10px" };
   const bareInp = { width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: 0, color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
 
@@ -12724,15 +12724,15 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
         {photos.map((pid, i) => (
           <div key={pid} style={{ position: "relative", aspectRatio: "1/1", borderRadius: 14, overflow: "hidden", border: i === 0 ? "1.5px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel2)" }}>
             <div onClick={() => i !== 0 && makeCover(pid)} title={i === 0 ? "Cover photo" : "Tap to make this the cover"} style={{ width: "100%", height: "100%", cursor: i === 0 ? "default" : "pointer" }}><img src={imgUrl(pid, 300)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
-            {i === 0 && <span style={{ position: "absolute", top: 6, left: 6, fontSize: 9.5, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 700, color: "var(--on-gold)", background: "var(--gold)", borderRadius: 20, padding: "2px 7px", pointerEvents: "none" }}>Cover</span>}
+            {i === 0 && <span style={{ position: "absolute", top: 6, left: 6, fontSize: 11.5, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 700, color: "var(--on-gold)", background: "var(--gold)", borderRadius: 20, padding: "2px 7px", pointerEvents: "none" }}>Cover</span>}
             <div onClick={() => removePhoto(pid)} title="Remove photo" style={{ position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Trash2 size={12} /></div>
           </div>
         ))}
         <button onClick={() => setPicker({ target: "gallery" })} style={{ aspectRatio: "1/1", borderRadius: 14, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 5, padding: 0, cursor: "pointer" }}>
-          <Plus size={22} /><span style={{ fontSize: 11, fontWeight: 600 }}>Add photo</span>
+          <Plus size={22} /><span style={{ fontSize: 12.5, fontWeight: 600 }}>Add photo</span>
         </button>
       </div>
-      <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Tap a photo to make it the cover · tap the trash to remove.</p>
+      <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Tap a photo to make it the cover · tap the trash to remove.</p>
       <SaveBar />
     </>
   );
@@ -12890,7 +12890,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               <button key={(it.name || g.label || "") + i} onClick={() => addAddonFromOther(g)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, background: "var(--panel)", border: "1.5px solid var(--border)", borderRadius: 13, padding: "14px 15px", marginBottom: 10, color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 15.5, fontWeight: 600 }}>{it.name || g.label || "Add-on"}</span>
-                  <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>{it.addsPrice !== false && it.price ? `+$${it.price}` : ""}{it.addsTime !== false && it.min ? `${it.price ? " · " : ""}+${it.min} min` : ""} · from {from}</span>
+                  <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>{it.addsPrice !== false && it.price ? `+$${it.price}` : ""}{it.addsTime !== false && it.min ? `${it.price ? " · " : ""}+${it.min} min` : ""} · from {from}</span>
                 </span>
                 <Plus size={18} style={{ color: "var(--text)", flexShrink: 0 }} />
               </button>
@@ -12942,7 +12942,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
             <>
               {backBar("SERVICES", () => setEditing(null))}
               {/* Mangomint-style service header: eyebrow + name + quick facts */}
-              <div style={{ fontSize: 11.5, letterSpacing: 1.8, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "2px 0 4px" }}>{editing === "new" ? "New service" : "Service"}</div>
+              <div style={{ fontSize: 13, letterSpacing: 1.8, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "2px 0 4px" }}>{editing === "new" ? "New service" : "Service"}</div>
               <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 27, fontWeight: 500, letterSpacing: "-0.4px", margin: "0 0 6px", lineHeight: 1.08, wordBreak: "break-word" }}>{form.name || "Untitled service"}</h2>
               <div style={{ fontSize: 14.5, color: "var(--sub)", margin: "0 0 22px" }}>${form.price || "—"} · {form.duration || "—"} min{live ? "" : " · Internal"}</div>
 
@@ -12962,19 +12962,19 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
               {/* Advanced (cut styles legacy + combo) */}
               <div style={{ borderTop: "1px solid var(--line)" }}>
                 <button onClick={() => setAdvancedOpen((v) => !v)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "16px 4px", background: "transparent", border: "none", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
-                  <span style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Advanced</span>
+                  <span style={{ fontSize: 12.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Advanced</span>
                   {advancedOpen ? <ChevronUp size={18} style={{ color: "var(--faint)" }} /> : <ChevronDown size={18} style={{ color: "var(--faint)" }} />}
                 </button>
                 {advancedOpen && (
                   <div style={{ padding: "0 4px 16px" }}>
                     {legacyCuts && (
                       <>
-                        <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "4px 0 4px" }}>Cut styles (legacy)</div>
-                        <p style={{ fontSize: 12.5, color: "var(--faint)", margin: "0 0 6px", lineHeight: 1.45 }}>Cut styles are being retired — make each cut its own service instead. This stays so existing bookings keep working.</p>
+                        <div style={{ fontSize: 12.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "4px 0 4px" }}>Cut styles (legacy)</div>
+                        <p style={{ fontSize: 13.5, color: "var(--faint)", margin: "0 0 6px", lineHeight: 1.45 }}>Cut styles are being retired — make each cut its own service instead. This stays so existing bookings keep working.</p>
                         <DrillRow label="Cut styles" sub={`${cutCount} style${cutCount === 1 ? "" : "s"}`} target="cutstyles" />
                       </>
                     )}
-                    <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "16px 0 10px" }}>Combo</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "16px 0 10px" }}>Combo</div>
                     {comboBody}
                   </div>
                 )}
@@ -13115,7 +13115,7 @@ function MenuEditor({ services, setServices, categories, setCategories, provider
           return (
             <div key={cat} style={{ marginBottom: 22 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 9px 4px", minHeight: 20 }}>
-                <span style={{ flex: 1, fontSize: 11.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{cat}</span>
+                <span style={{ flex: 1, fontSize: 13, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{cat}</span>
               </div>
               <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: cardClipping ? "hidden" : "visible" }}>
                 {inCat.length === 0 && <div style={{ fontSize: 14, color: "var(--faint)", padding: "16px 16px" }}>No services here yet.</div>}
@@ -13233,7 +13233,7 @@ function HourMinutePicker({ totalMin, onChange, maxHours = 72 }) {
   const setM = (nm) => { let v = nm; if (v < 0) v = 55; if (v > 55) v = 0; onChange(h * 60 + v); };
   const col = (label, val, dec, inc, display) => (
     <div style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 8px" }}>
-      <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", textAlign: "center", marginBottom: 8 }}>{label}</div>
+      <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", textAlign: "center", marginBottom: 8 }}>{label}</div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
         <button onClick={dec} style={{ width: 30, height: 30, borderRadius: 6, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 17, lineHeight: 1 }}>−</button>
         <span style={{ fontSize: 19, color: "var(--text)", minWidth: 34, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>{display}</span>
@@ -13305,7 +13305,7 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <span style={{ minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>{m.label}</span>
-                  {m.timing && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{m.timing}</span>}
+                  {m.timing && <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>{m.timing}</span>}
                 </span>
                 <Toggle on={on} onClick={() => setMsg(m.id, { enabled: !on })} />
               </div>
@@ -13320,7 +13320,7 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
           ); })}
         </div>
         <button onClick={onOpenMessages} style={{ marginTop: 14, background: "none", border: "none", color: "var(--gold)", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "4px 2px", display: "inline-flex", alignItems: "center", gap: 5 }}>Edit wording & timing <ChevronRight size={15} /></button>
-        <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>* Texts begin once your A2P carrier registration clears; until then a “Text” or “Both” message is delivered by email.</p>
+        <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>* Texts begin once your A2P carrier registration clears; until then a “Text” or “Both” message is delivered by email.</p>
       </>) : (<>
         <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, margin: "14px 2px 16px", fontWeight: 300 }}>How your team is alerted to activity. App pop-ups need the Vero iOS app (and each person allowing notifications on their device); email &amp; text alerts go to the contact info saved in each staff profile.</p>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
@@ -13328,19 +13328,19 @@ function NotificationsCenter({ form, setForm, onOpenMessages }) {
             <div key={ev.k} style={{ padding: "15px 0", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>{ev.label}</span>
-                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{ev.desc} · Push</span>
+                <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>{ev.desc} · Push</span>
               </span>
               <Toggle on={on} onClick={() => setSA(ev.k, !on)} />
             </div>
           ); })}
         </div>
 
-        <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", margin: "22px 2px 10px" }}>Email / text the barber</p>
+        <p style={{ fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", margin: "22px 2px 10px" }}>Email / text the barber</p>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "4px 16px 6px" }}>
           <div style={{ padding: "15px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <span style={{ minWidth: 0 }}>
               <span style={{ display: "block", fontSize: 15.5, lineHeight: 1.3 }}>Alert the barber on new bookings</span>
-              <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Sent to the email in their staff profile · text joins once your carrier clears</span>
+              <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>Sent to the email in their staff profile · text joins once your carrier clears</span>
             </span>
             <Toggle on={sa.emailStaffOnBooking !== false} onClick={() => setSA("emailStaffOnBooking", !(sa.emailStaffOnBooking !== false))} />
           </div>
@@ -13402,8 +13402,8 @@ function NewClientsEditor({ providers = [], setProviders, onBackRef }) {
 
   const CARD = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "var(--shadow-sm)" };
   const ROW = { display: "flex", alignItems: "center", minHeight: 58, padding: "13px 16px" };
-  const SOFT = { fontSize: 11.5, fontWeight: 600, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--sub)", margin: "26px 4px 10px" };
-  const HINT = { fontSize: 12.5, color: "var(--faint)", margin: "10px 4px 0", lineHeight: 1.45 };
+  const SOFT = { fontSize: 13, fontWeight: 600, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--sub)", margin: "26px 4px 10px" };
+  const HINT = { fontSize: 13.5, color: "var(--faint)", margin: "10px 4px 0", lineHeight: 1.45 };
   const first = (prov.name || "").split(" ")[0] || "this person";
 
   // ---------- Main screen ----------
@@ -13469,7 +13469,7 @@ function NewClientsEditor({ providers = [], setProviders, onBackRef }) {
 function BookingWordingPreview({ bs }) {
   const [pv, setPv] = useState("cat");
   bs = bs || {};
-  const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
+  const EYE = { fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)" };
   const HEAD = { fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, lineHeight: 1.18, letterSpacing: "-0.2px", color: "var(--text)", margin: "11px 0 0" };
   const LEAD = { fontFamily: "'Jost', sans-serif", color: "var(--sub)", fontSize: 14.5, fontWeight: 400, lineHeight: 1.55, margin: "9px 0 0" };
   const NAME = { fontFamily: "'Jost', sans-serif", fontSize: 16, fontWeight: 500, textTransform: "uppercase", letterSpacing: 1.5, color: "var(--text)" };
@@ -13477,7 +13477,7 @@ function BookingWordingPreview({ bs }) {
     <div style={{ border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden", background: "var(--panel)", boxShadow: "var(--shadow-sm)", marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 13px", borderBottom: "1px solid var(--line)", background: "var(--panel2)" }}>
         <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
-        <span style={{ fontSize: 11, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>What clients see</span>
+        <span style={{ fontSize: 12.5, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>What clients see</span>
       </div>
       <div style={{ padding: "12px 13px 0" }}>
         <Segmented options={[{ value: "cat", label: "Category" }, { value: "cut", label: "Cut" }]} value={pv} onChange={setPv} />
@@ -13499,7 +13499,7 @@ function BookingWordingPreview({ bs }) {
         )}
         {pv === "cut" && (
           <div>
-            <span style={{ display: "inline-block", fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 20, padding: "5px 13px", marginBottom: 16 }}>{bs.greeting || "First time? Welcome in"}</span>
+            <span style={{ display: "inline-block", fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 20, padding: "5px 13px", marginBottom: 16 }}>{bs.greeting || "First time? Welcome in"}</span>
             <div style={HEAD}>{bs.head || "What are we doing today?"}</div>
             <div style={LEAD}>{bs.lead || "Just pick your style — we'll handle the details in the chair."}</div>
           </div>
@@ -13544,13 +13544,13 @@ function LogoEditor({ form, setForm }) {
       <div style={{ border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden", background: "var(--panel)", boxShadow: "var(--shadow-sm)", marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 13px", borderBottom: "1px solid var(--line)", background: "var(--panel2)" }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
-          <span style={{ fontSize: 11, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Your logo, as clients see it</span>
+          <span style={{ fontSize: 12.5, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Your logo, as clients see it</span>
         </div>
         <div style={{ padding: "30px 20px 34px", background: "var(--bg)", textAlign: "center" }}>
           {hasLogo
             ? <img src={form.logo} alt={wordmark} style={{ display: "block", margin: "0 auto", width: fit === "cover" ? "min(320px, 86%)" : "auto", maxWidth: "min(320px, 86%)", height: fit === "cover" ? 120 : "auto", maxHeight: 130, objectFit: fit }} />
             : <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(30px, 11vw, 46px)", fontWeight: 500, lineHeight: 1, letterSpacing: 1, margin: 0, color: "var(--text)", wordBreak: "break-word" }}>{wordmark}</h1>}
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 14 }}>Book an appointment</div>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 14 }}>Book an appointment</div>
         </div>
       </div>
 
@@ -13561,21 +13561,21 @@ function LogoEditor({ form, setForm }) {
         </div>
         <div style={{ flex: 1 }}>
           <button onClick={() => fileRef.current && fileRef.current.click()} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 11, padding: "11px 16px", fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}>{hasLogo ? "Replace logo" : "Upload logo"}</button>
-          <div style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 7 }}>PNG or SVG with a transparent background looks best. We resize and sharpen it so it stays crisp on your booking page, headers, and receipts.</div>
+          <div style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 7 }}>PNG or SVG with a transparent background looks best. We resize and sharpen it so it stays crisp on your booking page, headers, and receipts.</div>
         </div>
       </div>
 
       {hasLogo && (
         <>
           {/* Fit / Fill */}
-          <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "4px 2px 8px" }}>How it sits</div>
+          <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "4px 2px 8px" }}>How it sits</div>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             {[{ v: "contain", t: "Fit", s: "Whole logo shows" }, { v: "cover", t: "Fill", s: "Edge to edge" }].map((o) => {
               const on = fit === o.v;
               return (
                 <button key={o.v} onClick={() => setForm({ ...form, logoFit: o.v })} style={{ flex: 1, borderRadius: 12, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: "var(--text)", padding: "12px 10px", textAlign: "center", cursor: "pointer" }}>
                   <span style={{ display: "block", fontSize: 14, fontWeight: on ? 600 : 500 }}>{o.t}</span>
-                  <span style={{ display: "block", fontSize: 11.5, color: "var(--sub)", marginTop: 3 }}>{o.s}</span>
+                  <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{o.s}</span>
                 </button>
               );
             })}
@@ -13593,11 +13593,11 @@ function BrandingPreview({ logo }) {
     <div style={{ border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden", background: "var(--panel)", boxShadow: "var(--shadow-sm)", marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 13px", borderBottom: "1px solid var(--line)", background: "var(--panel2)" }}>
         <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
-        <span style={{ fontSize: 11, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Your logo, as clients see it</span>
+        <span style={{ fontSize: 12.5, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700 }}>Your logo, as clients see it</span>
       </div>
       <div style={{ padding: "34px 20px 38px", background: "var(--bg)", textAlign: "center" }}>
         <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(30px, 11vw, 46px)", fontWeight: 500, lineHeight: 1, letterSpacing: 1, margin: 0, color: "var(--text)", wordBreak: "break-word" }}>{text}</h1>
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 14 }}>Book an appointment</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 14 }}>Book an appointment</div>
       </div>
     </div>
   );
@@ -13647,7 +13647,7 @@ function BookingRulesEditor({ b, onChange }) {
             </div>
 
             <div style={{ opacity: b.enabled ? 1 : 0.4, pointerEvents: b.enabled ? "auto" : "none", display: "grid", gap: 12 }}>
-              <div style={{ marginTop: 4, fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginLeft: 4 }}>When it's on</div>
+              <div style={{ marginTop: 4, fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginLeft: 4 }}>When it's on</div>
 
               <div style={{ ...card, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
                 {head("Multiple services per booking", "More than one service in a single appointment.")}
@@ -13695,7 +13695,7 @@ function BookingRulesEditor({ b, onChange }) {
                 })()}
               </div>
 
-              <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 4, marginLeft: 4, fontStyle: "italic" }}>
+              <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 4, marginLeft: 4, fontStyle: "italic" }}>
                 Buffer and minimum notice live in Calendar &amp; day → Scheduling. Per-staff daily caps live under each staff member.
               </p>
             </div>
@@ -13873,7 +13873,7 @@ function EmailPreview({ body, business }) {
           );
         })}
       </div>
-      <div style={{ textAlign: "center", fontSize: 11.5, color: "var(--faint)", padding: "14px 18px", borderTop: "1px solid var(--line)", marginTop: 8 }}>Sent by {c.business} · Powered by Vero</div>
+      <div style={{ textAlign: "center", fontSize: 13, color: "var(--faint)", padding: "14px 18px", borderTop: "1px solid var(--line)", marginTop: 8 }}>Sent by {c.business} · Powered by Vero</div>
     </div>
   );
 }
@@ -13914,7 +13914,7 @@ function MessagesEditor({ messages, onChange, business, onBackRef }) {
               {m.channel === "text"
                 ? <div style={{ background: "#3A86E0", color: "#fff", borderRadius: 16, padding: "12px 15px", fontSize: 14.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{renderPlainPreview(m.body, business)}</div>
                 : <EmailPreview body={m.body} business={business} />}
-              {m.channel === "both" && <p style={{ fontSize: 12, color: "var(--sub)", margin: "10px 2px 0" }}>The text version sends these same details as plain lines.</p>}
+              {m.channel === "both" && <p style={{ fontSize: 13, color: "var(--sub)", margin: "10px 2px 0" }}>The text version sends these same details as plain lines.</p>}
             </>
           ) : (
             <>
@@ -13923,20 +13923,20 @@ function MessagesEditor({ messages, onChange, business, onBackRef }) {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "18px 0 8px" }}>
                 <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500 }}>Message</span>
                 {DEFAULT_MESSAGE_BODIES[m.id] != null && DEFAULT_MESSAGE_BODIES[m.id] !== m.body && (
-                  <button onClick={() => restoreDefault(m)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 4, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Restore default</button>
+                  <button onClick={() => restoreDefault(m)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 4, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Restore default</button>
                 )}
               </div>
               <textarea value={m.body} onChange={(e) => update(m.id, { body: e.target.value })} rows={6} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, lineHeight: 1.55, resize: "vertical", outline: "none" }} />
-              <div style={{ fontSize: 12, color: "var(--sub)", margin: "13px 2px 7px" }}>Tap to insert a detail</div>
+              <div style={{ fontSize: 13, color: "var(--sub)", margin: "13px 2px 7px" }}>Tap to insert a detail</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {MERGE_FACTS.map((tag) => (
-                  <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 11px", color: "var(--text2)", cursor: "pointer", fontFamily: "inherit" }}>{tag}</button>
+                  <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 13.5, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 11px", color: "var(--text2)", cursor: "pointer", fontFamily: "inherit" }}>{tag}</button>
                 ))}
               </div>
-              <div style={{ fontSize: 12, color: "var(--sub)", margin: "14px 2px 7px" }}>Or drop in a ready-made block</div>
+              <div style={{ fontSize: 13, color: "var(--sub)", margin: "14px 2px 7px" }}>Or drop in a ready-made block</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {MERGE_BLOCKS.map((tag) => (
-                  <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 12.5, background: "var(--wash)", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 8, padding: "6px 11px", color: "var(--gold)", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>{tag}</button>
+                  <button key={tag} onClick={() => insertTag(m, tag)} style={{ fontSize: 13.5, background: "var(--wash)", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 8, padding: "6px 11px", color: "var(--gold)", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>{tag}</button>
                 ))}
               </div>
             </>
@@ -13956,7 +13956,7 @@ function MessagesEditor({ messages, onChange, business, onBackRef }) {
           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderTop: i ? "1px solid var(--line)" : "none", opacity: m.enabled ? 1 : 0.55 }}>
             <button onClick={() => { setPreview(false); setOpenId(m.id); }} style={{ background: "none", border: "none", color: "var(--text)", textAlign: "left", flex: 1, minWidth: 0, padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
               <div style={{ fontSize: 14.5, fontWeight: 500 }}>{m.label}</div>
-              <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 3 }}>{channelLabel(m.channel)} · {m.timing}</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 3 }}>{channelLabel(m.channel)} · {m.timing}</div>
               <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(m.body || "").split("\n")[0]}</div>
             </button>
             <Toggle on={m.enabled} onClick={() => update(m.id, { enabled: !m.enabled })} />
@@ -14018,13 +14018,13 @@ function TippingEditor({ t, onChange }) {
         </Row>
 
         {/* live preview */}
-        <div style={{ fontSize: 10.5, letterSpacing: 1.4, color: "var(--faint)", fontWeight: 700, textTransform: "uppercase", margin: "18px 0 10px" }}>What clients see (on a ${sampleTotal} ticket)</div>
+        <div style={{ fontSize: 12, letterSpacing: 1.4, color: "var(--faint)", fontWeight: 700, textTransform: "uppercase", margin: "18px 0 10px" }}>What clients see (on a ${sampleTotal} ticket)</div>
         <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: 16 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: t.allowNoTip || t.allowCustom ? 10 : 0 }}>
             {t.presets.map((p, i) => { const on = t.smartDefault === p; return (
               <div key={i} style={{ flex: 1, textAlign: "center", padding: "10px 4px", borderRadius: 10, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "var(--panel)", color: on ? "var(--on-gold)" : "var(--text)" }}>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{p}%</div>
-                <div style={{ fontSize: 12, opacity: 0.8 }}>${(sampleTotal * p / 100).toFixed(0)}</div>
+                <div style={{ fontSize: 13, opacity: 0.8 }}>${(sampleTotal * p / 100).toFixed(0)}</div>
               </div>
             ); })}
           </div>
@@ -14081,7 +14081,7 @@ function WaitlistRulesEditor({ w, onChange }) {
       )}
       </>)}
       <div style={{ borderTop: "1px solid var(--line)", marginTop: 22, paddingTop: 8 }}>
-        <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", margin: "8px 0 4px" }}>ON THE CLIENT'S WAITLIST FORM</div>
+        <div style={{ fontSize: 13.5, letterSpacing: 1.5, color: "var(--faint)", margin: "8px 0 4px" }}>ON THE CLIENT'S WAITLIST FORM</div>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 3 }}>Reference photo</div>
         <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.45, marginBottom: 10 }}>A photo of the client's hair now and the cut they want lets you judge whether you can fit them in.</div>
         {(() => { const mode = w.photoMode || (w.photoNudge === false ? "off" : "required"); const opts = [["required", "Required"], ["recommended", "Recommended"], ["off", "Off"]]; return (
@@ -14132,7 +14132,7 @@ function BusinessHoursEditor({ hours, onChange }) {
     <div>
       <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>The hours your shop is open — the outer frame of your calendar. Each staff member's bookable times still come from their own work hours.</p>
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
-        <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>This week</div>
+        <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>This week</div>
         {summary.map((r, i) => (
           <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < summary.length - 1 ? "1px solid var(--line)" : "none", fontSize: 15 }}>
             <span style={{ color: "var(--sub)" }}>{r.l}</span>
@@ -14167,7 +14167,7 @@ function BusinessHoursEditor({ hours, onChange }) {
           );
         })}
       </div>
-      <p style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>Tap a day's times to change them.</p>
+      <p style={{ fontSize: 13.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 12 }}>Tap a day's times to change them.</p>
     </div>
   );
 }
@@ -14282,7 +14282,7 @@ function WaitingRoomEditor({ w, onChange }) {
           {w.autoReadyMessage && (<>
             <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 8 }}>Message wording</div>
             <textarea value={w.readyMessage || ""} onChange={(e) => set({ readyMessage: e.target.value })} rows={3} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", resize: "vertical", lineHeight: 1.5 }} />
-            <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Use <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> to drop in the staff member's name automatically.</div>
+            <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.4 }}>Use <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> to drop in the staff member's name automatically.</div>
           </>)}
         </div>
       )}
@@ -14327,7 +14327,7 @@ function RunningLateEditor({ r, onChange }) {
           <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 4 }}>Message to the client</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.4 }}>Sent as an in-app notification — no text message.</div>
           <textarea value={r.message || ""} onChange={(e) => set({ message: e.target.value })} rows={4} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, boxSizing: "border-box", resize: "vertical", lineHeight: 1.5 }} />
-          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.5 }}>Tags you can use: <strong style={{ color: "var(--sub)" }}>{"{client}"}</strong> name, <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> staff member, <strong style={{ color: "var(--sub)" }}>{"{shop}"}</strong>, <strong style={{ color: "var(--sub)" }}>{"{range}"}</strong> minutes behind.</div>
+          <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 8, lineHeight: 1.5 }}>Tags you can use: <strong style={{ color: "var(--sub)" }}>{"{client}"}</strong> name, <strong style={{ color: "var(--sub)" }}>{"{provider}"}</strong> staff member, <strong style={{ color: "var(--sub)" }}>{"{shop}"}</strong>, <strong style={{ color: "var(--sub)" }}>{"{range}"}</strong> minutes behind.</div>
         </div>
       </>)}
     </div>
@@ -14666,7 +14666,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
   return (
     <div>
       {["upload", "map", "preview"].includes(stage) && (
-        <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 14 }}>
+        <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase", marginBottom: 14 }}>
           {stage === "upload" ? "Step 1 of 3 · Upload" : stage === "map" ? "Step 2 of 3 · Line up columns" : "Step 3 of 3 · Preview"}
         </div>
       )}
@@ -14704,7 +14704,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
           </div>
         </div>
         <button className="lift" disabled={!canPreview} onClick={build} style={{ width: "100%", background: canPreview ? "var(--gold)" : "var(--border2)", color: canPreview ? "var(--on-gold)" : "var(--faint)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none" }}>Preview import</button>
-        {!canPreview && <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8, textAlign: "center" }}>Map at least a phone, name, or email to continue.</div>}
+        {!canPreview && <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 8, textAlign: "center" }}>Map at least a phone, name, or email to continue.</div>}
         <button onClick={() => setStage("upload")} style={{ width: "100%", marginTop: 8, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 8 }}>Back</button>
       </>)}
 
@@ -14718,7 +14718,7 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
           ))}
         </div>
         {built.merges && built.merges.length > 0 && (() => {
-          const chip = (basis) => { const m = { phone: ["Phone", "var(--sub)", "var(--panel2)"], email: ["Email", "var(--sub)", "var(--panel2)"] }[basis] || ["Match", "var(--sub)", "var(--panel2)"]; return <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.3, color: m[1], background: m[2], borderRadius: 7, padding: "3px 8px", flexShrink: 0 }}>{m[0]}</span>; };
+          const chip = (basis) => { const m = { phone: ["Phone", "var(--sub)", "var(--panel2)"], email: ["Email", "var(--sub)", "var(--panel2)"] }[basis] || ["Match", "var(--sub)", "var(--panel2)"]; return <span style={{ fontSize: 12.5, fontWeight: 600, letterSpacing: 0.3, color: m[1], background: m[2], borderRadius: 7, padding: "3px 8px", flexShrink: 0 }}>{m[0]}</span>; };
           return (
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500, marginBottom: 8 }}>Merging into existing clients</div>
@@ -14729,21 +14729,21 @@ function ImportDataEditor({ shopId, services = [], providers = [], clients = [],
                     {chip(m.basis)}
                   </div>
                 ))}
-                {built.merges.length > 12 && <div style={{ padding: "10px 14px", fontSize: 12.5, color: "var(--faint)", borderTop: "1px solid var(--line)" }}>+{built.merges.length - 12} more</div>}
+                {built.merges.length > 12 && <div style={{ padding: "10px 14px", fontSize: 13.5, color: "var(--faint)", borderTop: "1px solid var(--line)" }}>+{built.merges.length - 12} more</div>}
               </div>
-              <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 8, paddingLeft: 2 }}>Matched on phone or email — their visits import onto the existing card instead of creating a duplicate.</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 8, paddingLeft: 2 }}>Matched on phone or email — their visits import onto the existing card instead of creating a duplicate.</div>
             </div>
           );
         })()}
         {built.possibleDupes && built.possibleDupes.length > 0 && (
           <div style={{ marginBottom: 16, background: "color-mix(in srgb, var(--amber, #E5AC34) 9%, var(--panel))", border: "1px solid color-mix(in srgb, var(--amber, #E5AC34) 30%, var(--border))", borderRadius: 16, padding: "13px 15px" }}>
             <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 600, marginBottom: 5 }}>Possible duplicates ({built.possibleDupes.length})</div>
-            <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: built.possibleDupes.length ? 9 : 0 }}>These share a name with a client you already have but no matching phone or email, so they'll import as <b style={{ color: "var(--text)", fontWeight: 600 }}>separate</b> clients. If they're the same person, add a phone/email to the file and re-import.</div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: built.possibleDupes.length ? 9 : 0 }}>These share a name with a client you already have but no matching phone or email, so they'll import as <b style={{ color: "var(--text)", fontWeight: 600 }}>separate</b> clients. If they're the same person, add a phone/email to the file and re-import.</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {built.possibleDupes.slice(0, 12).map((d, i) => (
-                <span key={d.name + i} style={{ fontSize: 12.5, color: "var(--text)", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "4px 10px" }}>{d.name}</span>
+                <span key={d.name + i} style={{ fontSize: 13.5, color: "var(--text)", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "4px 10px" }}>{d.name}</span>
               ))}
-              {built.possibleDupes.length > 12 && <span style={{ fontSize: 12.5, color: "var(--faint)", padding: "4px 2px" }}>+{built.possibleDupes.length - 12} more</span>}
+              {built.possibleDupes.length > 12 && <span style={{ fontSize: 13.5, color: "var(--faint)", padding: "4px 2px" }}>+{built.possibleDupes.length - 12} more</span>}
             </div>
           </div>
         )}
@@ -15039,16 +15039,16 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
                 <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
                   <span style={{ width: 9, height: 9, borderRadius: 9, background: f.paused ? "var(--faint)" : (unassigned ? "#c0392b" : "#5E8C61"), flexShrink: 0 }} />
                   <span style={{ fontFamily: "'Fraunces', serif", fontSize: 17 }}>{provName(f.providerId) || "Unassigned calendar"}</span>
-                  <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--faint)" }}>{f.paused ? "paused" : ago(f.lastSyncAt)}</span>
+                  <span style={{ marginLeft: "auto", fontSize: 13, color: "var(--faint)" }}>{f.paused ? "paused" : ago(f.lastSyncAt)}</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: 12.5, color: "var(--sub)", flexShrink: 0 }}>Whose calendar:</span>
+                  <span style={{ fontSize: 13.5, color: "var(--sub)", flexShrink: 0 }}>Whose calendar:</span>
                   <select value={f.providerId || ""} onChange={(e) => setFeedProvider(f.id, e.target.value)} style={{ ...selStyle, padding: "8px 10px", fontSize: 13.5 }}>
                     <option value="">Choose staff…</option>
                     {staff.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
-                <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5 }}>
+                <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>
                   {unassigned
                     ? <span style={{ color: "#c0392b" }}>Pick a staff member so these appointments show under the right name.</span>
                     : <>{n} appointment{n === 1 ? "" : "s"} mirrored{f.paused ? "" : " · checks every minute while open"}.{f.lastError ? <><br /><span style={{ color: "#c0392b" }}>{f.lastError}</span></> : null}</>}
@@ -15072,20 +15072,20 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
         <div style={{ border: "1px solid var(--border2)", borderRadius: 14, padding: 16 }}>
           <p style={{ color: "var(--sub)", fontSize: 14, lineHeight: 1.55, margin: "0 0 14px" }}>Mirror one staff member's outside calendar into Vero — <strong>one calendar per person</strong>. Add each person's so you all see each other. Future appointments flow in automatically and <strong>clients are never notified</strong>.</p>
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--sub)", marginBottom: 6 }}>Whose calendar is this?</div>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--sub)", marginBottom: 6 }}>Whose calendar is this?</div>
             <select value={addProv} onChange={(e) => setAddProv(e.target.value)} style={selStyle}>
               <option value="">Choose staff…</option>
               {staff.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--sub)", marginBottom: 6 }}>Paste their calendar link</div>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--sub)", marginBottom: 6 }}>Paste their calendar link</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "4px 6px 4px 14px" }}>
             <Link2 size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             <input value={addUrl} onChange={(e) => setAddUrl(e.target.value)} placeholder="Paste this person's calendar link" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, padding: "12px 0" }} />
             <button onClick={addFeed} disabled={busy} className="lift" style={{ background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 9, padding: "10px 16px", fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>{busy ? "…" : "Add"}</button>
           </div>
           <div style={{ background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", marginTop: 16 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)", marginBottom: 10 }}>{isIOS ? "On your iPhone" : "How to get the link"}</div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)", marginBottom: 10 }}>{isIOS ? "On your iPhone" : "How to get the link"}</div>
             <ol style={{ margin: 0, paddingLeft: 18, color: "var(--sub)", fontSize: 13.5, lineHeight: 1.7 }}>
               <li>In Mangomint, open <strong>that staff member's Calendar → Sync / Subscribe</strong> and copy the link. <span style={{ color: "var(--faint)" }}>(Mangomint support will send it if you ask.)</span></li>
               <li>Pick the staff member above, then {isIOS ? "double-tap → Paste" : "press and hold → Paste"} the link.</li>
@@ -15103,7 +15103,7 @@ function CalendarSyncTool({ shopId, providers = [], services = [], appts = [], s
         </div>
       )}
 
-      <p style={{ color: "var(--faint)", fontSize: 12, lineHeight: 1.5, marginTop: 14, textAlign: "center" }}>Clients are never notified about mirrored appointments. Vero won't double-book over them. Everyone sees each connected calendar on Vero's calendar.</p>
+      <p style={{ color: "var(--faint)", fontSize: 13, lineHeight: 1.5, marginTop: 14, textAlign: "center" }}>Clients are never notified about mirrored appointments. Vero won't double-book over them. Everyone sees each connected calendar on Vero's calendar.</p>
     </div>
   );
 }
@@ -15270,7 +15270,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   const SecHeader = ({ title, onBack, right }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
       <button onClick={onBack} style={{ background: "none", color: "var(--sub)", display: "flex", alignItems: "center", fontSize: 16 }}><ChevronLeft size={20} /></button>
-      <div style={{ flex: 1 }}><div style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{person ? person.name.toUpperCase() : "STAFF"}</div><h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{title}</h2></div>
+      <div style={{ flex: 1 }}><div style={{ fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 500 }}>{person ? person.name.toUpperCase() : "STAFF"}</div><h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.3px" }}>{title}</h2></div>
       {right}
     </div>
   );
@@ -15288,7 +15288,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             <div key={p.id} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "14px 4px", borderBottom: "1px solid var(--line)" }}>
               <button onClick={() => archive(p.id)} aria-label={`Archive ${p.name}`} style={{ width: 24, height: 24, borderRadius: "50%", background: "#C2563F", color: "#fff", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "none", padding: 0, fontSize: 20, lineHeight: 0, fontWeight: 600 }}>−</button>
               <Avatar size={40} photo={staffPhoto(p)} initial={p.name?.charAt(0)} color={p.color || "var(--gold)"} />
-              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{p.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{p.role}</div></div>
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{p.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>{p.role}</div></div>
               <div style={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
                 <button onClick={() => moveStaff(p.id, -1)} disabled={i === 0} style={{ background: "none", color: i === 0 ? "var(--faint)" : "var(--sub)", padding: 3, opacity: i === 0 ? 0.4 : 1 }}><ChevronUp size={18} /></button>
                 <button onClick={() => moveStaff(p.id, 1)} disabled={i === active.length - 1} style={{ background: "none", color: i === active.length - 1 ? "var(--faint)" : "var(--sub)", padding: 3, opacity: i === active.length - 1 ? 0.4 : 1 }}><ChevronDown size={18} /></button>
@@ -15298,7 +15298,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             <button key={p.id} onClick={() => { setOpenId(p.id); setSection(null); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
                 <Avatar size={40} photo={staffPhoto(p)} initial={p.name?.charAt(0)} color={p.color || "var(--gold)"} />
-                <div style={{ minWidth: 0 }}><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{p.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[p.role, p.id !== "anyone" ? (p.email || p.phone) : null].filter(Boolean).join(" · ") || "No title set"}</div></div>
+                <div style={{ minWidth: 0 }}><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{p.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[p.role, p.id !== "anyone" ? (p.email || p.phone) : null].filter(Boolean).join(" · ") || "No title set"}</div></div>
               </div>
               <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </button>
@@ -15311,12 +15311,12 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
 
         {!editMode && archived.length > 0 && (
           <>
-            <div style={{ fontSize: 11.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 0 4px 4px" }}>Archived</div>
+            <div style={{ fontSize: 13, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 0 4px 4px" }}>Archived</div>
             <div style={{ display: "flex", flexDirection: "column" }}>
               {archived.map((p) => (
                 <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 4px", borderBottom: "1px solid var(--line)" }}>
                   <Avatar size={40} photo={staffPhoto(p)} initial={p.name?.charAt(0)} color={p.color || "var(--faint)"} />
-                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px", color: "var(--sub)" }}>{p.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Archived</div></div>
+                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px", color: "var(--sub)" }}>{p.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>Archived</div></div>
                   <button onClick={() => restore(p.id)} style={{ background: "none", color: "var(--gold)", fontSize: 14, fontWeight: 500 }}>Restore</button>
                 </div>
               ))}
@@ -15349,7 +15349,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                 <div style={G_BOX}><label style={G_LBL}>Role / title</label><input value={detailsDraft ? detailsDraft.role : (person.role || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), role: e.target.value }))} style={G_INPUT} /></div>
                 <div style={G_BOX}><label style={G_LBL}>Email</label><input value={detailsDraft ? detailsDraft.email : (person.email || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), email: e.target.value }))} inputMode="email" autoCapitalize="none" style={G_INPUT} /></div>
                 <div style={G_BOX}><label style={G_LBL}>Phone</label><input value={detailsDraft ? detailsDraft.phone : (person.phone || "")} onChange={(e) => setDetailsDraft((d) => ({ ...(d || {}), phone: formatPhone(e.target.value) }))} inputMode="tel" placeholder="(503) 555-0142" style={G_INPUT} /></div>
-                <div><div style={{ fontSize: 12.5, color: "var(--sub)", fontWeight: 500, margin: "0 0 7px" }}>User type</div><Segmented options={[{ value: "Admin", label: "Admin" }, { value: "Staff", label: "Staff" }, { value: "Front Desk", label: "Front desk" }]} value={ut} onChange={(v) => patch(person.id, { userType: v })} /></div>
+                <div><div style={{ fontSize: 13.5, color: "var(--sub)", fontWeight: 500, margin: "0 0 7px" }}>User type</div><Segmented options={[{ value: "Admin", label: "Admin" }, { value: "Staff", label: "Staff" }, { value: "Front Desk", label: "Front desk" }]} value={ut} onChange={(v) => patch(person.id, { userType: v })} /></div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderTop: "1px solid var(--line)", marginTop: 8 }}>
                 <span style={{ fontSize: 14.5, fontWeight: 500 }}>Is a service provider</span><Toggle on={person.isProvider !== false} onClick={() => patch(person.id, { isProvider: !(person.isProvider !== false) })} />
@@ -15422,7 +15422,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           if (!inCat.length) return null;
           return (
             <div key={cat} style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 4px 9px" }}>{cat}</div>
+              <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 4px 9px" }}>{cat}</div>
               <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
                 {inCat.map((s, i) => {
                   const e = entryFor(s); const on = e.on !== false;
@@ -15432,7 +15432,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14.5, fontWeight: 500 }}>{s.name}</div>
-                          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>Shop default · {s.duration} min{s.price != null ? ` · $${s.price}` : ""}</div>
+                          <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>Shop default · {s.duration} min{s.price != null ? ` · $${s.price}` : ""}</div>
                         </div>
                         <Toggle on={on} onClick={() => setSvc(s.id, { on: !on })} />
                       </div>
@@ -15440,21 +15440,21 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                         <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 13, background: "var(--panel2)", borderRadius: 11, padding: "10px 12px", flexWrap: "wrap" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <NumBox value={e.duration} placeholder={String(s.duration)} onChange={(v) => setSvc(s.id, { duration: v === "" ? null : Number(v) })} />
-                            <span style={{ fontSize: 12.5, color: "var(--sub)" }}>min</span>
+                            <span style={{ fontSize: 13.5, color: "var(--sub)" }}>min</span>
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ fontSize: 12.5, color: "var(--sub)" }}>$</span>
+                            <span style={{ fontSize: 13.5, color: "var(--sub)" }}>$</span>
                             <NumBox value={e.price} placeholder={s.price != null ? String(s.price) : "—"} onChange={(v) => setSvc(s.id, { price: v === "" ? null : Number(v) })} />
                           </div>
                           {((e.duration != null && e.duration !== "") || (e.price != null && e.price !== ""))
-                            ? <button onClick={() => setSvc(s.id, { duration: null, price: null })} style={{ marginLeft: "auto", background: "none", color: "var(--gold)", fontSize: 12.5, fontWeight: 600, padding: 0 }}>Reset</button>
-                            : <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--faint)" }}>Using defaults</span>}
+                            ? <button onClick={() => setSvc(s.id, { duration: null, price: null })} style={{ marginLeft: "auto", background: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, padding: 0 }}>Reset</button>
+                            : <span style={{ marginLeft: "auto", fontSize: 13.5, color: "var(--faint)" }}>Using defaults</span>}
                         </div>
                       )}
                       {/* per-cut-style timing — only when the service has cut styles and is on */}
                       {on && cutTypes.length > 0 && (
                         <div style={{ marginTop: 12 }}>
-                          <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 2px 8px" }}>{first}'s time &amp; price per style</div>
+                          <div style={{ fontSize: 12.5, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 2px 8px" }}>{first}'s time &amp; price per style</div>
                           <div style={{ display: "grid", gap: 7 }}>
                             {cutTypes.map((ct) => {
                               const ov = cutDurFor(s, ct.id);
@@ -15537,12 +15537,12 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
               <div style={{ width: 46, flexShrink: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: h.on ? "var(--text)" : "var(--faint)" }}>{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}</div>
-                <div style={{ fontSize: 12, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div>
+                <div style={{ fontSize: 13, color: "var(--faint)" }}>{d.getMonth()+1}/{d.getDate()}</div>
               </div>
               <button onClick={() => setDayEdit({ dow, date: d })} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: h.on ? "var(--tint2)" : "var(--panel2)", border: `1px solid ${h.on ? "color-mix(in srgb, var(--gold) 30%, var(--border))" : "var(--border)"}`, borderRadius: 12, padding: "15px 16px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                   <span style={{ fontSize: 15.5, fontWeight: h.on ? 600 : 400, color: h.on ? "var(--text)" : "var(--faint)", fontStyle: h.on ? "normal" : "italic" }}>{h.on ? `${fmtTime(h.start)} – ${fmtTime(h.end)}` : "No shifts"}</span>
-                  {hasEx && <span style={{ fontSize: 10.5, letterSpacing: 0.5, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 5, padding: "2px 6px", flexShrink: 0 }}>JUST THIS DAY</span>}
+                  {hasEx && <span style={{ fontSize: 12, letterSpacing: 0.5, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 5, padding: "2px 6px", flexShrink: 0 }}>JUST THIS DAY</span>}
                 </span>
                 <Edit2 size={15} style={{ color: "var(--sub)", flexShrink: 0 }} />
               </button>
@@ -15573,7 +15573,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
               <Sheet open={true} onClose={() => setDayEdit(null)} align="bottom" maxWidth={460}>
                 <div style={{ padding: "6px 2px 8px" }}>
                   <div style={{ textAlign: "center", marginBottom: 20 }}>
-                    <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>WORK HOURS</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>WORK HOURS</div>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginTop: 6 }}>{dayName}</div>
                     <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{dateLabel}</div>
                   </div>
@@ -15588,26 +15588,26 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                   {draft.on && (
                     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>START</div>
+                        <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>START</div>
                         <TimeScrollPicker value={draft.start} onChange={(v) => setDraft((d) => ({ ...d, start: v, end: Math.max(v + 15, d.end) }))} label={`${dayName} start`} full />
                       </div>
                       <span style={{ color: "var(--faint)", fontSize: 15, marginTop: 22 }}>–</span>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>END</div>
+                        <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>END</div>
                         <TimeScrollPicker value={draft.end} onChange={(v) => setDraft((d) => ({ ...d, end: v }))} minMin={draft.start + 15} label={`${dayName} end`} full />
                       </div>
                     </div>
                   )}
 
                   {/* scope: one-off vs recurring */}
-                  <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "2px 2px 8px" }}>Apply this change to</div>
+                  <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "2px 2px 8px" }}>Apply this change to</div>
                   <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
                     {[{ v: "date", t: `Just ${dateLabel.split(" ").slice(0,1)[0]}`, s: `${MONTHS[theDate.getMonth()].slice(0,3)} ${theDate.getDate()} only` }, { v: "weekly", t: `Every ${dayName}`, s: "Going forward" }].map((o) => {
                       const on = scope === o.v;
                       return (
                         <button key={o.v} onClick={() => setScope(o.v)} style={{ flex: 1, borderRadius: 12, border: `1.5px solid ${on ? "var(--gold)" : "var(--border)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: "var(--text)", padding: "12px 10px", textAlign: "center", cursor: "pointer" }}>
                           <span style={{ display: "block", fontSize: 14, fontWeight: on ? 600 : 500 }}>{o.t}</span>
-                          <span style={{ display: "block", fontSize: 11.5, color: "var(--sub)", marginTop: 3 }}>{o.s}</span>
+                          <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 3 }}>{o.s}</span>
                         </button>
                       );
                     })}
@@ -15644,7 +15644,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
               <Sheet open={true} onClose={() => setRepeatFor(null)} align="center" maxWidth={360}>
                 <div style={{ padding: "4px 0 6px" }}>
                   <div style={{ textAlign: "center", marginBottom: 6 }}>
-                    <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>REPEAT THESE HOURS</div>
+                    <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600 }}>REPEAT THESE HOURS</div>
                     <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, marginTop: 6 }}>{fmtTime(repeatFor.h.start)} – {fmtTime(repeatFor.h.end)}</div>
                   </div>
                   <p style={{ fontSize: 13.5, color: "var(--sub)", textAlign: "center", lineHeight: 1.5, marginBottom: 16 }}>Pick the days to copy this shift to.</p>
@@ -15653,7 +15653,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                       const on = picked.has(di);
                       return (
                         <button key={di} onClick={() => toggle(di)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderRadius: 11, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--tint2)" : "var(--panel2)", color: "var(--text)", fontSize: 15.5, fontWeight: on ? 600 : 400, cursor: "pointer" }}>
-                          {dn}{di === repeatFor.dow && <span style={{ fontSize: 12, color: "var(--sub)" }}>(this day)</span>}
+                          {dn}{di === repeatFor.dow && <span style={{ fontSize: 13, color: "var(--sub)" }}>(this day)</span>}
                           <span style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
                         </button>
                       );
@@ -15701,9 +15701,9 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 14.5, fontWeight: 500 }}>{o.label}</span>
-                          {o.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
+                          {o.smart && <span style={{ fontSize: 10.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 4, padding: "1px 5px" }}>SMART</span>}
                         </div>
-                        <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{o.cap}</div>
+                        <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{o.cap}</div>
                       </div>
                       <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
                     </button>
@@ -15848,13 +15848,13 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
 
         {/* Live earnings readout */}
         <div style={{ background: "var(--tint)", border: "1px solid var(--gold)", borderRadius: 16, padding: 18, marginTop: 6 }}>
-          <div style={{ fontSize: 12, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>ESTIMATED EARNINGS · THIS WEEK</div>
+          <div style={{ fontSize: 13, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, marginBottom: 8 }}>ESTIMATED EARNINGS · THIS WEEK</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 600, marginBottom: 4 }}>${est.total.toFixed(2)}</div>
           <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 14 }}>{est.basis} · {est.count} completed appt{est.count !== 1 ? "s" : ""}</div>
           {[["Service sales", `$${est.serviceSales.toFixed(2)}`], ["Service commission", `$${est.svcCommission.toFixed(2)}`], ...((pc.on || est.productSales > 0) ? [["Product sales", `$${est.productSales.toFixed(2)}`], ["Product commission", `$${est.prodCommission.toFixed(2)}`]] : []), ["Hours scheduled", `${est.hours.toFixed(1)} h`], ["Hourly pay", `$${est.hourlyPay.toFixed(2)}`]].map(([k, v]) => (
             <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", fontSize: 14.5, borderTop: "1px solid var(--wash)" }}><span style={{ color: "var(--sub)" }}>{k}</span><span style={{ fontWeight: 600 }}>{v}</span></div>
           ))}
-          <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Live estimate from completed appointments using the settings above. Real payroll (taxes, tips, time clock, pay periods) requires the backend.</p>
+          <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 12, lineHeight: 1.5 }}>Live estimate from completed appointments using the settings above. Real payroll (taxes, tips, time clock, pay periods) requires the backend.</p>
         </div>
       </div>
     );
@@ -15914,7 +15914,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
   const HubCard = ({ label, sec, rows }) => (
     <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-        <span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>{label}</span>
+        <span style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>{label}</span>
         {sec && <button onClick={() => { setSection(sec); setEditingDetails(false); }} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 4, padding: 0, cursor: "pointer" }}>Edit</button>}
       </div>
       {rows.map((r, i) => {
@@ -15945,7 +15945,7 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 500, lineHeight: 1.1 }}>{person.name}</div>
           <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 4, display: "flex", alignItems: "center", gap: 7 }}>
             {person.role}
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: bookable ? "var(--live)" : "var(--sub)", fontWeight: 500, fontSize: 12.5 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: bookable ? "var(--live)" : "var(--faint)" }} />{bookable ? "Bookable online" : "Not bookable online"}</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: bookable ? "var(--live)" : "var(--sub)", fontWeight: 500, fontSize: 13.5 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: bookable ? "var(--live)" : "var(--faint)" }} />{bookable ? "Bookable online" : "Not bookable online"}</span>
           </div>
         </div>
       </div>
@@ -15962,19 +15962,19 @@ function StaffMembersView({ providers, setProviders, services, setServices, appt
           <div style={{ padding: "12px 0", borderTop: "1px solid var(--line)" }}>
             <div style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 500, marginBottom: 6 }}>{title}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px" }}>
-              <span style={{ flex: 1, fontSize: 12.5, color: "var(--sub)", fontFamily: "ui-monospace, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{url.replace(/^https?:\/\//, "")}</span>
-              <button onClick={() => copyText(url, label)} style={{ flexShrink: 0, background: "none", border: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}><Copy size={14} /> Copy</button>
+              <span style={{ flex: 1, fontSize: 13.5, color: "var(--sub)", fontFamily: "ui-monospace, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{url.replace(/^https?:\/\//, "")}</span>
+              <button onClick={() => copyText(url, label)} style={{ flexShrink: 0, background: "none", border: "none", color: "var(--gold)", display: "flex", alignItems: "center", gap: 5, fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}><Copy size={14} /> Copy</button>
             </div>
-            {sub && <div style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, marginTop: 6 }}>{sub}</div>}
+            {sub && <div style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.45, marginTop: 6 }}>{sub}</div>}
           </div>
         );
         return (
           <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px 14px", marginBottom: 14, boxShadow: "var(--shadow-sm)" }}>
-            <span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Booking &amp; calendar links</span>
+            <span style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>Booking &amp; calendar links</span>
             <LinkRow title={`Book ${first} directly`} url={bookUrl} label={`${first}'s booking link`} sub={`Opens your booking page with ${first} already selected.`} />
             {icalToken
               ? <LinkRow title={`Subscribe to ${first}'s calendar`} url={icalUrl} label="Calendar link" sub="Paste into Apple or Google Calendar — read-only. Private to you; don't share it." />
-              : <div style={{ padding: "12px 0", borderTop: "1px solid var(--line)", fontSize: 12.5, color: "var(--faint)" }}>Preparing {first}'s private calendar link…</div>}
+              : <div style={{ padding: "12px 0", borderTop: "1px solid var(--line)", fontSize: 13.5, color: "var(--faint)" }}>Preparing {first}'s private calendar link…</div>}
           </div>
         );
       })()}
@@ -16030,20 +16030,20 @@ function AppearancePicker({ theme, setTheme }) {
     const tint = (pct) => `color-mix(in srgb, ${acc} ${pct}%, ${v.panel})`;
     return (
       <div style={{ background: v.bg, padding: "20px 20px 22px", position: "relative", minHeight: 200 }}>
-        <div style={{ fontFamily: th.body, fontSize: 12, letterSpacing: 2, color: v.faint, marginBottom: 6, fontWeight: 600 }}>FRIDAY · TODAY</div>
+        <div style={{ fontFamily: th.body, fontSize: 13, letterSpacing: 2, color: v.faint, marginBottom: 6, fontWeight: 600 }}>FRIDAY · TODAY</div>
         <div style={{ fontFamily: th.disp, color: v.text, fontSize: 38, fontWeight: 500, letterSpacing: th.disp.includes("Oswald") ? 1 : -0.5, lineHeight: 0.95, marginBottom: 18 }}>Sanctuary</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 9, marginBottom: 18 }}>
           <div style={{ background: tint(12), borderLeft: `3px solid ${acc}`, border: `1px solid color-mix(in srgb, ${acc} 26%, ${v.border})`, borderRadius: 12, padding: "11px 13px" }}>
             <div style={{ fontFamily: th.body, fontSize: 13, fontWeight: 600, color: v.text, marginBottom: 4 }}>Marcus Webb</div>
-            <div style={{ fontFamily: th.body, fontSize: 11, color: v.sub }}>9:00 AM · Cut &amp; Beard</div>
+            <div style={{ fontFamily: th.body, fontSize: 12.5, color: v.sub }}>9:00 AM · Cut &amp; Beard</div>
           </div>
           <div style={{ background: v.panel, border: `1px solid ${v.border}`, borderRadius: 12, padding: "11px 13px" }}>
             <div style={{ fontFamily: th.body, fontSize: 13, fontWeight: 600, color: v.text2, marginBottom: 4 }}>Tariq Allen</div>
-            <div style={{ fontFamily: th.body, fontSize: 11, color: v.faint }}>10:30 AM · Skin Fade</div>
+            <div style={{ fontFamily: th.body, fontSize: 12.5, color: v.faint }}>10:30 AM · Skin Fade</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ flex: 1, background: acc, color: v.onGold, fontFamily: th.body, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textAlign: "center", padding: "12px 0", borderRadius: 30 }}>Book it</div>
+          <div style={{ flex: 1, background: acc, color: v.onGold, fontFamily: th.body, fontSize: 12.5, fontWeight: 700, letterSpacing: 1.5, textAlign: "center", padding: "12px 0", borderRadius: 30 }}>Book it</div>
           <div style={{ fontFamily: th.disp, color: acc, fontSize: 30, fontWeight: 600, lineHeight: 1 }}>Aa</div>
         </div>
       </div>
@@ -16056,7 +16056,7 @@ function AppearancePicker({ theme, setTheme }) {
 
       {THEME_CATS.map((cat) => (
         <div key={cat} style={{ marginBottom: 26 }}>
-          <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>{cat.toUpperCase()}</div>
+          <div style={{ fontSize: 13, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 14 }}>{cat.toUpperCase()}</div>
           <div style={{ display: "grid", gap: 16 }}>
             {THEMES.filter((t) => t.cat === cat).map((th) => { const on = theme === th.id; const v = th.t; return (
               <button key={th.id} className="lift" onClick={() => { setTheme(th.id); setAccent(null); setFontPair(null); }} style={{ padding: 0, borderRadius: 18, border: on ? "2px solid var(--gold)" : "1px solid var(--border)", overflow: "hidden", textAlign: "left", background: v.bg, display: "block", width: "100%", position: "relative", boxShadow: on ? "0 10px 34px -14px var(--wash)" : "0 4px 18px -14px rgba(0,0,0,0.5)" }}>
@@ -16065,9 +16065,9 @@ function AppearancePicker({ theme, setTheme }) {
                 <div style={{ padding: "12px 16px", background: "var(--panel)", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
                     <div style={{ fontSize: 14.5, fontWeight: 600, color: on ? "var(--gold)" : "var(--text)" }}>{th.name}</div>
-                    <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 1 }}>{th.tagline}</div>
+                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 1 }}>{th.tagline}</div>
                   </div>
-                  <span style={{ fontSize: 10, letterSpacing: 1.5, fontWeight: 600, color: on ? "var(--gold)" : "var(--faint)" }}>{on ? "ON" : (th.dark ? "DARK" : "LIGHT")}</span>
+                  <span style={{ fontSize: 12, letterSpacing: 1.5, fontWeight: 600, color: on ? "var(--gold)" : "var(--faint)" }}>{on ? "ON" : (th.dark ? "DARK" : "LIGHT")}</span>
                 </div>
               </button>
             ); })}
@@ -16077,7 +16077,7 @@ function AppearancePicker({ theme, setTheme }) {
 
       {/* Make it yours — accent + fonts, folded together under the gallery */}
       <div style={{ marginTop: 8, borderTop: "1px solid var(--line)", paddingTop: 22 }}>
-        <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>MAKE IT YOURS</div>
+        <div style={{ fontSize: 13, letterSpacing: 2.5, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>MAKE IT YOURS</div>
         <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 16 }}>Optional — nudge the accent or type while keeping your theme.</div>
 
         <button onClick={() => setExpand(expand === "accent" ? null : "accent")} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: expand === "accent" ? 0 : 12 }}>
@@ -16085,7 +16085,7 @@ function AppearancePicker({ theme, setTheme }) {
             <span style={{ width: 26, height: 26, borderRadius: "50%", background: accent || "var(--gold)", flexShrink: 0, border: "1px solid rgba(0,0,0,0.12)" }} />
             <div>
               <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Accent</div>
-              <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 1 }}>{accent ? ((ACCENTS.find((a) => a.hex === accent) || {}).name || "Custom") : "Theme default"}</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 1 }}>{accent ? ((ACCENTS.find((a) => a.hex === accent) || {}).name || "Custom") : "Theme default"}</div>
             </div>
           </div>
           <ChevronDown size={18} style={{ color: "var(--faint)", transform: expand === "accent" ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
@@ -16094,13 +16094,13 @@ function AppearancePicker({ theme, setTheme }) {
           <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderTop: "none", borderRadius: "0 0 14px 14px", padding: "18px 16px", marginBottom: 12 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
               <button onClick={() => setAccent(null)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, background: "none" }}>
-                <span style={{ width: 50, height: 50, borderRadius: "50%", border: !accent ? "2px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)", fontSize: 10, letterSpacing: 0.5 }}>Theme</span>
-                <span style={{ fontSize: 11.5, color: !accent ? "var(--gold)" : "var(--sub)", fontWeight: !accent ? 600 : 400 }}>Default</span>
+                <span style={{ width: 50, height: 50, borderRadius: "50%", border: !accent ? "2px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)", fontSize: 12, letterSpacing: 0.5 }}>Theme</span>
+                <span style={{ fontSize: 13, color: !accent ? "var(--gold)" : "var(--sub)", fontWeight: !accent ? 600 : 400 }}>Default</span>
               </button>
               {ACCENTS.map((a) => { const aon = accent === a.hex; return (
                 <button key={a.id} onClick={() => setAccent(a.hex)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, background: "none" }}>
                   <span style={{ width: 50, height: 50, borderRadius: "50%", background: a.hex, border: aon ? "2px solid var(--text)" : "1px solid rgba(0,0,0,0.1)", boxShadow: aon ? "0 0 0 3px var(--panel2), 0 0 0 5px " + a.hex : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{aon && <Check size={17} style={{ color: "#fff" }} strokeWidth={3} />}</span>
-                  <span style={{ fontSize: 11.5, color: aon ? "var(--text)" : "var(--sub)", fontWeight: aon ? 600 : 400 }}>{a.name}</span>
+                  <span style={{ fontSize: 13, color: aon ? "var(--text)" : "var(--sub)", fontWeight: aon ? 600 : 400 }}>{a.name}</span>
                 </button>
               ); })}
             </div>
@@ -16110,21 +16110,21 @@ function AppearancePicker({ theme, setTheme }) {
         <button onClick={() => setExpand(expand === "font" ? null : "font")} style={{ width: "100%", textAlign: "left", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: expand === "font" ? 0 : 12 }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Fonts</div>
-            <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 1 }}>{fontPair ? fontPair.name : "Theme default"}</div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 1 }}>{fontPair ? fontPair.name : "Theme default"}</div>
           </div>
           <ChevronDown size={18} style={{ color: "var(--faint)", transform: expand === "font" ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
         </button>
         {expand === "font" && (
           <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderTop: "none", borderRadius: "0 0 14px 14px", padding: "16px", display: "grid", gap: 10 }}>
             <button onClick={() => setFontPair(null)} style={{ textAlign: "left", padding: "14px 16px", borderRadius: 12, border: !fontPair ? "2px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div><div style={{ fontSize: 14.5, fontWeight: 600, color: !fontPair ? "var(--gold)" : "var(--text)" }}>Theme default</div><div style={{ fontSize: 12, color: "var(--sub)", marginTop: 2 }}>The type that ships with this theme</div></div>
+              <div><div style={{ fontSize: 14.5, fontWeight: 600, color: !fontPair ? "var(--gold)" : "var(--text)" }}>Theme default</div><div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>The type that ships with this theme</div></div>
               {!fontPair && <Check size={16} style={{ color: "var(--gold)" }} strokeWidth={3} />}
             </button>
             {FONT_PAIRS.map((f) => { const fon = fontPair && fontPair.id === f.id; return (
               <button key={f.id} onClick={() => setFontPair(f)} style={{ textAlign: "left", padding: "14px 16px", borderRadius: 12, border: fon ? "2px solid var(--gold)" : "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
                   <div style={{ fontFamily: f.disp, fontSize: 24, color: "var(--text)", lineHeight: 1 }}>Sanctuary</div>
-                  <div style={{ fontFamily: f.body, fontSize: 12, color: "var(--sub)", marginTop: 4 }}>{f.name} · {f.note}</div>
+                  <div style={{ fontFamily: f.body, fontSize: 13, color: "var(--sub)", marginTop: 4 }}>{f.name} · {f.note}</div>
                 </div>
                 {fon && <Check size={16} style={{ color: "var(--gold)" }} strokeWidth={3} />}
               </button>
@@ -16162,13 +16162,13 @@ function PaymentsEditor({ p, onChange }) {
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
           {cps.map((lbl) => (
             <div key={lbl} style={{ flex: 1, textAlign: "center", border: "1px solid color-mix(in srgb, var(--gold) 40%, var(--border))", background: "var(--wash)", borderRadius: 12, padding: "11px 4px" }}>
-              <div style={{ fontSize: 12, color: "var(--sub)", fontWeight: 500 }}>{lbl}</div>
-              <div style={{ fontSize: 9.5, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 3, fontWeight: 700, color: "var(--gold)" }}>Live</div>
+              <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 500 }}>{lbl}</div>
+              <div style={{ fontSize: 11.5, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 3, fontWeight: 700, color: "var(--gold)" }}>Live</div>
             </div>
           ))}
         </div>
 
-        <div style={{ fontSize: 12.5, color: "var(--sub)", textAlign: "center", marginTop: 18, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", textAlign: "center", marginTop: 18, lineHeight: 1.5 }}>
           Powered by Stripe · cards are encrypted and never stored by Vero.
         </div>
       </div>
@@ -16303,7 +16303,7 @@ function PayoutsView({ showToast }) {
           <div style={{ ...card, marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
               <div>
-                <div style={{ fontSize: 12.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>Current balance</div>
+                <div style={{ fontSize: 13.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>Current balance</div>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 500, lineHeight: 1, color: "var(--text)" }}>{money(d.available, d.currency)}</div>
                 {Number(d.pending) > 0 && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 8 }}>{money(d.pending, d.currency)} still clearing</div>}
               </div>
@@ -16314,7 +16314,7 @@ function PayoutsView({ showToast }) {
               <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.5 }}>{scheduleLine(d.schedule)}</div>
             </div>
             {d.payoutsEnabled === false && (
-              <div style={{ marginTop: 12, fontSize: 12.5, color: "#C2563F", lineHeight: 1.5 }}>Payouts are paused on your Stripe account — finish verification in Stripe to start getting paid.</div>
+              <div style={{ marginTop: 12, fontSize: 13.5, color: "#C2563F", lineHeight: 1.5 }}>Payouts are paused on your Stripe account — finish verification in Stripe to start getting paid.</div>
             )}
             {/* Pay me now — SECONDARY, only when there are instant-eligible funds. Never the default action. */}
             {canInstant && (
@@ -16326,7 +16326,7 @@ function PayoutsView({ showToast }) {
 
           {/* Recent payouts */}
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "0 0 9px 4px" }}>
-            <div style={{ fontSize: 12.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Recent payouts</div>
+            <div style={{ fontSize: 13.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Recent payouts</div>
             <button onClick={openLedger} style={linkBtn}>View all transactions ›</button>
           </div>
           {(d.payouts || []).length === 0 ? (
@@ -16337,13 +16337,13 @@ function PayoutsView({ showToast }) {
                 <button key={p.id} onClick={() => openDetail(p)} style={{ width: "100%", textAlign: "left", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "15px 18px", borderTop: i > 0 ? "1px solid var(--line)" : "none", borderLeft: "none", borderRight: "none", borderBottom: "none", color: "var(--text)" }}>
                   <div>
                     <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{money(p.amount, p.currency)}</div>
-                    <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>
+                    <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>
                       {p.status === "paid" ? `Paid ${dayLabel(p.arrivalDate)}` : `${statusLabel(p.status)} · expected ${dayLabel(p.arrivalDate)}`}
                       {p.method === "instant" ? " · instant" : ""}
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                    <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.5, color: statusColor(p.status), border: `1px solid color-mix(in srgb, ${statusColor(p.status)} 40%, transparent)`, borderRadius: 30, padding: "5px 11px", whiteSpace: "nowrap" }}>{statusLabel(p.status)}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.5, color: statusColor(p.status), border: `1px solid color-mix(in srgb, ${statusColor(p.status)} 40%, transparent)`, borderRadius: 30, padding: "5px 11px", whiteSpace: "nowrap" }}>{statusLabel(p.status)}</span>
                     <ChevronRight size={17} style={{ color: "var(--faint)" }} />
                   </div>
                 </button>
@@ -16354,7 +16354,7 @@ function PayoutsView({ showToast }) {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
             <a href="https://dashboard.stripe.com/payouts" target="_blank" rel="noopener noreferrer" style={{ ...linkBtn, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>Manage account in Stripe <ArrowUpRight size={15} /></a>
           </div>
-          <div style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.5, marginTop: 8, padding: "0 4px" }}>Balances, payouts and transactions come straight from Stripe. To change your bank account or payout schedule, use “Manage account in Stripe”.</div>
+          <div style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginTop: 8, padding: "0 4px" }}>Balances, payouts and transactions come straight from Stripe. To change your bank account or payout schedule, use “Manage account in Stripe”.</div>
         </>
       )}
 
@@ -16372,17 +16372,17 @@ function PayoutsView({ showToast }) {
                   {[["Gross", detail.data.gross], ["Stripe fees", -Math.abs(detail.data.fees)], ["Net", detail.data.net]].map(([lbl, val]) => (
                     <div key={lbl} style={{ flex: 1, textAlign: "center", border: "1px solid var(--border)", background: "var(--panel2)", borderRadius: 12, padding: "11px 4px" }}>
                       <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{money(val, detail.payout.currency)}</div>
-                      <div style={{ fontSize: 10.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 3 }}>{lbl}</div>
+                      <div style={{ fontSize: 12, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 3 }}>{lbl}</div>
                     </div>
                   ))}
                 </div>
-                <div style={{ fontSize: 11.5, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "4px 0 6px" }}>{detail.data.count} item{detail.data.count === 1 ? "" : "s"}</div>
+                <div style={{ fontSize: 13, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "4px 0 6px" }}>{detail.data.count} item{detail.data.count === 1 ? "" : "s"}</div>
                 <div style={{ maxHeight: "46vh", overflowY: "auto" }}>
                   {detail.data.items.map((t, i) => (
                     <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "11px 2px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 14, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.description || cap(txnLabel(t.type))}</div>
-                        <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 1 }}>{dayLabel(t.created)}{t.fee ? ` · fee ${money(t.fee, t.currency)}` : ""}</div>
+                        <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 1 }}>{dayLabel(t.created)}{t.fee ? ` · fee ${money(t.fee, t.currency)}` : ""}</div>
                       </div>
                       <div style={{ fontSize: 14, fontWeight: 600, color: t.net < 0 ? "#C2563F" : "var(--text)", flexShrink: 0 }}>{money(t.net, t.currency)}</div>
                     </div>
@@ -16408,7 +16408,7 @@ function PayoutsView({ showToast }) {
                 <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 2px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.description || cap(txnLabel(t.type))}</div>
-                    <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 1 }}>{dayLabel(t.created)} · {txnLabel(t.type)}{t.fee ? ` · fee ${money(t.fee, t.currency)}` : ""}</div>
+                    <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 1 }}>{dayLabel(t.created)} · {txnLabel(t.type)}{t.fee ? ` · fee ${money(t.fee, t.currency)}` : ""}</div>
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: t.net < 0 ? "#C2563F" : "var(--text)", flexShrink: 0 }}>{money(t.net, t.currency)}</div>
                 </div>
@@ -16495,7 +16495,7 @@ function ReviewsManager({ value = {}, onChange, reviews = [], setReviews, showTo
       <div>
         <div style={{ fontSize: 14.5, fontWeight: 500, marginBottom: 8 }}>Send by</div>
         <Segmented options={[{ value: "email", label: "Email" }, { value: "text", label: "Text" }, { value: "both", label: "Both" }]} value={cfg.channel || "both"} onChange={(v) => set({ channel: v })} />
-        <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 6 }}>Texts start automatically once your number is approved — email is used until then.</div>
+        <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 6 }}>Texts start automatically once your number is approved — email is used until then.</div>
       </div>
       <ToggleSetting label="Only ask each client once" desc="Never re-ask someone who's already been invited." on={cfg.oncePerClient !== false} onToggle={(v) => set({ oncePerClient: v })} />
       <div>
@@ -16504,7 +16504,7 @@ function ReviewsManager({ value = {}, onChange, reviews = [], setReviews, showTo
         <input value={cfg.googleReviewUrl || ""} onChange={(e) => set({ googleReviewUrl: e.target.value })} placeholder="https://g.page/r/…/review" style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", fontSize: 14.5, color: "var(--text)", fontFamily: FONT_BODY }} />
       </div>
       <ToggleSetting label="Show ratings & reviews on my booking page" desc="Display your star rating and featured testimonials to people booking online." on={cfg.showOnStorefront !== false} onToggle={(v) => set({ showOnStorefront: v })} />
-      <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5, background: "var(--panel2)", borderRadius: 10, padding: "12px 14px" }}>Every review comes to you privately first — nothing shows publicly until you publish it below. The Google invite is shown to <b>every</b> reviewer the same way, which keeps you compliant with Google's review rules.</div>
+      <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, background: "var(--panel2)", borderRadius: 10, padding: "12px 14px" }}>Every review comes to you privately first — nothing shows publicly until you publish it below. The Google invite is shown to <b>every</b> reviewer the same way, which keeps you compliant with Google's review rules.</div>
     </div>)}
 
     <div style={{ marginTop: 26, borderTop: "1px solid var(--line)", paddingTop: 20 }}>
@@ -16524,10 +16524,10 @@ function ReviewsManager({ value = {}, onChange, reviews = [], setReviews, showTo
             return (<div key={r.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 15px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
                 <div style={{ display: "flex", gap: 2 }}>{[1, 2, 3, 4, 5].map((n) => <Star key={n} size={15} style={{ color: "var(--gold)", fill: n <= (r.rating || 0) ? "var(--gold)" : "transparent" }} />)}</div>
-                <div style={{ fontSize: 11.5, color: "var(--faint)" }}>{fmtD(r.createdAt)}</div>
+                <div style={{ fontSize: 13, color: "var(--faint)" }}>{fmtD(r.createdAt)}</div>
               </div>
               {r.comment ? <div style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.5, marginBottom: 6 }}>“{r.comment}”</div> : <div style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", marginBottom: 6 }}>No comment left.</div>}
-              <div style={{ fontSize: 12.5, color: "var(--sub)", marginBottom: 11 }}>— {r.displayName || "A client"}{r.providerName ? ` · with ${r.providerName}` : ""}{status === "published" ? " · live" : status === "declined" ? " · hidden" : ""}</div>
+              <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 11 }}>— {r.displayName || "A client"}{r.providerName ? ` · with ${r.providerName}` : ""}{status === "published" ? " · live" : status === "declined" ? " · hidden" : ""}</div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {status !== "published" && <button onClick={() => setStatus(r.id, "published")} style={revBtn(true)}>Publish</button>}
                 {status === "published" && <button onClick={() => setStatus(r.id, "pending")} style={revBtn(false)}>Unpublish</button>}
@@ -16771,14 +16771,14 @@ function BookingTimesEditor({ b, onChange }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{m.label}</span>
-                {m.rec && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--on-gold)", background: "var(--gold)", borderRadius: 20, padding: "2px 7px" }}>RECOMMENDED</span>}
+                {m.rec && <span style={{ fontSize: 10.5, letterSpacing: 1, fontWeight: 700, color: "var(--on-gold)", background: "var(--gold)", borderRadius: 20, padding: "2px 7px" }}>RECOMMENDED</span>}
               </div>
               {radioEl(on)}
             </div>
             <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 6 }}>{m.desc}</div>
             {on && m.v === "grid" && (
               <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 13, paddingTop: 13, borderTop: "1px solid color-mix(in srgb, var(--gold) 18%, var(--border))" }}>
-                <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--faint)", fontWeight: 700, marginBottom: 9 }}>SHOW TIMES EVERY</div>
+                <div style={{ fontSize: 12.5, letterSpacing: 1, color: "var(--faint)", fontWeight: 700, marginBottom: 9 }}>SHOW TIMES EVERY</div>
                 <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
                   {PRESETS.map((g) => { const sel = !customOpen && gridMin === g; return (
                     <button key={g} onClick={(e) => { e.stopPropagation(); setCustomOpen(false); onChange({ gridMin: g }); }} style={chip(sel)}>{g === 60 ? "1 hour" : `${g} min`}</button>
@@ -16790,7 +16790,7 @@ function BookingTimesEditor({ b, onChange }) {
                     <span style={{ fontSize: 13, color: "var(--sub)", fontWeight: 600 }}>Custom spacing</span>
                     <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
                       <input type="number" min="5" max="240" value={gridMin} onChange={(e) => { const v = Math.max(5, Math.min(240, Number(e.target.value) || 5)); onChange({ gridMin: v }); }} style={{ width: 66, textAlign: "right", fontSize: 16, fontWeight: 600, color: "var(--text)", background: "var(--panel2)", border: "1.5px solid var(--gold)", borderRadius: 9, padding: "8px 10px", fontFamily: "inherit" }} />
-                      <span style={{ fontSize: 12, color: "var(--faint)" }}>min</span>
+                      <span style={{ fontSize: 13, color: "var(--faint)" }}>min</span>
                     </span>
                   </div>
                 )}
@@ -16835,7 +16835,7 @@ function BookingTimesEditor({ b, onChange }) {
         />
         {fakeOn && (
           <div style={{ marginTop: 13 }}>
-            <div style={{ fontSize: 11.5, letterSpacing: 1, color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>HIDE</div>
+            <div style={{ fontSize: 13, letterSpacing: 1, color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>HIDE</div>
             <div style={{ display: "flex", gap: 8 }}>
               {PCTS.map((n) => { const sel = pct === n; return (
                 <button key={n} onClick={() => onChange({ fakeItPct: n })} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: `1.5px solid ${sel ? "var(--gold)" : "var(--border)"}`, background: sel ? "var(--tint)" : "var(--panel)", color: sel ? "var(--gold)" : "var(--text)", fontSize: 14, fontWeight: sel ? 700 : 400, cursor: "pointer" }}>{n}%</button>
@@ -16888,24 +16888,24 @@ function AnyoneRoutingEditor({ b, onChange, providers = [] }) {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{m.label}</span>
-                  {m.smart && <span style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 4, padding: "1px 5px" }}>DEFAULT</span>}
+                  {m.smart && <span style={{ fontSize: 10.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 4, padding: "1px 5px" }}>DEFAULT</span>}
                 </div>
                 <span style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--gold)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <Check size={13} style={{ color: "var(--on-gold)" }} strokeWidth={3} />}</span>
               </div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 5 }}>{m.desc}</div>
               {on && (
                 <div style={{ marginTop: 12, background: "var(--tint)", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderRadius: 11, padding: "11px 13px" }}>
-                  <div style={{ fontSize: 11, letterSpacing: 0.3, color: "var(--gold)", fontWeight: 600, marginBottom: 5 }}>For example</div>
+                  <div style={{ fontSize: 12.5, letterSpacing: 0.3, color: "var(--gold)", fontWeight: 600, marginBottom: 5 }}>For example</div>
                   <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.55 }}>{m.example}</div>
                 </div>
               )}
               {on && showOrder && reals.length > 1 && (
                 <div style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
-                  <div style={{ fontSize: 10.5, letterSpacing: 1.5, color: "var(--sub)", fontWeight: 700, marginBottom: 7 }}>{orderHdr}</div>
+                  <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--sub)", fontWeight: 700, marginBottom: 7 }}>{orderHdr}</div>
                   <div style={{ display: "grid", gap: 6 }}>
                     {order.map((id, i) => (
                       <div key={id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 10px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 9 }}>
-                        <span style={{ width: 19, height: 19, borderRadius: "50%", background: "var(--text)", color: "var(--panel)", fontSize: 10.5, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
+                        <span style={{ width: 19, height: 19, borderRadius: "50%", background: "var(--text)", color: "var(--panel)", fontSize: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
                         <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(id)}</span>
                         <button onClick={() => move(i, -1)} disabled={i === 0} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)", color: i === 0 ? "var(--border2)" : "var(--text)", cursor: i === 0 ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Move up"><ChevronUp size={16} /></button>
                         <button onClick={() => move(i, 1)} disabled={i === order.length - 1} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)", color: i === order.length - 1 ? "var(--border2)" : "var(--text)", cursor: i === order.length - 1 ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Move down"><ChevronDown size={16} /></button>
@@ -16918,7 +16918,7 @@ function AnyoneRoutingEditor({ b, onChange, providers = [] }) {
           );
         })}
       </div>
-      <div style={{ marginTop: 13, fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5 }}>A client can always pick a specific staff member instead. This only applies when they choose &ldquo;Anyone.&rdquo;</div>
+      <div style={{ marginTop: 13, fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5 }}>A client can always pick a specific staff member instead. This only applies when they choose &ldquo;Anyone.&rdquo;</div>
     </div>
   );
 }
@@ -16977,7 +16977,7 @@ function WebsiteEditor({ w, onChange, business, theme, setTheme, onBackRef }) {
   };
   const Card = ({ label, dim, children, right }) => (
     <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "16px 18px", boxShadow: "var(--shadow-sm)", opacity: dim ? 0.7 : 1 }}>
-      {label && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}><span style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>{label}</span>{right}</div>}
+      {label && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}><span style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, textTransform: "uppercase" }}>{label}</span>{right}</div>}
       {children}
     </div>
   );
@@ -16993,7 +16993,7 @@ function WebsiteEditor({ w, onChange, business, theme, setTheme, onBackRef }) {
             <button onClick={openPreview} style={btn}>Preview my website</button>
             <button onClick={copyLink} style={{ ...btn, color: copied ? "var(--gold)" : "var(--sub)" }}>{copied ? "Copied" : "Copy link"}</button>
           </div>
-          <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 10, lineHeight: 1.5 }}>Preview opens your real site in a new tab. Save first to see your latest changes.</p>
+          <p style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 10, lineHeight: 1.5 }}>Preview opens your real site in a new tab. Save first to see your latest changes.</p>
         </Card>
 
         <Card label="Branding">
@@ -17010,7 +17010,7 @@ function WebsiteEditor({ w, onChange, business, theme, setTheme, onBackRef }) {
           <input value={w.tagline || ""} onChange={(e) => set("tagline", e.target.value)} placeholder="e.g. True to the craft." style={input} />
           <div style={fieldLabel}>Welcome text</div>
           <textarea value={w.intro || ""} onChange={(e) => set("intro", e.target.value)} rows={4} placeholder="A sentence or two about your shop — what makes it yours." style={{ ...input, resize: "vertical", lineHeight: 1.6 }} />
-          <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.5 }}>Leave the tagline or welcome blank to hide them.</p>
+          <p style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.5 }}>Leave the tagline or welcome blank to hide them.</p>
         </Card>
 
         <Card label="Theme">
@@ -17039,13 +17039,13 @@ function WebsiteEditor({ w, onChange, business, theme, setTheme, onBackRef }) {
                   <span style={{ padding: "13px 4px 13px 15px", color: "var(--sub)", fontSize: 15.5 }}>@</span>
                   <input value={ig} onChange={(e) => set("instagram", e.target.value.replace(/[^a-zA-Z0-9._]/g, ""))} placeholder="yourshop" style={{ ...input, border: "none", background: "transparent", paddingLeft: 2 }} />
                 </div>
-                <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.5 }}>Adds a "See our work" button linking to your Instagram. Leave blank to hide.</p>
+                <p style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 8, lineHeight: 1.5 }}>Adds a "See our work" button linking to your Instagram. Leave blank to hide.</p>
               </div>
             )}
           </div>
         </Card>
 
-        <Card label="Your own domain" dim right={<span style={{ fontSize: 12, color: "var(--sub)" }}>coming soon</span>}>
+        <Card label="Your own domain" dim right={<span style={{ fontSize: 13, color: "var(--sub)" }}>coming soon</span>}>
           <p style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, margin: "0 0 12px" }}>Point your own web address (like yourshop.com) at your Vero site. We'll give you the exact records to add with your domain provider.</p>
           <input value={w.customDomain || ""} onChange={(e) => set("customDomain", e.target.value.trim().toLowerCase())} placeholder="yourshop.com" style={input} />
         </Card>
@@ -17225,9 +17225,9 @@ function ArticleIllustration({ id }) {
         <circle cx="180" cy="70" r="1.6" fill={G} />
         <circle cx="300" cy="70" r="28" fill={G} />
         <path d="M288 70 L297 79 L313 60" fill="none" stroke={ON} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-        <text x="60" y="124" textAnchor="middle" fill={T} style={{ fontFamily: "'Fraunces', serif", fontSize: 12.5, fontWeight: 500 }}>Pick a service</text>
-        <text x="180" y="124" textAnchor="middle" fill={T} style={{ fontFamily: "'Fraunces', serif", fontSize: 12.5, fontWeight: 500 }}>Choose a time</text>
-        <text x="300" y="124" textAnchor="middle" fill={T} style={{ fontFamily: "'Fraunces', serif", fontSize: 12.5, fontWeight: 500 }}>You're booked</text>
+        <text x="60" y="124" textAnchor="middle" fill={T} style={{ fontFamily: "'Fraunces', serif", fontSize: 13.5, fontWeight: 500 }}>Pick a service</text>
+        <text x="180" y="124" textAnchor="middle" fill={T} style={{ fontFamily: "'Fraunces', serif", fontSize: 13.5, fontWeight: 500 }}>Choose a time</text>
+        <text x="300" y="124" textAnchor="middle" fill={T} style={{ fontFamily: "'Fraunces', serif", fontSize: 13.5, fontWeight: 500 }}>You're booked</text>
       </svg>
     );
   }
@@ -17332,7 +17332,7 @@ function HelpAssistant({ articles, onBack, onOpenArticle, supportHref }) {
                 <ol style={{ margin: "12px 0 0", padding: 0, listStyle: "none" }}>
                   {m.steps.map((s, j) => (
                     <li key={j} style={{ display: "flex", gap: 11, marginBottom: 9, color: "var(--sub)", fontSize: 14, lineHeight: 1.45 }}>
-                      <span style={{ flexShrink: 0, width: 21, height: 21, borderRadius: "50%", background: "var(--wash)", color: "var(--gold)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{j + 1}</span>
+                      <span style={{ flexShrink: 0, width: 21, height: 21, borderRadius: "50%", background: "var(--wash)", color: "var(--gold)", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{j + 1}</span>
                       <span>{s}</span>
                     </li>
                   ))}
@@ -17401,14 +17401,14 @@ function HelpCenter({ business, onBack }) {
     if (a) return (
       <div className="appt-screen fade-up" style={{ paddingBottom: 48 }}>
         <button onClick={() => setOpenArticle(null)} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "4px 0 18px", cursor: "pointer" }}><ArrowLeft size={17} /> All articles</button>
-        <div style={{ fontSize: 11.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 8 }}>{a.category}</div>
+        <div style={{ fontSize: 13, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 8 }}>{a.category}</div>
         <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 600, lineHeight: 1.1, margin: "0 0 16px", color: "var(--text)" }}>{a.title}</h1>
         {a.illustration && <ArticleIllustration id={a.illustration} />}
         <div>{renderBody(a.body)}</div>
 
         {Array.isArray(a.related) && a.related.filter((rid) => HELP_ARTICLES.some((x) => x.id === rid)).length > 0 && (
           <div style={{ marginTop: 30 }}>
-            <div style={{ fontSize: 11.5, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Related</div>
+            <div style={{ fontSize: 13, letterSpacing: 2, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>Related</div>
             {a.related.map((rid) => { const r = HELP_ARTICLES.find((x) => x.id === rid); return r ? (
               <button key={rid} onClick={() => goArticle(rid)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "13px 15px", marginBottom: 9, textAlign: "left", cursor: "pointer" }}>
                 <span style={{ fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{r.title}</span>
@@ -17436,7 +17436,7 @@ function HelpCenter({ business, onBack }) {
     <div className="appt-screen fade-up" style={{ paddingBottom: 48 }}>
       <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "4px 0 16px", cursor: "pointer" }}><ArrowLeft size={17} /> Settings</button>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <span style={{ fontSize: 12, letterSpacing: 3, color: "var(--faint)", textTransform: "uppercase" }}>Help Center</span>
+        <span style={{ fontSize: 13, letterSpacing: 3, color: "var(--faint)", textTransform: "uppercase" }}>Help Center</span>
       </div>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1.05, margin: "0 0 18px", color: "var(--text)" }}>How can we help?</h1>
       <div style={{ position: "relative", marginBottom: 24 }}>
@@ -17459,7 +17459,7 @@ function HelpCenter({ business, onBack }) {
           <div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 12 }}>{results.length} result{results.length === 1 ? "" : "s"}</div>
           {results.map((a) => (
             <button key={a.id} onClick={() => setOpenArticle(a.id)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", marginBottom: 10, textAlign: "left", cursor: "pointer" }}>
-              <span><span style={{ display: "block", fontSize: 15.5, fontWeight: 600, color: "var(--text)" }}>{a.title}</span><span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 2 }}>{a.category}</span></span>
+              <span><span style={{ display: "block", fontSize: 15.5, fontWeight: 600, color: "var(--text)" }}>{a.title}</span><span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 2 }}>{a.category}</span></span>
               <ChevronRight size={18} style={{ color: "var(--gold)", flexShrink: 0 }} />
             </button>
           ))}
@@ -17469,7 +17469,7 @@ function HelpCenter({ business, onBack }) {
         <div>
           {cats.map((cat) => (
             <div key={cat} style={{ marginBottom: 26 }}>
-              <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>{cat}</div>
+              <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>{cat}</div>
               {HELP_ARTICLES.filter((a) => a.category === cat).map((a) => (
                 <button key={a.id} onClick={() => setOpenArticle(a.id)} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", marginBottom: 9, textAlign: "left", cursor: "pointer" }}>
                   <span style={{ fontSize: 14.5, fontWeight: 500, color: "var(--text)" }}>{a.title}</span>
@@ -17766,7 +17766,7 @@ function MergeDuplicatesTool({ shopId, clients, setClients, appts, setAppts, sho
         <>
           {sameNameGroups.length > 0 && (
             <div style={{ marginBottom: 18 }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>READY TO MERGE</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>READY TO MERGE</div>
               {sameNameGroups.map((g) => (
                 <div key={g.phone} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 14px", marginBottom: 10 }}>
                   <div style={{ fontSize: 15.5, fontWeight: 600 }}>{g.survivor.name}</div>
@@ -17779,13 +17779,13 @@ function MergeDuplicatesTool({ shopId, clients, setClients, appts, setAppts, sho
 
           {mixedGroups.length > 0 && (
             <div>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>NEEDS YOUR CALL</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>NEEDS YOUR CALL</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>These share a phone number but have different names — could be family on one number. Merge only if they're the same person.</div>
               {mixedGroups.map((g) => (
                 <div key={g.phone} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 14px", marginBottom: 10 }}>
                   <div style={{ fontSize: 13, color: "var(--sub)", marginBottom: 6 }}>{fmtPhone(g.phone)} · {groupSummary(g)}</div>
                   {g.list.map((c, i) => (
-                    <div key={c.id} style={{ fontSize: 15, color: "var(--text)", marginBottom: 2 }}>{c.name}{i === 0 ? <span style={{ color: "var(--faint)", fontSize: 12.5 }}> · newest, kept</span> : null}</div>
+                    <div key={c.id} style={{ fontSize: 15, color: "var(--text)", marginBottom: 2 }}>{c.name}{i === 0 ? <span style={{ color: "var(--faint)", fontSize: 13.5 }}> · newest, kept</span> : null}</div>
                   ))}
                   <div style={{ display: "flex", gap: 10, marginTop: 11 }}>
                     <button onClick={() => mergeGroups([g])} disabled={busy} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: 12, fontSize: 13.5, fontWeight: 600, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>Merge</button>
@@ -17852,7 +17852,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
 
   // shared premium style idiom (matches ProductsEditor)
   const aoInp = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
-  const aoSectionLbl = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 2px 10px" };
+  const aoSectionLbl = { fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 2px 10px" };
   const aoMoneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)" };
   const aoMoneyInput = { flex: 1, minWidth: 0, width: "100%", border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
 
@@ -17900,7 +17900,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
           <input value={form.yesLabel || `Yes — ${form.name || "add it"}`} onChange={(e) => setForm({ ...form, yesLabel: e.target.value })} style={aoInp} />
           <input value={form.noLabel || "No thanks"} onChange={(e) => setForm({ ...form, noLabel: e.target.value })} style={aoInp} />
         </div>
-        <p style={{ fontSize: 12.5, color: "var(--faint)", fontStyle: "italic", margin: "8px 2px 0", lineHeight: 1.45 }}>Exactly what clients tap while booking. Edit these to whatever you want.</p>
+        <p style={{ fontSize: 13.5, color: "var(--faint)", fontStyle: "italic", margin: "8px 2px 0", lineHeight: 1.45 }}>Exactly what clients tap while booking. Edit these to whatever you want.</p>
 
         <div style={aoSectionLbl}>Asked on</div>
         {svcList.length === 0 && <p style={{ fontSize: 14, color: "var(--faint)", padding: "12px 0" }}>No services yet.</p>}
@@ -17940,7 +17940,7 @@ function AddOnsEditor({ services, setServices, business, setBusiness, showToast,
               <span style={{ width: 50, height: 50, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{a.photo ? <img src={imgUrl(a.photo, 160)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={18} style={{ color: "var(--faint)" }} />}</span>
               <span style={{ minWidth: 0, flex: 1 }}>
                 <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500 }}>{a.name}</span>
-                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 4, letterSpacing: 0.2 }}>{a.required ? "Required · " : ""}{(a.services || []).length ? (a.services || []).map(svcName).join(", ") : "Not attached yet"}</span>
+                <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 4, letterSpacing: 0.2 }}>{a.required ? "Required · " : ""}{(a.services || []).length ? (a.services || []).map(svcName).join(", ") : "Not attached yet"}</span>
               </span>
               <span style={{ fontFamily: FONT_DISPLAY, fontSize: 18, flexShrink: 0 }}>${Number(a.price) || 0}</span>
             </button>
@@ -18009,7 +18009,7 @@ function QuestionsEditor({ services, setServices, business, setBusiness, showToa
   const removeOpt = (oi) => setForm((f) => ({ ...f, options: f.options.filter((_, i) => i !== oi) }));
 
   const aoInp = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
-  const aoSectionLbl = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 2px 10px" };
+  const aoSectionLbl = { fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "26px 2px 10px" };
   const aoMoneyWrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)" };
   const aoMoneyInput = { flex: 1, minWidth: 0, width: "100%", border: "none", outline: "none", background: "transparent", padding: "14px 14px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
 
@@ -18089,7 +18089,7 @@ function QuestionsEditor({ services, setServices, business, setBusiness, showToa
             <button key={q.id} onClick={() => { setForm(JSON.parse(JSON.stringify(q))); setEditing(q.id); }} className="lift" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: "16px 18px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}>
               <span style={{ minWidth: 0, flex: 1 }}>
                 <span style={{ display: "block", fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500 }}>{q.label}</span>
-                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 4, letterSpacing: 0.2 }}>{(q.options || []).length} answer{(q.options || []).length === 1 ? "" : "s"}{q.required ? " · required" : ""} · {(q.services || []).length ? (q.services || []).map(svcName).join(", ") : "Not attached yet"}</span>
+                <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 4, letterSpacing: 0.2 }}>{(q.options || []).length} answer{(q.options || []).length === 1 ? "" : "s"}{q.required ? " · required" : ""} · {(q.services || []).length ? (q.services || []).map(svcName).join(", ") : "Not attached yet"}</span>
               </span>
               <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </button>
@@ -18244,7 +18244,7 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
   };
 
   const inp = { width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 12, padding: "14px 16px", color: "var(--text)", fontSize: 15.5, fontFamily: FONT_BODY };
-  const sectionLbl = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" };
+  const sectionLbl = { fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 12px" };
   const money$ = (n) => { const wrap = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", background: "var(--panel2)" }; return wrap; };
 
   // ---- add / edit form ----
@@ -18255,7 +18255,7 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
 
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
           <button onClick={() => fileRef.current && fileRef.current.click()} style={{ width: 132, height: 132, borderRadius: 18, border: "1px solid var(--border)", background: draft.image ? `center/cover no-repeat url(${draft.image})` : "var(--panel2)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 7, color: "var(--sub)", cursor: "pointer", overflow: "hidden", boxShadow: draft.image ? "var(--shadow-sm)" : "none" }}>
-            {!draft.image && <><Camera size={24} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 12 }}>Add photo</span></>}
+            {!draft.image && <><Camera size={24} style={{ color: "var(--faint)" }} /><span style={{ fontSize: 13 }}>Add photo</span></>}
           </button>
         </div>
         {draft.image && <div style={{ textAlign: "center" }}><button onClick={() => setDraft({ ...draft, image: "" })} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13, textDecoration: "underline", textUnderlineOffset: 2, padding: "4px 0 0", cursor: "pointer" }}>Remove photo</button></div>}
@@ -18354,11 +18354,11 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
       <button onClick={() => startEdit(p)} className="lift" style={{ display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", textAlign: "left", color: "var(--text)", cursor: "pointer", padding: 0, boxShadow: "var(--shadow-sm)", opacity: p.active === false ? 0.6 : 1 }}>
         <span style={{ position: "relative", width: "100%", aspectRatio: "1", background: p.image ? `center/cover no-repeat url(${p.image})` : "linear-gradient(160deg, var(--panel2), var(--panel))", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "inset 0 -1px 0 var(--line)" }}>
           {!p.image && <Sparkles size={26} style={{ color: "var(--faint)" }} />}
-          {p.trackStock && <span style={{ position: "absolute", top: 9, right: 9, fontSize: 10.5, fontWeight: 600, letterSpacing: 0.2, color: out ? "#fff" : low ? "#8A5A00" : "var(--text)", background: out ? "#c0392b" : low ? "#FBE7C9" : "rgba(255,255,255,.92)", border: (out || low) ? "none" : "1px solid var(--line)", borderRadius: 20, padding: "3px 9px", boxShadow: "0 1px 3px rgba(0,0,0,.08)" }}>{out ? "Out" : `${p.onHand} left`}</span>}
-          {p.active === false && <span style={{ position: "absolute", top: 9, left: 9, fontSize: 9.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "#fff", background: "rgba(10,10,10,.72)", borderRadius: 6, padding: "3px 7px" }}>Hidden</span>}
+          {p.trackStock && <span style={{ position: "absolute", top: 9, right: 9, fontSize: 12, fontWeight: 600, letterSpacing: 0.2, color: out ? "#fff" : low ? "#8A5A00" : "var(--text)", background: out ? "#c0392b" : low ? "#FBE7C9" : "rgba(255,255,255,.92)", border: (out || low) ? "none" : "1px solid var(--line)", borderRadius: 20, padding: "3px 9px", boxShadow: "0 1px 3px rgba(0,0,0,.08)" }}>{out ? "Out" : `${p.onHand} left`}</span>}
+          {p.active === false && <span style={{ position: "absolute", top: 9, left: 9, fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "#fff", background: "rgba(10,10,10,.72)", borderRadius: 6, padding: "3px 7px" }}>Hidden</span>}
         </span>
         <span style={{ padding: "12px 14px 14px" }}>
-          <span style={{ display: "block", fontSize: 9.5, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.category || "—"}</span>
+          <span style={{ display: "block", fontSize: 11.5, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.category || "—"}</span>
           <span style={{ display: "block", fontSize: 15, fontWeight: 500, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
           <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500, marginTop: 6, letterSpacing: -0.2 }}>${p.price}</span>
         </span>
@@ -18381,7 +18381,7 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
           {stats.map((s, i) => (
             <div key={s.k} style={{ flex: 1, textAlign: "center", borderLeft: i ? "1px solid var(--line)" : "none", padding: "2px 6px" }}>
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, lineHeight: 1, letterSpacing: -0.3 }}>{s.v}</div>
-              <div style={{ fontSize: 10, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 7 }}>{s.k}</div>
+              <div style={{ fontSize: 12, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 7 }}>{s.k}</div>
             </div>
           ))}
         </div>
@@ -18393,7 +18393,7 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
           const on = filterCat === t.id;
           return (
             <button key={t.label} onClick={() => setFilterCat(t.id)} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 16px", borderRadius: 22, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400, fontFamily: FONT_BODY, cursor: "pointer", whiteSpace: "nowrap" }}>
-              {t.label}<span style={{ fontSize: 12, opacity: on ? 0.7 : 0.5 }}>{t.n}</span>
+              {t.label}<span style={{ fontSize: 13, opacity: on ? 0.7 : 0.5 }}>{t.n}</span>
             </button>
           );
         })}
@@ -18406,7 +18406,7 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
           <span style={{ width: 38, height: 38, borderRadius: "50%", background: "#F5E2B8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><AlertCircle size={19} style={{ color: "#9A6A00" }} /></span>
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: "block", fontSize: 14.5, fontWeight: 600 }}>{needs.length} product{needs.length === 1 ? "" : "s"} {anyOut ? "to restock" : "running low"}</span>
-            <span style={{ display: "block", fontSize: 12.5, color: "var(--sub)", marginTop: 1 }}>{needs.slice(0, 3).map((p) => p.name).join(" · ")}{needs.length > 3 ? "…" : ""}</span>
+            <span style={{ display: "block", fontSize: 13.5, color: "var(--sub)", marginTop: 1 }}>{needs.slice(0, 3).map((p) => p.name).join(" · ")}{needs.length > 3 ? "…" : ""}</span>
           </span>
           <ChevronRight size={20} style={{ color: "#9A6A00", flexShrink: 0 }} />
         </button>
@@ -18469,9 +18469,9 @@ function ProductsEditor({ products = [], categories, onChange, onCategoriesChang
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
                         <span style={{ fontSize: 14.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                        {chip && <span style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: chip.c, background: chip.b, borderRadius: 6, padding: "2px 6px" }}>{chip.t}</span>}
+                        {chip && <span style={{ flexShrink: 0, fontSize: 11.5, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: chip.c, background: chip.b, borderRadius: 6, padding: "2px 6px" }}>{chip.t}</span>}
                       </span>
-                      <span style={{ display: "block", fontSize: 12, color: "var(--sub)", marginTop: 1 }}>{onHand} on hand{add > 0 ? ` → ${onHand + add}` : ""}</span>
+                      <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 1 }}>{onHand} on hand{add > 0 ? ` → ${onHand + add}` : ""}</span>
                     </span>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                       <button onClick={() => bumpRecv(p.id, -1)} disabled={add <= 0} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--border2)", background: "var(--panel)", color: add <= 0 ? "var(--faint)" : "var(--text)", fontSize: 18, cursor: add <= 0 ? "default" : "pointer" }}>–</button>
@@ -18518,7 +18518,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   // background is var(--panel) to match the card wrapper these render inside. ALL-CAPS call-site
   // labels are softened to sentence case so the floating label reads cleanly.
   const gFldBox = { position: "relative", border: "1.5px solid var(--border)", borderRadius: 15, padding: "18px 16px 13px", marginBottom: 14, background: "var(--panel)" };
-  const gFldLbl = { position: "absolute", top: -8, left: 13, background: "var(--panel)", padding: "0 6px", fontSize: 12, color: "var(--sub)", fontWeight: 500, fontFamily: FONT_BODY };
+  const gFldLbl = { position: "absolute", top: -8, left: 13, background: "var(--panel)", padding: "0 6px", fontSize: 13, color: "var(--sub)", fontWeight: 500, fontFamily: FONT_BODY };
   const gFldInput = { width: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent", padding: 0, color: "var(--text)", fontSize: 17, fontWeight: 500, fontFamily: FONT_BODY };
   const niceLabel = (s) => (s == null ? "" : (() => { const t = String(s); return /[a-z]/.test(t) ? t : (t.charAt(0) + t.slice(1).toLowerCase()); })());
 
@@ -18566,11 +18566,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       status: "Customize", keywords: "booking copy wording headlines titles category cut question text voice customize edit words",
       editor: (<>
         <BookingWordingPreview bs={form.bookingStep || {}} />
-        <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The words clients see while booking. Leave any field blank to use the default shown in grey.</div>
-        <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, margin: "2px 0 8px" }}>CATEGORY SCREEN</div>
+        <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, marginBottom: 16 }}>The words clients see while booking. Leave any field blank to use the default shown in grey.</div>
+        <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, margin: "2px 0 8px" }}>CATEGORY SCREEN</div>
         {bword("HEADLINE", "catHead", "What are you here for today?")}
         {bword("SUB-LINE", "catLead", "Tell us the vibe — we'll take it from there.")}
-        <div style={{ fontSize: 11, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, margin: "12px 0 8px" }}>CUT SCREEN</div>
+        <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, margin: "12px 0 8px" }}>CUT SCREEN</div>
         {bword("GREETING PILL", "greeting", "First time? Welcome in")}
         {bword("HEADLINE", "head", "What are we doing today?")}
         {bword("SUB-LINE", "lead", "Just pick your style — we'll handle the details in the chair.")}
@@ -18637,7 +18637,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       editor: (
         <>
         {/* Row size — pinned at top */}
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>CALENDAR ROW SIZE</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>CALENDAR ROW SIZE</div>
         <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>How tall each hour appears on your calendar. Larger rows give appointments room to breathe.</div>
         <div style={{ display: "flex", background: "var(--panel2)", borderRadius: 12, padding: 4, gap: 4, marginBottom: 22, border: "1px solid var(--border)" }}>
           {["S","M","L","XL"].map((s) => { const on = (form.calendarRowSize || "L") === s; return (
@@ -18645,7 +18645,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           ); })}
         </div>
 
-        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>WEEK STARTS ON</div>
+        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>WEEK STARTS ON</div>
         <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>The first day shown on your calendar's week strip.</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 22 }}>
           {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map((day, i) => { const on = (form.weekStartsOn ?? 0) === i; return (
@@ -18689,7 +18689,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           );
           return (
             <div style={{ marginTop: 22 }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>VISIBLE HOURS</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>VISIBLE HOURS</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>The time range your calendar shows. Set it to cover your real open hours.</div>
               <Stepper label="Day starts" sub="Top of the calendar" value={startHr}
                 onDec={() => setCal({ dayStartHr: Math.max(5, startHr - 1) })}
@@ -18702,7 +18702,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         })()}
         {(providers || []).filter((p) => p.id !== "anyone").length > 1 && (
           <div style={{ marginTop: 22 }}>
-            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>COLUMN ORDER</div>
+            <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>COLUMN ORDER</div>
             <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 12, lineHeight: 1.45 }}>Default left-to-right order of staff columns on the calendar. Whoever you're viewing still leads, and anyone off that day moves to the right.</div>
             <ColumnOrderEditor providers={providers} setProviders={setProviders} />
           </div>
@@ -18771,7 +18771,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             <div style={{ background: "rgba(255,255,255,.15)", borderRadius: 12, padding: "12px 14px", fontSize: 14, lineHeight: 1.5 }}>A regular's cut that's booked as <span style={{ opacity: .7, textDecoration: "line-through" }}>30 min</span> <strong>35 min</strong> — because that's how long it actually takes. So their next booking holds 35, and the client behind them isn't left waiting.</div>
           </div>
 
-          <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 2px 8px" }}>How it works</div>
+          <div style={{ fontSize: 13, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "0 2px 8px" }}>How it works</div>
           <div style={{ marginBottom: 22 }}>
             {[["1", "You finish the appointment", "At checkout, Vero shows how long it really took."], ["2", "Save it as their time — one tap", "Need more time for a detailed client? Less for a quick regular? Save the real number."], ["3", "Next time, it just fits", "Their future bookings reserve that exact length automatically. No guessing, no rushing, no dead gaps."]].map(([n, b, d], i) => (
               <div key={n} style={{ display: "flex", gap: 13, alignItems: "flex-start", padding: "13px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
@@ -19135,7 +19135,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <div style={{ marginBottom: 22 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 600, lineHeight: 1.12, letterSpacing: "-0.4px", margin: 0 }}>{active.title}</h2>
-            {active.smart && <span style={{ fontFamily: FONT_DISPLAY, fontSize: 12, fontStyle: "italic", letterSpacing: "0.2px", color: "var(--faint)" }}>learns</span>}
+            {active.smart && <span style={{ fontFamily: FONT_DISPLAY, fontSize: 13, fontStyle: "italic", letterSpacing: "0.2px", color: "var(--faint)" }}>learns</span>}
           </div>
           {(active.subtitle || active.status) && <div style={{ fontSize: 13, color: "var(--sub)", fontWeight: 400, marginTop: 5, lineHeight: 1.4 }}>{active.subtitle || active.status}</div>}
         </div>
@@ -19162,9 +19162,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
           <div style={{ minWidth: 0, flexShrink: 0, maxWidth: hasToggle ? "82%" : "52%" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
               <span style={{ fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px", whiteSpace: refreshed ? "normal" : "normal" }}>{c.title}</span>
-              {c.smart && <span style={{ fontFamily: "'Fraunces', serif", fontSize: 11, fontStyle: "italic", letterSpacing: "0.2px", color: "var(--faint)", flexShrink: 0 }}>learns</span>}
+              {c.smart && <span style={{ fontFamily: "'Fraunces', serif", fontSize: 12.5, fontStyle: "italic", letterSpacing: "0.2px", color: "var(--faint)", flexShrink: 0 }}>learns</span>}
             </div>
-            {!refreshed && (c.subtitle || c.status) && <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>}
+            {!refreshed && (c.subtitle || c.status) && <div style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subtitle || c.status}</div>}
           </div>
           {!refreshed && <span onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, display: "flex", alignItems: "center" }}><Explain title={c.title}>{explainText}</Explain></span>}
           {hasToggle ? (
@@ -19194,9 +19194,9 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
           {Ic && <Ic size={20} style={{ color: "var(--gold)", flexShrink: 0 }} />}
           <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16.5, fontWeight: 500, letterSpacing: "-0.2px", lineHeight: 1.1 }}>{c.title}</span>
-          {c.smart && <span style={{ fontSize: 8.5, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 5, padding: "2px 5px" }}>SMART</span>}
+          {c.smart && <span style={{ fontSize: 10, letterSpacing: 1, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--wash)", borderRadius: 5, padding: "2px 5px" }}>SMART</span>}
         </span>
-        {meta && <span style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 11, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{meta}</span>}
+        {meta && <span style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 11, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{meta}</span>}
       </button>
     );
   };
@@ -19225,7 +19225,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
               <span style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--live, var(--gold))", color: "#16181C", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Check size={18} strokeWidth={3} /></span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500 }}>Every scenario checks out 🎉</div>
-                <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>All {totalCount} client scenarios verified.</div>
+                <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>All {totalCount} client scenarios verified.</div>
               </div>
             </div>
             <button onClick={() => setCockpitHidden(true)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 6, display: "flex", alignItems: "center" }}><X size={16} /></button>
@@ -19239,11 +19239,11 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                 <span style={{ width: 40, height: 40, borderRadius: 12, background: "color-mix(in srgb, var(--live, var(--gold)) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Sparkles size={19} style={{ color: "var(--live, var(--gold))" }} /></span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 18, lineHeight: 1.1 }}>Does every client scenario work?</div>
-                  <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>Walk each path a client can take and tick it off as you verify it</div>
+                  <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>Walk each path a client can take and tick it off as you verify it</div>
                 </div>
               </div>
               <div style={{ height: 8, borderRadius: 8, background: "var(--panel2)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((doneCount / totalCount) * 100)}%`, background: "var(--live, var(--gold))", borderRadius: 8, transition: "width .3s" }} /></div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 9, fontSize: 12, color: "var(--faint)" }}><span>{doneCount} of {totalCount} checked</span><span>{totalCount - doneCount} left</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 9, fontSize: 13, color: "var(--faint)" }}><span>{doneCount} of {totalCount} checked</span><span>{totalCount - doneCount} left</span></div>
             </div>
             <button onClick={() => setCockpitHidden(true)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 6, display: "flex", alignItems: "flex-start" }}><X size={16} /></button>
           </div>
@@ -19260,23 +19260,23 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                   <span style={{ width: 34, height: 34, borderRadius: 10, background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold)", flexShrink: 0 }}><SIcon size={16} /></span>
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 15.5, fontWeight: 600, letterSpacing: -0.1 }}>{s.label}</span>
-                    <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 1 }}>{s.desc}</span>
+                    <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 1 }}>{s.desc}</span>
                   </span>
-                  <span style={{ fontSize: 11.5, fontWeight: 600, padding: "4px 9px", borderRadius: 20, flexShrink: 0, background: complete ? "color-mix(in srgb, var(--live, var(--gold)) 18%, transparent)" : "var(--panel2)", color: complete ? "var(--live, var(--gold))" : "var(--sub)" }}>{complete ? "\u2713 Done" : `${done}/${total}`}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, padding: "4px 9px", borderRadius: 20, flexShrink: 0, background: complete ? "color-mix(in srgb, var(--live, var(--gold)) 18%, transparent)" : "var(--panel2)", color: complete ? "var(--live, var(--gold))" : "var(--sub)" }}>{complete ? "\u2713 Done" : `${done}/${total}`}</span>
                   <ChevronRight size={16} style={{ color: "var(--faint)", flexShrink: 0, transform: open ? "rotate(90deg)" : "none", transition: "transform .2s" }} />
                 </button>
                 {open && (
                   <div style={{ borderTop: "1px solid var(--line)", padding: "6px 16px 12px" }}>
                     {s.groups.map((g) => (
                       <div key={g.label}>
-                        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "14px 2px 4px" }}>{g.label}</div>
+                        <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, margin: "14px 2px 4px" }}>{g.label}</div>
                         {g.items.map((it, i) => {
                           const on = isDone(it);
                           return (
                             <div key={it.k} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "11px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
                               <button onClick={() => toggleCheck(it.k)} aria-pressed={on} style={{ width: 21, height: 21, borderRadius: 6, flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", background: on ? "var(--live, var(--gold))" : "transparent", border: on ? "1.5px solid var(--live, var(--gold))" : "1.5px solid var(--border2)", cursor: "pointer", padding: 0 }}>{on && <Check size={12} style={{ color: "#16181C" }} strokeWidth={3} />}</button>
                               <button onClick={() => toggleCheck(it.k)} style={{ flex: 1, background: "none", border: "none", color: on ? "var(--faint)" : "var(--text)", textAlign: "left", fontSize: 14.5, lineHeight: 1.4, padding: 0, cursor: "pointer", textDecoration: on ? "line-through" : "none" }}>{it.label}</button>
-                              {it.card && <button onClick={() => setOpenCard(it.card)} style={{ fontSize: 12, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, background: "none", border: "none", flexShrink: 0, marginTop: 2, cursor: "pointer" }}>Open</button>}
+                              {it.card && <button onClick={() => setOpenCard(it.card)} style={{ fontSize: 13, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, background: "none", border: "none", flexShrink: 0, marginTop: 2, cursor: "pointer" }}>Open</button>}
                             </div>
                           );
                         })}
@@ -19293,7 +19293,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
 
       {!showCockpit && !openCat && !q && (
-        <p style={{ fontSize: 12.5, color: "var(--faint)", margin: "0 4px 24px", lineHeight: 1.5 }}>Type what you're after in plain words — or jump to a common one below.</p>
+        <p style={{ fontSize: 13.5, color: "var(--faint)", margin: "0 4px 24px", lineHeight: 1.5 }}>Type what you're after in plain words — or jump to a common one below.</p>
       )}
 
       {q ? (
@@ -19343,7 +19343,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                           <button onClick={() => setOpenGroup({ label: g.label, desc: g.desc, ids: g.ids, catLabel: cat.label })} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "center", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
                             <span style={{ flex: 1, minWidth: 0 }}>
                               <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>{g.label}</span>
-                              {g.desc && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.desc}</span>}
+                              {g.desc && <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.desc}</span>}
                             </span>
                             <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
                           </button>
@@ -19353,7 +19353,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
                   }
                   return (
                     <div key={g.label} style={{ marginBottom: 22 }}>
-                      <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 9px" }}>{g.label}</div>
+                      <div style={{ fontSize: 12, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 9px" }}>{g.label}</div>
                       <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
                         {groupCards.map((c, i) => <SettingRow key={c.id} c={c} first={i === 0} refreshed />)}
                       </div>
@@ -19376,13 +19376,13 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             if (!inSection.length) return null;
             return (
               <div key={sectionName} style={{ marginBottom: 22 }}>
-                <div style={{ fontSize: 10.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 9px" }}>{sectionName}</div>
+                <div style={{ fontSize: 12, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, margin: "0 4px 9px" }}>{sectionName}</div>
                 <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
                   {inSection.map((cat, i) => (
                     <button key={cat.id} onClick={() => { if (cat.settings.length === 1) { setOpenCard(cat.settings[0]); } else { setOpenCat(cat.id); } }} style={{ width: "100%", background: "none", border: "none", borderTop: i ? "1px solid var(--line)" : "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>{cat.label}</span>
-                        <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.desc}</span>
+                        <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.desc}</span>
                       </span>
                       <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
                     </button>
@@ -19401,7 +19401,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             <button onClick={() => setHelpOpen(true)} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "baseline", gap: 12, padding: "17px 17px", minHeight: 60, textAlign: "left", color: "var(--text)", cursor: "pointer" }}>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: "block", fontSize: 18, fontWeight: 400, letterSpacing: "-0.2px" }}>Help &amp; support</span>
-                <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>Guides, answers &amp; how-tos</span>
+                <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>Guides, answers &amp; how-tos</span>
               </span>
               <ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} />
             </button>
@@ -19411,7 +19411,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
 
           {onSignOutAccount && (
             <div style={{ marginTop: 40, paddingTop: 4, textAlign: "center" }}>
-              {authEmail && <div style={{ fontSize: 12, color: "var(--faint)", marginBottom: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Signed in as {authEmail}</div>}
+              {authEmail && <div style={{ fontSize: 13, color: "var(--faint)", marginBottom: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Signed in as {authEmail}</div>}
               <button onClick={() => { if (typeof window !== "undefined" && window.confirm("Log out of this account?")) onSignOutAccount(); }} style={{ background: "none", border: "none", borderBottom: "1px solid var(--border)", borderRadius: 0, padding: "0 0 3px", color: "var(--sub)", fontSize: 14, fontWeight: 400, fontFamily: FONT_BODY, letterSpacing: "0.3px", cursor: "pointer" }}>
                 Log out
               </button>
@@ -19470,16 +19470,16 @@ function NativeDiagnostics() {
   useEffect(() => { run(); }, []);
   return (
     <div style={{ marginTop: 18, padding: "14px 16px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--panel2)" }}>
-      <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-3</div>
-      <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: "var(--text2)", lineHeight: 1.75, wordBreak: "break-all" }}>
+      <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 9 }}>Diagnostics · {isNative ? "app" : "web"} · build diag-3</div>
+      <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, color: "var(--text2)", lineHeight: 1.75, wordBreak: "break-all" }}>
         <div>auth.uid(): <b style={{ color: "var(--text)" }}>{info.uid}</b></div>
         {info.push ? <div>push: {info.push}</div> : null}
         {info.err ? <div style={{ color: "var(--text)" }}>error: {info.err}</div> : null}
-        {info.claims ? <div style={{ color: "var(--sub)", fontSize: 11 }}>claims: {info.claims}</div> : null}
+        {info.claims ? <div style={{ color: "var(--sub)", fontSize: 12.5 }}>claims: {info.claims}</div> : null}
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
-        <button onClick={run} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY }}>Re-check</button>
-        <button onClick={forcePush} disabled={pushBusy} style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--text)", borderRadius: 10, padding: "9px 16px", fontSize: 12.5, fontWeight: 600, cursor: pushBusy ? "default" : "pointer", fontFamily: FONT_BODY }}>{pushBusy ? "Registering…" : "Register push"}</button>
+        <button onClick={run} style={{ background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: "9px 16px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY }}>Re-check</button>
+        <button onClick={forcePush} disabled={pushBusy} style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--text)", borderRadius: 10, padding: "9px 16px", fontSize: 13.5, fontWeight: 600, cursor: pushBusy ? "default" : "pointer", fontFamily: FONT_BODY }}>{pushBusy ? "Registering…" : "Register push"}</button>
       </div>
     </div>
   );
@@ -19544,7 +19544,7 @@ function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, prov
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 16, fontWeight: 500 }}>{w.name || "Client"}</div>
               <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2 }}>{w.service}{w.provider ? ` · prefers ${w.provider}` : ""}</div>
-              {w.when && <div style={{ display: "inline-block", marginTop: 8, fontSize: 12.5, background: "rgba(176,141,87,0.12)", border: "1px solid rgba(176,141,87,0.3)", borderRadius: 20, padding: "4px 11px", color: "var(--gold)" }}>{whenLabel[w.when] || w.when}</div>}
+              {w.when && <div style={{ display: "inline-block", marginTop: 8, fontSize: 13.5, background: "rgba(176,141,87,0.12)", border: "1px solid rgba(176,141,87,0.3)", borderRadius: 20, padding: "4px 11px", color: "var(--gold)" }}>{whenLabel[w.when] || w.when}</div>}
             </div>
             <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
           </button>
@@ -19610,7 +19610,7 @@ function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, prov
             <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 14 }}>
               {dayOpts.map((d, i) => { const l = dayLabel(d); const on = aDays.includes(l); const atMax = !on && aDays.length >= 3; return (
                 <button key={i} disabled={atMax} onClick={() => toggleDay(l)} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", textAlign: "center", opacity: atMax ? 0.4 : 1 }}>
-                  <div style={{ fontSize: 12, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
+                  <div style={{ fontSize: 13, letterSpacing: 1, opacity: 0.7 }}>{["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}</div>
                   <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{d.getDate()}</div>
                 </button>
               ); })}
@@ -19699,7 +19699,7 @@ const _SHEET = {
   head: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "calc(env(safe-area-inset-top) + 20px) 22px 16px" },
   title: { fontSize: 21, fontWeight: 600, letterSpacing: -0.4 },
   sub: { fontSize: 13, color: "var(--gold)", fontWeight: 500, marginTop: 5 },
-  cancel: { border: "1px solid var(--border)", background: "transparent", color: "var(--sub)", fontSize: 11, fontWeight: 600, letterSpacing: 1.2, padding: "9px 14px", borderRadius: 10, cursor: "pointer", flexShrink: 0, fontFamily: FONT_BODY },
+  cancel: { border: "1px solid var(--border)", background: "transparent", color: "var(--sub)", fontSize: 12.5, fontWeight: 600, letterSpacing: 1.2, padding: "9px 14px", borderRadius: 10, cursor: "pointer", flexShrink: 0, fontFamily: FONT_BODY },
   onat: { display: "flex", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" },
   cell: { flex: 1, padding: "16px 22px" },
   k: { color: "var(--faint)", fontSize: 14, marginRight: 7 },
@@ -19811,8 +19811,8 @@ function BarberHoursSheet({ providerName, dateLabel, weekdayName, initial, fmtTi
                 <span style={{ fontSize: 16 }}>Working this day</span>
                 <Switch on={on} />
               </div>
-              {on && !valid && <div style={{ fontSize: 12, color: "#e0796a", marginTop: 10 }}>End needs to be after the start.</div>}
-              <div style={{ fontSize: 12, letterSpacing: 0.3, color: "var(--sub)", margin: "24px 0 12px" }}>Apply to</div>
+              {on && !valid && <div style={{ fontSize: 13, color: "#e0796a", marginTop: 10 }}>End needs to be after the start.</div>}
+              <div style={{ fontSize: 13, letterSpacing: 0.3, color: "var(--sub)", margin: "24px 0 12px" }}>Apply to</div>
               <div style={{ display: "flex", gap: 10 }}>
                 {[["day", "Just this day"], ["week", "Every " + weekdayName]].map(([v, lbl]) => {
                   const sel = scope === v;
@@ -20104,7 +20104,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
           {/* OPTIONS — any cut choice / question / add-on from the master libraries */}
           {service && allOptionGroups.length > 0 && (
             <div style={fieldWrap}>
-              <div style={{ fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 16 }}>Options</div>
+              <div style={{ fontSize: 13, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 16 }}>Options</div>
               {allOptionGroups.map((g) => {
                 if (g.type === "choice") {
                   return (
@@ -20247,7 +20247,7 @@ function DatePickerSheet({ selectedDate, onPick, onClose }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
         <button onClick={() => stepMonth(-1)} aria-label="Previous month" style={navBtn}><ChevronLeft size={17} /></button>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 4 }}>{year}</div>
+          <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 4 }}>{year}</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, letterSpacing: -0.3 }}>{MONTHS[monthIdx]}</div>
         </div>
         <button onClick={() => stepMonth(1)} aria-label="Next month" style={navBtn}><ChevronRight size={17} /></button>
@@ -20255,7 +20255,7 @@ function DatePickerSheet({ selectedDate, onPick, onClose }) {
       {/* Day-of-week header */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6 }}>
         {["S","M","T","W","T","F","S"].map((d, i) => (
-          <div key={i} style={{ textAlign: "center", fontSize: 10.5, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, padding: "6px 0" }}>{d}</div>
+          <div key={i} style={{ textAlign: "center", fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", fontWeight: 600, padding: "6px 0" }}>{d}</div>
         ))}
       </div>
       {/* Date grid */}
@@ -21117,18 +21117,18 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
             </div>
             {liveOpenings.length > 0 && (
               <div style={{ marginBottom: 22 }}>
-                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "#16A34A", fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16A34A" }} />OPENING{liveOpenings.length > 1 ? "S" : ""} TO FILL</div>
+                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "#16A34A", fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16A34A" }} />OPENING{liveOpenings.length > 1 ? "S" : ""} TO FILL</div>
                 <div style={{ display: "grid", gap: 12 }}>
                   {liveOpenings.map((o) => (
                     <div key={o.id} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)" }}>{fmtTime(o.start)}–{fmtTime(o.end)}{(providers.find((p) => p.id === o.providerId) || {}).name ? ` · ${(providers.find((p) => p.id === o.providerId) || {}).name}` : ""}</div>
-                      <div style={{ fontSize: 12.5, color: "var(--sub)", marginBottom: 10 }}>{relativeDate(new Date(o.bookedFor))}</div>
+                      <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 10 }}>{relativeDate(new Date(o.bookedFor))}</div>
                       <div style={{ display: "grid", gap: 8 }}>
                         {o.people.map((p) => (
                           <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontSize: 14.5, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name || "Client"}</div>
-                              <div style={{ fontSize: 11, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 600, color: p.earlierApptId ? "#96621E" : "var(--faint)" }}>{p.earlierApptId ? "Booked · wants earlier" : "Waitlist"}</div>
+                              <div style={{ fontSize: 12.5, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 600, color: p.earlierApptId ? "#96621E" : "var(--faint)" }}>{p.earlierApptId ? "Booked · wants earlier" : "Waitlist"}</div>
                             </div>
                             <button className="lift" onClick={() => sendOpeningOffer(p, o)} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "9px 14px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><Bell size={15} /> Send offer</button>
                           </div>
@@ -21137,7 +21137,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     </div>
                   ))}
                 </div>
-                <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Booked clients who asked for an earlier time show first. Each offer is a text + email with a booking link — sent only when you tap. Nothing goes out on its own.</p>
+                <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Booked clients who asked for an earlier time show first. Each offer is a text + email with a booking link — sent only when you tap. Nothing goes out on its own.</p>
               </div>
             )}
             <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={(p) => showToast && showToast(`Texting ${p.name || "client"}…`)} onNotify={(w) => sendOpeningOffer(w, null)} showToast={showToast} providers={providers} services={services} />
@@ -21156,7 +21156,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
             {/* Row size */}
             <div style={{ marginBottom: 22 }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>ROW HEIGHT</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>ROW HEIGHT</div>
               <div style={{ display: "flex", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 4, gap: 4 }}>
                 {ROW_SIZES.map((s) => { const on = sizeId === s.id; return (
                   <button key={s.id} onClick={() => setBusiness({ ...business, calendarRowSize: s.id })} style={{ flex: 1, padding: "11px 0", borderRadius: 8, fontSize: 14, background: on ? "var(--gold)" : "transparent", color: on ? "var(--on-gold)" : "var(--sub)", fontWeight: on ? 700 : 500, letterSpacing: 0.5 }}>{s.label}</button>
@@ -21166,7 +21166,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
             {/* Staff filter */}
             <div style={{ marginBottom: 22 }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>SHOWING</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>SHOWING</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {allStaff.map((p) => {
                   const on = !hidden.includes(p.id);
@@ -21182,15 +21182,15 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
             {/* Column order */}
             {allStaff.length > 1 && (
               <div style={{ marginBottom: 22 }}>
-                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>COLUMN ORDER</div>
+                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>COLUMN ORDER</div>
                 <ColumnOrderEditor providers={providers} setProviders={setProviders} />
-                <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Default left-to-right order. Whoever you're viewing still leads; anyone off that day moves to the right.</p>
+                <p style={{ fontSize: 13.5, color: "var(--faint)", marginTop: 10, lineHeight: 1.5 }}>Default left-to-right order. Whoever you're viewing still leads; anyone off that day moves to the right.</p>
               </div>
             )}
 
             {/* Legend */}
             <div>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>STATUS COLORS</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>STATUS COLORS</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 9, fontSize: 14, color: "var(--text)" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: STATUS_COLORS["checked-in"] }} /> Checked in</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 12, height: 12, borderRadius: 12, background: STATUS_COLORS["in-service"] }} /> In service</span>
@@ -21221,7 +21221,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
             <span>{relativeDate(selectedDate)}</span>
             <ChevronDown size={19} style={{ color: "var(--faint)", flexShrink: 0 }} />
           </h2>
-          <div style={{ fontSize: 11, letterSpacing: "3px", color: "var(--faint)", marginTop: 12, fontWeight: 500, textTransform: "uppercase" }}>{`${DAYS[selectedDate.getDay()]} · ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
+          <div style={{ fontSize: 12.5, letterSpacing: "3px", color: "var(--faint)", marginTop: 12, fontWeight: 500, textTransform: "uppercase" }}>{`${DAYS[selectedDate.getDay()]} · ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`}</div>
         </button>
         {(() => {
           const isToday = sameDay(selectedDate.toISOString(), today);
@@ -21248,7 +21248,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
       <Sheet open={calMenuOpen} onClose={() => setCalMenuOpen(false)} align="bottom" maxWidth={420}>
         <div style={{ padding: "8px 0 4px" }}>
-          <button onClick={() => { setCalMenuOpen(false); setShowWaitlistPanel(true); }} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "center", gap: 13, padding: "16px 6px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, cursor: "pointer", textAlign: "left", borderBottom: "1px solid var(--line)" }}><Clock size={18} style={{ color: "var(--sub)" }} /> <span style={{ flex: 1 }}>Waitlist</span>{waitlist.length > 0 && <span style={{ background: "var(--text)", color: "var(--bg)", fontSize: 12, fontWeight: 500, borderRadius: 18, minWidth: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 6px" }}>{waitlist.length}</span>}</button>
+          <button onClick={() => { setCalMenuOpen(false); setShowWaitlistPanel(true); }} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "center", gap: 13, padding: "16px 6px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, cursor: "pointer", textAlign: "left", borderBottom: "1px solid var(--line)" }}><Clock size={18} style={{ color: "var(--sub)" }} /> <span style={{ flex: 1 }}>Waitlist</span>{waitlist.length > 0 && <span style={{ background: "var(--text)", color: "var(--bg)", fontSize: 13, fontWeight: 500, borderRadius: 18, minWidth: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 6px" }}>{waitlist.length}</span>}</button>
           <button onClick={() => { setCalMenuOpen(false); setShowCalendarOptions(true); }} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "center", gap: 13, padding: "16px 6px", color: "var(--text)", fontSize: 16, fontFamily: FONT_BODY, cursor: "pointer", textAlign: "left" }}><Settings size={18} style={{ color: "var(--sub)" }} /> <span style={{ flex: 1 }}>Calendar settings</span></button>
         </div>
       </Sheet>
@@ -21266,7 +21266,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const isToday = offset === 0;
           return (
             <button key={offset} data-today={isToday ? "1" : undefined} data-sel={isSelected ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: d.getDay() === 0 ? "start" : "none", textAlign: "center", padding: "10px 4px 12px", borderRadius: 14, background: isSelected ? "var(--gold)" : (isToday ? "var(--wash)" : "transparent"), color: isSelected ? "var(--on-gold)" : (isToday ? "var(--gold)" : "var(--sub)"), border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
-              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10.5, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.85 : (isToday ? 0.8 : 0.55) }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.85 : (isToday ? 0.8 : 0.55) }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: isSelected || isToday ? 500 : 400, lineHeight: 1 }}>{d.getDate()}</div>
               {!isSelected && isToday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "var(--gold)" }} />}
             </button>
@@ -21296,7 +21296,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
         {/* time gutter — hour labels only, right-aligned against the grid line */}
         <div style={{ width: 48, flexShrink: 0, position: "relative", height: gridHeight }}>
           {quarterLines.filter((t) => t < DAY_END && t % 60 === 0).map((t) => (
-            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, right: 8, fontSize: 12, color: "var(--faint)", fontWeight: 400, fontVariantNumeric: "tabular-nums", transform: "translateY(-50%)", background: "var(--bg)", padding: "1px 0 1px 3px" }}>
+            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, right: 8, fontSize: 13, color: "var(--faint)", fontWeight: 400, fontVariantNumeric: "tabular-nums", transform: "translateY(-50%)", background: "var(--bg)", padding: "1px 0 1px 3px" }}>
               {fmtTime(t).replace(":00", "")}
             </div>
           ))}
@@ -21375,7 +21375,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               ); })}
               {/* open-gap markers — display only, sit behind the tap layer so tapping a gap still opens a new appointment */}
               {gapsForProvider(p).map((g) => (
-                <div key={`gap-${g.start}`} style={{ position: "absolute", top: (g.start - DAY_START) * PPM + 1, left: 0, right: 0, height: (g.end - g.start) * PPM - 2, borderRadius: 3, background: "color-mix(in srgb, var(--text) 3.5%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 500, letterSpacing: 0.2, color: "var(--faint)", pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
+                <div key={`gap-${g.start}`} style={{ position: "absolute", top: (g.start - DAY_START) * PPM + 1, left: 0, right: 0, height: (g.end - g.start) * PPM - 2, borderRadius: 3, background: "color-mix(in srgb, var(--text) 3.5%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12.5, fontWeight: 500, letterSpacing: 0.2, color: "var(--faint)", pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
                   {(g.end - g.start) >= 30 ? `${g.end - g.start} min open` : ""}
                 </div>
               ))}
@@ -21446,31 +21446,31 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                     className={isDragging ? "" : "lift"}
                     style={{ position: "absolute", top, ...lanePos, height, background: blkBg, opacity: isDone ? 0.6 : 1, border: "none", borderRadius: 3, padding: height > 48 ? "10px 14px 6px" : "5px 14px", color: nameOn, textAlign: "left", overflow: "hidden", display: "flex", flexDirection: "column", cursor: "grab", touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", zIndex: isDragging ? 40 : 1, boxShadow: isDragging ? "var(--shadow-lg)" : "none", transition: isDragging ? "none" : "box-shadow .15s var(--ease)" }}>
                     {/* service — small-caps eyebrow above the name on tall-enough tiles (service only, clean) */}
-                    {height > 48 && <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{svcTop}</span>}
+                    {height > 48 && <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", color: subOn, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{svcTop}</span>}
                     {/* client name — compact & airy, sized to FIT the full name like Mango (Dan-approved). */}
                     <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2, letterSpacing: "-0.1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: height > 48 ? 3 : 0, paddingRight: height <= 54 && isNew ? 30 : 0 }}>{apptDisplayName(a, clients)}</span>
                     {/* full time range under the name */}
-                    {height > 64 && <span style={{ fontSize: 11, color: subOn, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{range}</span>}
+                    {height > 64 && <span style={{ fontSize: 12.5, color: subOn, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{range}</span>}
                     {/* cut style + add-ons on tall blocks — online bookings carry them (shortened) on
                         addonLabels; older/staff appts keep a free-text detail string, shown verbatim */}
                     {height > 110 && (() => {
                       const txt = (Array.isArray(a.addonLabels) && a.addonLabels.length)
                         ? [...new Set(a.addonLabels.map(cleanServiceLabel).filter(Boolean))].join(" · ")
                         : (a.detail || "");
-                      return txt ? <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: 0.1, color: nameOn, lineHeight: 1.35, marginTop: 5, paddingRight: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{txt}</div> : null;
+                      return txt ? <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.1, color: nameOn, lineHeight: 1.35, marginTop: 5, paddingRight: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{txt}</div> : null;
                     })()}
                     {/* quiet markers, bottom-right: ✎ note · ▱ photos · NEW · ↻ rebooked · ★ regular */}
                     {height > 54 && (
                     <div style={{ position: "absolute", bottom: 9, right: 11, display: "flex", gap: 7, alignItems: "center", color: subOn }}>
                       {a.hasNote && <Edit2 size={11} style={{ opacity: 0.75 }} />}
                       {a.hasPhotos && <ImageIcon size={12} style={{ opacity: 0.75 }} />}
-                      {isNew && <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8, color: nameOn }}>NEW</span>}
+                      {isNew && <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.8, color: nameOn }}>NEW</span>}
                       {rebooked && <span style={{ fontSize: 13, lineHeight: 1 }}>↻</span>}
                       {a.vip && <span style={{ fontSize: 13, color: nameOn }}>★</span>}
                     </div>
                     )}
                     {/* short tiles still flag a first-time client */}
-                    {height <= 54 && isNew && <span style={{ position: "absolute", top: 6, right: 11, fontSize: 9, fontWeight: 700, letterSpacing: 0.8, color: nameOn }}>NEW</span>}
+                    {height <= 54 && isNew && <span style={{ position: "absolute", top: 6, right: 11, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, color: nameOn }}>NEW</span>}
                   </div>
                 );
               })}
@@ -21494,7 +21494,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
               <div key={m.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel2)", border: `1px solid ${queued ? "var(--border)" : "var(--gold)"}`, borderRadius: 12, padding: "11px 14px", opacity: queued ? 0.6 : 1 }}>
                 <div><div style={{ fontSize: 15, fontWeight: 600 }}>{m.name}</div><div style={{ fontSize: 13, color: "var(--sub)" }}>{m.service}{m.provider ? ` · ${m.provider}` : ""}</div></div>
                 {wlRules.order === "longest"
-                  ? (i === 0 ? <span style={{ fontSize: 12, fontWeight: 600, color: "var(--gold)" }}>FIRST UP</span> : <span style={{ fontSize: 12, color: "var(--faint)" }}>in {(wlRules.delayMin || 30) * i} min</span>)
+                  ? (i === 0 ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--gold)" }}>FIRST UP</span> : <span style={{ fontSize: 13, color: "var(--faint)" }}>in {(wlRules.delayMin || 30) * i} min</span>)
                   : <Check size={16} style={{ color: "var(--gold)" }} />}
               </div>
             ); })}
@@ -21518,7 +21518,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           <div onClick={() => setNotifyMove((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, textAlign: "left", background: notifyMove ? "var(--tint2)" : "var(--panel2)", border: `1px solid ${notifyMove ? "color-mix(in srgb, var(--gold) 32%, var(--border))" : "var(--border)"}`, borderRadius: 13, padding: "12px 14px", marginBottom: 16, cursor: "pointer" }}>
             <div>
               <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text)" }}>Notify client of the new time</div>
-              <div style={{ fontSize: 12.5, color: notifyMove ? "var(--gold)" : "var(--sub)", marginTop: 2 }}>{notifyMove ? "We'll text them the change when you confirm" : "They won't be told unless you turn this on"}</div>
+              <div style={{ fontSize: 13.5, color: notifyMove ? "var(--gold)" : "var(--sub)", marginTop: 2 }}>{notifyMove ? "We'll text them the change when you confirm" : "They won't be told unless you turn this on"}</div>
             </div>
             <span role="switch" aria-checked={notifyMove} style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: notifyMove ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: notifyMove ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
           </div>
@@ -21605,7 +21605,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
             <div style={{ position: "fixed", left, top, width: MW, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 16, padding: 12, zIndex: 56, boxShadow: "var(--shadow-lg)", boxSizing: "border-box", transformOrigin: "top center", animation: "popIn .18s var(--ease) both" }}>
               <div style={{ padding: "2px 4px 10px" }}>
                 <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.2 }}>{fmtTime(createSlot.start)}</div>
-                <div style={{ fontSize: 12.5, color: "var(--sub)" }}>with {(providers.find((p) => p.id === createSlot.providerId) || {}).name}</div>
+                <div style={{ fontSize: 13.5, color: "var(--sub)" }}>with {(providers.find((p) => p.id === createSlot.providerId) || {}).name}</div>
               </div>
               <button className="lift" onClick={() => createAt("appt")} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "var(--gold)", color: "var(--on-gold)", padding: "12px 13px", borderRadius: 11, fontSize: 14, fontWeight: 600, marginBottom: 7, boxSizing: "border-box" }}><Calendar size={16} /> New appointment</button>
               <button className="lift" onClick={() => createAt("block")} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", padding: "12px 13px", borderRadius: 11, fontSize: 14, fontWeight: 500, boxSizing: "border-box" }}><Clock size={16} style={{ color: "var(--sub)" }} /> Block off time</button>
@@ -21789,13 +21789,13 @@ function CardChargeInline({ amount, appt, onCancel, onPaid, money }) {
   };
   return (
     <div style={{ padding: "20px 24px 32px" }}>
-      <div style={{ fontSize: 12, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 500 }}>CARD</div>
+      <div style={{ fontSize: 13, letterSpacing: 2.5, color: "var(--faint)", marginBottom: 8, fontWeight: 500 }}>CARD</div>
       <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, letterSpacing: -0.5, marginBottom: 18 }}>{money(amount)}</h2>
       <div style={{ background: "#FFFFFF", border: "1px solid var(--border)", borderRadius: 13, padding: "15px 14px", marginBottom: 12 }}><div ref={cardBox} /></div>
       {err && <p style={{ color: "#c0392b", fontSize: 13.5, marginBottom: 12, lineHeight: 1.4 }}>{err}</p>}
       <button className="lift" disabled={!ready || busy} onClick={charge} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 16, fontSize: 15.5, fontWeight: 600, borderRadius: 14, border: "none", opacity: !ready || busy ? 0.6 : 1 }}>{busy ? "Charging…" : `Charge ${money(amount)}`}</button>
       <button onClick={onCancel} disabled={busy} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: 8 }}>Back</button>
-      <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.5, marginTop: 10 }}>Manual entry for now — pairs with a tap-to-pay reader later.</p>
+      <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.5, marginTop: 10 }}>Manual entry for now — pairs with a tap-to-pay reader later.</p>
     </div>
   );
 }
@@ -22008,7 +22008,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const Header = ({ title, onBack, close }) => (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
       <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 17, padding: 4, cursor: "pointer", width: 32, textAlign: "left" }}>{close ? <X size={19} /> : <ChevronLeft size={21} />}</button>
-      <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{title}</span>
+      <span style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{title}</span>
       <span style={{ width: 32 }} />
     </div>
   );
@@ -22065,7 +22065,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       {/* top bar — Mango-style: close · CHECKOUT · Pay */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 44, marginBottom: 8 }}>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text)", padding: 4, cursor: "pointer", width: 44, textAlign: "left" }}><X size={19} /></button>
-        <span style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>Checkout</span>
+        <span style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>Checkout</span>
         {fullyPaidAtBooking
           ? <button onClick={settlePrepaid} disabled={payBusy} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer", padding: 4, width: 60, textAlign: "right", opacity: payBusy ? 0.5 : 1 }}>Done</button>
           : <button onClick={() => { if ((reopen ? balance : netDue) > 0) { setPayErr(""); setStage("method"); } }} disabled={(reopen ? balance : netDue) <= 0} style={{ background: "none", border: "none", color: (reopen ? balance : netDue) > 0 ? "var(--gold)" : "var(--faint)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: (reopen ? balance : netDue) > 0 ? "pointer" : "default", padding: 4, width: 44, textAlign: "right" }}>Pay</button>}
@@ -22093,11 +22093,11 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         <div key={l.id} style={{ borderTop: "1px solid var(--line)", marginTop: 16, padding: "16px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 16.5, fontWeight: 600 }}>{l.name}</div>
-            {chipVals.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 8 }}>{chipVals.map((c, ci) => <span key={ci} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "6px 10px", fontSize: 12.5, color: "var(--text2)" }}>{c}</span>)}</div>}
+            {chipVals.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 8 }}>{chipVals.map((c, ci) => <span key={ci} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "6px 10px", fontSize: 13.5, color: "var(--text2)" }}>{c}</span>)}</div>}
             <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 7 }}>{l.withName ? `with ${l.withName}` : (l.id !== "main" ? "Added" : (provider ? `with ${provider.name}` : ""))}</div>
             <div style={{ marginTop: 8, display: "flex", gap: 14 }}>
-              <button onClick={() => setEditLineId(editLineId === l.id ? null : l.id)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Edit price</button>
-              {l.id !== "main" && <button onClick={() => setLines(lines.filter((x) => x.id !== l.id))} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 12.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Remove</button>}
+              <button onClick={() => setEditLineId(editLineId === l.id ? null : l.id)} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Edit price</button>
+              {l.id !== "main" && <button onClick={() => setLines(lines.filter((x) => x.id !== l.id))} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, textDecoration: "underline", textUnderlineOffset: 3, padding: 0, cursor: "pointer" }}>Remove</button>}
             </div>
           </div>
           {editLineId === l.id
@@ -22144,14 +22144,14 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
                   ); })}
                 </div>
               )}
-              {orderedCats.length <= 1 && <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>Tap to add</div>}
+              {orderedCats.length <= 1 && <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>Tap to add</div>}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxHeight: "44vh", overflowY: "auto" }}>
                 {list.map((p) => { const out = p.trackStock && (p.onHand || 0) <= 0; return (
                   <button key={p.id} disabled={out} onClick={() => { setLines([...lines, { id: "ln_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: p.name, price: +Number(p.price || 0).toFixed(2), productId: p.id, image: p.image || "" }]); setAddSheet(null); }} style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "var(--panel)", textAlign: "left", cursor: out ? "not-allowed" : "pointer", opacity: out ? 0.5 : 1, padding: 0, display: "flex", flexDirection: "column" }}>
                     <span style={{ width: "100%", aspectRatio: "1", background: p.image ? `center/cover no-repeat url(${p.image})` : "var(--panel2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{!p.image && <Sparkles size={18} style={{ color: "var(--faint)" }} />}</span>
                     <span style={{ padding: "7px 8px 9px" }}>
-                      <span style={{ display: "block", fontSize: 12.5, fontWeight: 500, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                      <span style={{ display: "block", fontSize: 12, color: "var(--sub)", marginTop: 1 }}>${p.price}{out ? " · out" : (p.trackStock ? ` · ${p.onHand}` : "")}</span>
+                      <span style={{ display: "block", fontSize: 13.5, fontWeight: 500, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                      <span style={{ display: "block", fontSize: 13, color: "var(--sub)", marginTop: 1 }}>${p.price}{out ? " · out" : (p.trackStock ? ` · ${p.onHand}` : "")}</span>
                     </span>
                   </button>
                 ); })}
@@ -22187,7 +22187,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       {showDiscPick && <DiscountPicker discounts={business?.discounts || []} current={checkoutDiscount} onPick={setCheckoutDiscount} onClose={() => setShowDiscPick(false)} />}
       {/* Foot: Mango shows a running Subtotal here; the pay action lives in the top-right "Pay". */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid var(--line)", marginTop: 14, padding: "16px 2px 8px" }}>
-        <span style={{ fontSize: 12, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{(reopen || bookingCredit > 0) ? "Balance due" : "Subtotal"}</span>
+        <span style={{ fontSize: 13, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>{(reopen || bookingCredit > 0) ? "Balance due" : "Subtotal"}</span>
         <span style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500 }}>{money(reopen ? balance : netDue)}</span>
       </div>
     </>);
@@ -22197,7 +22197,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     <>
       <Header title="Payment" onBack={() => setStage("summary")} />
       <div style={{ textAlign: "center", margin: "10px 0 30px" }}>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Charging</div>
+        <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Charging</div>
         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1 }}>{money(reopen ? balance : netDue)}</div>
         {tipCfg.enabled && !noNewTip && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 9 }}>{appt.name || "Walk-in"} · tip comes next</div>}
         {reopen && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 9 }}>Balance on a reopened ticket — no tip step</div>}
@@ -22217,7 +22217,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         ].map((m) => (
           <button key={m.id} disabled={m.dis || payBusy} onClick={() => startMethod(m.id)} className={m.dis ? "" : "lift"} style={{ minHeight: 82, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, textAlign: "center", padding: "16px 12px", borderRadius: 16, border: m.dis ? "1px solid var(--border)" : "none", background: m.dis ? "var(--panel2)" : "var(--gold-grad, var(--gold))", color: m.dis ? "var(--faint)" : "var(--on-gold)", boxShadow: m.dis ? "none" : "var(--shadow-sm)", cursor: m.dis ? "default" : "pointer" }}>
             <span style={{ fontSize: 14.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", lineHeight: 1.15 }}>{m.t}</span>
-            {(m.soon || m.sub) && <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.82 }}>{m.soon ? "coming soon" : m.sub}</span>}
+            {(m.soon || m.sub) && <span style={{ fontSize: 12.5, fontWeight: 500, opacity: 0.82 }}>{m.soon ? "coming soon" : m.sub}</span>}
           </button>
         ))}
       </div>
@@ -22240,7 +22240,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           {tipCfg.presets.map((p) => { const on = customTip == null && tipPct === p; return (
             <button key={p} onClick={() => { setTipPct(p); setCustomTip(null); }} className="lift" style={{ background: on ? "var(--gold)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 18, padding: "22px 0 18px", textAlign: "center", color: on ? "var(--on-gold)" : "var(--text)", cursor: "pointer", boxShadow: on ? "var(--glow)" : "var(--shadow-sm)" }}>
               <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 26 }}>{p}%</span>
-              <span style={{ display: "block", fontSize: 12, color: on ? "var(--on-gold)" : "var(--faint)", marginTop: 5, opacity: on ? 0.75 : 1 }}>{money(+(subtotal * p / 100).toFixed(2))}</span>
+              <span style={{ display: "block", fontSize: 13, color: on ? "var(--on-gold)" : "var(--faint)", marginTop: 5, opacity: on ? 0.75 : 1 }}>{money(+(subtotal * p / 100).toFixed(2))}</span>
             </button>
           ); })}
         </div>
@@ -22254,7 +22254,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         </div>
         <div style={{ flex: 1 }} />
         <button className="lift" disabled={payBusy} onClick={chargeNow} style={{ ...goldBtn, background: "var(--live, var(--gold))", color: "var(--on-gold)", opacity: payBusy ? 0.6 : 1 }}>{payBusy ? "CHARGING…" : `CHARGE ${money(finalFor(selAmt))}`}</button>
-        {isCof && scOn && <div style={{ textAlign: "center", fontSize: 11.5, color: "var(--faint)", marginTop: 10 }}>{(cofCard?.brand || "Card").charAt(0).toUpperCase() + (cofCard?.brand || "card").slice(1)} ··{cofCard?.last4} · includes {scPct}% card fee</div>}
+        {isCof && scOn && <div style={{ textAlign: "center", fontSize: 13, color: "var(--faint)", marginTop: 10 }}>{(cofCard?.brand || "Card").charAt(0).toUpperCase() + (cofCard?.brand || "card").slice(1)} ··{cofCard?.last4} · includes {scPct}% card fee</div>}
       </>);
   }
 
@@ -22334,7 +22334,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           </div>
         );
       })()}
-      <div style={{ fontSize: 12, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WHEN?</div>
+      <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WHEN?</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 12 }}>
         {rebookCfg.weeks.map((w) => { const on = rebookWeeks === w && !customDate; const isRhythm = w === rhythmWeek; return (
           <button key={w} onClick={() => { setRebookWeeks(w); setCustomDate(null); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "var(--panel)", color: "var(--text)", textAlign: "left" }}>
@@ -22356,7 +22356,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         <input type="date" value={customDate || ""} min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)} onChange={(e) => { if (e.target.value) { setCustomDate(e.target.value); setRebookWeeks(null); } }} style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
       </label>
       <button className="lift" disabled={!hasSelection} onClick={() => { setChosenStart(null); setShowAllRebookTimes(false); setStage("pickTime"); }} style={{ width: "100%", background: !hasSelection ? "var(--panel2)" : "linear-gradient(155deg,#FCE187 0%,#F4C84F 34%,#E5AC34 70%,#CF971F 100%)", color: !hasSelection ? "var(--faint)" : "#33260A", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: !hasSelection ? "none" : "0 10px 22px -8px rgba(190,135,20,.55), inset 0 1px 0 rgba(255,255,255,.6)" }}>{!hasSelection ? "PICK A DAY FIRST" : `PICK A TIME · ${selectionLabel}`}</button>
-      {hasSelection && <p style={{ color: "var(--faint)", fontSize: 12.5, lineHeight: 1.5, textAlign: "center", marginTop: 10 }}>{discountOn ? `Nothing is charged today — the ${discLabel} is taken off when they come in. ` : "Nothing is charged today. "}We'll send the confirmation and reminders automatically.</p>}
+      {hasSelection && <p style={{ color: "var(--faint)", fontSize: 13.5, lineHeight: 1.5, textAlign: "center", marginTop: 10 }}>{discountOn ? `Nothing is charged today — the ${discLabel} is taken off when they come in. ` : "Nothing is charged today. "}We'll send the confirmation and reminders automatically.</p>}
       <button onClick={() => { setRebookWeeks(null); setCustomDate(null); setChosenStart(null); setStage("done"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 4 }}>NO THANKS</button>
     </div>
   );
@@ -22375,7 +22375,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       ) : (
         <>
           {hasBest && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text2)", marginBottom: 12, lineHeight: 1.4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--text2)", marginBottom: 12, lineHeight: 1.4 }}>
               <span style={{ width: 12, height: 12, borderRadius: 4, background: "linear-gradient(145deg,#F4C84F,#CF971F)", flexShrink: 0 }} />
               Gold times sit right against another appointment — no gaps in {provider?.name ? provider.name.split(" ")[0] + "'s" : "the"} day.
             </div>
@@ -22417,15 +22417,15 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
               <div style={{ display: "flex" }}>
                 <div style={{ width: 42, flexShrink: 0, position: "relative", height: heightT }}>
                   {Array.from({ length: Math.floor((winEnd - winStart) / 60) + 1 }).map((_, i) => { const t = winStart + i * 60; return (
-                    <div key={t} style={{ position: "absolute", top: (t - winStart) * PPMt - 6, right: 8, fontSize: 10.5, color: "var(--faint)" }}>{fmtTime(t).replace(":00", "")}</div>
+                    <div key={t} style={{ position: "absolute", top: (t - winStart) * PPMt - 6, right: 8, fontSize: 12, color: "var(--faint)" }}>{fmtTime(t).replace(":00", "")}</div>
                   ); })}
                 </div>
                 <div style={{ flex: 1, position: "relative", height: heightT, borderLeft: "1px solid var(--border2)", background: `repeating-linear-gradient(var(--border2) 0 1px, transparent 1px ${60 * PPMt}px)` }}>
                   {dayBlocks.map((a) => (
-                    <div key={a.id} style={{ position: "absolute", left: 4, right: 4, top: (a.start - winStart) * PPMt, height: Math.max(18, (a.end - a.start) * PPMt), borderRadius: 8, background: "var(--panel2)", borderLeft: "3px solid var(--border2)", padding: "3px 8px", fontSize: 11, color: "var(--sub)", overflow: "hidden", boxSizing: "border-box" }}>{(a.name || a.title || "Booked").split(" ")[0]}</div>
+                    <div key={a.id} style={{ position: "absolute", left: 4, right: 4, top: (a.start - winStart) * PPMt, height: Math.max(18, (a.end - a.start) * PPMt), borderRadius: 8, background: "var(--panel2)", borderLeft: "3px solid var(--border2)", padding: "3px 8px", fontSize: 12.5, color: "var(--sub)", overflow: "hidden", boxSizing: "border-box" }}>{(a.name || a.title || "Booked").split(" ")[0]}</div>
                   ))}
                   {boxes.map((s) => { const sel = chosenStart === s.start; return (
-                    <button key={s.start} onClick={() => setChosenStart(s.start)} style={{ position: "absolute", left: 4, right: 4, top: (s.start - winStart) * PPMt, height: 22, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 12.5, fontWeight: sel || s.best ? 600 : 500, overflow: "hidden",
+                    <button key={s.start} onClick={() => setChosenStart(s.start)} style={{ position: "absolute", left: 4, right: 4, top: (s.start - winStart) * PPMt, height: 22, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 13.5, fontWeight: sel || s.best ? 600 : 500, overflow: "hidden",
                       background: sel ? "linear-gradient(155deg,#FCE187,#E5AC34)" : s.best ? "color-mix(in srgb, #F4C84F 22%, var(--panel))" : "var(--panel)",
                       color: sel ? "#33260A" : s.best ? "var(--text)" : "var(--faint)",
                       border: sel ? "1px solid #C8901C" : s.best ? "1.5px solid #E7C065" : "1.5px dashed var(--border2)",
@@ -22527,7 +22527,7 @@ function CardOnFileSheet({ open, onClose, client, onSaved, showToast, live }) {
     <Sheet open={open} onClose={onClose} align="bottom" maxWidth={420}>
       <div style={{ padding: "6px 4px 8px" }}>
         <div style={{ textAlign: "center", marginBottom: 18 }}>
-          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD ON FILE</div>
+          <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD ON FILE</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
         </div>
         <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
@@ -22547,7 +22547,7 @@ function CardOnFileSheet({ open, onClose, client, onSaved, showToast, live }) {
 function PayRow({ label, value, last }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: last ? "none" : "1px solid var(--border)" }}>
-      <span style={{ fontSize: 12.5, letterSpacing: 0.8, color: "var(--sub)", textTransform: "uppercase" }}>{label}</span>
+      <span style={{ fontSize: 13.5, letterSpacing: 0.8, color: "var(--sub)", textTransform: "uppercase" }}>{label}</span>
       <span style={{ fontSize: 14.5, fontWeight: 500, color: "var(--text)", textAlign: "right" }}>{value}</span>
     </div>
   );
@@ -22590,7 +22590,7 @@ function RefundSheet({ open, onClose, client, payment, onApply, showToast }) {
         ) : (
           <>
             <div style={{ textAlign: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>REFUND OR DISCOUNT</div>
+              <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>REFUND OR DISCOUNT</div>
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
               <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 4 }}>Up to ${maxRefund.toFixed(2)} refundable</div>
             </div>
@@ -22654,7 +22654,7 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
   const statusPill = (st) => {
     const map = { paid: ["Paid", "var(--gold)"], refunded: ["Refunded", "var(--sub)"], partial: ["Partial refund", "#C8923F"] };
     const [label, col] = map[st] || ["Paid", "var(--gold)"];
-    return <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.5, color: col }}>{label}</span>;
+    return <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.5, color: col }}>{label}</span>;
   };
 
   // Write a field change back to whichever store the row came from.
@@ -22685,7 +22685,7 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
       <RptPeriod value={period} onChange={setPeriod} options={[["week", "Week"], ["month", "Month"], ["year", "Year"]]} style={{ marginBottom: 26 }} />
 
       <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, padding: "20px 18px", marginBottom: 16 }}>
-        <div style={{ fontSize: 10.5, letterSpacing: "2.5px", color: "var(--faint)", fontWeight: 500, marginBottom: 8, textTransform: "uppercase" }}>Money in</div>
+        <div style={{ fontSize: 12, letterSpacing: "2.5px", color: "var(--faint)", fontWeight: 500, marginBottom: 8, textTransform: "uppercase" }}>Money in</div>
         <div style={{ ...RPT_HERO, fontWeight: 400 }}>{fmtMoney0(grossIn)}</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
           <span style={{ fontSize: 13.5, color: "var(--sub)" }}>&minus; Refunds</span>
@@ -22704,8 +22704,8 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
 
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 16px", marginBottom: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-          <span style={{ fontSize: 11, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600 }}>CASH vs CARD</span>
-          <span style={{ fontSize: 12.5, color: "var(--faint)" }}>{cashPct}% cash</span>
+          <span style={{ fontSize: 12.5, letterSpacing: 1.3, color: "var(--sub)", fontWeight: 600 }}>CASH vs CARD</span>
+          <span style={{ fontSize: 13.5, color: "var(--faint)" }}>{cashPct}% cash</span>
         </div>
         <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", background: "var(--panel2)", marginBottom: 10 }}>
           <div style={{ width: cashPct + "%", background: "var(--gold)" }} />
@@ -22758,7 +22758,7 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
               {openRow.last4 && <PayRow label="Card" value={`${openRow.brand ? openRow.brand.charAt(0).toUpperCase() + openRow.brand.slice(1) : "Card"} ···· ${openRow.last4}`} last />}
             </div>
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, letterSpacing: 1, color: "var(--sub)", marginBottom: 6 }}>NOTE</div>
+              <div style={{ fontSize: 13, letterSpacing: 1, color: "var(--sub)", marginBottom: 6 }}>NOTE</div>
               <textarea value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onBlur={saveNote} placeholder="Add a note about this charge…" rows={2} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", fontSize: 14.5, color: "var(--text)", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
             </div>
             {openRow.status !== "refunded" && openRow.paymentIntentId && (
@@ -22821,7 +22821,7 @@ function CardSaleSheet({ open, onClose, amount, description, onPaid, showToast, 
     <Sheet open={open} onClose={onClose} align="center" maxWidth={420}>
       <div style={{ padding: "6px 4px 8px" }}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD PAYMENT</div>
+          <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD PAYMENT</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500 }}>${(Math.round((amount || 0) * 100) / 100).toFixed(2)}</div>
         </div>
         <div ref={cardBox} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 16px", marginBottom: 12, minHeight: 24 }} />
@@ -23002,7 +23002,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
               </button>
 
               {/* quick add */}
-              <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>QUICK ADD</div>
+              <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--faint)", fontWeight: 600, marginBottom: 10 }}>QUICK ADD</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
                 {services.slice(0, 8).map((s) => (
                   <button key={s.id} onClick={() => addItem(s.name, s.price)} style={{ background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 11, padding: "9px 13px", fontSize: 13.5, color: "var(--text)", display: "flex", alignItems: "center", gap: 7 }}>
@@ -23029,7 +23029,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
                     <div key={x.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 14.5, fontWeight: 500 }}>{x.name}</div>
-                        <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{fm(x.price)} each</div>
+                        <div style={{ fontSize: 13.5, color: "var(--sub)" }}>{fm(x.price)} each</div>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <button onClick={() => setQty(x.id, -1)} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--text)", fontSize: 16, lineHeight: 1 }}>–</button>
@@ -23080,7 +23080,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
                   <button onClick={onClose} style={{ background: "var(--panel2)", border: "1px solid var(--border)", width: 34, height: 34, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--sub)" }}><X size={16} /></button>
                 </div>
                 <div style={{ textAlign: "center", margin: "6px 0 26px" }}>
-                  <div style={{ fontSize: 11, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Charging</div>
+                  <div style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Charging</div>
                   <div style={{ fontFamily: "'Fraunces', serif", fontSize: 44, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1 }}>{fm(total)}</div>
                   {tipCfg.enabled && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 9 }}>{client ? client.name : "Walk-in"} · tip comes next</div>}
                 </div>
@@ -23112,7 +23112,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
                 {(tipCfg.presets || [18, 20, 25]).map((p) => { const on = customTip == null && tipPct === p; return (
                   <button key={p} onClick={() => { setTipPct(p); setCustomTip(null); }} className="lift" style={{ background: on ? "var(--gold)" : "var(--panel)", border: `1px solid ${on ? "var(--gold)" : "var(--border)"}`, borderRadius: 18, padding: "22px 0 18px", textAlign: "center", color: on ? "var(--on-gold)" : "var(--text)", cursor: "pointer", boxShadow: "var(--shadow-sm)" }}>
                     <span style={{ display: "block", fontFamily: "'Fraunces', serif", fontSize: 26 }}>{p}%</span>
-                    <span style={{ display: "block", fontSize: 12, color: on ? "var(--on-gold)" : "var(--faint)", marginTop: 5, opacity: on ? 0.75 : 1 }}>{fm(Math.round(total * p) / 100)}</span>
+                    <span style={{ display: "block", fontSize: 13, color: on ? "var(--on-gold)" : "var(--faint)", marginTop: 5, opacity: on ? 0.75 : 1 }}>{fm(Math.round(total * p) / 100)}</span>
                   </button>
                 ); })}
               </div>
@@ -23153,9 +23153,9 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
           {/* cash sheet */}
           <Sheet open={payMode === "cash"} onClose={() => setPayMode(null)} align="center" maxWidth={380}>
             <div style={{ padding: "6px 4px 8px", textAlign: "center" }}>
-              <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CASH</div>
+              <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CASH</div>
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 16 }}>{fm(chargeTotal)}</div>
-              <div style={{ textAlign: "left", fontSize: 12, letterSpacing: 1, color: "var(--sub)", marginBottom: 6 }}>AMOUNT TENDERED</div>
+              <div style={{ textAlign: "left", fontSize: 13, letterSpacing: 1, color: "var(--sub)", marginBottom: 6 }}>AMOUNT TENDERED</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "12px 16px", marginBottom: 12 }}>
                 <span style={{ fontFamily: "'Fraunces', serif", fontSize: 24, color: "var(--sub)" }}>$</span>
                 <input value={tendered} onChange={(e) => setTendered(e.target.value)} inputMode="decimal" autoFocus style={{ flex: 1, background: "none", border: "none", outline: "none", fontFamily: "'Fraunces', serif", fontSize: 24, color: "var(--text)", width: "100%" }} />
@@ -23188,7 +23188,7 @@ function RegisterView({ open, onClose, services, business, setBusiness, clients,
               };
               return (
                 <div style={{ padding: "6px 4px 8px", textAlign: "center" }}>
-                  <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD ON FILE</div>
+                  <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CARD ON FILE</div>
                   <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 6 }}>{fm(chargeTotal)}</div>
                   <div style={{ fontSize: 14, color: "var(--sub)", marginBottom: 18 }}>{brand} ···· {oc ? oc.last4 : "••••"} · {client?.name}</div>
                   {onfileErr && <div style={{ color: "#B5564B", fontSize: 13, marginBottom: 12 }}>{onfileErr}</div>}
@@ -23259,7 +23259,7 @@ function ChargeCardSheet({ open, onClose, client, defaultAmount, onCharged, show
         ) : (
           <>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CHARGE NO-SHOW FEE</div>
+          <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>CHARGE NO-SHOW FEE</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500 }}>{client?.name || "Client"}</div>
           {card && <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 4 }}>{card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : "Card"} ···· {card.last4}</div>}
         </div>
@@ -23318,7 +23318,7 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
     <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
       <div style={{ background: "radial-gradient(120% 120% at 50% 0%, #26241F 0%, #1A1916 62%)", border: "1px solid #34322C", borderRadius: 18, padding: 18, boxShadow: "0 14px 36px rgba(18,14,8,.34)", color: "#F4EFE4" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 16 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 8, background: `color-mix(in srgb, ${tagColor} 18%, transparent)`, border: `1px solid color-mix(in srgb, ${tagColor} 45%, transparent)`, color: tagColor, fontSize: 11.5, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", padding: "5px 12px 5px 10px", borderRadius: 30 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8, background: `color-mix(in srgb, ${tagColor} 18%, transparent)`, border: `1px solid color-mix(in srgb, ${tagColor} 45%, transparent)`, color: tagColor, fontSize: 13, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", padding: "5px 12px 5px 10px", borderRadius: 30 }}>
             <span style={{ position: "relative", width: 9, height: 9 }}>
               <span style={{ position: "absolute", inset: -4, borderRadius: "50%", background: `color-mix(in srgb, ${tagColor} 45%, transparent)`, animation: "pulse 1.7s var(--ease) infinite" }} />
               <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: tagColor }} />
@@ -23335,7 +23335,7 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
             </svg>
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
               <span style={{ fontFamily: "'Fraunces', serif", fontSize: 26, lineHeight: 1, color: "#FBF7EE", fontVariantNumeric: "tabular-nums" }}>{mm}:{String(ss).padStart(2, "0")}</span>
-              <span style={{ fontSize: 9, letterSpacing: 2, color: "rgba(244,239,228,.5)", textTransform: "uppercase", marginTop: 4 }}>in chair</span>
+              <span style={{ fontSize: 10.5, letterSpacing: 2, color: "rgba(244,239,228,.5)", textTransform: "uppercase", marginTop: 4 }}>in chair</span>
             </div>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -23350,7 +23350,7 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
         {/* Up next — synced to the barber's calendar (gap-aware), independent of when the timer was started.
             Shown big so the next client is always clear at a glance. */}
         <div style={{ marginTop: 15, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,.09)" }}>
-          <div style={{ fontSize: 10, letterSpacing: 1.8, textTransform: "uppercase", color: "rgba(244,239,228,.5)", fontWeight: 700, marginBottom: 7 }}>Next in the chair</div>
+          <div style={{ fontSize: 12, letterSpacing: 1.8, textTransform: "uppercase", color: "rgba(244,239,228,.5)", fontWeight: 700, marginBottom: 7 }}>Next in the chair</div>
           {upNext ? (
             <>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
@@ -23818,7 +23818,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
 
   const Cell = ({ label, value }) => (
     <div style={{ flex: 1, padding: "16px 18px" }}>
-      <div style={{ fontSize: 11, letterSpacing: 1.8, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 12.5, letterSpacing: 1.8, textTransform: "uppercase", color: T.faint, fontWeight: 600, marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 18, color: T.text, fontWeight: 600 }}>{value}</div>
     </div>
   );
@@ -23980,7 +23980,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 if (!lastCut && !client.notes && !lastDur && !visits) return null;
                 return (
                   <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}`, background: "rgba(122,158,159,0.08)" }}>
-                    <div style={{ fontSize: 11.5, letterSpacing: 1.5, color: T.sub, fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={13} style={{ color: "var(--gold)" }} /> THE BRIEFING</div>
+                    <div style={{ fontSize: 13, letterSpacing: 1.5, color: T.sub, fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={13} style={{ color: "var(--gold)" }} /> THE BRIEFING</div>
                     {/* the concierge whisper */}
                     <div style={{ fontSize: 14.5, color: T.text, lineHeight: 1.5, marginBottom: 14, fontStyle: "italic" }}>{briefing}.</div>
                     <div style={{ display: "flex", gap: 12 }}>
@@ -23997,7 +23997,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
 
               {/* On / At — labeled date + time, aligned side by side (label over pill, pills level) */}
               {(() => {
-                const dtLbl = { fontSize: 11.5, letterSpacing: 1.5, color: T.sub, fontWeight: 600, marginBottom: 8, textTransform: "uppercase" };
+                const dtLbl = { fontSize: 13, letterSpacing: 1.5, color: T.sub, fontWeight: 600, marginBottom: 8, textTransform: "uppercase" };
                 const dtChip = { ...EDIT_CHIP, width: "100%", boxSizing: "border-box", justifyContent: "space-between", padding: "9px 12px" };
                 return (
                   <div style={{ display: "flex", gap: 12, padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
@@ -24142,12 +24142,12 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   under the service info, above the photos, on a highlighted band so it can't be missed. */}
               {editing ? (
                 <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
-                  <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: T.sub, fontWeight: 700, marginBottom: 9 }}>APPOINTMENT NOTE</div>
+                  <div style={{ fontSize: 13.5, letterSpacing: 1.5, color: T.sub, fontWeight: 700, marginBottom: 9 }}>APPOINTMENT NOTE</div>
                   <textarea value={draftNote} onChange={(e) => setDraftNote(e.target.value)} placeholder="Anything to remember for this visit" rows={2} style={{ width: "100%", boxSizing: "border-box", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 10, padding: "12px 14px", color: T.text, fontSize: 15.5, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", outline: "none" }} />
                 </div>
               ) : (appt.note || "").trim() ? (
                 <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}`, background: "color-mix(in srgb, var(--gold) 9%, transparent)" }}>
-                  <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, marginBottom: 8 }}>{"\uD83D\uDCDD"} APPOINTMENT NOTE</div>
+                  <div style={{ fontSize: 13.5, letterSpacing: 1.5, color: "var(--gold)", fontWeight: 700, marginBottom: 8 }}>{"\uD83D\uDCDD"} APPOINTMENT NOTE</div>
                   <div style={{ fontSize: 16, color: T.text, fontWeight: 500, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{"\u201C"}{appt.note.trim()}{"\u201D"}</div>
                 </div>
               ) : null}
@@ -24185,7 +24185,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     {/* Service time — first */}
                     {service && (
                       <div style={{ padding: 18 }}>
-                        <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Service time &amp; price</div>
+                        <div style={{ fontSize: 12.5, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Service time &amp; price</div>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
                           <span style={{ fontSize: 15.5, color: T.sub }}>{(client.name || "their").split(" ")[0]}'s time for {service.name}</span>
                           <div style={{ display: "flex", alignItems: "center", background: T.bg, border: `1px solid ${T.line}`, borderRadius: 11, overflow: "hidden", flexShrink: 0 }}>
@@ -24201,7 +24201,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                             <input type="text" inputMode="decimal" value={wuPriceVal} onChange={(e) => setWuPrice(e.target.value)} placeholder="0" style={{ width: 80, textAlign: "center", background: "none", border: "none", outline: "none", color: T.text, fontSize: 16, fontWeight: 700, padding: "13px 8px", fontFamily: FONT_BODY }} />
                           </div>
                         </div>
-                        <div style={{ fontSize: 12.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Booked at {service.duration} min · ${defaultPrice}. This sets {(client.name || "their").split(" ")[0]}'s time and price so future bookings get the right amount of chair — and quote the right amount.</div>
+                        <div style={{ fontSize: 13.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Booked at {service.duration} min · ${defaultPrice}. This sets {(client.name || "their").split(" ")[0]}'s time and price so future bookings get the right amount of chair — and quote the right amount.</div>
                         {timedMin != null && (
                           <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 11, background: `color-mix(in srgb, #E5AC34 12%, ${T.panel})`, border: "1px solid color-mix(in srgb, #E5AC34 32%, transparent)" }}>
                             <div style={{ fontSize: 13.5, color: T.text, lineHeight: 1.4 }}>
@@ -24212,10 +24212,10 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 11, paddingTop: 11, borderTop: "1px solid color-mix(in srgb, #E5AC34 28%, transparent)" }}>
                                 <div style={{ fontSize: 13.5, color: T.text, lineHeight: 1.45 }}>
                                   <strong>{(client.name || "They").split(" ")[0]} averages {avgMin} min</strong> → suggests {suggestMin}
-                                  <span style={{ display: "block", fontSize: 12, color: T.faint, marginTop: 2 }}>across their last {cleanCuts.length} timed visits · rounded up to the next 5</span>
+                                  <span style={{ display: "block", fontSize: 13, color: T.faint, marginTop: 2 }}>across their last {cleanCuts.length} timed visits · rounded up to the next 5</span>
                                 </div>
                                 {suggestMin !== wuDur && (
-                                  <button onClick={() => setWuDur(suggestMin)} style={{ flexShrink: 0, background: "linear-gradient(155deg,#F4C84F,#CF971F)", color: "#33260A", border: "none", borderRadius: 9, padding: "9px 13px", fontSize: 12.5, fontWeight: 700, letterSpacing: 0.3, whiteSpace: "nowrap" }}>Use {suggestMin}</button>
+                                  <button onClick={() => setWuDur(suggestMin)} style={{ flexShrink: 0, background: "linear-gradient(155deg,#F4C84F,#CF971F)", color: "#33260A", border: "none", borderRadius: 9, padding: "9px 13px", fontSize: 13.5, fontWeight: 700, letterSpacing: 0.3, whiteSpace: "nowrap" }}>Use {suggestMin}</button>
                                 )}
                               </div>
                             )}
@@ -24225,7 +24225,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     )}
                     {/* Photos — 3 tiles, camera or gallery */}
                     <div style={{ padding: 18, borderTop: service ? `1px solid ${T.line}` : "none" }}>
-                      <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Photos</div>
+                      <div style={{ fontSize: 12.5, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Photos</div>
                       {/* Only photos taken in THIS visit's wrap-up — the client's booking photos live in
                           "Client Photos" above and the profile gallery, never pre-filling these tiles. */}
                       {(() => { const wuPhotos = (client.gallery || []).filter((g) => g.apptId === appt.id); return (
@@ -24237,18 +24237,18 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                           </div>
                         ))}
                         {Array.from({ length: Math.max(1, 3 - wuPhotos.length) }).map((_, i) => (
-                          <button key={"wuadd" + i} className="lift" onClick={() => wuFileRef.current && wuFileRef.current.click()} style={{ width: 64, height: 64, borderRadius: 12, border: `1.5px dashed ${T.faint}`, background: "none", boxShadow: "none", color: T.accent, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+                          <button key={"wuadd" + i} className="lift" onClick={() => wuFileRef.current && wuFileRef.current.click()} style={{ width: 64, height: 64, borderRadius: 12, border: `1.5px dashed ${T.faint}`, background: "none", boxShadow: "none", color: T.accent, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontSize: 13, fontWeight: 600, flexShrink: 0 }}>
                             <Plus size={20} /> Add
                           </button>
                         ))}
                         <input ref={wuFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { addWuPhoto(e.target.files && e.target.files[0]); e.target.value = ""; }} />
                       </div>
                       ); })()}
-                      <div style={{ fontSize: 12.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Photos you take after the cut — saved to {(client.name || "their").split(" ")[0]}'s gallery.</div>
+                      <div style={{ fontSize: 13.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Photos you take after the cut — saved to {(client.name || "their").split(" ")[0]}'s gallery.</div>
                     </div>
                     {/* Note — last, bigger box */}
                     <div style={{ padding: 18, borderTop: `1px solid ${T.line}` }}>
-                      <div style={{ fontSize: 12.5, letterSpacing: 1.4, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 11 }}>Note for next time</div>
+                      <div style={{ fontSize: 13.5, letterSpacing: 1.4, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 11 }}>Note for next time</div>
                       <textarea value={wuNote} onChange={(e) => { setWuNote(e.target.value); setWuDirty(true); setWuSaved(false); }} placeholder="Tighter on the sides. #2 guard, scissor on top. Black coffee, no small talk…" rows={5} style={{ width: "100%", boxSizing: "border-box", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "15px 16px", color: T.text, fontSize: 16.5, resize: "vertical", lineHeight: 1.55, outline: "none", minHeight: 120 }} />
                     </div>
                     {(wuDirty || wuSaved) && (
@@ -24380,7 +24380,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
       <Sheet open={priceOpen} onClose={() => setPriceOpen(false)} align="bottom" maxWidth={420}>
         <div style={{ padding: "6px 4px 8px" }}>
           <div style={{ textAlign: "center", marginBottom: 18 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>EDIT PRICE</div>
+            <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>EDIT PRICE</div>
             <div style={{ fontFamily: FONT_BODY, fontSize: 20, fontWeight: 600 }}>{service?.name || appt.title}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 18px", marginBottom: 12 }}>
@@ -24399,7 +24399,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
       <Sheet open={startTimeOpen} onClose={() => setStartTimeOpen(false)} align="bottom" maxWidth={420}>
         <div style={{ padding: "6px 4px 8px" }}>
           <div style={{ textAlign: "center", marginBottom: 16 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>STARTED AT</div>
+            <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>STARTED AT</div>
             <div style={{ fontFamily: FONT_BODY, fontSize: 20, fontWeight: 600 }}>{service?.name || appt.title}</div>
             <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 4 }}>When did the service actually begin?</div>
           </div>
@@ -24418,7 +24418,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   <button onClick={() => !atLo && setStartDraft((v) => Math.max(lo, v - 1))} disabled={atLo} style={stepBtn(atLo)} aria-label="One minute earlier"><Minus size={24} /></button>
                   <div style={{ minWidth: 138, textAlign: "center" }}>
                     <div style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 600, lineHeight: 1 }}>{fmtTime(startDraft)}</div>
-                    <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 7 }}>{sub}</div>
+                    <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 7 }}>{sub}</div>
                   </div>
                   <button onClick={() => !atHi && setStartDraft((v) => Math.min(hi, v + 1))} disabled={atHi} style={stepBtn(atHi)} aria-label="One minute later"><Plus size={24} /></button>
                 </div>
@@ -24436,7 +24436,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
       <Sheet open={dateOpen} onClose={() => setDateOpen(false)} align="bottom" maxWidth={380}>
         <div style={{ padding: "2px 4px 8px" }}>
           <div style={{ textAlign: "center", marginBottom: 4 }}>
-            <div style={{ fontSize: 11, letterSpacing: 2.5, color: "#B58A2E", fontWeight: 600 }}>APPOINTMENT DATE</div>
+            <div style={{ fontSize: 12.5, letterSpacing: 2.5, color: "#B58A2E", fontWeight: 600 }}>APPOINTMENT DATE</div>
           </div>
           <ApptDatePicker value={draftDate} T={T} onPick={(d) => { setDraftDate(d); setDateOpen(false); }} />
           <button onClick={() => setDateOpen(false)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "10px 0 2px", marginTop: 4 }}>Cancel</button>
@@ -24492,7 +24492,7 @@ function ApptDatePicker({ value, onPick, T }) {
         <button onClick={() => setM(new Date(year, month + 1, 1))} aria-label="Next month" style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronRight size={18} /></button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3, marginBottom: 6 }}>
-        {["S", "M", "T", "W", "T", "F", "S"].map((w, i) => <div key={i} style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.5, color: T.faint, fontWeight: 600 }}>{w}</div>)}
+        {["S", "M", "T", "W", "T", "F", "S"].map((w, i) => <div key={i} style={{ textAlign: "center", fontSize: 12.5, letterSpacing: 0.5, color: T.faint, fontWeight: 600 }}>{w}</div>)}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3 }}>
         {cells.map((d, i) => {
@@ -24657,12 +24657,12 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
 
   // shared bits
   const SectionLabel = ({ children }) => (
-    <div style={{ textAlign: "right", fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: "var(--border2)", fontWeight: 400, fontFamily: FB, margin: "26px 2px 10px" }}>{children}</div>
+    <div style={{ textAlign: "right", fontSize: 12.5, letterSpacing: 4, textTransform: "uppercase", color: "var(--border2)", fontWeight: 400, fontFamily: FB, margin: "26px 2px 10px" }}>{children}</div>
   );
   const Masthead = ({ title, sub }) => (
     <div style={{ paddingTop: 8, marginBottom: 6 }}>
       <h2 style={{ fontFamily: FD, fontSize: 38, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.8px", color: "var(--text)", margin: 0 }}>{title}</h2>
-      {sub && <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12, fontFamily: FB }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12.5, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12, fontFamily: FB }}>{sub}</div>}
     </div>
   );
   const Row = ({ left, right, last }) => (
@@ -24837,8 +24837,8 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
         {rows.map((s, i) => <Row key={i} left={`${s.name} · ${s.rate}%`} right={`${money(s.rev)} → ${money(s.aside)}`} last={i === rows.length - 1} />)}
       </div>
       <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", marginTop: 16 }}>
-        <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 8, fontFamily: FB }}>Important — please read</div>
-        <p style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.6, margin: 0, fontFamily: FB }}>These figures are a rough estimate only and are <b style={{ color: "var(--text)", fontWeight: 600 }}>not tax advice</b>. They apply a flat percentage to gross booking revenue shown in Vero and do not account for tips, cash payments, business expenses, deductions, credits, your filing status, or your federal, state, and local tax obligations. Your actual tax owed may be significantly higher or lower. Vero is not a tax preparer, accountant, or financial advisor. Consult a qualified tax professional before making financial or tax decisions.</p>
+        <div style={{ fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 8, fontFamily: FB }}>Important — please read</div>
+        <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.6, margin: 0, fontFamily: FB }}>These figures are a rough estimate only and are <b style={{ color: "var(--text)", fontWeight: 600 }}>not tax advice</b>. They apply a flat percentage to gross booking revenue shown in Vero and do not account for tips, cash payments, business expenses, deductions, credits, your filing status, or your federal, state, and local tax obligations. Your actual tax owed may be significantly higher or lower. Vero is not a tax preparer, accountant, or financial advisor. Consult a qualified tax professional before making financial or tax decisions.</p>
       </div></>);
     }
     return null;
@@ -24854,10 +24854,10 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
             <button key={p.id} onClick={() => applyPreset(p.id)} style={{ padding: "11px 0", borderRadius: 10, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", fontSize: 13.5, fontWeight: on ? 600 : 400, fontFamily: FB, cursor: "pointer" }}>{p.label}</button>
           ); })}
         </div>
-        <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: activePreset === null ? "var(--text)" : "var(--faint)", fontFamily: FB, marginBottom: 8 }}>Custom range</div>
+        <div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: activePreset === null ? "var(--text)" : "var(--faint)", fontFamily: FB, marginBottom: 8 }}>Custom range</div>
         <div style={{ display: "flex", gap: 10 }}>
-          <div style={{ flex: 1 }}><div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontFamily: FB, marginBottom: 6 }}>From</div><input type="date" value={from} max={to} onChange={(e) => { setFrom(e.target.value); setActivePreset(null); }} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FB, boxSizing: "border-box" }} /></div>
-          <div style={{ flex: 1 }}><div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontFamily: FB, marginBottom: 6 }}>To</div><input type="date" value={to} min={from} max={todayISO()} onChange={(e) => { setTo(e.target.value); setActivePreset(null); }} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FB, boxSizing: "border-box" }} /></div>
+          <div style={{ flex: 1 }}><div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontFamily: FB, marginBottom: 6 }}>From</div><input type="date" value={from} max={to} onChange={(e) => { setFrom(e.target.value); setActivePreset(null); }} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FB, boxSizing: "border-box" }} /></div>
+          <div style={{ flex: 1 }}><div style={{ fontSize: 12.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontFamily: FB, marginBottom: 6 }}>To</div><input type="date" value={to} min={from} max={todayISO()} onChange={(e) => { setTo(e.target.value); setActivePreset(null); }} style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 10, padding: "12px 12px", color: "var(--text)", fontSize: 15, fontFamily: FB, boxSizing: "border-box" }} /></div>
         </div>
         <button onClick={() => setPickerOpen(null)} style={{ width: "100%", marginTop: 18, background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 10, padding: 15, fontFamily: FB, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Apply</button>
       </div>
@@ -24881,7 +24881,7 @@ function ReportsHub({ appts, clients, providers, services, business, setBusiness
           <div style={{ height: 8 }} />
           {renderReport(openReport)}
           <button onClick={exportPDF} className="no-print" style={{ width: "100%", marginTop: 24, background: "transparent", border: "1px solid var(--text)", color: "var(--text)", borderRadius: 10, padding: 15, fontFamily: FB, fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", cursor: "pointer" }}>Export PDF</button>
-          <div style={{ fontSize: 11, color: "var(--faint)", fontFamily: FB, textAlign: "center", marginTop: 10 }} className="no-print">On iPhone: tap Export, then pinch the preview to save as PDF.</div>
+          <div style={{ fontSize: 12.5, color: "var(--faint)", fontFamily: FB, textAlign: "center", marginTop: 10 }} className="no-print">On iPhone: tap Export, then pinch the preview to save as PDF.</div>
         </div>
         {datePicker}
         {/* staff + service pickers, available inside the open report too */}
@@ -25082,7 +25082,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         confirmNuke ? (
           <div style={{ marginBottom: 18, padding: 14, border: "1px solid color-mix(in srgb, #c0392b 40%, var(--border))", borderRadius: 12, background: "var(--panel)" }}>
             <div style={{ fontSize: 14.5, color: "var(--text)", marginBottom: 12, lineHeight: 1.45 }}>Delete all {(clients || []).length} client{(clients || []).length === 1 ? "" : "s"}, {(appts || []).length} appointment{(appts || []).length === 1 ? "" : "s"}, and {(waitlist || []).length} waitlist entr{(waitlist || []).length === 1 ? "y" : "ies"}? This can't be undone.</div>
-            <div style={{ fontSize: 12.5, color: "var(--sub)", marginBottom: 7 }}>Type <b style={{ color: "var(--text)", letterSpacing: 1 }}>DELETE</b> to confirm.</div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", marginBottom: 7 }}>Type <b style={{ color: "var(--text)", letterSpacing: 1 }}>DELETE</b> to confirm.</div>
             <input value={nukeConfirmText} onChange={(e) => setNukeConfirmText(e.target.value)} autoFocus placeholder="DELETE" style={{ width: "100%", boxSizing: "border-box", marginBottom: 12, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", color: "var(--text)", fontSize: 15, letterSpacing: 1, fontFamily: FONT_BODY }} />
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={nukeAll} disabled={nuking || nukeConfirmText.trim().toUpperCase() !== "DELETE"} style={{ flex: 1, background: "#c0392b", color: "#fff", border: "none", borderRadius: 10, padding: 13, fontSize: 14, fontWeight: 600, cursor: (nuking || nukeConfirmText.trim().toUpperCase() !== "DELETE") ? "default" : "pointer", opacity: (nuking || nukeConfirmText.trim().toUpperCase() !== "DELETE") ? 0.5 : 1 }}>{nuking ? "Deleting…" : "Delete everything"}</button>
@@ -25098,14 +25098,14 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
           <div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, color: "var(--text)" }}>Clients</h2>
-            <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{clients.length} {clients.length === 1 ? "person" : "people"}</div>
+            <div style={{ fontSize: 12.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, marginTop: 12 }}>{clients.length} {clients.length === 1 ? "person" : "people"}</div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "stretch" }}>
             <button onClick={() => setShowNudgeFolder(true)} aria-label="Rebooking nudges" style={{ position: "relative", background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", height: 42, width: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
               <Bell size={17} style={{ color: overdue.length > 0 ? "var(--text)" : "var(--sub)" }} />
-              {overdue.length > 0 && <span style={{ position: "absolute", top: -5, right: -5, background: "var(--text)", color: "var(--bg)", fontSize: 11, fontWeight: 500, borderRadius: 10, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", lineHeight: 1 }}>{overdue.length}</span>}
+              {overdue.length > 0 && <span style={{ position: "absolute", top: -5, right: -5, background: "var(--text)", color: "var(--bg)", fontSize: 12.5, fontWeight: 500, borderRadius: 10, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", lineHeight: 1 }}>{overdue.length}</span>}
             </button>
-            <button onClick={() => { setDraft(blank); setAdding(true); }} aria-label="Add client" style={{ background: "var(--text)", color: "var(--bg)", border: "none", height: 42, padding: "0 18px", borderRadius: 12, display: "flex", alignItems: "center", gap: 7, fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase" }}><Plus size={16} strokeWidth={2} /> Add</button>
+            <button onClick={() => { setDraft(blank); setAdding(true); }} aria-label="Add client" style={{ background: "var(--text)", color: "var(--bg)", border: "none", height: 42, padding: "0 18px", borderRadius: 12, display: "flex", alignItems: "center", gap: 7, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase" }}><Plus size={16} strokeWidth={2} /> Add</button>
           </div>
         </div>
       </div>
@@ -25115,7 +25115,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
         <User size={17} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--faint)", pointerEvents: "none" }} />
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", marginTop: 3 }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}</div>
+      <div style={{ display: "flex", flexDirection: "column" }}>{shown.map((c) => { const provider = providers.find((p) => p.id === c.provider) || providers[1]; return (<button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", borderBottom: "1px solid var(--line)", borderRadius: 0, padding: "15px 4px", color: "var(--text)", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: 14 }}><Avatar size={40} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provider.color} /><div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: 400, letterSpacing: "-0.2px" }}>{c.name}</div><div style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", marginTop: 3 }}>{c.visits} visits · {provider.name}</div></div></div><ChevronRight size={18} style={{ color: "var(--faint)", flexShrink: 0 }} /></button>); })}</div>
       {shown.length === 0 && <p style={{ color: "var(--faint)", fontSize: 14.5, textAlign: "center", padding: "36px 0" }}>{q ? `No clients match “${query}”.` : "No clients yet — tap + to add your first one."}</p>}
     </div>
 
@@ -25129,32 +25129,32 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
 
           <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>FIRST NAME</label>
+              <label style={{ fontSize: 13.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>FIRST NAME</label>
               <input value={draft.firstName || ""} onChange={(e) => setDraft({ ...draft, firstName: e.target.value })} placeholder="First" style={inputS} />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>LAST NAME</label>
+              <label style={{ fontSize: 13.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>LAST NAME</label>
               <input value={draft.lastName || ""} onChange={(e) => setDraft({ ...draft, lastName: e.target.value })} placeholder="Last" style={inputS} />
             </div>
           </div>
 
-          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PHONE</label>
+          <label style={{ fontSize: 13.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PHONE</label>
           <input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} placeholder="(555) 000-0000" inputMode="tel" style={{ ...inputS, marginBottom: 14 }} />
 
-          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>EMAIL</label>
+          <label style={{ fontSize: 13.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>EMAIL</label>
           <input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} placeholder="name@email.com" inputMode="email" style={{ ...inputS, marginBottom: 14 }} />
 
-          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>BIRTHDAY (optional)</label>
+          <label style={{ fontSize: 13.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>BIRTHDAY (optional)</label>
           <input type="date" value={draft.birthday ? String(draft.birthday).slice(0, 10) : ""} onChange={(e) => setDraft({ ...draft, birthday: e.target.value ? new Date(e.target.value + "T12:00:00").toISOString() : "" })} style={{ ...inputS, marginBottom: 14 }} />
 
-          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PREFERRED STAFF MEMBER</label>
+          <label style={{ fontSize: 13.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>PREFERRED STAFF MEMBER</label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
             {staff.map((p) => { const on = draft.provider === p.id; return (
               <button key={p.id} onClick={() => setDraft({ ...draft, provider: p.id })} style={{ padding: "10px 16px", borderRadius: 24, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "rgba(176,141,87,0.12)" : "transparent", color: on ? "var(--gold)" : "var(--text)", fontSize: 14.5, fontWeight: on ? 600 : 400 }}>{p.name}</button>
             ); })}
           </div>
 
-          <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>NOTES (optional)</label>
+          <label style={{ fontSize: 13.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 7 }}>NOTES (optional)</label>
           <textarea value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} rows={3} placeholder="Formula, preferences, anything to remember…" style={{ ...inputS, resize: "vertical", lineHeight: 1.5, marginBottom: 20 }} />
 
           <button className="lift" onClick={saveClient} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none" }}>Add client</button>
@@ -25168,7 +25168,7 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
       <div style={{ padding: "18px 4px 12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 400, letterSpacing: "-0.4px" }}>Due to rebook</h2>
-          {overdue.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 11, fontWeight: 700, borderRadius: 8, padding: "3px 8px", lineHeight: 1 }}>{overdue.length}</span>}
+          {overdue.length > 0 && <span style={{ background: "var(--gold)", color: "var(--on-gold)", fontSize: 12.5, fontWeight: 700, borderRadius: 8, padding: "3px 8px", lineHeight: 1 }}>{overdue.length}</span>}
         </div>
         <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 18, lineHeight: 1.5 }}>Clients past their usual rebooking rhythm. Send a nudge — or skip them with ×.</p>
         {overdue.length === 0 ? (
@@ -25207,15 +25207,15 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
             </div>
             <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 18, lineHeight: 1.5 }}>To <strong style={{ color: "var(--text)" }}>{o.c.name}</strong> · {o.over}d overdue</p>
 
-            <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 8 }}>SEND BY</label>
+            <label style={{ fontSize: 13.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 8 }}>SEND BY</label>
             <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
               <button onClick={() => hasPhone && setNudgeChannel("text")} disabled={!hasPhone} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: `1.5px solid ${nudgeChannel === "text" ? "var(--gold)" : "var(--border)"}`, background: nudgeChannel === "text" ? "var(--tint2)" : "var(--panel2)", color: hasPhone ? (nudgeChannel === "text" ? "var(--gold)" : "var(--text)") : "var(--faint)", fontSize: 14.5, fontWeight: nudgeChannel === "text" ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><MessageSquare size={16} /> Text{!hasPhone ? " (no #)" : ""}</button>
               <button onClick={() => hasEmail && setNudgeChannel("email")} disabled={!hasEmail} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: `1.5px solid ${nudgeChannel === "email" ? "var(--gold)" : "var(--border)"}`, background: nudgeChannel === "email" ? "var(--tint2)" : "var(--panel2)", color: hasEmail ? (nudgeChannel === "email" ? "var(--gold)" : "var(--text)") : "var(--faint)", fontSize: 14.5, fontWeight: nudgeChannel === "email" ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Send size={15} /> Email{!hasEmail ? " (none)" : ""}</button>
             </div>
 
-            <label style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 8 }}>MESSAGE</label>
+            <label style={{ fontSize: 13.5, letterSpacing: 1.5, color: "var(--faint)", display: "block", marginBottom: 8 }}>MESSAGE</label>
             <textarea value={nudgeMsg} onChange={(e) => setNudgeMsg(e.target.value)} rows={4} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 15, fontFamily: FONT_BODY, resize: "vertical", lineHeight: 1.5, outline: "none", marginBottom: 8 }} />
-            <p style={{ fontSize: 12.5, color: "var(--faint)", marginBottom: 18, lineHeight: 1.4 }}>Your booking link is added automatically when it sends.</p>
+            <p style={{ fontSize: 13.5, color: "var(--faint)", marginBottom: 18, lineHeight: 1.4 }}>Your booking link is added automatically when it sends.</p>
 
             <button className="lift" onClick={sendNudge} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none" }}>Send {nudgeChannel === "email" ? "email" : "text"}</button>
             <button onClick={() => setNudgeConfirm(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "12px 0 2px" }}>Cancel</button>
@@ -25228,8 +25228,8 @@ function ClientList({ clients, setClients, providers, onOpen, showToast, isOwner
 }
 
 // Shared styles for the redesigned (Studio b/w) client card.
-const sheetGhost = { flex: 1, textAlign: "center", padding: 14, borderRadius: 12, fontSize: 12.5, letterSpacing: 1.2, textTransform: "uppercase", fontWeight: 600, border: "1px solid var(--border2)", background: "none", color: "var(--text)", cursor: "pointer", fontFamily: FONT_BODY };
-const sheetPrimary = { flex: 1, textAlign: "center", padding: 14, borderRadius: 12, fontSize: 12.5, letterSpacing: 1.2, textTransform: "uppercase", fontWeight: 600, border: "none", background: "var(--text)", color: "var(--bg)", cursor: "pointer", fontFamily: FONT_BODY, width: "100%" };
+const sheetGhost = { flex: 1, textAlign: "center", padding: 14, borderRadius: 12, fontSize: 13.5, letterSpacing: 1.2, textTransform: "uppercase", fontWeight: 600, border: "1px solid var(--border2)", background: "none", color: "var(--text)", cursor: "pointer", fontFamily: FONT_BODY };
+const sheetPrimary = { flex: 1, textAlign: "center", padding: 14, borderRadius: 12, fontSize: 13.5, letterSpacing: 1.2, textTransform: "uppercase", fontWeight: 600, border: "none", background: "var(--text)", color: "var(--bg)", cursor: "pointer", fontFamily: FONT_BODY, width: "100%" };
 
 // Per-service Booking row: inline Time + Price overrides for this client. Module-scope
 // so typing never remounts the inputs (keyboard stays open). Empty field = revert that field.
@@ -25242,7 +25242,7 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
   const effPrice = curPrice != null ? curPrice : basePrice;
   const commitT = () => { const v = t.trim() === "" ? null : Math.max(0, parseInt(t, 10) || 0); onSave({ dur: v }); };
   const commitP = () => { const v = p.trim() === "" ? null : Math.max(0, Math.round((parseFloat(p) || 0) * 100) / 100); onSave({ price: v }); };
-  const fl = { fontSize: 11.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, marginBottom: 6 };
+  const fl = { fontSize: 13, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, marginBottom: 6 };
   const ipt = { display: "flex", alignItems: "center", border: "1px solid var(--border2)", borderRadius: 11, overflow: "hidden", background: "var(--bg)" };
   const inp = { width: "100%", border: "none", outline: "none", background: "transparent", padding: "11px 12px", fontFamily: FONT_BODY, fontSize: 15, color: "var(--text)" };
   return (
@@ -25264,7 +25264,7 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
       {hasOverride ? (
         <div style={{ marginTop: 11 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text)", fontWeight: 500 }}>
-            <span style={{ background: "var(--text)", color: "var(--bg)", borderRadius: 20, padding: "3px 9px", fontSize: 10, letterSpacing: 0.5 }}>CUSTOM</span>
+            <span style={{ background: "var(--text)", color: "var(--bg)", borderRadius: 20, padding: "3px 9px", fontSize: 12, letterSpacing: 0.5 }}>CUSTOM</span>
             Books at {fmtDur(effDur)} · ${effPrice}
           </span>
           <div><button onClick={onClear} style={{ background: "none", border: "none", padding: 0, fontSize: 13, color: "var(--sub)", textDecoration: "underline", textUnderlineOffset: 2, marginTop: 10, cursor: "pointer" }}>Revert to default</button></div>
@@ -25446,7 +25446,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
     setResched(null); setDetail(null); showToast("Appointment moved.");
   };
 
-  const tabLabel = { fontFamily: "'Jost', sans-serif", fontSize: 11.5, letterSpacing: 2.2, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, margin: "22px 4px 10px" };
+  const tabLabel = { fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 2.2, textTransform: "uppercase", color: "var(--sub)", fontWeight: 600, margin: "22px 4px 10px" };
   const cardStyle = { border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", background: "var(--bg)", boxShadow: "var(--shadow-sm)" };
   const chev = <ChevronRight size={16} style={{ color: "var(--border2)", flexShrink: 0 }} />;
 
@@ -25461,16 +25461,16 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
             : <span style={{ fontFamily: "'Fraunces', serif", fontSize: 14, width: 50, flexShrink: 0, color: "var(--text2)" }}>{niceDate(a.bookedFor)}</span>}
           <span style={{ flex: 1, minWidth: 0 }}>
             <b style={{ fontWeight: 500, fontSize: 14.5, display: "block" }}>{mode === "up" ? `${niceDateFull(a.bookedFor)} · ${fmtTime(a.start)}` : a.title}</b>
-            <span style={{ fontSize: 12, color: "var(--sub)" }}>{mode === "up" ? `${a.title} · ${provName(a)}` : `${showPrice ? money0(paidForAppt(a)) + " · " : ""}${provName(a)}`}</span>
+            <span style={{ fontSize: 13, color: "var(--sub)" }}>{mode === "up" ? `${a.title} · ${provName(a)}` : `${showPrice ? money0(paidForAppt(a)) + " · " : ""}${provName(a)}`}</span>
           </span>
-          {el != null && mode !== "up" && <span style={{ fontSize: 11, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 9px", whiteSpace: "nowrap", fontWeight: 500 }}>{el} min</span>}
+          {el != null && mode !== "up" && <span style={{ fontSize: 12.5, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 9px", whiteSpace: "nowrap", fontWeight: 500 }}>{el} min</span>}
           {chev}
         </span>
         {/* the client's booking note — front and center on upcoming appointments */}
         {mode === "up" && (a.note || "").trim() && (
           <span style={{ display: "block", fontSize: 14, color: "var(--text)", background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))", borderRadius: 10, padding: "10px 12px", marginTop: 10, lineHeight: 1.45 }}>📝 “{a.note.trim()}”</span>
         )}
-        {mode === "up" && a.hasPhotos && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 10px", marginTop: 8, fontWeight: 500 }}><ImageIcon size={12} /> {a.photos || ""} photo{(a.photos || 0) > 1 ? "s" : ""} attached</span>}
+        {mode === "up" && a.hasPhotos && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 10px", marginTop: 8, fontWeight: 500 }}><ImageIcon size={12} /> {a.photos || ""} photo{(a.photos || 0) > 1 ? "s" : ""} attached</span>}
       </button>
     );
   };
@@ -25507,7 +25507,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           {editBday ? (
             <input type="date" autoFocus value={live.birthday ? String(live.birthday).slice(0, 10) : ""} onChange={(e) => saveBirthday(e.target.value ? new Date(e.target.value + "T12:00:00").toISOString() : "")} onBlur={() => setEditBday(false)} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "6px 10px", color: "var(--text)", fontSize: 13, fontFamily: FONT_BODY }} />
           ) : (
-            <button onClick={() => setEditBday(true)} style={{ background: "none", border: "none", color: live.birthday ? "var(--sub)" : "var(--faint)", fontSize: 12.5, cursor: "pointer", fontFamily: FONT_BODY }}>{live.birthday ? `Birthday · ${fmtBday(live.birthday)}` : "+ Add birthday"}</button>
+            <button onClick={() => setEditBday(true)} style={{ background: "none", border: "none", color: live.birthday ? "var(--sub)" : "var(--faint)", fontSize: 13.5, cursor: "pointer", fontFamily: FONT_BODY }}>{live.birthday ? `Birthday · ${fmtBday(live.birthday)}` : "+ Add birthday"}</button>
           )}
         </div>
       </div>
@@ -25517,7 +25517,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         {[[visitCount, "Visits"], [sinceLabel, "Since"], [cadenceShort, "Cadence"], [money0(lifetime), "Lifetime"]].map(([n, l], i) => (
           <div key={l} style={{ flex: 1, textAlign: "center", padding: "12px 4px", borderLeft: i === 0 ? "none" : "1px solid var(--line)" }}>
             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 500 }}>{n}</div>
-            <div style={{ fontSize: 9.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 3 }}>{l}</div>
+            <div style={{ fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginTop: 3 }}>{l}</div>
           </div>
         ))}
       </div>
@@ -25559,7 +25559,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
         {/* the feed: appointments + every change made to them (staff or client), newest first */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "22px 4px 10px" }}>
-          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Timeline</div>
+          <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Timeline</div>
         </div>
         {(() => {
           const feed = [
@@ -25573,11 +25573,11 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
                 <button key={`v-${a.id}`} onClick={() => setDetail({ appt: a, mode: "past" })} style={{ display: "block", width: "100%", textAlign: "left", border: "1px solid var(--border)", borderRadius: 13, padding: "13px 15px", background: "var(--bg)", cursor: "pointer", color: "var(--text)", boxShadow: "var(--shadow-sm)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
                     <b style={{ fontWeight: 500, fontSize: 14.5 }}>{a.title}</b>
-                    <span style={{ fontSize: 12, color: "var(--sub)", whiteSpace: "nowrap" }}>{niceDate(a.bookedFor)} · {money0(paidForAppt(a))} · {provName(a)}</span>
+                    <span style={{ fontSize: 13, color: "var(--sub)", whiteSpace: "nowrap" }}>{niceDate(a.bookedFor)} · {money0(paidForAppt(a))} · {provName(a)}</span>
                   </div>
-                  {el != null && <span style={{ display: "inline-block", fontSize: 11, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "2px 9px", marginTop: 8, fontWeight: 500 }}>{el} min in the chair</span>}
+                  {el != null && <span style={{ display: "inline-block", fontSize: 12.5, color: "var(--text2)", border: "1px solid var(--border)", borderRadius: 20, padding: "2px 9px", marginTop: 8, fontWeight: 500 }}>{el} min in the chair</span>}
                   {a.note && <div style={{ fontSize: 13.5, color: "var(--text)", background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 26%, var(--border))", borderRadius: 9, padding: "9px 11px", marginTop: 8, lineHeight: 1.45 }}>📝 “{a.note}” <span style={{ color: "var(--sub)" }}>· {firstName} at booking</span></div>}
-                  {a.wrapNote && <div style={{ fontSize: 12.5, color: "var(--text2)", background: "var(--panel2)", borderRadius: 9, padding: "8px 10px", marginTop: 8, lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{a.wrapNote}</div>}
+                  {a.wrapNote && <div style={{ fontSize: 13.5, color: "var(--text2)", background: "var(--panel2)", borderRadius: 9, padding: "8px 10px", marginTop: 8, lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{a.wrapNote}</div>}
                 </button>
               ); }
               const t = it.t; return (
@@ -25585,7 +25585,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
                   <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--gold)", flexShrink: 0, marginTop: 6 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{t.text}</div>
-                    {t.date && <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 5 }}>{niceDate(t.date)}{t.at ? ` · ${t.at}` : ""}</div>}
+                    {t.date && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 5 }}>{niceDate(t.date)}{t.at ? ` · ${t.at}` : ""}</div>}
                   </div>
                 </div>
               );
@@ -25614,7 +25614,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
                 {gs.map((g) => (
                   <button key={g.id} onClick={() => setLightbox(g.id)} style={{ position: "relative", aspectRatio: "1", borderRadius: 11, overflow: "hidden", border: "1px solid var(--border)", background: "var(--panel2)", cursor: "pointer", padding: 0 }}>
                     <img src={imgUrl(g.photo, 240)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                    {g.source === "client" && <span style={{ position: "absolute", bottom: 4, left: 4, fontSize: 9, fontWeight: 700, letterSpacing: 0.4, color: "#fff", background: "rgba(0,0,0,0.55)", borderRadius: 5, padding: "2px 5px" }}>CLIENT</span>}
+                    {g.source === "client" && <span style={{ position: "absolute", bottom: 4, left: 4, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: "#fff", background: "rgba(0,0,0,0.55)", borderRadius: 5, padding: "2px 5px" }}>CLIENT</span>}
                   </button>
                 ))}
               </div>
@@ -25653,13 +25653,13 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
             {family.map((m, i) => (
               <button key={m.id} onClick={() => setOpenMember(m.id)} style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 18px", borderTop: i === 0 ? "none" : "1px solid var(--line)", width: "100%", background: "none", border: "none", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
                 <span style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 15, flexShrink: 0 }}>{m.name?.charAt(0)}</span>
-                <span style={{ flex: 1 }}><b style={{ display: "block", fontWeight: 500, fontSize: 14.5 }}>{m.name}</b>{m.note && <span style={{ fontSize: 12, color: "var(--sub)" }}>{m.note}</span>}</span>
+                <span style={{ flex: 1 }}><b style={{ display: "block", fontWeight: 500, fontSize: 14.5 }}>{m.name}</b>{m.note && <span style={{ fontSize: 13, color: "var(--sub)" }}>{m.note}</span>}</span>
                 {chev}
               </button>
             ))}
             <button onClick={() => setAddMemberOpen(true)} style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 18px", borderTop: family.length ? "1px solid var(--line)" : "none", width: "100%", background: "none", border: "none", textAlign: "left", cursor: "pointer", color: "var(--text)" }}>
               <span style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 18, color: "var(--sub)", flexShrink: 0 }}>+</span>
-              <span style={{ flex: 1 }}><b style={{ display: "block", fontWeight: 500, fontSize: 14.5 }}>Add someone</b><span style={{ fontSize: 12, color: "var(--sub)" }}>Kids, partner, siblings</span></span>
+              <span style={{ flex: 1 }}><b style={{ display: "block", fontWeight: 500, fontSize: 14.5 }}>Add someone</b><span style={{ fontSize: 13, color: "var(--sub)" }}>Kids, partner, siblings</span></span>
               {chev}
             </button>
           </div>
@@ -25700,10 +25700,10 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         <div style={{ marginTop: 30, paddingTop: 20, borderTop: "1px solid var(--line)", textAlign: "center", paddingBottom: 8 }}>
           {isBlocked ? (<>
             <div style={{ fontSize: 13, color: "#c0392b", fontWeight: 500 }}>Blocked from booking</div>
-            {live.blockReason && <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 4, lineHeight: 1.45 }}>{live.blockReason}</div>}
-            <button onClick={unblock} style={{ marginTop: 10, background: "none", border: "1px solid var(--border)", color: "var(--text)", fontSize: 12.5, padding: "7px 16px", borderRadius: 9, cursor: "pointer", fontFamily: FONT_BODY }}>Unblock</button>
+            {live.blockReason && <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 4, lineHeight: 1.45 }}>{live.blockReason}</div>}
+            <button onClick={unblock} style={{ marginTop: 10, background: "none", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13.5, padding: "7px 16px", borderRadius: 9, cursor: "pointer", fontFamily: FONT_BODY }}>Unblock</button>
           </>) : (
-            <button onClick={() => setBlockPrompt(true)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 12.5, cursor: "pointer", fontFamily: FONT_BODY, textDecoration: "underline", textUnderlineOffset: 3 }}>Block {firstName} from booking</button>
+            <button onClick={() => setBlockPrompt(true)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer", fontFamily: FONT_BODY, textDecoration: "underline", textUnderlineOffset: 3 }}>Block {firstName} from booking</button>
           )}
         </div>
       )}
@@ -25750,14 +25750,14 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         const apptPrice = a.price != null ? a.price : (svc ? getPrice(svc, a.providerId) : 0);
         return (
           <Sheet open onClose={() => { setDetail(null); setWrapEdit(false); }} align="center" maxWidth={440}>
-            <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{detail.mode === "up" ? `Upcoming · ${daysFromNow(a.bookedFor)}` : `Past visit · ${niceDateFull(a.bookedFor)}`}</div>
+            <div style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{detail.mode === "up" ? `Upcoming · ${daysFromNow(a.bookedFor)}` : `Past visit · ${niceDateFull(a.bookedFor)}`}</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, letterSpacing: "-0.4px", marginTop: 8 }}>{detail.mode === "up" ? `${niceDateFull(a.bookedFor)} · ${fmtTime(a.start)}` : a.title}</h2>
             <div style={{ color: "var(--text2)", fontSize: 14, marginTop: 6 }}>{detail.mode === "up" ? `${a.title} · with ${provName(a)}` : `with ${provName(a)}`}</div>
 
             {detail.mode === "past" && el != null && (
               <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 16, marginTop: 18, textAlign: "center" }}>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500 }}>{el} <span style={{ fontStyle: "normal", fontSize: 15, color: "var(--sub)" }}>min</span></div>
-                <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 6 }}>This visit ran {el} minutes — in {fmtClock(a.serviceStartedAt)}, out {fmtClock(a.serviceEndedAt)}</div>
+                <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 6 }}>This visit ran {el} minutes — in {fmtClock(a.serviceStartedAt)}, out {fmtClock(a.serviceEndedAt)}</div>
               </div>
             )}
 
@@ -25775,14 +25775,14 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
             {(a.note || "").trim() && (
               <div style={{ background: "var(--panel2)", borderRadius: 12, padding: "13px 14px", marginTop: 14 }}>
-                <div style={{ fontSize: 9.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Client's booking note</div>
+                <div style={{ fontSize: 11.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Client's booking note</div>
                 <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, marginTop: 6 }}>“{a.note}”</div>
               </div>
             )}
 
             {detail.mode === "past" && (
               <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 9.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>Wrap-up note</div>
+                <div style={{ fontSize: 11.5, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 6 }}>Wrap-up note</div>
                 {wrapEdit ? (
                   <div>
                     <textarea autoFocus value={wrapDraft} onChange={(e) => setWrapDraft(e.target.value)} rows={3} placeholder="Formula, what you did, how it went — notes for next time." style={{ width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", color: "var(--text)", fontSize: 14, fontFamily: FONT_BODY, lineHeight: 1.5, resize: "vertical", boxSizing: "border-box" }} />
@@ -25829,7 +25829,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
               <button onClick={() => stepDay(1)} style={{ background: "none", border: "none", color: "var(--sub)", cursor: "pointer", padding: 6 }}><ChevronRight size={18} /></button>
             </div>
             <div style={{ marginBottom: 12 }}><TimeScrollPicker value={resched.start} onChange={(v) => setResched((r) => ({ ...r, start: v }))} step={15} label="Start time" full /></div>
-            {conflict && <p style={{ fontSize: 12.5, color: "#c0392b", marginBottom: 12 }}>{provName(a)} already has a booking overlapping this time. Pick a free slot to move it.</p>}
+            {conflict && <p style={{ fontSize: 13.5, color: "#c0392b", marginBottom: 12 }}>{provName(a)} already has a booking overlapping this time. Pick a free slot to move it.</p>}
             <button onClick={saveReschedule} disabled={conflict} style={{ ...sheetPrimary, opacity: conflict ? 0.4 : 1, cursor: conflict ? "not-allowed" : "pointer" }}>Move appointment</button>
             <button onClick={() => setResched(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14, padding: "12px 0 2px", marginTop: 4, cursor: "pointer" }}>Cancel</button>
           </Sheet>
@@ -25851,7 +25851,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         const method = rec ? (rec.method === "cash" ? "Cash" : rec.last4 ? `${rec.brand || "Card"} ··${rec.last4}` : "Card") : "—";
         return (
           <Sheet open onClose={() => setTxnAppt(null)} align="center" maxWidth={440}>
-            <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Transaction{a.bookedFor ? ` · ${niceDate(a.bookedFor)}` : ""}</div>
+            <div style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Transaction{a.bookedFor ? ` · ${niceDate(a.bookedFor)}` : ""}</div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginTop: 8 }}>{money0(total)}</h2>
             <div style={{ color: "var(--text2)", fontSize: 14, marginTop: 6 }}>Paid on {method}</div>
             <div style={{ marginTop: 18 }}>
@@ -25862,7 +25862,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
               {drow("Status", status)}
             </div>
             {pi && (
-              <a href={`https://dashboard.stripe.com/payments/${pi}`} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--line)", borderRadius: 11, padding: "11px 13px", marginTop: 16, fontSize: 12.5, color: "var(--sub)", textDecoration: "none" }}>
+              <a href={`https://dashboard.stripe.com/payments/${pi}`} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel2)", border: "1px solid var(--line)", borderRadius: 11, padding: "11px 13px", marginTop: 16, fontSize: 13.5, color: "var(--sub)", textDecoration: "none" }}>
                 <CreditCard size={14} /> Stripe · <b style={{ color: "var(--text)", fontWeight: 500 }}>{pi.length > 14 ? pi.slice(0, 11) + "…" : pi}</b> · <span style={{ textDecoration: "underline" }}>Open in Stripe</span>
               </a>
             )}
@@ -25871,7 +25871,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
               <button onClick={() => { setTxnAppt(null); setCheckout({ ...a, __reopen: true }); }} style={sheetPrimary}>Charge more</button>
             </div>
             {(rec || total > 0) && <div style={{ display: "flex", marginTop: 10 }}><button onClick={() => { setTxnAppt(null); setRefundAppt(a); }} style={{ ...sheetGhost, color: "#c0392b", borderColor: "#c0392b" }}>Refund…</button></div>}
-            <div style={{ fontSize: 11.5, color: "var(--sub)", lineHeight: 1.5, marginTop: 12 }}>"Charge more" reopens the ticket for anything not rung up. "Refund" returns the full amount or a partial — both run through Stripe.</div>
+            <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginTop: 12 }}>"Charge more" reopens the ticket for anything not rung up. "Refund" returns the full amount or a partial — both run through Stripe.</div>
           </Sheet>
         );
       })()}
@@ -25928,7 +25928,7 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 22, paddingTop: 8 }}>
           <div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 36, fontWeight: 400, letterSpacing: "-0.7px", lineHeight: 1, marginBottom: 12 }}>Messages</h2>
-            <div style={{ fontSize: 11, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500 }}>{totalUnread > 0 ? `${totalUnread} unread` : "All caught up"}</div>
+            <div style={{ fontSize: 12.5, letterSpacing: "3px", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500 }}>{totalUnread > 0 ? `${totalUnread} unread` : "All caught up"}</div>
           </div>
           <button onClick={() => setComposeOpen(true)} aria-label="New message" style={{ flexShrink: 0, background: "var(--text)", color: "var(--bg)", border: "none", width: 42, height: 42, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", marginTop: 2 }}><PenSquare size={18} /></button>
         </div>
@@ -25953,7 +25953,7 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                     <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 17, fontWeight: unread ? 500 : 400, letterSpacing: "-0.2px" }}>{c.name}</span>
-                    {last && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", flexShrink: 0 }}>{last.time}</span>}
+                    {last && <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: "var(--faint)", flexShrink: 0 }}>{last.time}</span>}
                   </div>
                   <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: unread ? "var(--text2)" : "var(--sub)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: unread ? 500 : 300, marginTop: 2 }}>{last ? (last.from === "shop" ? "You: " : "") + last.text : "No messages yet"}</div>
                 </div>
@@ -25980,7 +25980,7 @@ function MessagesView({ clients, setClients, providers, msgTarget, clearTarget, 
                   <Avatar size={38} photo={clientPhoto(c)} initial={c.name?.charAt(0)} color={provColor(c)} />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 14.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-                    {c.phone && <span style={{ display: "block", fontSize: 12.5, color: "var(--faint)", marginTop: 1 }}>{c.phone}</span>}
+                    {c.phone && <span style={{ display: "block", fontSize: 13.5, color: "var(--faint)", marginTop: 1 }}>{c.phone}</span>}
                   </span>
                   <ChevronRight size={17} style={{ color: "var(--faint)", flexShrink: 0 }} />
                 </button>
