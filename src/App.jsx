@@ -955,6 +955,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
   const [result, setResult] = useState(null);
   const [ready, setReady] = useState(false); // true once the secure card field is mounted & tappable
   const [wallet, setWallet] = useState(false); // true once an Apple Pay / Google Pay button is available & mounted
+  const [walletChecking, setWalletChecking] = useState(true); // true while canMakePayment() is still resolving — holds the wallet slot so Apple Pay never pops in late
   const cardBox = useRef(null);
   const prBox = useRef(null);
   const els = useRef(null);
@@ -965,7 +966,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
     (async () => {
       const stripe = await getStripe();
       if (dead) return;
-      if (!stripe || !cardBox.current) { setErr("Couldn't load the secure card field. Refresh and try again."); return; }
+      if (!stripe || !cardBox.current) { setErr("Couldn't load the secure card field. Refresh and try again."); setWalletChecking(false); return; }
       const elements = stripe.elements();
       const card = elements.create("card", { style: { base: { fontSize: "16px", color: "#232221", fontFamily: "'Jost', sans-serif", "::placeholder": { color: "#A39C8A" } }, invalid: { color: "#B5564B" } } });
       card.mount(cardBox.current);
@@ -989,6 +990,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
         const prButton = elements.create("paymentRequestButton", { paymentRequest: pr, style: { paymentRequestButton: { type: "default", theme: "dark", height: "48px" } } });
         const can = await pr.canMakePayment();
         if (can && !dead && prBox.current) { prButton.mount(prBox.current); setWallet(true); els.current.prButton = prButton; }
+        if (!dead) setWalletChecking(false);
         pr.on("paymentmethod", async (ev) => {
           try {
             if (isPay) {
@@ -1019,7 +1021,7 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
             }
           } catch (e2) { try { ev.complete("fail"); } catch (_) {} setErr(e2.message || "Something went wrong. Try the card field."); }
         });
-      } catch (e) { /* wallet unavailable — card field remains */ }
+      } catch (e) { if (!dead) setWalletChecking(false); /* wallet unavailable — card field remains */ }
 
       // Fallback: if the 'ready' event is ever missed, enable the button shortly after mount.
       setTimeout(() => { if (!dead) setReady(true); }, 1200);
@@ -1088,6 +1090,11 @@ function StripeCardSheet({ live, mode, amount, totalDue, clientName, clientEmail
                 <div style={{ fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>We keep a card on file to hold your spot. You won't be charged unless you no-show or cancel late.</div>
               )}
 
+              {walletChecking && !wallet && (
+                <div style={{ marginTop: 18, height: 48, borderRadius: 10, background: "var(--panel2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "var(--faint)", fontSize: 12.5 }}>
+                  Checking for Apple&nbsp;Pay…
+                </div>
+              )}
               <div ref={prBox} style={{ marginTop: wallet ? 18 : 0 }} />
               {wallet && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
@@ -4560,6 +4567,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // call) so it always runs with fresh cardOnFile and can't double-fire.
   useEffect(() => {
     if (!pendingFinish || !cardOnFile || booking) return;
+    // The SMS + cancellation agreements now sit BELOW the card. If they aren't both checked yet,
+    // don't auto-finish — clear the pending flag and let the Book button commit once they agree.
+    // (When they agreed first, this passes straight through and still finishes in one tap.)
+    if (!agreed || !smsConsent) { setPendingFinish(false); return; }
     setPendingFinish(false);
     const digits = (s) => (s || "").replace(/\D/g, "");
     const phoneChanged = !!matched && digits(phone) !== digits(matched.phone);
@@ -6783,23 +6794,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </div>
                 </div>
               )}
-              {/* One SMS consent unit: the Vonage-required checkbox (never pre-checked) + the
-                  by-providing-your-number fine-print, wrapped as a single block instead of two
-                  separate paragraphs. Copy is carrier-vetted — do NOT reword; the locked SMS
-                  reminder phrase must stay present (ship-check enforces exactly 4x in App.jsx). */}
-              <div style={{ border: `1px solid ${smsConsent ? "var(--border)" : "var(--border2)"}`, background: smsConsent ? "var(--panel)" : "color-mix(in srgb, var(--gold) 6%, var(--panel))", borderRadius: 12, padding: "13px 14px", marginBottom: 14, transition: "background .15s" }}>
-                <button type="button" onClick={() => setSmsConsent(v => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                  <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${smsConsent ? "var(--gold)" : "var(--text)"}`, background: smsConsent ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1, transition: "background .15s, border-color .15s" }}>
-                    {smsConsent && <Check size={14} style={{ color: "var(--on-gold)" }} />}
-                  </span>
-                  <span style={{ color: smsConsent ? "var(--sub)" : "var(--text2)", fontSize: 12.5, lineHeight: 1.5 }}>
-                    <b style={{ color: "var(--text)" }}>Required</b> — check to get your appointment reminders by text. I agree to receive appointment reminders via SMS from Sanctuary Barber Co. Message and data rates may apply. Message frequency varies. Text HELP for help or STOP to opt out. See our <a href="https://sanctuarybarberco.com/privacy-policy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a>.
-                  </span>
-                </button>
-                <p style={{ color: "var(--faint)", fontSize: 11, margin: "10px 0 0", lineHeight: 1.5 }}>
-                  By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text2)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text2)", textDecoration: "underline" }}>terms</a>.
-                </p>
-              </div>
+
             </div>
 
             {/* Profile selfie ($5 off) — only when this client has no photo on file yet. The
@@ -6831,18 +6826,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 )}
               </div>
             )}
-
-            {/* Cancellation policy — collapsed to an agree row with an expandable "Read it" */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "6px 18px", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
-                <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, color: "var(--text)", cursor: "pointer", flex: 1, textAlign: "left" }}>
-                  <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
-                  <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>I agree to the cancellation policy</span>
-                </button>
-                {business.policy && <button onClick={() => setPolicyOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, fontWeight: 600, padding: "6px 2px", flexShrink: 0, cursor: "pointer" }}>{policyOpen ? "Hide" : "Read it ›"}</button>}
-              </div>
-              {policyOpen && business.policy && <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 14px" }}>{business.policy}</p>}
-            </div>
 
             {/* Card on file / deposit — real Stripe in Live, safe simulation in Test */}
             {(() => {
@@ -6911,7 +6894,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                     ) : (
                       <>
                         <button disabled={!identityOk} onClick={() => { if (identityOk) setCardSheetOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: identityOk ? "var(--gold)" : "var(--panel2)", border: identityOk ? "none" : "1px solid var(--border)", borderRadius: 12, padding: 15, color: identityOk ? "var(--on-gold)" : "var(--faint)", fontSize: 15, fontWeight: 700, cursor: identityOk ? "pointer" : "default", opacity: identityOk ? 1 : 0.6 }}><CreditCard size={17} /> Pay ${payTotal} to book</button>
-                        {!identityOk && <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, marginTop: 8, textAlign: "center" }}>Add your name, phone &amp; email and check the box above first.</p>}
+                        {!identityOk && <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, marginTop: 8, textAlign: "center" }}>Add your name, phone &amp; email and check the boxes below first.</p>}
                       </>
                     )}
                     {!livePay && <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Secure card entry · test mode — no real charge yet.</p>}
@@ -6962,13 +6945,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                       <button onClick={() => { setCardOnFile(false); setCardInfo(null); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--sub)", fontSize: 13.5, cursor: "pointer" }}>Change</button>
                     </div>
                   ) : (() => {
-                    // Card / Apple Pay may ONLY open once name, phone, email & consent are set — otherwise
-                    // a one-tap wallet payment could commit a booking with no client details.
-                    const identityOk = agreed && smsConsent && newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10 && (!cart.some((e) => e && e.service && e.service.booking && e.service.booking.requireAddress) || !!newAddress.trim());
+                    // Card / Apple Pay may open once name, phone & email are set. The SMS + cancellation
+                    // agreements now live BELOW the card and gate the final Book button instead — a saved
+                    // card can't finish the booking until both are checked (see the pendingFinish guard).
+                    const identityOk = newFirst.trim() && newLast.trim() && newEmail.trim() && phone.replace(/\D/g, "").length >= 10 && (!cart.some((e) => e && e.service && e.service.booking && e.service.booking.requireAddress) || !!newAddress.trim());
                     return (
                       <>
                         <button disabled={!identityOk} onClick={() => { if (identityOk) setCardSheetOpen(true); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, color: "var(--text)", fontSize: 14.5, fontWeight: 500, cursor: identityOk ? "pointer" : "default", opacity: identityOk ? 1 : 0.5 }}><CreditCard size={17} style={{ color: "var(--text)" }} /> {depositAmt > 0 ? `Pay $${depositAmt} deposit` : "Add a card"}</button>
-                        {!identityOk && <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, marginTop: 8, textAlign: "center" }}>Add your name, phone &amp; email and check the box above first.</p>}
+                        {!identityOk && <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.45, marginTop: 8, textAlign: "center" }}>Add your name, phone &amp; email first.</p>}
                       </>
                     );
                   })()}
@@ -6987,6 +6971,36 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 </div>
               );
             })()}
+
+            {/* One SMS consent unit: the Vonage-required checkbox (never pre-checked) + the
+                  by-providing-your-number fine-print, wrapped as a single block instead of two
+                  separate paragraphs. Copy is carrier-vetted — do NOT reword; the locked SMS
+                  reminder phrase must stay present (ship-check enforces exactly 4x in App.jsx). */}
+              <div style={{ border: `1px solid ${smsConsent ? "var(--border)" : "var(--border2)"}`, background: smsConsent ? "var(--panel)" : "color-mix(in srgb, var(--gold) 6%, var(--panel))", borderRadius: 12, padding: "13px 14px", marginBottom: 14, transition: "background .15s" }}>
+                <button type="button" onClick={() => setSmsConsent(v => !v)} style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                  <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${smsConsent ? "var(--gold)" : "var(--text)"}`, background: smsConsent ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1, transition: "background .15s, border-color .15s" }}>
+                    {smsConsent && <Check size={14} style={{ color: "var(--on-gold)" }} />}
+                  </span>
+                  <span style={{ color: smsConsent ? "var(--sub)" : "var(--text2)", fontSize: 12.5, lineHeight: 1.5 }}>
+                    <b style={{ color: "var(--text)" }}>Required</b> — check to get your appointment reminders by text. I agree to receive appointment reminders via SMS from Sanctuary Barber Co. Message and data rates may apply. Message frequency varies. Text HELP for help or STOP to opt out. See our <a href="https://sanctuarybarberco.com/privacy-policy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "var(--text)", textDecoration: "underline" }}>privacy policy</a>.
+                  </span>
+                </button>
+                <p style={{ color: "var(--faint)", fontSize: 11, margin: "10px 0 0", lineHeight: 1.5 }}>
+                  By providing your number, you agree to receive booking confirmations and reminders from Sanctuary Barber Co. Message and data rates may apply. Reply STOP to opt out. See our <a href="#privacy" style={{ color: "var(--text2)", textDecoration: "underline" }}>privacy policy</a> and <a href="#terms" style={{ color: "var(--text2)", textDecoration: "underline" }}>terms</a>.
+                </p>
+              </div>
+
+            {/* Cancellation policy — collapsed to an agree row with an expandable "Read it" */}
+            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "6px 18px", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
+                <button onClick={() => setAgreed(!agreed)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, color: "var(--text)", cursor: "pointer", flex: 1, textAlign: "left" }}>
+                  <span style={{ width: 44, height: 26, borderRadius: 13, background: agreed ? "var(--text)" : "var(--border2)", position: "relative", flexShrink: 0 }}><span style={{ position: "absolute", top: 3, left: agreed ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .2s" }} /></span>
+                  <span style={{ fontSize: 14.5, lineHeight: 1.3 }}>I agree to the cancellation policy</span>
+                </button>
+                {business.policy && <button onClick={() => setPolicyOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, fontWeight: 600, padding: "6px 2px", flexShrink: 0, cursor: "pointer" }}>{policyOpen ? "Hide" : "Read it ›"}</button>}
+              </div>
+              {policyOpen && business.policy && <p style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 14px" }}>{business.policy}</p>}
+            </div>
 
             {(() => {
               const bk = business.booking || {};
@@ -7012,7 +7026,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 return;
               }
               commitBooking(phone, newEmail);
-            }} style={{ width: "100%", background: canLock ? "var(--text)" : "transparent", color: canLock ? "var(--bg)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (!smsConsent ? "AGREE TO TEXT REMINDERS ABOVE" : (payFull && !paid ? "PAY ABOVE TO BOOK" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : `BOOK FOR ${relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate).split(",")[0].toUpperCase() + " " + MONTHS[selectedDate.getMonth()].toUpperCase() + " " + selectedDate.getDate() : relativeDate(selectedDate).toUpperCase()}`)))}</button>
+            }} style={{ width: "100%", background: canLock ? "var(--text)" : "transparent", color: canLock ? "var(--bg)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (payFull && !paid ? "PAY ABOVE TO BOOK" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : ((!smsConsent || !agreed) ? "CHECK BOTH BOXES TO BOOK" : `BOOK FOR ${relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate).split(",")[0].toUpperCase() + " " + MONTHS[selectedDate.getMonth()].toUpperCase() + " " + selectedDate.getDate() : relativeDate(selectedDate).toUpperCase()}`)))}</button>
             {bookErr && <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "color-mix(in srgb, #c0392b 14%, var(--panel))", color: "var(--text)", fontSize: 13.5, lineHeight: 1.45, textAlign: "center" }}>Couldn't confirm your booking — check your connection and tap again. Your time wasn't held, so nothing's lost.</div>}
             </>
               );
