@@ -3677,11 +3677,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const max = 900; let w = img.width, h = img.height;
-        if (w > h && w > max) { h = Math.round(h * max / w); w = max; } else if (h > max) { w = Math.round(w * max / h); h = max; }
-        const c = document.createElement("canvas"); c.width = w; c.height = h;
-        c.getContext("2d").drawImage(img, 0, 0, w, h);
-        const url = c.toDataURL("image/jpeg", 0.5); // keep the base64 payload small so the token save can't choke
+        const shrink = (maxPx, q) => { let w = img.width, h = img.height; if (w > h && w > maxPx) { h = Math.round(h * maxPx / w); w = maxPx; } else if (h > maxPx) { w = Math.round(w * maxPx / h); h = maxPx; } const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h); return c.toDataURL("image/jpeg", q); };
+        let url = shrink(900, 0.5);
+        if (url.length > 300000) url = shrink(700, 0.4); // hard byte cap: keep every photo well under the proven-fast payload size
         setPhotos((cur) => cur.length >= 3 ? cur : [...cur, url]);
       };
       img.src = reader.result;
@@ -4231,12 +4229,30 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // path. It writes, on the server: the note + reference photos → the appointment; the selfie → the
   // client's profile photo; and each reference photo → the client's gallery (by date). Photos are
   // downscaled so the payload stays small (a bloated body was silently failing before).
-  const saveConfirmationExtras = (over = {}) => {
-    if (isStaff || !bookedToken) return;
+  const [extrasSave, setExtrasSave] = useState({ state: "idle", msg: "" }); // idle | saving | saved | error — VISIBLE save status, no more silent failures
+  const extrasEverSentRef = useRef(false);
+  const saveConfirmationExtras = async (over = {}) => {
+    if (isStaff || !bookedToken) return true;
     const note = ((over.note !== undefined ? over.note : clientNote) || "").trim();
     const pd = Array.isArray(over.photos) ? over.photos : (Array.isArray(photos) ? photos : []);
     const sf = (over.selfie !== undefined ? over.selfie : selfie) || null;
-    try { supabase.rpc("attach_booking_extras_by_token", { p_token: bookedToken, p_note: note, p_photos: pd, p_selfie: sf }).catch(() => {}); } catch (e) {}
+    if (!note && !pd.length && !sf && !extrasEverSentRef.current) return true; // nothing to save (and nothing saved before to clear)
+    setExtrasSave({ state: "saving", msg: "" });
+    // 3 attempts, 15s cap each — and the ACTUAL error is surfaced on screen, never swallowed.
+    let lastErr = "";
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const res = await Promise.race([
+          supabase.rpc("attach_booking_extras_by_token", { p_token: bookedToken, p_note: note, p_photos: pd, p_selfie: sf }),
+          new Promise((resolve) => setTimeout(() => resolve({ error: { message: "timed out" } }), 15000)),
+        ]);
+        if (!res || !res.error) { extrasEverSentRef.current = true; setExtrasSave({ state: "saved", msg: "" }); return true; }
+        lastErr = res.error.message || "save failed";
+      } catch (e) { lastErr = (e && e.message) || "save failed"; }
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 1200));
+    }
+    setExtrasSave({ state: "error", msg: lastErr });
+    return false;
   };
   // Keep the booked appointment in local state in sync while on the confirmation screen, and re-save the
   // extras to the server (debounced) after any change to the note / photos / selfie.
@@ -4258,9 +4274,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     const entries = photos.map((p, i) => ({ id: "g" + baseTs + "_" + i, photo: p, note: "", date: new Date().toISOString(), source: "client" }));
     setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, gallery: [...entries, ...(c.gallery || [])] } : c));
   };
-  // Immediate flush on "Update Appt" / exit — guarantees the extras land even if the client leaves before
-  // the 900ms debounce fires. Also surfaces the in-app "note/photos added" alert to the assigned staff.
-  const flushBookingDetails = () => { saveConfirmationExtras(); };
+  // Immediate flush on "Update Appt" / exit — AWAITED, so the button can confirm success or show the
+  // real error and stay put. Also surfaces the in-app "note/photos added" alert to the assigned staff.
+  const flushBookingDetails = () => saveConfirmationExtras();
 
   // Selfie taken on the CONFIRMATION screen → the client's PROFILE photo + gallery (persisted by the
   // extras RPC, passing the fresh dataURL since state isn't updated yet) and $5 off THIS visit.
@@ -7123,7 +7139,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           noteOn={business?.booking?.askNote !== false} photoOn={business?.bookingPhotos?.mode !== "off"}
           clientNote={clientNote} setClientNote={setClientNote} photoList={photos} setPhotos={setPhotos} clientPhotoRef={clientPhotoRef} onPhotoPick={onPhotoPick}
           selfie={selfie} selfieRef={selfieRef} onSelfiePick={onSelfiePick} onClearSelfie={clearSelfie} selfieEligible={!((clients.find((c) => c.id === bookedClientId) || {}).photo)}
-          onManage={() => { flushBookingDetails(); captureBookingGallery(); setStep(9); }} onExit={() => { flushBookingDetails(); captureBookingGallery(); (matched ? goClientHome : onExit)(); }} />}
+          saveState={extrasSave}
+          onManage={async () => { const ok = await flushBookingDetails(); captureBookingGallery(); if (ok) setStep(9); }} onExit={async () => { const ok = await flushBookingDetails(); captureBookingGallery(); if (ok) (matched ? goClientHome : onExit)(); }} />}
 
         {step === 9 && <ManageByToken token={(appts.find((a) => a.id === bookedId) || {}).manageToken} shopId={shopId} business={business} providers={providers} services={services} onExit={onExit} />}
         </div>
@@ -7230,7 +7247,7 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
   );
 }
 
-function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider, selectedDate, slot, noteOn, photoOn, clientNote, setClientNote, photoList, setPhotos, clientPhotoRef, onPhotoPick, selfie, selfieRef, onSelfiePick, onClearSelfie, selfieEligible, onManage, onExit }) {
+function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider, selectedDate, slot, noteOn, photoOn, clientNote, setClientNote, photoList, setPhotos, clientPhotoRef, onPhotoPick, selfie, selfieRef, onSelfiePick, onClearSelfie, selfieEligible, saveState, onManage, onExit }) {
   const F = FONT_BODY; // this screen is intentionally single-font (all Jost)
   const relDate = relativeDate(selectedDate);
   const relPlus = relDate.includes(",") ? relDate : `${relDate}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
@@ -7325,7 +7342,13 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
         </div>
       </div>
 
-      <button onClick={onExit} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: F, fontSize: 12.5, letterSpacing: 1.2, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: "pointer" }}>{hasChanges ? "Update Appt" : "Done"}</button>
+      {saveState && saveState.state === "error" && (
+        <div style={{ display: "flex", gap: 9, background: "color-mix(in srgb, #C0392B 9%, var(--panel))", border: "1px solid color-mix(in srgb, #C0392B 30%, var(--border))", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
+          <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--text)", lineHeight: 1.45 }}><b>Couldn't save your photos &amp; note</b> — check your connection and tap Update Appt again.{saveState.msg ? <span style={{ color: "var(--sub)" }}> ({saveState.msg})</span> : null}</div>
+        </div>
+      )}
+      <button disabled={saveState && saveState.state === "saving"} onClick={onExit} style={{ width: "100%", background: (saveState && saveState.state === "saving") ? "var(--border2)" : "var(--text)", color: "var(--bg)", padding: 16, fontFamily: F, fontSize: 12.5, letterSpacing: 1.2, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: (saveState && saveState.state === "saving") ? "default" : "pointer" }}>{(saveState && saveState.state === "saving") ? "Saving…" : (hasChanges ? (saveState && saveState.state === "error" ? "Try again" : "Update Appt") : "Done")}</button>
+      {saveState && saveState.state === "saved" && hasChanges && <div style={{ textAlign: "center", fontFamily: F, fontSize: 12, color: "var(--gold)", fontWeight: 600, marginTop: 8 }}>✓ Saved to your appointment</div>}
       <button onClick={onManage} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", color: "var(--sub)", padding: "14px 0 4px", fontFamily: F, fontSize: 13, fontWeight: 500, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>Reschedule or cancel</button>
 
       <div style={{ textAlign: "center", color: "var(--faint)", fontFamily: F, fontSize: 11.5, marginTop: 22, lineHeight: 1.6, paddingBottom: 8 }}>
@@ -25496,13 +25519,15 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           <div style={cardStyle}>{upcomingAppts.map((a) => <VisitRow key={a.id} a={a} mode="up" />)}</div>
         </>)}
 
-        {/* Gallery — every uploaded photo (client selfies/refs + staff adds), grouped by date */}
-        {gallery.length > 0 && (
+        {/* Gallery — every uploaded photo (client selfies/refs + staff adds), grouped by date.
+            ALWAYS visible (empty state included) so the owner can find it before the first photo. */}
+        {(
           <>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "22px 4px 10px" }}>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 10, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Gallery</div>
               <button onClick={() => setGalPicker(true)} style={{ background: "none", border: "none", color: "var(--text)", fontSize: 13, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}><Plus size={14} /> Add photo</button>
             </div>
+            {gallery.length === 0 && <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", margin: "0 4px 6px" }}>No photos yet — booking photos and selfies land here automatically, newest first.</p>}
             {(() => {
               const groups = {};
               [...gallery].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)).forEach((g) => {
