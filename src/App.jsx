@@ -2008,6 +2008,19 @@ function App() {
       await ensureFreshSession(); // refresh a stale token before writing (fixes native 42501)
       const list = items || [];
       let rows = list.map((it, i) => ({ id: String(it.id ?? `${table}_${i}`), shop_id: SHOP_ID, data: it }));
+      // Send ONLY rows that actually changed since the last known server state. Appointments and
+      // clients now legitimately carry base64 photos, so upserting the ENTIRE table in one request
+      // built multi-MB bodies that could fail ("save failed: appointments") — the save then reverted
+      // on refetch and re-landed later (the disappearing-appointment bug). Baseline = lastRemoteRef,
+      // which is refreshed on load, on realtime refetch, and after every successful save.
+      {
+        const base = lastRemoteRef.current[table];
+        if (Array.isArray(base) && base.length) {
+          const prev = new Map(base.map((it) => [String(it && it.id), JSON.stringify(it)]));
+          const changed = rows.filter((r) => prev.get(r.id) !== JSON.stringify(r.data));
+          if (changed.length < rows.length) rows = changed;
+        }
+      }
       // SAFETY BACKSTOP (recurring "staff email/phone disappears" bug): a provider save must NEVER blank
       // out an email/phone/pin that the server still has. The sanitized public feed can leave local state
       // without these fields; without this guard a later save would persist the blanks permanently. We
@@ -2026,15 +2039,18 @@ function App() {
           }
         } catch (e) { /* safety read failed — fall through with the un-merged rows */ }
       }
-      // 1. Upsert what we currently have — adds new rows, updates existing ones, destroys nothing.
-      if (rows.length) {
-        const { error: upErr } = await supabase.from(table).upsert(rows);
+      // 1. Upsert what changed — adds new rows, updates existing ones, destroys nothing. Chunked so a
+      //    photo-heavy batch (base64 galleries / appointment photos) never builds one oversized request.
+      for (let i = 0; i < rows.length; i += 10) {
+        const { error: upErr } = await supabase.from(table).upsert(rows.slice(i, i + 10));
         if (upErr) throw upErr;
       }
       // 2. Delete ONLY rows this device knew about and has since removed. A server row we
       //    don't have but never knew about is a NEW row from another device (e.g. Heather just
       //    booked someone) — deleting it would be the two-device clobber, so we leave it.
-      const keepIds = new Set(rows.map((r) => r.id));
+      // keepIds must come from the FULL list (rows is only the changed subset) — otherwise every
+      // unchanged row would look "removed" and get deleted.
+      const keepIds = new Set(list.map((it, i) => String((it && it.id) ?? `${table}_${i}`)));
       const prevKnown = new Set((lastRemoteRef.current[table] || []).map((it) => String(it && it.id)));
       const { data: existing, error: selErr } = await supabase.from(table).select('id').eq('shop_id', SHOP_ID);
       if (selErr) throw selErr;
@@ -23768,7 +23784,15 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     ? (new Date(appt.serviceStartedAt).getHours() * 60 + new Date(appt.serviceStartedAt).getMinutes())
     : appt.start;
   const writeStartMin = (v, note) => { onUpdate(appt.id, { serviceStartedAt: apptDayBase() + v * 60000 }); if (note) showToast(note); };
-  const openStartEdit = () => { setStartDraft(startedAtMin); setStartTimeOpen(true); };
+  // Open the picker on the 5-min mark closest to the BOOKED start time (clamped inside the editable
+  // window) — the usual correction is "it actually began on time", so start there, not at the timer.
+  const openStartEdit = () => {
+    const lo = Math.max(0, startedAtMin - 60);
+    const hi = Math.min(startedAtMin + 60, new Date().getHours() * 60 + new Date().getMinutes());
+    const near5 = Math.round((appt.start || startedAtMin) / 5) * 5;
+    setStartDraft(Math.min(hi, Math.max(lo, near5)));
+    setStartTimeOpen(true);
+  };
   const saveStartEdit = () => { writeStartMin(startDraft, `Timer set to ${fmtTime(startDraft)} start.`); setStartTimeOpen(false); };
   const snapToScheduled = () => writeStartMin(appt.start, `Timer moved to the ${fmtTime(appt.start)} start.`);
   // Who can edit price: owners and admins (you + Heather). Only an explicit regular "Staff" member is blocked.
@@ -24041,11 +24065,11 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       <span>Timer started {startedLateBy} min after the booked time — but it began on time? <span style={{ color: T.accent, whiteSpace: "nowrap" }}>Use {fmtTime(appt.start)} →</span></span>
                     </button>
                   )}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: T.sub }}>
-                    <Clock size={14} style={{ flexShrink: 0, opacity: 0.85 }} />
-                    <span>Timer started at <strong style={{ color: T.text }}>{fmtClockTs(appt.serviceStartedAt)}</strong></span>
-                    <button onClick={openStartEdit} style={{ marginLeft: "auto", background: "none", border: "none", color: T.accent, fontWeight: 700, fontSize: 14, cursor: "pointer", padding: "4px 2px" }}>Edit</button>
-                  </div>
+                  <button onClick={openStartEdit} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", background: T.panel, border: `1px solid ${T.line}`, borderRadius: 13, padding: "13px 15px", cursor: "pointer" }}>
+                    <span style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, var(--gold) 12%, transparent)", color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center" }}><Clock size={16} /></span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 15.5, color: T.text }}>Timer started at <strong>{fmtClockTs(appt.serviceStartedAt)}</strong></span>
+                    <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 5, border: `1px solid color-mix(in srgb, var(--gold) 45%, ${T.line})`, color: "var(--gold)", borderRadius: 9, padding: "7px 13px", fontSize: 14, fontWeight: 700 }}><Edit2 size={13} /> Edit</span>
+                  </button>
                 </div>
               )}
 
@@ -24479,24 +24503,25 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
             <div style={{ fontFamily: FONT_BODY, fontSize: 20, fontWeight: 600 }}>{service?.name || appt.title}</div>
             <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 4 }}>When did the service actually begin?</div>
           </div>
-          {/* Minute stepper — tick up/down a minute at a time, centered on when the timer started.
-              Stays within an hour either side (can't run past "now"), so there's no day-long list to scroll. */}
+          {/* 5-minute stepper — opens on the 5-min mark nearest the BOOKED time; ± ticks in 5s.
+              Stays within an hour either side of the timer (can't run past "now"). */}
           <div style={{ marginBottom: 14 }}>
             {(() => {
               const lo = Math.max(0, startedAtMin - 60);
               const hi = Math.min(startedAtMin + 60, nowMinTick);
               const atLo = startDraft <= lo, atHi = startDraft >= hi;
               const stepBtn = (off) => ({ display: "flex", alignItems: "center", justifyContent: "center", width: 58, height: 58, borderRadius: 999, border: "1px solid var(--border)", background: "var(--panel2)", color: off ? "var(--faint)" : "var(--text)", cursor: off ? "default" : "pointer", flexShrink: 0 });
-              const delta = startDraft - startedAtMin;
-              const sub = delta === 0 ? "when the timer started" : (delta < 0 ? `${-delta} min earlier` : `${delta} min later`);
+              const dBook = startDraft - (appt.start || 0);
+              const dTimer = startDraft - startedAtMin;
+              const sub = dBook === 0 ? "right on the booked time" : (dTimer === 0 ? "when the timer started" : (dBook < 0 ? `${-dBook} min before the booked time` : `${dBook} min after the booked time`));
               return (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18 }}>
-                  <button onClick={() => !atLo && setStartDraft((v) => Math.max(lo, v - 1))} disabled={atLo} style={stepBtn(atLo)} aria-label="One minute earlier"><Minus size={24} /></button>
+                  <button onClick={() => !atLo && setStartDraft((v) => Math.max(lo, v - 5))} disabled={atLo} style={stepBtn(atLo)} aria-label="Five minutes earlier"><Minus size={24} /></button>
                   <div style={{ minWidth: 138, textAlign: "center" }}>
                     <div style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 600, lineHeight: 1 }}>{fmtTime(startDraft)}</div>
                     <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 7 }}>{sub}</div>
                   </div>
-                  <button onClick={() => !atHi && setStartDraft((v) => Math.min(hi, v + 1))} disabled={atHi} style={stepBtn(atHi)} aria-label="One minute later"><Plus size={24} /></button>
+                  <button onClick={() => !atHi && setStartDraft((v) => Math.min(hi, v + 5))} disabled={atHi} style={stepBtn(atHi)} aria-label="Five minutes later"><Plus size={24} /></button>
                 </div>
               );
             })()}
