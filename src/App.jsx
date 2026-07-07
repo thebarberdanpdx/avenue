@@ -4276,9 +4276,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const clearSelfie = () => {
     setSelfie(null);
     if (!bookedClientId) return;
+    // Full undo: the offer only shows for clients with NO photo, so reverting the profile photo to
+    // none is correct — and it flips selfieEligible back to true so the offer reappears (re-addable).
+    const existing = (clients || []).find((c) => c.id === bookedClientId);
+    setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, photo: undefined } : c));
+    const patch = existing ? { ...existing, photo: null } : { id: bookedClientId, photo: null };
+    try { supabase.rpc("save_booking_client", { p_shop: shopId, p_client: patch }).catch(() => {}); } catch (e) {}
     setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: undefined } : a));
     setMyAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: undefined } : a));
-    if (matched && matched.id === bookedClientId) setMatched((m) => m ? { ...m, _localAppts: Array.isArray(m._localAppts) ? m._localAppts.map((a) => a.id === bookedId ? { ...a, discount: undefined } : a) : m._localAppts } : m);
+    if (matched && matched.id === bookedClientId) setMatched((m) => m ? { ...m, photo: undefined, _localAppts: Array.isArray(m._localAppts) ? m._localAppts.map((a) => a.id === bookedId ? { ...a, discount: undefined } : a) : m._localAppts } : m);
     if (bookedToken) { try { supabase.rpc("set_selfie_discount_by_token", { p_token: bookedToken, p_on: false }).catch(() => {}); } catch (e) {} }
   };
 
@@ -4829,7 +4835,18 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
         {tokenManage && (
           <div style={{ position: "fixed", inset: 0, zIndex: 85, background: "var(--bg)", overflowY: "auto" }}>
-            <ManageByToken token={tokenManage.manageToken} shopId={shopId} business={business} providers={providers} services={services} onExit={() => { setTokenManage(null); refreshMyAppts(); }} />
+            <ManageByToken token={tokenManage.manageToken} shopId={shopId} business={business} providers={providers} services={services}
+              onChanged={(res) => {
+                if (!res) return;
+                // Reflect the token-based cancel/reschedule back into the local session so the home
+                // doesn't show the stale snapshot (a local session has no server token to re-fetch with).
+                const apply = (list) => (list || []).map((a) => (a.id === tokenManage.id || (a.manageToken && a.manageToken === tokenManage.manageToken))
+                  ? (res.type === "cancel" ? { ...a, status: "cancelled" } : { ...a, start: res.start, end: res.end, bookedFor: res.bookedFor })
+                  : a);
+                setMyAppts(apply);
+                setMatched((m) => (m && m._localSession) ? { ...m, _localAppts: apply(m._localAppts) } : m);
+              }}
+              onExit={() => { setTokenManage(null); refreshMyAppts(); }} />
           </div>
         )}
         {homeAction && (
@@ -7486,7 +7503,7 @@ function ReviewByToken({ token, shopId, business, onExit }) {
 // (gotvero.com/manage?t=CODE). Looks up the one appointment by its code via a public RPC,
 // then lets the client reschedule (through the real computeFreeSlots engine, honoring every
 // booking-time setting) or cancel — persisting via RPC and firing the matching message.
-function ManageByToken({ token, shopId, business, providers, services, onExit }) {
+function ManageByToken({ token, shopId, business, providers, services, onExit, onChanged }) {
   const [appt, setAppt] = useState(null);
   const [avail, setAvail] = useState([]);
   const [phase, setPhase] = useState("loading"); // loading | error | view | resched | cancel | cancelled | rescheduled
@@ -7578,7 +7595,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
 
   const submitCancel = async () => {
     if (busy) return; setBusy(true);
-    try { await supabase.rpc("manage_cancel_by_token", { p_token: token }); fireNotify("canceled", appt); setPhase("cancelled"); }
+    try { await supabase.rpc("manage_cancel_by_token", { p_token: token }); fireNotify("canceled", appt); setPhase("cancelled"); if (onChanged) onChanged({ type: "cancel" }); }
     catch (e) { setPhase("error"); } finally { setBusy(false); }
   };
   const submitReschedule = async () => {
@@ -7587,7 +7604,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
     try {
       await supabase.rpc("manage_reschedule_by_token", { p_token: token, p_start: newSlot, p_date: when.toISOString() });
       const updated = { ...appt, start: newSlot, end: newSlot + dur, bookedFor: when.toISOString() };
-      setAppt(updated); fireNotify("rescheduled", updated); fireStaffPush({ shopId, title: "Appointment rescheduled", appt: updated, prevAppt: appt, event: "rescheduled", business }); setPhase("rescheduled");
+      setAppt(updated); fireNotify("rescheduled", updated); fireStaffPush({ shopId, title: "Appointment rescheduled", appt: updated, prevAppt: appt, event: "rescheduled", business }); setPhase("rescheduled"); if (onChanged) onChanged({ type: "reschedule", start: newSlot, end: newSlot + dur, bookedFor: when.toISOString() });
     } catch (e) { setPhase("error"); } finally { setBusy(false); }
   };
   // Client self-check-in: flip the appointment to "in lobby" (RPC) AND push the barber. The push
