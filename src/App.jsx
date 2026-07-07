@@ -23583,6 +23583,14 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     setPendingPrice(isNaN(n) ? null : Math.round(n * 100) / 100);
     setWuDirty(true); setWuSaved(false);
   };
+  // Commit the note on blur — the simple Photos & Notes card autosaves (no Save button).
+  const commitWuNote = () => {
+    if (!client) return;
+    const v = (wuNote || "").trim();
+    let changed = false;
+    patchTarget((pt) => { if ((pt.notes || "") === v) return pt; changed = true; return { ...pt, notes: v }; });
+    if (changed) { setWuSaved(true); setTimeout(() => setWuSaved(false), 2500); }
+  };
   // Commit all pending Wrap Up changes (note + duration) on the Save button.
   const saveWrapUp = () => {
     if (!client) return;
@@ -24173,101 +24181,35 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               })()}
 
               </div>
-              {/* WRAP UP — service time, photos, note — auto-saved to the client profile */}
+              {/* PHOTOS & NOTES — after-the-cut photos + the running note, auto-saved to the client profile.
+                  Replaces the old Wrap Up module (time/price steppers live in the profile's Pricing/Duration tab). */}
               {client && (
-                <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}`, ...(appt.status === "done" ? { background: "color-mix(in srgb, var(--gold) 6%, transparent)" } : {}) }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: "linear-gradient(155deg,#F4C84F,#CF971F)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 10px -3px rgba(190,135,20,.5)" }}><Sparkles size={19} style={{ color: "#33260A" }} /></div>
-                    <div style={{ fontFamily: FONT_BODY, fontSize: 18, fontWeight: 600, color: T.text, lineHeight: 1 }}>{appt.status === "done" ? "Wrap up the visit" : "Wrap Up"}</div>
+                <div style={{ padding: "22px 18px", borderBottom: `1px solid ${T.line}` }}>
+                  <div style={{ fontSize: 17.5, fontWeight: 600, color: T.text, lineHeight: 1.1 }}>Photos &amp; Notes</div>
+                  <div style={{ fontSize: 14.5, color: T.sub, margin: "4px 0 14px" }}>Saved to {(client.name || "their").split(" ")[0]}'s profile automatically.</div>
+                  {(() => { const wuPhotos = (client.gallery || []).filter((g) => g.apptId === appt.id); return (
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    {wuPhotos.map((g) => (
+                      <div key={g.id} style={{ width: 68, height: 68, borderRadius: 12, overflow: "hidden", position: "relative", flexShrink: 0, background: T.chip }}>
+                        <img src={imgUrl(g.photo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                        <button onClick={() => removeWuPhoto(g.id)} style={{ position: "absolute", top: 4, right: 4, width: 21, height: 21, borderRadius: "50%", background: "rgba(0,0,0,.55)", color: "#fff", fontSize: 14, border: "none", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>×</button>
+                      </div>
+                    ))}
+                    <button className="lift" onClick={() => wuFileRef.current && wuFileRef.current.click()} style={{ width: 68, height: 68, borderRadius: 12, border: `1.5px dashed ${T.faint}`, background: "none", boxShadow: "none", color: T.accent, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontSize: 14, fontWeight: 600, flexShrink: 0 }}>
+                      <Plus size={20} /> Add
+                    </button>
+                    <input ref={wuFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { addWuPhoto(e.target.files && e.target.files[0]); e.target.value = ""; }} />
                   </div>
-                  <div style={{ fontSize: 14.5, color: T.sub, marginBottom: 16, display: "flex", alignItems: "center", gap: 6, lineHeight: 1.45 }}><Check size={14} style={{ color: T.accent, flexShrink: 0 }} /> {appt.status === "done" ? `Checked out — capture this visit. Photos, notes, time & price save to ${(client.name || "their").split(" ")[0]} for next time.` : `Photos, notes & timing — saved to ${(client.name || "their").split(" ")[0]} automatically`}</div>
-                  <div style={{ background: T.panel, border: `1.5px solid ${appt.status === "done" ? "color-mix(in srgb, var(--gold) 45%, var(--line))" : T.line}`, borderRadius: 16, overflow: "hidden" }}>
-                    {/* Service time — first */}
-                    {service && (
-                      <div style={{ padding: 18 }}>
-                        <div style={{ fontSize: 13.5, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Service time &amp; price</div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
-                          <span style={{ fontSize: 16.5, color: T.sub }}>{(client.name || "their").split(" ")[0]}'s time for {service.name}</span>
-                          <div style={{ display: "flex", alignItems: "center", background: T.bg, border: `1px solid ${T.line}`, borderRadius: 11, overflow: "hidden", flexShrink: 0 }}>
-                            <button onClick={() => setWuDur(Math.max(5, wuDur - 5))} style={{ background: "none", border: "none", color: T.text, width: 44, height: 44, fontSize: 22 }}>−</button>
-                            <span style={{ width: 64, textAlign: "center", fontSize: 16, fontWeight: 700 }}>{wuDur} min</span>
-                            <button onClick={() => setWuDur(wuDur + 5)} style={{ background: "none", border: "none", color: T.text, width: 44, height: 44, fontSize: 22 }}>+</button>
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginTop: 12 }}>
-                          <span style={{ fontSize: 16.5, color: T.sub }}>{(client.name || "their").split(" ")[0]}'s price for {service.name}</span>
-                          <div style={{ display: "flex", alignItems: "center", background: T.bg, border: `1px solid ${T.line}`, borderRadius: 11, overflow: "hidden", flexShrink: 0, paddingLeft: 14 }}>
-                            <span style={{ fontSize: 16, fontWeight: 700, color: T.sub }}>$</span>
-                            <input type="text" inputMode="decimal" value={wuPriceVal} onChange={(e) => setWuPrice(e.target.value)} placeholder="0" style={{ width: 80, textAlign: "center", background: "none", border: "none", outline: "none", color: T.text, fontSize: 16, fontWeight: 700, padding: "13px 8px", fontFamily: FONT_BODY }} />
-                          </div>
-                        </div>
-                        <div style={{ fontSize: 14.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Booked at {service.duration} min · ${defaultPrice}. This sets {(client.name || "their").split(" ")[0]}'s time and price so future bookings get the right amount of chair — and quote the right amount.</div>
-                        {timedMin != null && (
-                          <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 11, background: `color-mix(in srgb, #E5AC34 12%, ${T.panel})`, border: "1px solid color-mix(in srgb, #E5AC34 32%, transparent)" }}>
-                            <div style={{ fontSize: 14.5, color: T.text, lineHeight: 1.4 }}>
-                              <Clock size={13} style={{ color: "#CF971F", verticalAlign: "-2px", marginRight: 6 }} />
-                              This visit ran <strong>{timedMin} min</strong><span style={{ color: T.faint }}> · in {fmtClockTs(appt.serviceStartedAt)} → out {fmtClockTs(appt.serviceEndedAt)}</span>
-                            </div>
-                            {showAvg && (
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 11, paddingTop: 11, borderTop: "1px solid color-mix(in srgb, #E5AC34 28%, transparent)" }}>
-                                <div style={{ fontSize: 14.5, color: T.text, lineHeight: 1.45 }}>
-                                  <strong>{(client.name || "They").split(" ")[0]} averages {avgMin} min</strong> → suggests {suggestMin}
-                                  <span style={{ display: "block", fontSize: 14, color: T.faint, marginTop: 2 }}>across their last {cleanCuts.length} timed visits · rounded up to the next 5</span>
-                                </div>
-                                {suggestMin !== wuDur && (
-                                  <button onClick={() => setWuDur(suggestMin)} style={{ flexShrink: 0, background: "linear-gradient(155deg,#F4C84F,#CF971F)", color: "#33260A", border: "none", borderRadius: 9, padding: "9px 13px", fontSize: 14.5, fontWeight: 700, letterSpacing: 0.3, whiteSpace: "nowrap" }}>Use {suggestMin}</button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {/* Photos — 3 tiles, camera or gallery */}
-                    <div style={{ padding: 18, borderTop: service ? `1px solid ${T.line}` : "none" }}>
-                      <div style={{ fontSize: 13.5, letterSpacing: 1.6, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 13 }}>Photos</div>
-                      {/* Only photos taken in THIS visit's wrap-up — the client's booking photos live in
-                          "Client Photos" above and the profile gallery, never pre-filling these tiles. */}
-                      {(() => { const wuPhotos = (client.gallery || []).filter((g) => g.apptId === appt.id); return (
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        {wuPhotos.map((g) => (
-                          <div key={g.id} style={{ width: 64, height: 64, borderRadius: 12, overflow: "hidden", position: "relative", flexShrink: 0, background: T.chip }}>
-                            <img src={imgUrl(g.photo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                            <button onClick={() => removeWuPhoto(g.id)} style={{ position: "absolute", top: 4, right: 4, width: 21, height: 21, borderRadius: "50%", background: "rgba(0,0,0,.55)", color: "#fff", fontSize: 14, border: "none", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>×</button>
-                          </div>
-                        ))}
-                        {Array.from({ length: Math.max(1, 3 - wuPhotos.length) }).map((_, i) => (
-                          <button key={"wuadd" + i} className="lift" onClick={() => wuFileRef.current && wuFileRef.current.click()} style={{ width: 64, height: 64, borderRadius: 12, border: `1.5px dashed ${T.faint}`, background: "none", boxShadow: "none", color: T.accent, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontSize: 14, fontWeight: 600, flexShrink: 0 }}>
-                            <Plus size={20} /> Add
-                          </button>
-                        ))}
-                        <input ref={wuFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { addWuPhoto(e.target.files && e.target.files[0]); e.target.value = ""; }} />
-                      </div>
-                      ); })()}
-                      <div style={{ fontSize: 14.5, color: T.faint, marginTop: 10, lineHeight: 1.5 }}>Photos you take after the cut — saved to {(client.name || "their").split(" ")[0]}'s gallery.</div>
-                    </div>
-                    {/* Note — last, bigger box */}
-                    <div style={{ padding: 18, borderTop: `1px solid ${T.line}` }}>
-                      <div style={{ fontSize: 14.5, letterSpacing: 1.4, textTransform: "uppercase", color: T.faint, fontWeight: 700, marginBottom: 11 }}>Note for next time</div>
-                      <textarea value={wuNote} onChange={(e) => { setWuNote(e.target.value); setWuDirty(true); setWuSaved(false); }} placeholder="Tighter on the sides. #2 guard, scissor on top. Black coffee, no small talk…" rows={5} style={{ width: "100%", boxSizing: "border-box", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "15px 16px", color: T.text, fontSize: 16.5, resize: "vertical", lineHeight: 1.55, outline: "none", minHeight: 120 }} />
-                    </div>
-                    {(wuDirty || wuSaved) && (
-                      <div style={{ padding: "0 18px 18px" }}>
-                        {wuDirty ? (
-                          <button className="lift" onClick={saveWrapUp} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: 15, fontSize: 15, letterSpacing: 1, fontWeight: 700, textTransform: "uppercase" }}>Save</button>
-                        ) : (
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: 15, color: "#3FA968", fontSize: 15, fontWeight: 600 }}><Check size={17} strokeWidth={3} /> Saved</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  ); })()}
+                  <textarea value={wuNote} onChange={(e) => { setWuNote(e.target.value); setWuSaved(false); }} onBlur={commitWuNote} placeholder="Note for next time — #2 guard, scissor on top, tighter on the sides…" rows={3} style={{ width: "100%", boxSizing: "border-box", background: T.chip, border: `1px solid ${T.line}`, borderRadius: 12, padding: "14px 15px", color: T.text, fontSize: 16, resize: "vertical", lineHeight: 1.5, outline: "none", minHeight: 92, marginTop: 14 }} />
+                  {wuSaved && <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#3FA968", fontSize: 14.5, fontWeight: 600, marginTop: 9 }}><Check size={15} strokeWidth={3} /> Saved</div>}
                 </div>
               )}
 
               {/* booking details */}
               <div style={{ padding: "20px 18px 30px" }}>
                 <div style={{ fontSize: 16, color: T.sub, letterSpacing: 0.3, marginBottom: 12 }}>Booking Details</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15.5, color: T.text, marginBottom: 10 }}><Clock size={15} style={{ color: T.faint }} /> Booked Wed, May 20 at 9:02 AM</div>
+                {(() => { const t = Number(appt.id); const d = (isFinite(t) && t > 1577836800000 && t < 4102444800000) ? new Date(t) : null; return d ? <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15.5, color: T.text, marginBottom: 10 }}><Clock size={15} style={{ color: T.faint }} /> Booked {d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} at {d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div> : null; })()}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15.5, color: T.text }}><User size={15} style={{ color: T.faint }} /> {fmtBookDate}</div>
               </div>
 
