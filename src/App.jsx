@@ -3163,6 +3163,10 @@ function computeFreeSlots({ prov, date, durMin, providers = [], appts = [], busi
         if (re - rs < durMin) return;
         candidates.add(rs);            // flush after the previous appt / day open
         candidates.add(re - durMin);   // flush before the next appt / day close
+        // Same-day fix: when the run's left edge is already in the past (an empty morning), the only
+        // surviving anchor was flush-before-close — leaving a wide-open afternoon unbookable. Anchor
+        // at "now" (rounded up to :05) too, so back-to-back packing restarts from this moment.
+        if (rs < earliest) { const tNow = Math.ceil(earliest / 5) * 5; if (tNow + durMin <= re) candidates.add(tNow); }
       });
     } else {
       // openTight: offer starts spaced by the BOOKED SERVICE's own length within each open run —
@@ -3895,13 +3899,15 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const dateOptions = useMemo(() => {
     const arr = [];
     const base = new Date();
-    const worksOn = (dow) => providers.some((p) => p.id !== "anyone" && p.hours?.[dow]?.on);
+    // Per-DATE, not per-weekday: hoursForDate honors one-off hoursOverrides, so a day the barber
+    // opened by exception (normally closed) still appears — and stays consistent with the slot engine.
+    const worksOn = (d) => providers.some((p) => { if (p.id === "anyone") return false; const h = hoursForDate(p, d); return !!(h && h.on); });
     // Booking window: how far out clients can book. 0 = no cutoff (capped at 730 days for rendering sanity).
     const horizon = (business?.booking?.horizonDays === 0) ? 730 : (Math.max(1, business?.booking?.horizonDays || 60));
     for (let i = 0; i < horizon; i++) {
       const d = new Date(base);
       d.setDate(base.getDate() + i);
-      if (!worksOn(d.getDay())) continue;
+      if (!worksOn(d)) continue;
       arr.push(d);
     }
     return arr;
@@ -7366,12 +7372,12 @@ function ManageStandalone({ business, appts, setAppts, providers, services, onEx
   const dateOptions = useMemo(() => {
     const arr = [];
     const base = new Date();
-    const worksOn = (dow) => providers.some((p) => p.id !== "anyone" && p.hours?.[dow]?.on);
+    const worksOn = (d) => providers.some((p) => { if (p.id === "anyone") return false; const h = hoursForDate(p, d); return !!(h && h.on); }); // per-date: honors one-off opened days
     const horizon = (business?.booking?.horizonDays === 0) ? 730 : (Math.max(1, business?.booking?.horizonDays || 60));
     for (let i = 0; i < horizon; i++) {
       const d = new Date(base);
       d.setDate(base.getDate() + i);
-      if (!worksOn(d.getDay())) continue;
+      if (!worksOn(d)) continue;
       arr.push(d);
     }
     return arr;
@@ -7535,9 +7541,9 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
 
   const dateOptions = useMemo(() => {
     const arr = []; const base = new Date();
-    const worksOn = (dow) => providers.some((p) => p.id !== "anyone" && p.hours && p.hours[dow] && p.hours[dow].on);
+    const worksOn = (d) => providers.some((p) => { if (p.id === "anyone") return false; const h = hoursForDate(p, d); return !!(h && h.on); }); // per-date: honors one-off opened days
     const horizon = (business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60);
-    for (let i = 0; i < horizon && arr.length < 30; i++) { const d = new Date(base); d.setDate(base.getDate() + i); if (worksOn(d.getDay())) arr.push(d); }
+    for (let i = 0; i < horizon && arr.length < 30; i++) { const d = new Date(base); d.setDate(base.getDate() + i); if (worksOn(d)) arr.push(d); }
     return arr;
   }, [providers, business]);
 
