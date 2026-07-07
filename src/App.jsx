@@ -3668,7 +3668,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [bookCustomTip, setBookCustomTip] = useState(null); // #7 prepay: custom tip $ (null = not custom)
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [waitlistDone, setWaitlistDone] = useState(false);
-  const [capBlock, setCapBlock] = useState(null); // set when book_public rejects a new client over the daily cap → offer the waitlist
   const [photos, setPhotos] = useState([]);      // booking reference photos — compressed image dataURLs (max 3)
   const clientPhotoRef = useRef(null);            // hidden file/camera input for booking photos
   const onPhotoPick = (e) => {
@@ -4511,14 +4510,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       .then(({ error }) => {
         setBooking(false);
         if (error) {
-          // New-client daily cap reached for this provider/day → offer the waitlist instead of a dead end.
           const emsg = `${error.message || ""} ${error.details || ""} ${error.hint || ""}`;
-          if (emsg.includes("newclient_cap")) {
-            const ap0 = newAppts[0] || {};
-            const provName = (providers.find((p) => p.id === ap0.providerId) || {}).name || "This barber";
-            setCapBlock({ providerName: provName, name: (matched?.name || newName || "").trim(), phone: finalPhone, service: cart.map(describeEntry).join(", "), date: new Date(selectedDate) });
-            return;
-          }
+          // New-client cap: with `enabled` now honored server-side it's off unless the owner turns it
+          // on, and capped days are filtered out of the picker — so this should not be reachable. If it
+          // ever is (e.g. the SQL migration hasn't been applied yet), route to the day picker quietly
+          // rather than surfacing any "fully booked for new clients" wall to the client.
+          if (emsg.includes("newclient_cap")) { setSlot(null); setStep(6); return; }
           // Genuine race — someone grabbed the slot between showing times and this write. Show the
           // friendly "pick another opening" banner (same as the pre-check) rather than a generic error.
           if (emsg.includes("slot_taken")) { setSlot(null); setStep(6); setSlotConflict(true); return; }
@@ -6097,7 +6094,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               )}
 
               {wwPhase === "when" && (
-                <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => waSlotsFor(pid, d).length > 0} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
+                <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); }} selectable={(d) => waSlotsFor(pid, d).length > 0 && !newClientDayFull(prov || { id: "anyone" }, d)} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
               )}
 
               {wwPhase === "when" && selectedDate && !dayFull && (<>
@@ -6341,32 +6338,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Let's set this up together</h2>
           <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>{callOnly ? `Booking ${callOnly.name} starts with a quick chat so we can go over the details. ` : ""}{business?.phones?.[0]?.number ? `Call or text us at ${business.phones[0].number} and we'll get you scheduled.` : "Reach out and we'll get you scheduled."}</p>
           <button onClick={() => setCallOnly(null)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>Got it</button>
-        </Sheet>
-        {/* New-client daily cap — this barber is full for new clients that day; offer the existing waitlist. */}
-        <Sheet open={!!capBlock} onClose={() => setCapBlock(null)} align="top">
-          {capBlock && (capBlock.done ? (
-            <>
-              <CheckCircle2 size={30} style={{ color: "#7A9E9F", marginBottom: 12 }} />
-              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>You're on the list</h2>
-              <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>You're on the list, {capBlock.name ? capBlock.name.split(" ")[0] : "there"}. If a spot opens up with {capBlock.providerName}, we'll reach out.</p>
-              <button onClick={() => { setCapBlock(null); onExit(); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>Done</button>
-            </>
-          ) : (
-            <>
-              <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
-              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>Fully booked for new clients</h2>
-              <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>{capBlock.providerName} is taking no more new clients on <strong style={{ color: "var(--text)" }}>{relativeDate(capBlock.date)}, {MONTHS[capBlock.date.getMonth()]} {capBlock.date.getDate()}</strong>. Join the waitlist and we'll reach out if a spot opens up.</p>
-              <button className="lift" onClick={() => {
-                const e = capBlock;
-                const dayLabel = `${relativeDate(e.date)}, ${MONTHS[e.date.getMonth()]} ${e.date.getDate()}`;
-                const wlEntry = { id: "wl" + Date.now() + Math.floor(Math.random() * 1000), name: e.name, phone: e.phone, forWho: "self", provider: e.providerName, anyProvider: false, days: [dayLabel], day: dayLabel, dayTimes: { [dayLabel]: "any" }, when: "any", service: e.service, photos: 0, at: new Date().toLocaleString() };
-                setWaitlist((cur) => [...cur, wlEntry]);
-                if (!isStaff) { try { supabase.rpc("join_waitlist", { p_shop: shopId, p_entry: wlEntry }); } catch (err) {} }
-                setCapBlock({ ...e, done: true });
-              }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>Join the waitlist</button>
-              <button onClick={() => setCapBlock(null)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 14.5, fontWeight: 500, borderRadius: 12 }}>Maybe later</button>
-            </>
-          ))}
         </Sheet>
         {step === 5 && showCodeEntry && (
           <div className="fade-up">
@@ -6673,7 +6644,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             })()}
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2, fontWeight: 600, textTransform: "uppercase", color: "var(--faint)", marginBottom: 12 }}>Or pick another day</div>
             {(() => { const calProv = provider && provider.id !== "anyone" ? provider : (providers.find((p) => p.id === "dan") || providers[1]); return (
-              <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); setNcCapFull(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
+              <DateStrip selectedDate={selectedDate} onPick={(d) => { setSelectedDate(d); setSlot(null); setSlotConflict(false); setNcCapFull(false); }} selectable={(d) => freeSlotsFor(calProv, d, effMin || 30, 15).length > 0 && !newClientDayFull(calProv, d)} horizonDays={(business?.booking?.horizonDays === 0) ? 730 : Math.max(1, business?.booking?.horizonDays || 60)} />
             ); })()}
             {selectedDate && !dateIsFull && (<>
               <div style={{ height: 26 }} />
