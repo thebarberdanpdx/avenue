@@ -23676,6 +23676,33 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const [notifyChange, setNotifyChange] = useState(false); // edit-mode: text the client about a time/day change
   const [pickList, setPickList] = useState(null); // null | "time" | "dur" — which full-screen 5-min list is open
   const [dateOpen, setDateOpen] = useState(false);
+  // ── Edit-mode SERVICES editor ─────────────────────────────────────────────────
+  // draftItems mirrors appt.lineItems: [{serviceId, cutType, beardType, addons}]. Picking a different
+  // service resets that line and re-derives duration + price from the ASSIGNED STAFF's own defaults
+  // (per-staff → service default; per-client overrides are deliberately skipped, per Dan's rule that
+  // changing the service reverts to the barber's stated time & price).
+  const [draftItems, setDraftItems] = useState(null); // seeded by startEdit
+  const draftItemsInitRef = useRef("");
+  const staffItemCalc = (it, pid) => {
+    const s = services.find((x) => x.id === it.serviceId);
+    if (!s) return { s: null, price: 0, min: 0, labels: [] };
+    let price = getPrice(s, pid);
+    let min = getDuration(null, s, pid);
+    const labels = [];
+    if (it.cutType) { const ct = (s.cutTypes || []).find((c) => c.id === it.cutType); if (ct) { price = cutStylePrice(s, pid, it.cutType); min = cutStyleDuration(null, s, pid, it.cutType); labels.push(ct.label); } }
+    if (it.beardType) { const bt = (s.beardTypes || []).find((b) => b.id === it.beardType); if (bt) { min += Number(bt.min) || 0; labels.push(bt.label); } }
+    (s.addonGroups || []).forEach((g) => {
+      const sel = it.addons && it.addons[g.id];
+      if (!sel) return;
+      if (g.type === "choice") { const opt = (g.options || []).find((o) => o.id === sel); if (opt) { price += answerPriceFor(s, pid, g, opt); min += answerDuration(s, pid, g, opt); if (opt.label) labels.push(opt.label); } }
+      else { price += addonPriceFor(s, pid, g); min += addonDuration(s, pid, g); if (g.item && g.item.name) labels.push(g.item.name); }
+    });
+    return { s, price, min, labels };
+  };
+  const itemsTotals = (list, pid) => (list || []).reduce((acc, it) => { const c = staffItemCalc(it, pid); return { price: acc.price + c.price, min: acc.min + c.min }; }, { price: 0, min: 0 });
+  // Every items change re-syncs the duration chip to the recomputed total (still manually adjustable after).
+  const updateDraftItems = (next) => { setDraftItems(next); const t = itemsTotals(next, draftProvider); setDraftDur(Math.max(5, t.min || 5)); };
+  const draftItemsChanged = mode === "edit" && draftItems != null && JSON.stringify(draftItems) !== draftItemsInitRef.current;
   const editing = mode === "edit";
   // The notify toggle surfaces the moment the start time or the calendar day differs from what's booked.
   const sameYMD = (a, b) => !!(a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate());
@@ -23684,9 +23711,25 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const fmtDur = (m) => { const h = Math.floor(m / 60), mm = m % 60; if (h === 0) return `${mm} min`; return mm === 0 ? `${h} hr` : `${h} hr ${mm} min`; };
   const TIME_OPTS = []; for (let t = DAY_START; t <= DAY_END; t += 5) TIME_OPTS.push(t);
   const DUR_OPTS = []; for (let m = 5; m <= 240; m += 5) DUR_OPTS.push(m);
-  const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setDraftDate(appt.bookedFor ? new Date(appt.bookedFor) : new Date()); setNotifyChange(false); setPickList(null); setDateOpen(false); setMode("edit"); setMenuOpen(false); };
+  const startEdit = () => { setDraftStart(appt.start); setDraftDur(appt.end - appt.start); setDraftProvider(appt.providerId); setDraftNote(appt.note || ""); setDraftDate(appt.bookedFor ? new Date(appt.bookedFor) : new Date()); setNotifyChange(false); setPickList(null); setDateOpen(false); const seed = (Array.isArray(appt.lineItems) && appt.lineItems.length) ? appt.lineItems.map((li) => ({ serviceId: li.serviceId, cutType: li.cutType || null, beardType: li.beardType || null, addons: { ...(li.addons || {}) } })) : [{ serviceId: appt.serviceId, cutType: null, beardType: null, addons: {} }]; setDraftItems(seed); draftItemsInitRef.current = JSON.stringify(seed); setMode("edit"); setMenuOpen(false); };
   const cancelEdit = () => { setPickList(null); setDateOpen(false); setNotifyChange(false); setMode("detail"); };
-  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged; const _wrote = onUpdate(appt.id, { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() }); if (_wrote === false) return; if (willNotify) { const _cl = (clients || []).find((c) => c.id === appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: { ...appt, start: draftStart, end: draftStart + draftDur, providerId: draftProvider, bookedFor: bf.toISOString() }, business, providers, contact: { email: _cl.email || "", phone: appt.phone || _cl.phone || "" } }); } if (timeOrDayChanged) { fireStaffPush({ shopId, title: "Appointment moved", appt: { ...appt, start: draftStart, bookedFor: bf.toISOString() }, event: "rescheduled", business }); } showToast(willNotify ? "Updated — client notified." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
+  const saveEdit = () => { const bf = new Date(draftDate); bf.setHours(Math.floor(draftStart / 60), draftStart % 60, 0, 0); const willNotify = notifyChange && timeOrDayChanged;
+    const patch = { start: draftStart, end: draftStart + draftDur, providerId: draftProvider, note: draftNote, bookedFor: bf.toISOString() };
+    // Services were edited: rewrite the service fields and lock the recomputed per-staff price.
+    if (draftItemsChanged) {
+      const items = (draftItems || []).filter((it) => services.some((s) => s.id === it.serviceId));
+      if (items.length) {
+        const calcs = items.map((it) => staffItemCalc(it, draftProvider));
+        patch.serviceId = items[0].serviceId;
+        patch.lineItems = items;
+        patch.serviceName = calcs.map((c) => c.s.name).join(", ");
+        patch.addonLabels = [...new Set(calcs.flatMap((c) => c.labels.map(cleanServiceLabel)).filter(Boolean))];
+        patch.title = patch.serviceName;
+        patch.price = calcs.reduce((sum, c) => sum + c.price, 0);
+        patch.detail = ""; // stale legacy chips would misdescribe the new service
+      }
+    }
+    const _wrote = onUpdate(appt.id, patch); if (_wrote === false) return; if (willNotify) { const _cl = (clients || []).find((c) => c.id === appt.clientId) || {}; fireApptNotify({ msgId: "rescheduled", appt: { ...appt, start: draftStart, end: draftStart + draftDur, providerId: draftProvider, bookedFor: bf.toISOString() }, business, providers, contact: { email: _cl.email || "", phone: appt.phone || _cl.phone || "" } }); } if (timeOrDayChanged) { fireStaffPush({ shopId, title: "Appointment moved", appt: { ...appt, start: draftStart, bookedFor: bf.toISOString() }, event: "rescheduled", business }); } showToast(willNotify ? "Updated — client notified." : "Appointment updated."); setNotifyChange(false); setPickList(null); setMode("detail"); };
   // TODO(SMS live): when willNotify, dispatch the reschedule/moved template to the client's phone.
 
   // ---- price (admin-editable; per-appointment override stored on appt.price) ----
@@ -23854,6 +23897,11 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
           <ApptListPicker title="Time" options={TIME_OPTS} value={draftStart} fmtLabel={fmtTime} onPick={(v) => { setDraftStart(v); setPickList(null); }} onBack={() => setPickList(null)} T={T} />
         ) : pickList === "dur" ? (
           <ApptListPicker title="Duration" options={DUR_OPTS} value={draftDur} fmtLabel={fmtDur} onPick={(v) => { setDraftDur(v); setPickList(null); }} onBack={() => setPickList(null)} T={T} />
+        ) : (pickList && pickList.kind === "svc") ? (
+          <ApptListPicker title="Service" options={services.filter((s) => !s.archived && s.id !== "anyone").map((s) => s.id)} value={(draftItems && draftItems[pickList.idx] && draftItems[pickList.idx].serviceId) || null}
+            fmtLabel={(id) => { const s = services.find((x) => x.id === id); return s ? `${s.name} — $${getPrice(s, draftProvider)} · ${fmtDur(getDuration(null, s, draftProvider))}` : String(id); }}
+            onPick={(id) => { const next = [...(draftItems || [])]; const fresh = { serviceId: id, cutType: null, beardType: null, addons: {} }; if (pickList.idx < next.length) next[pickList.idx] = fresh; else next.push(fresh); updateDraftItems(next); setPickList(null); }}
+            onBack={() => setPickList(null)} T={T} />
         ) : (mode === "detail" || mode === "edit") ? (
           <>
             <TopBar
@@ -24102,6 +24150,53 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
 
               {/* service block */}
               <div style={{ padding: "18px", borderBottom: `1px solid ${T.line}` }}>
+                {editing && draftItems ? (
+                  /* ── SERVICES editor: change/add/remove services, cut style & add-ons. Duration and
+                        price re-derive from THIS BARBER's own defaults on every change. ── */
+                  <div style={{ marginBottom: 13 }}>
+                    <div style={{ fontSize: 14.5, letterSpacing: 1.5, color: T.sub, fontWeight: 700, marginBottom: 10 }}>SERVICES</div>
+                    {draftItems.map((it, i) => { const c = staffItemCalc(it, draftProvider); const s = c.s; return (
+                      <div key={i} style={{ border: `1px solid ${T.line}`, borderRadius: 12, padding: "12px 13px", marginBottom: 10, background: T.panel }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                          <button onClick={() => setPickList({ kind: "svc", idx: i })} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: T.chip, border: `1px solid ${T.line}`, borderRadius: 10, padding: "10px 12px", color: T.text, textAlign: "left", cursor: "pointer" }}>
+                            <span style={{ fontSize: 16, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s ? s.name : "Pick a service"}</span>
+                            <span style={{ fontSize: 14, color: T.sub, flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>${c.price} · {fmtDur(c.min)}<ChevronRight size={14} style={{ color: T.faint }} /></span>
+                          </button>
+                          {draftItems.length > 1 && <button onClick={() => updateDraftItems(draftItems.filter((_, j) => j !== i))} style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, border: `1px solid ${T.line}`, background: "none", color: T.sub, fontSize: 18, lineHeight: 1, cursor: "pointer" }}>×</button>}
+                        </div>
+                        {s && Array.isArray(s.cutTypes) && s.cutTypes.length > 0 && (
+                          <div style={{ marginTop: 11 }}>
+                            <div style={{ fontSize: 13, letterSpacing: 1, color: T.faint, fontWeight: 700, marginBottom: 7 }}>CUT STYLE</div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                              {s.cutTypes.map((ct) => { const on = it.cutType === ct.id; return (
+                                <button key={ct.id} onClick={() => updateDraftItems(draftItems.map((x, j) => j === i ? { ...x, cutType: on ? null : ct.id } : x))} style={{ background: on ? "var(--gold)" : T.chip, color: on ? "var(--on-gold)" : T.text, border: `1px solid ${on ? "var(--gold)" : T.line}`, borderRadius: 9, padding: "7px 12px", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{ct.label}</button>
+                              ); })}
+                            </div>
+                          </div>
+                        )}
+                        {s && (s.addonGroups || []).map((g) => (
+                          <div key={g.id} style={{ marginTop: 11 }}>
+                            <div style={{ fontSize: 13, letterSpacing: 1, color: T.faint, fontWeight: 700, marginBottom: 7 }}>{(cleanServiceLabel(g.label || (g.item && g.item.name) || "Add-on") || "Add-on").toUpperCase()}</div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                              {g.type === "choice"
+                                ? (g.options || []).map((o) => { const on = (it.addons || {})[g.id] === o.id; const ap = answerPriceFor(s, draftProvider, g, o); return (
+                                    <button key={o.id} onClick={() => updateDraftItems(draftItems.map((x, j) => j === i ? { ...x, addons: { ...(x.addons || {}), [g.id]: on ? undefined : o.id } } : x))} style={{ background: on ? "var(--gold)" : T.chip, color: on ? "var(--on-gold)" : T.text, border: `1px solid ${on ? "var(--gold)" : T.line}`, borderRadius: 9, padding: "7px 12px", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{o.label}{ap > 0 ? ` +$${ap}` : ""}</button>
+                                  ); })
+                                : (() => { const on = !!(it.addons || {})[g.id]; const ap = addonPriceFor(s, draftProvider, g); return (
+                                    <button onClick={() => updateDraftItems(draftItems.map((x, j) => j === i ? { ...x, addons: { ...(x.addons || {}), [g.id]: on ? undefined : true } } : x))} style={{ background: on ? "var(--gold)" : T.chip, color: on ? "var(--on-gold)" : T.text, border: `1px solid ${on ? "var(--gold)" : T.line}`, borderRadius: 9, padding: "7px 12px", fontSize: 14, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{(g.item && g.item.name) || "Add-on"}{ap > 0 ? ` +$${ap}` : ""}</button>
+                                  ); })()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ); })}
+                    <button onClick={() => setPickList({ kind: "svc", idx: (draftItems || []).length })} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: `1.5px dashed ${T.faint}`, borderRadius: 10, padding: "9px 14px", color: T.accent, fontSize: 14.5, fontWeight: 600, cursor: "pointer" }}><Plus size={15} /> Add service</button>
+                    {(() => { const t = itemsTotals(draftItems, draftProvider); const pv = providers.find((p) => p.id === draftProvider); return (
+                      <div style={{ fontSize: 14, color: T.sub, marginTop: 11, lineHeight: 1.5 }}>Total <b style={{ color: T.text }}>${t.price}</b> · <b style={{ color: T.text }}>{fmtDur(Math.max(5, t.min || 5))}</b>{draftItemsChanged ? ` — reset to ${(pv && pv.name ? pv.name.split(" ")[0] : "the barber")}'s defaults; fine-tune below if needed.` : ""}</div>
+                    ); })()}
+                  </div>
+                ) : (
+                <>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 13 }}>
                   <span style={{ fontSize: 18, fontWeight: 600, color: T.text }}>{service?.name || appt.title}</span>
                   {canEditPrice ? (
@@ -24140,6 +24235,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       <span key={i} style={{ background: T.chip, color: T.text, padding: "7px 12px", borderRadius: 8, fontSize: 14.5 }}>{d.trim()}</span>
                     ))}
                   </div>
+                )}
+                </>
                 )}
                 <div style={{ fontSize: 16, color: T.text, lineHeight: 1.95 }}>
                   <span style={{ fontStyle: "italic", color: T.faint, marginRight: 6 }}>with</span><span style={{ fontWeight: 500 }}>{provider.name}</span>
