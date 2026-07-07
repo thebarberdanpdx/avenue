@@ -4255,6 +4255,19 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, gallery: [...entries, ...(c.gallery || [])] } : c));
   };
 
+  // Write the post-booking note + reference photos to the appointment IMMEDIATELY (no debounce). The
+  // background debounce (see the step-8 effect) can be cancelled if the client leaves within ~1.2s, so
+  // "Update Appt"/exit calls this to guarantee the details land on the server — which also surfaces the
+  // in-app "note/photos added" alert to the assigned staff (the appts watcher picks up the change).
+  const flushBookingDetails = () => {
+    if (isStaff || bookedId == null || !bookedToken) return;
+    const note = (clientNote || "").trim();
+    const pd = Array.isArray(photos) ? photos : [];
+    setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, note, hasNote: !!note, photos: pd.length, hasPhotos: pd.length > 0, photoData: pd } : a));
+    if (!note && !pd.length) return;
+    try { supabase.rpc("attach_booking_details_by_token", { p_token: bookedToken, p_note: note, p_photos: pd }).catch(() => {}); } catch (e) {}
+  };
+
   // Selfie taken on the CONFIRMATION screen: set it as the client's PROFILE photo (server-merged via
   // save_booking_client) and take $5 off THIS visit. The discount is written onto the appointment by
   // its own private code (set_selfie_discount_by_token) so staff see it at checkout — same possession-
@@ -4874,7 +4887,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         </div>
         {step >= 3 && step <= 5 && (wwMerged ? <Stepper active={1} /> : <Stepper active={0} />)}
         {step === 6 && <Stepper active={1} />}
-        {step >= 7 && <Stepper active={2} />}
+        {step === 7 && <Stepper active={2} />}
 
         <div key={screenKey} className={"screen-swap swap-" + slideDir}>
         {/* STEP 0 — WELCOME / front door */}
@@ -7125,7 +7138,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           noteOn={business?.booking?.askNote !== false} photoOn={business?.bookingPhotos?.mode !== "off"}
           clientNote={clientNote} setClientNote={setClientNote} photoList={photos} setPhotos={setPhotos} clientPhotoRef={clientPhotoRef} onPhotoPick={onPhotoPick}
           selfie={selfie} selfieRef={selfieRef} onSelfiePick={onSelfiePick} onClearSelfie={clearSelfie} selfieEligible={!((clients.find((c) => c.id === bookedClientId) || {}).photo)}
-          onManage={() => { captureBookingGallery(); setStep(9); }} onExit={() => { captureBookingGallery(); (matched ? goClientHome : onExit)(); }} />}
+          onManage={() => { flushBookingDetails(); captureBookingGallery(); setStep(9); }} onExit={() => { flushBookingDetails(); captureBookingGallery(); (matched ? goClientHome : onExit)(); }} />}
 
         {step === 9 && <ManageByToken token={(appts.find((a) => a.id === bookedId) || {}).manageToken} shopId={shopId} business={business} providers={providers} services={services} onExit={onExit} />}
         </div>
@@ -7238,26 +7251,30 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
   const relPlus = relDate.includes(",") ? relDate : `${relDate}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
   const total = selfie ? Math.max(0, cartPrice - 5) : cartPrice;
   const showSelfie = selfieEligible || !!selfie;
+  const hasChanges = !!selfie || !!(clientNote && clientNote.trim()) || (Array.isArray(photoList) && photoList.length > 0);
   const goldSoft = "color-mix(in srgb, var(--gold) 7%, var(--panel))";
   const goldLine = "color-mix(in srgb, var(--gold) 26%, var(--border))";
   const card = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)" };
-  const eyebrow = { fontFamily: F, fontSize: 10.5, letterSpacing: 1.8, textTransform: "uppercase", fontWeight: 700, color: "var(--sub)" };
+  const eyebrow = { display: "block", fontFamily: F, fontSize: 10.5, letterSpacing: 1.8, textTransform: "uppercase", fontWeight: 700, color: "var(--sub)", textAlign: "left", margin: "0 2px 11px" };
+  const rowTitle = { fontFamily: F, fontSize: 14.5, fontWeight: 600, lineHeight: 1.2, color: "var(--text)", textAlign: "left" };
+  const rowSub = { fontFamily: F, fontSize: 12.5, color: "var(--sub)", lineHeight: 1.4, textAlign: "left" };
+  const chip = { fontFamily: F, fontSize: 10, fontWeight: 700, letterSpacing: 0.4, color: "var(--gold)", background: goldSoft, border: `1px solid ${goldLine}`, borderRadius: 999, padding: "2px 7px" };
   return (
-    <div className="fade-up" style={{ paddingTop: 6, fontFamily: F }}>
+    <div className="fade-up" style={{ paddingTop: 4, fontFamily: F, textAlign: "left" }}>
       {/* hero */}
-      <div style={{ textAlign: "center", marginBottom: 22 }}>
-        <div className="success-bloom" style={{ width: 46, height: 46, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
-          <Check size={22} strokeWidth={2.6} />
+      <div style={{ textAlign: "center", marginBottom: 26 }}>
+        <div className="success-bloom" style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 15px" }}>
+          <Check size={21} strokeWidth={2.6} />
         </div>
-        <h2 style={{ fontFamily: F, fontSize: 27, fontWeight: 600, lineHeight: 1.05, letterSpacing: "-0.4px", margin: "0 0 9px", color: "var(--text)" }}>You're confirmed.</h2>
-        <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: "var(--text2)", margin: 0 }}>Add photos &amp; notes for your barber <span style={{ color: "var(--faint)" }}>— optional</span></p>
+        <h2 style={{ fontFamily: F, fontSize: 26, fontWeight: 600, lineHeight: 1.05, letterSpacing: "-0.4px", margin: "0 0 8px", color: "var(--text)" }}>You're confirmed.</h2>
+        <p style={{ fontFamily: F, fontSize: 14.5, fontWeight: 500, color: "var(--text2)", margin: 0 }}>Add photos &amp; notes for your barber <span style={{ color: "var(--faint)" }}>— optional</span></p>
       </div>
 
       {/* compact appointment strip */}
-      <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "13px 15px", marginBottom: 20 }}>
+      <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 16px", marginBottom: 26 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: "var(--text)", lineHeight: 1.25 }}>{relPlus} · {fmtTime(slot)}</div>
-          <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>{cart.map(describeEntry).join(", ")} · with {provider.name}</div>
+          <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--sub)", marginTop: 3 }}>{cart.map(describeEntry).join(", ")} · with {provider.name}</div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           {selfie && <div style={{ fontFamily: F, fontSize: 12, color: "var(--faint)", textDecoration: "line-through" }}>${cartPrice}</div>}
@@ -7268,17 +7285,17 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
       {/* before you come in — selfie + inspiration/notes */}
       {(showSelfie || noteOn || photoOn) && (
         <>
-          <div style={{ margin: "0 2px 10px" }}><span style={eyebrow}>Before you come in</span></div>
-          <div style={{ ...card, overflow: "hidden", marginBottom: 20 }}>
+          <span style={eyebrow}>Before you come in</span>
+          <div style={{ ...card, overflow: "hidden", marginBottom: 26 }}>
             {showSelfie && (
-              <div style={{ display: "flex", alignItems: "center", gap: 13, padding: 15 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 13, padding: 16 }}>
                 <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
                 {selfie
                   ? <img src={selfie} alt="" style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: `1px solid ${goldLine}` }} />
-                  : <div style={{ width: 40, height: 40, borderRadius: 11, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: goldSoft, border: `1px solid ${goldLine}`, color: "var(--gold)" }}><Camera size={19} /></div>}
+                  : <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: goldSoft, border: `1px solid ${goldLine}`, color: "var(--gold)" }}><Camera size={19} /></div>}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: F, fontSize: 14.5, fontWeight: 600, lineHeight: 1.2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{selfie ? "Selfie added" : "Quick selfie"}<span style={{ fontFamily: F, fontSize: 10, fontWeight: 700, letterSpacing: 0.4, color: "var(--gold)", background: goldSoft, border: `1px solid ${goldLine}`, borderRadius: 999, padding: "2px 7px" }}>{selfie ? "$5 OFF" : "SAVE $5"}</span></div>
-                  <div style={{ fontFamily: F, fontSize: 12, color: "var(--sub)", lineHeight: 1.4, marginTop: 3 }}>{selfie ? "$5 came off — and it's now your profile photo." : "So we see how you look today. Becomes your profile photo."}</div>
+                  <div style={{ ...rowTitle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{selfie ? "Selfie added" : "Add a selfie"}<span style={chip}>{selfie ? "$5 OFF" : "SAVE $5"}</span></div>
+                  <div style={{ ...rowSub, fontSize: 12, marginTop: 3 }}>{selfie ? "Now your profile photo." : "So we see how you look today."}</div>
                 </div>
                 {selfie
                   ? <button onClick={onClearSelfie} style={{ flexShrink: 0, background: "none", border: "1px solid var(--border)", color: "var(--sub)", borderRadius: 10, padding: "9px 12px", fontFamily: F, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Remove</button>
@@ -7286,13 +7303,12 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
               </div>
             )}
             {(noteOn || photoOn) && (
-              <div style={{ padding: 15, borderTop: showSelfie ? "1px solid var(--line)" : "none" }}>
-                <div style={{ fontFamily: F, fontSize: 14.5, fontWeight: 600, lineHeight: 1.2, marginBottom: 3 }}>Inspiration &amp; notes</div>
-                <div style={{ fontFamily: F, fontSize: 12, color: "var(--sub)", lineHeight: 1.4, marginBottom: 12 }}>Show your barber the look you're after.</div>
+              <div style={{ padding: 16, borderTop: showSelfie ? "1px solid var(--line)" : "none" }}>
+                <div style={{ ...rowTitle, marginBottom: 12 }}>Inspiration &amp; notes</div>
                 {photoOn && (
                   <>
                     <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
-                    <div style={{ display: "flex", gap: 8, marginBottom: noteOn ? 9 : 0 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
+                    <div style={{ display: "flex", gap: 8, marginBottom: noteOn ? 10 : 0 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
                       <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 11, overflow: "hidden", border: `1.5px ${src ? "solid" : "dashed"} ${src ? goldLine : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--panel2)", cursor: src ? "default" : "pointer" }}>
                         {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={18} style={{ color: "var(--faint)" }} />}
                       </div>
@@ -7300,9 +7316,9 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
                   </>
                 )}
                 {noteOn && (
-                  <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keep length on top" rows={2} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 11, padding: "11px 13px", color: "var(--text)", fontSize: 14, resize: "none", minHeight: 52, lineHeight: 1.45, fontFamily: F }} />
+                  <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="Anything your barber should know — e.g. tighter on the sides, keep length on top." rows={2} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 11, padding: "11px 13px", color: "var(--text)", fontSize: 14, resize: "none", minHeight: 54, lineHeight: 1.45, fontFamily: F }} />
                 )}
-                <div style={{ fontFamily: F, fontSize: 11.5, color: "var(--faint)", marginTop: 8 }}>Up to 3 photos · saved to your profile for next time.</div>
+                <div style={{ fontFamily: F, fontSize: 11.5, color: "var(--faint)", marginTop: 9, textAlign: "left" }}>Up to 3 photos · saved to your profile for next time.</div>
               </div>
             )}
           </div>
@@ -7310,27 +7326,26 @@ function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider
       )}
 
       {/* what to expect */}
-      <div style={{ margin: "0 2px 10px" }}><span style={eyebrow}>What to expect</span></div>
-      <div style={{ marginBottom: 22 }}>
+      <span style={eyebrow}>What to expect</span>
+      <div style={{ marginBottom: 26 }}>
         {[["24 hours before", "Reminder by text & email."], ["3 hours before", "A quick heads-up text."], ["15 minutes before", "Check-in text — time to head over."]].map(([w, d], i) => (
-          <div key={i} style={{ display: "flex", gap: 11, alignItems: "baseline", padding: "5px 0" }}>
-            <div style={{ flexShrink: 0, width: 100, fontFamily: F, fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{w}</div>
+          <div key={i} style={{ display: "flex", gap: 12, alignItems: "baseline", padding: "5px 0" }}>
+            <div style={{ flexShrink: 0, width: 104, fontFamily: F, fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{w}</div>
             <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--sub)", lineHeight: 1.4 }}>{d}</div>
           </div>
         ))}
-        <div style={{ display: "flex", gap: 10, marginTop: 12, padding: "12px 14px", background: goldSoft, border: `1px solid ${goldLine}`, borderRadius: 12 }}>
+        <div style={{ display: "flex", gap: 10, marginTop: 14, padding: "12px 14px", background: goldSoft, border: `1px solid ${goldLine}`, borderRadius: 12 }}>
           <MapPinIcon size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
           <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--text2)", lineHeight: 1.45 }}>We're inside the <b style={{ color: "var(--text)" }}>Image Studio</b> building and the door stays locked. No need to knock or call &mdash; just <b style={{ color: "var(--text)" }}>check in when you arrive</b> and we're notified right away.</div>
         </div>
       </div>
 
-      <button onClick={onExit} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontFamily: F, fontSize: 12, letterSpacing: 1.2, fontWeight: 600, textTransform: "uppercase", borderRadius: 11, border: "none", cursor: "pointer", marginBottom: 10 }}>Done &mdash; see my appointment</button>
-      <button onClick={onManage} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontFamily: F, fontSize: 11.5, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", borderRadius: 11, cursor: "pointer" }}>Manage my appointment</button>
-      <p style={{ textAlign: "center", fontFamily: F, fontSize: 11.5, color: "var(--faint)", margin: "14px 0 0", lineHeight: 1.5 }}>Signed in on this device — come back anytime, no code needed.</p>
+      <button onClick={onExit} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: F, fontSize: 12.5, letterSpacing: 1.2, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: "pointer" }}>{hasChanges ? "Update Appt" : "Done"}</button>
+      <button onClick={onManage} style={{ display: "block", width: "100%", textAlign: "center", background: "none", border: "none", color: "var(--sub)", padding: "14px 0 4px", fontFamily: F, fontSize: 13, fontWeight: 500, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>Reschedule or cancel</button>
 
-      <div style={{ textAlign: "center", color: "var(--faint)", fontFamily: F, fontSize: 12, marginTop: 18, lineHeight: 1.6, paddingBottom: 8 }}>
-        <div style={{ fontFamily: F, fontSize: 13, color: "var(--sub)", marginBottom: 2 }}>{business.legalName || business.name}</div>
-        {business.address}{business.address2 ? `, ${business.address2}` : ""}{business.cityZip ? ` · ${business.cityZip}` : ""}
+      <div style={{ textAlign: "center", color: "var(--faint)", fontFamily: F, fontSize: 11.5, marginTop: 22, lineHeight: 1.6, paddingBottom: 8 }}>
+        <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--sub)", marginBottom: 2 }}>{business.legalName || business.name}</div>
+        Signed in on this device — come back anytime, no code needed.
       </div>
     </div>
   );
@@ -23667,13 +23682,14 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
     if (!pm || !c.stripeCustomerId) return null;
     return { paymentMethodId: pm, stripeCustomerId: c.stripeCustomerId, brand: c.brand || null, last4: c.last4 || null, exp: c.exp || null };
   })();
-  // Pull the client's latest profile from the server once — a card or selfie added by an online
-  // booking moments ago may not be in the dashboard's clients list yet (no realtime), which would
-  // hide the card on file and show initials instead of their photo. Fetched once per client here.
+  // Pull the client's latest profile from the server once, keyed on the APPOINTMENT's clientId (not the
+  // local client) — a brand-new online booking may not be in the dashboard's clients list yet, which
+  // hides their phone/email/card and shows initials instead of their photo. If the client is missing we
+  // add the full record; if present we fill only the gaps a just-booked update brought. Once per client.
   const freshPulledRef = useRef(new Set());
   useEffect(() => {
-    const id = client?.id;
-    if (!id || !shopId || !setClients) return;
+    const id = appt.clientId;
+    if (!id || id === "guest" || !shopId || !setClients) return;
     if (freshPulledRef.current.has(id)) return;
     freshPulledRef.current.add(id);
     let alive = true;
@@ -23682,14 +23698,24 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
         const { data } = await supabase.from("clients").select("data").eq("shop_id", shopId).eq("id", id).maybeSingle();
         const d = data && data.data;
         if (!alive || !d) return;
-        const patch = {};
-        if (d.savedCard && d.savedCard.pmId && d.savedCard.stripeCustomerId) patch.savedCard = d.savedCard;
-        if (d.photo) patch.photo = d.photo;
-        if (Object.keys(patch).length) setClients((list) => (list || []).map((c) => (c.id === id ? { ...c, ...patch } : c)));
+        setClients((list) => {
+          const arr = list || [];
+          if (!arr.some((c) => c.id === id)) return [d, ...arr]; // not loaded yet → add the full fresh record
+          return arr.map((c) => {
+            if (c.id !== id) return c;
+            const patch = {};
+            if (d.savedCard && d.savedCard.pmId && d.savedCard.stripeCustomerId && !(c.savedCard && c.savedCard.pmId)) patch.savedCard = d.savedCard;
+            if (d.photo && !c.photo) patch.photo = d.photo;
+            if (d.phone && !c.phone) patch.phone = d.phone;
+            if (d.email && !c.email) patch.email = d.email;
+            if (d.name && !c.name) patch.name = d.name;
+            return Object.keys(patch).length ? { ...c, ...patch } : c;
+          });
+        });
       } catch (e) {}
     })();
     return () => { alive = false; };
-  }, [client?.id, shopId]);
+  }, [appt.clientId, shopId]);
   const saveCardToClient = (info) => {
     if (!client || !setClients) { showToast("Couldn't attach the card to this client."); return; }
     setClients((prev) => prev.map((c) => c.id === client.id ? { ...c, card: info } : c));
@@ -24016,8 +24042,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   <button onClick={() => { const d = (client?.phone || appt.phone || "").replace(/\D/g, ""); if (d) { if (typeof window !== "undefined") window.location.href = `sms:${d}`; } else { showToast("No phone number on file."); } }} style={{ width: 42, height: 42, borderRadius: 11, border: `1px solid ${T.line}`, background: "none", color: T.text, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><MessageSquare size={17} /></button>
                 </div>
                 <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-                  <DetailRow T={T} label="Phone" value={client?.phone ? <PhoneLink number={client.phone} /> : "—"} accent />
-                  <DetailRow T={T} label="Email" value={client?.email ? <EmailLink email={client.email} /> : "—"} />
+                  <DetailRow T={T} label="Phone" value={(client?.phone || appt.phone) ? <PhoneLink number={client?.phone || appt.phone} /> : "—"} accent />
+                  <DetailRow T={T} label="Email" value={(client?.email || appt.email) ? <EmailLink email={client?.email || appt.email} /> : "—"} />
                   <DetailRow T={T} label="Card" value={
                     canEditPrice ? (
                       <button onClick={() => setCardOpen(true)} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: savedCard ? T.text : "var(--gold)", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 500 }}>
