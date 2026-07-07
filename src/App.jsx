@@ -23968,14 +23968,23 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       onUpdate && onUpdate(appt.id, { lobbyNotifiedAt: Date.now() }); // persist so the button reads "Notified"
                       // The owner can turn the auto-text off and just mark the client notified (e.g. they waved them over in person).
                       if (wr.autoReadyMessage === false) { showToast(`${appt.name} notified.`); return; }
-                      // Actually send the "ready" message to the CLIENT (this used to only show a toast and send nothing).
-                      // Text when SMS is live, else /api/notify bridges to email. Fire-and-forget — never blocks the UI.
+                      // Send the "ready" message and report what ACTUALLY happened — the old toast said
+                      // "Sent" unconditionally while errors were swallowed, so a suppressed/failed send
+                      // looked identical to a delivered one. The endpoint's response is authoritative.
                       const client = (clients || []).find((c) => c.id === appt.clientId) || {};
                       const phone = (appt.phone || client.phone || "").trim();
                       const email = (client.email || "").trim();
                       if (!phone && !email) { showToast(`No phone or email on file for ${String(appt.name || "this client").split(" ")[0]}.`); return; }
-                      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel: "text", to: { email, phone, smsOptOut: client.smsOptOut === true }, subject: `${business.name}: We're ready for you`, template: tmpl, context: { client: String(appt.name || "there").split(" ")[0], provider: provName, business: business.name || "your shop" } }) }).catch(() => {});
-                      showToast(`Sent: "${fill(tmpl)}"`);
+                      showToast("Sending…");
+                      fetch(API_BASE + "/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: _stripeShop, channel: "text", to: { email, phone, smsOptOut: client.smsOptOut === true }, subject: `${business.name}: We're ready for you`, template: tmpl, context: { client: String(appt.name || "there").split(" ")[0], provider: provName, business: business.name || "your shop" } }) })
+                        .then(async (r) => {
+                          const j = await r.json().catch(() => ({}));
+                          const rs = (j && j.results) || {};
+                          if (rs.sms === "sent") showToast(`Texted: "${fill(tmpl)}"`);
+                          else if (rs.email === "sent") showToast(`Emailed (no text — ${client.smsOptOut ? "client opted out of SMS" : "texting unavailable"}): "${fill(tmpl)}"`);
+                          else showToast(`Couldn't send — ${j.error || rs.sms || rs.email || (client.smsOptOut === true ? "client opted out of SMS" : "no channel available")}`);
+                        })
+                        .catch(() => showToast("Couldn't send — check your connection and tap again."));
                     };
                     return notified
                       ? <button className="lift" onClick={doNotify} title="Tap to re-send" style={{ display: "inline-flex", alignItems: "center", gap: 7, background: `color-mix(in srgb, ${STATUS_COLORS["checked-in"]} 13%, var(--panel))`, border: `1px solid color-mix(in srgb, ${STATUS_COLORS["checked-in"]} 40%, transparent)`, color: STATUS_COLORS["checked-in"], padding: "10px 16px", borderRadius: 30, fontSize: 14, letterSpacing: 0.5, fontWeight: 700, cursor: "pointer" }}><Check size={15} strokeWidth={3} /> NOTIFIED</button>
