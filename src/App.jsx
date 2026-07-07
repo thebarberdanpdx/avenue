@@ -1665,6 +1665,9 @@ function App() {
     return "shop";
   });
   const [clientNonce, setClientNonce] = useState(0); // bump to restart the booking flow fresh
+  // Set true while a client is on the booking CONFIRMATION screen so the version auto-updater below
+  // never hard-reloads mid-confirmation (that reload was wiping the "You're in" page → login).
+  const holdReloadRef = useRef(false);
   const [shopUnlocked, setShopUnlocked] = useState(true);
   const [shopPwPrompt, setShopPwPrompt] = useState(false);
   const [pwEntry, setPwEntry] = useState("");
@@ -1681,6 +1684,7 @@ function App() {
     if (LOCAL === "dev") return; // skip in local dev
     let cancelled = false;
     const check = async () => {
+      if (holdReloadRef.current) return; // client is mid-confirmation — don't reload out from under them
       try {
         const r = await fetch(API_BASE + "/api/version", { cache: "no-store" });
         if (!r.ok) return;
@@ -2564,7 +2568,7 @@ function App() {
       {view === "privacy" && <PrivacyPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "client" && ((!session && acctLocs.length > 1 && !locParam)
         ? <LocationChooser shopId={SHOP_ID} locations={acctLocs} business={business} />
-        : <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} />)}
+        : <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} onHoldReload={(v) => { holdReloadRef.current = !!v; }} />)}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={goBooking} />}
       {view === "managetoken" && <ManageByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} providers={providers} services={services} onExit={goBooking} />}
       {view === "reviewtoken" && <ReviewByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} onExit={goBooking} />}
@@ -3475,7 +3479,7 @@ function GroupedTimes({ slots, selected, onPick, bestSet, cell }) {
   );
 }
 
-function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit, onManage }) {
+function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit, onManage, onHoldReload }) {
   const [step, setStep] = useState(0);
   const [bookingFor, setBookingFor] = useState(null); // null until chosen: "self" or "other"
   const [showWhoFor, setShowWhoFor] = useState(false); // who's-it-for screen for a matched returning client
@@ -3604,9 +3608,13 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         const c = JSON.parse(raw);
         if (c && c.id) {
           setMatched(c); setShowHome(true);
-          supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: c.id, p_session: c.sessionToken })
-            .then(({ data }) => { if (alive) setMyAppts(Array.isArray(data) ? data : []); })
-            .catch(() => {});
+          if (c.sessionToken) {
+            supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: c.id, p_session: c.sessionToken })
+              .then(({ data }) => { if (alive) setMyAppts(Array.isArray(data) ? data : []); })
+              .catch(() => {});
+          } else if (Array.isArray(c._localAppts)) {
+            setMyAppts(c._localAppts); // brand-new booker: no server session token, so show their appt(s) from the local snapshot
+          }
         }
       }
     } catch (e) {}
@@ -3620,8 +3628,12 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
       else localStorage.removeItem(_clientKey);
     } catch (e) {}
   }, [matched]);
+  // Hold the App's version auto-reload while the client is on the confirmation screen (step 8) so a
+  // background version bump can't hard-reload the "You're confirmed" page out from under them.
+  useEffect(() => { if (onHoldReload) onHoldReload(step === 8); return () => { if (onHoldReload) onHoldReload(false); }; }, [step]);
   const [showAllVisits, setShowAllVisits] = useState(false); // expand the recent-visits list on the home
   const [homeAction, setHomeAction] = useState(null); // { type: "cancel" | "reschedule", appt, person } — confirm sheet on the home next-visit card
+  const [tokenManage, setTokenManage] = useState(null); // appt to manage via its secure per-appointment link (used by brand-new local sessions that have no server token)
   const [reschedPrev, setReschedPrev] = useState(null); // when set, the just-completed booking is a home reschedule of THIS appt → owner push shows old → new instead of "new booking"
   useEffect(() => {
     if (!matched) return;
@@ -3693,7 +3705,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         if (w > h && w > max) { h = Math.round(h * max / w); w = max; } else if (h > max) { w = Math.round(w * max / h); h = max; }
         const c = document.createElement("canvas"); c.width = w; c.height = h;
         c.getContext("2d").drawImage(img, 0, 0, w, h);
-        setSelfie(c.toDataURL("image/jpeg", 0.7));
+        applySelfie(c.toDataURL("image/jpeg", 0.7));
       };
       img.src = reader.result;
     };
@@ -4244,6 +4256,38 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, gallery: [...entries, ...(c.gallery || [])] } : c));
   };
 
+  // Selfie taken on the CONFIRMATION screen: set it as the client's PROFILE photo (server-merged via
+  // save_booking_client) and take $5 off THIS visit. The discount is written onto the appointment by
+  // its own private code (set_selfie_discount_by_token) so staff see it at checkout — same possession-
+  // of-the-token model as the manage link. Runs post-booking only (bookedClientId/bookedToken are set).
+  const SELFIE_DISCOUNT = { id: "selfie", name: "Profile photo", type: "amount", value: 5 };
+  const applySelfie = (dataUrl) => {
+    setSelfie(dataUrl);
+    if (!bookedClientId) return;
+    setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, photo: dataUrl } : c));
+    const existing = (clients || []).find((c) => c.id === bookedClientId);
+    const patch = existing ? { ...existing, photo: dataUrl } : { id: bookedClientId, photo: dataUrl };
+    try { supabase.rpc("save_booking_client", { p_shop: shopId, p_client: patch }).catch(() => {}); } catch (e) {}
+    setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a));
+    setMyAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a));
+    if (matched && matched.id === bookedClientId) setMatched((m) => m ? { ...m, photo: dataUrl, _localAppts: Array.isArray(m._localAppts) ? m._localAppts.map((a) => a.id === bookedId ? { ...a, discount: SELFIE_DISCOUNT } : a) : m._localAppts } : m);
+    if (bookedToken) { try { supabase.rpc("set_selfie_discount_by_token", { p_token: bookedToken, p_on: true }).catch(() => {}); } catch (e) {} }
+  };
+  const clearSelfie = () => {
+    setSelfie(null);
+    if (!bookedClientId) return;
+    // Full undo: the offer only shows for clients with NO photo, so reverting the profile photo to
+    // none is correct — and it flips selfieEligible back to true so the offer reappears (re-addable).
+    const existing = (clients || []).find((c) => c.id === bookedClientId);
+    setClients((cur) => (cur || []).map((c) => c.id === bookedClientId ? { ...c, photo: undefined } : c));
+    const patch = existing ? { ...existing, photo: null } : { id: bookedClientId, photo: null };
+    try { supabase.rpc("save_booking_client", { p_shop: shopId, p_client: patch }).catch(() => {}); } catch (e) {}
+    setAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: undefined } : a));
+    setMyAppts((cur) => (cur || []).map((a) => a.id === bookedId ? { ...a, discount: undefined } : a));
+    if (matched && matched.id === bookedClientId) setMatched((m) => m ? { ...m, photo: undefined, _localAppts: Array.isArray(m._localAppts) ? m._localAppts.map((a) => a.id === bookedId ? { ...a, discount: undefined } : a) : m._localAppts } : m);
+    if (bookedToken) { try { supabase.rpc("set_selfie_discount_by_token", { p_token: bookedToken, p_on: false }).catch(() => {}); } catch (e) {} }
+  };
+
   // A signature of whichever screen is currently visible. When it changes, the
   // keyed wrapper below remounts the screen region, which RE-FIRES the entry
   // animation every time (without a changing key, React reuses the same DOM
@@ -4512,6 +4556,17 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           }
         } catch (e) {}
         setBookedId(baseId); setBookedClientId(clientId); setBookedToken(newAppts[0] && newAppts[0].manageToken); galleryCapturedRef.current = false; setStep(8);
+        // Keep the just-booked client signed in ON THIS DEVICE, so the confirmation stays put and they
+        // land on their own home (not the login) if they leave it. Returning clients already carry a
+        // server session; a brand-new booker gets a light LOCAL session (no server token) — their home
+        // appts come from a local snapshot, and manage actions run through the secure per-appointment link.
+        if (!matched) {
+          const _sessAppts = newAppts.map((a) => ({ ...a }));
+          setMatched({ id: clientId, name: (newName || "").trim() || (newFirst + " " + newLast).trim(), firstName: newFirst.trim(), lastName: newLast.trim(), email: (finalEmail || "").trim(), phone: (finalPhone || "").trim(), family: [], gallery: [], _localSession: true, _localAppts: _sessAppts });
+          setMyAppts(_sessAppts);
+        } else {
+          setMyAppts((cur) => { const ids = new Set((cur || []).map((a) => a.id)); return [...newAppts.filter((a) => !ids.has(a.id)), ...(cur || [])]; });
+        }
         // ---- Authoritative card-on-file persistence (single source of truth) ----
         // Runs after book_public so the client row exists, and re-applies the card LAST so
         // book_public's delete-then-insert can't clobber it. Works for new + returning clients.
@@ -4612,7 +4667,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const fmtHomeDate = (a) => { const d = apptWhen(a); if (!d) return ""; return `${DOW[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
   const fmtHomeShort = (a) => { const d = apptWhen(a); if (!d) return ""; return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
   const fmtHomeTime = (a) => { const d = apptWhen(a); if (!d) return ""; let h = d.getHours(); const m = d.getMinutes(); const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return `${h}:${String(m).padStart(2, "0")} ${ap}`; };
-  const refreshMyAppts = () => { if (!matched) return; supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: matched.id, p_session: matched.sessionToken }).then(({ data }) => { if (Array.isArray(data)) setMyAppts(data); }).catch(() => {}); };
+  const refreshMyAppts = () => { if (!matched) return; if (matched._localSession) { setMyAppts(Array.isArray(matched._localAppts) ? matched._localAppts : []); return; } supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: matched.id, p_session: matched.sessionToken }).then(({ data }) => { if (Array.isArray(data)) setMyAppts(data); }).catch(() => {}); };
   const goClientHome = () => {
     setStep(0); setSimpleStep(null); setSimpleCat(null); setSimplePref(null); setSimpleChange(null);
     setShowWhoFor(false); setShowUsual(false); setShowSchedChoice(false); setShowWizardIntro(false);
@@ -4712,8 +4767,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.05, color: "var(--text)" }}>{fmtHomeDate(nextVisit)} · {fmtHomeTime(nextVisit)}</div>
                 <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text2)", marginTop: 5 }}>{svcLabel(nextVisit)} · with {provFirst(nextVisit.providerId)}{nextVisit.familyMemberId ? ` · for ${personLabel(nextVisit)}` : ""}</div>
                 <div style={{ display: "flex", gap: 18, marginTop: 14, paddingTop: 13, borderTop: "1px solid var(--line)" }}>
-                  <button onClick={() => setHomeAction({ type: "reschedule", appt: nextVisit })} style={{ background: "none", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Reschedule &#8594;</button>
-                  <button onClick={() => setHomeAction({ type: "cancel", appt: nextVisit })} style={{ background: "none", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 400, color: "var(--sub)", cursor: "pointer" }}>Cancel</button>
+                  <button onClick={() => { if (matched._localSession && nextVisit.manageToken) { setTokenManage(nextVisit); return; } setHomeAction({ type: "reschedule", appt: nextVisit }); }} style={{ background: "none", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Reschedule &#8594;</button>
+                  <button onClick={() => { if (matched._localSession && nextVisit.manageToken) { setTokenManage(nextVisit); return; } setHomeAction({ type: "cancel", appt: nextVisit }); }} style={{ background: "none", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 400, color: "var(--sub)", cursor: "pointer" }}>Cancel</button>
                 </div>
               </div>
             ) : (
@@ -4778,6 +4833,22 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           </div>
         </div>
 
+        {tokenManage && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 85, background: "var(--bg)", overflowY: "auto" }}>
+            <ManageByToken token={tokenManage.manageToken} shopId={shopId} business={business} providers={providers} services={services}
+              onChanged={(res) => {
+                if (!res) return;
+                // Reflect the token-based cancel/reschedule back into the local session so the home
+                // doesn't show the stale snapshot (a local session has no server token to re-fetch with).
+                const apply = (list) => (list || []).map((a) => (a.id === tokenManage.id || (a.manageToken && a.manageToken === tokenManage.manageToken))
+                  ? (res.type === "cancel" ? { ...a, status: "cancelled" } : { ...a, start: res.start, end: res.end, bookedFor: res.bookedFor })
+                  : a);
+                setMyAppts(apply);
+                setMatched((m) => (m && m._localSession) ? { ...m, _localAppts: apply(m._localAppts) } : m);
+              }}
+              onExit={() => { setTokenManage(null); refreshMyAppts(); }} />
+          </div>
+        )}
         {homeAction && (
           <div onClick={() => setHomeAction(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "var(--bg)", borderRadius: "20px 20px 0 0", padding: "26px 22px 30px" }}>
@@ -6798,35 +6869,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
             </div>
 
-            {/* Profile selfie ($5 off) — only when this client has no photo on file yet. The
-                inspiration photo / note moved to the post-booking "You're in" screen (less on this page). */}
-            {!(matched && matched.photo) && (
-              <div style={{ background: "var(--panel)", border: `1px solid ${selfie ? "var(--gold)" : "var(--border)"}`, borderRadius: 16, padding: "18px", marginBottom: 18, boxShadow: "var(--shadow-sm)" }}>
-                {/* two pickers: camera (front) vs photo library — same handler */}
-                <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
-                <input ref={uploadRef} type="file" accept="image/*" onChange={onSelfiePick} style={{ display: "none" }} />
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <button onClick={() => { if (!selfie && uploadRef.current) uploadRef.current.click(); }} style={{ position: "relative", width: 60, height: 60, borderRadius: "50%", flexShrink: 0, border: `2px ${selfie ? "solid" : "dashed"} ${selfie ? "var(--gold)" : "var(--border2)"}`, background: "var(--panel2)", overflow: "hidden", cursor: "pointer", padding: 0 }}>
-                    {selfie ? <img src={selfie} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Camera size={22} style={{ color: "var(--faint)" }} />}
-                  </button>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500, lineHeight: 1.2 }}>Add a profile photo — save $5</div>
-                    <div style={{ fontSize: 13.5, color: "var(--sub)", lineHeight: 1.45, marginTop: 4 }}>{selfie ? "Looking good — $5 comes off this visit." : <>We like to have a face to the name. <b style={{ color: "var(--text)" }}>Upload a photo of yourself or take a selfie!</b></>}</div>
-                  </div>
-                </div>
-                {selfie ? (
-                  <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-                    <button onClick={() => uploadRef.current && uploadRef.current.click()} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border2)", color: "var(--text)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Change photo</button>
-                    <button onClick={() => setSelfie(null)} style={{ flex: 1, background: "none", border: "1px solid var(--border2)", color: "var(--sub)", padding: 11, fontSize: 13.5, fontWeight: 500, borderRadius: 11, cursor: "pointer" }}>Remove</button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-                    <button onClick={() => uploadRef.current && uploadRef.current.click()} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border2)", color: "var(--text)", padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><ImageIcon size={16} /> Upload a photo</button>
-                    <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Camera size={16} /> Take a selfie</button>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Profile selfie ($5 off) moved to the post-booking confirmation screen (front-camera only,
+                for new clients / anyone without a profile photo). See ConfirmationScreen + applySelfie. */}
 
             {/* Card on file / deposit — real Stripe in Live, safe simulation in Test */}
             {(() => {
@@ -7106,9 +7150,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           </div>
         )}
 
-        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} provider={provider} selectedDate={selectedDate} slot={slot} photos={photos.length}
+        {step === 8 && <ConfirmationScreen business={business} cart={cart} describeEntry={describeEntry} cartPrice={cartAdjTotal} provider={provider} selectedDate={selectedDate} slot={slot}
           noteOn={business?.booking?.askNote !== false} photoOn={business?.bookingPhotos?.mode !== "off"}
           clientNote={clientNote} setClientNote={setClientNote} photoList={photos} setPhotos={setPhotos} clientPhotoRef={clientPhotoRef} onPhotoPick={onPhotoPick}
+          selfie={selfie} selfieRef={selfieRef} onSelfiePick={onSelfiePick} onClearSelfie={clearSelfie} selfieEligible={!((clients.find((c) => c.id === bookedClientId) || {}).photo)}
           onManage={() => { captureBookingGallery(); setStep(9); }} onExit={() => { captureBookingGallery(); (matched ? goClientHome : onExit)(); }} />}
 
         {step === 9 && <ManageByToken token={(appts.find((a) => a.id === bookedId) || {}).manageToken} shopId={shopId} business={business} providers={providers} services={services} onExit={onExit} />}
@@ -7216,78 +7261,105 @@ function FirstTimeIntake({ service, onCancel, onDone }) {
   );
 }
 
-function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider, selectedDate, slot, photos, noteOn, photoOn, clientNote, setClientNote, photoList, setPhotos, clientPhotoRef, onPhotoPick, onManage, onExit }) {
+function ConfirmationScreen({ business, cart, describeEntry, cartPrice, provider, selectedDate, slot, noteOn, photoOn, clientNote, setClientNote, photoList, setPhotos, clientPhotoRef, onPhotoPick, selfie, selfieRef, onSelfiePick, onClearSelfie, selfieEligible, onManage, onExit }) {
+  const F = FONT_BODY; // this screen is intentionally single-font (all Jost)
   const relDate = relativeDate(selectedDate);
   const relPlus = relDate.includes(",") ? relDate : `${relDate}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
+  const total = selfie ? Math.max(0, cartPrice - 5) : cartPrice;
+  const showSelfie = selfieEligible || !!selfie;
+  const goldSoft = "color-mix(in srgb, var(--gold) 7%, var(--panel))";
+  const goldLine = "color-mix(in srgb, var(--gold) 26%, var(--border))";
+  const card = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--shadow-sm)" };
+  const eyebrow = { fontFamily: F, fontSize: 10.5, letterSpacing: 1.8, textTransform: "uppercase", fontWeight: 700, color: "var(--sub)" };
   return (
-    <div className="fade-up" style={{ paddingTop: 8 }}>
-      <div style={{ textAlign: "center", marginBottom: 30 }}>
-        <div className="success-bloom" style={{ width: 52, height: 52, borderRadius: "50%", border: "1.5px solid var(--text)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
-          <Check size={24} style={{ color: "var(--text)" }} strokeWidth={2.5} />
+    <div className="fade-up" style={{ paddingTop: 6, fontFamily: F }}>
+      {/* hero */}
+      <div style={{ textAlign: "center", marginBottom: 22 }}>
+        <div className="success-bloom" style={{ width: 46, height: 46, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+          <Check size={22} strokeWidth={2.6} />
         </div>
-        <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, letterSpacing: 2, fontWeight: 700, textTransform: "uppercase", color: "var(--sub)", marginBottom: 10 }}>Booked</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 500, lineHeight: 1.1, letterSpacing: "-0.4px", marginBottom: 12, color: "var(--text)" }}>You're in.</h2>
-        <p style={{ fontFamily: FONT_BODY, color: "var(--sub)", fontSize: 16.5, lineHeight: 1.55, maxWidth: 360, margin: "0 auto", fontWeight: 400 }}>We'll text you a reminder closer to the day. See you soon.</p>
+        <h2 style={{ fontFamily: F, fontSize: 27, fontWeight: 600, lineHeight: 1.05, letterSpacing: "-0.4px", margin: "0 0 9px", color: "var(--text)" }}>You're confirmed.</h2>
+        <p style={{ fontFamily: F, fontSize: 15, fontWeight: 500, color: "var(--text2)", margin: 0 }}>Add photos &amp; notes for your barber <span style={{ color: "var(--faint)" }}>— optional</span></p>
       </div>
 
-      <div className="drift-in" style={{ border: "1.5px solid var(--border)", borderRadius: 16, padding: "24px 22px", marginBottom: 18 }}>
-        <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, letterSpacing: 1.8, color: "var(--text)", fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Your appointment</div>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 500, lineHeight: 1.15, marginBottom: 6, color: "var(--text)" }}>{relPlus}</div>
-        <div style={{ fontFamily: FONT_BODY, fontSize: 17, color: "var(--sub)", marginBottom: 18 }}>{fmtTime(slot)} · with {provider.name}</div>
-        <div style={{ borderTop: "1.5px solid var(--line)", paddingTop: 16 }}>
-          {cart.map((e, i) => (
-            <div key={i} style={{ fontFamily: FONT_BODY, fontSize: 17, fontWeight: 500, color: "var(--text)", marginBottom: i < cart.length - 1 ? 7 : 0, lineHeight: 1.4 }}>{describeEntry(e)}</div>
-          ))}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 16, paddingTop: 16, borderTop: "1.5px solid var(--line)" }}>
-            <span style={{ fontFamily: FONT_BODY, fontSize: 12.5, letterSpacing: 1.8, color: "var(--sub)", fontWeight: 700, textTransform: "uppercase" }}>Total</span>
-            <span style={{ fontFamily: FONT_DISPLAY, fontSize: 26, color: "var(--text)", fontWeight: 500 }}>${cartPrice}</span>
-          </div>
-          {photos > 0 && (
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1.5px solid var(--line)", fontFamily: FONT_BODY, fontSize: 15, color: "var(--sub)", display: "flex", alignItems: "center", gap: 8 }}>
-              <ImageIcon size={15} style={{ color: "var(--text)" }} />
-              <span>{photos} photo{photos > 1 ? "s" : ""} attached for your staff member</span>
-            </div>
-          )}
+      {/* compact appointment strip */}
+      <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "13px 15px", marginBottom: 20 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: F, fontSize: 15, fontWeight: 600, color: "var(--text)", lineHeight: 1.25 }}>{relPlus} · {fmtTime(slot)}</div>
+          <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--sub)", marginTop: 2 }}>{cart.map(describeEntry).join(", ")} · with {provider.name}</div>
+        </div>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          {selfie && <div style={{ fontFamily: F, fontSize: 12, color: "var(--faint)", textDecoration: "line-through" }}>${cartPrice}</div>}
+          <div style={{ fontFamily: F, fontSize: 19, fontWeight: 600, color: "var(--text)", lineHeight: 1 }}>${total}</div>
         </div>
       </div>
 
-      {(noteOn || photoOn) && (
-        <div className="drift-in" style={{ border: "1.5px solid var(--border)", borderRadius: 16, padding: "24px 22px", marginBottom: 18 }}>
-          <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, letterSpacing: 1.8, color: "var(--sub)", fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>Optional</div>
-          <p style={{ fontFamily: FONT_BODY, fontSize: 17, color: "var(--text)", lineHeight: 1.5, margin: "0 0 16px", fontWeight: 500 }}>Leave a quick note or upload a few inspiration photos!</p>
-          {noteOn && (
-            <>
-              <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keeping length on top" rows={3} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1.5px solid var(--border2)", borderRadius: 14, padding: "15px 16px", color: "var(--text)", fontSize: 16.5, resize: "none", minHeight: 88, lineHeight: 1.5, fontFamily: FONT_BODY }} />
-              {clientNote.length > 0 && <div style={{ fontSize: 13, color: "var(--faint)", textAlign: "right", marginTop: 6 }}>{clientNote.length} / 200</div>}
-            </>
-          )}
-          {photoOn && (
-            <div style={{ marginTop: noteOn ? 16 : 0 }}>
-              <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
-              <div style={{ display: "flex", gap: 10 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
-                <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 14, overflow: "hidden", border: `1.5px dashed ${src ? "var(--text)" : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: src ? "var(--panel2)" : "transparent", cursor: src ? "default" : "pointer" }}>
-                  {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 5, right: 5, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={20} style={{ color: "var(--faint)" }} />}
+      {/* before you come in — selfie + inspiration/notes */}
+      {(showSelfie || noteOn || photoOn) && (
+        <>
+          <div style={{ margin: "0 2px 10px" }}><span style={eyebrow}>Before you come in</span></div>
+          <div style={{ ...card, overflow: "hidden", marginBottom: 20 }}>
+            {showSelfie && (
+              <div style={{ display: "flex", alignItems: "center", gap: 13, padding: 15 }}>
+                <input ref={selfieRef} type="file" accept="image/*" capture="user" onChange={onSelfiePick} style={{ display: "none" }} />
+                {selfie
+                  ? <img src={selfie} alt="" style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: `1px solid ${goldLine}` }} />
+                  : <div style={{ width: 40, height: 40, borderRadius: 11, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: goldSoft, border: `1px solid ${goldLine}`, color: "var(--gold)" }}><Camera size={19} /></div>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: F, fontSize: 14.5, fontWeight: 600, lineHeight: 1.2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{selfie ? "Selfie added" : "Quick selfie"}<span style={{ fontFamily: F, fontSize: 10, fontWeight: 700, letterSpacing: 0.4, color: "var(--gold)", background: goldSoft, border: `1px solid ${goldLine}`, borderRadius: 999, padding: "2px 7px" }}>{selfie ? "$5 OFF" : "SAVE $5"}</span></div>
+                  <div style={{ fontFamily: F, fontSize: 12, color: "var(--sub)", lineHeight: 1.4, marginTop: 3 }}>{selfie ? "$5 came off — and it's now your profile photo." : "So we see how you look today. Becomes your profile photo."}</div>
                 </div>
-              ); })}</div>
-              <p style={{ fontSize: 13.5, color: "var(--sub)", textAlign: "center", marginTop: 12 }}>Tap to add — up to 3.</p>
-            </div>
-          )}
-        </div>
+                {selfie
+                  ? <button onClick={onClearSelfie} style={{ flexShrink: 0, background: "none", border: "1px solid var(--border)", color: "var(--sub)", borderRadius: 10, padding: "9px 12px", fontFamily: F, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Remove</button>
+                  : <button onClick={() => selfieRef.current && selfieRef.current.click()} style={{ flexShrink: 0, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 10, padding: "9px 14px", fontFamily: F, fontSize: 12.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><Camera size={15} /> Selfie</button>}
+              </div>
+            )}
+            {(noteOn || photoOn) && (
+              <div style={{ padding: 15, borderTop: showSelfie ? "1px solid var(--line)" : "none" }}>
+                <div style={{ fontFamily: F, fontSize: 14.5, fontWeight: 600, lineHeight: 1.2, marginBottom: 3 }}>Inspiration &amp; notes</div>
+                <div style={{ fontFamily: F, fontSize: 12, color: "var(--sub)", lineHeight: 1.4, marginBottom: 12 }}>Show your barber the look you're after.</div>
+                {photoOn && (
+                  <>
+                    <input ref={clientPhotoRef} type="file" accept="image/*" onChange={onPhotoPick} style={{ display: "none" }} />
+                    <div style={{ display: "flex", gap: 8, marginBottom: noteOn ? 9 : 0 }}>{[0, 1, 2].map((i) => { const src = photoList[i]; return (
+                      <div key={i} onClick={() => { if (!src && clientPhotoRef.current) clientPhotoRef.current.click(); }} style={{ position: "relative", flex: 1, aspectRatio: "1", borderRadius: 11, overflow: "hidden", border: `1.5px ${src ? "solid" : "dashed"} ${src ? goldLine : "var(--border2)"}`, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--panel2)", cursor: src ? "default" : "pointer" }}>
+                        {src ? (<><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /><button onClick={(e) => { e.stopPropagation(); setPhotos((cur) => cur.filter((_, j) => j !== i)); }} style={{ position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>×</button></>) : <Camera size={18} style={{ color: "var(--faint)" }} />}
+                      </div>
+                    ); })}</div>
+                  </>
+                )}
+                {noteOn && (
+                  <textarea value={clientNote} onChange={(e) => setClientNote(e.target.value.slice(0, 200))} placeholder="e.g. tighter on the sides, keep length on top" rows={2} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border2)", borderRadius: 11, padding: "11px 13px", color: "var(--text)", fontSize: 14, resize: "none", minHeight: 52, lineHeight: 1.45, fontFamily: F }} />
+                )}
+                <div style={{ fontFamily: F, fontSize: 11.5, color: "var(--faint)", marginTop: 8 }}>Up to 3 photos · saved to your profile for next time.</div>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
-      <div style={{ border: "1.5px solid var(--border)", borderRadius: 16, padding: "24px 22px", marginBottom: 24 }}>
-        <div style={{ fontFamily: FONT_BODY, fontSize: 12.5, letterSpacing: 1.8, color: "var(--sub)", fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>What's next</div>
-        <div style={{ fontFamily: FONT_BODY, fontSize: 16, color: "var(--text2)", lineHeight: 1.6 }}>
-          A confirmation is on its way to your phone and email. We'll send a reminder the day before. If anything changes, you can always reschedule or cancel below.
+      {/* what to expect */}
+      <div style={{ margin: "0 2px 10px" }}><span style={eyebrow}>What to expect</span></div>
+      <div style={{ marginBottom: 22 }}>
+        {[["24 hours before", "Reminder by text & email."], ["3 hours before", "A quick heads-up text."], ["15 minutes before", "Check-in text — time to head over."]].map(([w, d], i) => (
+          <div key={i} style={{ display: "flex", gap: 11, alignItems: "baseline", padding: "5px 0" }}>
+            <div style={{ flexShrink: 0, width: 100, fontFamily: F, fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{w}</div>
+            <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--sub)", lineHeight: 1.4 }}>{d}</div>
+          </div>
+        ))}
+        <div style={{ display: "flex", gap: 10, marginTop: 12, padding: "12px 14px", background: goldSoft, border: `1px solid ${goldLine}`, borderRadius: 12 }}>
+          <MapPinIcon size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 1 }} />
+          <div style={{ fontFamily: F, fontSize: 12.5, color: "var(--text2)", lineHeight: 1.45 }}>We're inside the <b style={{ color: "var(--text)" }}>Image Studio</b> building and the door stays locked. No need to knock or call &mdash; just <b style={{ color: "var(--text)" }}>check in when you arrive</b> and we're notified right away.</div>
         </div>
       </div>
 
-      <button onClick={onManage} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 11, cursor: "pointer" }}>Manage my appointment</button>
-      <button onClick={onExit} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, marginBottom: 28, border: "none", cursor: "pointer" }}>Book another</button>
+      <button onClick={onExit} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontFamily: F, fontSize: 12, letterSpacing: 1.2, fontWeight: 600, textTransform: "uppercase", borderRadius: 11, border: "none", cursor: "pointer", marginBottom: 10 }}>Done &mdash; see my appointment</button>
+      <button onClick={onManage} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontFamily: F, fontSize: 11.5, letterSpacing: 1, fontWeight: 600, textTransform: "uppercase", borderRadius: 11, cursor: "pointer" }}>Manage my appointment</button>
+      <p style={{ textAlign: "center", fontFamily: F, fontSize: 11.5, color: "var(--faint)", margin: "14px 0 0", lineHeight: 1.5 }}>Signed in on this device — come back anytime, no code needed.</p>
 
-      <div style={{ textAlign: "center", color: "var(--faint)", fontFamily: "'Jost', sans-serif", fontSize: 13, lineHeight: 1.7, paddingBottom: 8 }}>
-        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: "var(--sub)", marginBottom: 4, letterSpacing: 0.3 }}>{business.legalName}</div>
-        {business.address}{business.address2 ? `, ${business.address2}` : ""}<br />{business.cityZip}
+      <div style={{ textAlign: "center", color: "var(--faint)", fontFamily: F, fontSize: 12, marginTop: 18, lineHeight: 1.6, paddingBottom: 8 }}>
+        <div style={{ fontFamily: F, fontSize: 13, color: "var(--sub)", marginBottom: 2 }}>{business.legalName || business.name}</div>
+        {business.address}{business.address2 ? `, ${business.address2}` : ""}{business.cityZip ? ` · ${business.cityZip}` : ""}
       </div>
     </div>
   );
@@ -7431,7 +7503,7 @@ function ReviewByToken({ token, shopId, business, onExit }) {
 // (gotvero.com/manage?t=CODE). Looks up the one appointment by its code via a public RPC,
 // then lets the client reschedule (through the real computeFreeSlots engine, honoring every
 // booking-time setting) or cancel — persisting via RPC and firing the matching message.
-function ManageByToken({ token, shopId, business, providers, services, onExit }) {
+function ManageByToken({ token, shopId, business, providers, services, onExit, onChanged }) {
   const [appt, setAppt] = useState(null);
   const [avail, setAvail] = useState([]);
   const [phase, setPhase] = useState("loading"); // loading | error | view | resched | cancel | cancelled | rescheduled
@@ -7523,7 +7595,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
 
   const submitCancel = async () => {
     if (busy) return; setBusy(true);
-    try { await supabase.rpc("manage_cancel_by_token", { p_token: token }); fireNotify("canceled", appt); setPhase("cancelled"); }
+    try { await supabase.rpc("manage_cancel_by_token", { p_token: token }); fireNotify("canceled", appt); setPhase("cancelled"); if (onChanged) onChanged({ type: "cancel" }); }
     catch (e) { setPhase("error"); } finally { setBusy(false); }
   };
   const submitReschedule = async () => {
@@ -7532,7 +7604,7 @@ function ManageByToken({ token, shopId, business, providers, services, onExit })
     try {
       await supabase.rpc("manage_reschedule_by_token", { p_token: token, p_start: newSlot, p_date: when.toISOString() });
       const updated = { ...appt, start: newSlot, end: newSlot + dur, bookedFor: when.toISOString() };
-      setAppt(updated); fireNotify("rescheduled", updated); fireStaffPush({ shopId, title: "Appointment rescheduled", appt: updated, prevAppt: appt, event: "rescheduled", business }); setPhase("rescheduled");
+      setAppt(updated); fireNotify("rescheduled", updated); fireStaffPush({ shopId, title: "Appointment rescheduled", appt: updated, prevAppt: appt, event: "rescheduled", business }); setPhase("rescheduled"); if (onChanged) onChanged({ type: "reschedule", start: newSlot, end: newSlot + dur, bookedFor: when.toISOString() });
     } catch (e) { setPhase("error"); } finally { setBusy(false); }
   };
   // Client self-check-in: flip the appointment to "in lobby" (RPC) AND push the barber. The push
