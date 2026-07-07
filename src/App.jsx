@@ -21687,10 +21687,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
         );
       })()}
 
-      {/* full appointment experience: detail · ••• menu · edit */}
+      {/* full appointment experience: detail · ••• menu · edit. The sheet reads the LIVE appt from
+          appts (not the tap-time snapshot) so a client checking in flips it to In Lobby instantly. */}
       {open && (
         <AppointmentSheet
-          appt={open}
+          appt={(appts || []).find((a) => a.id === open.id) || open}
           shopId={shopId}
           providers={providers}
           clients={clients}
@@ -24320,16 +24321,9 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 </div>
               )}
 
-              {/* booking details */}
-              <div style={{ padding: "20px 18px 30px" }}>
-                <div style={{ fontSize: 16, color: T.sub, letterSpacing: 0.3, marginBottom: 12 }}>Booking Details</div>
-                {(() => { const t = Number(appt.id); const d = (isFinite(t) && t > 1577836800000 && t < 4102444800000) ? new Date(t) : null; return d ? <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15.5, color: T.text, marginBottom: 10 }}><Clock size={15} style={{ color: T.faint }} /> Booked {d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} at {d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div> : null; })()}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15.5, color: T.text }}><User size={15} style={{ color: T.faint }} /> {fmtBookDate}</div>
-              </div>
-
-              {/* FLEXIBILITY — earlier-slot opt-in, kept at the very bottom */}
+              {/* FLEXIBILITY — earlier-slot opt-in (above Booking Details, per Dan) */}
               {appt.status === "confirmed" && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", borderTop: `1px solid ${T.line}` }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 16, fontWeight: 600, color: T.text }}>Notify if an earlier slot opens</div>
                     <div style={{ fontSize: 14, color: T.sub, marginTop: 3, lineHeight: 1.4 }}>If a sooner spot frees up with {provider.name}, {((appt.name || "they").split(" ")[0])} gets first dibs.</div>
@@ -24339,6 +24333,13 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   </button>
                 </div>
               )}
+
+              {/* booking details — the record line, kept at the very bottom */}
+              <div style={{ padding: "20px 18px 30px" }}>
+                <div style={{ fontSize: 16, color: T.sub, letterSpacing: 0.3, marginBottom: 12 }}>Booking Details</div>
+                {(() => { const t = Number(appt.id); const d = (isFinite(t) && t > 1577836800000 && t < 4102444800000) ? new Date(t) : null; return d ? <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15.5, color: T.text, marginBottom: 10 }}><Clock size={15} style={{ color: T.faint }} /> Booked {d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} at {d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div> : null; })()}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15.5, color: T.text }}><User size={15} style={{ color: T.faint }} /> {fmtBookDate}</div>
+              </div>
             </div>
 
             {/* ••• action menu popover */}
