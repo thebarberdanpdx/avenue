@@ -2390,6 +2390,19 @@ function App() {
     window.addEventListener("focus", onFg);
     return () => { document.removeEventListener("visibilitychange", onFg); window.removeEventListener("focus", onFg); };
   }, [sessionUid]);
+  // Heartbeat: while the app is OPEN and visible, quietly re-pull appointments + clients every
+  // 60s. Realtime is the instant path (when the tables are in Supabase's realtime publication);
+  // this is the guaranteed floor — the calendar can never drift more than a minute behind even
+  // if the socket silently died. refetchTable's guards keep it from stomping a mid-save edit.
+  useEffect(() => {
+    if (!sessionUid) return;
+    const id = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      lastFgRefetch.current = Date.now();
+      refetchTable('appointments'); refetchTable('clients');
+    }, 60000);
+    return () => clearInterval(id);
+  }, [sessionUid]);
 
   // Retry: re-push everything currently in memory (used by the failed-save banner's Retry button).
   const resaveAll = () => {
