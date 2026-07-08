@@ -24518,7 +24518,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
 
             {cancelConfirm && (
               <>
-                <div onClick={() => setCancelConfirm(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 20px 20px", boxSizing: "border-box" }}>
+                <div onClick={() => setCancelConfirm(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", boxSizing: "border-box" }}>
                   <div className="fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 811, padding: 24 }}>
                     <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, marginBottom: 4, color: T.text }}>Cancel this appointment?</div>
                     <div style={{ fontSize: 15, color: T.sub, marginBottom: 16, lineHeight: 1.45 }}>{(appt.name || "This client")}'s {appt.serviceName || appt.title || "appointment"} will be marked cancelled and the slot freed.</div>
@@ -24537,7 +24537,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
             )}
 
             {deleteAsk && (
-              <div onClick={() => setDeleteAsk(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 20px 20px", boxSizing: "border-box" }}>
+              <div onClick={() => setDeleteAsk(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", boxSizing: "border-box" }}>
                 <div className="fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 811, padding: 24 }}>
                   <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, marginBottom: 4, color: T.text }}>Delete this appointment?</div>
                   <div style={{ fontSize: 15, color: T.sub, marginBottom: 18, lineHeight: 1.5 }}>
@@ -24552,7 +24552,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
             )}
 
             {revertAsk > 0 && (
-              <div onClick={() => setRevertAsk(0)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 20px 20px", boxSizing: "border-box" }}>
+              <div onClick={() => setRevertAsk(0)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", boxSizing: "border-box" }}>
                 <div className="fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 811, padding: 24 }}>
                   <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, marginBottom: 4, color: T.text }}>Back to confirmed?</div>
                   <div style={{ fontSize: 15, color: T.sub, marginBottom: 18, lineHeight: 1.5 }}><strong style={{ color: T.text }}>${revertAsk.toFixed(2)}</strong> was collected for this ticket. To make it like {(appt.name || "the client").split(" ")[0]} never came in, refund it first — card payments reverse to the card, cash gets handed back. A full refund flips the appointment back to confirmed automatically.</div>
@@ -24565,7 +24565,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
 
             {lateOpen && (
               <>
-                <div onClick={() => { setLateOpen(false); setLateCascade(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 20px 20px", boxSizing: "border-box" }}>
+                <div onClick={() => { setLateOpen(false); setLateCascade(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", boxSizing: "border-box" }}>
                   <div className="fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 811, padding: 24 }}>
                   {!lateCascade ? (
                   <>
