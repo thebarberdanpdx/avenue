@@ -20470,7 +20470,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   // #16: an appointment that already carries a payment (checked out once, or a status reverted after
   // payment) must open in balance-only (reopen) mode — never the full-price charge flow — so it can
   // never be charged a second time. paidForAppt credits what was already collected.
-  const startCheckout = (appt, opts) => { setOpen(null); if (appt) delete committedRef.current[appt.id]; const alreadyPaid = !!(appt && appt.paid && Number(appt.paid.total) > 0); setCheckout(((opts && opts.reopen) || alreadyPaid) ? { ...appt, __reopen: true } : appt); };
+  // A ticket counts as "already paid" if EITHER the appt carries a paid summary OR the payment
+  // LEDGER has money against it. The ledger check matters: if the paid stamp failed to persist
+  // (app closed mid-save), the record of the charge still exists — without this, checkout would
+  // reopen at FULL PRICE and try to charge the client a second time.
+  const startCheckout = (appt, opts) => { setOpen(null); if (appt) delete committedRef.current[appt.id]; const alreadyPaid = !!(appt && appt.paid && Number(appt.paid.total) > 0) || !!(appt && paidForAppt(appt) > 0); setCheckout(((opts && opts.reopen) || alreadyPaid) ? { ...appt, __reopen: true } : appt); };
   const [refundAppt, setRefundAppt] = useState(null); // appt whose payment is being refunded from the appointment sheet
   // Everything ever charged against an appointment (ledger first, appt summary as fallback).
   const paidForAppt = (appt) => {
@@ -22138,6 +22142,8 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         <span style={{ fontSize: 12.5, letterSpacing: 2, color: "var(--faint)", textTransform: "uppercase", fontWeight: 600 }}>Checkout</span>
         {fullyPaidAtBooking
           ? <button onClick={settlePrepaid} disabled={payBusy} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer", padding: 4, width: 60, textAlign: "right", opacity: payBusy ? 0.5 : 1 }}>Done</button>
+          : (reopen && balance <= 0)
+          ? <button onClick={() => setStage("done")} style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: "pointer", padding: 4, width: 60, textAlign: "right" }}>Done</button>
           : <button onClick={() => { if ((reopen ? balance : netDue) > 0) { setPayErr(""); setStage("method"); } }} disabled={(reopen ? balance : netDue) <= 0} style={{ background: "none", border: "none", color: (reopen ? balance : netDue) > 0 ? "var(--gold)" : "var(--faint)", fontSize: 16.5, fontWeight: 600, fontFamily: FONT_BODY, cursor: (reopen ? balance : netDue) > 0 ? "pointer" : "default", padding: 4, width: 44, textAlign: "right" }}>Pay</button>}
       </div>
 
@@ -22154,6 +22160,12 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         <div style={{ display: "flex", alignItems: "center", gap: 10, background: "color-mix(in srgb, var(--gold) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginTop: 14 }}>
           <Check size={17} style={{ color: "var(--gold)" }} />
           <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.45 }}>Paid in full at booking{(Number(appt.prepaidTip) || 0) > 0 ? ` — ${money(+((Number(appt.prepaidTotal) || 0)).toFixed(2))} incl. ${money(+((Number(appt.prepaidTip) || 0)).toFixed(2))} tip` : ` — ${money(+((Number(appt.prepaidTotal) || bookingCredit) || 0).toFixed(2))}`}. Nothing to charge — tap <b>Done</b>. Add items above to charge extra.</div>
+        </div>
+      )}
+      {reopen && balance <= 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "color-mix(in srgb, var(--gold) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 35%, var(--border))", borderRadius: 12, padding: "12px 14px", marginTop: 14 }}>
+          <Check size={17} style={{ color: "var(--gold)" }} />
+          <div style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.45 }}>Already paid — {money(alreadyPaid)} is on record for this ticket. Nothing more to charge — tap <b>Done</b> to close it out. Add items above to charge extra.</div>
         </div>
       )}
 
