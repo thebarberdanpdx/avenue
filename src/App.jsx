@@ -2007,7 +2007,8 @@ function App() {
     try {
       await ensureFreshSession(); // refresh a stale token before writing (fixes native 42501)
       const list = items || [];
-      let rows = list.map((it, i) => ({ id: String(it.id ?? `${table}_${i}`), shop_id: SHOP_ID, data: it }));
+      // Null-safe like keepIds/prevKnown below — one corrupt element must not brick every save.
+      let rows = list.map((it, i) => ({ id: String((it && it.id) ?? `${table}_${i}`), shop_id: SHOP_ID, data: it })).filter((r) => r.data != null);
       // Send ONLY rows that actually changed since the last known server state. Appointments and
       // clients now legitimately carry base64 photos, so upserting the ENTIRE table in one request
       // built multi-MB bodies that could fail ("save failed: appointments") — the save then reverted
@@ -2041,9 +2042,12 @@ function App() {
       }
       // 1. Upsert what changed — adds new rows, updates existing ones, destroys nothing. Chunked so a
       //    photo-heavy batch (base64 galleries / appointment photos) never builds one oversized request.
+      //    A failed chunk is captured, NOT thrown yet: the delete step below must still run — otherwise
+      //    one oversized row blocks every deletion forever (audited resurrect path).
+      let upsertErr = null;
       for (let i = 0; i < rows.length; i += 10) {
         const { error: upErr } = await supabase.from(table).upsert(rows.slice(i, i + 10));
-        if (upErr) throw upErr;
+        if (upErr) { upsertErr = upErr; break; }
       }
       // 2. Delete ONLY rows this device knew about and has since removed. A server row we
       //    don't have but never knew about is a NEW row from another device (e.g. Heather just
@@ -2061,8 +2065,17 @@ function App() {
         // refetch (the un-deletable test appointment bug). Surface that as a real failure.
         const { data: deleted, error: delErr } = await supabase.from(table).delete().eq('shop_id', SHOP_ID).in('id', toDelete).select('id');
         if (delErr) throw delErr;
-        if ((deleted || []).length < toDelete.length) throw new Error(`delete blocked on '${table}': ${(deleted || []).length}/${toDelete.length} rows removed — likely a missing RLS DELETE policy`);
+        if ((deleted || []).length < toDelete.length) {
+          // Shortfall: only a real failure if the missing rows STILL EXIST. Another device (or a
+          // manual purge) deleting them concurrently is success, not an error — without this
+          // re-check a save could keep throwing over rows that are already gone.
+          const got = new Set((deleted || []).map((r) => String(r.id)));
+          const missing = toDelete.filter((id) => !got.has(String(id)));
+          const { data: still } = await supabase.from(table).select('id').eq('shop_id', SHOP_ID).in('id', missing);
+          if ((still || []).length) throw new Error(`delete blocked on '${table}': ${(still || []).length} row(s) refused — likely a missing RLS DELETE policy`);
+        }
       }
+      if (upsertErr) throw upsertErr; // deletions are done — now surface the failed upsert chunk for retry
       // Success: this list is now exactly what's on the server, so it becomes our known baseline.
       lastRemoteRef.current[table] = list;
       lastSaveAt.current[table] = Date.now();
@@ -2213,6 +2226,17 @@ function App() {
     })();
   }, []);
 
+  // A session-keyed load must NEVER clobber a local edit that hasn't reached the server yet.
+  // The session OBJECT's identity churns (hourly token refresh; native getSession() returns a
+  // fresh object on every app foreground) — so these effects used to re-run on every app switch,
+  // and an unguarded setState both resurrected server rows AND re-baselined lastRemoteRef, which
+  // made the save effect's `state === baseline` check swallow the pending save forever (the
+  // "deleted appointment comes back" delivery path). Two defenses: the effects below key on the
+  // stable USER ID (one run per sign-in, not per token), and each apply step skips while a save
+  // for that table is running, queued, or pending in the debounce window.
+  const tableBusy = (table) => { const s = savingRef.current[table]; return !!(s && (s.running || s.queued)) || pendingSaveRef.current[table] !== undefined || !!(lastSaveAt.current[table] && Date.now() - lastSaveAt.current[table] < 2500); };
+  const sessionUid = session?.user?.id || null;
+
   // Private client list: load it ONLY when signed-in staff are present, and never for public booking
   // visitors. When there's no staff session we set an empty list (clearing the in-code demo seed) so the
   // public view can never write seed data to the live database. Uses the same array reference for state
@@ -2229,12 +2253,13 @@ function App() {
       const { data, error } = await supabase.from('clients').select('data').eq('shop_id', SHOP_ID);
       if (!alive) return;
       if (error) { console.error('[vero] load clients failed:', error); return; }
+      if (tableBusy('clients')) return; // a local edit is mid-save — don't stomp it with server state
       const list = data ? data.map((r) => r.data) : [];
       lastRemoteRef.current.clients = list;
       setClients(list);
     })();
     return () => { alive = false; };
-  }, [session]);
+  }, [sessionUid]);
 
   // Public booking: fetch this account's bookable locations (names only) so the booking page can
   // offer a location chooser for multi-shop businesses. Non-staff only; single-shop returns empty.
@@ -2243,7 +2268,7 @@ function App() {
     let alive = true;
     (async () => { try { const { data } = await supabase.rpc("get_account_locations", { p_shop_id: SHOP_ID }); if (alive && Array.isArray(data)) setAcctLocs(data); } catch (e) {} })();
     return () => { alive = false; };
-  }, [session]);
+  }, [sessionUid]);
 
   // Full barber records (with PINs) and the waitlist (client phone numbers) load ONLY for signed-in
   // staff — overwriting the sanitized public baseline. For public visitors the waitlist stays empty.
@@ -2260,20 +2285,20 @@ function App() {
         if (!provBusy()) { const list = sortProviders(pr.data.map((r) => r.data)); lastRemoteRef.current.providers = list; if (list.length) setProviders(list); }
       }
       const wl = await supabase.from('waitlist').select('data').eq('shop_id', SHOP_ID);
-      if (alive && !wl.error && Array.isArray(wl.data)) { const list = wl.data.map((r) => r.data); lastRemoteRef.current.waitlist = list; setWaitlist(list); }
+      if (alive && !wl.error && Array.isArray(wl.data) && !tableBusy('waitlist')) { const list = wl.data.map((r) => r.data); lastRemoteRef.current.waitlist = list; setWaitlist(list); }
       // Reviews hold client names + comments, so (like waitlist) they load ONLY for signed-in staff.
       // The 'reviews' table may not exist yet (owner hasn't run the SQL) — a load error is harmless.
-      try { const rv = await supabase.from('reviews').select('data').eq('shop_id', SHOP_ID); if (alive && !rv.error && Array.isArray(rv.data)) { const list = rv.data.map((r) => r.data); lastRemoteRef.current.reviews = list; setReviews(list); } } catch (e) {}
+      try { const rv = await supabase.from('reviews').select('data').eq('shop_id', SHOP_ID); if (alive && !rv.error && Array.isArray(rv.data) && !tableBusy('reviews')) { const list = rv.data.map((r) => r.data); lastRemoteRef.current.reviews = list; setReviews(list); } } catch (e) {}
     })();
     return () => { alive = false; };
-  }, [session]);
+  }, [sessionUid]);
 
   // When a signed-in user has been invited to an account, fold those invites into real
   // memberships. Safe + idempotent: a no-op when there are no pending invites for their email.
   useEffect(() => {
     if (!session) return;
     (async () => { try { await supabase.rpc("claim_my_invites"); } catch (e) {} })();
-  }, [session]);
+  }, [sessionUid]);
 
   // Appointments load, session-keyed. The public gets TIMES ONLY (open/busy slots) via get_availability —
   // never names or phones; signed-in staff load the full appointment rows. Mirrors the clients effect above.
@@ -2293,12 +2318,13 @@ function App() {
       const { data, error } = await supabase.from('appointments').select('data').eq('shop_id', SHOP_ID);
       if (!alive) return;
       if (error) { console.error('[vero] load appointments failed:', error); return; }
+      if (tableBusy('appointments')) return; // a local edit (e.g. a just-deleted appt) is mid-save — don't resurrect it
       const list = data ? data.map((r) => r.data) : [];
       lastRemoteRef.current.appointments = list;
       setAppts(list);
     })();
     return () => { alive = false; };
-  }, [session]);
+  }, [sessionUid]);
 
   const shopsPendingRef = useRef(null); // debounced shops-settings snapshot awaiting save (flushed on app-background)
   const fireShopsSave = async () => {
