@@ -2031,6 +2031,13 @@ function App() {
   const locParam = (() => { try { return typeof window !== "undefined" && new URL(window.location.href).searchParams.get("loc") === "1"; } catch (e) { return false; } })();
   const loadedRef = useRef(false); // blocks saves until the first load finishes (so seed data can't overwrite real data)
   const [dataLoaded, setDataLoaded] = useState(false); // true once the first load finishes — used to avoid flashing placeholder names
+  // [outage-honest-menu] TRUE only once a REAL services menu is in hand — from the server, or from
+  // the last-synced offline cache. Stays FALSE if the menu load failed with no cache, i.e. the app
+  // is still holding the in-code DEFAULT_SERVICES demo placeholder. The public booking page reads
+  // this to show an honest "can't load — call us" state instead of letting a client book off a menu
+  // that isn't the shop's (the outage masquerade). Fails SAFE: a wrong FALSE shows "call us" (a lost
+  // tap), never a fake booking.
+  const [servicesTrusted, setServicesTrusted] = useState(false);
   const savingRef = useRef({});    // per-table { running, queued } — guarantees in-order saves
   const providersDirtyRef = useRef(false); // true between a local provider edit and its successful sync — blocks focus-reload clobber
   const providersFullRef = useRef(false); // true once a signed-in session holds FULL provider rows (with email/phone/PIN) — stops the sanitized public feed from overwriting them on a remount race (the "email/phone disappears" bug)
@@ -2216,6 +2223,13 @@ function App() {
     (async () => {
       let allLoaded = true; // flipped to false on ANY real error — blocks saves so seeds can't overwrite real data
       let savedCutLibrary = null; // captured from shops.settings below; if absent we seed it from services
+      // [outage-honest-menu] Wrap the whole load so it ALWAYS reaches a terminal state. A hard network
+      // failure makes a supabase call REJECT (throw), not just return {error}; without this, one thrown
+      // load aborted the routine before setDataLoaded(true), leaving the app stuck in a false "loading"
+      // limbo forever — and the public page silently kept the DEFAULT_SERVICES demo menu. The finally
+      // guarantees dataLoaded flips (so the honest-menu gate can fire) while loadedRef only ever turns
+      // true when allLoaded is genuinely true — so a failed/thrown load can still never unblock saves.
+      try {
 
       // Settings (business) live on the shops row. maybeSingle returns null (not error) when no row exists yet.
       const { data: shopRow, error: shopErr } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle();
@@ -2256,7 +2270,7 @@ function App() {
       // The public feed is SANITIZED (no email/phone/PIN). If a signed-in session has already loaded
       // the full rows, never let this stripped copy overwrite them — that race blanked staff email/phone.
       if (pr && pr.length && !providersFullRef.current && !hasStoredSession()) setProviders(pr);
-      const sv = await loadList('services');     if (sv) sv.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9)); if (sv && sv.length) setServices(sv);
+      const sv = await loadList('services');     if (sv) sv.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9)); if (sv && sv.length) { setServices(sv); setServicesTrusted(true); } // [outage-honest-menu] real menu from the server
 
       // Record the loaded baseline so the safe-delete reconciliation knows which rows this device
       // already knew about (so it never deletes a row another device adds later).
@@ -2305,12 +2319,18 @@ function App() {
       // Only fall back to the cache when a load actually ERRORED (!allLoaded) — never over a
       // genuinely-empty shop, which would show stale rows.
       if (pr && pr.length) writeCache('providers', pr); else if (!allLoaded) { const c = readCache('providers'); if (c && c.length && !providersFullRef.current) { lastRemoteRef.current.providers = c; setProviders(c); } }
-      if (sv && sv.length) writeCache('services', sv); else if (!allLoaded) { const c = readCache('services'); if (c && c.length) { lastRemoteRef.current.services = c; setServices(c); } }
+      if (sv && sv.length) writeCache('services', sv); else if (!allLoaded) { const c = readCache('services'); if (c && c.length) { lastRemoteRef.current.services = c; setServices(c); setServicesTrusted(true); } } // [outage-honest-menu] last-synced real menu from the offline cache
 
-      // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
-      if (allLoaded) { loadedRef.current = true; setLoadIncomplete(false); setUsingCache(false); }
-      else { console.error('[vero] one or more loads failed — saves are blocked until reload to protect existing data'); setLoadIncomplete(true); }
-      setDataLoaded(true);
+      } catch (e) {
+        // A load threw (hard network failure / abort). Treat as an incomplete load: never unblock saves.
+        allLoaded = false;
+        console.error('[vero] load routine threw — treating as incomplete; saves stay blocked:', e);
+      } finally {
+        // ONLY enable saves if every load succeeded — otherwise the in-memory seed defaults could overwrite real server data.
+        if (allLoaded) { loadedRef.current = true; setLoadIncomplete(false); setUsingCache(false); }
+        else { console.error('[vero] one or more loads failed — saves are blocked until reload to protect existing data'); setLoadIncomplete(true); }
+        setDataLoaded(true);
+      }
     })();
   }, []);
 
@@ -2773,7 +2793,7 @@ function App() {
       {view === "privacy" && <PrivacyPage onExit={() => { setView("client"); if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname + window.location.search); }} />}
       {view === "client" && ((!session && acctLocs.length > 1 && !locParam)
         ? <LocationChooser shopId={SHOP_ID} locations={acctLocs} business={business} />
-        : <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} onExit={goBooking} onManage={() => setView("manage")} onHoldReload={(v) => { holdReloadRef.current = !!v; }} />)}
+        : <ClientFlow key={clientNonce} shopId={SHOP_ID} isStaff={!!session} business={business} services={services} providers={providers} categories={categories} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} dataLoaded={dataLoaded} servicesTrusted={servicesTrusted} onExit={goBooking} onManage={() => setView("manage")} onHoldReload={(v) => { holdReloadRef.current = !!v; }} />)}
       {view === "manage" && <ManageStandalone business={business} appts={appts} setAppts={setAppts} providers={providers} services={services} onExit={goBooking} />}
       {view === "managetoken" && <ManageByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} providers={providers} services={services} onExit={goBooking} />}
       {view === "reviewtoken" && <ReviewByToken token={(() => { try { return new URLSearchParams(window.location.search).get("t"); } catch (e) { return null; } })()} shopId={SHOP_ID} business={business} onExit={goBooking} />}
@@ -3688,7 +3708,7 @@ function GroupedTimes({ slots, selected, onPick, bestSet, cell }) {
   );
 }
 
-function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, onExit, onManage, onHoldReload }) {
+function ClientFlow({ shopId, isStaff, business, services, providers, categories = [], clients, setClients, appts, setAppts, waitlist, setWaitlist, dataLoaded = true, servicesTrusted = true, onExit, onManage, onHoldReload }) {
   const [step, setStep] = useState(0);
   const [bookingFor, setBookingFor] = useState(null); // null until chosen: "self" or "other"
   const [showWhoFor, setShowWhoFor] = useState(false); // who's-it-for screen for a matched returning client
@@ -5053,6 +5073,29 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   };
   const lblStyle = { fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 2.4, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "30px 2px 10px" };
   const avStyle = { width: 34, height: 34, borderRadius: "50%", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 14, color: "var(--text)", flexShrink: 0 };
+
+  // [outage-honest-menu] The load has FINISHED but we never got a real menu (server failed AND no
+  // last-synced cache on this device) — so `services` is still the in-code DEFAULT_SERVICES demo
+  // placeholder. NEVER let a client book off that: show an honest "can't load — call us" state
+  // instead. Scoped to the public page (staff/owner preview is exempt) and only fires once loading
+  // is done, so it never flashes during a normal load. Fails safe — the worst case is a real menu
+  // wrongly gated to "call us", never a fake menu shown as real.
+  if (!isStaff && dataLoaded && !servicesTrusted) {
+    const shopPhone = (business && business.phones && business.phones[0] && business.phones[0].number) || (business && business.phone) || "";
+    const telHref = shopPhone ? `tel:${String(shopPhone).replace(/[^0-9+]/g, "")}` : "";
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "var(--bg)", padding: "24px 22px" }}>
+        <div style={{ width: "100%", maxWidth: 440, textAlign: "center" }}>
+          {business && business.name ? <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, marginBottom: 14 }}>{business.name}</div> : null}
+          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.12, margin: "0 0 12px", color: "var(--text)" }}>We can't load booking right now</h1>
+          <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 15.5, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 26px" }}>
+            Our system is having a moment — this is on us, not you. Please try again in a few minutes{shopPhone ? <>, or reach us directly at <a href={telHref} style={{ color: "var(--text)", fontWeight: 500 }}>{shopPhone}</a> and we'll get you booked</> : ""}.
+          </p>
+          <button onClick={() => { try { window.location.reload(); } catch (e) {} }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.8, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: "pointer" }}>Try again</button>
+        </div>
+      </div>
+    );
+  }
 
   if (showHome && matched) {
     const firstName = (matched.name || "there").split(" ")[0];

@@ -122,6 +122,7 @@ const GUARDS = [
   { needle: "GUARD: login-fail-open", label: "login/auth gate fails OPEN — a failed/slow/timed-out session check can never grey out the sign-in button or brick the app" },
   { needle: "GUARD: cancel-window-lock", label: "client change/cancel window enforced everywhere — one resolver (12h default; leadTimeMin:0 can't zero it) + re-checks at action time, not just render" },
   { needle: "GUARD: conflict-next-slot-from-start", label: "conflict popup suggests the TRUE next opening — scan from the attempted start with the moved appt excluded (9:20-instead-of-9:10 bug)" },
+  { needle: "outage-honest-menu", label: "public booking shows an honest 'can't load — call us' state on a failed menu load, never the DEFAULT_SERVICES demo menu masquerading as the shop's real one" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
