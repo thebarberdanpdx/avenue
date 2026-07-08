@@ -19952,8 +19952,10 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     try { window.scrollTo(0, 0); } catch (e) {}
   }, []);
-  // Rebook flow: guide "choose the day → then pick from smart times" by opening the date picker first.
-  useEffect(() => { if (smartTimes) setShowDatePick(true); }, []);
+  // Rebook flow: guide "choose the day → then pick from smart times" by opening the date picker
+  // first. If the day was already chosen (a rebook chip jumped the calendar there), skip straight
+  // to the time picker — the same settings-aware slots a client sees booking online.
+  useEffect(() => { if (smartTimes) { if (slot && slot.dayChosen) setShowTimePick(true); else setShowDatePick(true); } }, []);
   // search by first name, last name, OR any part of the phone number (digits only)
   const qd = q.replace(/\D/g, "");
   const matches = q.trim() ? clients.filter((c) => {
@@ -20482,15 +20484,24 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     commitCheckout(id, summary);
     setCheckout(null);
     const src = appts.find((a) => a.id === id);
-    // Rebook hand-off: land on the REAL calendar (whole day, open spots and all) with this
-    // client + service armed — the next open slot the barber taps opens the form pre-filled.
+    // Rebook hand-off: jump the calendar to the chosen day AND open the new-appointment form
+    // pre-filled (client + service + barber) with the time picker up — the same settings-aware
+    // open slots a client sees booking online (computeFreeSlots + this client's real duration).
+    // Closing the form falls back to the armed banner: tap any open time on the day grid.
     if (summary && summary.rebookJump && src) {
+      let targetDate = new Date(); targetDate.setHours(0, 0, 0, 0);
       if (summary.rebookJump.date) {
         const d = new Date(summary.rebookJump.date); d.setHours(0, 0, 0, 0);
         const t0 = new Date(); t0.setHours(0, 0, 0, 0);
         setDayOffset(Math.round((d - t0) / 86400000));
+        targetDate = d;
       }
-      setRebookPrefill({ clientId: src.clientId, serviceId: src.serviceId, providerId: src.providerId, name: (src.name || "the client").split(" ")[0] });
+      const c = (clients || []).find((x) => x.id === src.clientId) || null;
+      const s = (services || []).find((x) => x.id === src.serviceId) || null;
+      const pid = src.providerId || (c && c.provider) || (providers[1] || providers[0] || {}).id;
+      const dur = s ? getDuration(c, s, pid) : Math.max(15, (src.end - src.start) || 30);
+      setRebookPrefill({ clientId: src.clientId, serviceId: src.serviceId, providerId: pid, name: (src.name || "the client").split(" ")[0] });
+      setNewApptSlot({ providerId: pid, start: earliestOpenSlot(pid, targetDate, dur), initialClient: c, initialService: s, rebook: true, dayChosen: !!summary.rebookJump.date });
     }
     // "Text a reminder instead": stamp the due date on the client — the reminder cron sends it.
     if (summary && summary.bookReminder && src && src.clientId) {
@@ -21328,7 +21339,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
       {/* Rebook hand-off banner — armed at checkout; tapping any open time opens the form pre-filled */}
       {rebookPrefill && (
-        <div className="fade-in" style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--wash)", border: "1px solid var(--gold)", borderRadius: 12, padding: "10px 12px", margin: "8px 0 0" }}>
+        <div className="fade-in" style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--wash)", border: "1px solid var(--gold)", borderRadius: 12, padding: "10px 12px", margin: "8px 0 14px" }}>
           <Repeat size={16} style={{ color: "var(--gold)", flexShrink: 0 }} />
           <div style={{ flex: 1, fontSize: 14, color: "var(--text)", lineHeight: 1.35 }}><strong style={{ fontWeight: 600 }}>Rebooking {rebookPrefill.name}</strong> — tap any open time and the appointment is pre-filled.</div>
           <button onClick={() => setRebookPrefill(null)} style={{ background: "none", border: "none", color: "var(--sub)", padding: 4, cursor: "pointer" }}><X size={16} /></button>
