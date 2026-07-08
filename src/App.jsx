@@ -1310,6 +1310,33 @@ function useNow(intervalMs = 1000) {
   }, [intervalMs]);
   return now;
 }
+
+// ── Client change/cancel window — GUARD: cancel-window-lock ──────────────────
+// THE single resolver for "how close to an appointment can a client still
+// reschedule / change service / cancel online", in MINUTES. Every surface that
+// shows or enforces the window (home next-visit card, /manage token page, the
+// legacy manage screen, the No-show Protection editor) MUST read it from here,
+// so the number a client sees and the number that's enforced can never drift.
+//   1. booking.cancelWindowMin — the owner's choice in Settings → No-show
+//      Protection. 0 is a real choice ("No minimum") and is respected.
+//   2. Legacy booking.leadTimeMin — ONLY when it's a real positive value. That
+//      field is the "how far ahead can you BOOK" floor and defaults to 0;
+//      treating its 0 as "0-hour cancel window" is the bug that let a client
+//      open the reschedule sheet 7 minutes before their appointment.
+//   3. Legacy root cancelWindowHrs (pre-booking-rules shops).
+//   4. Nothing set → 12 hours, the shop's standing policy. Picking any option
+//      in No-show Protection writes cancelWindowMin and takes precedence.
+function cancelWindowMinutes(business) {
+  const b = business || {};
+  const bk = b.booking || {};
+  const own = Number(bk.cancelWindowMin);
+  if (bk.cancelWindowMin != null && isFinite(own) && own >= 0) return own;
+  const legacyLead = Number(bk.leadTimeMin);
+  if (isFinite(legacyLead) && legacyLead > 0) return legacyLead;
+  const legacyHrs = Number(b.cancelWindowHrs);
+  if (isFinite(legacyHrs) && legacyHrs > 0) return legacyHrs * 60;
+  return 720;
+}
 // Duration cascade: per-client override → per-staff default → service default.
 const getStaffEntry = (service, providerId) => (service && service.staff && providerId && service.staff[providerId]) || null;
 const getDuration = (client, service, providerId) => {
@@ -3817,13 +3844,18 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   useEffect(() => { if (onHoldReload) onHoldReload(step === 8); return () => { if (onHoldReload) onHoldReload(false); }; }, [step]);
   const [showAllVisits, setShowAllVisits] = useState(false); // expand the recent-visits list on the home
   const [homeAction, setHomeAction] = useState(null); // { type: "cancel" | "reschedule", appt, person } — confirm sheet on the home next-visit card
-  // Change/cancel window — same resolution as the manage-link page (booking.cancelWindowMin →
-  // legacy leadTimeMin → cancelWindowHrs → 24h). Reschedule / change-service / cancel on a visit
-  // inside the window are refused online with the "call us" message; notes & photos stay allowed.
-  const manageWindowHrs = (business?.booking?.cancelWindowMin != null) ? business.booking.cancelWindowMin / 60
-    : (business?.booking?.leadTimeMin != null) ? business.booking.leadTimeMin / 60
-    : (business?.cancelWindowHrs || 24);
-  const insideManageWindow = (a) => { const d = apptWhen(a); return !!d && (d.getTime() - Date.now()) < manageWindowHrs * 3600000; };
+  // Change/cancel window — ONE resolver shared by every manage surface (cancelWindowMinutes).
+  // Reschedule / change-service / cancel on a visit inside the window are refused online with
+  // the "call us" message; notes & photos stay allowed.
+  const manageWindowHrs = cancelWindowMinutes(business) / 60;
+  // Ticks every 60s (and instantly on tab-return, via useNow's visibilitychange refresh) while
+  // the signed-in home is up — so a page left open across the deadline flips to locked on its
+  // own. Without this, "locked" was frozen at render time and a stale open tab kept live
+  // buttons past the cutoff; the onClick re-checks below are the hard backstop.
+  const homeNow = useNow(showHome && matched ? 60000 : 3600000);
+  // Fail CLOSED: a visit whose date can't be read refuses online changes (call us) rather than
+  // silently allowing them — same "don't write on bad data" rule as everywhere else.
+  const insideManageWindow = (a) => { const d = apptWhen(a); const t = d ? d.getTime() : NaN; if (!isFinite(t)) return true; return (t - homeNow.getTime()) < manageWindowHrs * 3600000; };
   // "Notes & photos" on a signed-in client's upcoming visit — same server write as the
   // confirmation screen (token RPC), with a session-authenticated fallback when no token is held.
   const [extrasFor, setExtrasFor] = useState(null);
@@ -3995,6 +4027,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [booking, setBooking] = useState(false);   // true while the confirmed booking is being saved to the server
   const [pendingFinish, setPendingFinish] = useState(false); // set when card is saved → effect commits the booking once
   const [bookErr, setBookErr] = useState(false);   // true if that save failed — client is told to retry, nothing was held
+  const [reschedTooLate, setReschedTooLate] = useState(false); // a home reschedule/change-service was CONFIRMED after the change window closed mid-flow — blocked; the original appointment stays
   // waitlist join form
   const [wlName, setWlName] = useState("");
   const [wlDays, setWlDays] = useState([]);        // preferred days (multi-select, label strings)
@@ -4751,6 +4784,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
 
     // Staff/preview bookings persist through the dashboard's own save path — show success immediately.
     if (isStaff) { setAppts((cur) => [...cur, ...newAppts]); captureClientPhotos(); dropFromWaitlist(); fireApptNotify({ msgId: "booked", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Appointment confirmed` }); { const _paid = newAppts[0] && (newAppts[0].prepaidTotal || newAppts[0].deposit || 0); if (_paid > 0) fireApptNotify({ msgId: "deposit", appt: newAppts[0], business, providers, contact: { email: finalEmail, phone: finalPhone }, subject: `${business.name}: Payment received`, extra: { amount: `$${_paid}` } }); } fireStaffPush({ shopId, title: "New booking", appt: newAppts[0], event: "newBooking", business }); fireStaffNotify({ shopId, appt: newAppts[0], business }); setBookedId(baseId); setBookedClientId(clientId); galleryCapturedRef.current = false; setStep(8); return; }
+    // GUARD: cancel-window-lock — a reschedule/change-service that started OUTSIDE the change
+    // window but is being confirmed INSIDE it (browse, phone sleeps, confirm hours later) must
+    // not go through: block before anything is written, keep the original appointment untouched.
+    setReschedTooLate(false);
+    if (reschedPrev && insideManageWindow(reschedPrev)) { setReschedTooLate(true); return; }
     // Public booking: the slot is never held while saving, and the client is only told they're booked
     // once the server actually has it — so a failed save can never become a ghost booking.
     setBooking(true); setBookErr(false);
@@ -5002,6 +5040,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setPhone(""); setNewFirst(""); setNewLast(""); setNewEmail(""); setNewAddress(""); setSmsConsent(false);
   };
   const doCancelAppt = (appt) => {
+    // GUARD: cancel-window-lock — CHOKEPOINT: every cancel through this helper re-checks the
+    // window, so no caller (current or future) can late-cancel even if its own guard is missed.
+    // The 3-minute grace mirrors the server trigger: a home reschedule re-checks BEFORE booking
+    // the new time, then releases the old slot seconds later — without the grace, crossing the
+    // boundary in those seconds would strand the client double-booked instead of finishing the
+    // swap. Unreadable dates refuse (fail closed).
+    const _t = apptWhen(appt); const _tt = _t ? _t.getTime() : NaN;
+    if (!isFinite(_tt) || (_tt - Date.now()) < (manageWindowHrs * 60 - 3) * 60000) { setHomeAction({ type: "locked", appt }); return; }
     try { supabase.rpc("cancel_my_appointment", { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(appt.id), p_session: matched.sessionToken }).catch(() => {}); } catch (e) {}
     setMyAppts((cur) => cur.map((a) => a.id === appt.id ? { ...a, status: "cancelled" } : a));
   };
@@ -5047,10 +5093,10 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   </div>
                 )}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: locked ? 12 : 14, paddingTop: locked ? 0 : 13, borderTop: locked ? "none" : "1px solid var(--line)" }}>
-                  <button disabled={locked} onClick={() => { if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "reschedule", appt: v }); }} style={locked ? lockedBtn : { background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Reschedule</button>
-                  <button disabled={locked} onClick={() => { setReschedPrev(v); bookForPerson(v.familyMemberId ? { id: v.familyMemberId, name: personLabel(v) } : { id: null }); }} style={locked ? lockedBtn : { background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Change service</button>
+                  <button disabled={locked} onClick={() => { if (insideManageWindow(v)) { setHomeAction({ type: "locked", appt: v }); return; } if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "reschedule", appt: v }); }} style={locked ? lockedBtn : { background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Reschedule</button>
+                  <button disabled={locked} onClick={() => { if (insideManageWindow(v)) { setHomeAction({ type: "locked", appt: v }); return; } setReschedPrev(v); bookForPerson(v.familyMemberId ? { id: v.familyMemberId, name: personLabel(v) } : { id: null }); }} style={locked ? lockedBtn : { background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Change service</button>
                   <button onClick={() => openExtras(v)} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Add notes &amp; photos</button>
-                  <button disabled={locked} onClick={() => { if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "cancel", appt: v }); }} style={locked ? lockedBtn : { background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 400, color: "var(--sub)", cursor: "pointer" }}>Cancel</button>
+                  <button disabled={locked} onClick={() => { if (insideManageWindow(v)) { setHomeAction({ type: "locked", appt: v }); return; } if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "cancel", appt: v }); }} style={locked ? lockedBtn : { background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 400, color: "var(--sub)", cursor: "pointer" }}>Cancel</button>
                 </div>
               </div>
             ); }) : (
@@ -5156,16 +5202,22 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             </div>
           </div>
         )}
-        {homeAction && (
+        {homeAction && (() => {
+          // "locked" = tapped a manage action inside the change window (or crossed the deadline
+          // with this sheet open) — explain honestly instead of doing anything. GUARD: cancel-window-lock.
+          const haLocked = homeAction.type === "locked";
+          const haPh = (business.phones && business.phones[0] && business.phones[0].number) || business.phone || "";
+          return (
           <div onClick={() => setHomeAction(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "var(--bg)", borderRadius: "20px 20px 0 0", padding: "26px 22px 30px" }}>
-              <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, color: "var(--text)", margin: "0 0 8px", letterSpacing: "-0.2px" }}>{homeAction.type === "cancel" ? "Cancel this appointment?" : "Pick a new time?"}</h3>
-              <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 0 22px" }}>{homeAction.type === "cancel" ? `Your ${svcLabel(homeAction.appt)} on ${fmtHomeShort(homeAction.appt)} will be released.` : `Your ${fmtHomeShort(homeAction.appt)} spot stays booked until you pick and confirm a new time — nothing is lost if you change your mind.`}</p>
-              <button onClick={() => { const a = homeAction.appt; if (homeAction.type === "cancel") { doCancelAppt(a); setHomeAction(null); } else { setReschedPrev(a); bookForPerson(a.familyMemberId ? { id: a.familyMemberId, name: personLabel(a) } : { id: null }); } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: "pointer", marginBottom: 11 }}>{homeAction.type === "cancel" ? "Yes, cancel it" : "Pick a new time"}</button>
-              <button onClick={() => setHomeAction(null)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 500, textTransform: "uppercase", borderRadius: 12, cursor: "pointer" }}>Keep it</button>
+              <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, color: "var(--text)", margin: "0 0 8px", letterSpacing: "-0.2px" }}>{haLocked ? "Too close to change online" : homeAction.type === "cancel" ? "Cancel this appointment?" : "Pick a new time?"}</h3>
+              <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, color: "var(--sub)", lineHeight: 1.5, margin: "0 0 22px" }}>{haLocked ? <>Your {svcLabel(homeAction.appt)} on {fmtHomeShort(homeAction.appt)} is less than {manageWindowHrs} hours away, so it can't be changed or cancelled online. {haPh ? <>Need to? <a href={`tel:${String(haPh).replace(/[^0-9+]/g, "")}`} style={{ color: "var(--text)", fontWeight: 500 }}>Call {haPh}</a> and we'll help.</> : "Please call us and we'll help."}</> : homeAction.type === "cancel" ? `Your ${svcLabel(homeAction.appt)} on ${fmtHomeShort(homeAction.appt)} will be released.` : `Your ${fmtHomeShort(homeAction.appt)} spot stays booked until you pick and confirm a new time — nothing is lost if you change your mind.`}</p>
+              {!haLocked && <button onClick={() => { const a = homeAction.appt; if (insideManageWindow(a)) { setHomeAction({ type: "locked", appt: a }); return; } if (homeAction.type === "cancel") { doCancelAppt(a); setHomeAction(null); } else { setReschedPrev(a); bookForPerson(a.familyMemberId ? { id: a.familyMemberId, name: personLabel(a) } : { id: null }); } }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: "pointer", marginBottom: 11 }}>{homeAction.type === "cancel" ? "Yes, cancel it" : "Pick a new time"}</button>}
+              <button onClick={() => setHomeAction(null)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 500, textTransform: "uppercase", borderRadius: 12, cursor: "pointer" }}>{haLocked ? "OK" : "Keep it"}</button>
             </div>
           </div>
-        )}
+          );
+        })()}
       </div>
     );
   }
@@ -7375,6 +7427,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               commitBooking(phone, newEmail);
             }} style={{ width: "100%", background: canLock ? "var(--text)" : "transparent", color: canLock ? "var(--bg)" : "var(--faint)", padding: 17, fontFamily: "'Jost', sans-serif", fontSize: 14, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 10, border: canLock ? "none" : "1px solid var(--border)", cursor: canLock ? "pointer" : "default" }}>{booking ? "CONFIRMING…" : (payFull && !paid ? "PAY ABOVE TO BOOK" : (needsCard && !cardOnFile ? "ADD A CARD TO CONTINUE" : ((!smsConsent || !agreed) ? "CHECK BOTH BOXES TO BOOK" : `BOOK FOR ${relativeDate(selectedDate).includes(",") ? relativeDate(selectedDate).split(",")[0].toUpperCase() + " " + MONTHS[selectedDate.getMonth()].toUpperCase() + " " + selectedDate.getDate() : relativeDate(selectedDate).toUpperCase()}`)))}</button>
             {bookErr && <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "color-mix(in srgb, #c0392b 14%, var(--panel))", color: "var(--text)", fontSize: 13.5, lineHeight: 1.45, textAlign: "center" }}>Couldn't confirm your booking — check your connection and tap again. Your time wasn't held, so nothing's lost.</div>}
+            {reschedTooLate && <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13.5, lineHeight: 1.45, textAlign: "center" }}>Your original appointment is now less than {manageWindowHrs} hours away, so it can't be changed online anymore. It's still booked exactly as it was — call us and we'll help.</div>}
             </>
               );
             })()}
@@ -7816,14 +7869,11 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
   const [newSlot, setNewSlot] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  // Change/cancel window = the notice the owner set in No-show Protection (booking.cancelWindowMin,
-  // minutes). #1: its OWN field now (was sharing leadTimeMin with the booking floor). Fall back to the
-  // legacy leadTimeMin, then cancelWindowHrs, then 24h, so older shops keep their current behavior.
-  const windowHrs = (business?.booking?.cancelWindowMin != null)
-    ? business.booking.cancelWindowMin / 60
-    : (business?.booking?.leadTimeMin != null)
-    ? business.booking.leadTimeMin / 60
-    : (business.cancelWindowHrs || 24);
+  // Change/cancel window — ONE resolver shared by every manage surface (cancelWindowMinutes).
+  const windowHrs = cancelWindowMinutes(business) / 60;
+  // 60s tick (+ instant refresh on tab-return) so a page left open across the deadline flips to
+  // the locked notice by itself; the submit guards below are the hard backstop.
+  useNow(60000);
   // Arrival deep-link: the 15-minute reminder's check-in link adds ?a=1 so we open straight
   // onto the "I've arrived" screen.
   const arriveFlag = (() => { try { return new URLSearchParams(window.location.search).get("a") === "1"; } catch (e) { return false; } })();
@@ -7898,13 +7948,22 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
     } catch (e) {}
   };
 
+  // GUARD: cancel-window-lock — re-check the window at the moment of the write, not just at
+  // render: a tab opened before the deadline and submitted after it must be refused. Falling
+  // back to "view" re-renders with changeable=false, which shows the honest locked notice.
+  // (NaN-safe: an unreadable date fails the >= and locks — never fails open.)
+  const stillChangeable = () => !!appt && hoursUntil(appt.bookedFor) >= windowHrs;
   const submitCancel = async () => {
-    if (busy) return; setBusy(true);
+    if (busy) return;
+    if (!stillChangeable()) { setPhase("view"); return; }
+    setBusy(true);
     try { await supabase.rpc("manage_cancel_by_token", { p_token: token }); fireNotify("canceled", appt); setPhase("cancelled"); if (onChanged) onChanged({ type: "cancel" }); }
     catch (e) { setPhase("error"); } finally { setBusy(false); }
   };
   const submitReschedule = async () => {
-    if (busy || newDate == null || newSlot == null) return; setBusy(true);
+    if (busy || newDate == null || newSlot == null) return;
+    if (!stillChangeable()) { setNewDate(null); setNewSlot(null); setPhase("view"); return; }
+    setBusy(true);
     const when = new Date(newDate); when.setHours(Math.floor(newSlot / 60), newSlot % 60, 0, 0);
     try {
       await supabase.rpc("manage_reschedule_by_token", { p_token: token, p_start: newSlot, p_date: when.toISOString() });
@@ -8059,8 +8118,8 @@ function ManageByToken({ token, shopId, business, providers, services, onExit, o
           </div>
           {changeable ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button onClick={() => { setPhase("resched"); setNewDate(null); setNewSlot(null); }} style={goBtn}>Reschedule</button>
-              <button onClick={() => setPhase("cancel")} style={ghostBtn}>Cancel this appointment</button>
+              <button onClick={() => { if (!stillChangeable()) { setPhase("view"); return; } setPhase("resched"); setNewDate(null); setNewSlot(null); }} style={goBtn}>Reschedule</button>
+              <button onClick={() => { if (!stillChangeable()) { setPhase("view"); return; } setPhase("cancel"); }} style={ghostBtn}>Cancel this appointment</button>
             </div>
           ) : (
             <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 15px", fontSize: 13.5, color: "var(--sub)", lineHeight: 1.5, textAlign: "center" }}>
@@ -8086,14 +8145,11 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
   const [newSlot, setNewSlot] = useState(null);
   const [cancelId, setCancelId] = useState(null);    // appt pending cancel confirm
 
-  // Change/cancel window = the notice the owner set in No-show Protection (booking.cancelWindowMin,
-  // minutes). #1: its OWN field now (was sharing leadTimeMin with the booking floor). Fall back to the
-  // legacy leadTimeMin, then cancelWindowHrs, then 24h, so older shops keep their current behavior.
-  const windowHrs = (business?.booking?.cancelWindowMin != null)
-    ? business.booking.cancelWindowMin / 60
-    : (business?.booking?.leadTimeMin != null)
-    ? business.booking.leadTimeMin / 60
-    : (business.cancelWindowHrs || 24);
+  // Change/cancel window — ONE resolver shared by every manage surface (cancelWindowMinutes).
+  const windowHrs = cancelWindowMinutes(business) / 60;
+  // 60s tick (+ tab-return refresh) so an open page flips to the locked notice on its own;
+  // the doReschedule/doCancel guards below are the hard backstop.
+  useNow(60000);
   const digits = (s) => (s || "").replace(/\D/g, "");
   const mine = appts.filter((a) => digits(a.phone) === digits(phone) && a.status !== "cancelled" && a.bookedFor);
   // sort soonest first
@@ -8105,6 +8161,9 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
 
   const doReschedule = (a) => {
     if (newDate == null || newSlot == null) return;
+    // GUARD: cancel-window-lock — re-check at the moment of the write; a page left open across
+    // the deadline must be refused (the render flips to the locked notice on the next tick).
+    if (!canChange(a.bookedFor)) { setReschedId(null); setNewDate(null); setNewSlot(null); if (showToast) showToast("Too close to the appointment to change online — give us a call and we'll help."); return; }
     const when = new Date(newDate); when.setHours(Math.floor(newSlot / 60), newSlot % 60, 0, 0);
     const losesDiscount = a.rebookDiscount > 0;
     setAppts(appts.map((x) => x.id === a.id ? { ...x, start: newSlot, bookedFor: when.toISOString(), rebookDiscount: 0, discountForfeited: losesDiscount || x.discountForfeited } : x));
@@ -8112,6 +8171,8 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
     if (showToast) showToast(losesDiscount ? "Rescheduled — rebooking discount no longer applies." : "Appointment rescheduled.");
   };
   const doCancel = (a) => {
+    // GUARD: cancel-window-lock — same action-time re-check as doReschedule.
+    if (!canChange(a.bookedFor)) { setCancelId(null); if (showToast) showToast("Too close to the appointment to cancel online — give us a call and we'll help."); return; }
     setAppts(appts.map((x) => x.id === a.id ? { ...x, status: "cancelled" } : x));
     setCancelId(null);
   };
@@ -8190,7 +8251,7 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
                 </div>
               ) : cancelId === a.id ? (
                 <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
-                  <p style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5, marginBottom: 14 }}>Cancel this appointment? Per the policy, you're within the {windowHrs}-hour window, so there's no charge.</p>
+                  <p style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.5, marginBottom: 14 }}>Cancel this appointment? Per the policy, you're giving more than {windowHrs} hours' notice, so there's no charge.</p>
                   <div style={{ display: "flex", gap: 10 }}>
                     <button onClick={() => setCancelId(null)} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 15, letterSpacing: 1, borderRadius: 8 }}>Keep it</button>
                     <button className="lift" onClick={() => doCancel(a)} style={{ flex: 1, background: "#C2563F", color: "#fff", padding: 13, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 8 }}>Cancel appointment</button>
@@ -8198,8 +8259,8 @@ function ManageAppointment({ business, appts, setAppts, providers, services, ini
                 </div>
               ) : changeable ? (
                 <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                  <button className="lift" onClick={() => { setReschedId(a.id); setNewDate(null); setNewSlot(null); }} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 15, letterSpacing: 1, fontWeight: 500, borderRadius: 8 }}>Reschedule</button>
-                  <button className="lift" onClick={() => setCancelId(a.id)} style={{ flex: 1, background: "transparent", boxShadow: "none", border: "1px solid var(--border)", color: "var(--sub)", padding: 13, fontSize: 15, letterSpacing: 1, borderRadius: 8 }}>Cancel</button>
+                  <button className="lift" onClick={() => { if (!canChange(a.bookedFor)) { setReschedId(null); setCancelId(null); return; } setReschedId(a.id); setNewDate(null); setNewSlot(null); }} style={{ flex: 1, background: "var(--panel2)", border: "1px solid var(--border)", color: "var(--text)", padding: 13, fontSize: 15, letterSpacing: 1, fontWeight: 500, borderRadius: 8 }}>Reschedule</button>
+                  <button className="lift" onClick={() => { if (!canChange(a.bookedFor)) { setReschedId(null); setCancelId(null); return; } setCancelId(a.id); }} style={{ flex: 1, background: "transparent", boxShadow: "none", border: "1px solid var(--border)", color: "var(--sub)", padding: 13, fontSize: 15, letterSpacing: 1, borderRadius: 8 }}>Cancel</button>
                 </div>
               ) : (
                 <div style={{ marginTop: 16, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 8, padding: "13px 15px", fontSize: 15, color: "var(--sub)", lineHeight: 1.5 }}>
@@ -16948,14 +17009,16 @@ function Explain({ title, children }) {
 // No-show protection: card-on-file, deposit (none/fixed/percent), notice window, and policy text.
 // Writes to business.booking (requireCard, deposit{mode,amount}, cancelWindowMin) + business.policy.
 // The actual charge is simulated until a live payment processor is connected.
-function NoShowEditor({ b, policy, onBooking, onPolicy }) {
+function NoShowEditor({ b, policy, onBooking, onPolicy, windowMin }) {
   const dep = b.deposit || { mode: "none", amount: 0 };
   const setDep = (patch) => onBooking({ deposit: { ...dep, ...patch } });
   const noticeOpts = [
     { v: 0, label: "No minimum" }, { v: 60, label: "1 hour" }, { v: 120, label: "2 hours" },
     { v: 240, label: "4 hours" }, { v: 720, label: "12 hours" }, { v: 1440, label: "24 hours" }, { v: 2880, label: "48 hours" },
   ];
-  const lead = b.cancelWindowMin != null ? b.cancelWindowMin : (b.leadTimeMin || 0); // #1: cancel window own field (legacy leadTimeMin only as display fallback)
+  // Highlight what's actually ENFORCED — the same cancelWindowMinutes resolver the client pages
+  // use (12h when nothing is set) — so the owner never sees one number while clients get another.
+  const lead = windowMin != null ? windowMin : cancelWindowMinutes({ booking: b });
   return (
     <div style={{ display: "grid", gap: 0 }}>
       {/* Preview-mode notice */}
@@ -19041,7 +19104,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
       explain: <>This is how you protect your time and money from no-shows and last-minute cancellations — the same tools Booksy, GlossGenius and Square charge for. Require a card to book, take a deposit, and set how much notice a client must give. You write the rules they agree to when they book. <b>Heads up:</b> until you turn on live payments, the card and deposit steps run in preview — clients see and agree to everything, but no money moves until you flip it live.</>,
       status: (() => { const bk = form.booking || {}; const bits = []; if (bk.requireCard) bits.push("Card required"); if (bk.deposit?.mode && bk.deposit.mode !== "none") bits.push("Deposit on"); bits.push(`${Math.round((bk.leadTimeMin || 0) / 60)}h notice`); return bits.join(" · "); })(),
       keywords: "cancellation no-show no show policy refund rules deposit charge fee reschedule late cancel card on file protect revenue window cutoff notice hold stripe payment",
-      editor: <NoShowEditor b={form.booking || {}} policy={form.policy} onBooking={(patch) => setForm({ ...form, booking: { ...(form.booking || {}), ...patch } })} onPolicy={(v) => setForm({ ...form, policy: v })} />,
+      editor: <NoShowEditor b={form.booking || {}} windowMin={cancelWindowMinutes(form)} policy={form.policy} onBooking={(patch) => setForm({ ...form, booking: { ...(form.booking || {}), ...patch } })} onPolicy={(v) => setForm({ ...form, policy: v })} />,
     },
     {
       id: "waitlist", title: "Waitlist", icon: Clock, category: "Calendar & Appointments",
@@ -21284,7 +21347,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     const conflicts = findConflicts(pending.appt.providerId, pending.newStart, pending.newEnd, pending.appt.id);
     if (conflicts.length > 0) {
       const dur = pending.newEnd - pending.newStart;
-      const nextSlot = findNextFreeSlot(pending.appt.providerId, pending.newEnd, dur, pending.appt.id);
+      // GUARD: conflict-next-slot-from-start — scan for the suggestion from the attempted START,
+      // with the moved appt excluded. Scanning from the attempted END skipped every real opening
+      // before it (moving 9:10 Buddy onto an 8:30–9:10 appt suggested 9:20, when the true next
+      // opening was his own 9:10 slot — i.e. "keep it where it is").
+      const nextSlot = findNextFreeSlot(pending.appt.providerId, pending.newStart, dur, pending.appt.id);
       setConflictModal({ mode: "move", moveData: { ...pending }, conflicts, nextSlot, dur });
       setPending(null);
       setNotifyMove(false); // conflict resolution is a silent override — never auto-texts
@@ -21486,7 +21553,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     const end = data.start + dur;
     const conflicts = findConflicts(data.providerId, data.start, end);
     if (conflicts.length > 0) {
-      const nextSlot = findNextFreeSlot(data.providerId, end, dur);
+      // Same rule as the move path (GUARD: conflict-next-slot-from-start): the first real
+      // opening at or after the time the owner AIMED for — not after where the appointment
+      // would have ended — so a gap right after the conflicting block is never skipped.
+      const nextSlot = findNextFreeSlot(data.providerId, data.start, dur);
       setConflictModal({ mode: "create", bookData: data, conflicts, nextSlot, dur });
       return;
     }
@@ -22057,6 +22127,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           const first = conflictModal.conflicts[0];
           const more = conflictModal.conflicts.length - 1;
           const nextSlotTxt = conflictModal.nextSlot != null ? fmtTime(conflictModal.nextSlot) : null;
+          // Moving an appt earlier onto a busy stretch can resolve to its OWN current slot being
+          // the next real opening — then the honest offer is "keep it where it is", not a no-op
+          // "move" (which would fire a moved toast/push for nothing).
+          const keepSame = conflictModal.mode === "move" && conflictModal.nextSlot != null && conflictModal.moveData && conflictModal.nextSlot === conflictModal.moveData.appt.start;
           // Which barber are we double-booking? Pull from the booking (create) or the moving appt (move).
           const provId = conflictModal.mode === "create" ? conflictModal.bookData.providerId : conflictModal.mode === "edit" ? conflictModal.editData.prov : conflictModal.moveData.appt.providerId;
           const provObj = providers.find((p) => p.id === provId);
@@ -22084,10 +22158,10 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           return (<>
             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, marginBottom: 8 }}>Already booked at this time</div>
             <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.5, marginBottom: 18 }}>
-              {barberName} already has {first.name} at {fmtTime(first.start)}{more > 0 ? ` (and ${more} more)` : ""}.{nextSlotTxt ? ` Next open slot is ${nextSlotTxt}.` : ""} Book anyway?
+              {barberName} already has {first.name} at {fmtTime(first.start)}{more > 0 ? ` (and ${more} more)` : ""}.{nextSlotTxt ? (keepSame ? ` The next opening is this appointment's own ${nextSlotTxt} time.` : ` Next open slot is ${nextSlotTxt}.`) : ""} Book anyway?
             </div>
             {nextSlotTxt && (
-              <button className="lift" onClick={onMove} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", letterSpacing: 0.5, marginBottom: 9 }}>Move to {nextSlotTxt}</button>
+              <button className="lift" onClick={keepSame ? () => setConflictModal(null) : onMove} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 14, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", letterSpacing: 0.5, marginBottom: 9 }}>{keepSame ? `Keep it at ${nextSlotTxt}` : `Move to ${nextSlotTxt}`}</button>
             )}
             <button onClick={onKeepBoth} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 14, fontSize: 15, fontWeight: 500, borderRadius: 12 }}>Book anyway</button>
           </>);
