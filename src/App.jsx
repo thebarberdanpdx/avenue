@@ -19793,7 +19793,6 @@ function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, prov
   const whenLabel = { early: "Morning", morning: "Morning", midday: "Midday", afternoon: "Afternoon", evening: "Evening", any: "Any time" };
   const whenWord = { early: "morning", morning: "morning", midday: "midday", afternoon: "afternoon", evening: "evening" };
   const [openId, setOpenId] = useState(null);
-  const [moveNotify, setMoveNotify] = useState(true); // "text them the new time" toggle in the move-up modal
   // Booked-but-wants-earlier clients: synthesized from confirmed, still-upcoming appointments whose
   // client/owner turned on "waitlist for an earlier time." They ride at the TOP of the waitlist with a
   // colored (sage) card so staff can move them up. Source of truth is the appointment — clearing the flag
@@ -19897,11 +19896,16 @@ function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, prov
     if (!a || !setAppts) return;
     const durMin = apptDuration(a);
     const bf = new Date(o.date); bf.setHours(Math.floor(o.start / 60), o.start % 60, 0, 0);
-    setAppts((cur) => (cur || []).map((x) => x.id === a.id ? { ...x, start: o.start, end: o.start + durMin, bookedFor: bf.toISOString(), providerId: o.providerId || x.providerId, wantsEarlier: false, earlierDays: undefined, earlierDayTimes: undefined, earlierAnyProvider: undefined } : x));
+    const moved = { ...a, start: o.start, end: o.start + durMin, bookedFor: bf.toISOString(), providerId: o.providerId || a.providerId, wantsEarlier: false, earlierDays: undefined, earlierDayTimes: undefined, earlierAnyProvider: undefined };
+    setAppts((cur) => (cur || []).map((x) => x.id === a.id ? moved : x));
     setOpenId(null);
+    // Auto-send the STANDARD "rescheduled" confirmation — the same message every reschedule fires, and no
+    // more. Staff coordinate with the client by phone BEFORE moving them up, so there's no separate "can we
+    // move you?" text. Goes through the shop's message settings + server-side SMS opt-out like any other.
+    const _cl = (clients || []).find((c) => c.id === a.clientId) || {};
+    try { fireApptNotify({ msgId: "rescheduled", appt: moved, business, providers, contact: { email: a.email || _cl.email || "", phone: a.phone || _cl.phone || "" } }); } catch (e) {}
     const who = (entry.name || "client").split(" ")[0];
-    if (moveNotify) { const ph = String(entry.phone || "").replace(/\D/g, ""); if (ph) { const msg = `Good news ${who}! We were able to move your ${entry.service} up to ${slotLabel(o)}. See you then!`; try { window.location.href = `sms:${ph}?&body=${encodeURIComponent(msg)}`; } catch (e) {} } }
-    if (showToast) showToast(`Moved ${who} up to ${slotLabel(o)} — off the waitlist.`);
+    if (showToast) showToast(`Moved ${who} up to ${slotLabel(o)} — off the waitlist. Their rescheduled confirmation is on its way.`);
   };
   // "Remove from waitlist" for a booked entry clears the flag on the appointment (keeps the appointment).
   const clearBooked = (entry) => { if (!setAppts) return; setAppts((cur) => (cur || []).map((x) => x.id === entry.apptId ? { ...x, wantsEarlier: false, earlierDays: undefined, earlierDayTimes: undefined, earlierAnyProvider: undefined } : x)); setOpenId(null); };
@@ -19985,13 +19989,7 @@ function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, prov
                       </div>
                     )}
 
-                    {openings.length > 0 && (
-                      <button onClick={() => setMoveNotify((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", marginBottom: 14, cursor: "pointer" }}>
-                        <span style={{ textAlign: "left" }}><span style={{ fontSize: 14, fontWeight: 500, display: "block" }}>Text {first} the new time</span><span style={{ fontSize: 12.5, color: moveNotify ? "var(--gold)" : "var(--sub)", marginTop: 1 }}>{moveNotify ? "On — opens a text with their new time" : "Off — moves silently"}</span></span>
-                        <span style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: moveNotify ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: moveNotify ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
-                      </button>
-                    )}
-                    <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.45, marginBottom: 16 }}>Moving {first} up reschedules their {open.service} to the new time and takes them off the waitlist.</p>
+                    <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.45, marginBottom: 16 }}>Moving {first} up reschedules their {open.service} to the new time and takes them off the waitlist. They get your standard rescheduled confirmation automatically — coordinate with them first.</p>
 
                     <button onClick={() => clearBooked(open)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer" }}><X size={16} /> TAKE OFF THE EARLIER LIST</button>
                   </>
