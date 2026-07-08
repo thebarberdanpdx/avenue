@@ -2056,8 +2056,12 @@ function App() {
       if (selErr) throw selErr;
       const toDelete = (existing || []).filter((r) => !keepIds.has(r.id) && prevKnown.has(r.id)).map((r) => r.id);
       if (toDelete.length) {
-        const { error: delErr } = await supabase.from(table).delete().eq('shop_id', SHOP_ID).in('id', toDelete);
+        // VERIFIED delete: ask for the deleted rows back. A missing RLS DELETE policy makes
+        // .delete() "succeed" while removing 0 rows — the row then resurrects on the next
+        // refetch (the un-deletable test appointment bug). Surface that as a real failure.
+        const { data: deleted, error: delErr } = await supabase.from(table).delete().eq('shop_id', SHOP_ID).in('id', toDelete).select('id');
         if (delErr) throw delErr;
+        if ((deleted || []).length < toDelete.length) throw new Error(`delete blocked on '${table}': ${(deleted || []).length}/${toDelete.length} rows removed — likely a missing RLS DELETE policy`);
       }
       // Success: this list is now exactly what's on the server, so it becomes our known baseline.
       lastRemoteRef.current[table] = list;
