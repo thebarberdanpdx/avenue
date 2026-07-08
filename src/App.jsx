@@ -23564,6 +23564,15 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const [mode, setMode] = useState("detail"); // detail | edit
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [revertAsk, setRevertAsk] = useState(0); // $ still on record when "Back to confirmed" was tapped (0 = closed)
+  // Un-refunded money in the LEDGER for this appointment — the source of truth for refund
+  // availability (appt.paid alone misses reverted tickets whose payment is still on record).
+  const apptLedgerLeft = (() => {
+    let s = 0;
+    (clients || []).forEach((c) => (c.payments || []).forEach((p) => { if (p.apptId === appt.id) s += (p.amount || 0) - (p.refunded || 0); }));
+    ((business && business.sales) || []).forEach((p) => { if (p.apptId === appt.id) s += (p.amount || 0) - (p.refunded || 0); });
+    return +Math.max(0, s).toFixed(2);
+  })();
   const [cancelNotify, setCancelNotify] = useState(false);
   const [checkinOpen, setCheckinOpen] = useState(false); // CHECK-IN pill dropdown (In Lobby / In Service)
   // Desktop dialog detection. Driven by JS (not a CSS media query) so it's reliable
@@ -24471,14 +24480,24 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                       {onRefund && <MenuItem T={T} icon={<RefreshCw size={17} />} label="Refund…" onClick={() => { setMenuOpen(false); onRefund(appt); }} />}
                     </>
                   ) : (
-                    <MenuItem T={T} icon={<DollarSign size={17} />} label="Checkout" onClick={() => { setMenuOpen(false); onCheckout(appt); }} />
+                    <>
+                      <MenuItem T={T} icon={<DollarSign size={17} />} label="Checkout" onClick={() => { setMenuOpen(false); onCheckout(appt); }} />
+                      {onRefund && apptLedgerLeft > 0.009 && <MenuItem T={T} icon={<RefreshCw size={17} />} label={`Refund… ($${apptLedgerLeft.toFixed(2)} on record)`} onClick={() => { setMenuOpen(false); onRefund(appt); }} />}
+                    </>
                   )}
                   {/* Undo checkout: put the ticket back to an upcoming CONFIRMED state (e.g. after a refund
                       or an accidental checkout). Clears the done status, the in-chair timer stamps, and the
                       paid summary from the APPOINTMENT — the actual payments/refunds stay in the ledger, so
                       reports don't change and a re-checkout still credits any money genuinely on record. */}
                   {(appt.status === "done" || appt.paid) && (
-                    <MenuItem T={T} icon={<RotateCw size={17} />} label="Back to confirmed (undo checkout)" onClick={() => { setMenuOpen(false); onUpdate(appt.id, { status: "confirmed", paid: null, serviceStartedAt: null, serviceEndedAt: null, pendingDurationSave: null }); showToast("Back to confirmed — payments and refunds stay in your books."); }} />
+                    <MenuItem T={T} icon={<RotateCw size={17} />} label="Back to confirmed (undo checkout)" onClick={() => {
+                      setMenuOpen(false);
+                      // Money still on record → ask about the refund FIRST, so "back to confirmed"
+                      // really means "like they never came in" (card reversal / cash handed back).
+                      if (apptLedgerLeft > 0.009) { setRevertAsk(apptLedgerLeft); return; }
+                      onUpdate(appt.id, { status: "confirmed", paid: null, serviceStartedAt: null, serviceEndedAt: null, pendingDurationSave: null });
+                      showToast("Back to confirmed.");
+                    }} />
                   )}
                   {canEditPrice && savedCard && <MenuItem T={T} icon={<CreditCard size={17} />} label="Charge no-show fee" onClick={() => { setMenuOpen(false); setChargeOpen(true); }} />}
                   <Divider T={T} />
@@ -24514,6 +24533,18 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   </div>
                 </div>
               </>
+            )}
+
+            {revertAsk > 0 && (
+              <div onClick={() => setRevertAsk(0)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 20px 20px", boxSizing: "border-box" }}>
+                <div className="fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 811, padding: 24 }}>
+                  <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, marginBottom: 4, color: T.text }}>Back to confirmed?</div>
+                  <div style={{ fontSize: 15, color: T.sub, marginBottom: 18, lineHeight: 1.5 }}><strong style={{ color: T.text }}>${revertAsk.toFixed(2)}</strong> was collected for this ticket. To make it like {(appt.name || "the client").split(" ")[0]} never came in, refund it first — card payments reverse to the card, cash gets handed back. A full refund flips the appointment back to confirmed automatically.</div>
+                  <button className="lift" onClick={() => { setRevertAsk(0); if (onRefund) onRefund(appt); }} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", border: "none", padding: "15px 0", borderRadius: 14, fontSize: 16, fontWeight: 600, cursor: "pointer" }}>Refund ${revertAsk.toFixed(2)} first</button>
+                  <button onClick={() => { setRevertAsk(0); onUpdate(appt.id, { status: "confirmed", paid: null, serviceStartedAt: null, serviceEndedAt: null, pendingDurationSave: null }); showToast("Back to confirmed — the payment stays in your books."); }} style={{ width: "100%", marginTop: 10, background: "transparent", border: `1px solid ${T.line}`, color: T.text, padding: "14px 0", borderRadius: 14, fontSize: 15.5, fontWeight: 500, cursor: "pointer" }}>Keep the payment — just revert</button>
+                  <button onClick={() => setRevertAsk(0)} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: T.sub, fontSize: 15.5, padding: 8, cursor: "pointer" }}>Cancel</button>
+                </div>
+              </div>
             )}
 
             {lateOpen && (
