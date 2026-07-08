@@ -22035,7 +22035,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
 
   const sheet = (inner, dismissable, top = true) => createPortal((
     <div className="fade-in" onClick={dismissable ? onClose : undefined} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", alignItems: top ? "flex-start" : "flex-end", justifyContent: "center" }}>
-      <div onClick={(e) => e.stopPropagation()} className={top ? "appt-drop" : ""} style={{ background: "var(--bg)", borderBottomLeftRadius: 24, borderBottomRightRadius: 24, borderTopLeftRadius: top ? 0 : 24, borderTopRightRadius: top ? 0 : 24, width: "100%", maxWidth: 480, maxHeight: "92vh", overflowY: "auto", boxShadow: top ? "0 20px 60px var(--shadow)" : "0 -20px 60px var(--shadow)" }}>
+      <div onClick={(e) => e.stopPropagation()} className={top ? "appt-drop" : "sheet-up"} style={{ background: "var(--bg)", borderBottomLeftRadius: top ? 24 : 0, borderBottomRightRadius: top ? 24 : 0, borderTopLeftRadius: top ? 0 : 24, borderTopRightRadius: top ? 0 : 24, width: "100%", maxWidth: 480, maxHeight: "92vh", overflowY: "auto", paddingBottom: top ? 0 : "env(safe-area-inset-bottom)", boxShadow: top ? "0 20px 60px var(--shadow)" : "0 -20px 60px var(--shadow)" }}>
         {!top && <div style={{ display: "flex", justifyContent: "center", paddingTop: 10 }}><div style={{ width: 38, height: 4, borderRadius: 4, background: "var(--border2)" }} /></div>}
         {inner}
         {top && <div style={{ display: "flex", justifyContent: "center", paddingBottom: 10 }}><div style={{ width: 38, height: 4, borderRadius: 4, background: "var(--border2)" }} /></div>}
@@ -22418,7 +22418,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       </div>
       <button onClick={() => { setRebookOutcome(null); setStage("done"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 8 }}>NO THANKS</button>
     </div>
-  ); }
+  , undefined, false); }
 
   return sheet(
     <div className="fade-in" style={{ padding: "56px 28px 64px", textAlign: "center" }}>
@@ -22447,7 +22447,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         </div>
       )}
     </div>
-  );
+  , undefined, false);
 }
 function CheckoutRow({ label, val, bold }) {
   return (
