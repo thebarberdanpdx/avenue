@@ -62,6 +62,9 @@ Three access paths, by design:
 **Push:**
 - `save_device_token(p_token, p_shop, p_platform)`
 
+## Triggers
+- `trg_enforce_cancel_window` on `appointments` — refuses **anon** (public-key) cancels or date/time moves of an appointment inside the shop's change/cancel window (No-show Protection; default 12h), with a 3-min grace for the reschedule-release race. Staff (`authenticated`) and `service_role` are exempt. Source: `db/cancel-window-guard-2026-07-08.sql`. **⚠️ Pending until Dan runs it in the SQL editor** — until then the window is enforced only in the app (see `GUARD: cancel-window-lock` in `src/App.jsx`).
+
 ## To complete a true backup (future task)
 1. `pg_dump --schema-only` (or `supabase db dump`) against the DB → commit `db/schema.sql` (captures exact tables, RLS policy SQL, and RPC function bodies — currently the unaudited part of the security surface).
 2. **Backups: DONE — the project is on Supabase Pro, so automated daily backups are ACTIVE** (Pro retains 7 days of daily backups; Point-in-Time Recovery is available as an add-on). The irreplaceable client/appointment data is protected on THREE levels: (a) Supabase's server-side daily backups; (b) the app-side write-guard — a failed load leaves `loadedRef` false, blocking every save so an outage can never cascade into deletion; (c) the on-device **offline read-cache** (`hydrateFromCache` in `src/App.jsx`) — each successful load is mirrored to localStorage (photos stripped), so a Supabase/network outage shows the last-synced calendar read-only instead of a blank screen. ⚠️ Do NOT tell Dan he has no backups — he does. (This line was previously stale — "free tier has none" — which was wrong and caused a bad call during the 2026-07-08 Supabase outage.)
