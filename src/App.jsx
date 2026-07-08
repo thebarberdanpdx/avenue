@@ -4411,10 +4411,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   // Commits the booking with the resolved phone and email. Called either directly from LOCK IT IN
   // (no conflict) or from the conflict-confirmation sheet (after the user picks which to keep).
   const commitBooking = (finalPhone, finalEmail) => {
-    // Heads-up guard: if this returning client already has an upcoming appointment within 10 days
-    // of the one they're booking, remind them and let them cancel the earlier one first.
+    // Heads-up guard: if this returning client already has ANY upcoming appointment, alert them
+    // before booking a second one and let them choose to keep both or cancel the existing one.
     if (matched) {
-      const newDay = new Date(selectedDate); newDay.setHours(0, 0, 0, 0);
       const today0 = new Date(); today0.setHours(0, 0, 0, 0);
       const existing = myAppts.find((a) => {
         if (a.clientId !== matched.id) return false;
@@ -4422,9 +4421,7 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         if (a.status !== "confirmed") return false;
         const d = new Date(a.bookedFor); if (isNaN(d)) return false;
         const d0 = new Date(d); d0.setHours(0, 0, 0, 0);
-        if (d0 < today0) return false;                                   // ignore past
-        const days = Math.abs((d0 - newDay) / 86400000);
-        return days <= 10;                                                // within 10 days of the new one
+        return d0 >= today0;                                              // ANY future appointment counts
       });
       if (existing) { setDupWarn({ existing, phone: finalPhone, email: finalEmail }); return; }
     }
@@ -6398,20 +6395,22 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
           <button onClick={() => setBlockedNotice(false)} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14, letterSpacing: 1.5, fontWeight: 600, borderRadius: 12, border: "none" }}>OK</button>
         </Sheet>
         {/* Duplicate-appointment reminder — the client already has one within 10 days of this booking. */}
-        <Sheet open={!!dupWarn} onClose={() => setDupWarn(null)} align="top">
+        <Sheet open={!!dupWarn} onClose={() => setDupWarn(null)} align="center" maxWidth={380}>
           {dupWarn && (() => {
             const d = new Date(dupWarn.existing.bookedFor);
-            const dayTxt = `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+            const dayTxt = `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
             const timeTxt = fmtTime(dupWarn.existing.start);
             const prov = providers.find((p) => p.id === dupWarn.existing.providerId);
             return (
-              <>
-                <div style={{ width: 28, height: 1.5, background: "var(--text)", marginBottom: 12 }} />
-                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 500, marginBottom: 8 }}>You already have an appointment</h2>
-                <p style={{ fontSize: 15, color: "var(--sub)", lineHeight: 1.55, marginBottom: 20 }}>You're booked for <strong style={{ color: "var(--text)" }}>{dupWarn.existing.title || "an appointment"}</strong> on <strong style={{ color: "var(--text)" }}>{dayTxt}</strong> at <strong style={{ color: "var(--text)" }}>{timeTxt}</strong>{prov ? ` with ${prov.name}` : ""} — that's close to the one you're booking now. Want to keep both, or cancel the earlier one?</p>
-                <button className="lift" onClick={() => { const ph = dupWarn.phone, em = dupWarn.email; setDupWarn(null); doCommitBooking(ph, em); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14.5, fontWeight: 600, borderRadius: 12, border: "none", marginBottom: 10 }}>Keep both</button>
-                <button onClick={() => { const ex = dupWarn.existing, ph = dupWarn.phone, em = dupWarn.email; try { supabase.rpc('cancel_my_appointment', { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(ex.id), p_session: matched.sessionToken }); } catch (e) {} setMyAppts((cur) => cur.map((a) => a.id === ex.id ? { ...a, status: "cancelled" } : a)); setDupWarn(null); doCommitBooking(ph, em); }} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 14.5, fontWeight: 500, borderRadius: 12 }}>Cancel the {dayTxt} one</button>
-              </>
+              <div style={{ textAlign: "center", padding: "10px 2px 4px" }}>
+                <div style={{ width: 54, height: 54, borderRadius: "50%", background: "color-mix(in srgb, var(--gold) 14%, var(--panel))", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}><AlertTriangle size={24} style={{ color: "var(--gold)" }} /></div>
+                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 500, marginBottom: 12, lineHeight: 1.15 }}>You're already booked</h2>
+                <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", marginBottom: 18, fontSize: 15, lineHeight: 1.5 }}>
+                  <strong>{dupWarn.existing.title || "Appointment"}</strong><br />{dayTxt} · {timeTxt}{prov ? ` · ${prov.name}` : ""}
+                </div>
+                <button className="lift" onClick={() => { const ph = dupWarn.phone, em = dupWarn.email; setDupWarn(null); doCommitBooking(ph, em); }} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 15, fontSize: 14.5, fontWeight: 600, letterSpacing: 0.5, borderRadius: 12, border: "none", marginBottom: 10 }}>KEEP BOTH</button>
+                <button onClick={() => { const ex = dupWarn.existing, ph = dupWarn.phone, em = dupWarn.email; try { supabase.rpc('cancel_my_appointment', { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(ex.id), p_session: matched.sessionToken }); } catch (e) {} setMyAppts((cur) => cur.map((a) => a.id === ex.id ? { ...a, status: "cancelled" } : a)); setDupWarn(null); doCommitBooking(ph, em); }} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 14.5, fontWeight: 500, borderRadius: 12 }}>Cancel it — book this instead</button>
+              </div>
             );
           })()}
         </Sheet>
