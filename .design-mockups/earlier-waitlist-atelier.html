@@ -1,0 +1,507 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Jost:wght@300;400;500;600&display=swap');
+
+.mk {
+  /* --- Atelier theme tokens (verbatim from THEMES in App.jsx) --- */
+  --paper:#FAF9F6; --panel:#FFFFFF; --panel2:#F4F2EC;
+  --line:#EFEDE6; --border:#E6E3DB; --border2:#D3CEC2;
+  --ink:#1B1A16; --ink2:#3B372F; --sub:#8A857A; --faint:#B3AEA3;
+  --pine:#34483C; --on-pine:#F6F4EE;
+  /* --- one new semantic state: "booked, wants earlier" --- */
+  --sage:#E9EEE9; --sage2:#E2E9E3; --sage-line:#CBD7CD;
+  --brass:#9A7B45; --brass-tint:rgba(176,141,87,.14); --brass-line:rgba(176,141,87,.34);
+  --disp:'Fraunces', Georgia, serif; --body:'Jost', system-ui, sans-serif;
+
+  background:
+    radial-gradient(120% 80% at 50% -10%, #F1EDE3 0%, #E7E3D8 60%, #E2DDD1 100%);
+  padding: 46px 20px 60px;
+  font-family: var(--body);
+  color: var(--ink);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.mk *, .mk *::before, .mk *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+.mk .mono { font-family: var(--body); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; font-weight: 600; }
+.mk .serif { font-family: var(--disp); }
+.mk .wrap { max-width: 1180px; margin: 0 auto; }
+
+/* ===================== MASTHEAD ===================== */
+.mk .mast { max-width: 720px; margin: 0 auto 52px; text-align: center; }
+.mk .mast .eyebrow { color: var(--brass); margin-bottom: 20px; }
+.mk .mast h1 {
+  font-family: var(--disp); font-weight: 400; font-size: clamp(34px, 6vw, 54px);
+  line-height: 1.02; letter-spacing: -.02em; color: var(--ink); text-wrap: balance;
+}
+.mk .mast h1 em { font-style: italic; color: var(--pine); }
+.mk .mast .dek {
+  margin: 22px auto 0; max-width: 58ch; font-size: 16px; line-height: 1.6; color: var(--ink2); font-weight: 300;
+}
+.mk .swap { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
+.mk .swap .chip {
+  flex: 1 1 300px; max-width: 340px; text-align: left;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 15px 17px; box-shadow: 0 1px 0 rgba(255,255,255,.6) inset;
+}
+.mk .swap .chip .tag { display: block; margin-bottom: 6px; }
+.mk .swap .chip.was .tag { color: var(--faint); }
+.mk .swap .chip.now .tag { color: var(--pine); }
+.mk .swap .chip p { font-size: 14.5px; line-height: 1.5; color: var(--ink2); }
+.mk .swap .chip.was p { color: var(--sub); text-decoration: line-through; text-decoration-color: var(--border2); text-decoration-thickness: 1px; }
+
+/* ===================== STAGE / FIGURES ===================== */
+.mk .stage { display: flex; flex-wrap: wrap; gap: 52px 36px; justify-content: center; align-items: flex-start; }
+.mk .fig { flex: 1 1 358px; max-width: 400px; display: flex; flex-direction: column; }
+.mk .fig .cap-top { margin-bottom: 15px; }
+.mk .fig .cap-top .n { color: var(--brass); }
+.mk .fig .cap-top h3 { font-family: var(--disp); font-size: 21px; font-weight: 500; letter-spacing: -.01em; margin-top: 4px; color: var(--ink); }
+.mk .fig .cap-note { margin-top: 16px; font-size: 13.5px; line-height: 1.55; color: var(--sub); border-top: 1px solid var(--border); padding-top: 13px; }
+.mk .fig .cap-note b { color: var(--ink2); font-weight: 500; }
+
+/* phone shell */
+.mk .phone {
+  width: 100%; background: #fbfaf7; border-radius: 40px; padding: 10px;
+  border: 1px solid #DAD4C6;
+  box-shadow: 0 34px 60px -34px rgba(40,34,22,.5), 0 2px 3px rgba(40,34,22,.05), 0 2px 0 rgba(255,255,255,.7) inset;
+}
+.mk .screen { border-radius: 31px; overflow: hidden; background: var(--paper); position: relative; }
+
+/* status bar */
+.mk .statusbar { display: flex; align-items: center; justify-content: space-between; padding: 11px 22px 7px; font-size: 12.5px; font-weight: 500; color: var(--ink); }
+.mk .statusbar .dots { display: flex; align-items: center; gap: 4px; }
+.mk .statusbar .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--ink); display: block; opacity: .85; }
+.mk .statusbar .bat { width: 22px; height: 11px; border: 1.3px solid var(--ink); border-radius: 3px; position: relative; opacity: .85; }
+.mk .statusbar .bat::before { content:""; position:absolute; inset: 1.5px; right: 6px; background: var(--ink); border-radius: 1px; }
+.mk .statusbar .bat::after { content:""; position:absolute; right:-3px; top: 3px; width: 2px; height: 5px; background: var(--ink); border-radius: 0 1px 1px 0; }
+
+.mk .pad { padding: 8px 18px 22px; }
+.mk .home-ind { height: 22px; display: flex; align-items: center; justify-content: center; }
+.mk .home-ind::after { content:""; width: 118px; height: 5px; border-radius: 5px; background: var(--border2); }
+
+/* generic app bits */
+.mk .lbl { display: block; font-size: 13px; color: var(--faint); margin-bottom: 8px; font-weight: 400; }
+.mk .eye { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; font-weight: 600; color: var(--faint); }
+.mk svg { display: block; }
+.mk .row { display: flex; align-items: center; }
+
+/* toggle switch (app style: 52x30 track, 24 knob) */
+.mk .sw { width: 52px; height: 30px; border-radius: 30px; position: relative; flex-shrink: 0; transition: background .2s; }
+.mk .sw.on { background: var(--pine); }
+.mk .sw.off { background: var(--border); }
+.mk .sw .knob { position: absolute; top: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: left .2s; }
+.mk .sw.on .knob { left: 25px; }
+.mk .sw.off .knob { left: 3px; }
+
+/* day chips */
+.mk .dayrow { display: flex; gap: 8px; overflow: hidden; }
+.mk .day { flex: 1; min-width: 0; padding: 9px 0; border-radius: 9px; border: 1px solid var(--border2); text-align: center; background: transparent; }
+.mk .day .dn { font-size: 11px; letter-spacing: .06em; opacity: .62; }
+.mk .day .dd { font-family: var(--disp); font-size: 18px; margin-top: 1px; }
+.mk .day.sel { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.mk .day.booked { border-style: dashed; border-color: var(--border2); color: var(--faint); position: relative; }
+.mk .day.booked .bk { display: block; font-size: 8px; letter-spacing: .12em; margin-top: 2px; color: var(--faint); }
+
+/* time-window pills */
+.mk .wins { display: flex; gap: 7px; flex-wrap: wrap; }
+.mk .win { padding: 7px 13px; border-radius: 9px; border: 1px solid var(--border); background: var(--panel); font-size: 13px; color: var(--ink2); }
+.mk .win.sel { border: 1.5px solid var(--ink); background: #ECE9E2; color: var(--ink); font-weight: 600; }
+
+/* buttons */
+.mk .btn { width: 100%; border: none; border-radius: 13px; padding: 15px; font-family: var(--body); font-size: 15px; font-weight: 600; text-align: center; cursor: default; }
+.mk .btn.pine { background: var(--pine); color: var(--on-pine); }
+.mk .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--sub); font-weight: 500; }
+.mk .btn .sub { display: block; font-size: 12.5px; font-weight: 400; opacity: .9; margin-top: 3px; }
+
+/* ---------- screen 1 : dark summary card ---------- */
+.mk .darkcard { background: var(--ink); border-radius: 18px; padding: 17px 19px; color: var(--paper); box-shadow: 0 14px 32px -18px rgba(0,0,0,.5); }
+.mk .darkcard .dc-date { font-family: var(--disp); font-size: 21px; font-weight: 500; line-height: 1.2; }
+.mk .darkcard .dc-meta { font-size: 13px; margin-top: 5px; color: rgba(250,249,246,.72); line-height: 1.45; }
+.mk .darkcard .dc-rule { height: 1px; background: rgba(250,249,246,.2); margin: 14px 0; }
+.mk .darkcard .dc-toggle { display: flex; align-items: center; gap: 13px; }
+.mk .darkcard .dc-toggle .t-txt { font-size: 14.5px; line-height: 1.25; color: rgba(250,249,246,.92); }
+.mk .darkcard .dc-toggle .t-txt small { display: block; font-size: 12.5px; color: rgba(250,249,246,.6); margin-top: 3px; }
+.mk .darkcard .sw.on { background: var(--paper); }
+.mk .darkcard .sw.on .knob { background: var(--ink); }
+
+.mk .reveal { margin-top: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 16px; position: relative; }
+.mk .reveal::before {
+  content:""; position: absolute; top: -7px; left: 30px; width: 12px; height: 12px;
+  background: var(--panel); border-left: 1px solid var(--border); border-top: 1px solid var(--border); transform: rotate(45deg);
+}
+.mk .foot-note { font-size: 12.5px; color: var(--sub); line-height: 1.5; margin-top: 13px; display: flex; gap: 7px; }
+.mk .foot-note svg { flex-shrink: 0; margin-top: 1px; color: var(--pine); }
+
+/* ---------- screen 2 : appointment sheet ---------- */
+.mk .sheet-hd { background: var(--ink); padding: 18px 18px 20px; color: var(--paper); }
+.mk .sheet-hd .status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #B7C6B9; background: rgba(52,72,60,.5); border: 1px solid rgba(183,198,185,.3); padding: 4px 9px; border-radius: 20px; }
+.mk .sheet-hd h4 { font-family: var(--disp); font-size: 27px; font-weight: 500; margin: 12px 0 3px; }
+.mk .sheet-hd .sub { font-size: 14px; color: rgba(250,249,246,.72); }
+.mk .sect { padding: 17px 18px; border-bottom: 1px solid var(--line); background: var(--paper); }
+.mk .sect .s-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.mk .sect .s-top .s-ttl { font-size: 16px; font-weight: 600; color: var(--ink); }
+.mk .sect .s-top .s-desc { font-size: 13.5px; color: var(--sub); margin-top: 3px; line-height: 1.45; }
+
+/* ---------- screen 3 : waitlist list ---------- */
+.mk .wl-h { font-family: var(--disp); font-size: 30px; font-weight: 500; }
+.mk .wl-sub { color: var(--sub); font-size: 13.5px; margin: 4px 0 15px; font-weight: 300; line-height: 1.5; }
+.mk .wl-add { display: inline-flex; align-items: center; gap: 8px; background: var(--pine); color: var(--on-pine); border-radius: 12px; padding: 10px 15px; font-size: 13.5px; font-weight: 600; margin-bottom: 17px; }
+.mk .wcard { border-radius: 14px; padding: 14px 15px; margin-bottom: 11px; display: flex; align-items: center; gap: 12px; }
+.mk .wcard .body { flex: 1; min-width: 0; }
+.mk .wcard .nm { font-size: 16px; font-weight: 500; color: var(--ink); }
+.mk .wcard .mt { font-size: 13.5px; color: var(--sub); margin-top: 2px; }
+.mk .wcard .chev { color: var(--faint); flex-shrink: 0; }
+/* neutral (open-waitlist) card */
+.mk .wcard.open { background: var(--panel2); border: 1px solid var(--border); }
+.mk .wcard.open .pill { display: inline-block; margin-top: 8px; font-size: 12.5px; background: var(--brass-tint); border: 1px solid var(--brass-line); border-radius: 20px; padding: 3px 10px; color: var(--brass); }
+/* booked-wants-earlier card (the colored one) */
+.mk .wcard.booked { background: var(--sage); border: 1px solid var(--sage-line); border-left: 4px solid var(--pine); }
+.mk .wcard.booked .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; background: var(--pine); color: var(--on-pine); border-radius: 6px; padding: 3px 8px; margin-bottom: 7px; }
+.mk .wcard.booked .now { font-size: 13px; color: var(--pine); font-weight: 500; display: flex; align-items: center; gap: 6px; margin-top: 7px; }
+.mk .wcard.booked .now s { color: var(--sub); text-decoration: none; }
+.mk .legend { display: flex; gap: 16px; margin: 4px 2px 14px; flex-wrap: wrap; }
+.mk .legend span { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--sub); }
+.mk .legend span i { width: 22px; height: 14px; border-radius: 4px; display: block; }
+.mk .legend .i-open { background: var(--panel2); border: 1px solid var(--border); }
+.mk .legend .i-booked { background: var(--sage); border: 1px solid var(--sage-line); border-left: 3px solid var(--pine); }
+
+/* ---------- screen 4 : reschedule modal ---------- */
+.mk .modal-scrim { background: rgba(24,22,18,.42); padding: 26px 14px; }
+.mk .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 22px; padding: 20px; box-shadow: 0 24px 60px rgba(24,22,18,.3); }
+.mk .modal .m-hd { display: flex; align-items: flex-start; justify-content: space-between; }
+.mk .modal .m-hd .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; background: var(--pine); color: var(--on-pine); border-radius: 6px; padding: 3px 8px; margin-bottom: 9px; }
+.mk .modal .m-hd h4 { font-family: var(--disp); font-size: 25px; font-weight: 500; }
+.mk .modal .m-hd .ph { font-size: 14px; color: var(--sub); margin-top: 2px; }
+.mk .modal .m-hd .x { color: var(--faint); }
+.mk .factrow { display: flex; align-items: flex-start; gap: 10px; font-size: 14.5px; padding: 11px 0; }
+.mk .factrow svg { color: var(--pine); flex-shrink: 0; margin-top: 2px; }
+.mk .factrow .k { color: var(--sub); flex-shrink: 0; }
+.mk .factrow .v { font-weight: 500; color: var(--ink); }
+.mk .divide { height: 1px; background: var(--line); margin: 6px 0; }
+.mk .open-chips { display: grid; gap: 8px; margin: 10px 0 4px; }
+.mk .oc { display: flex; align-items: center; justify-content: space-between; border-radius: 12px; padding: 13px 15px; border: 1px solid var(--border2); background: var(--panel); font-size: 15px; }
+.mk .oc .t { font-weight: 500; }
+.mk .oc .free { font-size: 12.5px; color: var(--sub); }
+.mk .oc.best { border: 1.5px solid var(--pine); background: var(--sage); }
+.mk .oc.best .free { color: var(--pine); font-weight: 600; }
+.mk .oc.best .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--pine); }
+.mk .notify { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--panel2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin: 14px 0; }
+.mk .notify .nt { font-size: 14px; font-weight: 500; }
+.mk .notify .nt small { display: block; font-size: 12.5px; color: var(--pine); font-weight: 400; margin-top: 1px; }
+
+/* success toast */
+.mk .toast { position: absolute; left: 14px; right: 14px; bottom: 34px; background: var(--ink); color: var(--paper); border-radius: 14px; padding: 13px 15px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; line-height: 1.35; box-shadow: 0 16px 40px -14px rgba(0,0,0,.6); }
+.mk .toast .tk { width: 22px; height: 22px; border-radius: 50%; background: var(--pine); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--on-pine); }
+.mk .toast b { font-weight: 600; }
+
+/* colophon */
+.mk .colophon { max-width: 1180px; margin: 54px auto 0; padding-top: 20px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 10px 22px; justify-content: space-between; }
+.mk .colophon span { font-size: 11.5px; letter-spacing: .06em; color: var(--sub); }
+.mk .colophon .swatches { display: flex; gap: 6px; align-items: center; }
+.mk .colophon .swatches i { width: 15px; height: 15px; border-radius: 4px; border: 1px solid rgba(0,0,0,.08); display: block; }
+
+/* motion */
+.mk .fig { opacity: 0; transform: translateY(14px); animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
+.mk .fig:nth-child(2){ animation-delay: .08s; }
+.mk .fig:nth-child(3){ animation-delay: .16s; }
+.mk .fig:nth-child(4){ animation-delay: .24s; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .mk .fig { animation: none; opacity: 1; transform: none; } }
+</style>
+
+<div class="mk">
+  <div class="wrap">
+
+    <!-- ===================== MASTHEAD ===================== -->
+    <div class="mast">
+      <div class="eyebrow mono">Sanctuary&nbsp;·&nbsp;Vero — feature mockup — Atelier theme</div>
+      <h1>From <em>“notify me”</em><br>to <em>“move me up.”</em></h1>
+      <p class="dek">Retiring the earlier-slot <b>alert</b>. In its place: a client hoping to get in sooner joins the <b>waitlist</b> for an earlier day — and you move their real appointment up in a single tap.</p>
+
+      <div class="swap">
+        <div class="chip was">
+          <span class="tag mono">Was</span>
+          <p>“We’ll text you a booking link if an earlier spot opens.” The client re-books themselves, if they catch it in time.</p>
+        </div>
+        <div class="chip now">
+          <span class="tag mono">Now</span>
+          <p>They’re on the waitlist for a sooner day. You see them there, already booked, and reschedule them the moment it opens.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== STAGE ===================== -->
+    <div class="stage">
+
+      <!-- ---------- 01 · CLIENT BOOKING ---------- -->
+      <div class="fig">
+        <div class="cap-top">
+          <div class="n mono">01 — Client booking, last step</div>
+          <h3>“Hoping to get in sooner?”</h3>
+        </div>
+        <div class="phone">
+          <div class="screen">
+            <div class="statusbar">
+              <span>9:41</span>
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="bat" aria-hidden="true"></span>
+            </div>
+            <div class="pad">
+              <!-- dark confirmation summary card -->
+              <div class="darkcard">
+                <div class="dc-date">Sat, Jul 12 · 2:30 PM</div>
+                <div class="dc-meta">Cut &amp; Beard · $60 · with Dan</div>
+                <div class="dc-rule"></div>
+                <div class="dc-toggle">
+                  <span class="sw on" aria-hidden="true"><span class="knob"></span></span>
+                  <span class="t-txt">Hoping to get in sooner?
+                    <small>Keep this time — we’ll add you to the waitlist and bump you up if an earlier spot opens.</small>
+                  </span>
+                </div>
+              </div>
+
+              <!-- revealed day + time picker -->
+              <div class="reveal">
+                <span class="lbl">Which earlier days work? <span style="color:var(--sub)">(up to 3)</span></span>
+                <div class="dayrow" style="margin-bottom:15px">
+                  <div class="day sel"><div class="dn">WED</div><div class="dd">9</div></div>
+                  <div class="day sel"><div class="dn">THU</div><div class="dd">10</div></div>
+                  <div class="day sel"><div class="dn">FRI</div><div class="dd">11</div></div>
+                  <div class="day booked"><div class="dn">SAT</div><div class="dd">12</div><span class="bk">BOOKED</span></div>
+                </div>
+                <span class="lbl">What time each day?</span>
+                <div class="wins">
+                  <span class="win sel">Morning</span>
+                  <span class="win">Afternoon</span>
+                  <span class="win">Evening</span>
+                  <span class="win">Any time</span>
+                </div>
+                <div class="foot-note">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                  You keep your 2:30 no matter what — this only lets us move you earlier.
+                </div>
+              </div>
+            </div>
+            <div class="home-ind" aria-hidden="true"></div>
+          </div>
+        </div>
+        <p class="cap-note">Replaces the old “Notify me if an earlier spot opens up” switch. Toggling on <b>reveals a day + time picker</b>, scoped to days on or before the booked date — reusing the waitlist’s own day/window UI.</p>
+      </div>
+
+      <!-- ---------- 02 · ON THE APPOINTMENT ---------- -->
+      <div class="fig">
+        <div class="cap-top">
+          <div class="n mono">02 — On the appointment (calendar)</div>
+          <h3>Owner sets it too</h3>
+        </div>
+        <div class="phone">
+          <div class="screen">
+            <div class="statusbar">
+              <span>9:41</span>
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="bat" aria-hidden="true"></span>
+            </div>
+            <!-- appt sheet header -->
+            <div class="sheet-hd">
+              <span class="status"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Confirmed</span>
+              <h4>Marcus Webb</h4>
+              <div class="sub">Cut &amp; Beard · $60 · Sat, Jul 12 · 2:30 PM</div>
+            </div>
+            <!-- reframed flexibility section -->
+            <div class="sect">
+              <div class="s-top">
+                <div>
+                  <div class="s-ttl">Waitlist for an earlier time</div>
+                  <div class="s-desc">Marcus keeps this appointment. He’ll show on the waitlist so you can move him up the moment a sooner slot opens with Dan.</div>
+                </div>
+                <span class="sw on" aria-hidden="true"><span class="knob"></span></span>
+              </div>
+              <div class="reveal" style="margin-top:15px">
+                <span class="lbl">Earlier days he’d take <span style="color:var(--sub)">(up to 3)</span></span>
+                <div class="dayrow" style="margin-bottom:15px">
+                  <div class="day sel"><div class="dn">WED</div><div class="dd">9</div></div>
+                  <div class="day sel"><div class="dn">THU</div><div class="dd">10</div></div>
+                  <div class="day"><div class="dn">FRI</div><div class="dd">11</div></div>
+                  <div class="day booked"><div class="dn">SAT</div><div class="dd">12</div><span class="bk">BOOKED</span></div>
+                </div>
+                <span class="lbl">Preferred window</span>
+                <div class="wins">
+                  <span class="win sel">Morning</span>
+                  <span class="win">Afternoon</span>
+                  <span class="win">Evening</span>
+                  <span class="win sel">Any</span>
+                </div>
+              </div>
+            </div>
+            <div class="sect" style="border-bottom:none">
+              <div class="eye" style="margin-bottom:10px">Booking details</div>
+              <div class="row" style="gap:9px;font-size:14.5px;color:var(--ink2)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                Booked Mon, Jul 7 at 6:12 PM
+              </div>
+            </div>
+            <div class="home-ind" aria-hidden="true"></div>
+          </div>
+        </div>
+        <p class="cap-note">The same control on the staff side of the appointment sheet — replacing “Notify if an earlier slot opens.” Sets the preference <b>on the client’s behalf</b> when they mention it in the chair.</p>
+      </div>
+
+      <!-- ---------- 03 · THE WAITLIST ---------- -->
+      <div class="fig">
+        <div class="cap-top">
+          <div class="n mono">03 — The waitlist</div>
+          <h3>Colored = already booked</h3>
+        </div>
+        <div class="phone">
+          <div class="screen">
+            <div class="statusbar">
+              <span>9:41</span>
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="bat" aria-hidden="true"></span>
+            </div>
+            <div class="pad">
+              <div class="wl-h serif">Waitlist</div>
+              <p class="wl-sub">Clients hoping for an opening. Tap one to notify them — or, if they’re already booked, to move them up.</p>
+              <div class="legend">
+                <span><i class="i-booked"></i> Booked · wants earlier</span>
+                <span><i class="i-open"></i> Open waitlist</span>
+              </div>
+              <span class="wl-add"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg> Add to waitlist</span>
+
+              <!-- booked, wants earlier -->
+              <div class="wcard booked">
+                <div class="body">
+                  <span class="badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg> Booked · wants earlier</span>
+                  <div class="nm">Marcus Webb</div>
+                  <div class="mt">Cut &amp; Beard · Dan</div>
+                  <div class="now"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Now Sat Jul 12 · 2:30 PM <s>· hoping Wed–Fri AM</s></div>
+                </div>
+                <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </div>
+
+              <!-- booked, wants earlier -->
+              <div class="wcard booked">
+                <div class="body">
+                  <span class="badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg> Booked · wants earlier</span>
+                  <div class="nm">Priya Shah</div>
+                  <div class="mt">Skin Fade · Heather</div>
+                  <div class="now"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Now Thu Jul 17 · 4:00 PM <s>· hoping any AM</s></div>
+                </div>
+                <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </div>
+
+              <!-- open waitlist (neutral) -->
+              <div class="wcard open">
+                <div class="body">
+                  <div class="nm">Andre Foster</div>
+                  <div class="mt">Haircut · prefers Dan</div>
+                  <span class="pill">Midday</span>
+                </div>
+                <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </div>
+
+              <!-- open waitlist (neutral) -->
+              <div class="wcard open">
+                <div class="body">
+                  <div class="nm">Sam Rivera</div>
+                  <div class="mt">Haircut · anyone available</div>
+                  <span class="pill">Morning</span>
+                </div>
+                <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </div>
+            </div>
+            <div class="home-ind" aria-hidden="true"></div>
+          </div>
+        </div>
+        <p class="cap-note">Already-booked clients get a <b>sage card, pine rail, and a badge</b> — instantly separable from open-waitlist clients on the same list. A small legend names the two states.</p>
+      </div>
+
+      <!-- ---------- 04 · MOVE THEM UP ---------- -->
+      <div class="fig">
+        <div class="cap-top">
+          <div class="n mono">04 — Move them up (one tap)</div>
+          <h3>Reschedule &amp; auto-remove</h3>
+        </div>
+        <div class="phone">
+          <div class="screen">
+            <div class="statusbar">
+              <span>9:41</span>
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="bat" aria-hidden="true"></span>
+            </div>
+            <div class="modal-scrim">
+              <div class="modal">
+                <div class="m-hd">
+                  <div>
+                    <span class="badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg> Booked · wants earlier</span>
+                    <h4 class="serif">Marcus Webb</h4>
+                    <div class="ph">(503) 555-0142</div>
+                  </div>
+                  <svg class="x" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </div>
+
+                <div class="divide"></div>
+                <div class="factrow">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                  <span class="k">Now booked:</span><span class="v">Sat, Jul 12 · 2:30 PM · Dan</span>
+                </div>
+                <div class="factrow" style="padding-top:0">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                  <span class="k">Hoping for:</span><span class="v">Wed–Fri, mornings</span>
+                </div>
+
+                <span class="lbl" style="margin-top:8px">Earlier openings that fit</span>
+                <div class="open-chips">
+                  <div class="oc best">
+                    <span class="row" style="gap:10px"><span class="dot" aria-hidden="true"></span><span class="t">Wed Jul 9 · 9:15 AM</span></span>
+                    <span class="free">soonest · no wait</span>
+                  </div>
+                  <div class="oc">
+                    <span class="t">Thu Jul 10 · 10:00 AM</span>
+                    <span class="free">open</span>
+                  </div>
+                  <div class="oc">
+                    <span class="t">Fri Jul 11 · 9:00 AM</span>
+                    <span class="free">open</span>
+                  </div>
+                </div>
+
+                <div class="notify">
+                  <span class="nt">Text Marcus the new time<small>On — he gets a confirmation</small></span>
+                  <span class="sw on" aria-hidden="true"><span class="knob"></span></span>
+                </div>
+
+                <button class="btn pine">Move Marcus up to Wed 9:15 AM
+                  <span class="sub">Reschedules his 2:30 PM · removes him from the waitlist</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- success toast -->
+            <div class="toast">
+              <span class="tk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <span><b>Moved.</b> Marcus is in Wed 9:15 AM — and off the waitlist.</span>
+            </div>
+          </div>
+        </div>
+        <p class="cap-note">Tapping the card opens this. Pick an opening → his existing appointment <b>reschedules</b> (start / bookedFor updated, like <b>moveAppointmentUp</b>) → he’s <b>removed from the waitlist</b> automatically, with an optional text.</p>
+      </div>
+
+    </div>
+
+    <!-- colophon -->
+    <div class="colophon">
+      <span>Vero · gotvero.com — Atelier theme (light)</span>
+      <span class="swatches">
+        <i style="background:#FAF9F6"></i>
+        <i style="background:#F4F2EC"></i>
+        <i style="background:#34483C"></i>
+        <i style="background:#E9EEE9"></i>
+        <i style="background:#9A7B45"></i>
+        <span style="margin-left:4px">paper · cream · pine · sage · brass</span>
+      </span>
+      <span>Fraunces + Jost</span>
+    </div>
+
+  </div>
+</div>
