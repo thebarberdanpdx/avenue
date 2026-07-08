@@ -4854,7 +4854,18 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setMyAppts(fresh);
     setMatched((m) => (m && m._localSession) ? { ...m, _localAppts: fresh } : m);
   };
-  const refreshMyAppts = () => { if (!matched) return; if (matched._localSession) { setMyAppts(Array.isArray(matched._localAppts) ? matched._localAppts : []); refreshLocalAppts(matched); return; } supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: matched.id, p_session: matched.sessionToken }).then(({ data }) => { if (Array.isArray(data)) setMyAppts(data); }).catch(() => {}); };
+  const refreshMyAppts = () => { if (!matched) return; if (matched._localSession) { refreshLocalAppts(matched); return; } supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: matched.id, p_session: matched.sessionToken }).then(({ data }) => { if (Array.isArray(data)) setMyAppts(data); }).catch(() => {}); };
+  // Keep the signed-in home LIVE, same as the staff app: re-pull when the page returns to the
+  // foreground and every 60s while it sits open — a staff move/cancel shows within a minute
+  // even if the client never touches the page.
+  useEffect(() => {
+    if (!showHome || !matched) return;
+    const onVis = () => { if (document.visibilityState === "visible") refreshMyAppts(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    const id = setInterval(() => { if (document.visibilityState === "visible") refreshMyAppts(); }, 60000);
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", onVis); clearInterval(id); };
+  }, [showHome, matched && matched.id]);
   const goClientHome = () => {
     setStep(0); setSimpleStep(null); setSimpleCat(null); setSimplePref(null); setSimpleChange(null);
     setShowWhoFor(false); setShowUsual(false); setShowSchedChoice(false); setShowWizardIntro(false);
