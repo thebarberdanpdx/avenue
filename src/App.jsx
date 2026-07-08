@@ -21378,7 +21378,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       {/* STICKY calendar context — Mango-style: the day strip + staff names pin below the dashboard
           bar while the grid scrolls, so you always know what day/columns you're looking at. Bleeds
           edge-to-edge (cancels the tab-content wrapper's 10px side padding). */}
-      <div style={{ position: "sticky", top: "calc(env(safe-area-inset-top, 0px) + 56px)", zIndex: 9, background: "var(--bg)", margin: "0 -10px", padding: "6px 10px 0", borderBottom: "1px solid var(--line)" }}>
+      <div style={{ position: "sticky", top: "calc(env(safe-area-inset-top, 0px) + 56px)", zIndex: 9, background: "var(--bg)", margin: "0 -10px", padding: "6px 10px 0", borderBottom: "1px solid var(--border2)" }}>
       {/* Scrollable multi-week day strip — swipe horizontally, tap to pick. Includes 14 days back so barbers can look up past visits. */}
       <div ref={dayStripRef} style={{ display: "flex", gap: 6, marginBottom: 4, padding: "4px 2px", overflowX: "auto", scrollSnapType: "x proximity", WebkitOverflowScrolling: "touch" }}>
         {Array.from({ length: 14 + 70 }, (_, i) => { // 14 days back + 70 days ahead (rebook chips jump up to 8 weeks); today sits at index 14 and is pre-scrolled into view on mount
@@ -21389,7 +21389,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           return (
             <button key={offset} data-today={isToday ? "1" : undefined} data-sel={isSelected ? "1" : undefined} onClick={() => setDayOffset(offset)} style={{ flex: "0 0 14.2%", minWidth: 48, scrollSnapAlign: d.getDay() === 0 ? "start" : "none", textAlign: "center", padding: "10px 4px 12px", borderRadius: 14, background: isSelected ? "var(--gold)" : (isToday ? "var(--wash)" : "transparent"), color: isSelected ? "var(--on-gold)" : (isToday ? "var(--gold)" : "var(--sub)"), border: "none", cursor: "pointer", position: "relative", transition: "background .2s, color .2s" }}>
               <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, letterSpacing: 1.5, fontWeight: 500, marginBottom: 5, opacity: isSelected ? 0.85 : (isToday ? 0.8 : 0.55) }}>{["S","M","T","W","T","F","S"][d.getDay()]}</div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: isSelected || isToday ? 500 : 400, lineHeight: 1 }}>{d.getDate()}</div>
+              <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 17.5, fontWeight: isSelected || isToday ? 600 : 500, lineHeight: 1 }}>{d.getDate()}</div>
               {!isSelected && isToday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "var(--gold)" }} />}
             </button>
           );
@@ -21397,7 +21397,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       </div>
 
       {/* staff column headers — plain bold names, Mango-style (no color chips) */}
-      <div style={{ display: "flex", gap: 4 }}>
+      <div style={{ display: "flex", gap: 0 }}>
         <div style={{ width: 48, flexShrink: 0 }} />
         {orderedStaff.map((p) => { const off = isOffDay(p); const editable = p.id !== "anyone"; return (
           <div key={p.id} onClick={editable ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setHoursMenu({ providerId: p.id, cx: r.left + r.width / 2, top: r.bottom }); } : undefined} style={{ flex: 1, padding: "8px 0 10px", display: "flex", alignItems: "center", justifyContent: "center", opacity: off ? 0.55 : 1, minWidth: 0, cursor: editable ? "pointer" : "default" }}>
@@ -21416,25 +21416,26 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
         </div>
       )}
 
-      {/* the timeline grid — full-bleed to the screen edges, Mango-style */}
-      <div style={{ display: "flex", position: "relative", gap: 4, margin: "6px -10px 0" }}>
+      {/* the timeline grid — full-bleed to the screen edges, Mango-style. Columns touch (gap 0)
+          with a hairline divider between barbers; hour lines one step darker (approved contrast pass). */}
+      <div style={{ display: "flex", position: "relative", gap: 0, margin: "6px -10px 0" }}>
         {/* continuous hour/half-hour lines across the whole board (fills the gaps between columns) */}
         <div style={{ position: "absolute", left: 48, right: 0, top: 0, height: gridHeight, pointerEvents: "none", zIndex: 0 }}>
           {quarterLines.filter((t) => t % 30 === 0).map((t) => { const isHour = t % 60 === 0; return (
-            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, left: 0, right: 0, borderTop: isHour ? "1px solid var(--line)" : "1px solid color-mix(in srgb, var(--line) 40%, transparent)", height: 0 }} />
+            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, left: 0, right: 0, borderTop: isHour ? "1px solid color-mix(in srgb, var(--border2) 45%, var(--border))" : "1px solid color-mix(in srgb, var(--border) 50%, transparent)", height: 0 }} />
           ); })}
         </div>
         {/* time gutter — hour labels only, right-aligned against the grid line */}
         <div style={{ width: 48, flexShrink: 0, position: "relative", height: gridHeight }}>
           {quarterLines.filter((t) => t < DAY_END && t % 60 === 0).map((t) => (
-            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, right: 8, fontSize: 13, color: "var(--faint)", fontWeight: 400, fontVariantNumeric: "tabular-nums", transform: "translateY(-50%)", background: "var(--bg)", padding: "1px 0 1px 3px" }}>
+            <div key={t} style={{ position: "absolute", top: (t - DAY_START) * PPM, right: 8, fontSize: 13, color: "color-mix(in srgb, var(--text2) 45%, var(--sub))", fontWeight: 500, fontVariantNumeric: "tabular-nums", transform: "translateY(-50%)", background: "var(--bg)", padding: "1px 0 1px 3px" }}>
               {fmtTime(t).replace(":00", "")}
             </div>
           ))}
         </div>
 
         {/* columns */}
-        {orderedStaff.map((p) => {
+        {orderedStaff.map((p, pIdx) => {
           // Lane-aware layout: when N appointments on this provider overlap in time,
           // split that section of the column into N side-by-side lanes so nothing hides behind anything.
           // Single appointments keep the full column width.
@@ -21469,11 +21470,11 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           })();
           return (
             <div key={p.id}
-              style={{ flex: 1, position: "relative", height: gridHeight, background: "var(--panel)", overflow: "hidden" }}>
+              style={{ flex: 1, position: "relative", height: gridHeight, background: "var(--panel)", overflow: "hidden", borderRight: pIdx < orderedStaff.length - 1 ? "1.5px solid var(--border2)" : "none" }}>
               {/* off-shift shade: dim the hours outside this barber's shift for the selected day (behind cards, ignores taps) */}
               {(() => {
                 const h = hoursForDate(p, selectedDate);
-                const shade = "color-mix(in srgb, var(--text) 6%, transparent)";
+                const shade = "color-mix(in srgb, var(--text) 12%, transparent)"; // closed hours read as a REAL grey (approved calendar-contrast pass)
                 if (!h || !h.on) return <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: gridHeight, background: shade, pointerEvents: "none" }} />;
                 const segs = [];
                 const sStart = Math.max(DAY_START, h.start);
