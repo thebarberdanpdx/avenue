@@ -141,6 +141,45 @@ async function handler(req, res) {
         }
       }
     }
+
+    // ---- "Time to book" reminders — set on the checkout rebook screen instead of booking now. ----
+    // The client record carries { bookReminder: { at, label, serviceName, ... } }. When `at` comes due,
+    // text them a nudge with the shop's booking link (email fallback), then mark the reminder sent.
+    // Same atomic message_log claim as appointment reminders, so overlapping runs can't double-send.
+    for (const row of clients.data || []) {
+      const c = row.data || {};
+      const br = c.bookReminder;
+      if (!br || !br.at || br.sent) continue;
+      const dueMs = new Date(br.at).getTime();
+      if (isNaN(dueMs) || now < dueMs) continue;
+      if (now - dueMs > 7 * 24 * 60 * 60 * 1000) continue; // over a week stale (cron was down) — don't send an ancient nudge
+
+      const email = String(c.email || "").trim();
+      const phone = String(c.phone || "").replace(/\D/g, "");
+      const ch = resolveChannels({ channel: "text", smsLive: SMS_LIVE, email, phone, smsOptOut: c.smsOptOut === true });
+      if (!ch.email && !ch.sms) continue;
+
+      const logId = `${shop.id}__bookrem__${row.id}__${dueMs}`;
+      const claim = await supa.from("message_log").insert({ id: logId, shop_id: shop.id, appt_id: `bookrem__${row.id}`, message_id: "book-reminder", via: "pending", sent_at: new Date().toISOString() });
+      if (claim.error) continue; // already claimed by another run
+      checked++;
+
+      const first = String(c.name || "there").split(" ")[0];
+      const svc = br.serviceName ? `your next ${br.serviceName}` : "your next visit";
+      const bookUrl = `${SITE}/book?shop=${encodeURIComponent(shop.id)}`;
+      const textBody = `Hi ${first} — it's about that time! Ready for ${svc} at ${business}? Book here: ${bookUrl}`;
+      const via = [];
+      try { if (ch.sms) { await sendSms({ to: phone, text: textBody + "\nReply STOP to opt out." }); via.push("sms"); } } catch (e) { failed++; }
+      try { if (ch.email && !via.length) { await sendEmail({ to: email, subject: `${business}: time to book your next visit`, text: textBody, html: renderEmailHtml(textBody, {}) }); via.push("email"); } } catch (e) { failed++; }
+
+      if (via.length) {
+        await supa.from("message_log").update({ via: via.join("+"), sent_at: new Date().toISOString() }).eq("id", logId);
+        await supa.from("clients").update({ data: { ...c, bookReminder: { ...br, sent: true, sentAt: new Date().toISOString(), via: via.join("+") } } }).eq("shop_id", shop.id).eq("id", row.id);
+        sent++;
+      } else {
+        await supa.from("message_log").delete().eq("id", logId); // release the claim so a later run retries
+      }
+    }
   }
 
   if (failed > 0) await reportServerError(new Error(`send-reminders: ${failed} message(s) failed to send`), { fn: "send-reminders", checked, sent, failed });

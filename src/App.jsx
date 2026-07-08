@@ -16487,29 +16487,9 @@ function PayoutsView({ showToast }) {
 
 function RebookCheckoutEditor({ r, onChange }) {
   const set = (patch) => onChange({ ...r, ...patch });
-  const discountOn = r.discountEnabled !== false;
   return (
     <div style={{ display: "grid", gap: 4 }}>
-      <ToggleSetting label="Show the rebook screen at checkout" desc="After each visit, offer to book the client's next appointment before they leave." on={r.enabled !== false} onToggle={(v) => set({ enabled: v })} />
-      {r.enabled !== false && (
-        <div style={{ borderTop: "1px solid var(--line)", marginTop: 12, paddingTop: 14 }}>
-          <ToggleSetting label="Offer a discount as the incentive" desc="Sweeten rebooking with a discount. Turn off to simply prompt the next booking with no discount." on={discountOn} onToggle={(v) => set({ discountEnabled: v })} />
-          {discountOn && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 10 }}>Discount</div>
-              <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-                <button onClick={() => set({ discountType: "amount" })} style={{ flex: 1, padding: "12px", borderRadius: 12, border: `1.5px solid ${r.discountType !== "percent" ? "var(--gold)" : "var(--border2)"}`, background: r.discountType !== "percent" ? "var(--tint)" : "var(--panel2)", color: "var(--text)", fontSize: 15, fontWeight: 500 }}>Dollar ($)</button>
-                <button onClick={() => set({ discountType: "percent" })} style={{ flex: 1, padding: "12px", borderRadius: 12, border: `1.5px solid ${r.discountType === "percent" ? "var(--gold)" : "var(--border2)"}`, background: r.discountType === "percent" ? "var(--tint)" : "var(--panel2)", color: "var(--text)", fontSize: 15, fontWeight: 500 }}>Percent (%)</button>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px" }}>
-                <span style={{ fontSize: 18, color: "var(--sub)" }}>{r.discountType === "percent" ? "%" : "$"}</span>
-                <input type="number" min={0} value={r.discount ?? 0} onChange={(e) => set({ discount: Math.max(0, parseFloat(e.target.value) || 0) })} style={{ flex: 1, background: "transparent", border: "none", color: "var(--text)", fontSize: 20, fontWeight: 600, outline: "none" }} />
-                <span style={{ fontSize: 14, color: "var(--faint)" }}>off the next visit</span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <ToggleSetting label="Show the rebook screen at checkout" desc="After each visit, jump to the calendar to book the next appointment — or set a 'time to book' text reminder — before they leave." on={r.enabled !== false} onToggle={(v) => set({ enabled: v })} />
     </div>
   );
 }
@@ -18914,8 +18894,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     },
     {
       id: "rebookco", title: "Rebooking at Checkout", icon: Repeat, category: "Payments & Checkout",
-      status: (form.rebook?.enabled === false) ? "Off" : ((form.rebook?.discountEnabled !== false && (form.rebook?.discount || 0) > 0) ? `On · ${form.rebook?.discountType === "percent" ? form.rebook?.discount + "% off" : "$" + form.rebook?.discount + " off"}` : "On · no discount"),
-      keywords: "rebook rebooking checkout discount percent dollar amount incentive next visit prompt save offer",
+      status: (form.rebook?.enabled === false) ? "Off" : "On",
+      keywords: "rebook rebooking checkout next visit prompt calendar reminder text book",
       editor: <RebookCheckoutEditor r={form.rebook || { enabled: true, discountEnabled: true, discountType: "amount", discount: 5, weeks: [2,3,4,6,8] }} onChange={(rb) => setForm({ ...form, rebook: { ...(form.rebook || {}), ...rb } })} />,
     },
     {
@@ -19097,7 +19077,6 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
         { k: "cs_rc_move", label: "Rescheduled from the link — the old slot only released once the new one was confirmed", card: null },
         { k: "cs_rc_cancel", label: "Cancelled from the link — the slot freed instantly and the (email) cancellation notice went out", card: "messages" },
         { k: "cs_rc_window", label: "Inside the cancel window, both were refused with the “call us” message", card: "policy" },
-        { k: "cs_rc_forfeit", label: "Rescheduling forfeited the rebook discount — after warning them first", card: "rebookco" },
         { k: "cs_rc_dead", label: "A dead or already-used link showed “appointment released / link not found,” not an error", card: null },
       ] },
     ] },
@@ -19146,7 +19125,7 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     ] },
     { id: "after", label: "After the visit", icon: Repeat, desc: "Rebooking & keeping them coming back", groups: [
       { label: "The relationship", items: [
-        { k: "cs_after_rebook", label: "The checkout rebook screen suggested their real rhythm and created the future appointment with the discount", card: "rebookco" },
+        { k: "cs_after_rebook", label: "The checkout rebook screen jumped to the calendar pre-filled — or set the 'time to book' text reminder", card: "rebookco" },
         { k: "cs_after_wrap", label: "Wrap-up saved the learned service time, the photo to their gallery and the note to their card", card: "autotiming" },
         { k: "cs_after_radar", label: "The overdue-regulars radar surfaces who's due — nudge and dismiss both behave", card: null },
         { k: "cs_after_review", label: "The review request went out after the visit and the review link worked", card: "reviews" },
@@ -20435,6 +20414,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const [hoursEdit, setHoursEdit] = useState(null); // { providerId } → opens the per-barber hours editor
   const [pressInd, setPressInd] = useState(null); // { providerId, start, y } live indicator while holding
   const [checkout, setCheckout] = useState(null); // appt being checked out
+  const [rebookPrefill, setRebookPrefill] = useState(null); // { clientId, serviceId, providerId, name } — armed by the checkout rebook screen; the next open slot tapped opens the form pre-filled
   const [showDatePicker, setShowDatePicker] = useState(false); // month-grid date jumper triggered by tapping the date header
   const [registerOpen, setRegisterOpen] = useState(false); // walk-in register / point-of-sale overlay
   const dragRef = useRef(null);                // mutable: { id, startY, origStart, dur, moved }
@@ -20489,35 +20469,34 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     if (recs.length) return recs.reduce((s, r) => s + (r.amount || 0) - (r.tip || 0) - (r.refunded || 0), 0);
     return Math.max(0, ((appt.paid && appt.paid.total) || 0) - ((appt.paid && appt.paid.tip) || 0));
   };
-  // The actual "this ticket is done and paid" write (plus the rebooked future appointment).
-  // Runs the moment checkout shows "All done" (via onCommit) so the status can't be lost if the
-  // app is backgrounded during the closing animation. Guarded per-ticket: the close handler
-  // re-runs it harmlessly, and the rebook appointment can never be created twice.
+  // The actual "this ticket is done and paid" write. Runs the moment checkout shows "All done"
+  // (via onCommit) so the status can't be lost if the app is backgrounded during the closing
+  // animation. Guarded per-ticket; the close handler re-runs it harmlessly.
   const committedRef = useRef({});
   const commitCheckout = (id, summary) => {
     if (committedRef.current[id]) return;
     committedRef.current[id] = true;
-    setAppts((cur) => {
-      const done = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a);
-      // if they rebooked, drop a real future appointment on the calendar — confirmed, NOT prepaid
-      if (summary && (summary.rebookWeeks != null || summary.rebookDate)) {
-        const src = cur.find((a) => a.id === id);
-        if (src) {
-          const nd = summary.rebookDate ? new Date(summary.rebookDate + "T00:00:00") : (() => { const d = new Date(); d.setDate(d.getDate() + summary.rebookWeeks * 7); return d; })();
-          const dur = src.end - src.start;
-          const startMin = (summary.rebookStart != null) ? summary.rebookStart : earliestOpenSlot(src.providerId, nd, dur);
-          const newAppt = { ...src, id: "rb" + Date.now() + Math.floor(Math.random() * 1000), status: "confirmed", paid: null, prepaid: false, rebookDiscount: (business?.rebook?.discountEnabled !== false ? (business?.rebook?.discount || 0) : 0), rebookDiscountType: business?.rebook?.discountType || "amount", bookedFor: nd.toISOString(), start: startMin, end: startMin + dur, photos: 0, hasPhotos: false, hasNote: false };
-          fireStaffPush({ shopId, title: "New booking", appt: newAppt, event: "newBooking", business });
-          fireStaffNotify({ shopId, appt: newAppt, business });
-          done.push(newAppt);
-        }
-      }
-      return done;
-    });
+    setAppts((cur) => cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a));
   };
   const finishCheckout = (id, summary) => {
     commitCheckout(id, summary);
     setCheckout(null);
+    const src = appts.find((a) => a.id === id);
+    // Rebook hand-off: land on the REAL calendar (whole day, open spots and all) with this
+    // client + service armed — the next open slot the barber taps opens the form pre-filled.
+    if (summary && summary.rebookJump && src) {
+      if (summary.rebookJump.date) {
+        const d = new Date(summary.rebookJump.date); d.setHours(0, 0, 0, 0);
+        const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+        setDayOffset(Math.round((d - t0) / 86400000));
+      }
+      setRebookPrefill({ clientId: src.clientId, serviceId: src.serviceId, providerId: src.providerId, name: (src.name || "the client").split(" ")[0] });
+    }
+    // "Text a reminder instead": stamp the due date on the client — the reminder cron sends it.
+    if (summary && summary.bookReminder && src && src.clientId) {
+      setClients((curC) => curC.map((c) => c.id === src.clientId ? { ...c, bookReminder: { at: summary.bookReminder.at, label: summary.bookReminder.label, serviceId: src.serviceId || null, serviceName: src.serviceName || src.title || "", createdAt: new Date().toISOString() } } : c));
+      showToast(`Reminder set — ${(src.name || "the client").split(" ")[0]} gets a "time to book" text in ${summary.bookReminder.label}.`);
+    }
     // After-visit review request (gated by Settings → Customer Reviews + visit count). Fire-and-forget.
     try {
       const src = appts.find((a) => a.id === id);
@@ -21321,7 +21300,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       <div style={{ position: "sticky", top: "calc(env(safe-area-inset-top, 0px) + 56px)", zIndex: 9, background: "var(--bg)", margin: "0 -10px", padding: "6px 10px 0", borderBottom: "1px solid var(--line)" }}>
       {/* Scrollable multi-week day strip — swipe horizontally, tap to pick. Includes 14 days back so barbers can look up past visits. */}
       <div ref={dayStripRef} style={{ display: "flex", gap: 6, marginBottom: 4, padding: "4px 2px", overflowX: "auto", scrollSnapType: "x proximity", WebkitOverflowScrolling: "touch" }}>
-        {Array.from({ length: 14 + 28 }, (_, i) => { // 14 days back + 28 days ahead; today sits at index 14 and is pre-scrolled into view on mount
+        {Array.from({ length: 14 + 70 }, (_, i) => { // 14 days back + 70 days ahead (rebook chips jump up to 8 weeks); today sits at index 14 and is pre-scrolled into view on mount
           const offset = i - 14;
           const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + offset);
           const isSelected = d.toDateString() === selectedDate.toDateString();
@@ -21346,6 +21325,15 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
         ); })}
       </div>
       </div>
+
+      {/* Rebook hand-off banner — armed at checkout; tapping any open time opens the form pre-filled */}
+      {rebookPrefill && (
+        <div className="fade-in" style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--wash)", border: "1px solid var(--gold)", borderRadius: 12, padding: "10px 12px", margin: "8px 0 0" }}>
+          <Repeat size={16} style={{ color: "var(--gold)", flexShrink: 0 }} />
+          <div style={{ flex: 1, fontSize: 14, color: "var(--text)", lineHeight: 1.35 }}><strong style={{ fontWeight: 600 }}>Rebooking {rebookPrefill.name}</strong> — tap any open time and the appointment is pre-filled.</div>
+          <button onClick={() => setRebookPrefill(null)} style={{ background: "none", border: "none", color: "var(--sub)", padding: 4, cursor: "pointer" }}><X size={16} /></button>
+        </div>
+      )}
 
       {/* the timeline grid — full-bleed to the screen edges, Mango-style */}
       <div style={{ display: "flex", position: "relative", gap: 4, margin: "6px -10px 0" }}>
@@ -21679,8 +21667,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       {newApptSlot && (
         <NewAppointmentForm
           slot={newApptSlot}
-          initialClient={newApptSlot.initialClient || null}
-          initialService={newApptSlot.initialService || null}
+          initialClient={newApptSlot.initialClient || (rebookPrefill && (clients || []).find((c) => c.id === rebookPrefill.clientId)) || null}
+          initialService={newApptSlot.initialService || (rebookPrefill && (services || []).find((s) => s.id === rebookPrefill.serviceId)) || null}
           providers={providers}
           clients={clients}
           services={services}
@@ -21690,7 +21678,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           smartTimes={!!newApptSlot.rebook}
           onClose={() => setNewApptSlot(null)}
           onPickDate={(d) => { const t0 = new Date(); t0.setHours(0, 0, 0, 0); const tg = new Date(d); tg.setHours(0, 0, 0, 0); setDayOffset(Math.round((tg - t0) / 86400000)); }}
-          onBook={bookAppt}
+          onBook={(data) => { if (rebookPrefill) setRebookPrefill(null); return bookAppt(data); }}
           onBlock={({ providerId, start }) => {
             // hand off to the detail window instead of dropping a bare block
             setNewApptSlot(null);
@@ -21903,11 +21891,8 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   const [tipPct, setTipPct] = useState(tipCfg.enabled ? (tipCfg.smartDefault ?? tipCfg.presets[0]) : 0);
   const [customTip, setCustomTip] = useState(tipCfg.enabled ? null : 0);
   const [tipOpen, setTipOpen] = useState(false);
-  const [rebookWeeks, setRebookWeeks] = useState(null);
-  const [customDate, setCustomDate] = useState(null); // ISO date string when picked manually
-  const [chosenStart, setChosenStart] = useState(null); // minutes-of-day the barber picked for the rebook
-  const [pickView, setPickView] = useState("list"); // "list" chips | "calendar" day-timeline
-  const [showAllRebookTimes, setShowAllRebookTimes] = useState(false); // optimal (no-gap) times by default; "show all times" reveals every open slot
+  const [rebookOutcome, setRebookOutcome] = useState(null); // {kind:"calendar", date, label} → jump to the real calendar prefilled · {kind:"reminder", at, label} → schedule a "time to book" text
+  const [remindPick, setRemindPick] = useState(""); // dropdown value on the rebook screen ("2w".."8w", "3m".."5m")
   // ---- POS sale lines: the appointment's locked total is the first line; more can be added ----
   const [lines, setLines] = useState([{ id: "main", name: service?.name || appt.title || "Service", withName: provider?.name || null, price: base }]);
   const [addSheet, setAddSheet] = useState(null);   // null | "service" | "product"
@@ -21962,8 +21947,6 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     ? { paymentMethodId: cofPmId, stripeCustomerId: cofRaw.stripeCustomerId, brand: cofRaw.brand, last4: cofRaw.last4 }
     : null;
   const money = (n) => `$${n.toFixed(2)}`;
-  const discountOn = rebookCfg.discountEnabled !== false && (rebookCfg.discount || 0) > 0;
-  const discLabel = rebookCfg.discountType === "percent" ? `${rebookCfg.discount}%` : money(rebookCfg.discount);
 
   // Write the sale into the ledger PaymentsView reads (client.payments, or business.sales for walk-ins).
   const recordSale = (rec) => {
@@ -22022,11 +22005,10 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   };
   useEffect(() => {
     if (stage === "approved") { const t = setTimeout(() => setStage(!reopen && rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
-    if (stage === "rebook" && rhythmWeek != null && rebookWeeks == null && !customDate) { setRebookWeeks(rhythmWeek); }
     if (stage === "done") {
       const grandTotal = reopen ? +(alreadyPaid + (paidRec ? paidRec.amount : 0)).toFixed(2) : total;
       const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt;
-      const summary = { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, discount: discountAmt, discountName: reopen ? ((appt.paid && appt.paid.discountName) || null) : (checkoutDiscount ? checkoutDiscount.name : null), rebookWeeks, rebookDate: customDate, rebookStart: chosenStart, rebookLabel: hasSelection ? selectionLabel : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null };
+      const summary = { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, discount: discountAmt, discountName: reopen ? ((appt.paid && appt.paid.discountName) || null) : (checkoutDiscount ? checkoutDiscount.name : null), rebookJump: (rebookOutcome && rebookOutcome.kind === "calendar") ? { date: rebookOutcome.date, label: rebookOutcome.label } : null, bookReminder: (rebookOutcome && rebookOutcome.kind === "reminder") ? { at: rebookOutcome.at, label: rebookOutcome.label } : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null };
       // Commit the ticket (status → done + paid summary) the INSTANT "All done" appears — the
       // dwell below is purely visual. Before this, the write only happened after the 1.2s dwell,
       // so swiping the app away right at "All done" silently lost the whole checkout.
@@ -22036,32 +22018,20 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     }
   }, [stage]);
 
-  const rebookDate = (weeks) => { const d = new Date(); d.setDate(d.getDate() + weeks * 7); return d; };
-  const fmtRebook = (weeks) => { const d = rebookDate(weeks); return `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
-  const fmtCustom = (iso) => { const d = new Date(iso + "T00:00:00"); return `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
-  const hasSelection = rebookWeeks != null || customDate != null;
-  const selectionLabel = customDate ? fmtCustom(customDate) : (rebookWeeks != null ? fmtRebook(rebookWeeks) : "");
-
-  // The day we're rebooking onto (from the chosen cadence or custom date).
-  const targetDate = customDate ? new Date(customDate + "T00:00:00") : (rebookWeeks != null ? rebookDate(rebookWeeks) : null);
-  const targetLabel = targetDate ? `${DAYS_SHORT[targetDate.getDay()]}, ${MONTHS[targetDate.getMonth()]} ${targetDate.getDate()}` : "";
-  const apptDur = Math.max(15, (appt.end - appt.start) || service?.duration || 30);
-  const sameDayLocal = (iso, ref) => { if (!iso || !ref) return false; const a = new Date(iso); return a.getFullYear() === ref.getFullYear() && a.getMonth() === ref.getMonth() && a.getDate() === ref.getDate(); };
-  // Build the slot list for the target day: every open 15-min start where the appt fits,
-  // flagged "best" when it sits back-to-back with an existing appointment (no gap left behind).
-  const daySlots = (() => {
-    if (!targetDate || !provider) return { off: false, slots: [] };
-    const dow = targetDate.getDay();
-    const h = (provider.hours && provider.hours[dow]) || { on: true, start: 9 * 60, end: 19 * 60 };
-    if (!h.on) return { off: true, slots: [] };
-    const slots = computeFreeSlots({ prov: provider, date: targetDate, durMin: apptDur, providers: [provider], appts, business, gold: true });
-    return { off: false, slots };
-  })();
-  const hasBest = daySlots.slots.some((s) => s.best);
-  // Optimal = the gap-free anchors (flush against an appt, or day open/close). Show ONLY these by
-  // default so a rebook fits in nicely; "Show all times" reveals every open slot.
-  const optimalSlots = hasBest ? daySlots.slots.filter((s) => s.best) : daySlots.slots;
-  const listSlots = showAllRebookTimes ? daySlots.slots : optimalSlots;
+  // Quick-jump chips: each ideal week snapped FORWARD to the next day this barber actually works
+  // (hoursOverrides-aware via hoursForDate), so a chip can never land on a day off.
+  const snapToWorkday = (d) => {
+    if (!provider) return d;
+    for (let i = 0; i < 7; i++) { const t = new Date(d); t.setDate(d.getDate() + i); const h = hoursForDate(provider, t); if (h && h.on) return t; }
+    return d;
+  };
+  const chipWeeks = Array.from(new Set([1, ...(rebookCfg.weeks || [2, 3, 4, 6, 8])])).sort((a, b) => a - b);
+  const chipDate = (w) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + w * 7); return snapToWorkday(d); };
+  const fmtDay = (d) => `${DAYS_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  const goCalendar = (dateObj, label) => { setRebookOutcome({ kind: "calendar", date: dateObj ? dateObj.toISOString() : null, label: label || null }); setStage("done"); };
+  // "Text a reminder instead" choices: 2/3/4/6/8 weeks, then 3/4/5 months.
+  const REMIND_OPTS = [["2w", "2 weeks", { d: 14 }], ["3w", "3 weeks", { d: 21 }], ["4w", "4 weeks", { d: 28 }], ["6w", "6 weeks", { d: 42 }], ["8w", "8 weeks", { d: 56 }], ["3m", "3 months", { m: 3 }], ["4m", "4 months", { m: 4 }], ["5m", "5 months", { m: 5 }]];
+  const remindDate = (v) => { const o = REMIND_OPTS.find((x) => x[0] === v); if (!o) return null; const d = new Date(); d.setHours(9, 0, 0, 0); if (o[2].d) d.setDate(d.getDate() + o[2].d); else d.setMonth(d.getMonth() + o[2].m); return d; };
 
   const sheet = (inner, dismissable, top = true) => createPortal((
     <div className="fade-in" onClick={dismissable ? onClose : undefined} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 60, display: "flex", alignItems: top ? "flex-start" : "flex-end", justifyContent: "center" }}>
@@ -22391,12 +22361,12 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     </div>
   );
 
-  if (stage === "rebook") return sheet(
+  if (stage === "rebook") { const first = appt.name ? appt.name.split(" ")[0] : "them"; return sheet(
     <div style={{ padding: "28px 24px 32px" }}>
-      <div style={{ textAlign: "center", marginBottom: 26 }}>
+      <div style={{ textAlign: "center", marginBottom: 20 }}>
         <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--wash)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Repeat size={26} style={{ color: "var(--gold)" }} /></div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 27, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, lineHeight: 1.15 }}>{discountOn ? `Save ${discLabel} by rebooking now?` : "Book the next visit?"}</h2>
-        <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300 }}>{discountOn ? `Lock in ${appt.name ? appt.name.split(" ")[0] : "the next visit"}'s next ${service?.name || "appointment"} and take ${discLabel} off.` : `Lock in ${appt.name ? appt.name.split(" ")[0] : "the next visit"}'s next ${service?.name || "appointment"} before they head out.`}</p>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 500, letterSpacing: -0.3, marginBottom: 8, lineHeight: 1.15 }}>Rebook {first}?</h2>
+        <p style={{ color: "var(--sub)", fontSize: 15, fontWeight: 300, lineHeight: 1.5 }}>Jump ahead to see the real schedule, then tap any open time on the calendar — {first}'s appointment comes pre-filled.</p>
       </div>
       {(() => {
         // Rhythm read-out: how long since the last visit + their usual cadence. Helps the barber pick instantly.
@@ -22406,7 +22376,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
         const usualTxt = cadenceDays ? (cadenceDays < 14 ? `every ${cadenceDays} days` : `every ${Math.round(cadenceDays / 7)} weeks`) : null;
         if (!sinceTxt && !usualTxt) return null;
         return (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap", background: "var(--wash)", border: "1px solid var(--wash)", borderRadius: 12, padding: "11px 14px", marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap", background: "var(--wash)", border: "1px solid var(--wash)", borderRadius: 12, padding: "11px 14px", marginBottom: 16 }}>
             <Clock size={15} style={{ color: "var(--gold)", flexShrink: 0 }} />
             <span style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.4, textAlign: "center" }}>
               {sinceTxt && <>Last visit <strong style={{ color: "var(--text)", fontWeight: 600 }}>{sinceTxt}</strong></>}
@@ -22416,118 +22386,39 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           </div>
         );
       })()}
-      <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", marginBottom: 10 }}>WHEN?</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 12 }}>
-        {rebookCfg.weeks.map((w) => { const on = rebookWeeks === w && !customDate; const isRhythm = w === rhythmWeek; return (
-          <button key={w} onClick={() => { setRebookWeeks(w); setCustomDate(null); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${on ? "var(--gold)" : "var(--border2)"}`, background: on ? "var(--wash)" : "var(--panel)", color: "var(--text)", textAlign: "left" }}>
-            <div><div style={{ fontSize: 16, fontWeight: 600 }}>{w} weeks</div><div style={{ fontSize: 13, color: isRhythm ? "var(--gold)" : "var(--sub)", marginTop: 2 }}>{isRhythm ? `${appt.name ? appt.name.split(" ")[0] + "'s" : "their"} usual rhythm` : fmtRebook(w)}</div></div>
-            {on && <Check size={18} style={{ color: "var(--gold)" }} />}
+      <button className="lift" onClick={() => goCalendar(null, null)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 17, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, border: "none", boxShadow: "var(--glow)" }}><Calendar size={18} /> GO TO CALENDAR</button>
+      <div style={{ fontSize: 13, letterSpacing: 1.5, color: "var(--faint)", margin: "20px 0 10px" }}>OR JUMP AHEAD TO</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+        {chipWeeks.map((w) => { const d = chipDate(w); const isRhythm = w === rhythmWeek; return (
+          <button key={w} className="lift" onClick={() => goCalendar(d, fmtDay(d))} style={{ padding: "14px 15px", borderRadius: 14, border: `1px solid ${isRhythm ? "var(--gold)" : "var(--border2)"}`, background: isRhythm ? "var(--wash)" : "var(--panel)", color: "var(--text)", textAlign: "left" }}>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>{w === 1 ? "Next week" : `${w} weeks`}</div>
+            <div style={{ fontSize: 13, color: isRhythm ? "var(--gold)" : "var(--sub)", marginTop: 2 }}>{isRhythm ? `${first}'s usual · ` : ""}{fmtDay(d)}</div>
           </button>
         ); })}
       </div>
-      {/* custom date — opens the device calendar/date picker */}
-      <label style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderRadius: 14, border: `1px solid ${customDate ? "var(--gold)" : "var(--border2)"}`, background: customDate ? "var(--wash)" : "var(--panel)", color: "var(--text)", marginBottom: 22, cursor: "pointer" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Calendar size={19} style={{ color: "var(--gold)" }} />
+      {/* Not ready to pin a day? Schedule a "time to book" text instead. */}
+      <div style={{ marginTop: 20, background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 16, padding: "16px 16px 14px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 11, marginBottom: 12 }}>
+          <MessageSquare size={18} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
           <div>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>{customDate ? fmtCustom(customDate) : "Pick a custom date"}</div>
-            <div style={{ fontSize: 13, color: "var(--sub)", marginTop: 2 }}>{customDate ? "Tap to change" : "Open the calendar"}</div>
+            <div style={{ fontSize: 15.5, fontWeight: 600 }}>Text a reminder instead</div>
+            <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2, lineHeight: 1.4 }}>Not booking today? We'll text {first} when it's time.</div>
           </div>
         </div>
-        {customDate ? <Check size={18} style={{ color: "var(--gold)" }} /> : <ChevronRight size={18} style={{ color: "var(--faint)" }} />}
-        <input type="date" value={customDate || ""} min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)} onChange={(e) => { if (e.target.value) { setCustomDate(e.target.value); setRebookWeeks(null); } }} style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
-      </label>
-      <button className="lift" disabled={!hasSelection} onClick={() => { setChosenStart(null); setShowAllRebookTimes(false); setStage("pickTime"); }} style={{ width: "100%", background: !hasSelection ? "var(--panel2)" : "linear-gradient(155deg,#FCE187 0%,#F4C84F 34%,#E5AC34 70%,#CF971F 100%)", color: !hasSelection ? "var(--faint)" : "#33260A", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: !hasSelection ? "none" : "0 10px 22px -8px rgba(190,135,20,.55), inset 0 1px 0 rgba(255,255,255,.6)" }}>{!hasSelection ? "PICK A DAY FIRST" : `PICK A TIME · ${selectionLabel}`}</button>
-      {hasSelection && <p style={{ color: "var(--faint)", fontSize: 13.5, lineHeight: 1.5, textAlign: "center", marginTop: 10 }}>{discountOn ? `Nothing is charged today — the ${discLabel} is taken off when they come in. ` : "Nothing is charged today. "}We'll send the confirmation and reminders automatically.</p>}
-      <button onClick={() => { setRebookWeeks(null); setCustomDate(null); setChosenStart(null); setStage("done"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 4 }}>NO THANKS</button>
-    </div>
-  );
-
-  if (stage === "pickTime") return sheet(
-    <div style={{ padding: "24px 22px 30px" }}>
-      <button onClick={() => setStage("rebook")} style={{ background: "none", color: "var(--sub)", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 16 }}><ArrowLeft size={16} /> Back</button>
-      <div style={{ textAlign: "center", marginBottom: 20 }}>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 500, letterSpacing: -0.3, marginBottom: 6 }}>Pick a time</h2>
-        <p style={{ color: "var(--sub)", fontSize: 14.5, fontWeight: 300 }}>{targetLabel}{provider?.name ? ` · ${provider.name}` : ""}</p>
-      </div>
-      {daySlots.off ? (
-        <div style={{ textAlign: "center", padding: "24px 0", color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5 }}>{provider?.name || "This staff member"} isn't working that day.<br />Go back and pick a different day.</div>
-      ) : daySlots.slots.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "24px 0", color: "var(--sub)", fontSize: 14.5, lineHeight: 1.5 }}>That day is fully booked.<br />Go back and try another day.</div>
-      ) : (
-        <>
-          {hasBest && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--text2)", marginBottom: 12, lineHeight: 1.4 }}>
-              <span style={{ width: 12, height: 12, borderRadius: 4, background: "linear-gradient(145deg,#F4C84F,#CF971F)", flexShrink: 0 }} />
-              Gold times sit right against another appointment — no gaps in {provider?.name ? provider.name.split(" ")[0] + "'s" : "the"} day.
-            </div>
-          )}
-          <div style={{ display: "flex", background: "var(--panel2)", borderRadius: 11, padding: 4, gap: 4, marginBottom: 14 }}>
-            {[["list", "List"], ["calendar", "Calendar"]].map(([v, lbl]) => { const on = pickView === v; return (
-              <button key={v} onClick={() => setPickView(v)} style={{ flex: 1, textAlign: "center", fontSize: 13, fontWeight: 600, padding: "9px 0", borderRadius: 8, border: "none", background: on ? "var(--panel)" : "transparent", color: on ? "var(--text)" : "var(--sub)", boxShadow: on ? "0 1px 3px rgba(0,0,0,.12)" : "none" }}>{lbl}</button>
-            ); })}
+        <div style={{ display: "flex", gap: 9 }}>
+          <div style={{ position: "relative", flex: 1 }}>
+            <select value={remindPick} onChange={(e) => setRemindPick(e.target.value)} style={{ width: "100%", appearance: "none", WebkitAppearance: "none", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "13px 34px 13px 14px", fontSize: 15, fontWeight: 500, color: remindPick ? "var(--text)" : "var(--sub)", fontFamily: FONT_BODY }}>
+              <option value="">Remind in…</option>
+              {REMIND_OPTS.map(([v, lbl]) => <option key={v} value={v}>{lbl}</option>)}
+            </select>
+            <ChevronDown size={16} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--sub)", pointerEvents: "none" }} />
           </div>
-          {pickView === "list" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-              {listSlots.map((s) => {
-                const sel = chosenStart === s.start;
-                return (
-                  <button key={s.start} onClick={() => setChosenStart(s.start)} className={sel ? "vslot-sel" : undefined} style={{ position: "relative", overflow: "hidden", padding: "14px 0", borderRadius: 13, fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: sel || s.best ? 600 : 500,
-                    background: sel
-                      ? "linear-gradient(155deg,#FCE187 0%,#F4C84F 34%,#E5AC34 70%,#CF971F 100%)"
-                      : s.best ? "color-mix(in srgb, #F4C84F 20%, var(--panel))" : "var(--panel)",
-                    color: sel ? "#33260A" : "var(--text)",
-                    border: `${s.best && !sel ? "1.5px" : "1px"} solid ${sel ? "#C8901C" : s.best ? "#E7C065" : "var(--border2)"}`,
-                    boxShadow: sel
-                      ? "0 8px 18px -6px rgba(190,135,20,.55), inset 0 1px 0 rgba(255,255,255,.6), inset 0 -2px 4px rgba(150,100,10,.22)"
-                      : s.best ? "0 2px 7px -2px rgba(199,151,40,.30)" : "0 1px 2px rgba(60,45,15,.05)" }}>
-                    {s.best && !sel && <span style={{ position: "absolute", top: 7, left: "50%", transform: "translateX(-50%)", width: 5, height: 5, borderRadius: "50%", background: "linear-gradient(145deg,#FAD879,#D99B1C)", boxShadow: "0 0 5px rgba(217,155,28,.6)" }} />}
-                    {fmtTime(s.start)}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (() => {
-            const dow = targetDate.getDay();
-            const h = (provider.hours && provider.hours[dow]) || { on: true, start: 9 * 60, end: 19 * 60 };
-            const winStart = h.start, winEnd = h.end, PPMt = 1.0;
-            const heightT = Math.max(160, (winEnd - winStart) * PPMt);
-            const dayBlocks = (appts || []).filter((a) => a.providerId === provider.id && sameDayLocal(a.bookedFor, targetDate) && a.status !== "cancelled" && a.status !== "done").sort((a, b) => a.start - b.start);
-            const seen = {}; const boxes = [];
-            daySlots.slots.forEach((s) => { if ((s.best || s.start % 60 === 0 || s.start === chosenStart) && !seen[s.start]) { seen[s.start] = 1; boxes.push(s); } });
-            return (
-              <div style={{ display: "flex" }}>
-                <div style={{ width: 42, flexShrink: 0, position: "relative", height: heightT }}>
-                  {Array.from({ length: Math.floor((winEnd - winStart) / 60) + 1 }).map((_, i) => { const t = winStart + i * 60; return (
-                    <div key={t} style={{ position: "absolute", top: (t - winStart) * PPMt - 6, right: 8, fontSize: 12, color: "var(--faint)" }}>{fmtTime(t).replace(":00", "")}</div>
-                  ); })}
-                </div>
-                <div style={{ flex: 1, position: "relative", height: heightT, borderLeft: "1px solid var(--border2)", background: `repeating-linear-gradient(var(--border2) 0 1px, transparent 1px ${60 * PPMt}px)` }}>
-                  {dayBlocks.map((a) => (
-                    <div key={a.id} style={{ position: "absolute", left: 4, right: 4, top: (a.start - winStart) * PPMt, height: Math.max(18, (a.end - a.start) * PPMt), borderRadius: 8, background: "var(--panel2)", borderLeft: "3px solid var(--border2)", padding: "3px 8px", fontSize: 12.5, color: "var(--sub)", overflow: "hidden", boxSizing: "border-box" }}>{(a.name || a.title || "Booked").split(" ")[0]}</div>
-                  ))}
-                  {boxes.map((s) => { const sel = chosenStart === s.start; return (
-                    <button key={s.start} onClick={() => setChosenStart(s.start)} style={{ position: "absolute", left: 4, right: 4, top: (s.start - winStart) * PPMt, height: 22, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fraunces', serif", fontSize: 13.5, fontWeight: sel || s.best ? 600 : 500, overflow: "hidden",
-                      background: sel ? "linear-gradient(155deg,#FCE187,#E5AC34)" : s.best ? "color-mix(in srgb, #F4C84F 22%, var(--panel))" : "var(--panel)",
-                      color: sel ? "#33260A" : s.best ? "var(--text)" : "var(--faint)",
-                      border: sel ? "1px solid #C8901C" : s.best ? "1.5px solid #E7C065" : "1.5px dashed var(--border2)",
-                      boxShadow: sel ? "0 6px 14px -5px rgba(190,135,20,.6)" : "none" }}>
-                      {s.best && !sel && <span style={{ position: "absolute", top: 3, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "linear-gradient(145deg,#FAD879,#D99B1C)" }} />}
-                      {fmtTime(s.start)}
-                    </button>
-                  ); })}
-                </div>
-              </div>
-            );
-          })()}
-          {hasBest && pickView === "list" && (
-            <button onClick={() => setShowAllRebookTimes((v) => !v)} style={{ display: "block", margin: "16px auto 0", background: "none", border: "none", color: "var(--gold)", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}>{showAllRebookTimes ? "Show best times only" : "Show all times"}</button>
-          )}
-          <button className="lift" disabled={chosenStart == null} onClick={() => setStage("done")} style={{ width: "100%", marginTop: 20, background: chosenStart == null ? "var(--panel2)" : "linear-gradient(155deg,#FCE187 0%,#F4C84F 34%,#E5AC34 70%,#CF971F 100%)", color: chosenStart == null ? "var(--faint)" : "#33260A", padding: 16, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 14, boxShadow: chosenStart == null ? "none" : "0 10px 22px -8px rgba(190,135,20,.55), inset 0 1px 0 rgba(255,255,255,.6)" }}>{chosenStart == null ? "TAP A TIME ABOVE" : (discountOn ? `BOOK ${fmtTime(chosenStart)} · SAVE ${discLabel}` : `BOOK ${fmtTime(chosenStart)}`)}</button>
-        </>
-      )}
+          <button className="lift" disabled={!remindPick} onClick={() => { const d = remindDate(remindPick); const o = REMIND_OPTS.find((x) => x[0] === remindPick); if (d && o) { setRebookOutcome({ kind: "reminder", at: d.toISOString(), label: o[1] }); setStage("done"); } }} style={{ flexShrink: 0, background: remindPick ? "var(--gold)" : "var(--panel2)", color: remindPick ? "var(--on-gold)" : "var(--faint)", border: "none", borderRadius: 12, padding: "13px 18px", fontSize: 13.5, fontWeight: 600, letterSpacing: 0.8 }}>SET</button>
+        </div>
+      </div>
+      <button onClick={() => { setRebookOutcome(null); setStage("done"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 8 }}>NO THANKS</button>
     </div>
-  );
+  ); }
 
   return sheet(
     <div className="fade-in" style={{ padding: "56px 28px 64px", textAlign: "center" }}>
@@ -22535,17 +22426,19 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
       <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 500, marginBottom: 8 }}>All done</div>
       <p style={{ color: "var(--sub)", fontSize: 15.5, fontWeight: 300 }}>{money(total)} charged for today’s visit · receipt sent to {appt.name || "the client"}.</p>
 
-      {hasSelection && (
+      {rebookOutcome && (
         <div style={{ marginTop: 24, textAlign: "left", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, boxShadow: "var(--shadow-sm)", padding: "18px 20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-            <Repeat size={18} style={{ color: "var(--gold)" }} />
-            <div style={{ fontSize: 15.5, fontWeight: 600 }}>Rebooked · {selectionLabel}</div>
+            {rebookOutcome.kind === "reminder" ? <Bell size={18} style={{ color: "var(--gold)" }} /> : <Repeat size={18} style={{ color: "var(--gold)" }} />}
+            <div style={{ fontSize: 15.5, fontWeight: 600 }}>{rebookOutcome.kind === "reminder" ? `Reminder set · in ${rebookOutcome.label}` : "Heading to the calendar"}</div>
           </div>
-          {[
-            [Check, `Confirmation sent to ${appt.name ? appt.name.split(" ")[0] : "client"} now`],
-            [Bell, "Reminders will go out automatically before the visit"],
-            [DollarSign, `${money(rebookCfg.discount)} comes off at that visit — nothing charged today`],
-          ].map(([Ico, txt], i) => (
+          {(rebookOutcome.kind === "reminder" ? [
+            [MessageSquare, `We'll text ${appt.name ? appt.name.split(" ")[0] : "the client"} on ${fmtDay(new Date(rebookOutcome.at))} with your booking link`],
+            [Check, "Nothing else to do today"],
+          ] : [
+            [Calendar, `The calendar opens${rebookOutcome.label ? ` on ${rebookOutcome.label}` : ""} — the whole day, open spots and all`],
+            [Check, `Tap any open time — ${appt.name ? appt.name.split(" ")[0] : "the client"}'s appointment is pre-filled`],
+          ]).map(([Ico, txt], i) => (
             <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "6px 0" }}>
               <Ico size={15} style={{ color: "var(--sub)", marginTop: 2, flexShrink: 0 }} />
               <span style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.45 }}>{txt}</span>
