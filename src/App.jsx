@@ -23564,6 +23564,7 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [revertAsk, setRevertAsk] = useState(0); // $ still on record when "Back to confirmed" was tapped (0 = closed)
+  const [deleteAsk, setDeleteAsk] = useState(false); // "are you sure?" — EVERY delete confirms (owner's rule)
   // Un-refunded money in the LEDGER for this appointment — the source of truth for refund
   // availability (appt.paid alone misses reverted tickets whose payment is still on record).
   const apptLedgerLeft = (() => {
@@ -24472,7 +24473,8 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
               <>
                 <div onClick={() => setMenuOpen(false)} style={{ position: "absolute", inset: 0, zIndex: 8 }} />
                 <div className="fade-in" style={{ position: "absolute", top: 56, right: 14, width: 250, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,0.28)", zIndex: 9, overflow: "hidden", padding: "6px 0" }}>
-                  <MenuItem T={T} danger icon={<Trash2 size={17} />} label="Cancel / Delete" onClick={() => { const paidOrDone = (appt.paid && Number(appt.paid.total) > 0) || appt.status === "done"; if (paidOrDone && typeof window !== "undefined" && !window.confirm("This appointment is checked out / paid. Deleting it permanently removes its record and it drops from your reports. Delete anyway?")) return; onDelete(appt.id); }} />
+                  {/* Deleting is destructive — ALWAYS confirm first (owner's rule), in-app, never a bare browser dialog. */}
+                  <MenuItem T={T} danger icon={<Trash2 size={17} />} label="Cancel / Delete" onClick={() => { setMenuOpen(false); setDeleteAsk(true); }} />
                   {appt.paid ? (
                     <>
                       <MenuItem T={T} icon={<DollarSign size={17} />} label="Reopen ticket" onClick={() => { setMenuOpen(false); onCheckout(appt, { reopen: true }); }} />
@@ -24532,6 +24534,21 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   </div>
                 </div>
               </>
+            )}
+
+            {deleteAsk && (
+              <div onClick={() => setDeleteAsk(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 810, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 20px 20px", boxSizing: "border-box" }}>
+                <div className="fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: T.panel, border: `1px solid ${T.line}`, borderRadius: 18, boxShadow: "0 18px 50px rgba(0,0,0,0.3)", zIndex: 811, padding: 24 }}>
+                  <div style={{ fontFamily: FONT_BODY, fontSize: 19, fontWeight: 600, marginBottom: 4, color: T.text }}>Delete this appointment?</div>
+                  <div style={{ fontSize: 15, color: T.sub, marginBottom: 18, lineHeight: 1.5 }}>
+                    {(appt.paid && Number(appt.paid.total) > 0) || appt.status === "done" || apptLedgerLeft > 0.009
+                      ? <>This ticket has been checked out{apptLedgerLeft > 0.009 ? ` — $${apptLedgerLeft.toFixed(2)} is still on record` : ""}. Deleting permanently removes it from the calendar and your reports. This can't be undone.</>
+                      : <>{(appt.name || "This client")}'s {appt.serviceName || appt.title || "appointment"} will be permanently removed from the calendar. This can't be undone — to keep the record, mark it cancelled instead.</>}
+                  </div>
+                  <button className="lift" onClick={() => { setDeleteAsk(false); onDelete(appt.id); }} style={{ width: "100%", background: "#B5564B", color: "#fff", border: "none", padding: "15px 0", borderRadius: 14, fontSize: 16.5, fontWeight: 600, cursor: "pointer" }}>Delete appointment</button>
+                  <button onClick={() => setDeleteAsk(false)} style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: T.sub, fontSize: 15.5, padding: 8, cursor: "pointer" }}>Keep it</button>
+                </div>
+              </div>
             )}
 
             {revertAsk > 0 && (
