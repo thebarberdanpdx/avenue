@@ -19992,6 +19992,22 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
     : [];
   const pickerSlots = (smartSlots.length && !showAllTimes) ? smartSlots : timeOptions;
 
+  // Shared "day chosen" handler for the date picker AND its rebook week chips: move the calendar
+  // there, seed a sane start time, and (in the rebook flow) roll straight into the time picker.
+  const pickDay = (d) => {
+    if (onPickDate) onPickDate(d);
+    const w = provObj && provObj.hours && provObj.hours[d.getDay()];
+    setStartMin(w && typeof w.start === "number" ? w.start : 9 * 60);
+    setShowDatePick(false);
+    if (smartTimes) setShowTimePick(true); // rebook: day chosen → show smart times for it
+  };
+  // Rebook week chips (Next week, 2/3/4/6/8 weeks), snapped forward to a day this barber works.
+  const rebookChips = smartTimes ? Array.from(new Set([1, ...((business.rebook && business.rebook.weeks) || [2, 3, 4, 6, 8])])).sort((a, b) => a - b).map((w) => {
+    let d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + w * 7);
+    if (provObj) { for (let i = 0; i < 7; i++) { const t = new Date(d); t.setDate(d.getDate() + i); const h = hoursForDate(provObj, t); if (h && h.on) { d = t; break; } } }
+    return { w, d };
+  }) : [];
+
   const fieldWrap = { padding: "26px 0", borderBottom: "1px solid var(--line)" };
 
   return createPortal((
@@ -20197,6 +20213,9 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             <div style={{ maxWidth: 460, margin: "0 auto 14px", fontSize: 13.5, color: "var(--sub)", lineHeight: 1.4, textAlign: "center" }}>
               {showAllTimes ? "Every open time" : "Best open times"}{provObj ? ` for ${provObj.name.split(" ")[0]}` : ""} · {dateLabel}
             </div>
+            {smartTimes && (
+              <button onClick={() => { setShowTimePick(false); setShowDatePick(true); }} style={{ display: "block", margin: "0 auto 16px", background: "none", border: "none", color: "var(--gold)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>‹ Pick a different day</button>
+            )}
             {pickerSlots.length === 0 ? (
               <div style={{ maxWidth: 460, margin: "0 auto", color: "var(--sub)", fontSize: 14.5, textAlign: "center", padding: "30px 0", lineHeight: 1.5 }}>No openings that fit this service{provObj ? ` in ${provObj.name.split(" ")[0]}'s day` : ""}. Try another day or someone else.</div>
             ) : (
@@ -20221,16 +20240,24 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: "8px 14px 40px" }}>
             <div style={{ maxWidth: 460, margin: "0 auto" }}>
+              {rebookChips.length > 0 && (
+                <div style={{ padding: "14px 4px 6px" }}>
+                  <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", margin: "0 0 8px 2px" }}>JUMP AHEAD</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                    {rebookChips.map(({ w, d }) => (
+                      <button key={w} className="lift" onClick={() => pickDay(d)} style={{ padding: "10px 4px", borderRadius: 10, background: "var(--panel)", border: "1px solid var(--border2)", fontSize: 13.5, fontWeight: 600, color: "var(--text)", textAlign: "center" }}>
+                        {w === 1 ? "Next week" : `${w} weeks`}
+                        <div style={{ fontSize: 11.5, color: "var(--sub)", fontWeight: 400, marginTop: 2 }}>{MONTHS[d.getMonth()].slice(0, 3)} {d.getDate()}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 12.5, letterSpacing: 1.5, color: "var(--faint)", margin: "16px 0 0 2px" }}>OR ANY DAY</div>
+                </div>
+              )}
               <DatePickerSheet
                 selectedDate={selectedDate}
                 onClose={() => setShowDatePick(false)}
-                onPick={(d) => {
-                  if (onPickDate) onPickDate(d);
-                  const w = provObj && provObj.hours && provObj.hours[d.getDay()];
-                  setStartMin(w && typeof w.start === "number" ? w.start : 9 * 60);
-                  setShowDatePick(false);
-                  if (smartTimes) setShowTimePick(true); // rebook: day chosen → show smart times for it
-                }}
+                onPick={pickDay}
               />
             </div>
           </div>
