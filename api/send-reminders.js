@@ -50,7 +50,8 @@ async function handler(req, res) {
   for (const shop of shops || []) {
     const settings = shop.settings || {};
     const reminders = (settings.messages || []).filter((m) => m.enabled && parseOffsetMinutes(m.timing) != null);
-    if (!reminders.length) continue;
+    // NOTE: no early `continue` when reminders is empty — the "time to book" pass further down
+    // must still run for this shop even if every appointment reminder is switched off.
     const business = settings.name || "your barber";
     const shopPhone = (settings.phones && settings.phones[0] && settings.phones[0].number) || "";
     const shopEmail = settings.email || "";
@@ -68,7 +69,7 @@ async function handler(req, res) {
     const provById = Object.fromEntries((provs.data || []).map((r) => [r.id, r.data || {}]));
     const svcById = Object.fromEntries((svcs.data || []).map((r) => [r.id, r.data || {}]));
 
-    for (const row of appts.data || []) {
+    for (const row of (reminders.length ? appts.data : []) || []) {
       const a = row.data || {};
       if (!a.bookedFor) continue;
       if (DEAD_STATUSES.includes(String(a.status || "").toLowerCase())) continue;

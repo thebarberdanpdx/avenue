@@ -20515,6 +20515,13 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     if (committedRef.current[id]) return;
     committedRef.current[id] = true;
     setAppts((cur) => cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a));
+    // "Text a reminder instead" stamps the client HERE, at the same commit moment as the ticket —
+    // stamping it after the closing dwell (like the old checkout write) could lose the reminder
+    // to an app swipe-away. The reminder cron picks it up from client.bookReminder.
+    if (summary && summary.bookReminder) {
+      const src = appts.find((a) => a.id === id);
+      if (src && src.clientId) setClients((curC) => curC.map((c) => c.id === src.clientId ? { ...c, bookReminder: { at: summary.bookReminder.at, label: summary.bookReminder.label, serviceId: src.serviceId || null, serviceName: src.serviceName || src.title || "", createdAt: new Date().toISOString() } } : c));
+    }
   };
   const finishCheckout = (id, summary) => {
     commitCheckout(id, summary);
@@ -20539,9 +20546,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       setRebookPrefill({ clientId: src.clientId, serviceId: src.serviceId, providerId: pid, name: (src.name || "the client").split(" ")[0] });
       setNewApptSlot({ providerId: pid, start: earliestOpenSlot(pid, targetDate, dur), initialClient: c, initialService: s, rebook: true, dayChosen: !!summary.rebookJump.date });
     }
-    // "Text a reminder instead": stamp the due date on the client — the reminder cron sends it.
+    // The reminder itself was stamped at commit time (commitCheckout) — this is just the receipt.
     if (summary && summary.bookReminder && src && src.clientId) {
-      setClients((curC) => curC.map((c) => c.id === src.clientId ? { ...c, bookReminder: { at: summary.bookReminder.at, label: summary.bookReminder.label, serviceId: src.serviceId || null, serviceName: src.serviceName || src.title || "", createdAt: new Date().toISOString() } } : c));
       showToast(`Reminder set — ${(src.name || "the client").split(" ")[0]} gets a "time to book" text in ${summary.bookReminder.label}.`);
     }
     // After-visit review request (gated by Settings → Customer Reviews + visit count). Fire-and-forget.
@@ -22446,7 +22452,9 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           </button>
         ); })}
       </div>
-      {/* Not ready to pin a day? Schedule a "time to book" text instead. */}
+      {/* Not ready to pin a day? Schedule a "time to book" text instead. Only offered when this
+          ticket has a real client record with a phone/email — otherwise nothing could ever send. */}
+      {liveClient && (liveClient.phone || liveClient.email) && (
       <div style={{ marginTop: 20, background: "var(--panel)", border: "1px solid var(--border2)", borderRadius: 16, padding: "16px 16px 14px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 11, marginBottom: 12 }}>
           <MessageSquare size={18} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
@@ -22466,6 +22474,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
           <button className="lift" disabled={!remindPick} onClick={() => { const d = remindDate(remindPick); const o = REMIND_OPTS.find((x) => x[0] === remindPick); if (d && o) { setRebookOutcome({ kind: "reminder", at: d.toISOString(), label: o[1] }); setStage("done"); } }} style={{ flexShrink: 0, background: remindPick ? "var(--gold)" : "var(--panel2)", color: remindPick ? "var(--on-gold)" : "var(--faint)", border: "none", borderRadius: 12, padding: "13px 18px", fontSize: 13.5, fontWeight: 600, letterSpacing: 0.8 }}>SET</button>
         </div>
       </div>
+      )}
       <button onClick={() => { setRebookOutcome(null); setStage("done"); }} style={{ width: "100%", background: "transparent", color: "var(--sub)", padding: 14, fontSize: 14, letterSpacing: 1, marginTop: 8 }}>NO THANKS</button>
     </div>
   , undefined, false); }
