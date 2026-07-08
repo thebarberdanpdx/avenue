@@ -2296,7 +2296,11 @@ function App() {
     return () => { alive = false; };
   }, [session]);
 
-  useEffect(() => { if (!loadedRef.current || !session) return; const snap = { business, categories, cutLibrary }; const t = setTimeout(async () => {
+  const shopsPendingRef = useRef(null); // debounced shops-settings snapshot awaiting save (flushed on app-background)
+  const fireShopsSave = async () => {
+    const snap = shopsPendingRef.current;
+    if (!snap) return;
+    shopsPendingRef.current = null;
     // The calendar connection (calSync) is owned by the server (api/calendar-pull + the cron). NEVER let
     // a general settings-save overwrite it with a stale local copy — that's what silently disconnected the
     // calendar. Read the server's current calSync right before writing and preserve it verbatim.
@@ -2304,17 +2308,40 @@ function App() {
     try { const { data } = await supabase.from('shops').select('settings').eq('id', SHOP_ID).maybeSingle(); if (data?.settings && 'calSync' in data.settings) keptCalSync = data.settings.calSync; } catch (e) {}
     const { error } = await supabase.from('shops').upsert({ id: SHOP_ID, name: snap.business?.name || SHOP_ID, settings: { ...snap.business, calSync: keptCalSync, _categories: snap.categories, _cutLibrary: snap.cutLibrary } });
     if (error) { console.error('[vero] save shops failed:', error); setSaveFailed(true); try { Sentry.captureException(new Error('settings save failed'), { tags: { area: "save", table: "shops" }, extra: { detail: String((error && error.message) || error) } }); } catch (e) {} } else setSaveFailed(false);
-  }, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
+  };
+  useEffect(() => { if (!loadedRef.current || !session) return; shopsPendingRef.current = { business, categories, cutLibrary }; const t = setTimeout(fireShopsSave, 800); return () => clearTimeout(t); }, [business, categories, cutLibrary]);
   // Stamp lastSaveAt the moment a LOCAL edit happens (this runs only for local changes — a
   // live-sync refetch sets state === lastRemoteRef, so it returns above). This suppresses the
   // realtime refetch during the ~800ms debounce BEFORE the save lands, so an incoming echo can't
   // re-pull stale server data and stomp the optimistic edit (the drag-reschedule "didn't take" bug).
-  useEffect(() => { if (!loadedRef.current || !session) return; if (clients === lastRemoteRef.current.clients) return; lastSaveAt.current.clients = Date.now(); const t = setTimeout(() => { syncList('clients', clients); }, 800); return () => clearTimeout(t); }, [clients]);
-  useEffect(() => { if (!loadedRef.current || !session) return; if (appts === lastRemoteRef.current.appointments) return; lastSaveAt.current.appointments = Date.now(); const t = setTimeout(() => { syncList('appointments', appts); }, 800); return () => clearTimeout(t); }, [appts]);
-  useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; lastSaveAt.current.waitlist = Date.now(); const t = setTimeout(() => { syncList('waitlist', waitlist); }, 800); return () => clearTimeout(t); }, [waitlist]);
-  useEffect(() => { if (!loadedRef.current || !session) return; if (reviews === lastRemoteRef.current.reviews) return; lastSaveAt.current.reviews = Date.now(); const t = setTimeout(() => { syncList('reviews', reviews); }, 800); return () => clearTimeout(t); }, [reviews]);
-  useEffect(() => { if (!loadedRef.current || !session) return; if (services === lastRemoteRef.current.services) return; lastSaveAt.current.services = Date.now(); const t = setTimeout(() => { syncList('services', services); }, 800); return () => clearTimeout(t); }, [services]);
-  useEffect(() => { if (!loadedRef.current || !session) return; if (providers === lastRemoteRef.current.providers) return; lastSaveAt.current.providers = Date.now(); providersDirtyRef.current = true; const t = setTimeout(() => { syncList('providers', providers).finally(() => { providersDirtyRef.current = false; }); }, 800); return () => clearTimeout(t); }, [providers]);
+  // Every save below is debounced 800ms. pendingSaveRef tracks what's queued so the flush listener
+  // (further down) can fire it IMMEDIATELY if the app is backgrounded during the debounce window —
+  // otherwise an iOS swipe-away right after an edit (e.g. finishing a checkout) suspends the JS
+  // before the write ever starts and the edit silently never reaches the server.
+  const pendingSaveRef = useRef({});
+  const firePending = (table) => {
+    const v = pendingSaveRef.current[table];
+    if (v === undefined) return;
+    delete pendingSaveRef.current[table];
+    if (table === 'providers') syncList('providers', v).finally(() => { providersDirtyRef.current = false; });
+    else syncList(table, v);
+  };
+  useEffect(() => { if (!loadedRef.current || !session) return; if (clients === lastRemoteRef.current.clients) return; lastSaveAt.current.clients = Date.now(); pendingSaveRef.current.clients = clients; const t = setTimeout(() => firePending('clients'), 800); return () => clearTimeout(t); }, [clients]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (appts === lastRemoteRef.current.appointments) return; lastSaveAt.current.appointments = Date.now(); pendingSaveRef.current.appointments = appts; const t = setTimeout(() => firePending('appointments'), 800); return () => clearTimeout(t); }, [appts]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (waitlist === lastRemoteRef.current.waitlist) return; lastSaveAt.current.waitlist = Date.now(); pendingSaveRef.current.waitlist = waitlist; const t = setTimeout(() => firePending('waitlist'), 800); return () => clearTimeout(t); }, [waitlist]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (reviews === lastRemoteRef.current.reviews) return; lastSaveAt.current.reviews = Date.now(); pendingSaveRef.current.reviews = reviews; const t = setTimeout(() => firePending('reviews'), 800); return () => clearTimeout(t); }, [reviews]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (services === lastRemoteRef.current.services) return; lastSaveAt.current.services = Date.now(); pendingSaveRef.current.services = services; const t = setTimeout(() => firePending('services'), 800); return () => clearTimeout(t); }, [services]);
+  useEffect(() => { if (!loadedRef.current || !session) return; if (providers === lastRemoteRef.current.providers) return; lastSaveAt.current.providers = Date.now(); providersDirtyRef.current = true; pendingSaveRef.current.providers = providers; const t = setTimeout(() => firePending('providers'), 800); return () => clearTimeout(t); }, [providers]);
+  // Backgrounded mid-debounce → flush every pending save NOW. syncList itself serializes per
+  // table and diffs against the server baseline, so a flush followed by a stale timer firing
+  // can never double-write or send stale data.
+  useEffect(() => {
+    const flushAll = () => { Object.keys(pendingSaveRef.current).forEach(firePending); fireShopsSave(); };
+    const onVis = () => { if (document.visibilityState === "hidden") flushAll(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", flushAll);
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("pagehide", flushAll); };
+  }, []);
 
   // Retry: re-push everything currently in memory (used by the failed-save banner's Retry button).
   const resaveAll = () => {
@@ -20443,7 +20470,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   // #16: an appointment that already carries a payment (checked out once, or a status reverted after
   // payment) must open in balance-only (reopen) mode — never the full-price charge flow — so it can
   // never be charged a second time. paidForAppt credits what was already collected.
-  const startCheckout = (appt, opts) => { setOpen(null); const alreadyPaid = !!(appt && appt.paid && Number(appt.paid.total) > 0); setCheckout(((opts && opts.reopen) || alreadyPaid) ? { ...appt, __reopen: true } : appt); };
+  const startCheckout = (appt, opts) => { setOpen(null); if (appt) delete committedRef.current[appt.id]; const alreadyPaid = !!(appt && appt.paid && Number(appt.paid.total) > 0); setCheckout(((opts && opts.reopen) || alreadyPaid) ? { ...appt, __reopen: true } : appt); };
   const [refundAppt, setRefundAppt] = useState(null); // appt whose payment is being refunded from the appointment sheet
   // Everything ever charged against an appointment (ledger first, appt summary as fallback).
   const paidForAppt = (appt) => {
@@ -20458,7 +20485,14 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     if (recs.length) return recs.reduce((s, r) => s + (r.amount || 0) - (r.tip || 0) - (r.refunded || 0), 0);
     return Math.max(0, ((appt.paid && appt.paid.total) || 0) - ((appt.paid && appt.paid.tip) || 0));
   };
-  const finishCheckout = (id, summary) => {
+  // The actual "this ticket is done and paid" write (plus the rebooked future appointment).
+  // Runs the moment checkout shows "All done" (via onCommit) so the status can't be lost if the
+  // app is backgrounded during the closing animation. Guarded per-ticket: the close handler
+  // re-runs it harmlessly, and the rebook appointment can never be created twice.
+  const committedRef = useRef({});
+  const commitCheckout = (id, summary) => {
+    if (committedRef.current[id]) return;
+    committedRef.current[id] = true;
     setAppts((cur) => {
       const done = cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt), pendingDurationSave: (summary && summary.durationSuggest) ? summary.durationSuggest : null } : a);
       // if they rebooked, drop a real future appointment on the calendar — confirmed, NOT prepaid
@@ -20476,6 +20510,9 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       }
       return done;
     });
+  };
+  const finishCheckout = (id, summary) => {
+    commitCheckout(id, summary);
     setCheckout(null);
     // After-visit review request (gated by Settings → Customer Reviews + visit count). Fire-and-forget.
     try {
@@ -21747,6 +21784,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           showToast={showToast}
           onClose={() => setCheckout(null)}
           onDone={finishCheckout}
+          onCommit={commitCheckout}
         />
       )}
     </div>
@@ -21822,7 +21860,7 @@ function CardChargeInline({ amount, appt, onCancel, onPaid, money }) {
   );
 }
 
-function Checkout({ appt, service, provider, business, setBusiness, clients, appts, setClients, allServices = [], reopen = false, alreadyPaid = 0, showToast, onClose, onDone }) {
+function Checkout({ appt, service, provider, business, setBusiness, clients, appts, setClients, allServices = [], reopen = false, alreadyPaid = 0, showToast, onClose, onDone, onCommit }) {
   // ---- auto-timing: measure actual service time, round UP to next 5 ----
   const measuredMin = appt.serviceStartedAt ? Math.round((Date.now() - appt.serviceStartedAt) / 60000) : null;
   const roundUp5 = (m) => Math.max(5, Math.ceil(m / 5) * 5);
@@ -21981,7 +22019,17 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
   useEffect(() => {
     if (stage === "approved") { const t = setTimeout(() => setStage(!reopen && rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
     if (stage === "rebook" && rhythmWeek != null && rebookWeeks == null && !customDate) { setRebookWeeks(rhythmWeek); }
-    if (stage === "done") { const grandTotal = reopen ? +(alreadyPaid + (paidRec ? paidRec.amount : 0)).toFixed(2) : total; const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt; const t = setTimeout(() => onDone(appt.id, { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, discount: discountAmt, discountName: reopen ? ((appt.paid && appt.paid.discountName) || null) : (checkoutDiscount ? checkoutDiscount.name : null), rebookWeeks, rebookDate: customDate, rebookStart: chosenStart, rebookLabel: hasSelection ? selectionLabel : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null }), 1200); return () => clearTimeout(t); }
+    if (stage === "done") {
+      const grandTotal = reopen ? +(alreadyPaid + (paidRec ? paidRec.amount : 0)).toFixed(2) : total;
+      const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt;
+      const summary = { total: grandTotal, totalLabel: money(grandTotal), tip: grandTip, discount: discountAmt, discountName: reopen ? ((appt.paid && appt.paid.discountName) || null) : (checkoutDiscount ? checkoutDiscount.name : null), rebookWeeks, rebookDate: customDate, rebookStart: chosenStart, rebookLabel: hasSelection ? selectionLabel : null, durationSuggest: showDurationSuggest ? { measuredMin, suggestedMin, currentDur, serviceId: service.id, serviceName: service?.name, clientId: liveClient?.id, clientName: liveClient?.name } : null };
+      // Commit the ticket (status → done + paid summary) the INSTANT "All done" appears — the
+      // dwell below is purely visual. Before this, the write only happened after the 1.2s dwell,
+      // so swiping the app away right at "All done" silently lost the whole checkout.
+      if (onCommit) onCommit(appt.id, summary);
+      const t = setTimeout(() => onDone(appt.id, summary), 1200);
+      return () => clearTimeout(t);
+    }
   }, [stage]);
 
   const rebookDate = (weeks) => { const d = new Date(); d.setDate(d.getDate() + weeks * 7); return d; };
@@ -25519,7 +25567,10 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
   const checkInAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "in-service", serviceStartedAt: x.serviceStartedAt || Date.now() } : x)); setDetail(null); showToast(`${firstName} checked in.`); };
   const cancelAppt = (a) => { setAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, status: "cancelled" } : x)); setDetail(null); showToast("Appointment cancelled."); };
-  const finishCheckoutLite = (id, summary) => { setAppts((cur) => cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceStartedAt ? Date.now() : a.serviceEndedAt } : a)); setCheckout(null); showToast("Payment recorded."); };
+  // Commit runs the moment checkout shows "All done" (idempotent — the close re-runs it harmlessly),
+  // so backgrounding the app during the closing animation can't lose the paid/done status.
+  const commitCheckoutLite = (id, summary) => setAppts((cur) => cur.map((a) => a.id === id ? { ...a, status: "done", paid: summary, serviceEndedAt: a.serviceEndedAt || (a.serviceStartedAt ? Date.now() : a.serviceEndedAt) } : a));
+  const finishCheckoutLite = (id, summary) => { commitCheckoutLite(id, summary); setCheckout(null); showToast("Payment recorded."); };
   const sameDayLocal = (iso, ref) => { if (!iso || !ref) return false; const a = new Date(iso); return a.getFullYear() === ref.getFullYear() && a.getMonth() === ref.getMonth() && a.getDate() === ref.getDate(); };
   // Double-booking guard for inline reschedule — mirrors the online-booking guard
   // (computeFreeSlots): any non-cancelled/non-done appt for that provider that day,
@@ -25997,6 +26048,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
           showToast={showToast}
           onClose={() => setCheckout(null)}
           onDone={finishCheckoutLite}
+          onCommit={commitCheckoutLite}
         />
       )}
     </div>

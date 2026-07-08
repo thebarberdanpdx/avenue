@@ -115,6 +115,8 @@ const GUARDS = [
   { needle: "setTabNonce(", label: "bottom-tab tap resets to tab root" },
   { needle: "per-barber-pricing-lock", label: "per-barber price/time overrides on library questions & add-ons (service editor)" },
   { needle: "apptHoldsSlot", label: "single busy-slot rule — a shown booking time is always bookable (no false 'just taken')" },
+  { needle: "pendingSaveRef", label: "flush pending saves on app-background (a checkout/edit can't be lost to an iOS swipe-away)" },
+  { needle: "onCommit(appt.id, summary)", label: "checkout commits done+paid the moment 'All done' shows (not after the closing dwell)" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
