@@ -11389,7 +11389,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && !pulseDetail && <PulseView business={business} appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} services={services} providers={providers} setProviders={setProviders} me={me} isOwner={isOwner} dataLoaded={dataLoaded} pulseView={pulseView} setPulseView={setPulseView} onSignOut={() => setShowSignInPicker(true)} onNavigate={(t) => goTab(t)} onOpenRevenue={() => navTo({ pulseDetail: "revenue" })} onOpenPayments={() => navTo({ pulseDetail: "payments" })} onOpenAppointments={() => navTo({ pulseDetail: "appointments" })} onOpenClients={() => navTo({ pulseDetail: "clients" })} onOpenServices={() => navTo({ pulseDetail: "services" })} onOpenBarbers={() => navTo({ pulseDetail: "barbers" })} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c, pulseDetail: null })} onOpenAppt={(id) => { setPulseOpenApptId(id); navTo({ tab: "calendar", pulseDetail: null, activeClient: null }); }} showToast={showToast} notifCount={unseenCount} onOpenNotifications={() => navTo({ pulseDetail: "notifications" })} />}
         {tab === "pulse" && pulseDetail === "notifications" && <NotificationsView notifs={myNotifs} notifSeenAt={notifSeenAt} markSeen={markNotifsSeen} onClear={() => setNotifs([])} clients={clients} providers={providers} isOwner={isOwner} me={me} onBack={navBack} onOpenCalendar={(n) => { if (n && n.apptId != null) setPulseOpenApptId(n.apptId); goTab("calendar"); }} onOpenNudge={() => goTab("clients")} />}
         {tab === "pulse" && pulseDetail === "revenue" && <RevenueView appts={appts} clients={clients} services={services} providers={providers} business={business} onBack={navBack} />}
-        {tab === "pulse" && pulseDetail === "payments" && <PaymentsView appts={appts} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={navBack} showToast={showToast} />}
+        {tab === "pulse" && pulseDetail === "payments" && <PaymentsView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} providers={providers} onBack={navBack} showToast={showToast} />}
         {tab === "pulse" && pulseDetail === "appointments" && <AppointmentsView appts={appts} providers={providers} services={services} onBack={navBack} />}
         {tab === "pulse" && pulseDetail === "clients" && <ClientsReportView appts={appts} clients={clients} services={services} providers={providers} pulseView={pulseView} me={me} onBack={navBack} onOpenNudge={() => goTab("clients")} onOpenClient={(c) => navTo({ pulseDetail: null, activeClient: c, tab: "clients" })} />}
         {tab === "pulse" && pulseDetail === "services" && <ServiceMixView appts={appts} services={services} providers={providers} onBack={navBack} />}
@@ -21839,7 +21839,8 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
       )}
 
       {refundAppt && (
-        <ApptRefundSheet appt={refundAppt} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} showToast={showToast} onClose={() => setRefundAppt(null)} />
+        <ApptRefundSheet appt={refundAppt} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} showToast={showToast} onClose={() => setRefundAppt(null)}
+          onFullyRefunded={() => { applyApptPatch(refundAppt.id, { status: "confirmed", paid: null, serviceStartedAt: null, serviceEndedAt: null, pendingDurationSave: null }); showToast("Fully refunded — appointment is back to confirmed, like they haven't come in yet."); }} />
       )}
 
       {checkout && (
@@ -22440,7 +22441,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     <div className="fade-in" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
       <div style={{ width: 96, height: 96, borderRadius: "50%", background: "var(--live, var(--gold))", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24, animation: "popIn .4s var(--ease) both", boxShadow: "var(--glow)" }}><Check size={48} style={{ color: "var(--on-gold)" }} strokeWidth={3} /></div>
       <div style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 8 }}>Paid</div>
-      <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300 }}>{money(paidRec ? paidRec.amount : total)}{paidRec ? ` · ${paidRec.method === "cash" ? "cash" : paidRec.method === "card-on-file" ? `${paidRec.brand ? paidRec.brand : "card"} on file ··${paidRec.last4 || ""}` : "card"}` : ""}</p>
+      <p style={{ color: "var(--sub)", fontSize: 16, fontWeight: 300 }}>{money(paidRec ? paidRec.amount : total)}{paidRec ? ` · ${payMethodLabel(paidRec).toLowerCase()}${payIsCard(paidRec) && paidRec.last4 ? ` ··${paidRec.last4}` : ""}` : ""}</p>
     </div>
   );
 
@@ -22614,6 +22615,23 @@ function PayRow({ label, value, last }) {
   );
 }
 
+// ---- Payment-method display + classification --------------------------------
+// Manual checkout methods store the owner's label VERBATIM on rec.method ("Cash",
+// "Venmo", …); card charges store "card"/"card-on-file"/"tap"/"reader" and carry a
+// paymentIntentId. Display code used to treat anything ≠ lowercase "cash" as "Card",
+// which mislabeled every manual sale (a cash checkout showed "$42 paid with Card").
+function payIsCard(r) { return !!(r && (r.paymentIntentId || ["card", "card-on-file", "tap", "reader"].includes(String(r.method || "").toLowerCase()))); }
+function payMethodLabel(r) {
+  const raw = String((r && r.method) || "");
+  const m = raw.toLowerCase();
+  if (m === "cash") return "Cash";
+  if (m === "card-on-file") return "Card on file";
+  if (m === "card" || m === "tap" || m === "reader") return "Card";
+  if (m === "prepaid") return "Paid at booking";
+  if (!raw) return payIsCard(r) ? "Card" : "—";
+  return raw.charAt(0).toUpperCase() + raw.slice(1); // the owner's custom labels (Venmo, Zelle, …)
+}
+
 function RefundSheet({ open, onClose, client, payment, onApply, showToast }) {
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
@@ -22625,15 +22643,17 @@ function RefundSheet({ open, onClose, client, payment, onApply, showToast }) {
     const n = parseFloat(String(amount).replace(/[^0-9.]/g, ""));
     if (isNaN(n) || n <= 0) { setErr("Enter a valid amount."); return; }
     if (n > maxRefund + 0.001) { setErr(`You can refund at most $${maxRefund.toFixed(2)}.`); return; }
-    if (!payment.paymentIntentId) { setErr("This payment can't be refunded automatically."); return; }
     setBusy(true); setErr("");
     try {
-      const res = await stripeApi({ action: "refund", paymentIntentId: payment.paymentIntentId, amount: n });
-      if (res.status === "succeeded" || res.status === "pending") {
-        const amt = Math.round(n * 100) / 100;
-        if (onApply) onApply(amt);
-        setDone(amt); showToast(`Refunded $${amt} to ${client?.name || payment?.clientName || "client"}.`);
-      } else { setErr(`Stripe returned "${res.status}".`); }
+      // Card charges go through Stripe; manual records (cash / Venmo / …) just record the
+      // refund in the books — the money is handed back in person.
+      if (payment.paymentIntentId) {
+        const res = await stripeApi({ action: "refund", paymentIntentId: payment.paymentIntentId, amount: n });
+        if (!(res.status === "succeeded" || res.status === "pending")) { setErr(`Stripe returned "${res.status}".`); return; }
+      }
+      const amt = Math.round(n * 100) / 100;
+      if (onApply) onApply(amt);
+      setDone(amt); showToast(`Refunded $${amt}${payment.paymentIntentId ? " to the card" : ` (${payMethodLabel(payment)})`} — ${client?.name || payment?.clientName || "client"}.`);
     } catch (e) { setErr(e.message || "Refund failed."); }
     finally { setBusy(false); }
   };
@@ -22669,7 +22689,7 @@ function RefundSheet({ open, onClose, client, payment, onApply, showToast }) {
   );
 }
 
-function PaymentsView({ appts, clients, setClients, business, setBusiness, providers, onBack, showToast }) {
+function PaymentsView({ appts, setAppts, clients, setClients, business, setBusiness, providers, onBack, showToast }) {
   const [openId, setOpenId] = useState(null);
   const [refundFor, setRefundFor] = useState(null);
   const [period, setPeriod] = useState("month");
@@ -22701,7 +22721,7 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
   const grossIn = periodRows.reduce((s, r) => s + (r.amount || 0), 0);
   const refundsOut = periodRows.reduce((s, r) => s + (r.refunded || 0), 0);
   const netIn = grossIn - refundsOut;
-  const cashIn = periodRows.filter((r) => r.method === "cash").reduce((s, r) => s + (r.amount || 0), 0);
+  const cashIn = periodRows.filter((r) => !payIsCard(r)).reduce((s, r) => s + (r.amount || 0), 0); // cash side = every manual method (Cash, Venmo, …)
   const cardIn = grossIn - cashIn;
   const noShowFees = periodRows.filter((r) => r.type === "no-show").reduce((s, r) => s + (r.amount || 0), 0);
   const tipsIn = (appts || []).reduce((s, a) => (a.paid && inPeriod(a.bookedFor) ? s + (a.paid.tip || 0) : s), 0) + periodRows.reduce((s, r) => s + (r.tip || 0), 0);
@@ -22736,6 +22756,17 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
     const newRefunded = Math.round(((row.refunded || 0) + amt) * 100) / 100;
     const newStatus = newRefunded >= row.amount - 0.001 ? "refunded" : "partial";
     patchRow(row, { refunded: newRefunded, status: newStatus });
+    // Money fully returned → put the appointment back to CONFIRMED, as if the client
+    // hasn't come in yet (clears the done status, paid stamp, and in-chair timers).
+    // The ledger keeps the sale + refund history, so reports stay truthful.
+    if (row.apptId && setAppts && newStatus === "refunded") {
+      const others = rows.filter((r) => r.apptId === row.apptId && r.id !== row.id);
+      const allOut = others.every((r) => (r.refunded || 0) >= (r.amount || 0) - 0.001);
+      if (allOut) {
+        setAppts((cur) => cur.map((a) => a.id === row.apptId ? { ...a, status: "confirmed", paid: null, serviceStartedAt: null, serviceEndedAt: null, pendingDurationSave: null } : a));
+        showToast && showToast("Fully refunded — the appointment is back to confirmed.");
+      }
+    }
   };
 
   return (
@@ -22815,18 +22846,18 @@ function PaymentsView({ appts, clients, setClients, business, setBusiness, provi
               <PayRow label="Client" value={openRow.clientName} />
               <PayRow label="When" value={`${fmtDay(openRow.ts)} · ${fmtTime(openRow.ts)}`} />
               <PayRow label="Type" value={openRow.type === "no-show" ? "No-show fee" : "Sale"} last={!openRow.method && !openRow.last4} />
-              {openRow.method && <PayRow label="Paid with" value={openRow.method === "cash" ? "Cash" : "Card"} last={!openRow.last4} />}
+              {openRow.method && <PayRow label="Paid with" value={payMethodLabel(openRow)} last={!openRow.last4} />}
               {openRow.last4 && <PayRow label="Card" value={`${openRow.brand ? openRow.brand.charAt(0).toUpperCase() + openRow.brand.slice(1) : "Card"} ···· ${openRow.last4}`} last />}
             </div>
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 13, letterSpacing: 1, color: "var(--sub)", marginBottom: 6 }}>NOTE</div>
               <textarea value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onBlur={saveNote} placeholder="Add a note about this charge…" rows={2} style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", fontSize: 14.5, color: "var(--text)", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
             </div>
-            {openRow.status !== "refunded" && openRow.paymentIntentId && (
+            {openRow.status !== "refunded" && (
               <button onClick={() => setRefundFor(openRow)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%", background: "var(--panel)", color: "var(--text)", padding: 15, fontSize: 14, fontWeight: 600, letterSpacing: 1, borderRadius: 14, border: "1px solid var(--border2)" }}><RefreshCw size={16} /> Refund or discount</button>
             )}
             {openRow.status !== "refunded" && !openRow.paymentIntentId && (
-              <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", padding: "4px 8px" }}>This was a manual record — refund it in person.</div>
+              <div style={{ fontSize: 13, color: "var(--sub)", textAlign: "center", padding: "10px 8px 0" }}>{payMethodLabel(openRow)} payment — refunding records it in your books; hand the money back in person.</div>
             )}
             <button onClick={() => setOpenId(null)} style={{ width: "100%", background: "none", border: "none", color: "var(--sub)", fontSize: 14.5, padding: "14px 0 4px" }}>Close</button>
           </div>
@@ -23445,7 +23476,7 @@ function ProgressCard({ T, minutesLeft, minutesInto, secondsInto, dur, name, tit
 
 // Refund (full or partial) straight from the appointment sheet. Card payments refund
 // through Stripe by payment intent; cash payments are recorded as returned.
-function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, showToast, onClose }) {
+function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, showToast, onClose, onFullyRefunded }) {
   const live = business?.payments?.live === true;
   const findRecs = () => {
     const out = [];
@@ -23478,7 +23509,11 @@ function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, sho
       const newRefunded = +(((sel.refunded || 0) + n)).toFixed(2);
       patch(sel, { refunded: newRefunded, status: newRefunded >= (sel.amount || 0) ? "refunded" : "partial" });
       setDone(n);
-      showToast && showToast(`Refunded $${n.toFixed(2)}${sel.paymentIntentId ? " to the card" : " (cash)"}.`);
+      showToast && showToast(`Refunded $${n.toFixed(2)}${sel.paymentIntentId ? " to the card" : ` (${payMethodLabel(sel)})`}.`);
+      // Every dollar on this ticket returned → the caller puts the appointment back to
+      // CONFIRMED, as if the client hasn't come in yet. Ledger history stays intact.
+      const allOut = recs.every((r) => (r.id === sel.id ? newRefunded : (r.refunded || 0)) >= (r.amount || 0) - 0.001);
+      if (allOut && onFullyRefunded) onFullyRefunded();
     } catch (e) { setErr(e.message || "Refund failed."); }
     finally { setBusy(false); }
   };
@@ -23500,7 +23535,7 @@ function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, sho
               <div style={{ margin: "10px 0 4px" }}>
                 {recs.map((r) => (
                   <button key={r.id} onClick={() => setSelId(r.id)} style={{ width: "100%", display: "flex", justifyContent: "space-between", gap: 10, padding: "12px 14px", marginBottom: 8, background: selId === r.id ? "var(--tint)" : "var(--panel)", border: `1px solid ${selId === r.id ? "var(--gold)" : "var(--border)"}`, borderRadius: 12, color: "var(--text)", fontSize: 14, textAlign: "left", cursor: "pointer" }}>
-                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.method === "cash" ? "Cash" : r.last4 ? `Card ··${r.last4}` : "Card"} · {r.note || "Sale"}</span>
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{payMethodLabel(r)}{payIsCard(r) && r.last4 ? ` ··${r.last4}` : ""} · {r.note || "Sale"}</span>
                     <span style={{ flexShrink: 0, color: "var(--sub)" }}>${(((r.amount || 0) - (r.refunded || 0))).toFixed(2)} left</span>
                   </button>
                 ))}
@@ -23508,7 +23543,7 @@ function ApptRefundSheet({ appt, clients, setClients, business, setBusiness, sho
             )}
             {sel && (
               <>
-                <p style={{ fontSize: 14, color: "var(--sub)", margin: "8px 0 14px", lineHeight: 1.5 }}>{sel.method === "cash" ? "Cash payment — this records the refund; hand back the cash." : `Goes back to the card${sel.last4 ? ` ··${sel.last4}` : ""}.`} Up to <strong style={{ color: "var(--text)" }}>${remaining.toFixed(2)}</strong>.</p>
+                <p style={{ fontSize: 14, color: "var(--sub)", margin: "8px 0 14px", lineHeight: 1.5 }}>{payIsCard(sel) ? `Goes back to the card${sel.last4 ? ` ··${sel.last4}` : ""}.` : `${payMethodLabel(sel)} payment — this records the refund; hand the money back in person.`} Up to <strong style={{ color: "var(--text)" }}>${remaining.toFixed(2)}</strong>.</p>
                 <div style={{ position: "relative", marginBottom: 12 }}>
                   <span style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", color: "var(--sub)", fontSize: 17 }}>$</span>
                   <input type="number" inputMode="decimal" value={amt} onChange={(e) => { setAmt(e.target.value); setErr(""); }} style={{ width: "100%", boxSizing: "border-box", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 13, padding: "14px 16px 14px 30px", color: "var(--text)", fontSize: 18, fontFamily: FONT_BODY }} />
@@ -25998,7 +26033,7 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
         const refunded = recs.reduce((s, r) => s + (r.refunded || 0), 0);
         const status = refunded > 0 ? (refunded >= recs.reduce((s, r) => s + (r.amount || 0), 0) ? "Refunded" : "Partial refund") : (total > 0 ? "Succeeded" : "Unpaid");
         const pi = rec && rec.paymentIntentId;
-        const method = rec ? (rec.method === "cash" ? "Cash" : rec.last4 ? `${rec.brand || "Card"} ··${rec.last4}` : "Card") : "—";
+        const method = rec ? `${payMethodLabel(rec)}${payIsCard(rec) && rec.last4 ? ` ··${rec.last4}` : ""}` : "—";
         return (
           <Sheet open onClose={() => setTxnAppt(null)} align="center" maxWidth={440}>
             <div style={{ fontSize: 13, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>Transaction{a.bookedFor ? ` · ${niceDate(a.bookedFor)}` : ""}</div>
@@ -26028,7 +26063,8 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
 
       {/* ============ MONEY ENGINES (reused) ============ */}
       {refundAppt && (
-        <ApptRefundSheet appt={refundAppt} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} showToast={showToast} onClose={() => setRefundAppt(null)} />
+        <ApptRefundSheet appt={refundAppt} clients={clients} setClients={setClients} business={business} setBusiness={setBusiness} showToast={showToast} onClose={() => setRefundAppt(null)}
+          onFullyRefunded={() => { setAppts((cur) => cur.map((a) => a.id === refundAppt.id ? { ...a, status: "confirmed", paid: null, serviceStartedAt: null, serviceEndedAt: null, pendingDurationSave: null } : a)); showToast("Fully refunded — appointment is back to confirmed, like they haven't come in yet."); }} />
       )}
       {checkout && (
         <Checkout
