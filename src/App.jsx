@@ -21543,7 +21543,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           // Single appointments keep the full column width.
           const col = (() => {
             const list = appts
-              .filter((a) => a.providerId === p.id && sameDay(a.bookedFor, selectedDate))
+              .filter((a) => a.providerId === p.id && a.status !== "cancelled" && sameDay(a.bookedFor, selectedDate))
               .sort((aa, bb) => aa.start - bb.start || aa.end - bb.end);
             if (list.length === 0) return [];
             // Group into clusters where each cluster is a chain of mutually-overlapping appts.
