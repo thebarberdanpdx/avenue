@@ -3741,6 +3741,47 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   useEffect(() => { if (onHoldReload) onHoldReload(step === 8); return () => { if (onHoldReload) onHoldReload(false); }; }, [step]);
   const [showAllVisits, setShowAllVisits] = useState(false); // expand the recent-visits list on the home
   const [homeAction, setHomeAction] = useState(null); // { type: "cancel" | "reschedule", appt, person } — confirm sheet on the home next-visit card
+  // "Notes & photos" on a signed-in client's upcoming visit — same server write as the
+  // confirmation screen (token RPC), with a session-authenticated fallback when no token is held.
+  const [extrasFor, setExtrasFor] = useState(null);
+  const [exNote, setExNote] = useState("");
+  const [exPhotos, setExPhotos] = useState([]);
+  const [exBusy, setExBusy] = useState(false);
+  const [exMsg, setExMsg] = useState("");
+  const exPhotoRef = useRef(null);
+  const onExPhotoPick = (e) => {
+    const file = e.target.files && e.target.files[0]; if (e.target) e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const shrink = (maxPx, q) => { let w = img.width, h = img.height; if (w > h && w > maxPx) { h = Math.round(h * maxPx / w); w = maxPx; } else if (h > maxPx) { w = Math.round(w * maxPx / h); h = maxPx; } const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h); return c.toDataURL("image/jpeg", q); };
+        let url = shrink(900, 0.5);
+        if (url.length > 300000) url = shrink(700, 0.4);
+        setExPhotos((cur) => cur.length >= 3 ? cur : [...cur, url]);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  const openExtras = (a) => { setExtrasFor(a); setExNote((a.note || "").trim()); setExPhotos(Array.isArray(a.photoData) ? a.photoData.slice(0, 3) : []); setExMsg(""); };
+  const saveExtras = async () => {
+    const a = extrasFor; if (!a || exBusy) return;
+    setExBusy(true); setExMsg("");
+    const note = exNote.trim();
+    try {
+      const call = a.manageToken
+        ? supabase.rpc("attach_booking_extras_by_token", { p_token: a.manageToken, p_note: note, p_photos: exPhotos, p_selfie: null })
+        : supabase.rpc("attach_visit_extras_by_client", { p_shop: shopId, p_client_id: matched ? matched.id : "", p_session: (matched && matched.sessionToken) || "", p_appt_id: String(a.id), p_note: note, p_photos: exPhotos });
+      const res = await Promise.race([call, new Promise((r) => setTimeout(() => r({ error: { message: "timed out" } }), 15000))]);
+      if (res && res.error) throw new Error(res.error.message || "save failed");
+      setMyAppts((cur) => cur.map((x) => x.id === a.id ? { ...x, note, hasNote: !!note, photoData: exPhotos, photos: exPhotos.length, hasPhotos: exPhotos.length > 0 } : x));
+      setExMsg("saved");
+      setTimeout(() => setExtrasFor(null), 900);
+    } catch (e) { setExMsg(e.message || "Couldn't save — try again."); }
+    setExBusy(false);
+  };
   const [tokenManage, setTokenManage] = useState(null); // appt to manage via its secure per-appointment link (used by brand-new local sessions that have no server token)
   const [reschedPrev, setReschedPrev] = useState(null); // when set, the just-completed booking is a home reschedule of THIS appt → owner push shows old → new instead of "new booking"
   useEffect(() => {
@@ -4884,9 +4925,11 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               <div key={v.id} style={{ border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginTop: vi ? 10 : 0 }}>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.05, color: "var(--text)" }}>{fmtHomeDate(v)} · {fmtHomeTime(v)}</div>
                 <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text2)", marginTop: 5 }}>{svcLabel(v)} · with {provFirst(v.providerId)}{v.familyMemberId ? ` · for ${personLabel(v)}` : ""}</div>
-                <div style={{ display: "flex", gap: 18, marginTop: 14, paddingTop: 13, borderTop: "1px solid var(--line)" }}>
-                  <button onClick={() => { if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "reschedule", appt: v }); }} style={{ background: "none", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Reschedule &#8594;</button>
-                  <button onClick={() => { if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "cancel", appt: v }); }} style={{ background: "none", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 400, color: "var(--sub)", cursor: "pointer" }}>Cancel</button>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14, paddingTop: 13, borderTop: "1px solid var(--line)" }}>
+                  <button onClick={() => { if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "reschedule", appt: v }); }} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Reschedule</button>
+                  <button onClick={() => { setReschedPrev(v); bookForPerson(v.familyMemberId ? { id: v.familyMemberId, name: personLabel(v) } : { id: null }); }} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Change service</button>
+                  <button onClick={() => openExtras(v)} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Add notes &amp; photos</button>
+                  <button onClick={() => { if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "cancel", appt: v }); }} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 400, color: "var(--sub)", cursor: "pointer" }}>Cancel</button>
                 </div>
               </div>
             )) : (
@@ -4965,6 +5008,31 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                 setMatched((m) => (m && m._localSession) ? { ...m, _localAppts: apply(m._localAppts) } : m);
               }}
               onExit={() => { setTokenManage(null); refreshMyAppts(); }} />
+          </div>
+        )}
+        {extrasFor && (
+          <div onClick={() => !exBusy && setExtrasFor(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "var(--bg)", borderRadius: "20px 20px 0 0", padding: "26px 22px calc(30px + env(safe-area-inset-bottom))" }}>
+              <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, color: "var(--text)", margin: "0 0 6px", letterSpacing: "-0.2px" }}>Notes &amp; photos</h3>
+              <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--sub)", lineHeight: 1.5, margin: "0 0 16px" }}>For your {svcLabel(extrasFor)} on {fmtHomeShort(extrasFor)} — the shop sees this right away.</p>
+              <textarea value={exNote} onChange={(e) => setExNote(e.target.value)} rows={3} placeholder="Anything your barber should know — what you want, references, timing…" style={{ width: "100%", boxSizing: "border-box", background: "var(--panel, #fff)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", fontFamily: "'Jost', sans-serif", fontSize: 15, color: "var(--text)", lineHeight: 1.5, resize: "vertical" }} />
+              <div style={{ display: "flex", gap: 8, margin: "12px 0 4px" }}>
+                {exPhotos.map((p, i) => (
+                  <div key={i} onClick={() => setExPhotos((cur) => cur.filter((_, xi) => xi !== i))} style={{ position: "relative", width: 74, height: 74, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", cursor: "pointer" }}>
+                    <img src={p} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <span style={{ position: "absolute", top: 3, right: 3, width: 20, height: 20, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, lineHeight: 1 }}>×</span>
+                  </div>
+                ))}
+                {exPhotos.length < 3 && (
+                  <button onClick={() => exPhotoRef.current && exPhotoRef.current.click()} style={{ width: 74, height: 74, borderRadius: 12, border: "1.5px dashed var(--border2)", background: "transparent", color: "var(--sub)", fontSize: 24, cursor: "pointer" }}>+</button>
+                )}
+              </div>
+              <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--faint)", margin: "0 0 14px" }}>Up to 3 photos · tap a photo to remove it</p>
+              {exMsg && <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 13.5, color: exMsg === "saved" ? "var(--text)" : "#B5564B", margin: "0 0 10px", fontWeight: 500 }}>{exMsg === "saved" ? "Saved — your barber has it. ✓" : exMsg}</p>}
+              <button disabled={exBusy} onClick={saveExtras} style={{ width: "100%", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, border: "none", cursor: "pointer", opacity: exBusy ? 0.6 : 1, marginBottom: 11 }}>{exBusy ? "Saving…" : "Save"}</button>
+              <button disabled={exBusy} onClick={() => setExtrasFor(null)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 500, textTransform: "uppercase", borderRadius: 12, cursor: "pointer" }}>Close</button>
+              <input ref={exPhotoRef} type="file" accept="image/*" onChange={onExPhotoPick} style={{ display: "none" }} />
+            </div>
           </div>
         )}
         {homeAction && (
@@ -11267,7 +11335,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
     for (const a of (appts || [])) {
       if (!a || a.id == null) continue;
       const key = String(a.id);
-      nextSnap[key] = { start: a.start, bookedFor: a.bookedFor, status: a.status, hasNote: !!a.hasNote, photos: a.photos || 0 };
+      nextSnap[key] = { start: a.start, bookedFor: a.bookedFor, status: a.status, hasNote: !!a.hasNote, photos: a.photos || 0, note: (a.note || "").trim(), extrasAt: a.clientExtrasAt || "" };
       if (a.status === "block") continue;
       if (a.source === "sync" || a._synced) continue; // mirrored appts stay silent — the Sync panel reports them, not the bell
       const prev = snap[key];
@@ -11280,11 +11348,13 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         fresh.push({ ...base, id: "nn_" + key + "_" + Date.now(), kind: "new", note: (a.note || "").trim() });
       } else if (prev.start !== a.start || prev.bookedFor !== a.bookedFor) {
         fresh.push({ ...base, id: "nm_" + key + "_" + Date.now(), kind: "moved", prevWhen: prev.bookedFor, prevStart: prev.start });
-      } else if (a.bookedOnline && ((!prev.hasNote && !!a.hasNote) || ((a.photos || 0) > (prev.photos || 0)))) {
-        // Client added a note / reference photos AFTER booking (online bookings only, so a staff edit
-        // to a manual appt never self-notifies). IN-APP ONLY — this lands in the feed and never fires
-        // a push, email, or SMS (those are only the booking/reschedule/cancel alerts).
-        fresh.push({ ...base, id: "np_" + key + "_" + Date.now(), kind: "note", note: (a.note || "").trim(), addedNote: (!prev.hasNote && !!a.hasNote), photoCount: a.photos || 0 });
+      } else if ((a.clientExtrasAt && a.clientExtrasAt !== prev.extrasAt) || (a.bookedOnline && ((!prev.hasNote && !!a.hasNote) || ((a.photos || 0) > (prev.photos || 0))))) {
+        // Client added/changed a note or photos AFTER booking. clientExtrasAt is stamped by the
+        // SERVER token/session write (confirmation screen + portal "Notes & photos"), so it fires
+        // for staff-booked appointments too and never self-notifies on a staff edit. The old
+        // bookedOnline heuristic stays as a fallback for pre-stamp appointments. IN-APP ONLY —
+        // lands in the feed; never fires a push, email, or SMS.
+        fresh.push({ ...base, id: "np_" + key + "_" + Date.now(), kind: "note", note: (a.note || "").trim(), addedNote: !!(a.note || "").trim() && (a.note || "").trim() !== (prev.note || ""), photoCount: a.photos || 0 });
       }
     }
     apptSnapRef.current = nextSnap;
@@ -11426,7 +11496,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "pulse" && pulseDetail === "barbers" && <PerBarberView appts={appts} clients={clients} services={services} providers={providers} onBack={navBack} />}
         {tab === "calendar" && <CalendarView appts={appts} setAppts={setAppts} clients={clients} setClients={setClients} providers={providers} setProviders={setProviders} services={services} business={business} setBusiness={setBusiness} theme={theme} showToast={showToast} waitlist={waitlist} setWaitlist={setWaitlist} cutLibrary={cutLibrary} me={me} isOwner={isOwner} pulseView={pulseView} shopId={shopId} deepLinkApptId={deepLinkApptId || pulseOpenApptId} onDeepLinkHandled={() => { setPulseOpenApptId(null); onDeepLinkHandled && onDeepLinkHandled(); }} rebookSeed={rebookSeed} onRebookHandled={() => setRebookSeed(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
-        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} />}
+        {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} onOpenAppt={(a) => { setPulseOpenApptId(a.id); navTo({ tab: "calendar", activeClient: null }); }} />}
         {tab === "messages" && <MessagesView key={`messages-${tabNonce}`} clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
         {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
@@ -25520,7 +25590,7 @@ function CardBookingRow({ service, firstName, baseDur, basePrice, curDur, curPri
   );
 }
 
-function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, setAppts, business, setBusiness, me, shopId, onBack, showToast, onRebook }) {
+function ClientProfile({ client, clients, setClients, services, setServices, providers, appts, setAppts, business, setBusiness, me, shopId, onBack, showToast, onRebook, onOpenAppt }) {
   const live = clients.find((c) => c.id === client.id) || client;
   const provider = providers.find((p) => p.id === live.provider) || providers[1] || providers[0] || {};
   const firstName = (live.name || "").split(" ")[0] || "this client";
@@ -26056,6 +26126,9 @@ function ClientProfile({ client, clients, setClients, services, setServices, pro
                 <button onClick={() => rebook(a)} style={sheetPrimary}>Rebook</button>
               </>)}
             </div>
+            {detail.mode === "up" && onOpenAppt && (
+              <button onClick={() => { setDetail(null); onOpenAppt(a); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", marginTop: 10, background: "transparent", border: "1px solid var(--border2)", color: "var(--text)", padding: 13, borderRadius: 12, fontSize: 14.5, fontWeight: 500, cursor: "pointer" }}><Calendar size={15} style={{ color: "var(--gold)" }} /> Open on calendar — full appointment card</button>
+            )}
           </Sheet>
         );
       })()}
