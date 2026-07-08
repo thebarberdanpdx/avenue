@@ -19950,6 +19950,7 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   const [showTimePick, setShowTimePick] = useState(!!(smartTimes && slot && slot.dayChosen));
   const [showDatePick, setShowDatePick] = useState(!!(smartTimes && !(slot && slot.dayChosen)));
   const [showAllTimes, setShowAllTimes] = useState(false); // smart (no-gap) times by default; reveal every open time on demand
+  const [notifyClient, setNotifyClient] = useState(true); // send the client the booking confirmation (toggle off for silent bookings)
   const scrollRef = useRef(null);
   useLayoutEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -20196,9 +20197,17 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
       </div>
 
       {/* sticky footer — Cancel (left) and Book (right) pinned to the viewport bottom; safe-area padding keeps the iOS Safari toolbar from covering it */}
-      <div style={{ flexShrink: 0, padding: "12px 18px max(18px, env(safe-area-inset-bottom))", background: "var(--bg)", borderTop: "1px solid var(--line)", display: "flex", gap: 10, boxSizing: "border-box" }}>
-        <button onClick={onClose} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 15, letterSpacing: 1, borderRadius: 12 }}>CANCEL</button>
-        <button className="lift" onMouseDown={(e) => e.preventDefault()} onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note, addons: opts, optAddMin: optExtra.m, optAddPrice: optExtra.p, optLabels: optExtra.labels })} disabled={!canBook} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 12, border: "none", opacity: canBook ? 1 : 0.45 }}>BOOK</button>
+      <div style={{ flexShrink: 0, background: "var(--bg)", borderTop: "1px solid var(--line)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "11px 18px 0" }}>
+          <div style={{ fontSize: 14.5, color: "var(--text2)", lineHeight: 1.3 }}>Notify {client ? client.name.split(" ")[0] : "the client"} <span style={{ color: "var(--sub)" }}>· confirmation text/email</span></div>
+          <button onClick={() => setNotifyClient((v) => !v)} aria-label={notifyClient ? "On" : "Off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: notifyClient ? "var(--gold)" : "var(--border2)", position: "relative", cursor: "pointer", transition: "background .2s" }}>
+            <span style={{ position: "absolute", top: 3, left: notifyClient ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
+          </button>
+        </div>
+        <div style={{ padding: "10px 18px max(18px, env(safe-area-inset-bottom))", display: "flex", gap: 10, boxSizing: "border-box" }}>
+          <button onClick={onClose} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontSize: 15, letterSpacing: 1, borderRadius: 12 }}>CANCEL</button>
+          <button className="lift" onMouseDown={(e) => e.preventDefault()} onClick={() => canBook && onBook({ providerId: provId, start: startMin, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note, addons: opts, optAddMin: optExtra.m, optAddPrice: optExtra.p, optLabels: optExtra.labels, notifyClient })} disabled={!canBook} style={{ flex: 1, background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, letterSpacing: 1, fontWeight: 600, borderRadius: 12, border: "none", opacity: canBook ? 1 : 0.45 }}>BOOK</button>
+        </div>
       </div>
 
       {/* time picker — fills the form from the top, always in view */}
@@ -20989,7 +20998,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
   // The actual save — runs after conflict has been resolved (no conflict, or provider chose to keep both).
   // Accepts an optional `overrideStart` so the conflict modal can slide the booking to the next free slot in one tap.
-  const commitAppt = ({ providerId, start, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note, addons, optAddMin = 0, optAddPrice = 0, optLabels = [] }, overrideStart = null) => {
+  const commitAppt = ({ providerId, start, client, service, walkInFirst, walkInLast, walkInPhone, walkInEmail, note, addons, optAddMin = 0, optAddPrice = 0, optLabels = [], notifyClient = true }, overrideStart = null) => {
     // #7: in-flight guard — a double-tapped "Book anyway" / "Move" (the override modal stays live for
     // its 300ms close animation) must not create two appointments. Same booking signature within a
     // short window is dropped. Pairs with the ConfirmModal pointer-events fix.
@@ -21022,13 +21031,15 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
 
     const newAppt = { id, providerId, clientId: bookClient ? bookClient.id : null, serviceId: service.id, start: useStart, end: useStart + dur, bookedFor: bookedFor.toISOString(), status: "confirmed", vip: false, name: bookClient ? bookClient.name : (walkInName || "Walk-in"), title: (optLabels && optLabels.length) ? `${service.name} · ${optLabels.join(", ")}` : service.name, serviceName: service.name, addonLabels: optLabels || [], lineItems: [{ serviceId: service.id, cutType: null, beardType: null, addons: addons || {} }], manageToken: makeManageToken(), detail: note || "", hasNote: !!(note && note.trim()), price, phone: bookClient ? bookClient.phone : (walkInPhone || ""), email: bookClient ? (bookClient.email || "") : (walkInEmail || ""), hasPhotos: false, photos: 0, newClient: (!client && !!walkInName) ? true : undefined /* audit #29: a new walk-in counts toward the barber's new-client-per-day cap */ };
     setAppts((cur) => [...cur, newAppt]);
-    // Staff-created booking → fire the confirmation too (same engine as online bookings).
-    fireApptNotify({ msgId: "booked", appt: newAppt, business, providers, contact: { email: (bookClient ? bookClient.email : walkInEmail) || "", phone: (bookClient ? bookClient.phone : walkInPhone) || "" }, subject: `${business.name}: Appointment confirmed` });
+    // Staff-created booking → fire the confirmation too (same engine as online bookings) —
+    // unless the form's "Notify client" toggle was switched off (silent booking). Staff-side
+    // pushes still fire either way; the toggle only silences the CLIENT.
+    if (notifyClient !== false) fireApptNotify({ msgId: "booked", appt: newAppt, business, providers, contact: { email: (bookClient ? bookClient.email : walkInEmail) || "", phone: (bookClient ? bookClient.phone : walkInPhone) || "" }, subject: `${business.name}: Appointment confirmed` });
     fireStaffPush({ shopId, title: "New booking", appt: newAppt, event: "newBooking", business });
     fireStaffNotify({ shopId, appt: newAppt, business });
     setNewApptSlot(null);
     setConflictModal(null);
-    showToast(`${newAppt.name} booked at ${fmtTime(useStart)}.`);
+    showToast(notifyClient !== false ? `${newAppt.name} booked at ${fmtTime(useStart)}.` : `${newAppt.name} booked at ${fmtTime(useStart)} — no notification sent.`);
   };
 
   // Daily cap: count real appointments (not blocks/cancellations) for the viewed day.
@@ -21811,6 +21822,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
           onClose={() => setCheckout(null)}
           onDone={finishCheckout}
           onCommit={commitCheckout}
+          rebookOnReopen
         />
       )}
     </div>
@@ -21886,7 +21898,7 @@ function CardChargeInline({ amount, appt, onCancel, onPaid, money }) {
   );
 }
 
-function Checkout({ appt, service, provider, business, setBusiness, clients, appts, setClients, allServices = [], reopen = false, alreadyPaid = 0, showToast, onClose, onDone, onCommit }) {
+function Checkout({ appt, service, provider, business, setBusiness, clients, appts, setClients, allServices = [], reopen = false, alreadyPaid = 0, showToast, onClose, onDone, onCommit, rebookOnReopen = false }) {
   // ---- auto-timing: measure actual service time, round UP to next 5 ----
   const measuredMin = appt.serviceStartedAt ? Math.round((Date.now() - appt.serviceStartedAt) / 60000) : null;
   const roundUp5 = (m) => Math.max(5, Math.ceil(m / 5) * 5);
@@ -22038,7 +22050,7 @@ function Checkout({ appt, service, provider, business, setBusiness, clients, app
     onDone(appt.id, { total: paidTot, totalLabel: money(paidTot), tip: paidTip, discount: 0 });
   };
   useEffect(() => {
-    if (stage === "approved") { const t = setTimeout(() => setStage(!reopen && rebookCfg.enabled ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
+    if (stage === "approved") { const t = setTimeout(() => setStage(((!reopen || rebookOnReopen) && rebookCfg.enabled) ? "rebook" : "done"), 1300); return () => clearTimeout(t); }
     if (stage === "done") {
       const grandTotal = reopen ? +(alreadyPaid + (paidRec ? paidRec.amount : 0)).toFixed(2) : total;
       const grandTip = reopen ? ((appt.paid && appt.paid.tip) || 0) : tipAmt;
@@ -24385,6 +24397,13 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                     </>
                   ) : (
                     <MenuItem T={T} icon={<DollarSign size={17} />} label="Checkout" onClick={() => { setMenuOpen(false); onCheckout(appt); }} />
+                  )}
+                  {/* Undo checkout: put the ticket back to an upcoming CONFIRMED state (e.g. after a refund
+                      or an accidental checkout). Clears the done status, the in-chair timer stamps, and the
+                      paid summary from the APPOINTMENT — the actual payments/refunds stay in the ledger, so
+                      reports don't change and a re-checkout still credits any money genuinely on record. */}
+                  {(appt.status === "done" || appt.paid) && (
+                    <MenuItem T={T} icon={<RotateCw size={17} />} label="Back to confirmed (undo checkout)" onClick={() => { setMenuOpen(false); onUpdate(appt.id, { status: "confirmed", paid: null, serviceStartedAt: null, serviceEndedAt: null, pendingDurationSave: null }); showToast("Back to confirmed — payments and refunds stay in your books."); }} />
                   )}
                   {canEditPrice && savedCard && <MenuItem T={T} icon={<CreditCard size={17} />} label="Charge no-show fee" onClick={() => { setMenuOpen(false); setChargeOpen(true); }} />}
                   <Divider T={T} />
