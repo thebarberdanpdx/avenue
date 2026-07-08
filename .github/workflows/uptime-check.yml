@@ -22,7 +22,7 @@
 #
 # NOTE: scheduled workflows run from the DEFAULT branch and can be delayed by
 # GitHub under load; ~5-minute checks are best-effort, which is fine for uptime.
-name: uptime-check
+name: Vero is DOWN (uptime alarm)
 
 on:
   schedule:
