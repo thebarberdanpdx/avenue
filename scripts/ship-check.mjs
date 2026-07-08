@@ -118,6 +118,7 @@ const GUARDS = [
   { needle: "pendingSaveRef", label: "flush pending saves on app-background (a checkout/edit can't be lost to an iOS swipe-away)" },
   { needle: "onCommit(appt.id, summary)", label: "checkout commits done+paid the moment 'All done' shows (not after the closing dwell)" },
   { needle: "tableBusy(", label: "session-keyed loads can't clobber a mid-save local edit (uid-keyed + busy guard)" },
+  { needle: "hydrateFromCache(", label: "offline read-cache — an outage shows the last-synced calendar, never a blank screen" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
