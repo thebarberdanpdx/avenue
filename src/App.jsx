@@ -2372,6 +2372,24 @@ function App() {
     window.addEventListener("pagehide", flushAll);
     return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("pagehide", flushAll); };
   }, []);
+  // Cross-device freshness: when the app RETURNS to the foreground, re-pull the live tables.
+  // iOS suspends the realtime socket in the background and missed events are never replayed,
+  // and the uid-keyed loads above (correctly) no longer re-run per foreground — so a booking a
+  // client made while the app was asleep wouldn't show until a full reload. refetchTable's own
+  // guards (mid-save, save-echo window) keep this from ever stomping a local edit.
+  const lastFgRefetch = useRef(0);
+  useEffect(() => {
+    if (!sessionUid) return;
+    const onFg = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastFgRefetch.current < 15000) return; // at most once per 15s
+      lastFgRefetch.current = Date.now();
+      ["appointments", "clients", "waitlist", "services", "providers"].forEach((t) => refetchTable(t));
+    };
+    document.addEventListener("visibilitychange", onFg);
+    window.addEventListener("focus", onFg);
+    return () => { document.removeEventListener("visibilitychange", onFg); window.removeEventListener("focus", onFg); };
+  }, [sessionUid]);
 
   // Retry: re-push everything currently in memory (used by the failed-save banner's Retry button).
   const resaveAll = () => {
@@ -4848,17 +4866,17 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 12.5, letterSpacing: 3, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600 }}>{business.name}</div>
             <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1.05, margin: "12px 0 0", color: "var(--text)" }}>Welcome back,<br />{firstName}.</h1>
 
-            <div style={lblStyle}>Your next visit</div>
-            {nextVisit ? (
-              <div style={{ border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px" }}>
-                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.05, color: "var(--text)" }}>{fmtHomeDate(nextVisit)} · {fmtHomeTime(nextVisit)}</div>
-                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text2)", marginTop: 5 }}>{svcLabel(nextVisit)} · with {provFirst(nextVisit.providerId)}{nextVisit.familyMemberId ? ` · for ${personLabel(nextVisit)}` : ""}</div>
+            <div style={lblStyle}>{upcoming.length > 1 ? `Your upcoming visits (${upcoming.length})` : "Your next visit"}</div>
+            {upcoming.length ? upcoming.map((v, vi) => (
+              <div key={v.id} style={{ border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginTop: vi ? 10 : 0 }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.05, color: "var(--text)" }}>{fmtHomeDate(v)} · {fmtHomeTime(v)}</div>
+                <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text2)", marginTop: 5 }}>{svcLabel(v)} · with {provFirst(v.providerId)}{v.familyMemberId ? ` · for ${personLabel(v)}` : ""}</div>
                 <div style={{ display: "flex", gap: 18, marginTop: 14, paddingTop: 13, borderTop: "1px solid var(--line)" }}>
-                  <button onClick={() => { if (matched._localSession && nextVisit.manageToken) { setTokenManage(nextVisit); return; } setHomeAction({ type: "reschedule", appt: nextVisit }); }} style={{ background: "none", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Reschedule &#8594;</button>
-                  <button onClick={() => { if (matched._localSession && nextVisit.manageToken) { setTokenManage(nextVisit); return; } setHomeAction({ type: "cancel", appt: nextVisit }); }} style={{ background: "none", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 400, color: "var(--sub)", cursor: "pointer" }}>Cancel</button>
+                  <button onClick={() => { if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "reschedule", appt: v }); }} style={{ background: "none", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Reschedule &#8594;</button>
+                  <button onClick={() => { if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "cancel", appt: v }); }} style={{ background: "none", border: "none", padding: 0, fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 400, color: "var(--sub)", cursor: "pointer" }}>Cancel</button>
                 </div>
               </div>
-            ) : (
+            )) : (
               <div style={{ border: "1px solid var(--line)", borderRadius: 16, padding: "18px 18px", fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>No upcoming visit yet — book your next one below.</div>
             )}
 
