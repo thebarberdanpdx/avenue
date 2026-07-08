@@ -3721,7 +3721,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               .then(({ data }) => { if (alive) setMyAppts(Array.isArray(data) ? data : []); })
               .catch(() => {});
           } else if (Array.isArray(c._localAppts)) {
-            setMyAppts(c._localAppts); // brand-new booker: no server session token, so show their appt(s) from the local snapshot
+            setMyAppts(c._localAppts); // brand-new booker: show the local snapshot instantly…
+            refreshLocalAppts(c);      // …then re-pull each appt via its manage token so staff moves/cancels show
           }
         }
       }
@@ -4834,7 +4835,26 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const fmtHomeDate = (a) => { const d = apptWhen(a); if (!d) return ""; return `${DOW[d.getDay()]}, ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
   const fmtHomeShort = (a) => { const d = apptWhen(a); if (!d) return ""; return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`; };
   const fmtHomeTime = (a) => { const d = apptWhen(a); if (!d) return ""; let h = d.getHours(); const m = d.getMinutes(); const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return `${h}:${String(m).padStart(2, "0")} ${ap}`; };
-  const refreshMyAppts = () => { if (!matched) return; if (matched._localSession) { setMyAppts(Array.isArray(matched._localAppts) ? matched._localAppts : []); return; } supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: matched.id, p_session: matched.sessionToken }).then(({ data }) => { if (Array.isArray(data)) setMyAppts(data); }).catch(() => {}); };
+  // A LOCAL session (brand-new booker with no server session token) used to hold a FROZEN snapshot
+  // of their appointments from booking time — staff moves and cancellations never reached this
+  // device. Re-pull each held appointment from the server via its manage token (the same
+  // possession credential the manage page uses): times move, cancellations disappear.
+  const refreshLocalAppts = async (c) => {
+    const list = Array.isArray(c && c._localAppts) ? c._localAppts : [];
+    if (!list.some((a) => a && a.manageToken)) return;
+    const fresh = await Promise.all(list.map(async (a) => {
+      if (!a || !a.manageToken) return a;
+      try {
+        const { data, error } = await supabase.rpc("manage_lookup_by_token", { p_token: a.manageToken });
+        if (error) return a;                                  // transient — keep the local copy
+        if (!data || !data.id) return { ...a, status: "cancelled" }; // released/gone on the server
+        return { ...a, ...data };                             // fresh time/status over the local copy
+      } catch (e) { return a; }
+    }));
+    setMyAppts(fresh);
+    setMatched((m) => (m && m._localSession) ? { ...m, _localAppts: fresh } : m);
+  };
+  const refreshMyAppts = () => { if (!matched) return; if (matched._localSession) { setMyAppts(Array.isArray(matched._localAppts) ? matched._localAppts : []); refreshLocalAppts(matched); return; } supabase.rpc("get_client_appointments", { p_shop: shopId, p_client_id: matched.id, p_session: matched.sessionToken }).then(({ data }) => { if (Array.isArray(data)) setMyAppts(data); }).catch(() => {}); };
   const goClientHome = () => {
     setStep(0); setSimpleStep(null); setSimpleCat(null); setSimplePref(null); setSimpleChange(null);
     setShowWhoFor(false); setShowUsual(false); setShowSchedChoice(false); setShowWizardIntro(false);
