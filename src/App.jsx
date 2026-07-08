@@ -19028,14 +19028,15 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
   const [openSection, setOpenSection] = useState(null); // which checklist section is expanded
 
   // ============================================================
-  // CLIENT SCENARIO CHECKLIST — replaced the old launch checklist.
-  // One section per path a client can take through the shop: booking
-  // (new & returning), family, times & availability, waitlist,
-  // reschedule/cancel, blocked clients, day-of check-in & timers,
-  // staff-side booking, checkout & money, after the visit. Each item
-  // is something you DO and then verify happened. Ticks save to your
-  // shop (business.launchChecklist — new cs_ keys, so old launch
-  // ticks don't pre-fill this list). "card" jumps to that setting.
+  // THE GOLDEN CLIENT RUN — replaced the old launch checklist.
+  // Acts 1–7 are one guided walkthrough played as a single fake client
+  // ("Test Golden") from first booking through refund-and-delete; do
+  // them in order and each ticks a box. Acts 8–9 are the ship-readiness
+  // checks a payments+booking SaaS can't launch without: money
+  // reconciliation, the payment paths the run skips, failure safety,
+  // privacy, and the known weak spots the audit surfaced (⚠). Ticks
+  // save to your shop (business.launchChecklist — new gc_ keys, so old
+  // launch ticks don't pre-fill this list). "card" jumps to that setting.
   // ============================================================
   const checked = business.launchChecklist || {};
   const toggleCheck = (k) => setBusiness({ ...business, launchChecklist: { ...(business.launchChecklist || {}), [k]: !checked[k] } });
@@ -19045,120 +19046,103 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
     setBusiness({ ...business, launchChecklist: next });
   };
   const CHECKLIST = [
-    { id: "newbook", label: "A new client books", icon: Globe, desc: "The first-timer path, start to finish", groups: [
-      { label: "Book it yourself (incognito)", items: [
-        { k: "cs_nb_full", label: "Booked start-to-finish as a brand-new client on your booking page", card: "website" },
-        { k: "cs_nb_dupe", label: "Entered a phone number already on file — it caught it and offered “Verify & sign in” instead of making a duplicate", card: null },
-        { k: "cs_nb_consent", label: "The text-reminders consent box was required — BOOK stayed off until it was checked", card: "messages" },
-        { k: "cs_nb_policy", label: "Your cancellation policy showed and required “I agree”", card: "policy" },
-        { k: "cs_nb_selfie", label: "The profile-selfie offer appeared and the $5 came off the price", card: null },
-        { k: "cs_nb_call", label: "A “call to set this up” service opened the call/text sheet instead of booking online", card: "servicesmenu" },
-        { k: "cs_nb_cap", label: "When a barber hit the new-client daily cap, the day blanked and offered the waitlist", card: "newclients" },
+    { id: "act1", label: "Act 1 — A new client books", icon: Globe, desc: "On your phone, incognito, gotvero.com", groups: [
+      { label: "Book it", items: [
+        { k: "gc_a1_book", label: "Booked a real slot today (~20–30 min out) as “Test Golden” with your cell number", card: "website" },
+        { k: "gc_a1_consent", label: "The consent checkbox kept BOOK disabled until you checked it", card: "messages" },
+        { k: "gc_a1_policy", label: "The cancellation policy demanded “I agree”", card: "policy" },
+        { k: "gc_a1_selfie", label: "The selfie offer knocked $5 off — and you took the selfie", card: null },
+        { k: "gc_a1_note", label: "After confirming, added a booking note and an inspiration photo", card: "refphotos" },
       ] },
-      { label: "After it's booked", items: [
-        { k: "cs_nb_confirm", label: "The confirmation text / email arrived and reads right", card: "messages" },
-        { k: "cs_nb_cal", label: "It landed on your calendar as Confirmed, under the right barber", card: null },
-        { k: "cs_nb_note", label: "The booking note + inspiration photos saved to the appointment and the client's gallery", card: "refphotos" },
+      { label: "Check it landed", items: [
+        { k: "gc_a1_text", label: "The confirmation text arrived on your phone", card: "messages" },
+        { k: "gc_a1_cal", label: "It's on the shop calendar as Confirmed, under the right barber", card: null },
       ] },
     ] },
-    { id: "retbook", label: "A returning client books", icon: User, desc: "Sign-in, book again & their personal prices", groups: [
-      { label: "Sign in & book", items: [
-        { k: "cs_rb_code", label: "Signed in with a texted code — and with the email fallback", card: null },
-        { k: "cs_rb_badcode", label: "A wrong code showed the right error, and resend worked", card: null },
-        { k: "cs_rb_hub", label: "The home hub showed their next visit, their people, and “Book again”", card: null },
-        { k: "cs_rb_again", label: "“Book again” rebuilt their usual cut with the same barber in one tap", card: null },
-        { k: "cs_rb_custom", label: "Their custom price & time from the client card showed online — not the menu defaults", card: null },
-        { k: "cs_rb_stay", label: "They stayed signed in after closing the page — and Sign out fully cleared them (shared-device test)", card: null },
-        { k: "cs_rb_dupe10", label: "Booking twice within 10 days triggered the keep-both / cancel-the-earlier-one prompt", card: null },
-        { k: "cs_rb_gate", label: "The returning-clients-only / new-clients-only gates show the right message", card: "newclients" },
+    { id: "act2", label: "Act 2 — Come back as a returning client", icon: User, desc: "Reopen the booking page, sign in", groups: [
+      { label: "Sign in & book again", items: [
+        { k: "gc_a2_code", label: "Tapped “I've been here before” — a wrong code showed the right error, resend worked, then the real code let you in", card: null },
+        { k: "gc_a2_email", label: "Tried the email fallback once too", card: null },
+        { k: "gc_a2_hub", label: "The home hub greeted you with the upcoming visit", card: null },
+        { k: "gc_a2_dupe", label: "Booked a second appointment ~5 days out — the “already have one within 10 days” prompt appeared; kept both", card: null },
+        { k: "gc_a2_earlier", label: "Turned on “notify me if an earlier spot opens” on the second one", card: null },
       ] },
     ] },
-    { id: "family", label: "Family & group", icon: Users, desc: "Booking for kids, partners & pairs", groups: [
-      { label: "Booking for others", items: [
-        { k: "cs_fam_add", label: "Added a family member mid-booking — the consent box was required when they got their own phone", card: "family" },
-        { k: "cs_fam_kid", label: "Booked for a kid — the appointment shows who it's for and reminders go to the right phone", card: null },
-        { k: "cs_fam_two", label: "Booked two people together (same time) and back-to-back — both sets of slots worked", card: "family" },
-        { k: "cs_fam_price", label: "A family member's own custom time / price applied to their line, not the parent's", card: null },
+    { id: "act3", label: "Act 3 — Change plans from the text link", icon: RefreshCw, desc: "Using the second appointment's text", groups: [
+      { label: "Reschedule & cancel", items: [
+        { k: "gc_a3_resched", label: "Rescheduled the second appt from its link — the old slot held until the new one confirmed", card: null },
+        { k: "gc_a3_cancel", label: "Cancelled it — the cancellation email went out", card: "messages" },
+        { k: "gc_a3_opening", label: "The freed slot lit up the openings list on your calendar", card: null },
+        { k: "gc_a3_window", label: "Tried to reschedule today's appt — inside the window, it refused with the “call us” message", card: "policy" },
       ] },
     ] },
-    { id: "times", label: "Times & availability", icon: Clock, desc: "The times clients see, and why", groups: [
-      { label: "What gets offered", items: [
-        { k: "cs_time_hours", label: "Slots respect shop hours, each barber's hours, days off, and existing bookings + buffers", card: "hours" },
-        { k: "cs_time_lead", label: "Lead time and the how-far-ahead limit both hold", card: "booking" },
-        { k: "cs_time_best", label: "Best (no-gap) times are highlighted; awkward slivers hide per your gap policy", card: "avoidgaps" },
-        { k: "cs_time_peak", label: "Time-of-day pricing showed before confirm and was locked onto the appointment", card: "servicesmenu" },
-        { k: "cs_time_anyone", label: "“First available” routed to the right barber for your routing mode", card: "anyonerouting" },
-        { k: "cs_time_block", label: "A service's blocked time windows really block those slots", card: "servicesmenu" },
-        { k: "cs_time_display", label: "Times read right on a phone — booking page, texts & calendar all say the same thing", card: null },
+    { id: "act4", label: "Act 4 — Staff-side quick hits", icon: Calendar, desc: "On the shop device, while you wait", groups: [
+      { label: "Walk-in, drag & conflict", items: [
+        { k: "gc_a4_walkin", label: "Long-pressed an empty slot after Test Golden and created a walk-in “Golden Buddy” — it made a real client record", card: null },
+        { k: "gc_a4_drag", label: "Dragged Buddy's appointment around with Notify OFF (silent)", card: null },
+        { k: "gc_a4_conflict", label: "Dragged it onto Test Golden's slot — the overlap warning fired; used “next free slot”", card: null },
+        { k: "gc_a4_price", label: "Edited Buddy's price right on the appointment", card: "discounts" },
       ] },
     ] },
-    { id: "waitlist", label: "Waitlist", icon: List, desc: "Full days & filling freed slots", groups: [
-      { label: "Joining & filling", items: [
-        { k: "cs_wl_join", label: "A fully-booked day offered the waitlist and joining worked (days, time window, photo rule)", card: "waitlist" },
-        { k: "cs_wl_open", label: "Cancelling an appointment lit up the openings list with the right matches", card: null },
-        { k: "cs_wl_offer", label: "“Send offer” texted the client and marked them offered (or auto-notify messaged every match)", card: "waitlist" },
-        { k: "cs_wl_earlier", label: "A client who asked to hear about earlier openings was offered the slot before the waitlist", card: null },
-        { k: "cs_wl_drop", label: "Booking a real appointment removed that person from the waitlist", card: null },
+    { id: "act5", label: "Act 5 — The visit itself", icon: Scissors, desc: "When Test Golden's time hits", groups: [
+      { label: "Lobby, chair & running late", items: [
+        { k: "gc_a5_lobby", label: "Checked Test Golden into the lobby — the “we're ready” text landed on your phone", card: "waitingroom" },
+        { k: "gc_a5_brief", label: "The Briefing card (selfie, note, flags) was showing", card: null },
+        { k: "gc_a5_start", label: "Started the service — the chair timer ran", card: null },
+        { k: "gc_a5_late", label: "With Buddy booked next, sent the running-late text and confirmed it arrived", card: "runninglate" },
       ] },
     ] },
-    { id: "resched", label: "Reschedule & cancel", icon: RefreshCw, desc: "When the client changes plans", groups: [
-      { label: "From their text link", items: [
-        { k: "cs_rc_move", label: "Rescheduled from the link — the old slot only released once the new one was confirmed", card: null },
-        { k: "cs_rc_cancel", label: "Cancelled from the link — the slot freed instantly and the (email) cancellation notice went out", card: "messages" },
-        { k: "cs_rc_window", label: "Inside the cancel window, both were refused with the “call us” message", card: "policy" },
-        { k: "cs_rc_dead", label: "A dead or already-used link showed “appointment released / link not found,” not an error", card: null },
+    { id: "act6", label: "Act 6 — Checkout & after", icon: CreditCard, desc: "Ring it up, rebook, wrap up", groups: [
+      { label: "Take the money", items: [
+        { k: "gc_a6_items", label: "At checkout: added a product, a one-off item, and a small discount", card: "products" },
+        { k: "gc_a6_pay", label: "Tipped with a preset and paid by typing your own card in (a real, live charge)", card: "checkout" },
+      ] },
+      { label: "Rebook & wrap up", items: [
+        { k: "gc_a6_rebook", label: "On the rebook screen, booked the future appointment with the rebook discount", card: "rebookco" },
+        { k: "gc_a6_wrap", label: "Did the wrap-up: saved the learned time, a photo, and a note", card: "autotiming" },
+        { k: "gc_a6_review", label: "The review request arrived and the link worked", card: "reviews" },
+        { k: "gc_a6_forfeit", label: "Opened the rebooked appt's link, rescheduled it — got warned the rebook discount would be forfeited", card: null },
+        { k: "gc_a6_dead", label: "Tapped the cancelled appt's old link — it said “released / not found,” not an error", card: null },
       ] },
     ] },
-    { id: "blocked", label: "Blocked clients", icon: Lock, desc: "Keeping problem clients out", groups: [
-      { label: "Blocking", items: [
-        { k: "cs_blk_block", label: "Blocked a client (reason required) and unblocked them — the reason shows privately on their card", card: null },
-        { k: "cs_blk_reports", label: "A blocked client dropped out of your reports, overdue radar & marketing counts", card: null },
-        { k: "cs_blk_book", label: "A blocked client can NOT book online — test this one carefully; it's a known weak spot", card: null },
+    { id: "act7", label: "Act 7 — Unwind it", icon: Trash2, desc: "Refund and clean up", groups: [
+      { label: "Put it back", items: [
+        { k: "gc_a7_refund", label: "Refunded the charge — partial first, then the rest — and today's revenue report dropped to match", card: "reports" },
+        { k: "gc_a7_signout", label: "Signed out of the client session on your phone — it fully cleared", card: null },
+        { k: "gc_a7_delete", label: "Deleted Test Golden and Golden Buddy — their payment history survived in your books", card: "testdata" },
       ] },
     ] },
-    { id: "dayof", label: "Day of: check-in & timers", icon: Scissors, desc: "Lobby, the chair & running late", groups: [
-      { label: "In the shop", items: [
-        { k: "cs_day_lobby", label: "Checked a client into the lobby → sent the “we're ready” text → started the service", card: "waitingroom" },
-        { k: "cs_day_start", label: "With the waiting room off, START jumps straight to In Service", card: "waitingroom" },
-        { k: "cs_day_timer", label: "The chair timer ran, flipped to “Wrapping up” at 10 min left, and showed +over when long", card: null },
-        { k: "cs_day_forgot", label: "Forgot to start the timer — the “on the chair now” card caught it; a late start snapped back to schedule", card: null },
-        { k: "cs_day_brief", label: "The Briefing (last photo, usual time, notes, flags) showed at check-in", card: null },
-        { k: "cs_day_late", label: "Running-late texts: the next client got the heads-up, the one after got the lighter version", card: "runninglate" },
-        { k: "cs_day_arrive", label: "The arrival link (“I'm here”) checked them in from their phone and pinged you", card: null },
+    // Beyond the single run — the money/trust checks a real payments app can't
+    // launch without. These need extra paths the Golden run doesn't hit.
+    { id: "act8", label: "Act 8 — Money you can trust", icon: DollarSign, desc: "The paths real dollars depend on", groups: [
+      { label: "It all adds up", items: [
+        { k: "gc_a8_reconcile", label: "Stripe's dashboard total for the day matches the app's revenue report to the penny", card: "reports" },
+        { k: "gc_a8_receipt", label: "A receipt actually reached the client after checkout (not just the on-screen “receipt sent” line)", card: "messages" },
+        { k: "gc_a8_deposit", label: "A deposit-required booking took the deposit at booking and credited it at checkout", card: "policy" },
+        { k: "gc_a8_full", label: "A pay-in-full booking charged at booking and checked out with nothing more owed", card: "booking" },
+      ] },
+      { label: "The payment paths the run skipped", items: [
+        { k: "gc_a8_cof", label: "Card on file: saved at booking, charged clean at checkout; a declined card recovered with “pick another way”", card: "checkout" },
+        { k: "gc_a8_noshow", label: "A no-show fee actually hit the saved card and shows in your books", card: "policy" },
+        { k: "gc_a8_tap", label: "Tap-to-pay / card reader and cash each completed a checkout", card: "checkout" },
+      ] },
+      { label: "When things go wrong", items: [
+        { k: "gc_a8_double", label: "Refreshing or closing the page mid-payment never double-charged", card: null },
+        { k: "gc_a8_ghost", label: "A failed payment left NO ghost booking — the client was told nothing was held", card: null },
+        { k: "gc_a8_offline", label: "Losing signal mid-checkout showed a clear error, not a silent hang", card: null },
       ] },
     ] },
-    { id: "staffbook", label: "Staff-side booking & moving", icon: Calendar, desc: "Walk-ins, drags & conflicts", groups: [
-      { label: "On the calendar", items: [
-        { k: "cs_staff_create", label: "Long-pressed an empty slot to create; a walk-in name created a real client record", card: null },
-        { k: "cs_staff_move", label: "Dragged an appointment to move it — silent with notify off, reschedule text with it on", card: null },
-        { k: "cs_staff_conflict", label: "Overlap warnings fired on create, move AND edit; “next free slot” and “keep both” both worked", card: null },
-        { k: "cs_staff_double", label: "Double-tapping couldn't create the same appointment twice", card: null },
-        { k: "cs_staff_price", label: "Edited the price / added a discount on an existing appointment and it carried into checkout", card: "discounts" },
-        { k: "cs_staff_blockoff", label: "Time blocks (with weekly repeat) and one-off hour changes held on the calendar", card: null },
+    { id: "act9", label: "Act 9 — Guard the trust-breakers", icon: Lock, desc: "Privacy & the known weak spots", groups: [
+      { label: "Privacy & data", items: [
+        { k: "gc_a9_staff", label: "Entered a staff email + phone, saved, hard-reloaded — it persisted (never blanks)", card: "staff" },
+        { k: "gc_a9_privacy", label: "A signed-in client can't see any other client's name, number, or history anywhere in the flow", card: null },
+        { k: "gc_a9_optout", label: "A client who replies STOP / opts out stops getting texts", card: "notifications" },
+        { k: "gc_a9_timezone", label: "Times are correct across a day/date boundary and after a daylight-saving change", card: null },
       ] },
-    ] },
-    { id: "money", label: "Checkout & money", icon: CreditCard, desc: "Every way you get paid — and paid back", groups: [
-      { label: "Getting paid", items: [
-        { k: "cs_pay_methods", label: "Checked out every way you take money: tap-to-pay, reader, typed card, card on file, cash, custom", card: "checkout" },
-        { k: "cs_pay_tips", label: "Tips: preset, custom and none all worked; the card-on-file surcharge added right", card: "tipping" },
-        { k: "cs_pay_items", label: "Added a product (stock dropped), an extra service, a one-off item and a discount at checkout", card: "products" },
-        { k: "cs_pay_deposit", label: "A booking deposit credited at checkout; a pay-in-full booking checked out with nothing more owed", card: "policy" },
-        { k: "cs_pay_declined", label: "A declined card-on-file offered “pick another way”; an expired saved card forced a fresh one", card: null },
-        { k: "cs_pay_noshow", label: "Marked a no-show and charged the fee to the saved card (silent — no text goes out)", card: "policy" },
-      ] },
-      { label: "Money back & edge cases", items: [
-        { k: "cs_pay_refund", label: "Refunded full and partial (and a cash sale) — revenue reports dropped to match", card: "reports" },
-        { k: "cs_pay_reopen", label: "Reopened a paid ticket / “charge more” — only the balance charged, never doubled", card: null },
-        { k: "cs_pay_register", label: "Rang a walk-in sale on the register with cash tendered & change", card: "checkout" },
-      ] },
-    ] },
-    { id: "after", label: "After the visit", icon: Repeat, desc: "Rebooking & keeping them coming back", groups: [
-      { label: "The relationship", items: [
-        { k: "cs_after_rebook", label: "The checkout rebook screen jumped to the calendar pre-filled — or set the 'time to book' text reminder", card: "rebookco" },
-        { k: "cs_after_wrap", label: "Wrap-up saved the learned service time, the photo to their gallery and the note to their card", card: "autotiming" },
-        { k: "cs_after_radar", label: "The overdue-regulars radar surfaces who's due — nudge and dismiss both behave", card: null },
-        { k: "cs_after_review", label: "The review request went out after the visit and the review link worked", card: "reviews" },
-        { k: "cs_after_delete", label: "Deleted a test client — their payment history survived in your books", card: "testdata" },
+      { label: "Known weak spots — verify, then have me fix", items: [
+        { k: "gc_a9_blocked", label: "⚠ A blocked client still books online today — confirm, then fix so blocking is enforced on the booking page", card: null },
+        { k: "gc_a9_visits", label: "⚠ Visit count / last visit / rhythm don't update from a live checkout — so the overdue radar only works for imported clients", card: null },
+        { k: "gc_a9_messages", label: "⚠ The Messages tab says “Delivered” but may not send a real text — confirm what actually goes out", card: "messages" },
       ] },
     ] },
   ];
@@ -19280,8 +19264,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
             <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 13, background: "color-mix(in srgb, var(--live, var(--gold)) 12%, var(--panel))", border: "1px solid color-mix(in srgb, var(--live, var(--gold)) 35%, var(--border))", borderRadius: 16, padding: "15px 17px" }}>
               <span style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--live, var(--gold))", color: "#16181C", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Check size={18} strokeWidth={3} /></span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500 }}>Every scenario checks out 🎉</div>
-                <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>All {totalCount} client scenarios verified.</div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 500 }}>The Golden Client run is complete 🎉</div>
+                <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>All {totalCount} checks passed — trust it with real clients.</div>
               </div>
             </div>
             <button onClick={() => setCockpitHidden(true)} style={{ background: "none", border: "none", color: "var(--faint)", padding: 6, display: "flex", alignItems: "center" }}><X size={16} /></button>
@@ -19294,8 +19278,8 @@ function SettingsView({ business, setBusiness, providers, setProviders, services
               <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 14 }}>
                 <span style={{ width: 40, height: 40, borderRadius: 12, background: "color-mix(in srgb, var(--live, var(--gold)) 16%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Sparkles size={19} style={{ color: "var(--live, var(--gold))" }} /></span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 18, lineHeight: 1.1 }}>Does every client scenario work?</div>
-                  <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>Walk each path a client can take and tick it off as you verify it</div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 18, lineHeight: 1.1 }}>The Golden Client run</div>
+                  <div style={{ fontSize: 13.5, color: "var(--sub)", marginTop: 2 }}>One fake client, first booking to refund. Do the acts in order and tick each off.</div>
                 </div>
               </div>
               <div style={{ height: 8, borderRadius: 8, background: "var(--panel2)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((doneCount / totalCount) * 100)}%`, background: "var(--live, var(--gold))", borderRadius: 8, transition: "width .3s" }} /></div>
