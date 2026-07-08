@@ -5040,6 +5040,14 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     setPhone(""); setNewFirst(""); setNewLast(""); setNewEmail(""); setNewAddress(""); setSmsConsent(false);
   };
   const doCancelAppt = (appt) => {
+    // GUARD: cancel-window-lock — CHOKEPOINT: every cancel through this helper re-checks the
+    // window, so no caller (current or future) can late-cancel even if its own guard is missed.
+    // The 3-minute grace mirrors the server trigger: a home reschedule re-checks BEFORE booking
+    // the new time, then releases the old slot seconds later — without the grace, crossing the
+    // boundary in those seconds would strand the client double-booked instead of finishing the
+    // swap. Unreadable dates refuse (fail closed).
+    const _t = apptWhen(appt); const _tt = _t ? _t.getTime() : NaN;
+    if (!isFinite(_tt) || (_tt - Date.now()) < (manageWindowHrs * 60 - 3) * 60000) { setHomeAction({ type: "locked", appt }); return; }
     try { supabase.rpc("cancel_my_appointment", { p_shop: shopId, p_client_id: matched.id, p_appt_id: String(appt.id), p_session: matched.sessionToken }).catch(() => {}); } catch (e) {}
     setMyAppts((cur) => cur.map((a) => a.id === appt.id ? { ...a, status: "cancelled" } : a));
   };
