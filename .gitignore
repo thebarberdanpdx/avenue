@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Python bytecode (e.g. from scripts/uptime-watch.py compile/run)
+__pycache__/
+*.pyc
