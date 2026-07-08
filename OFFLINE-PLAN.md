@@ -18,6 +18,7 @@ The app runs off a local database **on the device**. With no internet / no Supab
 4. **Photos-as-base64 bloat the local DB** (audit item #5). Syncing multi-MB blobs to every device is slow + heavy. Likely forcing function to finally move photos to object storage; if not, sync buckets must exclude/trim gallery payloads for v1.
 5. **Auth during an outage:** PowerSync tokens are minted via Supabase auth. Already-signed-in staff keep working offline; a **fresh sign-in during a full auth outage stays impossible** (magic-link email needs the backend anyway). Honest limit — mitigated by long-lived sessions, not solved.
 6. **A sync engine is new moving machinery.** Bugs in bucket rules or the upload queue can drop or duplicate writes. Every stage below has a verification gate; the write path keeps the "refuse rather than corrupt" posture.
+7. **⚠️ WAL/disk-fill from the replication slot (VENDOR-ACKNOWLEDGED).** PowerSync's Supabase docs state they're "currently investigating an issue with Supabase logical replication where unused/idle instances have excessive WAL growth, resulting in maxed out disk usage." A shop DB is idle nightly/on closed days — squarely the at-risk profile. Neutralized by capping `max_wal_size` + `max_slot_wal_keep_size` (1GB) BEFORE connecting, live disk monitoring, and never leaving a dead/abandoned slot on the instance. This is the single biggest infra risk of the whole build — treat the DB-connection step with outage-level care.
 
 ## Dan's two policy decisions (needed before Stage 2 ships; recommendations ready)
 - **D1 — Offline double-booking:** RECOMMENDED: offline bookings show as **"pending — confirming"** until the server accepts them on reconnect; a clash flags loudly for staff to resolve (rebook/call). Never silently double-book, never silently drop. Alternative (not recommended): trust-last-write.
@@ -25,11 +26,16 @@ The app runs off a local database **on the device**. With no internet / no Supab
 
 ## Stages (each independently shippable, verified, and reversible)
 ### Stage 0 — Groundwork (no behavior change)
-- [ ] **Schema/RLS/RPC dump committed to git** (`db/schema.sql`) — needed for PowerSync bucket design anyway; also closes audit item #3 (structure not in version control). Dan runs the dump or pastes creds into the Supabase CLI flow — instructions in `db/`.
-- [ ] Dan creates the **PowerSync account** (free tier) + a dev instance pointed at Supabase (read-only publication; PowerSync needs no write access to Postgres).
-- [ ] Enable logical replication / publication for the 6 tables (SQL for Dan to paste, like the realtime SQL he's run before).
-- [ ] Define **sync buckets** = per-shop (`shop_id='sanctuary'`) slices of: shops(settings), services, providers (SANITIZED — the public feed's fields only, never email/phone/pin), appointments, clients (staff-only bucket), waitlist. Bucket rules enforce the same privacy walls RLS does today — verify with an anon token that private buckets are unreachable.
-- Gate: dev instance syncs a copy of real data; privacy probe passes; production app untouched.
+- [x] Dan creates the **PowerSync account** (free tier, GitHub login) — done 2026-07-08. Org `thebarberdanpdx`.
+- [ ] Create the PowerSync **project** shell (name "Vero", region US-West/Oregon to match Supabase us-west-2). Safe — touches nothing.
+- [ ] **⚠️ BEFORE connecting the database — set the WAL safety caps.** PowerSync's own Supabase guide warns: idle Supabase instances can get "excessive WAL growth, resulting in maxed out disk usage" (a disk-fill outage — the SAME class as the 2026-07-08 NANO incident). Mitigation, applied FIRST on the Micro instance: `max_wal_size` and `max_slot_wal_keep_size` = 1GB each. Capping slot WAL means if PowerSync ever lags badly the slot invalidates and re-syncs (cheap for a one-shop dataset) instead of filling the disk. Verify disk headroom + set an alert before connecting.
+- [ ] **Schema/RLS/RPC dump committed to git** (`db/schema.sql`) — needed for bucket design anyway; also closes audit item #3.
+- [ ] **Dedicated role, least privilege for its job:** `powersync_role` with `REPLICATION BYPASSRLS LOGIN` + `SELECT` on our tables only. ⚠️ `BYPASSRLS` means this role reads every row regardless of RLS — so its password is a high-value secret (guard it; the sync BUCKET RULES become the per-user privacy wall, not RLS). Password goes ONLY into the PowerSync connection form, never into chat/repo.
+- [ ] **Scope the publication — do NOT use `CREATE PUBLICATION powersync FOR ALL TABLES`** (the docs' default). That publishes every table incl. `message_log`/payment ledgers and risks memory spikes. Publish ONLY: shops, services, providers, appointments, clients, waitlist.
+- [ ] Point the PowerSync dev instance at Supabase via the **Direct connection** string (SSL `verify-full`, Supabase CA included). Read-only — no write access to Postgres.
+- [ ] Define **sync buckets** = per-shop (`shop_id='sanctuary'`) slices of: shops(settings), services, providers (SANITIZED — public-feed fields only, never email/phone/pin), appointments, clients (staff-only bucket), waitlist. Bucket rules enforce the same privacy walls RLS does today — verify with an anon token that private buckets are unreachable.
+- **Timing rule (non-negotiable):** the database-connection steps happen in a CALM window (after close), NOT right after an outage or at opening, with disk monitored live. Creating the project shell + committing SQL can happen any time.
+- Gate: dev instance syncs a copy of real data; privacy probe passes; WAL/disk stable over 24h; production app untouched.
 
 ### Stage 1 — Offline READING (kills the blank-screen class of outage for good)
 - App boots from the local DB and renders calendar/clients/menu instantly; network only freshens it. Replaces the snapshot-cache stopgap (`hydrateFromCache`) with a real always-current local DB — the cache stays as fallback until cutover, then retires.
