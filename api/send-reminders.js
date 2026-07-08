@@ -73,6 +73,10 @@ async function handler(req, res) {
       const a = row.data || {};
       if (!a.bookedFor) continue;
       if (DEAD_STATUSES.includes(String(a.status || "").toLowerCase())) continue;
+      // Service already under way → the client is in the chair, so don't send any remaining
+      // reminders (notably the ~15-min "time to check in" nudge). Owner's rule: once the service
+      // is started, no check-in. Triggered by the start timestamp or the "in-service" status.
+      if (a.serviceStartedAt || String(a.status || "").toLowerCase() === "in-service") continue;
       const apptMs = new Date(a.bookedFor).getTime();
       if (isNaN(apptMs) || apptMs <= now || apptMs - now > HORIZON_MS) continue;
 
