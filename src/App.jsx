@@ -20444,9 +20444,11 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
   // Staff-picked options (cut choice / questions / add-ons) for the chosen service, same set the
   // client sees online. { [groupId]: optionId (choice) | true (addon) }.
   const [opts, setOpts] = useState({});
+  const [extraIds, setExtraIds] = useState([]); // library options staff deliberately added on top of the service's own
+  const [showExtras, setShowExtras] = useState(false); // "Add an extra" picker open?
   // if the chosen service isn't offered by the current provider, switch to one who offers it
   useEffect(() => {
-    setOpts({}); // a fresh service starts with no options picked
+    setOpts({}); setExtraIds([]); setShowExtras(false); // a fresh service starts with no options picked
     if (!service || !service.staff) return;
     if (provId === "anyone") return;
     if (service.staff[provId]?.on === false) {
@@ -20454,13 +20456,21 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
       if (firstOffering) setProvId(firstOffering.id);
     }
   }, [service]);
-  // Staff can attach ANY add-on or question from the master libraries to an appointment — not just
-  // the ones wired to this service. Build the option groups from the libraries; if the picked
-  // service already carries that group (with per-barber price/time overrides), prefer it for amounts.
-  const allOptionGroups = [
+  // Options DEFAULT to the selected service's OWN groups — the exact set a client sees when booking
+  // that service online. This is what keeps a straight-razor add-on that's only wired to
+  // "Haircut + Beard" from showing up under a plain Haircut. Staff can still pull in anything from the
+  // shop's master libraries via the "Add an extra" control below; those fold in on demand and are
+  // deduped (by name) against the service's own options so the picker never offers a duplicate.
+  const serviceGroups = (service && Array.isArray(service.addonGroups)) ? service.addonGroups : [];
+  const libraryGroups = [
     ...((business.questionsLibrary || []).map((q) => ({ id: "libq-" + q.id, type: "choice", label: q.label, options: q.options || [] }))),
     ...((business.addOnsLibrary || []).map((a) => ({ id: "lib-" + a.id, type: "addon", label: a.name, item: { name: a.name, desc: a.desc || "", price: Number(a.price) || 0, min: Number(a.extraMin) || 0, addsPrice: true, addsTime: true } }))),
   ];
+  const groupName = (g) => String((g && (g.type === "choice" ? g.label : ((g.item && g.item.name) || g.label))) || "").trim().toLowerCase();
+  const serviceNames = new Set(serviceGroups.map(groupName));
+  const addableLibrary = libraryGroups.filter((g) => !serviceNames.has(groupName(g))); // library items not already on the service
+  const extraGroups = addableLibrary.filter((g) => extraIds.includes(g.id));
+  const allOptionGroups = [...serviceGroups, ...extraGroups];
   const groupAmount = (grp, selVal) => {
     const svcGrp = (service && Array.isArray(service.addonGroups)) ? service.addonGroups.find((x) => x.id === grp.id) : null;
     if (grp.type === "choice") {
@@ -20685,8 +20695,8 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
             )}
           </div>
 
-          {/* OPTIONS — any cut choice / question / add-on from the master libraries */}
-          {service && allOptionGroups.length > 0 && (
+          {/* OPTIONS — the service's OWN cut choice / questions / add-ons, plus any extras staff added */}
+          {service && (allOptionGroups.length > 0 || addableLibrary.length > 0) && (
             <div style={fieldWrap}>
               <div style={{ fontSize: 13, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--faint)", fontWeight: 700, marginBottom: 16 }}>Options</div>
               {allOptionGroups.map((g) => {
@@ -20719,6 +20729,28 @@ function NewAppointmentForm({ slot, providers, clients, services, appts, selecte
                   </button>
                 );
               })}
+              {/* Add an extra from the shop's master libraries — deliberate, not shown by default, so
+                  a service only ever offers ITS OWN options unless staff explicitly reach for more. */}
+              {addableLibrary.length > extraGroups.length && (showExtras ? (
+                <div style={{ marginTop: allOptionGroups.length ? 8 : 0 }}>
+                  <div style={{ fontSize: 13, color: "var(--faint)", fontWeight: 600, marginBottom: 8 }}>Add an extra</div>
+                  {addableLibrary.filter((g) => !extraIds.includes(g.id)).map((g) => {
+                    const it = g.item || {};
+                    const lbl = g.type === "choice" ? (g.label || "Question") : (it.name || g.label);
+                    const pr = g.type === "choice" ? 0 : (Number(it.price) || 0);
+                    const mn = g.type === "choice" ? 0 : (Number(it.min) || 0);
+                    return (
+                      <button key={g.id} onClick={() => setExtraIds((ids) => [...ids, g.id])} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "var(--panel)", border: "1px dashed var(--border2)", borderRadius: 12, padding: "12px 15px", color: "var(--text)", textAlign: "left", marginBottom: 8, cursor: "pointer" }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 10 }}><Plus size={16} style={{ color: "var(--sub)" }} /><span style={{ fontSize: 15 }}>{lbl}</span></span>
+                        <span style={{ fontSize: 13.5, color: "var(--sub)", flexShrink: 0 }}>{pr > 0 ? `+ $${pr}` : ""}{mn > 0 ? ` · +${mn}m` : ""}</span>
+                      </button>
+                    );
+                  })}
+                  <button onClick={() => setShowExtras(false)} style={{ background: "none", border: "none", color: "var(--sub)", fontSize: 14, padding: "4px 0", cursor: "pointer" }}>Done</button>
+                </div>
+              ) : (
+                <button onClick={() => setShowExtras(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "none", border: "1px dashed var(--border2)", borderRadius: 12, padding: "12px 15px", color: "var(--sub)", fontSize: 14, fontWeight: 500, cursor: "pointer", marginTop: allOptionGroups.length ? 4 : 0 }}><Plus size={16} /> Add an extra</button>
+              ))}
             </div>
           )}
 
@@ -24661,45 +24693,6 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                   </button>
                 </div>
               )}
-
-              {/* CHAIR-SIDE BRIEFING — full client story on check-in/in-service */}
-              {(appt.status === "checked-in" || appt.status === "in-service") && client && (() => {
-                const g = (client.gallery || []);
-                const lastCut = g.length ? g[g.length - 1] : null;
-                const lastDur = client.customDurations && appt.serviceId ? client.customDurations[appt.serviceId] : null;
-                const daysAgo = lastCut ? Math.round((Date.now() - new Date(lastCut.date)) / 86400000) : (client.lastVisit ? Math.round((Date.now() - new Date(client.lastVisit)) / 86400000) : null);
-                const visits = client.visits || 0;
-                const cadence = client.cadenceDays || null;
-                const first = (client.name || "").split(" ")[0] || "They";
-                // VIP / loyalty flags
-                const flags = [];
-                if (visits >= 10) flags.push("one of your regulars");
-                if (client.tipsWell) flags.push("tips well");
-                if (cadence && daysAgo != null && daysAgo > cadence + 7) flags.push("overdue — worth a rebook nudge");
-                // Build a warm, natural briefing line from real data (template-based; AI layer is phase 2)
-                const bits = [];
-                bits.push(`${first} is in for ${appt.title || (service && service.name) || "a visit"}`);
-                if (lastDur) bits.push(`usually runs about ${lastDur} min`);
-                if (visits) bits.push(`${visits}${visits === 1 ? "st" : ""} visit${visits === 1 ? "" : "s"} with you`);
-                if (flags.length) bits.push(flags.join(", "));
-                const briefing = bits.join(" · ");
-                if (!lastCut && !client.notes && !lastDur && !visits) return null;
-                return (
-                  <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}`, background: "rgba(122,158,159,0.08)" }}>
-                    <div style={{ fontSize: 14, letterSpacing: 1.5, color: T.sub, fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={13} style={{ color: "var(--gold)" }} /> THE BRIEFING</div>
-                    {/* the concierge whisper */}
-                    <div style={{ fontSize: 15.5, color: T.text, lineHeight: 1.5, marginBottom: 14, fontStyle: "italic" }}>{briefing}.</div>
-                    <div style={{ display: "flex", gap: 12 }}>
-                      {lastCut && <div style={{ width: 64, height: 64, borderRadius: 12, overflow: "hidden", flexShrink: 0, background: T.chip }}><img src={imgUrl(lastCut.photo, 200)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        {lastCut && <div style={{ fontSize: 15.5, color: T.text, fontWeight: 500, marginBottom: 2 }}>{lastCut.note || "Last visit"}</div>}
-                        {daysAgo != null && <div style={{ fontSize: 14, color: T.faint, marginBottom: client.notes ? 6 : 0 }}>{daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo} days ago`}{cadence ? ` · comes every ~${cadence} days` : ""}</div>}
-                        {client.notes && <div style={{ fontSize: 14.5, color: T.sub, lineHeight: 1.45 }}>{client.notes}</div>}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
 
               {/* On / At — labeled date + time, aligned side by side (label over pill, pills level) */}
               {(() => {
