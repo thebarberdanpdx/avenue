@@ -166,9 +166,9 @@ async function handler(req, res) {
       checked++;
 
       const first = String(c.name || "there").split(" ")[0];
-      const svc = br.serviceName ? `your next ${br.serviceName}` : "your next visit";
       const bookUrl = `${SITE}/book?shop=${encodeURIComponent(shop.id)}`;
-      const textBody = `Hi ${first} — it's about that time! Ready for ${svc} at ${business}? Book here: ${bookUrl}`;
+      // Keep the SMS to ONE segment (≤160 GSM chars): short greeting + link + opt-out, nothing else.
+      const textBody = `Hi ${first}! Here is your reminder to book with ${business}! Book: ${bookUrl}`;
       const via = [];
       try { if (ch.sms) { await sendSms({ to: phone, text: textBody + "\nReply STOP to opt out." }); via.push("sms"); } } catch (e) { failed++; }
       try { if (ch.email && !via.length) { await sendEmail({ to: email, subject: `${business}: time to book your next visit`, text: textBody, html: renderEmailHtml(textBody, {}) }); via.push("email"); } } catch (e) { failed++; }
