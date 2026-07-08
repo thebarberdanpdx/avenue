@@ -1707,21 +1707,48 @@ function App() {
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session || null);
-      setAuthReady(true);
-      // If the user asked for staff (via #staff) and is already signed in, go straight to the
-      // dashboard instead of the public landing page. Intent is cleared once consumed.
+    // GUARD: login-fail-open — authReady gates the WHOLE app (the login button at StaffLogin +
+    // the data-load effect). It MUST fail open. supabase.auth.getSession() can reject or hang
+    // (auth server unreachable, dead/flaky wifi, a bad or expired stored token that can't refresh)
+    // and it carries no timeout of its own. The old code set authReady ONLY inside the success
+    // .then(), with no .catch() and no backstop — so a single failed/slow session check left the
+    // "Send sign-in link" button permanently disabled ("can't even click to send") AND blocked the
+    // data load, bricking the entire app until a lucky clean reload on good network. The login
+    // screen is exactly where a person with NO session needs to act, so a failed session check
+    // must never lock them out. Mark ready on success, on error, on any auth event, AND after a
+    // short backstop timeout — belt and suspenders. See memory: login-must-fail-open.
+    let ready = false;
+    const markReady = () => { if (mounted && !ready) { ready = true; setAuthReady(true); } };
+    // If the user asked for staff (via #staff), route to the dashboard gate. Intent is cleared
+    // once a real session is confirmed; with no session the gate simply shows the login screen.
+    const applyStaffIntent = (hasSession) => {
       try {
         if (localStorage.getItem("vero_login_intent") === "staff") {
-          if (data.session) { localStorage.removeItem("vero_login_intent"); setView("shop"); }
-          else { setView("shop"); } // not signed in yet -> the gate shows the login screen
+          if (hasSession) localStorage.removeItem("vero_login_intent");
+          setView("shop");
         }
       } catch (e) {}
+    };
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setSession((data && data.session) || null);
+      markReady();
+      applyStaffIntent(!!(data && data.session));
+    }).catch((e) => {
+      // Session check failed — DO NOT strand the owner on a dead button. Treat as "not signed in"
+      // and enable the app so they can still reach the login screen and sign in.
+      try { console.error("[vero] getSession failed — failing open so login still works:", e); } catch (x) {}
+      if (!mounted) return;
+      setSession(null);
+      markReady();
+      applyStaffIntent(false);
     });
+    // Absolute backstop: if getSession neither resolves nor rejects (a true network hang), enable
+    // login after a few seconds no matter what, rather than leaving the app frozen on a dead gate.
+    const readyTimer = setTimeout(markReady, 5000);
     const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
       setSession(sess || null);
+      markReady(); // any auth event means the client is alive — unblock the app
       // Only a FRESH magic-link sign-in carries the "staff" intent flag we set when sending it,
       // so we drop the owner straight on the dashboard. A normal returning visitor has no flag,
       // so the public booking link is never hijacked to the dashboard.
@@ -1729,7 +1756,7 @@ function App() {
         try { if (localStorage.getItem("vero_login_intent") === "staff") { localStorage.removeItem("vero_login_intent"); setView("shop"); } } catch (e) {}
       }
     });
-    return () => { mounted = false; try { sub.subscription.unsubscribe(); } catch (e) {} };
+    return () => { mounted = false; clearTimeout(readyTimer); try { sub.subscription.unsubscribe(); } catch (e) {} };
   }, []);
   // ---- Native foreground refresh ----
   // iOS suspends Supabase's refresh timer while the app is backgrounded. When the

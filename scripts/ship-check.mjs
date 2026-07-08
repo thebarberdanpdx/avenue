@@ -119,6 +119,7 @@ const GUARDS = [
   { needle: "onCommit(appt.id, summary)", label: "checkout commits done+paid the moment 'All done' shows (not after the closing dwell)" },
   { needle: "tableBusy(", label: "session-keyed loads can't clobber a mid-save local edit (uid-keyed + busy guard)" },
   { needle: "hydrateFromCache(", label: "offline read-cache — an outage shows the last-synced calendar, never a blank screen" },
+  { needle: "GUARD: login-fail-open", label: "login/auth gate fails OPEN — a failed/slow/timed-out session check can never grey out the sign-in button or brick the app" },
 ];
 try {
   const app = readFileSync(join(ROOT, "src/App.jsx"), "utf8");
