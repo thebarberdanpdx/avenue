@@ -3749,7 +3749,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
     : (business?.booking?.leadTimeMin != null) ? business.booking.leadTimeMin / 60
     : (business?.cancelWindowHrs || 24);
   const insideManageWindow = (a) => { const d = apptWhen(a); return !!d && (d.getTime() - Date.now()) < manageWindowHrs * 3600000; };
-  const [windowBlock, setWindowBlock] = useState(null); // visit whose change was refused (inside the window)
   // "Notes & photos" on a signed-in client's upcoming visit — same server write as the
   // confirmation screen (token RPC), with a session-authenticated fallback when no token is held.
   const [extrasFor, setExtrasFor] = useState(null);
@@ -4960,18 +4959,23 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
             <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, letterSpacing: "-0.5px", lineHeight: 1.05, margin: "12px 0 0", color: "var(--text)" }}>Welcome back,<br />{firstName}.</h1>
 
             <div style={lblStyle}>{upcoming.length > 1 ? `Your upcoming visits (${upcoming.length})` : "Your next visit"}</div>
-            {upcoming.length ? upcoming.map((v, vi) => (
+            {upcoming.length ? upcoming.map((v, vi) => { const locked = insideManageWindow(v); const shopPh = (business.phones && business.phones[0] && business.phones[0].number) || business.phone || ""; const lockedBtn = { background: "transparent", border: "1px solid var(--line)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--faint)", cursor: "default", opacity: 0.55 }; return (
               <div key={v.id} style={{ border: "1px solid var(--border)", borderRadius: 16, padding: "18px 18px", marginTop: vi ? 10 : 0 }}>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 23, fontWeight: 500, letterSpacing: "-0.3px", lineHeight: 1.05, color: "var(--text)" }}>{fmtHomeDate(v)} · {fmtHomeTime(v)}</div>
                 <div style={{ fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--text2)", marginTop: 5 }}>{svcLabel(v)} · with {provFirst(v.providerId)}{v.familyMemberId ? ` · for ${personLabel(v)}` : ""}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14, paddingTop: 13, borderTop: "1px solid var(--line)" }}>
-                  <button onClick={() => { if (insideManageWindow(v)) { setWindowBlock(v); return; } if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "reschedule", appt: v }); }} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Reschedule</button>
-                  <button onClick={() => { if (insideManageWindow(v)) { setWindowBlock(v); return; } setReschedPrev(v); bookForPerson(v.familyMemberId ? { id: v.familyMemberId, name: personLabel(v) } : { id: null }); }} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Change service</button>
+                {locked && (
+                  <div style={{ background: "var(--panel2, #F4F2EC)", borderRadius: 10, padding: "9px 12px", marginTop: 12, fontFamily: "'Jost', sans-serif", fontSize: 12.5, color: "var(--sub)", lineHeight: 1.5 }}>
+                    Your visit is less than {manageWindowHrs} hours away, so it can't be changed or cancelled online. {shopPh ? <>Need to? <a href={`tel:${String(shopPh).replace(/[^0-9+]/g, "")}`} style={{ color: "var(--text)", fontWeight: 500 }}>Call {shopPh}</a>.</> : "Please call us and we'll help."}
+                  </div>
+                )}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: locked ? 12 : 14, paddingTop: locked ? 0 : 13, borderTop: locked ? "none" : "1px solid var(--line)" }}>
+                  <button disabled={locked} onClick={() => { if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "reschedule", appt: v }); }} style={locked ? lockedBtn : { background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Reschedule</button>
+                  <button disabled={locked} onClick={() => { setReschedPrev(v); bookForPerson(v.familyMemberId ? { id: v.familyMemberId, name: personLabel(v) } : { id: null }); }} style={locked ? lockedBtn : { background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Change service</button>
                   <button onClick={() => openExtras(v)} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer" }}>Add notes &amp; photos</button>
-                  <button onClick={() => { if (insideManageWindow(v)) { setWindowBlock(v); return; } if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "cancel", appt: v }); }} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 400, color: "var(--sub)", cursor: "pointer" }}>Cancel</button>
+                  <button disabled={locked} onClick={() => { if (matched._localSession && v.manageToken) { setTokenManage(v); return; } setHomeAction({ type: "cancel", appt: v }); }} style={locked ? lockedBtn : { background: "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 4px", fontFamily: "'Jost', sans-serif", fontSize: 13, fontWeight: 400, color: "var(--sub)", cursor: "pointer" }}>Cancel</button>
                 </div>
               </div>
-            )) : (
+            ); }) : (
               <div style={{ border: "1px solid var(--line)", borderRadius: 16, padding: "18px 18px", fontFamily: "'Jost', sans-serif", fontSize: 14, color: "var(--sub)", lineHeight: 1.5 }}>No upcoming visit yet — book your next one below.</div>
             )}
 
@@ -5049,16 +5053,6 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
               onExit={() => { setTokenManage(null); refreshMyAppts(); }} />
           </div>
         )}
-        {windowBlock && (() => { const ph = (business.phones && business.phones[0] && business.phones[0].number) || business.phone || ""; return (
-          <div onClick={() => setWindowBlock(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "var(--bg)", borderRadius: "20px 20px 0 0", padding: "26px 22px calc(30px + env(safe-area-inset-bottom))" }}>
-              <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 500, color: "var(--text)", margin: "0 0 8px", letterSpacing: "-0.2px" }}>Too close to change online</h3>
-              <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 14.5, color: "var(--sub)", lineHeight: 1.55, margin: "0 0 22px" }}>Your {svcLabel(windowBlock)} on {fmtHomeShort(windowBlock)} is less than {manageWindowHrs} hours away, so it can't be cancelled or rescheduled online. {ph ? "Give us a call and we'll help." : "Please call us and we'll help."}</p>
-              {ph && <a href={`tel:${String(ph).replace(/[^0-9+]/g, "")}`} style={{ display: "block", textAlign: "center", textDecoration: "none", width: "100%", boxSizing: "border-box", background: "var(--text)", color: "var(--bg)", padding: 16, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1.5, fontWeight: 600, textTransform: "uppercase", borderRadius: 12, marginBottom: 11 }}>Call {ph}</a>}
-              <button onClick={() => setWindowBlock(null)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", padding: 15, fontFamily: "'Jost', sans-serif", fontSize: 13, letterSpacing: 1, fontWeight: 500, textTransform: "uppercase", borderRadius: 12, cursor: "pointer" }}>OK</button>
-            </div>
-          </div>
-        ); })()}
         {extrasFor && (
           <div onClick={() => !exBusy && setExtrasFor(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "var(--bg)", borderRadius: "20px 20px 0 0", padding: "26px 22px calc(30px + env(safe-area-inset-bottom))" }}>
