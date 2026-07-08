@@ -3664,7 +3664,8 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
   const [loginNoMatch, setLoginNoMatch] = useState(null);  // null | "nomatch" | "error"
   const [blockedNotice, setBlockedNotice] = useState(false); // shown when a blocked client tries to book
   const [dupWarn, setDupWarn] = useState(null); // { existing, phone, email } — client already has an appt within 10 days
-  const [wantEarlier, setWantEarlier] = useState(false); // client opts in to be told if an earlier slot opens
+  const [wantEarlier, setWantEarlier] = useState(false); // client opts into the earlier-time waitlist (moved up if a sooner slot opens)
+  const [earlierPref, setEarlierPref] = useState({ days: [], dayTimes: {}, anyProvider: false }); // which earlier days/windows they'd take, + any-barber opt-in
   const [clientTypeBlock, setClientTypeBlock] = useState(null); // "returning_only" | "new_only" | null — set when shop's online booking is restricted to one type and this client is the other
   const [callOnly, setCallOnly] = useState(null); // #12: a service marked "prompt to call" — show a call-to-book message instead of booking it online
   const [newMemberName, setNewMemberName] = useState("");
@@ -4616,6 +4617,9 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
         groupId: isMultiPerson ? baseId : null,
         manageToken: makeManageToken(),
         wantsEarlier: wantEarlier,
+        earlierDays: wantEarlier ? earlierPref.days : undefined,
+        earlierDayTimes: wantEarlier ? earlierPref.dayTimes : undefined,
+        earlierAnyProvider: wantEarlier ? !!earlierPref.anyProvider : undefined,
         newClient: (pi === 0 && bookingIsNew) ? true : undefined, // audit #29: counts toward the barber's new-client-per-day cap
         address: (pi === 0 && newAddress.trim()) ? newAddress.trim() : undefined, // #11: home address for mobile/in-home services
         discount: (pi === 0 && selfie) ? { id: "selfie", name: "Profile photo", type: "amount", value: 5 } : undefined, // $5 off for adding a profile selfie
@@ -7040,12 +7044,25 @@ function ClientFlow({ shopId, isStaff, business, services, providers, categories
                   <div style={{ height: 1, background: "color-mix(in srgb, var(--bg) 22%, transparent)", margin: "14px 0" }} />
                   <button onClick={() => setWantEarlier(!wantEarlier)} style={{ display: "flex", alignItems: "center", gap: 13, background: "none", border: "none", padding: 0, width: "100%", textAlign: "left", cursor: "pointer" }}>
                     <span style={{ width: 44, height: 26, borderRadius: 13, background: wantEarlier ? "var(--bg)" : "color-mix(in srgb, var(--bg) 28%, transparent)", position: "relative", flexShrink: 0, transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: wantEarlier ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: wantEarlier ? "var(--text)" : "var(--bg)", transition: "left .2s" }} /></span>
-                    <span style={{ fontSize: 14.5, lineHeight: 1.3, color: "color-mix(in srgb, var(--bg) 88%, var(--text))" }}>Notify me if an earlier spot opens up</span>
+                    <span style={{ fontSize: 14.5, lineHeight: 1.3, color: "color-mix(in srgb, var(--bg) 88%, var(--text))" }}>Hoping to get in sooner?<span style={{ display: "block", fontSize: 12.5, color: "color-mix(in srgb, var(--bg) 62%, var(--text))", marginTop: 3, fontWeight: 400 }}>Keep this time — we'll add you to the waitlist and bump you up if an earlier spot opens.</span></span>
                   </button>
                 </div>
               );
             })()}
 
+            {wantEarlier && (() => {
+              const s0 = new Date(selectedDate); s0.setHours(0, 0, 0, 0);
+              const earlierDayOpts = (dateOptions || []).filter((d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x <= s0; });
+              const realProv = (providers || []).filter((p) => p.id !== "anyone" && p.isProvider !== false && !p.archived);
+              const showAny = realProv.length > 1 && provider && provider.name !== "Anyone";
+              return (
+                <div className="fade-up" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16, margin: "-14px 0 24px" }}>
+                  <div style={{ fontSize: 14.5, color: "var(--text)", fontWeight: 600, marginBottom: 4 }}>Add me to the waitlist for an earlier time</div>
+                  <div style={{ fontSize: 13, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>You keep your {fmtTime(slot)} no matter what — we'll only move you if something sooner opens that fits.</div>
+                  <EarlierWaitlistPicker dayOptions={earlierDayOpts} value={earlierPref} onChange={setEarlierPref} providerName={provider.name} showAnyProvider={showAny} />
+                </div>
+              );
+            })()}
             <div style={{ fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--faint)", fontWeight: 600, margin: "0 2px 11px" }}>Your details</div>
             <div style={{ display: "grid", gap: 11, marginBottom: 20 }}>
               <div style={{ display: "flex", gap: 11 }}>
@@ -11541,7 +11558,7 @@ function ShopDashboard({ authEmail, business, setBusiness, services, setServices
         {tab === "clients" && !activeClient && <ClientList clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} onOpen={(c) => navTo({ activeClient: c })} showToast={showToast} isOwner={isOwner} shopId={shopId} appts={appts} setAppts={setAppts} waitlist={waitlist} setWaitlist={setWaitlist} />}
         {tab === "clients" && activeClient && <ClientProfile client={activeClient} clients={clients} setClients={setClients} services={services} setServices={setServices} providers={providers} appts={appts} setAppts={setAppts} business={business} setBusiness={setBusiness} me={me} shopId={shopId} onBack={navBack} showToast={showToast} onRebook={(seed) => { setRebookSeed(seed); navTo({ tab: "calendar", activeClient: null }); }} onOpenAppt={(a) => { setPulseOpenApptId(a.id); navTo({ tab: "calendar", activeClient: null }); }} />}
         {tab === "messages" && <MessagesView key={`messages-${tabNonce}`} clients={isOwner ? clients : clients.filter((c) => c.provider === (me?.id))} setClients={setClients} providers={providers} msgTarget={msgTarget} clearTarget={() => setMsgTarget(null)} onOpenClient={(c) => navTo({ tab: "clients", activeClient: c })} />}
-        {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} />}
+        {tab === "waitlist" && <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={textPerson} showToast={showToast} providers={providers} services={services} appts={appts} setAppts={setAppts} clients={clients} business={business} />}
         {tab === "menu" && <MenuEditor services={services} setServices={setServices} categories={categories} setCategories={setCategories} providers={providers} business={business} setBusiness={setBusiness} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} />}
         {tab === "settings" && isOwner && <ErrorBoundary label="Settings"><SettingsView key={`settings-${tabNonce}`} business={business} setBusiness={setBusiness} providers={providers} setProviders={setProviders} services={services} setServices={setServices} categories={categories} setCategories={setCategories} appts={appts} clients={clients} theme={theme} setTheme={setTheme} me={me} showToast={showToast} cutLibrary={cutLibrary} setCutLibrary={setCutLibrary} shopId={shopId} setAppts={setAppts} setClients={setClients} waitlist={waitlist} setWaitlist={setWaitlist} reviews={reviews} setReviews={setReviews} onSignOutAccount={onSignOutAccount} authEmail={authEmail} /></ErrorBoundary>}
       </div>
@@ -19670,11 +19687,79 @@ function NativeDiagnostics() {
 }
 
 // ---------- shared dashboard pieces ----------
-function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, providers = [], services = [] }) {
+// Shared "earlier appointment" preference picker — the day + time-window chooser revealed when a
+// client (or staff) opts a booked appointment into the earlier-time waitlist. The days offered are
+// the ones ON OR BEFORE the booked date (an earlier day, or the same day but earlier), so it can only
+// ever move a client sooner. Mirrors the waitlist join form's day/window UI so the two feel identical.
+// State lives in the parent; value = { days:[label], dayTimes:{label:window}, anyProvider:bool }.
+function EarlierWaitlistPicker({ dayOptions = [], value, onChange, providerName, showAnyProvider }) {
+  const { days = [], dayTimes = {}, anyProvider = false } = value || {};
+  const set = (patch) => onChange && onChange({ days, dayTimes, anyProvider, ...patch });
+  const dayLabel = (d) => { const r = relativeDate(d); return r.includes(",") ? r : `${r}, ${MONTHS[d.getMonth()]} ${d.getDate()}`; };
+  const toggleDay = (l) => {
+    if (days.includes(l)) { const nt = { ...dayTimes }; delete nt[l]; set({ days: days.filter((x) => x !== l), dayTimes: nt }); return; }
+    if (days.length >= 3) return;
+    set({ days: [...days, l], dayTimes: { ...dayTimes, [l]: "any" } });
+  };
+  const lbl = { fontSize: 13, color: "var(--faint)", display: "block", marginBottom: 8 };
+  const WINS = [["morning", "Morning"], ["afternoon", "Afternoon"], ["evening", "Evening"], ["any", "Any time"]];
+  return (
+    <div>
+      <label style={lbl}>Which earlier days work? <span style={{ color: "var(--sub)", fontWeight: 400 }}>(up to 3)</span></label>
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 14 }}>
+        {dayOptions.map((d, i) => { const l = dayLabel(d); const on = days.includes(l); const atMax = !on && days.length >= 3; return (
+          <button key={i} type="button" disabled={atMax} onClick={() => toggleDay(l)} style={{ flexShrink: 0, minWidth: 52, padding: "10px 0", borderRadius: 8, border: `1px solid ${on ? "var(--text)" : "var(--border2)"}`, background: on ? "var(--text)" : "transparent", color: on ? "var(--bg)" : "var(--text)", textAlign: "center", opacity: atMax ? 0.4 : 1, cursor: atMax ? "default" : "pointer" }}>
+            <div style={{ fontSize: 13, letterSpacing: 1, opacity: 0.7 }}>{DAY_ABBR[d.getDay()]}</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18 }}>{d.getDate()}</div>
+          </button>
+        ); })}
+      </div>
+      {days.length > 0 && (
+        <div style={{ marginBottom: showAnyProvider ? 14 : 0 }}>
+          <label style={lbl}>What time each day?</label>
+          {days.map((l) => { const sel = dayTimes[l] || "any"; return (
+            <div key={l} style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 12px", marginBottom: 8 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>{l}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {WINS.map(([id, label]) => { const on = sel === id; return (
+                  <button key={id} type="button" onClick={() => set({ dayTimes: { ...dayTimes, [l]: id } })} style={{ padding: "7px 12px", borderRadius: 9, border: `1.5px solid ${on ? "var(--text)" : "var(--border)"}`, background: on ? "color-mix(in srgb, var(--text) 12%, var(--panel))" : "var(--panel)", color: "var(--text)", fontSize: 13, fontWeight: on ? 600 : 400, cursor: "pointer" }}>{label}</button>
+                ); })}
+              </div>
+            </div>
+          ); })}
+        </div>
+      )}
+      {showAnyProvider && (
+        <div>
+          <label style={lbl}>If an earlier spot opens with someone else, take it?</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" onClick={() => set({ anyProvider: false })} style={{ flex: 1, padding: "11px 8px", borderRadius: 10, border: `1.5px solid ${!anyProvider ? "var(--text)" : "var(--border2)"}`, background: !anyProvider ? "color-mix(in srgb, var(--text) 10%, var(--panel))" : "transparent", color: "var(--text)", fontSize: 14, fontWeight: !anyProvider ? 600 : 400, cursor: "pointer" }}>Only {providerName || "my barber"}</button>
+            <button type="button" onClick={() => set({ anyProvider: true })} style={{ flex: 1, padding: "11px 8px", borderRadius: 10, border: `1.5px solid ${anyProvider ? "var(--text)" : "var(--border2)"}`, background: anyProvider ? "color-mix(in srgb, var(--text) 10%, var(--panel))" : "transparent", color: "var(--text)", fontSize: 14, fontWeight: anyProvider ? 600 : 400, cursor: "pointer" }}>Any barber</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, providers = [], services = [], appts = [], setAppts, clients = [], business = {} }) {
   const whenLabel = { early: "Morning", morning: "Morning", midday: "Midday", afternoon: "Afternoon", evening: "Evening", any: "Any time" };
   const whenWord = { early: "morning", morning: "morning", midday: "midday", afternoon: "afternoon", evening: "evening" };
   const [openId, setOpenId] = useState(null);
-  const open = waitlist.find((w, i) => (w.id || i) === openId);
+  const [moveNotify, setMoveNotify] = useState(true); // "text them the new time" toggle in the move-up modal
+  // Booked-but-wants-earlier clients: synthesized from confirmed, still-upcoming appointments whose
+  // client/owner turned on "waitlist for an earlier time." They ride at the TOP of the waitlist with a
+  // colored (sage) card so staff can move them up. Source of truth is the appointment — clearing the flag
+  // (on move-up or remove) drops them off automatically, so there's no stale waitlist duplicate to drift.
+  const _now0 = new Date(); _now0.setHours(0, 0, 0, 0);
+  const earlierEntries = (appts || [])
+    .filter((a) => a && a.wantsEarlier === true && a.status === "confirmed" && a.bookedFor && new Date(a.bookedFor) >= _now0)
+    .map((a) => { const prov = (providers || []).find((p) => p.id === a.providerId); const days = a.earlierDays || []; const dayTimes = a.earlierDayTimes || {};
+      return { id: "ea-" + a.id, booked: true, apptId: a.id, name: a.name || "Client", phone: a.phone, service: a.title || a.serviceName || "appointment", provider: prov ? prov.name : null, providerId: a.providerId, anyProvider: !!a.earlierAnyProvider, days, day: days[0] || "", dayTimes, when: dayTimes[days[0]] || "any", currentStart: a.start, currentBookedFor: a.bookedFor }; })
+    .sort((a, b) => new Date(a.currentBookedFor) - new Date(b.currentBookedFor));
+  const rows = [...earlierEntries, ...(waitlist || [])];
+  const rowKey = (r, i) => r.id || ("wl-" + i);
+  const open = rows.find((r, i) => rowKey(r, i) === openId);
 
   // ---- Staff-side "add a client to the waitlist" (mirrors the client join form: up to 3 days) ----
   const [adding, setAdding] = useState(false);
@@ -19716,23 +19801,100 @@ function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, prov
   };
   const removeEntry = (w, i) => { setWaitlist(waitlist.filter((x, j) => (x.id || j) !== (w.id || i))); setOpenId(null); };
 
+  // ---- Move-up (booked-but-wants-earlier) ----
+  // Time-of-day windows (mirror the calendar's matcher) so a slot honors a client's stated window.
+  const _DS = 7 * 60, _DE = 22 * 60;
+  const WL_WINDOW = { early: [_DS, 720], morning: [_DS, 720], midday: [660, 840], afternoon: [720, 1020], evening: [1020, _DE] };
+  const windowFits = (win, s, e) => { const w = WL_WINDOW[String(win || "any").replace(/^custom.*/, "")]; return !w || (s < w[1] && e > w[0]); };
+  const slotLabel = (o) => { const r = relativeDate(o.date); const day = r.includes(",") ? r : `${r}, ${MONTHS[o.date.getMonth()]} ${o.date.getDate()}`; return `${day} · ${fmtTime(o.start)}`; };
+  // The appointment's REAL length: its locked booked duration (which already baked in the per-staff /
+  // per-client custom duration at booking time), falling back to the getDuration cascade. Never a flat default.
+  const apptDuration = (a) => {
+    if (a && a.start != null && a.end != null && a.end > a.start) return a.end - a.start;
+    const svc = (services || []).find((s) => s.id === a.serviceId);
+    const cli = (clients || []).find((c) => c.id === a.clientId);
+    return svc ? getDuration(cli, svc, a.providerId) : 30;
+  };
+  // Earlier openings that FIT this appointment (same length, same barber — or any barber if the client
+  // opted in), strictly before their current time, within one of their chosen windows. Soonest first.
+  const findOpenings = (entry) => {
+    const a = (appts || []).find((x) => x.id === entry.apptId);
+    if (!a || !a.bookedFor) return [];
+    const durMin = apptDuration(a);
+    const curDt = new Date(a.bookedFor);
+    const others = (appts || []).filter((x) => x.id !== a.id); // exclude THIS appt so its own slot isn't "busy"
+    const cand = entry.anyProvider ? realProvs : realProvs.filter((p) => p.id === a.providerId);
+    const wins = (entry.dayTimes && Object.keys(entry.dayTimes).length) ? Object.values(entry.dayTimes) : [];
+    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+    const d0 = new Date(a.bookedFor); d0.setHours(0, 0, 0, 0);
+    const out = [];
+    cand.forEach((prov) => {
+      for (let day = new Date(t0); day <= d0; day.setDate(day.getDate() + 1)) {
+        const dd = new Date(day);
+        computeFreeSlots({ prov, date: dd, durMin, providers, appts: others, business, services }).forEach((slot) => {
+          const startMin = slot.start;
+          const slotDt = new Date(dd); slotDt.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
+          if (!(slotDt < curDt)) return; // must be genuinely earlier than where they are now
+          if (wins.length && !wins.some((w) => windowFits(w, startMin, startMin + durMin))) return;
+          out.push({ providerId: prov.id, providerName: prov.name, date: dd, start: startMin, durMin, best: slot.best });
+        });
+      }
+    });
+    out.sort((x, y) => { const dx = new Date(x.date); dx.setHours(Math.floor(x.start / 60), x.start % 60, 0, 0); const dy = new Date(y.date); dy.setHours(Math.floor(y.start / 60), y.start % 60, 0, 0); return dx - dy; });
+    return out.slice(0, 6);
+  };
+  // Move a booked client up to an earlier opening: reschedule their appointment (real duration
+  // preserved), clear the earlier-waitlist flag (which drops them off the list), optionally text them.
+  const moveUp = (entry, o) => {
+    const a = (appts || []).find((x) => x.id === entry.apptId);
+    if (!a || !setAppts) return;
+    const durMin = apptDuration(a);
+    const bf = new Date(o.date); bf.setHours(Math.floor(o.start / 60), o.start % 60, 0, 0);
+    setAppts((cur) => (cur || []).map((x) => x.id === a.id ? { ...x, start: o.start, end: o.start + durMin, bookedFor: bf.toISOString(), providerId: o.providerId || x.providerId, wantsEarlier: false, earlierDays: undefined, earlierDayTimes: undefined, earlierAnyProvider: undefined } : x));
+    setOpenId(null);
+    const who = (entry.name || "client").split(" ")[0];
+    if (moveNotify) { const ph = String(entry.phone || "").replace(/\D/g, ""); if (ph) { const msg = `Good news ${who}! We were able to move your ${entry.service} up to ${slotLabel(o)}. See you then!`; try { window.location.href = `sms:${ph}?&body=${encodeURIComponent(msg)}`; } catch (e) {} } }
+    if (showToast) showToast(`Moved ${who} up to ${slotLabel(o)} — off the waitlist.`);
+  };
+  // "Remove from waitlist" for a booked entry clears the flag on the appointment (keeps the appointment).
+  const clearBooked = (entry) => { if (!setAppts) return; setAppts((cur) => (cur || []).map((x) => x.id === entry.apptId ? { ...x, wantsEarlier: false, earlierDays: undefined, earlierDayTimes: undefined, earlierAnyProvider: undefined } : x)); setOpenId(null); };
+
   return (
     <>
     <div className="fade-up">
       <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 500, marginBottom: 6 }}>Waitlist</h2>
-      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 16, fontWeight: 300 }}>Clients hoping for an opening. Tap one to see their preferred time and notify them when a space frees up.</p>
+      <p style={{ color: "var(--sub)", fontSize: 14, marginBottom: 16, fontWeight: 300 }}>Clients hoping for an opening. Tap one to notify them when a space frees up — or, if they're already booked, to move them up.</p>
+      {earlierEntries.length > 0 && (
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", margin: "-4px 0 14px", fontSize: 12.5, color: "var(--sub)" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}><i style={{ width: 22, height: 14, borderRadius: 4, background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderLeft: "3px solid var(--gold)", display: "block" }} /> Booked · wants earlier</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}><i style={{ width: 22, height: 14, borderRadius: 4, background: "var(--panel2)", border: "1px solid var(--border)", display: "block" }} /> Open waitlist</span>
+        </div>
+      )}
       <button className="lift" onClick={() => setAdding(true)} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", border: "none", borderRadius: 12, padding: "11px 16px", fontSize: 14, fontWeight: 600, marginBottom: 20, cursor: "pointer" }}><UserPlus size={17} /> Add to waitlist</button>
-      {waitlist.length === 0 ? <div style={{ color: "var(--faint)", fontSize: 14, textAlign: "center", padding: "40px 0" }}>No one waiting right now. When a day's full, clients can hop on here — and you'll be the first to know.</div> : (
-        <div style={{ display: "grid", gap: 12 }}>{waitlist.map((w, i) => (
-          <button key={w.id || i} className="lift" onClick={() => setOpenId(w.id || i)} style={{ textAlign: "left", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 16, fontWeight: 500 }}>{w.name || "Client"}</div>
-              <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2 }}>{w.service}{w.provider ? ` · prefers ${w.provider}` : ""}</div>
-              {w.when && <div style={{ display: "inline-block", marginTop: 8, fontSize: 13.5, background: "rgba(176,141,87,0.12)", border: "1px solid rgba(176,141,87,0.3)", borderRadius: 20, padding: "4px 11px", color: "var(--gold)" }}>{whenLabel[w.when] || w.when}</div>}
-            </div>
-            <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
-          </button>
-        ))}</div>
+      {rows.length === 0 ? <div style={{ color: "var(--faint)", fontSize: 14, textAlign: "center", padding: "40px 0" }}>No one waiting right now. When a day's full, clients can hop on here — and booked clients hoping to get in sooner show up here too.</div> : (
+        <div style={{ display: "grid", gap: 12 }}>{rows.map((r, i) => { const key = rowKey(r, i);
+          if (r.booked) { const cur = r.currentBookedFor ? new Date(r.currentBookedFor) : null; const curLabel = cur ? `${relativeDate(cur)} · ${fmtTime(r.currentStart)}` : ""; return (
+            <button key={key} className="lift" onClick={() => setOpenId(key)} style={{ textAlign: "left", width: "100%", background: "color-mix(in srgb, var(--gold) 8%, var(--panel))", border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))", borderLeft: "4px solid var(--gold)", borderRadius: 12, padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, background: "var(--gold)", color: "var(--on-gold)", borderRadius: 6, padding: "3px 8px", marginBottom: 8 }}><ArrowUpRight size={11} /> Booked · wants earlier</span>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{r.name}</div>
+                <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2 }}>{r.service}{r.provider ? ` · ${r.provider}` : ""}</div>
+                {curLabel && <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--gold)", fontWeight: 500, marginTop: 7 }}><Clock size={13} /> Now {curLabel}</div>}
+              </div>
+              <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+            </button>
+          ); }
+          return (
+            <button key={key} className="lift" onClick={() => setOpenId(key)} style={{ textAlign: "left", width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{r.name || "Client"}</div>
+                <div style={{ fontSize: 14, color: "var(--sub)", marginTop: 2 }}>{r.service}{r.provider ? ` · prefers ${r.provider}` : ""}</div>
+                {r.when && <div style={{ display: "inline-block", marginTop: 8, fontSize: 13.5, background: "rgba(176,141,87,0.12)", border: "1px solid rgba(176,141,87,0.3)", borderRadius: 20, padding: "4px 11px", color: "var(--gold)" }}>{whenLabel[r.when] || r.when}</div>}
+              </div>
+              <ChevronRight size={20} style={{ color: "var(--faint)", flexShrink: 0 }} />
+            </button>
+          );
+        })}</div>
       )}
     </div>
 
@@ -19742,24 +19904,66 @@ function WaitlistView({ waitlist, setWaitlist, onText, onNotify, showToast, prov
             <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, maxHeight: "85vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 22, boxShadow: "0 18px 50px var(--shadow)" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
                 <div>
+                  {open.booked && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, background: "var(--gold)", color: "var(--on-gold)", borderRadius: 6, padding: "3px 8px", marginBottom: 9 }}><ArrowUpRight size={11} /> Booked · wants earlier</span>}
                   <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26 }}>{open.name || "Client"}</div>
                   <div style={{ fontSize: 14.5, color: "var(--sub)", marginTop: 2 }}><PhoneLink number={open.phone} /></div>
                 </div>
                 <button onClick={() => setOpenId(null)} style={{ background: "none", color: "var(--sub)" }}><X size={22} /></button>
               </div>
 
-              <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
-                {(() => { const allDays = (open.days && open.days.length > 0) ? open.days : (open.day ? [open.day] : []); if (!allDays.length) return null; const dt = open.dayTimes || {}; const winLbl = (w) => { const s = String(w || "any"); if (s.startsWith("custom:")) return s.slice(7) || "Custom"; return whenLabel[s] || "Any time"; }; return <div style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 15 }}><Clock size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} /><span style={{ color: "var(--sub)", flexShrink: 0 }}>Wants:</span> <span style={{ display: "grid", gap: 3 }}>{allDays.map((d) => <span key={d} style={{ fontWeight: 600 }}>{d} <span style={{ color: "var(--sub)", fontWeight: 400 }}>&middot; {winLbl(dt[d])}</span></span>)}</span></div>; })()}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><Sparkles size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Service:</span> <span style={{ fontWeight: 600 }}>{open.service}</span></div>
-                {open.provider && <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><User size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Prefers:</span> <span style={{ fontWeight: 600 }}>{open.provider}</span></div>}
-                {/* days + times are shown together in the "Wants" block above */}
-                {open.at && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 2 }}>Added {open.at}</div>}
-              </div>
+              {open.booked ? (() => {
+                const cur = open.currentBookedFor ? new Date(open.currentBookedFor) : null;
+                const openings = findOpenings(open);
+                const winLbl = (w) => { const s = String(w || "any"); if (s.startsWith("custom:")) return s.slice(7) || "Custom"; return whenLabel[s] || "Any time"; };
+                const wantsSummary = (open.days && open.days.length) ? open.days.map((d) => winLbl((open.dayTimes || {})[d])).filter((v, i, a) => a.indexOf(v) === i).join(", ") : "any earlier time";
+                const first = (open.name || "them").split(" ")[0];
+                return (
+                  <>
+                    <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><Calendar size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)", flexShrink: 0 }}>Now booked:</span> <span style={{ fontWeight: 600 }}>{cur ? `${relativeDate(cur)} · ${fmtTime(open.currentStart)}` : "—"}{open.provider ? ` · ${open.provider}` : ""}</span></div>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 15 }}><Clock size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} /><span style={{ color: "var(--sub)", flexShrink: 0 }}>Hoping for:</span> <span style={{ fontWeight: 600 }}>earlier · {wantsSummary}{open.anyProvider ? " · any barber" : ""}</span></div>
+                    </div>
 
-              <button className="lift" onClick={() => notifyOpening(open)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Bell size={17} /> Notify a space opened up</button>
-              <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.45, marginBottom: 16 }}>Texts + emails {(open.name || "the client").split(" ")[0]} that a spot opened, with a link to book — sent only when you tap.</p>
+                    <div style={{ fontSize: 13, color: "var(--faint)", letterSpacing: 1, textTransform: "uppercase", fontWeight: 600, marginBottom: 10 }}>Earlier openings that fit</div>
+                    {openings.length === 0 ? (
+                      <div style={{ background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 15px", fontSize: 14, color: "var(--sub)", lineHeight: 1.5, marginBottom: 14 }}>No earlier openings that fit right now — {first} stays on the list, and you can move them up the moment something frees.</div>
+                    ) : (
+                      <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+                        {openings.map((o, oi) => (
+                          <button key={oi} className="lift" onClick={() => moveUp(open, o)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%", textAlign: "left", borderRadius: 12, padding: "13px 15px", border: oi === 0 ? "1.5px solid var(--gold)" : "1px solid var(--border2)", background: oi === 0 ? "color-mix(in srgb, var(--gold) 8%, var(--panel))" : "var(--panel)", cursor: "pointer" }}>
+                            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>{oi === 0 && <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />}<span style={{ fontSize: 15, fontWeight: 500 }}>{slotLabel(o)}{open.anyProvider && o.providerName ? ` · ${o.providerName}` : ""}</span></span>
+                            <span style={{ fontSize: 12.5, color: oi === 0 ? "var(--gold)" : "var(--sub)", fontWeight: oi === 0 ? 600 : 400 }}>{oi === 0 ? (o.best ? "soonest · no wait" : "soonest") : (o.best ? "no wait" : "open")}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
 
-              <button onClick={() => removeEntry(open, waitlist.indexOf(open))} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Trash2 size={16} /> REMOVE FROM WAITLIST</button>
+                    {openings.length > 0 && (
+                      <button onClick={() => setMoveNotify((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", marginBottom: 14, cursor: "pointer" }}>
+                        <span style={{ textAlign: "left" }}><span style={{ fontSize: 14, fontWeight: 500, display: "block" }}>Text {first} the new time</span><span style={{ fontSize: 12.5, color: moveNotify ? "var(--gold)" : "var(--sub)", marginTop: 1 }}>{moveNotify ? "On — opens a text with their new time" : "Off — moves silently"}</span></span>
+                        <span style={{ width: 50, height: 29, borderRadius: 29, flexShrink: 0, position: "relative", background: moveNotify ? "var(--gold)" : "var(--border2)", transition: "background .2s" }}><span style={{ position: "absolute", top: 3, left: moveNotify ? 24 : 3, width: 23, height: 23, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.2)", transition: "left .2s" }} /></span>
+                      </button>
+                    )}
+                    <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.45, marginBottom: 16 }}>Moving {first} up reschedules their {open.service} to the new time and takes them off the waitlist.</p>
+
+                    <button onClick={() => clearBooked(open)} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer" }}><X size={16} /> TAKE OFF THE EARLIER LIST</button>
+                  </>
+                );
+              })() : (
+                <>
+                  <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
+                    {(() => { const allDays = (open.days && open.days.length > 0) ? open.days : (open.day ? [open.day] : []); if (!allDays.length) return null; const dt = open.dayTimes || {}; const winLbl = (w) => { const s = String(w || "any"); if (s.startsWith("custom:")) return s.slice(7) || "Custom"; return whenLabel[s] || "Any time"; }; return <div style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 15 }}><Clock size={17} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} /><span style={{ color: "var(--sub)", flexShrink: 0 }}>Wants:</span> <span style={{ display: "grid", gap: 3 }}>{allDays.map((d) => <span key={d} style={{ fontWeight: 600 }}>{d} <span style={{ color: "var(--sub)", fontWeight: 400 }}>&middot; {winLbl(dt[d])}</span></span>)}</span></div>; })()}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><Sparkles size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Service:</span> <span style={{ fontWeight: 600 }}>{open.service}</span></div>
+                    {open.provider && <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15 }}><User size={17} style={{ color: "var(--gold)", flexShrink: 0 }} /><span style={{ color: "var(--sub)" }}>Prefers:</span> <span style={{ fontWeight: 600 }}>{open.provider}</span></div>}
+                    {open.at && <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 2 }}>Added {open.at}</div>}
+                  </div>
+
+                  <button className="lift" onClick={() => notifyOpening(open)} style={{ width: "100%", background: "var(--gold)", color: "var(--on-gold)", padding: 15, fontSize: 15, fontWeight: 600, borderRadius: 12, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}><Bell size={17} /> Notify a space opened up</button>
+                  <p style={{ fontSize: 13, color: "var(--faint)", textAlign: "center", lineHeight: 1.45, marginBottom: 16 }}>Texts + emails {(open.name || "the client").split(" ")[0]} that a spot opened, with a link to book — sent only when you tap.</p>
+
+                  <button onClick={() => removeEntry(open, waitlist.indexOf(open))} style={{ width: "100%", background: "transparent", border: "1px solid var(--border)", color: "var(--sub)", padding: 12, fontSize: 14, letterSpacing: 1, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><Trash2 size={16} /> REMOVE FROM WAITLIST</button>
+                </>
+              )}
             </div>
         </div>
       )}
@@ -20810,27 +21014,12 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
     showToast(msg);
     setWaitlistMatch(null);
   };
-  // Earlier-slot alerts: booked clients who opted into "tell me if something opens sooner."
-  // Match the freed slot to confirmed appointments (same barber) that sit LATER than the freed time.
-  const findEarlierAlerts = (freed) => {
-    if (!freed || !freed.bookedFor) return [];
-    const freedAt = new Date(freed.bookedFor);
-    if (isNaN(freedAt)) return [];
-    return (appts || []).filter((a) =>
-      a.wantsEarlier === true
-      && a.status === "confirmed"
-      && a.id !== freed.id
-      && a.providerId === freed.providerId
-      && a.bookedFor && new Date(a.bookedFor) > freedAt        // their appointment is later than the slot that just opened
-    ).map((a) => {
-      const prov = providers.find((p) => p.id === a.providerId);
-      return { id: "ea-" + a.id, name: a.name || "Client", service: a.title || "appointment", provider: prov?.name, earlierApptId: a.id };
-    });
-  };
+  // Booked clients who want an earlier time are handled on the WAITLIST page now (tap them → move
+  // their real appointment up), not offered a "book this link" here — so the freed-slot offer flow
+  // covers open-waitlist clients only. (Was: findEarlierAlerts injected booked clients into the offer.)
   const handleFreedSlot = (freed) => {
     if (!freed || freed.status === "done" || freed.status === "block") return;
-    // Earlier-alert clients (already booked, want to move up) sort ABOVE the waitlist.
-    const matches = [...findEarlierAlerts(freed), ...findWaitlistMatches(freed)];
+    const matches = findWaitlistMatches(freed);
     if (!matches.length) return;
     const alreadyOpen = (openings || []).some((o) => o.apptId === freed.id);
     const opening = { id: "op" + freed.id, apptId: freed.id, providerId: freed.providerId, bookedFor: freed.bookedFor, start: freed.start, end: freed.end, offered: [] };
@@ -21253,14 +21442,14 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
   const selectedDate = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(0, 0, 0, 0); return d; }, [dayOffset]);
   const sameDay = (iso, refDate) => { if (!iso) return false; const a = new Date(iso); return a.getFullYear() === refDate.getFullYear() && a.getMonth() === refDate.getMonth() && a.getDate() === refDate.getDate(); };
 
-  // Openings still genuinely free (not re-booked) + who fits each. Booked "notify me if earlier"
-  // clients sort ABOVE waitlist folks — they're already committed, so moving one up fills this slot
-  // AND frees theirs. Filled slots and already-offered people drop off on their own.
+  // Openings still genuinely free (not re-booked) + which open-waitlist clients fit each. (Booked
+  // clients hoping to get in sooner are handled on the Waitlist page's move-up, not offered here.)
+  // Filled slots and already-offered people drop off on their own.
   const liveOpenings = (openings || []).map((o) => {
     const filled = (appts || []).some((a) => a.id !== o.apptId && a.providerId === o.providerId && a.status !== "cancelled" && a.status !== "block" && a.bookedFor && sameDay(a.bookedFor, new Date(o.bookedFor)) && a.start === o.start);
     if (filled) return null;
     const freed = { id: o.apptId, providerId: o.providerId, bookedFor: o.bookedFor, start: o.start, end: o.end };
-    const people = [...findEarlierAlerts(freed), ...findWaitlistMatches(freed)].filter((p) => !(o.offered || []).includes(p.id));
+    const people = findWaitlistMatches(freed).filter((p) => !(o.offered || []).includes(p.id));
     return people.length ? { ...o, people } : null;
   }).filter(Boolean);
   const hasOpeningMatches = liveOpenings.length > 0;
@@ -21389,7 +21578,7 @@ function CalendarView({ appts, setAppts, clients, setClients, providers, setProv
                 <p style={{ fontSize: 13, color: "var(--faint)", lineHeight: 1.45, marginTop: 10 }}>Booked clients who asked for an earlier time show first. Each offer is a text + email with a booking link — sent only when you tap. Nothing goes out on its own.</p>
               </div>
             )}
-            <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={(p) => showToast && showToast(`Texting ${p.name || "client"}…`)} onNotify={(w) => sendOpeningOffer(w, null)} showToast={showToast} providers={providers} services={services} />
+            <WaitlistView waitlist={waitlist} setWaitlist={setWaitlist} onText={(p) => showToast && showToast(`Texting ${p.name || "client"}…`)} onNotify={(w) => sendOpeningOffer(w, null)} showToast={showToast} providers={providers} services={services} appts={appts} setAppts={setAppts} clients={clients} business={business} />
           </div>
         </div>
       )}
@@ -24575,16 +24764,36 @@ function AppointmentSheet({ appt, appts, providers, clients, setClients, service
                 </div>
               )}
 
-              {/* FLEXIBILITY — earlier-slot opt-in (above Booking Details, per Dan) */}
+              {/* FLEXIBILITY — earlier-time waitlist opt-in (above Booking Details, per Dan). When on, the
+                  client shows on the Waitlist as "booked · wants earlier" so staff can move them up. */}
               {appt.status === "confirmed" && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: T.text }}>Notify if an earlier slot opens</div>
-                    <div style={{ fontSize: 14, color: T.sub, marginTop: 3, lineHeight: 1.4 }}>If a sooner spot frees up with {provider.name}, {((appt.name || "they").split(" ")[0])} gets first dibs.</div>
+                <div style={{ padding: "16px 18px", borderBottom: `1px solid ${T.line}` }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: T.text }}>Waitlist for an earlier time</div>
+                      <div style={{ fontSize: 14, color: T.sub, marginTop: 3, lineHeight: 1.4 }}>{((appt.name || "They").split(" ")[0])} keeps this appointment — they'll show on the waitlist so you can move them up when a sooner slot opens{provider && provider.name ? ` with ${provider.name}` : ""}.</div>
+                    </div>
+                    <button onClick={() => onUpdate(appt.id, { wantsEarlier: !appt.wantsEarlier })} aria-label={appt.wantsEarlier ? "On" : "Off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: appt.wantsEarlier ? T.accent : T.line, position: "relative", cursor: "pointer", transition: "background .2s" }}>
+                      <span style={{ position: "absolute", top: 3, left: appt.wantsEarlier ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
+                    </button>
                   </div>
-                  <button onClick={() => onUpdate(appt.id, { wantsEarlier: !appt.wantsEarlier })} aria-label={appt.wantsEarlier ? "On" : "Off"} style={{ width: 52, height: 30, borderRadius: 30, border: "none", flexShrink: 0, background: appt.wantsEarlier ? T.accent : T.line, position: "relative", cursor: "pointer", transition: "background .2s" }}>
-                    <span style={{ position: "absolute", top: 3, left: appt.wantsEarlier ? 25 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }} />
-                  </button>
+                  {appt.wantsEarlier && (() => {
+                    const s0 = new Date(appt.bookedFor); s0.setHours(0, 0, 0, 0);
+                    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+                    const opts = []; for (let d = new Date(t0); d <= s0; d.setDate(d.getDate() + 1)) opts.push(new Date(d));
+                    const realProv = (providers || []).filter((p) => p.id !== "anyone" && p.isProvider !== false && !p.archived);
+                    return (
+                      <div style={{ marginTop: 14 }}>
+                        <EarlierWaitlistPicker
+                          dayOptions={opts}
+                          value={{ days: appt.earlierDays || [], dayTimes: appt.earlierDayTimes || {}, anyProvider: !!appt.earlierAnyProvider }}
+                          onChange={(next) => onUpdate(appt.id, { earlierDays: next.days, earlierDayTimes: next.dayTimes, earlierAnyProvider: next.anyProvider })}
+                          providerName={provider && provider.name}
+                          showAnyProvider={realProv.length > 1}
+                        />
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
