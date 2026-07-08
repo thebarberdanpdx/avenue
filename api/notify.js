@@ -50,6 +50,44 @@ async function handler(req, res) {
     if (!ok) return res.status(429).json({ error: "Too many requests. Please try again shortly." });
   }
 
+  // ---- System/downtime alert to the shop owner (or a named provider). Used by the
+  //      external uptime watchdog. Resolves the recipient SERVER-SIDE from the providers
+  //      table (like the staff path) so the caller never needs the owner's contact info,
+  //      and sends a CLEAN custom subject/message (not the booking template). Reaches only
+  //      on-file staff of the named shop; rate-limited by the gate above. This is an
+  //      operational alert to shop staff, NOT a client marketing message.
+  if (b.alert && b.alert.shopId) {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({ error: "alerts not configured" });
+    }
+    const subject = String(b.subject || "Vero system alert").slice(0, 140);
+    const message = String(b.message || b.template || "").slice(0, 600);
+    if (!message) return res.status(400).json({ error: "nothing to send" });
+    const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const { data: rows, error } = await supa.from("providers").select("data").eq("shop_id", b.alert.shopId);
+    if (error) return res.status(500).json({ error: "staff lookup: " + error.message });
+    const provs = (rows || []).map((r) => r.data)
+      .filter((p) => p && p.id && p.id !== "anyone" && p.isProvider !== false && !p.archived);
+    const owner = provs.find((p) => p.pulseRole === "owner");
+    const target = b.alert.providerId ? provs.find((p) => p.id === b.alert.providerId) : null;
+    const recip = [target || owner].filter(Boolean);
+    if (!recip.length) return res.status(404).json({ error: "no owner/provider on file for this shop" });
+    // SMS: one clean line (no "New booking" prefix). GSM-sanitized centrally in sendSms.
+    const smsText = `${subject} — ${message}`.replace(/\s+/g, " ").trim().slice(0, 300);
+    const sent = [];
+    for (const p of recip) {
+      const pEmail = String(p.email || "").trim();
+      const pPhone = String(p.phone || "").replace(/\D/g, "");
+      const r = { id: p.id };
+      try { if (pEmail) { await sendEmail({ to: pEmail, subject, text: message }); r.email = "sent"; } else r.email = "no-email"; }
+      catch (e) { r.email = "error: " + e.message; }
+      try { if (SMS_LIVE && pPhone) { await sendSms({ to: pPhone, text: smsText }); r.sms = "sent"; } else r.sms = SMS_LIVE ? "no-phone" : "sms-off"; }
+      catch (e) { r.sms = "error: " + e.message; }
+      sent.push(r);
+    }
+    return res.status(200).json({ ok: true, alert: true, smsLive: SMS_LIVE, sent });
+  }
+
   // ---- Staff booking alert: notify the barber an appointment is for, at the email/phone
   //      saved in their staff profile. Recipients are resolved SERVER-SIDE with the service
   //      role so a public (anonymous) booker never receives staff contact info. The owner

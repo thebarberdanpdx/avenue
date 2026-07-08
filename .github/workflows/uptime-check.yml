@@ -1,27 +1,18 @@
 # Vero uptime watchdog — Stage 2 of the outage-resilience work.
 #
-# WHY THIS LIVES ON GITHUB, NOT IN THE APP: an alarm has to run OUTSIDE the thing
-# it watches, or it dies in the same outage. This runs on GitHub's infrastructure
-# and checks Vero from the outside every 5 minutes:
-#   1. the website  (gotvero.com)
-#   2. the database (Supabase) — the exact thing that went dark on 2026-07-08; a
-#      plain site ping wouldn't catch it because the site returns 200 even when
-#      the database is down, so we hit the DB directly.
-# If either is DOWN, the step fails → the workflow fails → GitHub emails the repo
-# owner automatically (no app code, no third-party account, no secrets). Because
-# the alert path is GitHub's own email, it still fires even if BOTH the site and
-# the database are down at once — no blind spot.
+# Runs on GitHub's infrastructure (OUTSIDE the app, so it survives the app's own
+# outage) every 5 minutes. It checks the website AND the database directly — the
+# site returns 200 even when the database is down, which is exactly the failure a
+# plain ping would miss (2026-07-08).
 #
-# EMAIL ONLY (by choice): alerts go to the GitHub-account email of the repo owner.
-# Make sure GitHub → Settings → Notifications → "Actions" email is ON (it is by
-# default). Texts are intentionally not wired here; add SMS later once the Vonage
-# number is verified.
+# On a NEW outage it alerts the owner with a clean "Vero is DOWN" email + text
+# through the app's own messaging system (the channel proven to reach Dan). It
+# alerts ONCE per outage (reads this workflow's own run history), so a long
+# outage doesn't text every 5 minutes. See scripts/uptime-watch.py for the logic.
 #
-# The public anon key in the DB URL below is the same one shipped in the app
-# bundle — it is safe to commit. It grants no more than any visitor already has.
-#
-# NOTE: scheduled workflows run from the DEFAULT branch and can be delayed by
-# GitHub under load; ~5-minute checks are best-effort, which is fine for uptime.
+# The run also exits non-zero when down, so GitHub logs it and its built-in
+# failure email fires as a BACKUP — critical because if the whole SITE is down,
+# the /api/notify alert can't send (same host) and GitHub email is all that's left.
 name: Vero is DOWN (uptime alarm)
 
 on:
@@ -30,30 +21,29 @@ on:
   workflow_dispatch:
     inputs:
       test_alert:
-        description: "Type 'yes' to force a DELIBERATE test failure — use once to confirm the down-alert email reaches you. Nothing is actually wrong."
+        description: "Type 'yes' to send yourself a TEST downtime alert (email + text). Nothing is wrong."
         required: false
         default: "no"
 
-# One run at a time; don't pile up if a check is slow or GitHub bunches schedules.
+# Serialize runs so 'previous run conclusion' (the de-dupe signal) is never racy.
 concurrency:
   group: uptime-check
   cancel-in-progress: false
+
+# Least privilege: the watchdog only needs to READ its own run history for de-dupe.
+permissions:
+  actions: read
+  contents: read
 
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the probe script
+      - name: Check out the watchdog script
         uses: actions/checkout@v4
 
-      - name: Test alert (manual only — proves the email reaches you)
-        if: ${{ github.event.inputs.test_alert == 'yes' }}
-        run: |
-          echo "::error::TEST ALERT — this is a deliberate failure to confirm Vero downtime emails reach you. Nothing is actually wrong; ignore this one."
-          exit 1
-
-      - name: Website (gotvero.com) is reachable
-        run: bash scripts/uptime-probe.sh "https://gotvero.com" "200" "Vero website (gotvero.com)"
-
-      - name: Database (Supabase) is reachable
-        run: bash scripts/uptime-probe.sh "https://iufgznminbujcabqeesk.supabase.co/rest/v1/services?select=id&limit=1&shop_id=eq.sanctuary&apikey=sb_publishable_aGX3akW7VfHO6Lm-FsZmEA_sf95Nu2i" "200" "Vero database (Supabase)"
+      - name: Check site + database, alert once on a new outage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TEST_ALERT: ${{ github.event.inputs.test_alert }}
+        run: python3 scripts/uptime-watch.py
